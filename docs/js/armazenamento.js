@@ -214,6 +214,11 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
   }
   const novos = normalizar(JSON.parse(await banco.async('string')));
   if (novos.formato !== 'imoveis-v1') throw new Error('O ZIP não é uma exportação deste sistema.');
+  if (!novos.usuarios.length && dadosAtuais) {
+    // ZIP montado fora do sistema (ex.: dados de uma planilha): mantém os usuários desta pasta.
+    novos.usuarios = dadosAtuais.usuarios;
+    novos.seq.usuarios = dadosAtuais.seq.usuarios;
+  }
   if (dadosAtuais) {
     const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
     const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
