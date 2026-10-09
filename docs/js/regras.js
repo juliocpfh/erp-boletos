@@ -512,17 +512,21 @@ function alertaAplicacao(d, c) {
 
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
   const datas = correcoesDo(d, contrato.id).map((c) => c.data_vigencia);
-  const seguros = segurosDoImovel(d, contrato.imovel_id);
   return [
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     alertas.alertaCorrecao(dataBaseCorrecao(contrato), hoje, datas),
     alertaCaucao(d, contrato),
-    alertas.alertaSeguro(dataBaseCorrecao(contrato), hoje, seguros),
     alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     temFiador(contrato) && !fiadoresDo(d, contrato.id).length ? { nivel: 'aviso', tipo: 'Fiador', texto: 'Garantia por fiador, mas nenhum fiador cadastrado.' } : null,
     alertaAplicacao(d, contrato),
   ].filter(Boolean);
+}
+
+/** Seguro obrigatório é do imóvel: só cobra apólice enquanto houver inquilino ativo nele. */
+export function alertaSeguroImovel(d, i, hoje = C.hojeIso()) {
+  const atual = d.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))[0];
+  return atual ? alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoImovel(d, i.id)) : null;
 }
 
 export function todosAlertas(d, hoje = C.hojeIso()) {
@@ -536,6 +540,8 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     }
   }
   for (const i of d.imoveis) {
+    const a = alertaSeguroImovel(d, i, hoje);
+    if (a) lista.push({ ...a, imovel_id: i.id, imovel: i.nome, inquilino: '' });
     if (i.verificar) lista.push({ nivel: 'aviso', tipo: 'A verificar', texto: i.verificar, imovel_id: i.id, imovel: i.nome, inquilino: '' });
   }
   return lista.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
