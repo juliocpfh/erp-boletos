@@ -8,7 +8,7 @@ export const TABELAS = {
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Cobrança', recebimentos: 'Recebimento Airbnb',
   faturas: 'Fatura', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
-  renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
+  renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
   arquivos: 'Arquivo', banco: 'Banco de dados',
 };
 
@@ -486,14 +486,49 @@ export function calcularEncerramento(garantia, indicePercentual, debitos) {
   return { garantia_corrigida: corrigida, saldo: corrigida - (debitos || 0) };
 }
 
+// --------------------------------------------------------------------------
+// Leitura dos relógios (água, energia, gás)
+// --------------------------------------------------------------------------
+const RELOGIOS = [['agua', 'água'], ['energia', 'energia'], ['gas', 'gás']];
+
+/** Tira de `dados` os campos leitura_agua/energia/gas e devolve { agua, energia, gas }, ou null se vierem vazios. */
+export function separarLeitura(dados) {
+  const v = {};
+  for (const [k] of RELOGIOS) {
+    v[k] = dados[`leitura_${k}`] || '';
+    delete dados[`leitura_${k}`];
+  }
+  return RELOGIOS.some(([k]) => v[k]) ? v : null;
+}
+
+export const textoLeitura = (l) => RELOGIOS.filter(([k]) => l[k]).map(([k, t]) => `${t} ${l[k]}`).join(' · ');
+
+export function registrarLeitura(d, dados, usuario) {
+  return inserir(d, 'leituras', dados, usuario, `${dados.momento}: ${textoLeitura(dados)}`);
+}
+
+const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+export const leiturasDoImovel = (d, imovelId) => d.leituras.filter((l) => l.imovel_id === imovelId).sort(porData);
+export const leiturasDo = (d, contratoId) => d.leituras.filter((l) => l.contrato_id === contratoId).sort(porData);
+
+/** Novo inquilino: grava o contrato e, se informada, a leitura dos relógios na entrada. */
+export function novoContrato(d, dados, usuario, descricao) {
+  const leitura = separarLeitura(dados);
+  const c = inserir(d, 'contratos', dados, usuario, descricao);
+  if (leitura) registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data: c.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
+  return c;
+}
+
 export function encerrarContrato(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
+  const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
   if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
   const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
     `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
   atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
+  if (leitura) registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data: dados.data_saida, momento: 'Saída do inquilino', ...leitura, observacoes: '' }, usuario);
   return r;
 }
 

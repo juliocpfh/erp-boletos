@@ -257,3 +257,18 @@ test('troca de garantia e de fiador ficam no histórico', () => {
   R.trocarGarantia(d, c.id, { data: '2026-07-01', garantia_tipo: 'Caução', caucao_valor: 700000, caucao_data: '2026-07-01' }, 'julio');
   assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 700000);
 });
+
+test('leitura dos relógios na entrada e na saída fica no histórico do imóvel', () => {
+  const d = R.bancoVazio();
+  const c = R.novoContrato(d, { imovel_id: 5, inquilino_nome: 'X', data_entrada: '2026-02-01', aluguel_inicial: 100000,
+    leitura_agua: '0123', leitura_energia: '45678', leitura_gas: '' }, 'julio');
+  assert.equal(c.leitura_agua, undefined);
+  R.encerrarContrato(d, c.id, { data_saida: '2026-09-30', leitura_agua: '0456', leitura_energia: '', leitura_gas: '' }, 'julio');
+  assert.equal(d.encerramentos[0].leitura_agua, undefined);
+  assert.deepEqual(R.leiturasDoImovel(d, 5).map((l) => [l.momento, l.data, l.agua, l.energia]),
+    [['Saída do inquilino', '2026-09-30', '0456', ''], ['Entrada do inquilino', '2026-02-01', '0123', '45678']]);
+  assert.equal(R.textoLeitura(d.leituras[0]), 'água 0123 · energia 45678');
+  // sem leitura informada, nada é gravado
+  R.novoContrato(d, { imovel_id: 6, inquilino_nome: 'Y', data_entrada: '2026-03-01', leitura_agua: '' }, 'julio');
+  assert.equal(d.leituras.length, 2);
+});

@@ -17,6 +17,11 @@ export const IMOVEL = [
   campo('cidade', 'Cidade (município)'),
   campo('cep', 'CEP'),
   campo('grupo_id', 'Faz parte do grupo Airbnb', 'opcao', { opcoes: [], ajuda: 'Deixe em branco se não é Airbnb' }),
+  secao('Área e energia'),
+  campo('area_util', 'Área útil (m²)', 'pct'),
+  campo('area_total', 'Área total (m²)', 'pct'),
+  campo('energia_ligada', 'Energia ligada', 'opcao', { opcoes: ['Sim', 'Não'] }),
+  campo('energia_tipo', 'Tipo de ligação da energia', 'opcao', { opcoes: ['Monofásica', 'Bifásica', 'Trifásica'] }),
   secao('Registros'),
   campo('matricula', 'Matrícula'),
   campo('cartorio', 'Cartório de registro'),
@@ -46,6 +51,19 @@ export const GRUPO_AIRBNB = [
   campo('cliente_telefone', 'Telefone do cliente', 'tel'),
   campo('cliente_endereco', 'Endereço do cliente', 'texto', { largo: true, ajuda: 'Em branco: usa o endereço da unidade' }),
   secao('Observações'),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+/** Contas do imóvel e quem paga cada uma, conforme o contrato. */
+export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_condominio', 'Condomínio'], ['conta_internet', 'Internet / TV']];
+export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+/** Relógios lidos na entrada e na saída do inquilino. */
+export const LEITURAS = [['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás']];
+
+export const LEITURA = [
+  campo('data', 'Data da leitura', 'data', { obrig: true }),
+  campo('momento', 'Momento', 'opcao', { obrig: true, padrao: 'Entrada do inquilino', opcoes: ['Entrada do inquilino', 'Saída do inquilino', 'Outra'] }),
+  ...LEITURAS.map(([nome, rotulo]) => campo(nome, rotulo)),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -85,7 +103,13 @@ export const CONTRATO = [
   campo('taxa_boleto', 'Taxa de emissão do boleto (R$)', 'dinheiro'),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
-  campo('cobrar_iptu', 'Cobrar IPTU do inquilino', 'simnao', { padrao: true }),
+  secao('O que está incluso no contrato'),
+  campo('cobrar_iptu', 'IPTU cobrado do inquilino (entra no boleto)', 'simnao', { padrao: true }),
+  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA })),
+  campo('contas_adicionais', 'Contas ou cobranças adicionais previstas no contrato', 'area', { ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
+  { ...secao('Leitura dos relógios na entrada'), soNovo: true },
+  ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { soNovo: true,
+    ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'],
     ajuda: 'Os fiadores são cadastrados na página do inquilino depois de salvar' }),
@@ -199,6 +223,7 @@ export const RENOVACAO = [
 
 export const ENCERRAMENTO = [
   campo('data_saida', 'Data de saída', 'data', { obrig: true }),
+  ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct'),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
