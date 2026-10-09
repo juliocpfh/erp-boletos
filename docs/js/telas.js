@@ -330,6 +330,7 @@ function telaImovel(i) {
         <td>${R.contratoAtivo(c, hoje) ? etiqueta('Atual', 'ok') : etiqueta('Encerrado', 'neutra')} ${c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
     </table></div><p class="suave">Desmarque "Ativo" para não gerar cobrança para o inquilino.</p></div>
     ${caixaEmpresas(i)}
+    ${caixaSeguros(i)}
     <div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, 'Lançar IPTU do ano') : ''}</div>
       ${iptus.map((p) => { const ps = p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : C.parcelas(p.valor_total, p.num_parcelas); return `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s) ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
         <div class="rolagem"><table><tr>${ps.map((_, n) => `<th class="n">${n + 1}ª · ${compBr(C.somarMeses(p.primeira_competencia, n))}</th>`).join('')}</tr><tr>${ps.map((v) => `<td class="n">${reais(v)}</td>`).join('')}</tr></table></div>`; }).join('') || '<p class="suave">Nenhum IPTU lançado.</p>'}</div>
@@ -438,6 +439,17 @@ function caixaSaida(c) {
     ${podeUsuario('admin') ? botao('excluir', 'Desfazer registro da saída', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo de saída? A data de saída do contrato continua preenchida.') : ''}</div>`;
 }
 
+/** Seguro obrigatório: fica no imóvel e é cobrado do inquilino que estiver nele no mês da parcela. */
+function caixaSeguros(i) {
+  if (!i) return '';
+  const seguros = R.segurosDoImovel(d(), i.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório do imóvel ${esc(i.nome)}</h2>${opera() ? link(`#/novo/seguros?imovel=${i.id}`, 'Cadastrar apólice') : ''}</div>
+    <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
+      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span></td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
+        <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
+    <p class="suave">As parcelas entram na cobrança do inquilino que estiver no imóvel no mês de cada parcela.</p></div>`;
+}
+
 function telaContrato(c) {
   const i = buscar('imoveis', c.imovel_id);
   const hoje = C.hojeIso();
@@ -446,7 +458,6 @@ function telaContrato(c) {
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
   const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => a.tipo !== 'A verificar') : [];
   const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
-  const seguros = d().seguros.filter((s) => s.contrato_id === c.id).sort((a, b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
   const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
   const cadeia = R.cadeiaDeContratos(d(), c);
   const tel = (c.inquilino_telefone || '').replace(/\D/g, '');
@@ -487,17 +498,14 @@ function telaContrato(c) {
       <table><tr><th>Data</th><th>O que aconteceu</th><th>Novo término</th><th class="n">Novo valor</th><th>Obs.</th></tr>
       ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td></tr>`).join('')
       || '<tr><td colspan="5" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
-    <div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
-      <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
-      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span></td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
-        <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div></div>
+    ${caixaSeguros(i)}
     <div class="cartao"><h2>Cobranças</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
       ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a></td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : '-'}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhuma cobrança gerada ainda. Gere na tela "Cobranças".</td></tr>'}</table></div></div>
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaSaida(c)}
-    ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', 'Contrato, vistoria de entrada e saída, apólices, notificações, documento de identificação etc.')}
+    ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', 'Ficha cadastral, documentos iniciais, contrato, vistoria de entrada e saída, notificações, documento de identificação etc.')}
     <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
 }
 
@@ -593,10 +601,10 @@ const CADASTROS = {
     },
   },
   seguros: {
-    titulo: (r, q) => `Seguro obrigatório - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    titulo: (r, q) => `Seguro obrigatório - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
     campos: () => F.SEGURO,
-    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
-    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
+    fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
+    voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
     descricao: () => 'Seguro obrigatório',
   },
   iptus: {
@@ -789,6 +797,13 @@ function telaFormulario(tabela, registro, q, estado) {
 // --------------------------------------------------------------------------
 // Cobranças do mês
 // --------------------------------------------------------------------------
+/** Taxa do boleto usada pela maioria dos inquilinos ativos (sugestão do campo "para todos"). */
+function taxaMaisComum() {
+  const cont = new Map();
+  for (const c of d().contratos) if (R.contratoAtivo(c, C.hojeIso())) cont.set(c.taxa_boleto || 0, (cont.get(c.taxa_boleto || 0) || 0) + 1);
+  return [...cont].sort((a, b) => b[1] - a[1])[0]?.[0] || 0;
+}
+
 function telaCobrancas(comp) {
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
@@ -804,6 +819,11 @@ function telaCobrancas(comp) {
       <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as faturas: a numeração segue a ordem das datas de pagamento.</p>
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem cobrança neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar cobranças de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
+    ${opera() ? `<form data-form="taxaBoleto" data-comp="${comp}" class="cartao acoes" style="align-items:center">
+      <label for="taxa_todos"><b>Taxa de emissão do boleto para todos</b></label>
+      <input id="taxa_todos" name="valor" inputmode="decimal" value="${esc(C.reais(taxaMaisComum(), false))}" style="width:120px">
+      <button class="secundario">Aplicar a todos</button>
+      <span class="suave">Vale para todos os inquilinos ativos e para as cobranças ainda não pagas de ${compBr(comp)}.</span></form>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de fatura. ${botao('numerar', 'Numerar faturas agora', {}, 'pequeno')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
@@ -986,7 +1006,7 @@ function telaIptu(ano) {
     const ant = doAno(i, ano - 1);
     const varia = p && ant && ant.valor_total ? ((p.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace('.', ',') : null;
     const acao = !opera() ? '' : p ? link(`#/editar/iptus/${p.id}?de=iptu`, 'Editar') : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno');
-    return `<tr class="${p ? '' : 'amarelo'}"><td><a href="#/imovel/${i.id}#iptu">${esc(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
+    return `<tr class="${p ? '' : 'amarelo'}"><td><a href="#/imovel/${i.id}">${esc(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
       <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p ? compBr(p.primeira_competencia) : '-'}</td><td class="n">${acao}</td></tr>`;
   }).join('');
   const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
@@ -1157,6 +1177,13 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  async taxaBoleto(form) {
+    const valor = C.centavos(String(new FormData(form).get('valor') || '0'));
+    const r = await alterar((db) => R.aplicarTaxaBoleto(db, valor, form.dataset.comp, login()));
+    aviso(`Taxa do boleto de ${reais(valor)} aplicada: ${r.contratos} inquilino(s) alterado(s) e ${r.cobrancas} cobrança(s) em aberto de ${compBr(form.dataset.comp)} atualizada(s).`);
+    await mostrar();
+    return null;
+  },
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
   buscaInquilinos(form) {
@@ -1260,9 +1287,11 @@ export const ACOES = {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
-      if (tabela === 'imoveis') db.participacoes.filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, 'participacoes', p.id, login()));
+      if (tabela === 'imoveis') {
+        for (const t of ['participacoes', 'seguros']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
+      }
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'seguros', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || null);
     });
