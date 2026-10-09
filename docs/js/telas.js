@@ -789,6 +789,13 @@ function telaFormulario(tabela, registro, q, estado) {
 // --------------------------------------------------------------------------
 // Cobranças do mês
 // --------------------------------------------------------------------------
+/** Taxa do boleto usada pela maioria dos inquilinos ativos (sugestão do campo "para todos"). */
+function taxaMaisComum() {
+  const cont = new Map();
+  for (const c of d().contratos) if (R.contratoAtivo(c, C.hojeIso())) cont.set(c.taxa_boleto || 0, (cont.get(c.taxa_boleto || 0) || 0) + 1);
+  return [...cont].sort((a, b) => b[1] - a[1])[0]?.[0] || 0;
+}
+
 function telaCobrancas(comp) {
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
@@ -804,6 +811,11 @@ function telaCobrancas(comp) {
       <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as faturas: a numeração segue a ordem das datas de pagamento.</p>
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem cobrança neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar cobranças de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
+    ${opera() ? `<form data-form="taxaBoleto" data-comp="${comp}" class="cartao acoes" style="align-items:center">
+      <label for="taxa_todos"><b>Taxa de emissão do boleto para todos</b></label>
+      <input id="taxa_todos" name="valor" inputmode="decimal" value="${esc(C.reais(taxaMaisComum(), false))}" style="width:120px">
+      <button class="secundario">Aplicar a todos</button>
+      <span class="suave">Vale para todos os inquilinos ativos e para as cobranças ainda não pagas de ${compBr(comp)}.</span></form>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de fatura. ${botao('numerar', 'Numerar faturas agora', {}, 'pequeno')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
@@ -1157,6 +1169,13 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  async taxaBoleto(form) {
+    const valor = C.centavos(String(new FormData(form).get('valor') || '0'));
+    const r = await alterar((db) => R.aplicarTaxaBoleto(db, valor, form.dataset.comp, login()));
+    aviso(`Taxa do boleto de ${reais(valor)} aplicada: ${r.contratos} inquilino(s) alterado(s) e ${r.cobrancas} cobrança(s) em aberto de ${compBr(form.dataset.comp)} atualizada(s).`);
+    await mostrar();
+    return null;
+  },
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
   buscaInquilinos(form) {

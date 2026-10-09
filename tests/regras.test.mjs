@@ -204,3 +204,16 @@ test('inquilino sem imóvel ou inativo não gera cobrança', () => {
   assert.deepEqual(R.gerarCobrancas(d, '2026-07', 'julio'), { geradas: 0, existentes: 0 });
   assert.equal(R.contratoAtivo(R.buscar(d, 'contratos', c.id), '2026-07-01'), false);
 });
+
+test('taxa do boleto para todos: inquilinos ativos e cobranças em aberto do mês', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const jul = d.cobrancas.find((x) => x.competencia === '2026-07');
+  R.registrarPagamento(d, jul.id, '2026-08-10', null, 'julio');
+  const r = R.aplicarTaxaBoleto(d, 850, '2026-08', 'julio', '2026-08-01');
+  assert.deepEqual(r, { contratos: 1, cobrancas: 1 });
+  assert.equal(R.buscar(d, 'contratos', c.id).taxa_boleto, 850);
+  assert.equal(d.cobrancas.find((x) => x.competencia === '2026-08').taxa_boleto, 850);
+  assert.equal(R.buscar(d, 'cobrancas', jul.id).taxa_boleto, 350);
+});

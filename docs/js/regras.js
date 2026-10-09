@@ -240,6 +240,24 @@ export function gerarCobrancas(d, comp, usuario) {
 
 export const totais = (cb) => C.totaisCobranca(cb, cb.reserva_utilizada || 0);
 
+/** Mesma taxa de emissão do boleto para todos os inquilinos ativos e para as cobranças ainda não pagas do mês. */
+export function aplicarTaxaBoleto(d, valor, comp, usuario, hoje = C.hojeIso()) {
+  if (!Number.isInteger(valor) || valor < 0) throw new Error('Informe um valor válido para a taxa do boleto.');
+  let contratos = 0;
+  let cobrancas = 0;
+  for (const c of d.contratos) {
+    if (!contratoAtivo(c, hoje) || (c.taxa_boleto || 0) === valor) continue;
+    atualizar(d, 'contratos', c.id, { taxa_boleto: valor }, usuario, `Taxa do boleto ${C.reais(valor)} para todos`);
+    contratos += 1;
+  }
+  for (const cb of d.cobrancas) {
+    if (cb.competencia !== comp || cb.data_pagamento || (cb.taxa_boleto || 0) === valor) continue;
+    atualizar(d, 'cobrancas', cb.id, { taxa_boleto: valor }, usuario, `Taxa do boleto ${C.reais(valor)} para todos`);
+    cobrancas += 1;
+  }
+  return { contratos, cobrancas };
+}
+
 export function registrarPagamento(d, cobrancaId, dataPagamento, valorPago, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (faturasDe(d, 'cobranca', cb.id).length) {
