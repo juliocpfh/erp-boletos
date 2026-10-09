@@ -219,6 +219,11 @@ export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, d
 // Pagamento: multa, juros e nota fiscal
 // --------------------------------------------------------------------------
 
+/** Juros por dia de atraso, em centavos, como o banco calcula: % ao mês ÷ 30, centavos truncados. */
+export function jurosAoDia(base, jurosMesPct) {
+  return Math.floor((base * (jurosMesPct || 0)) / 100 / 30 + 1e-7);
+}
+
 /** Multa fixa sobre o valor em aberto e juros simples pro rata dia (mês de 30 dias). */
 export function multaEJuros(base, vencimento, pagamento, multaPct, jurosMesPct) {
   const dias = diasEntre(vencimento, pagamento);
@@ -226,7 +231,7 @@ export function multaEJuros(base, vencimento, pagamento, multaPct, jurosMesPct) 
   return {
     dias,
     multa: arred((base * (multaPct || 0)) / 100),
-    juros: arred((base * (jurosMesPct || 0) * dias) / 100 / 30),
+    juros: jurosAoDia(base, jurosMesPct) * dias,
   };
 }
 

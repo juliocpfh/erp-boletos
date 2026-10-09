@@ -23,12 +23,15 @@ export const IMOVEL = [
   campo('inscricao_iptu', 'Inscrição imobiliária (IPTU)'),
   campo('copel_uc', 'Unidade consumidora Copel'),
   campo('sanepar_matricula', 'Matrícula Sanepar'),
-  campo('condominio_nome', 'Condomínio / administradora'),
+  campo('condominio_nome', 'Condomínio'),
   campo('condominio_contato', 'Contato do condomínio'),
+  campo('administradora_nome', 'Administradora do condomínio'),
+  campo('administradora_contato', 'Contato da administradora'),
   secao('Último anúncio'),
   campo('anuncio_link', 'Link do último anúncio', 'url', { largo: true }),
   campo('anuncio_data', 'Data do anúncio', 'data'),
   secao('Observações'),
+  campo('verificar', 'Pontos a verificar (aparece em amarelo)', 'area'),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -58,40 +61,43 @@ export const CONTRATO = [
   campo('responsavel_nome', 'Outro contato (se houver)'),
   campo('responsavel_telefone', 'Telefone do contato', 'tel'),
   campo('responsavel_email', 'E-mail do contato', 'email'),
-  secao('Datas'),
+  campo('contrato_anterior_id', 'Continua o contrato de', 'opcao', { opcoes: [], ajuda: 'Ex.: alteração de titular. Liga o histórico dos dois inquilinos' }),
+  secao('Datas e prazo'),
   campo('data_entrada', 'Data de entrada', 'data', { obrig: true }),
-  campo('data_saida', 'Data de saída', 'data', { ajuda: 'Deixe em branco enquanto o inquilino estiver no imóvel' }),
-  campo('vigencia_inicio', 'Início da vigência do contrato', 'data', { obrig: true, ajuda: 'O aniversário desta data define a correção anual' }),
-  campo('vigencia_fim', 'Fim da vigência', 'data'),
+  campo('data_saida', 'Data de saída', 'data', { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
+  campo('vigencia_inicio', 'Início do contrato', 'data', { obrig: true }),
+  campo('prazo_tipo', 'Prazo', 'opcao', { obrig: true, padrao: 'Determinado', opcoes: ['Determinado', 'Indeterminado'] }),
+  campo('vigencia_fim', 'Fim do contrato (prazo determinado)', 'data'),
+  campo('renovacao_automatica', 'Renovação automática', 'simnao'),
+  secao('Correção anual'),
+  campo('indice_correcao', 'Índice de correção previsto no contrato', 'opcao', { opcoes: INDICES }),
+  campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
   secao('Valores e cobrança'),
-  campo('aluguel_inicial', 'Aluguel inicial (valor histórico)', 'dinheiro', { obrig: true }),
+  campo('aluguel_inicial', 'Aluguel inicial (valor cheio, histórico)', 'dinheiro', { obrig: true }),
   campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true, padrao: 10 }),
   campo('cobranca_mes_seguinte', 'O aluguel do mês vence no mês seguinte', 'simnao', { padrao: true, ajuda: 'Marcado: aluguel de julho vence em agosto' }),
-  campo('desconto_pontualidade_percentual', 'Desconto de pontualidade (%)', 'pct', { vinculo: 'desconto' }),
-  campo('desconto_pontualidade_valor', 'Desconto de pontualidade (R$)', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Preencha o % ou o valor: um calcula o outro' }),
+  campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true }),
+  campo('desconto_pontualidade_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto' }),
+  campo('desconto_pontualidade_valor', 'Bonificação (R$)', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Preencha o % ou o valor: um calcula o outro' }),
   campo('taxa_boleto', 'Taxa de emissão do boleto (R$)', 'dinheiro'),
-  campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 10 }),
+  campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
-  campo('indice_correcao', 'Índice de correção', 'opcao', { opcoes: INDICES }),
   campo('cobrar_iptu', 'Cobrar IPTU do inquilino', 'simnao', { padrao: true }),
   secao('Garantia'),
-  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { opcoes: ['Caução', 'Fiador', 'Seguro fiança', 'Sem garantia'] }),
-  campo('caucao_valor', 'Valor da caução', 'dinheiro'),
-  campo('caucao_data', 'Data em que a caução foi dada', 'data'),
-  campo('caucao_indice', 'Índice de correção da caução', 'opcao', { opcoes: INDICES }),
-  campo('caucao_valor_corrigido', 'Valor corrigido da caução', 'dinheiro'),
-  campo('caucao_data_correcao', 'Data da correção da caução', 'data'),
-  campo('fiador_nome', 'Fiador - nome'),
-  campo('fiador_cpf', 'Fiador - CPF'),
-  campo('fiador_rg', 'Fiador - RG'),
-  campo('fiador_telefone', 'Fiador - telefone', 'tel'),
-  campo('fiador_email', 'Fiador - e-mail', 'email'),
-  campo('fiador_endereco', 'Fiador - endereço', 'texto', { largo: true }),
+  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'],
+    ajuda: 'Os fiadores são cadastrados na página do inquilino depois de salvar' }),
+  campo('caucao_valor', 'Valor da caução', 'dinheiro', { mostrar: ['Caução'] }),
+  campo('caucao_data', 'Data em que a caução foi dada', 'data', { mostrar: ['Caução'] }),
+  campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { mostrar: ['Caução'], ajuda: 'Usado para sugerir o novo valor quando o aluguel for corrigido' }),
+  campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', { mostrar: ['Depósito garantia', 'Fiador + depósito'] }),
+  campo('deposito_data', 'Data do depósito', 'data', { mostrar: ['Depósito garantia', 'Fiador + depósito'] }),
+  campo('deposito_uso', 'Quando e onde o depósito será usado', 'texto', { largo: true, mostrar: ['Depósito garantia', 'Fiador + depósito'], ajuda: 'Ex.: abatido nos dois últimos aluguéis do contrato' }),
   secao('Reserva dada na visita'),
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
   secao('Observações'),
+  campo('verificar', 'Pontos a verificar (aparece em amarelo)', 'area'),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -119,6 +125,7 @@ export const IPTU = [
   campo('ano', 'Ano', 'inteiro', { obrig: true }),
   campo('valor_total', 'Valor total do IPTU', 'dinheiro', { obrig: true }),
   campo('num_parcelas', 'Número de parcelas', 'inteiro', { obrig: true, padrao: 10 }),
+  campo('valor_parcela', 'Valor fixo cobrado por parcela (opcional)', 'dinheiro', { ajuda: 'Ex.: arredondar para R$ 213,00. Em branco: total ÷ parcelas' }),
   campo('primeira_competencia', 'Cobrar 1ª parcela no aluguel de', 'mes', { obrig: true }),
   campo('observacoes', 'Observações', 'area'),
 ];
@@ -143,6 +150,63 @@ export const RECEBIMENTO = [
   campo('tomador_documento', 'CPF / CNPJ do cliente'),
   campo('tomador_telefone', 'Telefone do cliente', 'tel'),
   campo('tomador_endereco', 'Endereço na fatura', 'texto', { largo: true, ajuda: 'Em branco: endereço da unidade' }),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+export const FIADOR = [
+  campo('nome', 'Nome', 'texto', { obrig: true, largo: true }),
+  campo('cpf', 'CPF'),
+  campo('rg', 'RG'),
+  campo('telefone', 'Telefone', 'tel'),
+  campo('email', 'E-mail', 'email'),
+  campo('endereco', 'Endereço', 'texto', { largo: true }),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+export const APLICACAO = [
+  campo('data', 'Data da aplicação', 'data', { obrig: true }),
+  campo('emitente_id', 'Empresa onde foi aplicado', 'opcao', { obrig: true, opcoes: [] }),
+  campo('valor', 'Valor aplicado', 'dinheiro', { obrig: true }),
+  campo('observacoes', 'Observações (banco, aplicação)', 'area'),
+];
+
+export const CORRECAO_GARANTIA = [
+  campo('data', 'Data', 'data', { obrig: true }),
+  campo('valor_novo', 'Novo valor da caução', 'dinheiro', { obrig: true }),
+  campo('complemento', 'Complemento pago pelo inquilino', 'dinheiro', { ajuda: 'Em branco: diferença entre o novo e o anterior' }),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+export const RENOVACAO = [
+  campo('data', 'Data', 'data', { obrig: true, ajuda: 'O novo valor (se houver) vale a partir desta data' }),
+  campo('tipo', 'O que aconteceu', 'opcao', { obrig: true, opcoes: ['Renovado com nova data de término', 'Passou a prazo indeterminado', 'Novo valor negociado'] }),
+  campo('nova_vigencia_fim', 'Nova data de término', 'data', { ajuda: 'Só para renovação com prazo determinado' }),
+  campo('novo_valor', 'Novo valor do aluguel negociado (valor cheio)', 'dinheiro'),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+export const ENCERRAMENTO = [
+  campo('data_saida', 'Data de saída', 'data', { obrig: true }),
+  campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
+  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct'),
+  campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
+  campo('debitos_descricao', 'Descrição dos débitos', 'area'),
+  campo('vistoria_saida', 'Vistoria de saída', 'opcao', { opcoes: ['Sem pendências', 'Com pendências', 'Contestada', 'Não feita'] }),
+  campo('observacoes', 'Observações', 'area'),
+];
+
+export const AVULSA = [
+  campo('data_pagamento', 'Data em que o dinheiro entrou', 'data', { obrig: true }),
+  campo('valor', 'Valor da fatura', 'dinheiro', { obrig: true }),
+  campo('descricao', 'Descrição', 'texto', { largo: true, ajuda: 'Ex.: Airbnb outubro, aluguel de vaga, reembolso' }),
+  campo('imovel_id', 'Imóvel (opcional)', 'opcao', { opcoes: [], ajuda: 'Se escolher, usa as empresas e o endereço do imóvel' }),
+  campo('periodo_inicio', 'Período: de', 'data'),
+  campo('periodo_fim', 'Período: até', 'data'),
+  campo('tomador_nome', 'Cliente na fatura', 'texto', { obrig: true, largo: true }),
+  campo('tomador_documento', 'CPF / CNPJ do cliente'),
+  campo('tomador_telefone', 'Telefone do cliente', 'tel'),
+  campo('tomador_endereco', 'Endereço na fatura', 'texto', { largo: true }),
+  campo('municipio', 'Município', 'texto', { padrao: 'CURITIBA' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -268,7 +332,7 @@ export function camposHtml(campos, valores = {}, erros = {}) {
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : '';
       entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;
     }
-    return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''}">
+    return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''}" ${c.mostrar ? `data-mostrar="${esc(c.mostrar.join('|'))}"` : ''}>
       <label for="${id}">${esc(c.rotulo)}${c.obrig ? ' *' : ''}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}
       ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}</div>`;

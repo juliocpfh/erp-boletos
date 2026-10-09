@@ -118,6 +118,27 @@ export const TELAS = {
   _listaArquivos: listaArquivos,
 
   _ligarDesconto(raiz) {
+    const garantia = raiz.querySelector('select[name=garantia_tipo]');
+    if (garantia) {
+      const mostrarGarantia = () => raiz.querySelectorAll('[data-mostrar]').forEach((el) => {
+        el.hidden = !el.dataset.mostrar.split('|').includes(garantia.value);
+      });
+      garantia.addEventListener('change', mostrarGarantia);
+      mostrarGarantia();
+    }
+    const bonif = raiz.querySelector('input[name=bonificacao]');
+    if (bonif) {
+      const mostrarBonif = () => raiz.querySelectorAll('[data-vinculo="desconto"]').forEach((el) => { el.closest('div').hidden = !bonif.checked; });
+      bonif.addEventListener('change', mostrarBonif);
+      mostrarBonif();
+    }
+    const prazo = raiz.querySelector('select[name=prazo_tipo]');
+    const fim = raiz.querySelector('[name=vigencia_fim]');
+    if (prazo && fim) {
+      const mostrarFim = () => { fim.closest('div').hidden = prazo.value === 'Indeterminado'; };
+      prazo.addEventListener('change', mostrarFim);
+      mostrarFim();
+    }
     const pctEl = raiz.querySelector('[data-vinculo="desconto"][data-tipo="pct"]');
     const valEl = raiz.querySelector('[data-vinculo="desconto"][data-tipo="dinheiro"]');
     if (!pctEl || !valEl) return;
@@ -187,7 +208,7 @@ export const TELAS = {
         ${n(pend.length, 'pagamentos aguardando nº de fatura', '#/faturas')}
       </div>
       <div class="cartao"><h2>Alertas</h2>
-        ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.tipo)}</b> <a href="#/contrato/${a.contrato_id}">${esc(a.imovel)} · ${esc(a.inquilino)}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
         ${tabelaHistorico(ultimos(() => true, 12))}
@@ -240,6 +261,7 @@ export const TELAS = {
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   imprimir: (rota) => telaImprimir(rota),
   empresas: () => telaEmpresas(),
+  inquilinos: (rota) => telaInquilinos(rota.q),
   historico: (rota) => telaHistorico(rota.q),
   dados: () => telaDados(),
   usuarios() {
@@ -284,22 +306,25 @@ function telaImovel(i) {
       ${opera() ? `${link(`#/novo/contratos?imovel=${i.id}`, 'Novo inquilino', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo', 'Excluir este imóvel? Os arquivos da pasta são mantidos.') : ''}</div></div>
     <div class="endereco">📍 ${esc(endereco(i))}</div>
-    ${grupo ? `<div class="alerta info">Unidade do grupo <a href="#/imovel/${grupo.id}">${esc(grupo.nome)}</a>.</div>` : ''}
+    ${caixaVerificar(i.verificar)}
+    ${grupo ? `<div class="alerta info">No Airbnb: unidade do grupo <a href="#/imovel/${grupo.id}">${esc(grupo.nome)}</a>. Para tirar do Airbnb, use "Editar imóvel" e deixe o grupo em branco.</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Matrícula', esc(i.matricula || '-'))}${item('Cartório', esc(i.cartorio || '-'))}${item('Inscrição IPTU', esc(i.inscricao_iptu || '-'))}
       ${item('UC Copel', esc(i.copel_uc || '-'))}${item('Matrícula Sanepar', esc(i.sanepar_matricula || '-'))}
       ${item('Condomínio', esc([i.condominio_nome, i.condominio_contato].filter(Boolean).join(' · ') || '-'))}
+      ${item('Administradora do condomínio', esc([i.administradora_nome, i.administradora_contato].filter(Boolean).join(' · ') || '-'))}
       ${item('Pasta de arquivos', esc(i.pasta || '-'))}</div>
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
-      <tr><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th></tr>
-      ${contratos.map((c) => `<tr><td><a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}<br><span class="suave">📁 ${esc(c.pasta || nomePastaContrato(c))}</span></td>
+      <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th></tr>
+      ${contratos.map((c) => `<tr class="${c.verificar ? 'amarelo' : ''}"><td><input type="checkbox" title="Inquilino ativo (gera cobrança)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}></td>
+        <td><a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}<br><span class="suave">📁 ${esc(c.pasta || nomePastaContrato(c))}</span></td>
         <td>${dataBr(c.data_entrada)}</td><td>${dataBr(c.data_saida)}</td><td class="n">${reais(R.aluguelAtual(d(), c))}</td>
-        <td>${R.contratoAtivo(c, hoje) ? etiqueta('Atual', 'ok') : etiqueta('Encerrado', 'neutra')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
-    </table></div></div>
+        <td>${R.contratoAtivo(c, hoje) ? etiqueta('Atual', 'ok') : etiqueta('Encerrado', 'neutra')} ${c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
+    </table></div><p class="suave">Desmarque "Ativo" para não gerar cobrança para o inquilino.</p></div>
     ${caixaEmpresas(i)}
     <div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, 'Lançar IPTU do ano') : ''}</div>
-      ${iptus.map((p) => { const ps = C.parcelas(p.valor_total, p.num_parcelas); return `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s) ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
+      ${iptus.map((p) => { const ps = p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : C.parcelas(p.valor_total, p.num_parcelas); return `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s) ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
         <div class="rolagem"><table><tr>${ps.map((_, n) => `<th class="n">${n + 1}ª · ${compBr(C.somarMeses(p.primeira_competencia, n))}</th>`).join('')}</tr><tr>${ps.map((v) => `<td class="n">${reais(v)}</td>`).join('')}</tr></table></div>`; }).join('') || '<p class="suave">Nenhum IPTU lançado.</p>'}</div>
     <div class="cartao" id="titularidade"><div class="cabecalho"><h2>Troca de titularidade (Copel, Sanepar, Supergasbras, condomínio)</h2>${opera() ? link(`#/novo/titularidades?imovel=${i.id}`, 'Registrar protocolo') : ''}</div>
       <div class="rolagem"><table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Inquilino</th><th>Protocolo</th><th>Situação</th><th></th></tr>
@@ -336,20 +361,98 @@ function telaGrupoAirbnb(g) {
 // --------------------------------------------------------------------------
 // Contrato / inquilino
 // --------------------------------------------------------------------------
+function selosContrato(c) {
+  const base = R.dataBaseCorrecao(c);
+  const prazo = c.prazo_tipo === 'Indeterminado'
+    ? etiqueta('Prazo indeterminado', 'aviso')
+    : etiqueta(`Prazo determinado${c.vigencia_fim ? ` até ${dataBr(c.vigencia_fim)}` : ''}`, 'info');
+  return `<div class="selos">${prazo}
+    ${c.renovacao_automatica ? etiqueta('Renovação automática', 'neutra') : ''}
+    ${etiqueta(`Correção anual: ${c.indice_correcao || 'índice não informado'}${base ? ` · todo ${dataBr(base).slice(0, 5)}` : ''}`, 'ok')}
+    ${etiqueta(`Garantia: ${c.garantia_tipo || 'não informada'}`, 'neutra')}
+    ${R.contratoAtivo(c) ? '' : etiqueta('Encerrado', 'perigo')}</div>`;
+}
+
+const caixaVerificar = (texto) => (texto ? `<div class="verificar"><b>A verificar:</b> ${esc(texto).replace(/\n/g, '<br>')}</div>` : '');
+
+function caixaGarantia(c) {
+  const fiadores = R.fiadoresDo(d(), c.id);
+  const correcoes = R.correcoesGarantiaDo(d(), c.id);
+  const aplic = R.aplicacoesDo(d(), c.id);
+  const sit = R.situacaoAplicacao(d(), c);
+  const sug = R.caucaoSugerida(d(), c);
+  let html = `<div class="cartao" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>`;
+  if (R.temCaucao(c)) {
+    html += `<div class="grade">${item('Caução dada', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)}`)}
+      ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
+      ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>
+      <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
+      ${correcoes.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${esc(x.observacoes || '')}</td>
+        <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes_garantia', id: x.id }, 'perigo pequeno', 'Excluir esta correção da caução?') : ''}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="suave">Nenhuma correção registrada.</td></tr>'}</table>
+      ${opera() ? `<p>${link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução')}</p>` : ''}`;
+  }
+  if (R.temDeposito(c)) {
+    html += `<div class="grade">${item('Depósito de garantia', `${reais(c.deposito_valor)} em ${dataBr(c.deposito_data)}`)}
+      ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>`;
+  }
+  if (R.temFiador(c) || fiadores.length) {
+    html += `<h3>Fiadores</h3><table><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th></th></tr>
+      ${fiadores.map((f) => `<tr><td><b>${esc(f.nome)}</b>${f.endereco ? `<br><span class="suave">${esc(f.endereco)}</span>` : ''}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td>
+        <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
+        <td class="n">${opera() ? `${link(`#/editar/fiadores/${f.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'fiadores', id: f.id }, 'perigo pequeno', 'Excluir este fiador?')}` : ''}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="suave">Nenhum fiador cadastrado.</td></tr>'}</table>
+      ${opera() ? `<p>${link(`#/novo/fiadores?contrato=${c.id}`, 'Adicionar fiador')}</p>` : ''}`;
+  }
+  if (sit.total || aplic.length) {
+    html += `<h3>Onde o valor foi aplicado</h3>
+      <table><tr><th>Empresa</th><th class="n">Aplicado</th><th class="n">Deveria (metade)</th><th class="n">Falta</th></tr>
+      ${sit.linhas.map((l) => `<tr><td>${esc(l.emitente.nome)}</td><td class="n">${reais(l.aplicado)}</td><td class="n">${reais(l.meta)}</td><td class="n">${l.falta ? `<b>${reais(l.falta)}</b>` : '-'}</td></tr>`).join('')}
+      <tr class="total"><td>Total</td><td class="n">${reais(sit.soma)}</td><td class="n">${reais(sit.total)}</td><td class="n">${sit.ok ? etiqueta('100% aplicado', 'ok') : reais(sit.total - sit.soma)}</td></tr></table>
+      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Empresa</th><th class="n">Valor</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc((buscar('emitentes', a.emitente_id) || {}).nome || '-')}</td><td class="n">${reais(a.valor)}</td><td>${esc(a.observacoes || '')}</td>
+        <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aplicacoes', id: a.id }, 'perigo pequeno', 'Excluir esta aplicação?') : ''}</td></tr>`).join('')}</table>` : ''}
+      ${opera() ? `<p>${link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação')}</p>` : ''}
+      <p class="suave">Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final).</p>`;
+  }
+  return `${html}</div>`;
+}
+
+function caixaSaida(c) {
+  const e = R.encerramentoDo(d(), c.id);
+  if (!e) {
+    return opera() ? `<div class="cartao"><div class="cabecalho"><h2>Saída do inquilino</h2>${link(`#/novo/encerramentos?contrato=${c.id}`, 'Registrar saída e cálculo final', 'botao')}</div>
+      <p class="suave">Calcula a devolução da garantia corrigida, desconta os débitos e guarda tudo no histórico do inquilino.</p></div>` : '';
+  }
+  return `<div class="cartao" id="saida"><h2>Saída em ${dataBr(e.data_saida)}</h2><div class="grade">
+    ${item('Garantia a devolver', reais(e.garantia_valor))}${item('Correção (poupança)', `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}
+    ${item('Débitos descontados', reais(e.debitos))}${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
+    ${item('Vistoria de saída', esc(e.vistoria_saida || '-'))}</div>
+    ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
+    ${podeUsuario('admin') ? botao('excluir', 'Desfazer registro da saída', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo de saída? A data de saída do contrato continua preenchida.') : ''}</div>`;
+}
+
 function telaContrato(c) {
   const i = buscar('imoveis', c.imovel_id);
   const hoje = C.hojeIso();
   const aluguel = R.aluguelAtual(d(), c);
-  const desconto = C.descontoPorPercentual(aluguel, c.desconto_pontualidade_percentual);
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje) : [];
+  const pctBonif = R.percentualBonificacao(c);
+  const desconto = C.descontoPorPercentual(aluguel, pctBonif);
+  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => a.tipo !== 'A verificar') : [];
   const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
   const seguros = d().seguros.filter((s) => s.contrato_id === c.id).sort((a, b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio));
+  const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
+  const cadeia = R.cadeiaDeContratos(d(), c);
   const tel = (c.inquilino_telefone || '').replace(/\D/g, '');
-  return `<p class="suave"><a href="#/imovel/${i.id}">← ${esc(i.nome)}</a></p>
+  const lig = (x) => `<a href="#/contrato/${x.id}">${esc(x.inquilino_nome)}</a> (${dataBr(x.data_entrada)} a ${dataBr(x.data_saida)})`;
+  const historicoIds = new Set([c.id, ...cadeia.antes.map((x) => x.id), ...cadeia.depois.map((x) => x.id)]);
+  return `<p class="suave"><a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · <a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todas as suas cobranças?') : ''}</div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
+    ${selosContrato(c)}
+    ${caixaVerificar(c.verificar)}
+    ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
     <div class="cartao"><h2>Identificação e contato</h2><div class="grade">
       ${item('Telefone', `${esc(c.inquilino_telefone || '-')}${c.inquilino_whatsapp && tel ? ` <a class="etiqueta ok" target="_blank" rel="noopener" href="https://wa.me/${tel.length <= 11 ? `55${tel}` : tel}">WhatsApp</a>` : ''}`)}
@@ -357,21 +460,25 @@ function telaContrato(c) {
       ${item('CPF / CNPJ', esc(c.inquilino_cpf || '-'))}${item('RG', esc(c.inquilino_rg || '-'))}
       ${c.responsavel_nome ? item('Outro contato', esc([c.responsavel_nome, c.responsavel_telefone, c.responsavel_email].filter(Boolean).join(' · '))) : ''}</div></div>
     <div class="cartao"><h2>Contrato e valores</h2><div class="grade">
-      ${item('Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}${item('Vigência', `${dataBr(c.vigencia_inicio)} a ${dataBr(c.vigencia_fim)}`)}
-      ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual', `<span class="maior">${reais(aluguel)}</span>`)}
-      ${item('Desconto de pontualidade', `${pct(c.desconto_pontualidade_percentual)} = ${reais(desconto)}`)}${item('Aluguel com desconto', reais(aluguel - desconto))}
+      ${item('Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
+      ${item('Contrato', `${dataBr(c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : dataBr(c.vigencia_fim)}`)}
+      ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
+      ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
       ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', reais(c.taxa_boleto))}
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
-      ${item('Índice de correção', esc(c.indice_correcao || '-'))}${item('IPTU', c.cobrar_iptu ? 'cobrado do inquilino' : 'não cobrado')}</div></div>
-    <div class="cartao"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2><div class="grade">
-      ${c.caucao_valor ? `${item('Caução', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)}`)}${item('Caução corrigida', c.caucao_valor_corrigido ? `${reais(c.caucao_valor_corrigido)} em ${dataBr(c.caucao_data_correcao)} (${esc(c.caucao_indice || 'índice não informado')})` : 'não corrigida')}` : ''}
-      ${c.fiador_nome ? `${item('Fiador', esc(c.fiador_nome))}${item('CPF / RG do fiador', esc(`${c.fiador_cpf || '-'} / ${c.fiador_rg || '-'}`))}${item('Contato do fiador', esc([c.fiador_telefone, c.fiador_email].filter(Boolean).join(' · ') || '-'))}${item('Endereço do fiador', esc(c.fiador_endereco || '-'))}` : ''}</div>
+      ${item('IPTU', c.cobrar_iptu ? 'cobrado do inquilino' : 'não cobrado')}</div>
       ${c.reserva_valor > 0 ? `<h3>Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
-    <div class="cartao"><div class="cabecalho"><h2>Histórico de correção do aluguel</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
+    ${caixaGarantia(c)}
+    <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
       <table><tr><th>Vale a partir de</th><th>Índice</th><th class="n">%</th><th class="n">Valor anterior</th><th class="n">Novo valor</th><th></th></tr>
       <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="3" class="suave">Valor inicial do contrato</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
-      ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${esc(x.indice || '-')}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
+      ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${x.indice === 'Negociado' ? etiqueta('Negociado', 'aviso') : esc(x.indice || '-')}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
+    <div class="cartao" id="renovacoes"><div class="cabecalho"><h2>Renovação e novo valor negociado</h2>${opera() ? link(`#/novo/renovacoes?contrato=${c.id}`, 'Registrar renovação / novo valor') : ''}</div>
+      <p class="suave">No aniversário vale a correção pelo índice do contrato. No fim do prazo, o novo valor é negociado com o inquilino e registrado aqui.</p>
+      <table><tr><th>Data</th><th>O que aconteceu</th><th>Novo término</th><th class="n">Novo valor</th><th>Obs.</th></tr>
+      ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
     <div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
       <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span></td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
@@ -381,8 +488,9 @@ function telaContrato(c) {
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
+    ${caixaSaida(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', 'Contrato, vistoria de entrada e saída, apólices, notificações, documento de identificação etc.')}
-    <div class="cartao"><h2>Histórico deste contrato</h2>${tabelaHistorico(ultimos((h) => h.contrato_id === c.id))}</div>`;
+    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
 }
 
 // --------------------------------------------------------------------------
@@ -409,7 +517,12 @@ const CADASTROS = {
   },
   contratos: {
     titulo: (r, q) => `${r ? 'Editar' : 'Novo'} inquilino / contrato - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
-    campos: () => F.CONTRATO,
+    campos: (r, q) => {
+      const iid = r ? r.imovel_id : Number(q.imovel);
+      const ops = d().contratos.filter((c) => c.imovel_id === iid && (!r || c.id !== r.id))
+        .map((c) => [String(c.id), `${c.inquilino_nome} (${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)})`]);
+      return F.CONTRATO.map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c));
+    },
     fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : `#/imovel/${q.imovel}`),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
@@ -422,18 +535,26 @@ const CADASTROS = {
       for (const k of ['desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor']) if (dados[k] === null) dados[k] = 0;
       if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = 'Informe um dia entre 1 e 31';
       if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = 'A saída não pode ser antes da entrada';
+      if (dados.prazo_tipo === 'Determinado' && !dados.vigencia_fim) erros.vigencia_fim = 'Informe o fim do contrato, ou marque prazo indeterminado';
       dados.pasta = nomePastaContrato({ ...r, ...dados });
     },
     async depois(salvo, antigo) {
       const i = buscar('imoveis', salvo.imovel_id);
       if (antigo && antigo.pasta && antigo.pasta !== salvo.pasta) await renomearNoDisco([i.pasta || i.nome], antigo.pasta, salvo.pasta);
     },
+    destino: (salvo) => (R.temFiador(salvo) && !R.fiadoresDo(d(), salvo.id).length ? `#/novo/fiadores?contrato=${salvo.id}` : `#/contrato/${salvo.id}`),
   },
   correcoes: {
     titulo: (r, q) => `Correção do aluguel - ${buscar('contratos', q.contrato).inquilino_nome}`,
     campos: () => F.CORRECAO,
     fixos: (r, q) => ({ contrato_id: Number(q.contrato) }),
     padrao: (q) => ({ indice: buscar('contratos', q.contrato).indice_correcao || '' }),
+    destino: (salvo) => {
+      const c = buscar('contratos', salvo.contrato_id);
+      if (!R.temCaucao(c)) return `#/contrato/${c.id}`;
+      aviso('O aluguel foi corrigido: corrija também a caução.', 'aviso');
+      return `#/novo/correcoes_garantia?contrato=${c.id}`;
+    },
     aviso: (r, q) => `Aluguel atual: ${reais(R.aluguelAtual(d(), buscar('contratos', q.contrato)))}`,
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     descricao: (dados, r, q) => `Correção do aluguel de ${buscar('contratos', q.contrato).inquilino_nome}`,
@@ -487,6 +608,84 @@ const CADASTROS = {
     descricao: (dados) => `Recebimento de ${reais(dados.valor)} em ${dataBr(dados.data_pagamento)}`,
     ajustar(dados, erros, r) {
       if (r && R.faturasDe(d(), 'recebimento', r.id).length) erros.valor = 'Já tem fatura emitida';
+      if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
+    },
+  },
+  fiadores: {
+    titulo: (r, q) => `Fiador - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: () => F.FIADOR,
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
+    descricao: (dados) => `Fiador ${dados.nome}`,
+  },
+  aplicacoes: {
+    titulo: (r, q) => `Aplicação da garantia - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: () => F.APLICACAO.map((c) => (c.nome === 'emitente_id' ? { ...c, opcoes: d().emitentes.filter((e) => e.ativo).map((e) => [String(e.id), e.nome]) } : c)),
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    padrao: (q) => {
+      const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato));
+      const l = s.linhas.find((x) => x.falta > 0);
+      return { data: C.hojeIso(), emitente_id: l ? String(l.emitente.id) : '', valor: l ? l.falta : null };
+    },
+    aviso: (r, q) => { const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato)); return `Garantia ${reais(s.total)}: ${s.linhas.map((l) => `${l.emitente.nome} aplicado ${reais(l.aplicado)} de ${reais(l.meta)}`).join('; ')}.`; },
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
+    descricao: (dados) => `Garantia aplicada: ${reais(dados.valor)}`,
+  },
+  correcoes_garantia: {
+    titulo: (r, q) => `Correção da caução - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    campos: () => F.CORRECAO_GARANTIA,
+    fixos: (r, q) => ({ contrato_id: Number(q.contrato) }),
+    padrao: (q) => {
+      const c = buscar('contratos', q.contrato);
+      const ult = R.correcoesDo(d(), c.id).pop();
+      return { data: ult ? ult.data_vigencia : C.hojeIso(), valor_novo: R.caucaoSugerida(d(), c, ult ? ult.data_vigencia : C.hojeIso()) };
+    },
+    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Caução atual: ${reais(R.valorGarantia(d(), c))}${c.caucao_meses ? ` (${c.caucao_meses} aluguéis com bonificação)` : ''}.`; },
+    voltar: (r, q) => `#/contrato/${q.contrato}`,
+    descricao: (dados) => `Caução corrigida para ${reais(dados.valor_novo)}`,
+    ajustar(dados, erros, r, form, q) {
+      const anterior = R.valorGarantia(d(), buscar('contratos', q.contrato));
+      dados.valor_anterior = anterior;
+      if (dados.complemento === null) dados.complemento = dados.valor_novo - anterior;
+    },
+  },
+  renovacoes: {
+    titulo: (r, q) => `Renovação / novo valor - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    campos: () => F.RENOVACAO,
+    padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término' }; },
+    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
+    voltar: (r, q) => `#/contrato/${q.contrato}`,
+    ajustar(dados, erros) {
+      if (dados.tipo === 'Renovado com nova data de término' && !dados.nova_vigencia_fim) erros.nova_vigencia_fim = 'Informe a nova data de término';
+      if (dados.tipo === 'Passou a prazo indeterminado') dados.nova_vigencia_fim = null;
+      if (dados.tipo === 'Novo valor negociado' && !(dados.novo_valor > 0)) erros.novo_valor = 'Informe o novo valor';
+    },
+    salvar: (db, dados, q) => R.registrarRenovacao(db, Number(q.contrato), dados, login()),
+  },
+  encerramentos: {
+    titulo: (r, q) => `Saída e cálculo final - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    campos: () => F.ENCERRAMENTO,
+    padrao: (q) => {
+      const c = buscar('contratos', q.contrato);
+      const aberto = R.cobrancasEmAberto(d(), c.id);
+      return {
+        data_saida: c.data_saida || C.hojeIso(), garantia_valor: R.valorGarantia(d(), c),
+        debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0),
+        debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n'),
+      };
+    },
+    aviso: (r, q) => 'Confira a cobrança do último mês: com a data de saída preenchida, o aluguel do mês de saída é gerado proporcional aos dias. A garantia é corrigida pelo índice da poupança que você informar.',
+    voltar: (r, q) => `#/contrato/${q.contrato}`,
+    ajustar(dados) { for (const k of ['garantia_valor', 'indice_percentual', 'debitos']) if (dados[k] === null) dados[k] = 0; },
+    salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
+  },
+  avulsas: {
+    titulo: (r) => (r ? 'Editar fatura avulsa' : 'Nova fatura avulsa'),
+    campos: () => F.AVULSA.map((c) => (c.nome === 'imovel_id' ? { ...c, opcoes: ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]) } : c)),
+    voltar: () => '#/faturas',
+    descricao: (dados) => `Fatura avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
+    ajustar(dados, erros, r) {
+      if (r && R.faturasDe(d(), 'avulsa', r.id).length) erros.valor = 'Já tem número de fatura';
       if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
     },
   },
@@ -573,7 +772,8 @@ function telaCobrancas(comp) {
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}</td>
-        <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}</td>
+        <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}
+          ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.</td>
         <td>${cb.data_pagamento ? `${situacao(cb.situacao)}<br><span class="suave">em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ''}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao('estornar', 'Desfazer', { id: cb.id }, 'secundario pequeno', 'Desfazer este pagamento?')}` : ''}`
@@ -612,6 +812,20 @@ function demonstrativo(cb) {
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
 }
 
+function caixaBoleto(cb) {
+  const b = R.dadosBoleto(d(), cb);
+  const linha = (rotulo, valor, copia = valor) => `<tr><td class="suave">${rotulo}</td><td><b>${esc(valor)}</b></td><td class="n">${botao('copiar', 'Copiar', { texto: copia })}</td></tr>`;
+  const num = (c) => C.reais(c, false);
+  return `<div class="cartao boleto"><h2>Dados para emitir o boleto no banco</h2>
+    <table>${linha('Pagador', `${b.pagador}${b.documento_pagador ? ` · ${b.documento_pagador}` : ''}`, b.pagador)}
+    ${linha('Nº do documento', b.numero_documento)}${linha('Vencimento', dataBr(b.vencimento))}
+    ${linha('Valor do documento', reais(b.valor), num(b.valor))}
+    ${b.desconto ? linha(`Desconto se pago até ${dataBr(b.vencimento)}`, `${reais(b.desconto)} (fica ${reais(b.valor_com_desconto)})`, num(b.desconto)) : ''}
+    ${linha('Multa após o vencimento', pct(b.multa_percentual), String(b.multa_percentual).replace('.', ','))}
+    ${linha('Juros (mora) ao dia', reais(b.juros_ao_dia), num(b.juros_ao_dia))}</table>
+    <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div></div>`;
+}
+
 function telaCobranca(cb) {
   const c = buscar('contratos', cb.contrato_id);
   const fs = R.faturasDe(d(), 'cobranca', cb.id, false);
@@ -622,7 +836,7 @@ function telaCobranca(cb) {
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>
       ${opera() && !cb.data_pagamento ? `${link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir esta cobrança?')}` : ''}</div></div></div>
     ${demonstrativo(cb)}
-    <div class="nao-imprimir"><div class="cartao"><h2>Pagamento</h2>
+    <div class="nao-imprimir">${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
       ${cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
         ${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}
         ${item('Valor recebido', reais(cb.valor_pago))}${item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>`)}</div>
@@ -643,6 +857,10 @@ function origemTexto(f) {
   if (f.origem_tipo === 'cobranca') {
     const cb = buscar('cobrancas', f.origem_id);
     return cb ? `<a href="#/cobranca/${cb.id}">Aluguel ${compBr(cb.competencia)}</a>` : 'Aluguel';
+  }
+  if (f.origem_tipo === 'avulsa') {
+    const a = buscar('avulsas', f.origem_id);
+    return `Avulsa${a && a.descricao ? `: ${esc(a.descricao)}` : ''}`;
   }
   const r = buscar('recebimentos', f.origem_id);
   return r ? `<a href="#/imovel/${r.imovel_id}">Airbnb</a>` : 'Airbnb';
@@ -672,13 +890,42 @@ function telaFaturas(mes) {
         ${pend.map((p, n) => { const b = R.baseDaFatura(d(), p.tipo, p.registro); return `<tr class="${ultima && p.data < ultima.emissao ? 'fora' : ''}"><td>${R.numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p.data)}${ultima && p.data < ultima.emissao ? ` ${etiqueta('anterior à última fatura', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td><td class="n">${reais(b.valor)}</td></tr>`; }).join('')}</table>
         ${opera() ? `<p>${botao('numerar', 'Numerar estas faturas', {}, '')}</p>` : ''}`
       : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
+    ${caixaAvulsas()}
     <div class="cartao rolagem"><table><tr><th>Nº</th><th>Emissão</th><th>Cliente</th><th>Origem</th><th>Empresas</th><th class="n">Total</th><th>Situação</th><th></th></tr>
       ${grupos.map(([n, fs]) => `<tr><td><b>${R.numeroFatura(n)}</b></td><td>${dataBr(fs[0].emissao)}</td><td>${esc(fs[0].tomador_nome)}</td><td>${origemTexto(fs[0])}</td>
         <td>${fs.map((f) => `${esc(buscar('emitentes', f.emitente_id).nome)}: ${reais(f.valor)}`).join('<br>')}</td><td class="n">${reais(fs.reduce((s, f) => s + f.valor, 0))}</td>
         <td>${etiqueta(fs[0].situacao, fs[0].situacao === 'Emitida' ? 'ok' : 'perigo')}</td>
-        <td class="n nw">${fs[0].situacao === 'Emitida' ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}` : ''}</td></tr>`).join('')
+        <td class="n nw">${fs[0].situacao === 'Emitida' ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${fs[0].origem_tipo === 'avulsa' && opera() ? ` ${botao('cancelarAvulsa', 'Cancelar', { id: fs[0].origem_id }, 'perigo pequeno', 'Cancelar esta fatura avulsa? O número não será reaproveitado.')}` : ''}` : ''}</td></tr>`).join('')
       || `<tr><td colspan="8" class="suave">Nenhuma fatura emitida em ${compBr(mes)}.</td></tr>`}</table></div>
     ${grupos.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as faturas de ${compBr(mes)}</a> ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}`;
+}
+
+function caixaAvulsas() {
+  const pend = d().avulsas.filter((a) => !R.faturasDe(d(), 'avulsa', a.id).length);
+  return `<div class="cartao"><div class="cabecalho"><h2>Faturas avulsas</h2>${opera() ? link('#/novo/avulsas', 'Nova fatura avulsa', 'botao') : ''}</div>
+    <p class="suave">Para notas fora da regra: a nota mensal geral do AIRBNB, ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
+    ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
+      ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || '')}</td><td class="n">${reais(a.valor)}</td>
+        <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'avulsas', id: a.id }, 'perigo pequeno', 'Excluir esta fatura avulsa?')}` : ''}</td></tr>`).join('')}</table>` : ''}</div>`;
+}
+
+/** Inquilinos atuais e anteriores, com o resumo da saída. */
+function telaInquilinos(q) {
+  const hoje = C.hojeIso();
+  const todos = d().contratos.map((c) => ({ c, i: buscar('imoveis', c.imovel_id), e: R.encerramentoDo(d(), c.id) }));
+  const atuais = todos.filter((x) => R.contratoAtivo(x.c, hoje)).sort((a, b) => (a.i ? a.i.nome : '').localeCompare(b.i ? b.i.nome : '', 'pt-BR'));
+  const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida).localeCompare(String(a.c.data_saida)));
+  const anterior = (c) => (c.contrato_anterior_id ? buscar('contratos', c.contrato_anterior_id) : null);
+  const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
+  return `<h1>Inquilinos</h1>
+    <div class="cartao rolagem"><h2>Atuais (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : '-'}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td>
+        <td>${x.c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : `até ${dataBr(x.c.vigencia_fim)}`}</td><td class="n">${reais(R.aluguelAtual(d(), x.c))}</td>
+        <td>${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum.</td></tr>'}</table></div>
+    <div class="cartao rolagem"><h2>Histórico de inquilinos que saíram (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
+      ${anteriores.map((x) => `<tr><td>${x.i ? esc(x.i.nome) : '-'}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td><td>${dataBr(x.c.data_saida)}</td>
+        ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : 'sem cálculo final'}</td>`}</tr>`).join('')
+      || '<tr><td colspan="7" class="suave">Nenhum inquilino saiu ainda.</td></tr>'}</table></div>`;
 }
 
 function telaImprimir(rota) {
@@ -802,6 +1049,7 @@ export const FORMULARIOS = {
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     const salvo = await alterar((db) => {
+      if (cfg.salvar) return cfg.salvar(db, dados, rota.q);
       if (registro) {
         R.atualizar(db, tabela, registro.id, dados, login(), descricao);
         return R.buscar(db, tabela, registro.id);
@@ -811,7 +1059,7 @@ export const FORMULARIOS = {
     if (cfg.depois) await cfg.depois(salvo, antigo);
     if (tabela === 'usuarios' && salvo.id === E.usuario.id) E.usuario = salvo;
     aviso('Salvo.');
-    const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : tabela === 'contratos' ? `#/contrato/${salvo.id}` : cfg.voltar(salvo, rota.q);
+    const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : cfg.destino ? cfg.destino(salvo) : cfg.voltar(salvo, rota.q);
     ir(destino);
     return null;
   },
@@ -920,6 +1168,8 @@ const TABELAS_EXCLUSAO = {
   contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem faturas emitidas e não pode ser excluído.' : null), voltar: (r) => `#/imovel/${r.imovel_id}` },
   cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Esta cobrança tem fatura. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   recebimentos: { checar: (db, r) => (R.faturasDe(db, 'recebimento', r.id).length ? 'Este recebimento tem fatura emitida.' : null) },
+  avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta fatura avulsa já tem número.' : null) },
+  encerramentos: { admin: true },
 };
 
 export const ACOES = {
@@ -940,12 +1190,34 @@ export const ACOES = {
       if (problema) throw new Error(problema);
       if (tabela === 'imoveis') db.participacoes.filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, 'participacoes', p.id, login()));
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'seguros']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'seguros', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || null);
     });
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();
+  },
+
+  async alternarAtivo({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    await alterar((db) => {
+      const c = R.buscar(db, 'contratos', id);
+      R.atualizar(db, 'contratos', c.id, { ativo: c.ativo === false }, login(), c.ativo === false ? 'Inquilino marcado como ativo' : 'Inquilino marcado como inativo');
+    });
+    await mostrar();
+  },
+
+  async copiar({ texto }, el) {
+    await navigator.clipboard.writeText(texto);
+    const antes = el.textContent;
+    el.textContent = 'Copiado ✓';
+    setTimeout(() => { el.textContent = antes; }, 1500);
+  },
+
+  async cancelarAvulsa({ id }) {
+    await alterar((db) => R.cancelarFaturas(db, 'avulsa', Number(id), login()));
+    aviso('Fatura cancelada. O número não será reaproveitado.');
+    await mostrar();
   },
 
   async gerarCobrancas({ comp }) {

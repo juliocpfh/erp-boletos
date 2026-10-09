@@ -127,3 +127,12 @@ a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
   .fatura-xls { padding: 0; zoom: .88; }
   .cartao { border: 0; padding: 0; }
 }
+
+/* Pontos a verificar, selos do contrato e boleto */
+.verificar, .alerta.amarelo { background: #fef08a; border-left: 5px solid #ca8a04; padding: 9px 12px; border-radius: 6px; margin-bottom: 10px; }
+tr.amarelo td { background: #fef9c3; }
+.selos { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 14px; }
+.selos .etiqueta { font-size: 13px; padding: 3px 10px; }
+.descricao-boleto { background: #f8fafc; border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px; margin: 0; font-size: 14px; }
+.boleto td { padding: 4px 8px; }
+[hidden] { display: none !important; }

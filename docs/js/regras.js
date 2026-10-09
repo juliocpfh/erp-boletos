@@ -7,6 +7,8 @@ export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Cobrança', recebimentos: 'Recebimento Airbnb',
   faturas: 'Fatura', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
+  fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
+  renovacoes: 'Renovação / novo valor', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
   arquivos: 'Arquivo', banco: 'Banco de dados',
 };
 
@@ -18,10 +20,19 @@ export function bancoVazio() {
   return d;
 }
 
-/** Garante que um banco antigo tenha todas as tabelas (para versões futuras). */
+/** Garante que um banco antigo tenha todas as tabelas e campos novos. */
 export function normalizar(d) {
   const vazio = bancoVazio();
   for (const [k, v] of Object.entries(vazio)) if (d[k] === undefined) d[k] = v;
+  // versão 1 guardava um único fiador dentro do contrato
+  for (const c of d.contratos) {
+    if (c.fiador_nome && !d.fiadores.some((f) => f.contrato_id === c.id)) {
+      d.seq.fiadores = (d.seq.fiadores || 0) + 1;
+      d.fiadores.push({ id: d.seq.fiadores, contrato_id: c.id, nome: c.fiador_nome, cpf: c.fiador_cpf || '',
+        rg: c.fiador_rg || '', telefone: c.fiador_telefone || '', email: c.fiador_email || '', endereco: c.fiador_endereco || '' });
+    }
+    for (const k of ['fiador_nome', 'fiador_cpf', 'fiador_rg', 'fiador_telefone', 'fiador_email', 'fiador_endereco']) delete c[k];
+  }
   return d;
 }
 
@@ -37,6 +48,7 @@ function vinculos(d, tabela, r) {
     const c = buscar(d, 'contratos', r.contrato_id);
     return { imovel_id: c ? c.imovel_id : r.imovel_id, contrato_id: r.contrato_id };
   }
+  if (tabela === 'avulsas') return { imovel_id: r.imovel_id || null, contrato_id: r.contrato_id || null };
   if (tabela === 'faturas' && r.origem_tipo === 'cobranca') {
     const cb = buscar(d, 'cobrancas', r.origem_id);
     return cb ? vinculos(d, 'cobrancas', cb) : {};
@@ -103,7 +115,55 @@ export function aluguelAtual(d, contrato, dataRef = C.hojeIso()) {
 }
 
 export function contratoAtivo(contrato, dataRef = C.hojeIso()) {
-  return !contrato.data_saida || contrato.data_saida >= dataRef;
+  return contrato.ativo !== false && (!contrato.data_saida || contrato.data_saida >= dataRef);
+}
+
+/** Desconto de pontualidade do contrato (0 quando não tem bonificação). */
+export const percentualBonificacao = (c) => (c.bonificacao === false ? 0 : (c.desconto_pontualidade_percentual || 0));
+
+/** Data-base da correção anual: a informada ou, se vazia, o início da vigência. */
+export const dataBaseCorrecao = (c) => c.data_base_correcao || c.vigencia_inicio || c.data_entrada;
+
+// --------------------------------------------------------------------------
+// Garantias: caução, depósito, fiadores e aplicação do valor nas empresas
+// --------------------------------------------------------------------------
+export const GARANTIAS = ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'];
+export const temCaucao = (c) => c.garantia_tipo === 'Caução';
+export const temDeposito = (c) => ['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo);
+export const temFiador = (c) => ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo);
+export const fiadoresDo = (d, contratoId) => d.fiadores.filter((f) => f.contrato_id === contratoId);
+export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filter((x) => x.contrato_id === contratoId)
+  .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
+export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.contrato_id === contratoId)
+  .sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
+
+/** Valor atual da garantia em dinheiro (caução corrigida ou depósito). */
+export function valorGarantia(d, c) {
+  if (temCaucao(c)) {
+    const cs = correcoesGarantiaDo(d, c.id);
+    return cs.length ? cs[cs.length - 1].valor_novo : (c.caucao_valor || 0);
+  }
+  if (temDeposito(c)) return c.deposito_valor || 0;
+  return 0;
+}
+
+/** Caução sugerida: número de aluguéis × aluguel atual com bonificação. */
+export function caucaoSugerida(d, c, dataRef = C.hojeIso()) {
+  if (!(c.caucao_meses > 0)) return null;
+  const aluguel = aluguelAtual(d, c, dataRef);
+  return c.caucao_meses * (aluguel - C.descontoPorPercentual(aluguel, percentualBonificacao(c)));
+}
+
+/** Quanto da garantia foi aplicado em cada empresa e o que falta para 100% (metade em cada uma, ou o % definido). */
+export function situacaoAplicacao(d, c) {
+  const total = valorGarantia(d, c);
+  const emitentes = d.emitentes.filter((e) => e.ativo);
+  const aplicado = Object.fromEntries(emitentes.map((e) => [e.id, 0]));
+  for (const a of aplicacoesDo(d, c.id)) aplicado[a.emitente_id] = (aplicado[a.emitente_id] || 0) + a.valor;
+  const metas = C.dividir(total, emitentes.map(() => 100 / (emitentes.length || 1)));
+  const linhas = emitentes.map((e, i) => ({ emitente: e, aplicado: aplicado[e.id] || 0, meta: metas[i], falta: metas[i] - (aplicado[e.id] || 0) }));
+  const soma = linhas.reduce((s, l) => s + l.aplicado, 0);
+  return { total, linhas, soma, ok: total > 0 && soma === total && linhas.every((l) => Math.abs(l.falta) <= 1) };
 }
 
 export function competenciaReserva(contrato) {
@@ -123,7 +183,7 @@ function parcelasDoMes(lista, comp, rotulo) {
   for (const p of lista) {
     const [n, v] = C.parcelaNaCompetencia(p.valor_total, p.num_parcelas, p.primeira_competencia, comp);
     if (n) {
-      total += v;
+      total += p.valor_parcela > 0 ? p.valor_parcela : v;
       rotulos.push(`${rotulo(p)} parc. ${n}/${p.num_parcelas}`);
     }
   }
@@ -144,7 +204,7 @@ export function montarCobranca(d, contrato, comp) {
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
-    descontoPercentual: contrato.desconto_pontualidade_percentual, iptu, seguro,
+    descontoPercentual: percentualBonificacao(contrato), iptu, seguro,
     taxaBoleto: contrato.taxa_boleto || 0, reservaDisponivel: reserva,
   });
   return {
@@ -164,6 +224,7 @@ export function gerarCobrancas(d, comp, usuario) {
   let geradas = 0;
   let existentes = 0;
   for (const contrato of [...d.contratos]) {
+    if (contrato.ativo === false) continue;
     if (d.cobrancas.some((cb) => cb.contrato_id === contrato.id && cb.competencia === comp)) {
       existentes += 1;
       continue;
@@ -224,6 +285,9 @@ export function pendentesDeFatura(d) {
   for (const r of d.recebimentos) {
     if (!faturasDe(d, 'recebimento', r.id).length) lista.push({ tipo: 'recebimento', registro: r, data: r.data_pagamento });
   }
+  for (const r of d.avulsas) {
+    if (!faturasDe(d, 'avulsa', r.id).length) lista.push({ tipo: 'avulsa', registro: r, data: r.data_pagamento });
+  }
   return lista.sort((a, b) => a.data.localeCompare(b.data) || a.tipo.localeCompare(b.tipo) || a.registro.id - b.registro.id);
 }
 
@@ -242,6 +306,22 @@ export function baseDaFatura(d, tipo, registro) {
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${C.compBr(registro.competencia)}`,
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
+      partes: participacoesDo(d, imovel.id), origem: `o imóvel "${imovel.nome}"`,
+    };
+  }
+  if (tipo === 'avulsa') {
+    const imovel = registro.imovel_id ? buscar(d, 'imoveis', registro.imovel_id) : null;
+    const partes = registro.partes && registro.partes.length ? registro.partes
+      : (imovel ? participacoesDo(d, imovel.id) : d.emitentes.filter((e) => e.ativo)
+        .map((e, _, l) => ({ emitente_id: e.id, percentual: 100 / l.length })));
+    return {
+      imovel, valor: registro.valor, partes, origem: 'a fatura avulsa',
+      periodo_inicio: registro.periodo_inicio || registro.data_pagamento,
+      periodo_fim: registro.periodo_fim || registro.data_pagamento,
+      descricao: `Avulsa · ${registro.tomador_nome}${registro.descricao ? ` · ${registro.descricao}` : ''}`,
+      municipio: registro.municipio || (imovel && imovel.cidade) || '',
+      tomador: { nome: registro.tomador_nome, documento: registro.tomador_documento || '',
+        telefone: registro.tomador_telefone || '', endereco: registro.tomador_endereco || (imovel ? enderecoCompleto(imovel) : '') },
     };
   }
   const grupo = buscar(d, 'imoveis', registro.imovel_id);
@@ -253,6 +333,7 @@ export function baseDaFatura(d, tipo, registro) {
     tomador: { nome: registro.tomador_nome, documento: registro.tomador_documento || '',
       telefone: registro.tomador_telefone || '',
       endereco: registro.tomador_endereco || enderecoCompleto(unidade || grupo) },
+    partes: participacoesDo(d, grupo.id), origem: `o grupo "${grupo.nome}"`,
   };
 }
 
@@ -261,10 +342,10 @@ export function enderecoCompleto(imovel) {
 }
 
 function problemaDaFatura(d, base) {
-  const partes = participacoesDo(d, base.imovel.id);
-  if (!partes.length) return `Defina no imóvel "${base.imovel.nome}" quais empresas emitem a fatura.`;
+  const partes = base.partes;
+  if (!partes.length) return `Defina em ${base.origem} quais empresas emitem a fatura.`;
   const soma = partes.reduce((s, p) => s + p.percentual, 0);
-  if (Math.abs(soma - 100) > 1e-9) return `Os percentuais das empresas em "${base.imovel.nome}" somam ${soma}%, e precisam somar 100%.`;
+  if (Math.abs(soma - 100) > 1e-6) return `Os percentuais das empresas em ${base.origem} somam ${soma}%, e precisam somar 100%.`;
   if (!(base.valor > 0)) return `Valor da fatura zerado em ${base.descricao}.`;
   return null;
 }
@@ -287,14 +368,14 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
     const problema = problemaDaFatura(d, base);
     if (problema) return { numeradas, foraDeOrdem: [], problema, ultima };
     const numero = d.proxima_fatura;
-    const partes = participacoesDo(d, base.imovel.id);
+    const { partes } = base;
     const valores = C.dividir(base.valor, partes.map((x) => x.percentual));
     partes.forEach((parte, i) => {
       const e = buscar(d, 'emitentes', parte.emitente_id);
       inserir(d, 'faturas', {
         numero, emissao: p.data, origem_tipo: p.tipo, origem_id: p.registro.id, emitente_id: e.id,
         percentual: parte.percentual, valor: valores[i], periodo_inicio: base.periodo_inicio,
-        periodo_fim: base.periodo_fim, municipio: e.municipio || base.imovel.cidade || '',
+        periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
         tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento,
         tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, situacao: 'Emitida',
       }, usuario, `Fatura nº ${numeroFatura(numero)} · ${e.nome} · ${base.descricao}`);
@@ -308,14 +389,104 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
 // --------------------------------------------------------------------------
 // Alertas
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Renovação, novo valor negociado e saída do inquilino
+// --------------------------------------------------------------------------
+export const TIPOS_RENOVACAO = ['Renovado com nova data de término', 'Passou a prazo indeterminado', 'Novo valor negociado'];
+
+/** Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). */
+export function registrarRenovacao(d, contratoId, dados, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados }, usuario, dados.tipo);
+  const mud = {};
+  if (dados.tipo === 'Passou a prazo indeterminado') mud.prazo_tipo = 'Indeterminado';
+  if (dados.nova_vigencia_fim) Object.assign(mud, { vigencia_fim: dados.nova_vigencia_fim, prazo_tipo: 'Determinado' });
+  if (Object.keys(mud).length) atualizar(d, 'contratos', c.id, mud, usuario, dados.tipo);
+  if (dados.novo_valor > 0) {
+    const anterior = aluguelAtual(d, c, C.somarDias(dados.data, -1));
+    inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: dados.data, indice: 'Negociado',
+      percentual: anterior ? C.percentualPorDesconto(anterior, dados.novo_valor - anterior) : 0,
+      valor_anterior: anterior, valor_novo: dados.novo_valor, observacoes: dados.tipo }, usuario, `Novo valor negociado: ${C.reais(dados.novo_valor)}`);
+  }
+  return r;
+}
+
+export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && !cb.data_pagamento);
+
+/** Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. */
+export function calcularEncerramento(garantia, indicePercentual, debitos) {
+  const corrigida = C.arred((garantia || 0) * (1 + (indicePercentual || 0) / 100));
+  return { garantia_corrigida: corrigida, saldo: corrigida - (debitos || 0) };
+}
+
+export function encerrarContrato(d, contratoId, dados, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
+  if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
+  const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
+  const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
+    `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
+  atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
+  return r;
+}
+
+export const encerramentoDo = (d, contratoId) => d.encerramentos.find((e) => e.contrato_id === contratoId) || null;
+
+/** Contratos ligados (ex.: alteração de titular): anteriores e seguintes, em ordem. */
+export function cadeiaDeContratos(d, c) {
+  const antes = [];
+  let x = c;
+  const vistos = new Set([c.id]);
+  while (x.contrato_anterior_id && !vistos.has(x.contrato_anterior_id)) {
+    x = buscar(d, 'contratos', x.contrato_anterior_id);
+    if (!x) break;
+    vistos.add(x.id);
+    antes.unshift(x);
+  }
+  const depois = [];
+  x = c;
+  for (;;) {
+    const prox = d.contratos.find((y) => y.contrato_anterior_id === x.id && !vistos.has(y.id));
+    if (!prox) break;
+    vistos.add(prox.id);
+    depois.push(prox);
+    x = prox;
+  }
+  return { antes, depois };
+}
+
+// --------------------------------------------------------------------------
+// Alertas
+// --------------------------------------------------------------------------
+function alertaCaucao(d, c) {
+  if (!temCaucao(c) || !c.caucao_valor) return null;
+  const ultimaCaucao = correcoesGarantiaDo(d, c.id).map((x) => x.data).pop() || c.caucao_data || '';
+  const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
+  if (!correcao) return null;
+  const sug = caucaoSugerida(d, c, correcao.data_vigencia);
+  return { nivel: 'aviso', tipo: 'Correção da caução',
+    texto: `O aluguel foi corrigido em ${C.dataBr(correcao.data_vigencia)}. Corrija também a caução (atual ${C.reais(valorGarantia(d, c))}${sug ? `, sugerido ${C.reais(sug)}` : ''}).` };
+}
+
+function alertaAplicacao(d, c) {
+  const s = situacaoAplicacao(d, c);
+  if (!s.total || s.ok) return null;
+  return { nivel: 'info', tipo: 'Aplicação da garantia',
+    texto: `Garantia de ${C.reais(s.total)}: ${s.linhas.map((l) => `${l.emitente.nome.split(/\s+/)[0]} ${C.reais(l.aplicado)} de ${C.reais(l.meta)}`).join(', ')}. Confirme onde o valor foi aplicado.` };
+}
+
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
   const datas = correcoesDo(d, contrato.id).map((c) => c.data_vigencia);
   const seguros = d.seguros.filter((s) => s.contrato_id === contrato.id);
   return [
-    alertas.alertaCorrecao(contrato.vigencia_inicio, hoje, datas),
-    alertas.alertaSeguro(contrato.vigencia_inicio, hoje, seguros),
+    contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
+    alertas.alertaCorrecao(dataBaseCorrecao(contrato), hoje, datas),
+    alertaCaucao(d, contrato),
+    alertas.alertaSeguro(dataBaseCorrecao(contrato), hoje, seguros),
     alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
-    alertas.alertaVigencia(contrato.vigencia_fim, hoje),
+    contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
+    temFiador(contrato) && !fiadoresDo(d, contrato.id).length ? { nivel: 'aviso', tipo: 'Fiador', texto: 'Garantia por fiador, mas nenhum fiador cadastrado.' } : null,
+    alertaAplicacao(d, contrato),
   ].filter(Boolean);
 }
 
@@ -329,5 +500,40 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
       lista.push({ ...a, contrato_id: c.id, imovel: imovel ? imovel.nome : '', inquilino: c.inquilino_nome });
     }
   }
+  for (const i of d.imoveis) {
+    if (i.verificar) lista.push({ nivel: 'aviso', tipo: 'A verificar', texto: i.verificar, imovel_id: i.id, imovel: i.nome, inquilino: '' });
+  }
   return lista.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
+}
+
+// --------------------------------------------------------------------------
+// Boleto: textos para copiar no site do banco
+// --------------------------------------------------------------------------
+const rs = (c) => `RS${C.reais(c, false)}`;
+
+/** Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL RS3.644,45"). */
+export function dadosBoleto(d, cb) {
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const imovel = buscar(d, 'imoveis', c.imovel_id);
+  const t = totais(cb);
+  const linhas = [];
+  linhas.push(cb.dias_cobrados < cb.dias_mes ? `ALUGUEL ${cb.dias_cobrados}/${cb.dias_mes} DIAS ${rs(cb.aluguel)}` : `ALUGUEL ${rs(cb.aluguel)}`);
+  if (cb.desconto) linhas.push(`COM BONF. ${rs(cb.aluguel - cb.desconto)}`);
+  const extras = [];
+  if (cb.iptu) extras.push(`IPTU ${rs(cb.iptu)}`);
+  if (cb.seguro) {
+    const parc = /(\d+\/\d+)/.exec(cb.seguro_parcela || '');
+    extras.push(`SEGURO${parc ? parc[1] : ''} ${rs(cb.seguro)}`);
+  }
+  if (cb.outros) extras.push(`${(cb.outros_descricao || 'OUTROS').toLocaleUpperCase('pt-BR')} ${rs(cb.outros)}`);
+  if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
+  if (extras.length) linhas.push(extras.join(' '));
+  const valor = t.a_pagar_sem_desconto;
+  return {
+    pagador: c.inquilino_nome, documento_pagador: c.inquilino_cpf || '',
+    numero_documento: (imovel.nome || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
+    vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
+    valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
+    juros_ao_dia: C.jurosAoDia(valor, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
+  };
 }

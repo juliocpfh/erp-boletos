@@ -72,11 +72,11 @@ export function alertaVigencia(vigenciaFim, hoje) {
   const faltam = diasEntre(hoje, vigenciaFim);
   if (faltam < 0) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
-      texto: `Vigência terminou em ${dataBr(vigenciaFim)}. Renove ou registre a saída.` };
+      texto: `Vigência terminou em ${dataBr(vigenciaFim)}. Registre a renovação (nova data ou prazo indeterminado, com o novo valor negociado) ou a saída.` };
   }
   if (faltam <= ANTECEDENCIA_VIGENCIA) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
-      texto: `Vigência termina em ${dataBr(vigenciaFim)} (faltam ${faltam} dias).` };
+      texto: `Vigência termina em ${dataBr(vigenciaFim)} (faltam ${faltam} dias). Hora de negociar a renovação e o novo valor.` };
   }
   return null;
 }
