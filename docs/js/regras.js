@@ -224,7 +224,7 @@ export function gerarCobrancas(d, comp, usuario) {
   let geradas = 0;
   let existentes = 0;
   for (const contrato of [...d.contratos]) {
-    if (contrato.ativo === false) continue;
+    if (contrato.ativo === false || !contrato.imovel_id) continue;
     if (d.cobrancas.some((cb) => cb.contrato_id === contrato.id && cb.competencia === comp)) {
       existentes += 1;
       continue;
@@ -531,7 +531,7 @@ export function dadosBoleto(d, cb) {
   const valor = t.a_pagar_sem_desconto;
   return {
     pagador: c.inquilino_nome, documento_pagador: c.inquilino_cpf || '',
-    numero_documento: (imovel.nome || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
+    numero_documento: ((imovel && imovel.nome) || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
     vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
     valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
     juros_ao_dia: C.jurosAoDia(valor, cb.juros_mensal_percentual), descricao: linhas.join('\n'),

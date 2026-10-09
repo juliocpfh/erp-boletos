@@ -8,8 +8,8 @@ function base() {
   const jck = R.inserir(d, 'emitentes', { nome: 'JCK ADMINISTRADORA', razao_social: 'JCK ADMINISTRADORA DE BENS LTDA', cnpj: '58.522.768/0001-05', municipio: 'CURITIBA', ativo: true }, 'julio');
   const loja = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Loja 1', endereco: 'Rua Prof. Nilo Brandão, 117', complemento: 'Loja 1', cidade: 'Curitiba' }, 'julio');
   for (const e of [ank, jck]) R.inserir(d, 'participacoes', { imovel_id: loja.id, emitente_id: e.id, percentual: 50 }, 'julio');
-  const c = R.inserir(d, 'contratos', { imovel_id: loja.id, inquilino_nome: 'Carmem Beatriz Herrera', inquilino_cpf: '801.830.109-30',
-    inquilino_telefone: '41 99623-7614', data_entrada: '2026-06-07', vigencia_inicio: '2026-06-07', aluguel_inicial: 135000,
+  const c = R.inserir(d, 'contratos', { imovel_id: loja.id, inquilino_nome: 'Maria Exemplo', inquilino_cpf: '000.000.000-00',
+    inquilino_telefone: '41 90000-0000', data_entrada: '2026-06-07', vigencia_inicio: '2026-06-07', aluguel_inicial: 135000,
     dia_vencimento: 10, cobranca_mes_seguinte: true, desconto_pontualidade_percentual: 10, taxa_boleto: 350,
     multa_percentual: 10, juros_mensal_percentual: 1, cobrar_iptu: true, reserva_valor: 50000 }, 'julio');
   R.inserir(d, 'iptus', { imovel_id: loja.id, ano: 2026, valor_total: 100000, num_parcelas: 10, primeira_competencia: '2026-02' }, 'julio');
@@ -195,4 +195,12 @@ test('contratos ligados por alteração de titular', () => {
   const l = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'Licia', data_entrada: '2026-04-27', contrato_anterior_id: v.id }, 'julio');
   assert.deepEqual(R.cadeiaDeContratos(d, l).antes.map((x) => x.inquilino_nome), ['Vinicius']);
   assert.deepEqual(R.cadeiaDeContratos(d, v).depois.map((x) => x.inquilino_nome), ['Licia']);
+});
+
+test('inquilino sem imóvel ou inativo não gera cobrança', () => {
+  const { d, c } = base();
+  R.inserir(d, 'contratos', { inquilino_nome: 'Sem imóvel', data_entrada: '2026-01-01', aluguel_inicial: 100000, dia_vencimento: 5 }, 'julio');
+  R.atualizar(d, 'contratos', c.id, { ativo: false }, 'julio');
+  assert.deepEqual(R.gerarCobrancas(d, '2026-07', 'julio'), { geradas: 0, existentes: 0 });
+  assert.equal(R.contratoAtivo(R.buscar(d, 'contratos', c.id), '2026-07-01'), false);
 });

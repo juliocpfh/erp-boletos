@@ -50,6 +50,9 @@ export const GRUPO_AIRBNB = [
 ];
 
 export const CONTRATO = [
+  secao('Imóvel e situação'),
+  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], ajuda: 'Deixe em branco para cadastrar o inquilino sem imóvel (não gera cobrança)' }),
+  campo('ativo', 'Inquilino ativo', 'simnao', { padrao: true, ajuda: 'Desmarcado: não gera cobrança e vai para a lista de inativos' }),
   secao('Inquilino (responsável pelo contrato)'),
   campo('inquilino_nome', 'Nome completo', 'texto', { obrig: true, largo: true }),
   campo('inquilino_apelido', 'Apelido'),
