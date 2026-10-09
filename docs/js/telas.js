@@ -268,6 +268,7 @@ export const TELAS = {
   imprimir: (rota) => telaImprimir(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
+  iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
   dados: () => telaDados(),
   usuarios() {
@@ -602,8 +603,23 @@ const CADASTROS = {
     titulo: (r, q) => `IPTU - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
     campos: () => F.IPTU,
     fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
-    padrao: () => ({ ano: new Date().getFullYear() }),
-    voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
+    padrao: (q) => {
+      // novo ano: parte do ano anterior (mesmas parcelas, 1ª parcela no mesmo mês)
+      const ano = Number(q.ano) || new Date().getFullYear();
+      const ant = d().iptus.filter((p) => p.imovel_id === Number(q.imovel) && p.ano < ano).sort((a, b) => b.ano - a.ano)[0];
+      return ant ? { ano, num_parcelas: ant.num_parcelas, primeira_competencia: `${ano}${ant.primeira_competencia.slice(4)}` } : { ano };
+    },
+    aviso: (r, q) => {
+      const iid = r ? r.imovel_id : Number(q.imovel);
+      const ant = d().iptus.filter((p) => p.imovel_id === iid && p.ano < (r ? r.ano : Number(q.ano) || new Date().getFullYear())).sort((a, b) => b.ano - a.ano)[0];
+      return ant ? `Ano anterior (${ant.ano}): total ${reais(ant.valor_total)} em ${ant.num_parcelas} parcela(s)${ant.valor_parcela ? ` de ${reais(ant.valor_parcela)}` : ''}.` : 'Primeiro IPTU lançado para este imóvel.';
+    },
+    ajustar(dados, erros, r, form, q) {
+      const iid = r ? r.imovel_id : Number(q.imovel);
+      if (d().iptus.some((p) => p.imovel_id === iid && p.ano === dados.ano && (!r || p.id !== r.id))) erros.ano = 'Já existe IPTU deste ano para o imóvel. Use "Editar".';
+    },
+    voltar: (r, q) => (q && q.de === 'iptu' ? `#/iptu?ano=${r ? r.ano : q.ano}` : `#/imovel/${r ? r.imovel_id : q.imovel}`),
+    destino: (salvo, q) => (q.de === 'iptu' ? `#/iptu?ano=${salvo.ano}` : `#/imovel/${salvo.imovel_id}`),
     descricao: (dados) => `IPTU ${dados.ano}`,
   },
   titularidades: {
@@ -961,6 +977,25 @@ function telaInquilinos(q) {
       || '<tr><td colspan="9" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
 }
 
+function telaIptu(ano) {
+  const imoveis = ordenar(d().imoveis.filter((i) => i.tipo !== 'airbnb'), 'nome');
+  const doAno = (i, a) => d().iptus.find((p) => p.imovel_id === i.id && p.ano === a);
+  const resumo = (p) => (p ? `${reais(p.valor_total)} · ${p.num_parcelas}x${p.valor_parcela ? ` de ${reais(p.valor_parcela)}` : ''}` : '<span class="suave">-</span>');
+  const linhas = imoveis.map((i) => {
+    const p = doAno(i, ano);
+    const ant = doAno(i, ano - 1);
+    const varia = p && ant && ant.valor_total ? ((p.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace('.', ',') : null;
+    const acao = !opera() ? '' : p ? link(`#/editar/iptus/${p.id}?de=iptu`, 'Editar') : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno');
+    return `<tr class="${p ? '' : 'amarelo'}"><td><a href="#/imovel/${i.id}#iptu">${esc(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
+      <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p ? compBr(p.primeira_competencia) : '-'}</td><td class="n">${acao}</td></tr>`;
+  }).join('');
+  const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
+  return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
+    ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
+    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela no aluguel de</th><th></th></tr>${linhas}</table>
+    <p class="suave">As parcelas entram sozinhas nas cobranças dos inquilinos que pagam IPTU, a partir do mês da 1ª parcela.</p></div>`;
+}
+
 function telaImprimir(rota) {
   const tipo = rota.partes[1];
   const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
@@ -1092,7 +1127,7 @@ export const FORMULARIOS = {
     if (cfg.depois) await cfg.depois(salvo, antigo);
     if (tabela === 'usuarios' && salvo.id === E.usuario.id) E.usuario = salvo;
     aviso('Salvo.');
-    const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : cfg.destino ? cfg.destino(salvo) : cfg.voltar(salvo, rota.q);
+    const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : cfg.destino ? cfg.destino(salvo, rota.q) : cfg.voltar(salvo, rota.q);
     ir(destino);
     return null;
   },
