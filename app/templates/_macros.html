@@ -1,0 +1,126 @@
+{% macro csrf_input() %}<input type="hidden" name="_csrf" value="{{ csrf }}">{% endmacro %}
+
+{% macro botao_post(acao, texto, classe='secundario pequeno', confirmar=None) %}
+<form class="inline" method="post" action="{{ acao }}"{% if confirmar %} onsubmit="return confirm('{{ confirmar }}')"{% endif %}>
+  {{ csrf_input() }}<button class="{{ classe }}">{{ texto }}</button>
+</form>
+{% endmacro %}
+
+{% macro campos_form(campos, valores, erros, extra={}) %}
+<div class="formulario">
+{% for c in campos %}
+  {% if c.secao %}
+    <h3>{{ c.secao }}</h3>
+  {% else %}
+  {% set v = valores.get(c.nome, '') if valores else '' %}
+  <div class="{{ c.largura or '' }} {{ 'com-erro' if erros.get(c.nome) }}">
+    {% if c.tipo == 'simnao' %}
+      <label class="check"><input type="checkbox" name="{{ c.nome }}" value="1" {{ 'checked' if v in (1, '1', 'on', True) }}> {{ c.rotulo }}</label>
+    {% else %}
+      <label for="f_{{ c.nome }}">{{ c.rotulo }}{% if c.obrig %} *{% endif %}</label>
+      {% if c.tipo == 'area' %}
+        <textarea id="f_{{ c.nome }}" name="{{ c.nome }}">{{ v }}</textarea>
+      {% elif c.tipo == 'opcao' %}
+        <select id="f_{{ c.nome }}" name="{{ c.nome }}">
+          <option value=""></option>
+          {% for o in c.opcoes %}
+            {% set ov = o[0] if o is not string else o %}{% set ot = o[1] if o is not string else o %}
+            <option value="{{ ov }}" {{ 'selected' if v|string == ov|string }}>{{ ot }}</option>
+          {% endfor %}
+          {% set chaves = (c.opcoes|map('first')|list) if (c.opcoes and c.opcoes[0] is not string) else c.opcoes %}
+          {% if v and v|string not in chaves|map('string')|list %}
+            <option value="{{ v }}" selected>{{ v }}</option>
+          {% endif %}
+        </select>
+      {% else %}
+        {% set tipo = {'data': 'date', 'mes': 'month', 'email': 'email', 'url': 'url', 'tel': 'tel'}.get(c.tipo, 'text') %}
+        <input id="f_{{ c.nome }}" name="{{ c.nome }}" type="{{ tipo }}" value="{{ v }}"
+          {% if c.tipo in ('dinheiro', 'pct', 'inteiro') %}inputmode="decimal"{% endif %}
+          {% if c.vinculo %}data-vinculo="{{ c.vinculo }}" data-tipo="{{ c.tipo }}"{% endif %}
+          {% if c.tipo == 'mes' %}placeholder="AAAA-MM"{% endif %}>
+      {% endif %}
+    {% endif %}
+    {% if c.ajuda %}<div class="ajuda">{{ c.ajuda }}</div>{% endif %}
+    {% if erros.get(c.nome) %}<div class="erro-campo">{{ erros[c.nome] }}</div>{% endif %}
+  </div>
+  {% endif %}
+{% endfor %}
+</div>
+{% endmacro %}
+
+{% macro lista_arquivos(lista, escopo, rid, titulo, ancora, fotos=False) %}
+<div class="cartao" id="{{ ancora }}">
+  <div class="cabecalho">
+    <h2>{{ titulo }}</h2>
+    <div class="acoes nao-imprimir">
+      {{ botao_post(url_for('views.arquivo_abrir_pasta', escopo=escopo, rid=rid), 'Abrir pasta no computador') }}
+    </div>
+  </div>
+  {% if fotos %}
+    <div class="fotos">
+    {% for a in lista %}
+      <figure>
+        {% if a.foto %}<a href="{{ url_for('views.arquivo_ver', escopo=escopo, rid=rid, nome=a.nome) }}" target="_blank"><img src="{{ url_for('views.arquivo_ver', escopo=escopo, rid=rid, nome=a.nome) }}" alt="{{ a.nome }}"></a>{% endif %}
+        <figcaption><span>{{ a.nome }}</span>
+          {% if pode('operador') %}{{ botao_post(url_for('views.arquivo_excluir', escopo=escopo, rid=rid, nome=a.nome), '×', 'perigo pequeno', 'Excluir este arquivo?') }}{% endif %}
+        </figcaption>
+      </figure>
+    {% else %}<p class="suave">Nenhuma foto ainda.</p>{% endfor %}
+    </div>
+  {% else %}
+    <table>
+    {% for a in lista %}
+      <tr>
+        <td><a href="{{ url_for('views.arquivo_ver', escopo=escopo, rid=rid, nome=a.nome) }}" target="_blank">{{ a.nome }}</a></td>
+        <td class="n suave">{{ (a.tamanho / 1024)|round(0)|int }} KB</td>
+        <td class="n nao-imprimir">
+          <a class="botao secundario pequeno" href="{{ url_for('views.arquivo_ver', escopo=escopo, rid=rid, nome=a.nome, baixar=1) }}">Baixar</a>
+          {% if pode('operador') %}{{ botao_post(url_for('views.arquivo_excluir', escopo=escopo, rid=rid, nome=a.nome), 'Excluir', 'perigo pequeno', 'Excluir este arquivo?') }}{% endif %}
+        </td>
+      </tr>
+    {% else %}<tr><td class="suave">Nenhum arquivo ainda.</td></tr>{% endfor %}
+    </table>
+  {% endif %}
+  {% if pode('operador') %}
+  <form class="nao-imprimir acoes" style="margin-top:10px" method="post" enctype="multipart/form-data"
+        action="{{ url_for('views.arquivo_enviar', escopo=escopo, rid=rid) }}">
+    {{ csrf_input() }}
+    <input type="file" name="arquivos" multiple {% if fotos %}accept="image/*"{% endif %} style="max-width:420px">
+    <button>Anexar</button>
+  </form>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro tabela_historico(historico) %}
+<div class="tabela-rolagem">
+<table>
+  <tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr>
+  {% for h in historico %}
+  <tr>
+    <td style="white-space:nowrap">{{ h.quando|databr }}</td>
+    <td>{{ h.usuario }}</td>
+    <td>{{ h.acao }}{% if h.tabela_nome %} · {{ h.tabela_nome }}{% endif %}{% if h.descricao %}<br><span class="suave">{{ h.descricao }}</span>{% endif %}</td>
+    <td class="detalhes">
+      {% if h.acao == 'Alteração' %}
+        {% for campo, m in h.detalhes.items() %}
+          {% if m is mapping %}<div><code>{{ campo }}</code>: {{ m.de if m.de not in (None, '') else '(vazio)' }} → {{ m.para if m.para not in (None, '') else '(vazio)' }}</div>
+          {% else %}<div><code>{{ campo }}</code>: {{ m }}</div>{% endif %}
+        {% endfor %}
+      {% elif h.detalhes %}
+        <details><summary>ver</summary>
+        {% for campo, v in h.detalhes.items() %}<div><code>{{ campo }}</code>: {{ v }}</div>{% endfor %}
+        </details>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="suave">Nada registrado ainda.</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endmacro %}
+
+{% macro etiqueta_situacao(s) %}
+<span class="etiqueta {{ {'Paga em dia': 'ok', 'Paga com atraso': 'aviso', 'Em aberto': 'neutra'}.get(s, 'neutra') }}">{{ s }}</span>
+{% endmacro %}

@@ -1,0 +1,46 @@
+{% extends 'base.html' %}{% from '_macros.html' import csrf_input with context %}
+{% block titulo %}Dados e backup{% endblock %}
+{% block conteudo %}
+<h1>Dados e backup</h1>
+<div class="cartao">
+  <div class="grade">
+    <div><div class="rotulo">Banco criado em</div><div class="valor">{{ criado_em|databr }}</div></div>
+    <div><div class="rotulo">Última atualização</div><div class="valor">{{ ultima_atualizacao|databr if ultima_atualizacao else '-' }}{% if ultima_atualizacao_por %} por {{ ultima_atualizacao_por }}{% endif %}</div></div>
+    <div><div class="rotulo">Arquivos anexados</div><div class="valor">{{ (tamanho / 1048576)|round(1) }} MB</div></div>
+    <div class="largo" style="grid-column:1/-1"><div class="rotulo">Pasta dos dados neste computador</div><div class="valor">{{ pasta }}</div></div>
+  </div>
+  <p class="suave">Tudo é salvo automaticamente a cada alteração. Ao abrir o programa, uma cópia do banco é guardada em <code>backups/automaticos</code> (as 15 mais recentes).</p>
+</div>
+
+<div class="cartao">
+  <h2>Exportar (levar para outro computador)</h2>
+  <p>Gera um arquivo ZIP com o banco de dados e todos os arquivos anexados (contratos, vistorias, fotos, matrículas...).</p>
+  {% if pode('operador') %}<a class="botao" href="{{ url_for('views.exportar') }}">Baixar ZIP com todos os dados</a>{% endif %}
+</div>
+
+{% if pode('admin') %}
+<div class="cartao">
+  <h2>Importar ZIP</h2>
+  <div class="alerta aviso">A importação <b>substitui todos os dados deste computador</b> pelos do ZIP. Antes, o programa guarda uma cópia dos dados atuais em <code>backups</code>.</div>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('views.importar') }}" class="acoes">{{ csrf_input() }}
+    <input type="file" name="zip" accept=".zip" style="max-width:380px">
+    <label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="sim"> Entendo que os dados atuais serão substituídos</label>
+    <button class="perigo">Importar</button>
+  </form>
+</div>
+
+<div class="cartao">
+  <h2>Modelo XML da nota fiscal</h2>
+  {% if tem_modelo %}<p><span class="etiqueta ok">Modelo cadastrado</span> <a href="{{ url_for('views.modelo_xml_baixar') }}">baixar modelo atual</a></p>
+  {% else %}<p class="suave">Nenhum modelo cadastrado. Sem modelo, as faturas são emitidas para impressão, sem o XML.</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('views.modelo_xml') }}" class="acoes">{{ csrf_input() }}
+    <input type="file" name="modelo" accept=".xml" style="max-width:380px"><button class="secundario">Enviar modelo</button>
+    {% if tem_modelo %}<button class="perigo" name="remover" value="1">Remover modelo</button>{% endif %}
+  </form>
+  <details style="margin-top:10px"><summary>Campos que podem ser usados no modelo</summary>
+    <p class="suave">No XML, escreva o campo entre chaves duplas, por exemplo <code>&lt;ValorServicos&gt;{{ '{{valor_fatura}}' }}&lt;/ValorServicos&gt;</code>.</p>
+    <table>{% for k, v in campos_xml.items() %}<tr><td><code>{{ '{{' ~ k ~ '}}' }}</code></td><td>{{ v }}</td></tr>{% endfor %}</table>
+  </details>
+</div>
+{% endif %}
+{% endblock %}

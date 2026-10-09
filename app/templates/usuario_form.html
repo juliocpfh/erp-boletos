@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% from '_macros.html' import csrf_input, campos_form with context %}
+{% block titulo %}Usuário{% endblock %}
+{% block conteudo %}
+<h1>{{ 'Editar usuário' if registro else 'Novo usuário' }}</h1>
+<form method="post" class="cartao">
+  {{ csrf_input() }}
+  {{ campos_form(campos, valores, erros) }}
+  <div class="formulario" style="margin-top:12px">
+    <div class="{{ 'com-erro' if erros.get('senha') }}">
+      <label>{{ 'Nova senha (deixe em branco para manter)' if registro else 'Senha inicial *' }}</label>
+      <input type="password" name="senha" autocomplete="new-password">
+      {% if erros.get('senha') %}<div class="erro-campo">{{ erros.senha }}</div>{% endif %}
+    </div>
+  </div>
+  <p class="acoes"><button>Salvar</button><a class="botao secundario" href="{{ url_for('auth.usuarios') }}">Cancelar</a></p>
+</form>
+{% endblock %}

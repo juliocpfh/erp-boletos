@@ -1,0 +1,27 @@
+{% extends 'base.html' %}{% from '_macros.html' import tabela_historico with context %}
+{% block titulo %}Painel{% endblock %}
+{% block conteudo %}
+<h1>Painel</h1>
+<div class="numeros">
+  <a class="cartao" href="{{ url_for('views.imoveis') }}"><div class="grande">{{ resumo.imoveis }}</div>imóveis</a>
+  <a class="cartao" href="{{ url_for('views.imoveis') }}"><div class="grande">{{ resumo.contratos }}</div>contratos ativos</a>
+  <a class="cartao" href="{{ url_for('views.cobrancas', competencia=comp) }}"><div class="grande">{{ resumo.abertas }}</div>cobranças em aberto</a>
+  <div class="cartao"><div class="grande" style="color:{{ 'var(--perigo)' if resumo.vencidas else 'inherit' }}">{{ resumo.vencidas }}</div>em aberto e já vencidas</div>
+</div>
+
+<div class="cartao">
+  <h2>Alertas</h2>
+  {% for a in alertas %}
+    <div class="alerta {{ a.nivel }}"><b>{{ a.tipo }}</b>
+      <a href="{{ url_for('views.contrato', cid=a.contrato_id) }}">{{ a.imovel }} · {{ a.inquilino }}</a>: {{ a.texto }}</div>
+  {% else %}
+    <p class="suave">Nenhum alerta no momento.</p>
+  {% endfor %}
+</div>
+
+<div class="cartao">
+  <div class="cabecalho"><h2>Últimas alterações</h2><a href="{{ url_for('views.historico_tela') }}">Ver histórico completo</a></div>
+  {{ tabela_historico(historico) }}
+  <p class="suave">Banco de dados criado em {{ criado_em|databr }}.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exemplo de modelo. Troque pelo XML real da sua nota e mantenha os campos entre {{ }}. -->
+<Fatura>
+  <Numero>{{numero_fatura}}</Numero>
+  <DataEmissao>{{data_emissao}}</DataEmissao>
+  <Prestador>
+    <RazaoSocial>{{emitente_razao_social}}</RazaoSocial>
+    <Cnpj>{{emitente_cnpj}}</Cnpj>
+  </Prestador>
+  <Tomador>
+    <Nome>{{inquilino_nome}}</Nome>
+    <Cpf>{{inquilino_cpf}}</Cpf>
+    <Telefone>{{inquilino_telefone}}</Telefone>
+    <Endereco>{{imovel_endereco}}</Endereco>
+  </Tomador>
+  <Servico>
+    <Descricao>LOCAÇÃO DE IMÓVEL</Descricao>
+    <Municipio>{{emitente_municipio}}</Municipio>
+    <Periodo>{{periodo_inicio_br}} A {{periodo_fim_br}}</Periodo>
+    <Discriminacao>{{discriminacao}}</Discriminacao>
+    <Valor>{{valor_fatura}}</Valor>
+  </Servico>
+</Fatura>

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}{% from '_macros.html' import csrf_input, campos_form with context %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<h1>{{ titulo }}</h1>
+{% if aviso %}<div class="alerta info">{{ aviso }}</div>{% endif %}
+<form method="post" class="cartao" id="formulario"{% if base_desconto %} data-base-desconto="{{ base_desconto }}"{% endif %}>
+  {{ csrf_input() }}
+  {{ campos_form(campos, valores, erros) }}
+  <p class="acoes" style="margin-top:16px">
+    {% if pode('operador') %}<button>Salvar</button>{% endif %}
+    <a class="botao secundario" href="{{ voltar }}">Voltar</a>
+  </p>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+// Desconto de pontualidade: o % e o valor em R$ andam juntos.
+(function () {
+  const pct = document.querySelector('[data-vinculo="desconto"][data-tipo="pct"]');
+  const val = document.querySelector('[data-vinculo="desconto"][data-tipo="dinheiro"]');
+  if (!pct || !val) return;
+  const form = document.getElementById('formulario');
+  const num = t => { t = (t || '').replace(/[R$%\s]/g, ''); if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.'); return parseFloat(t); };
+  const br = (n, casas) => n.toLocaleString('pt-BR', {minimumFractionDigits: casas, maximumFractionDigits: casas});
+  const base = () => { const b = parseFloat(form.dataset.baseDesconto || ''); return isNaN(b) ? num(document.querySelector('[name=aluguel_inicial]').value) : b; };
+  pct.addEventListener('input', () => { const b = base(), p = num(pct.value); val.value = (isNaN(b) || isNaN(p)) ? '' : br(Math.round(b * p) / 100, 2); });
+  val.addEventListener('input', () => { const b = base(), v = num(val.value); pct.value = (isNaN(b) || isNaN(v) || !b) ? '' : br(v * 100 / b, 4).replace(/,?0+$/, ''); });
+  const aluguel = document.querySelector('[name=aluguel_inicial]');
+  if (aluguel && !form.dataset.baseDesconto) aluguel.addEventListener('input', () => pct.dispatchEvent(new Event('input')));
+})();
+</script>
+{% endblock %}

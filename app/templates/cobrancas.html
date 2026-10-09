@@ -1,0 +1,75 @@
+{% extends 'base.html' %}{% from '_macros.html' import csrf_input, etiqueta_situacao with context %}
+{% block titulo %}Cobranças {{ comp|compbr }}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1>Cobranças de {{ comp|compbr }}</h1>
+  <div class="mes-nav nao-imprimir">
+    <a class="botao secundario" href="{{ url_for('views.cobrancas', competencia=anterior) }}">← {{ anterior|compbr }}</a>
+    <form method="get" class="acoes"><input type="month" name="competencia" value="{{ comp }}" style="width:160px"><button class="secundario">Ir</button></form>
+    <a class="botao secundario" href="{{ url_for('views.cobrancas', competencia=proxima) }}">{{ proxima|compbr }} →</a>
+  </div>
+</div>
+<p class="suave">Competência é o mês de uso do imóvel. Ex.: aluguel de {{ comp|compbr }} com vencimento no mês seguinte.</p>
+
+{% if pendentes and pode('operador') %}
+<div class="alerta aviso">
+  {{ pendentes|length }} contrato(s) ainda sem cobrança neste mês: {{ pendentes|map(attribute='inquilino_nome')|join(', ') }}.
+  <form class="inline" method="post" action="{{ url_for('views.cobrancas_gerar') }}">{{ csrf_input() }}
+    <input type="hidden" name="competencia" value="{{ comp }}"><button class="pequeno">Gerar cobranças de {{ comp|compbr }}</button></form>
+</div>
+{% endif %}
+
+<div class="cartao tabela-rolagem">
+<table>
+  <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Confirmar pagamento</th><th class="n">Valor NF</th><th>Faturas</th></tr>
+  {% for x in lista %}{% set cb = x.c %}
+  <tr>
+    <td><a href="{{ url_for('views.cobranca', cbid=cb.id) }}"><b>{{ cb.imovel_nome }}</b></a><br>{{ cb.inquilino_nome }}
+      {% if cb.dias_cobrados < cb.dias_mes %}<br><span class="etiqueta info">proporcional {{ cb.dias_cobrados }}/{{ cb.dias_mes }} dias</span>{% endif %}
+      {% if cb.reserva_utilizada and cb.reserva_utilizada|float > 0 %}<br><span class="etiqueta aviso">usa reserva {{ cb.reserva_utilizada|brl }}</span>{% endif %}</td>
+    <td>{{ cb.vencimento|databr }}</td>
+    <td class="n">{{ x.t.a_pagar_pontual|brl }}</td>
+    <td class="n suave">{{ x.t.a_pagar_sem_desconto|brl }}<br>+ multa e juros</td>
+    <td>{{ etiqueta_situacao(cb.situacao) }}{% if cb.data_pagamento %}<br><span class="suave">em {{ cb.data_pagamento|databr }}{% if cb.dias_atraso %} ({{ cb.dias_atraso }} dias){% endif %}</span>{% endif %}</td>
+    <td>
+      {% if pode('operador') and not x.faturas %}
+      <form class="pagamento-form" method="post" action="{{ url_for('views.cobranca_pagamento', cbid=cb.id) }}">
+        {{ csrf_input() }}<input type="hidden" name="voltar" value="{{ url_for('views.cobrancas', competencia=comp) }}">
+        <input type="date" name="data_pagamento" value="{{ cb.data_pagamento or hoje.isoformat() }}" title="Data em que o inquilino pagou">
+        <input type="text" name="valor_pago" placeholder="valor pago" title="Opcional: valor efetivamente pago" value="{{ cb.valor_pago|num if cb.valor_pago else '' }}">
+        <button class="pequeno {{ 'secundario' if cb.data_pagamento }}">{{ 'Corrigir' if cb.data_pagamento else 'Confirmar' }}</button>
+      </form>
+      {% elif cb.valor_pago %}{{ cb.valor_pago|brl }}{% endif %}
+    </td>
+    <td class="n">{{ cb.valor_nf|brl if cb.valor_nf else '-' }}</td>
+    <td>
+      {% if x.faturas %}<a class="botao secundario pequeno" target="_blank" href="{{ url_for('views.faturas_imprimir', cbid=cb.id) }}">Nº {{ '%04d'|format(x.faturas[0].numero) }}</a>
+      {% elif cb.data_pagamento and pode('operador') %}
+        <form class="inline" method="post" action="{{ url_for('views.faturas_emitir', cbid=cb.id) }}">{{ csrf_input() }}
+          <input type="hidden" name="voltar" value="{{ url_for('views.cobrancas', competencia=comp) }}"><button class="pequeno">Emitir</button></form>
+      {% else %}<span class="suave">-</span>{% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="suave">Nenhuma cobrança gerada para {{ comp|compbr }}.</td></tr>
+  {% endfor %}
+  {% if lista %}
+  <tr class="total"><td colspan="2">Total</td><td class="n">{{ soma.a_pagar_pontual|brl }}</td><td></td><td></td><td></td><td class="n">{{ soma.nf|brl }}</td><td></td></tr>
+  {% endif %}
+</table>
+</div>
+
+{% if lista %}
+<div class="acoes nao-imprimir">
+  <a class="botao secundario" target="_blank" href="{{ url_for('views.cobrancas_imprimir', competencia=comp) }}">Imprimir demonstrativos do mês</a>
+  {% if pode('operador') %}
+  <form class="acoes" method="post" action="{{ url_for('views.faturas_emitir_mes') }}">{{ csrf_input() }}
+    <input type="hidden" name="competencia" value="{{ comp }}">
+    <label style="margin:0">Emissão</label><input type="date" name="emissao" value="{{ hoje.isoformat() }}" style="width:150px">
+    <button>Emitir faturas de todas as cobranças pagas</button>
+  </form>
+  {% endif %}
+  <a class="botao secundario" target="_blank" href="{{ url_for('views.faturas_imprimir_mes', competencia=comp) }}">Imprimir todas as faturas do mês</a>
+</div>
+{% endif %}
+{% endblock %}

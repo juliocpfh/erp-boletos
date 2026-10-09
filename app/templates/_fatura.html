@@ -1,0 +1,30 @@
+<div class="fatura">
+  <div class="linha">
+    <div>
+      <div class="empresa">{{ f.nome_curto|upper }}</div>
+      <div><b>{{ f.razao_social }}</b></div>
+      <div>CNPJ {{ f.cnpj or '' }}</div>
+      <div>{{ f.emitente_endereco or '' }}</div>
+    </div>
+    <div class="titulo-fatura">FATURA DE LOCAÇÃO<br>Nº {{ '%04d'|format(f.numero) }}<br><span style="font-size:13px;font-weight:400">Emissão: {{ f.emissao|databr }}</span></div>
+  </div>
+  <div class="bloco">
+    <div class="bloco-titulo">TOMADOR DE SERVIÇO</div>
+    <div class="linha"><div><b>NOME DO CLIENTE:</b> {{ c.inquilino_nome|upper }}</div><div><b>TELEFONE:</b> {{ c.inquilino_telefone or '' }}</div></div>
+    <div><b>CPF:</b> {{ c.inquilino_cpf or '' }}</div>
+    <div><b>ENDEREÇO:</b> {{ (i.endereco ~ (', ' ~ i.complemento if i.complemento else ''))|upper }}</div>
+  </div>
+  <div class="bloco">
+    <div class="bloco-titulo">DADOS DA LOCAÇÃO · PERÍODO DO SERVIÇO: {{ f.periodo_inicio|databr }} A {{ f.periodo_fim|databr }}</div>
+    <table>
+      <tr><th>ITEM</th><th>DESCRIÇÃO</th><th>MUNICÍPIO</th><th>UN</th><th>QUANTIDADE/MESES</th><th class="n">VALOR UNITÁRIO</th><th class="n">CUSTO TOTAL</th></tr>
+      <tr><td>1</td><td>LOCAÇÃO DE IMÓVEL</td><td>{{ (f.municipio or i.cidade or '')|upper }}</td><td>UN</td><td>1</td><td class="n">{{ f.valor|brl }}</td><td class="n">{{ f.valor|brl }}</td></tr>
+    </table>
+    <div class="total-fatura">VALOR TOTAL DA FATURA: {{ f.valor|brl }}</div>
+  </div>
+  <div class="canhoto">
+    <div class="linha"><div>RECEBEMOS DE {{ c.inquilino_nome|upper }} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO</div>
+      <div style="text-align:right;white-space:nowrap"><b>FATURA DE LOCAÇÃO<br>Nº {{ '%04d'|format(f.numero) }}</b></div></div>
+    <div class="assinaturas"><div>DATA DO RECEBIMENTO</div><div>IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR</div><div>{{ f.nome_curto }}</div></div>
+  </div>
+</div>

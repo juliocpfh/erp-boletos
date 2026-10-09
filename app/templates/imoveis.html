@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block titulo %}Imóveis{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Imóveis</h1>
+  {% if pode('operador') %}<a class="botao" href="{{ url_for('views.imovel_form') }}">Novo imóvel</a>{% endif %}</div>
+<div class="cartao tabela-rolagem">
+<table>
+  <tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual</th></tr>
+  {% for x in lista %}
+  <tr>
+    <td><a href="{{ url_for('views.imovel', iid=x.imovel.id) }}"><b>{{ x.imovel.nome }}</b></a></td>
+    <td>{{ x.imovel.endereco }}{% if x.imovel.complemento %}, {{ x.imovel.complemento }}{% endif %}</td>
+    <td>{% if x.atual %}<a href="{{ url_for('views.contrato', cid=x.atual.id) }}">{{ x.atual.inquilino_nome }}</a>
+        {% if x.atual.inquilino_apelido %}<span class="suave">({{ x.atual.inquilino_apelido }})</span>{% endif %}
+        {% else %}<span class="etiqueta aviso">Vago</span>{% endif %}</td>
+    <td class="n">{{ x.aluguel|brl if x.aluguel is not none else '-' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

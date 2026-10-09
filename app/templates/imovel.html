@@ -1,0 +1,107 @@
+{% extends 'base.html' %}{% from '_macros.html' import csrf_input, botao_post, lista_arquivos, tabela_historico with context %}
+{% block titulo %}{{ i.nome }}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1>{{ i.nome }}</h1>
+  <div class="acoes">
+    {% if pode('operador') %}
+      <a class="botao" href="{{ url_for('views.contrato_form', iid=i.id) }}">Novo inquilino</a>
+      <a class="botao secundario" href="{{ url_for('views.imovel_form', iid=i.id) }}">Editar imóvel</a>
+    {% endif %}
+    {% if pode('admin') %}{{ botao_post(url_for('views.imovel_excluir', iid=i.id), 'Excluir', 'perigo', 'Excluir este imóvel?') }}{% endif %}
+  </div>
+</div>
+<div class="endereco">📍 {{ i.endereco }}{% if i.complemento %}, {{ i.complemento }}{% endif %}{% if i.bairro %} · {{ i.bairro }}{% endif %}{% if i.cidade %} · {{ i.cidade }}{% endif %}{% if i.cep %} · CEP {{ i.cep }}{% endif %}</div>
+
+<div class="cartao">
+  <div class="grade">
+    <div><div class="rotulo">Matrícula</div><div class="valor">{{ i.matricula or '-' }}</div></div>
+    <div><div class="rotulo">Cartório</div><div class="valor">{{ i.cartorio or '-' }}</div></div>
+    <div><div class="rotulo">Inscrição IPTU</div><div class="valor">{{ i.inscricao_iptu or '-' }}</div></div>
+    <div><div class="rotulo">UC Copel</div><div class="valor">{{ i.copel_uc or '-' }}</div></div>
+    <div><div class="rotulo">Matrícula Sanepar</div><div class="valor">{{ i.sanepar_matricula or '-' }}</div></div>
+    <div><div class="rotulo">Condomínio</div><div class="valor">{{ i.condominio_nome or '-' }}{% if i.condominio_contato %} · {{ i.condominio_contato }}{% endif %}</div></div>
+    <div><div class="rotulo">Pasta de arquivos</div><div class="valor">{{ pasta.name }}</div></div>
+  </div>
+  {% if i.observacoes %}<p style="white-space:pre-line">{{ i.observacoes }}</p>{% endif %}
+</div>
+
+<div class="cartao">
+  <div class="cabecalho"><h2>Inquilinos deste imóvel</h2></div>
+  <div class="tabela-rolagem">
+  <table>
+    <tr><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th></tr>
+    {% for x in contratos %}
+    <tr>
+      <td><a href="{{ url_for('views.contrato', cid=x.c.id) }}"><b>{{ x.c.inquilino_nome }}</b></a>{% if x.c.inquilino_apelido %} <span class="suave">({{ x.c.inquilino_apelido }})</span>{% endif %}<br><span class="suave">📁 {{ x.pasta }}</span></td>
+      <td>{{ x.c.data_entrada|databr }}</td><td>{{ x.c.data_saida|databr }}</td>
+      <td class="n">{{ x.aluguel|brl }}</td>
+      <td>{% if x.ativo %}<span class="etiqueta ok">Atual</span>{% else %}<span class="etiqueta neutra">Encerrado</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="suave">Nenhum inquilino cadastrado.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+
+<div class="cartao" id="empresas">
+  <h2>Empresas que emitem a fatura deste imóvel</h2>
+  <table>
+    <tr><th>Empresa</th><th class="n">Percentual</th><th></th></tr>
+    {% set ns = namespace(total=0) %}
+    {% for p in participacoes %}{% set ns.total = ns.total + p.percentual|float %}
+    <tr><td>{{ p.nome_curto }} · {{ p.razao_social }}</td><td class="n">{{ p.percentual|pct }}</td>
+      <td class="n">{% if pode('operador') %}{{ botao_post(url_for('views.participacao_excluir', pid=p.id), 'Remover', 'perigo pequeno', 'Remover esta empresa do imóvel?') }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="3" class="suave">Nenhuma empresa definida. Sem isso não é possível emitir as faturas.</td></tr>{% endfor %}
+    {% if participacoes %}<tr class="total"><td>Total</td><td class="n">{{ ns.total|pct }}</td><td></td></tr>{% endif %}
+  </table>
+  {% if participacoes and ns.total|round(4) != 100 %}<div class="alerta perigo">Os percentuais precisam somar 100%.</div>{% endif %}
+  {% if pode('operador') %}
+  {% if emitentes %}
+  <form class="acoes nao-imprimir" style="margin-top:10px" method="post" action="{{ url_for('views.imovel_empresa', iid=i.id) }}">
+    {{ csrf_input() }}
+    <select name="emitente_id" style="max-width:280px">{% for e in emitentes %}<option value="{{ e.id }}">{{ e.nome_curto }} · {{ e.razao_social }}</option>{% endfor %}</select>
+    <input type="text" name="percentual" placeholder="%" style="width:90px" value="50">
+    <button>Adicionar / alterar</button>
+  </form>
+  {% else %}<p class="suave">Cadastre as empresas em <a href="{{ url_for('views.emitentes') }}">Empresas</a>.</p>{% endif %}
+  {% endif %}
+</div>
+
+<div class="cartao" id="iptu">
+  <div class="cabecalho"><h2>IPTU</h2>
+    {% if pode('operador') %}<a class="botao secundario pequeno" href="{{ url_for('views.iptu_form', iid=i.id) }}">Lançar IPTU do ano</a>{% endif %}</div>
+  {% for x in iptus %}
+    <h3>{{ x.p.ano }} · total {{ x.p.valor_total|brl }} em {{ x.p.num_parcelas }} parcela(s)
+      {% if pode('operador') %}<a class="botao secundario pequeno" href="{{ url_for('views.iptu_form', pid=x.p.id) }}">Editar</a>
+      {{ botao_post(url_for('views.iptu_excluir', pid=x.p.id), 'Excluir', 'perigo pequeno', 'Excluir o IPTU deste ano?') }}{% endif %}</h3>
+    <div class="tabela-rolagem"><table>
+      <tr>{% for n, comp, v in x.parcelas %}<th class="n">{{ n }}ª · {{ comp|compbr }}</th>{% endfor %}</tr>
+      <tr>{% for n, comp, v in x.parcelas %}<td class="n">{{ v|brl }}</td>{% endfor %}</tr>
+    </table></div>
+  {% else %}<p class="suave">Nenhum IPTU lançado.</p>{% endfor %}
+</div>
+
+<div class="cartao" id="titularidade">
+  <div class="cabecalho"><h2>Troca de titularidade (Copel, Sanepar, Supergasbras, condomínio)</h2>
+    {% if pode('operador') %}<a class="botao secundario pequeno" href="{{ url_for('views.titularidade_form', iid=i.id) }}">Registrar protocolo</a>{% endif %}</div>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Inquilino</th><th>Protocolo</th><th>Situação</th><th></th></tr>
+    {% for t in titularidades %}
+    <tr><td>{{ t.data|databr }}</td><td>{{ t.concessionaria }}</td><td>{{ t.tipo or '-' }}</td><td>{{ t.inquilino_nome or 'Proprietário' }}</td>
+      <td><b>{{ t.protocolo or '-' }}</b></td><td>{{ t.situacao or '-' }}</td>
+      <td class="n">{% if pode('operador') %}<a class="botao secundario pequeno" href="{{ url_for('views.titularidade_form', tid=t.id) }}">Editar</a>
+        {{ botao_post(url_for('views.titularidade_excluir', tid=t.id), 'Excluir', 'perigo pequeno', 'Excluir este registro?') }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="7" class="suave">Nenhum protocolo registrado.</td></tr>{% endfor %}
+  </table></div>
+</div>
+
+<div class="cartao" id="anuncio-link">
+  <h2>Último anúncio</h2>
+  {% if i.anuncio_link %}<p><a href="{{ i.anuncio_link }}" target="_blank" rel="noopener noreferrer">{{ i.anuncio_link }}</a>{% if i.anuncio_data %} <span class="suave">· {{ i.anuncio_data|databr }}</span>{% endif %}</p>
+  {% else %}<p class="suave">Nenhum link cadastrado (use "Editar imóvel").</p>{% endif %}
+</div>
+{{ lista_arquivos(fotos, 'anuncio', i.id, 'Fotos do último anúncio', 'anuncio', fotos=True) }}
+{{ lista_arquivos(docs, 'imovel', i.id, 'Documentos do imóvel (matrícula, cadastro do IPTU...)', 'documentos') }}
+
+<div class="cartao"><h2>Histórico do imóvel</h2>{{ tabela_historico(historico) }}</div>
+{% endblock %}
