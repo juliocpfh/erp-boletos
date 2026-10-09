@@ -181,7 +181,9 @@ const MENU = [
 ];
 
 function layout(conteudo, rota) {
-  const atual = rota.partes[0] || '';
+  // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
+  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'seguros'].includes(rota.partes[1]);
+  const atual = deInquilino ? 'inquilino' : rota.partes[0] || '';
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários</a>` : '');
   return `<header class="topo nao-imprimir">

@@ -58,6 +58,13 @@ const ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n).rever
 // --------------------------------------------------------------------------
 export const SUB_DOCS = 'Documentos do imóvel';
 export const SUB_ANUNCIO = 'Anúncio';
+export const PASTA_SEM_IMOVEL = 'Sem imóvel';
+
+/** Pasta-mãe dos arquivos do inquilino: a do imóvel, ou "Sem imóvel". */
+function pastaPaiContrato(c) {
+  const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null;
+  return i ? i.pasta || i.nome : PASTA_SEM_IMOVEL;
+}
 
 export function nomePastaContrato(c) {
   const fmt = (x) => (x ? dataBr(x).replace(/\//g, '-') : '-');
@@ -68,8 +75,7 @@ async function pastaDoEscopo(escopo, id) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'contrato') {
     const c = buscar('contratos', id);
-    const i = buscar('imoveis', c.imovel_id);
-    return S.subpasta(raiz, [i.pasta || i.nome, c.pasta || nomePastaContrato(c)]);
+    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c)]);
   }
   const i = buscar('imoveis', id);
   return S.subpasta(raiz, [i.pasta || i.nome, escopo === 'anuncio' ? SUB_ANUNCIO : SUB_DOCS]);
@@ -445,11 +451,12 @@ function telaContrato(c) {
   const tel = (c.inquilino_telefone || '').replace(/\D/g, '');
   const lig = (x) => `<a href="#/contrato/${x.id}">${esc(x.inquilino_nome)}</a> (${dataBr(x.data_entrada)} a ${dataBr(x.data_saida)})`;
   const historicoIds = new Set([c.id, ...cadeia.antes.map((x) => x.id), ...cadeia.depois.map((x) => x.id)]);
-  return `<p class="suave"><a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · <a href="#/inquilinos">Todos os inquilinos</a></p>
+  return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todas as suas cobranças?') : ''}</div></div>
-    <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
+    ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
+    ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera cobrança.</div>` : ''}
     ${selosContrato(c)}
     ${caixaVerificar(c.verificar)}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
@@ -485,7 +492,7 @@ function telaContrato(c) {
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div></div>
     <div class="cartao"><h2>Cobranças</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
       ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a></td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : '-'}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhuma cobrança gerada ainda. Gere na tela "Cobranças".</td></tr>'}</table></div></div>
-    <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
+    <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaSaida(c)}
@@ -516,15 +523,20 @@ const CADASTROS = {
     },
   },
   contratos: {
-    titulo: (r, q) => `${r ? 'Editar' : 'Novo'} inquilino / contrato - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
-    campos: (r, q) => {
-      const iid = r ? r.imovel_id : Number(q.imovel);
-      const ops = d().contratos.filter((c) => c.imovel_id === iid && (!r || c.id !== r.id))
-        .map((c) => [String(c.id), `${c.inquilino_nome} (${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)})`]);
-      return F.CONTRATO.map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c));
+    titulo: (r, q) => {
+      const i = buscar('imoveis', r ? r.imovel_id : Number(q.imovel));
+      return `${r ? 'Editar' : 'Novo'} inquilino${i ? ` - ${i.nome}` : ''}`;
     },
-    fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
-    voltar: (r, q) => (r ? `#/contrato/${r.id}` : `#/imovel/${q.imovel}`),
+    campos: (r) => {
+      const ops = d().contratos.filter((c) => !r || c.id !== r.id)
+        .sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
+        .map((c) => [String(c.id), `${c.inquilino_nome} (${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)})`]);
+      const imoveis = ordenar(d().imoveis.filter((i) => i.tipo !== 'airbnb'), 'nome').map((i) => [String(i.id), i.nome]);
+      return F.CONTRATO.map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c));
+    },
+    padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
+    valores: (r) => ({ ...r, ativo: r.ativo !== false }),
+    voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     base: (r) => (r ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form) {
@@ -539,8 +551,19 @@ const CADASTROS = {
       dados.pasta = nomePastaContrato({ ...r, ...dados });
     },
     async depois(salvo, antigo) {
-      const i = buscar('imoveis', salvo.imovel_id);
-      if (antigo && antigo.pasta && antigo.pasta !== salvo.pasta) await renomearNoDisco([i.pasta || i.nome], antigo.pasta, salvo.pasta);
+      if (!antigo || !antigo.pasta) return;
+      const paiAntigo = pastaPaiContrato(antigo);
+      const paiNovo = pastaPaiContrato(salvo);
+      if (paiAntigo === paiNovo) {
+        if (antigo.pasta !== salvo.pasta) await renomearNoDisco([paiNovo], antigo.pasta, salvo.pasta);
+        return;
+      }
+      try {
+        const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+        await S.moverPasta(await S.subpasta(raiz, [paiAntigo]), antigo.pasta, await S.subpasta(raiz, [paiNovo]), salvo.pasta);
+      } catch (e) {
+        aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo}": ${e.message}`, 'aviso');
+      }
     },
     destino: (salvo) => (R.temFiador(salvo) && !R.fiadoresDo(d(), salvo.id).length ? `#/novo/fiadores?contrato=${salvo.id}` : `#/contrato/${salvo.id}`),
   },
@@ -735,7 +758,7 @@ function telaFormulario(tabela, registro, q, estado) {
   if (!cfg) return '<h1>Página não encontrada</h1>';
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
   const campos = cfg.campos(registro, q);
-  let valores = estado ? estado.valores : F.paraFormulario(campos, registro);
+  let valores = estado ? estado.valores : F.paraFormulario(campos, registro && cfg.valores ? cfg.valores(registro) : registro);
   if (!registro && !estado) {
     const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== undefined).map((c) => [c.nome, c.padrao]));
     valores = F.paraFormulario(campos, { ...padroes, ...(cfg.padrao ? cfg.padrao(q) : {}) });
@@ -755,8 +778,8 @@ function telaCobrancas(comp) {
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
     const c = buscar('contratos', cb.contrato_id);
     return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: R.faturasDe(d(), 'cobranca', cb.id) };
-  }).sort((a, b) => a.i.nome.localeCompare(b.i.nome, 'pt-BR'));
-  const faltando = d().contratos.filter((c) => C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id));
+  }).sort((a, b) => (a.i ? a.i.nome : '').localeCompare(b.i ? b.i.nome : '', 'pt-BR'));
+  const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id));
   const pend = R.pendentesDeFatura(d());
   const soma = (f) => lista.reduce((s, x) => s + f(x), 0);
   return `<div class="cabecalho"><h1>Cobranças de ${compBr(comp)}</h1>
@@ -912,20 +935,30 @@ function caixaAvulsas() {
 /** Inquilinos atuais e anteriores, com o resumo da saída. */
 function telaInquilinos(q) {
   const hoje = C.hojeIso();
-  const todos = d().contratos.map((c) => ({ c, i: buscar('imoveis', c.imovel_id), e: R.encerramentoDo(d(), c.id) }));
-  const atuais = todos.filter((x) => R.contratoAtivo(x.c, hoje)).sort((a, b) => (a.i ? a.i.nome : '').localeCompare(b.i ? b.i.nome : '', 'pt-BR'));
-  const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida).localeCompare(String(a.c.data_saida)));
+  const busca = String(q.busca || '').trim().toLocaleLowerCase('pt-BR');
+  let todos = d().contratos.map((c) => ({ c, i: c.imovel_id ? buscar('imoveis', c.imovel_id) : null, e: R.encerramentoDo(d(), c.id) }));
+  if (busca) todos = todos.filter((x) => [x.c.inquilino_nome, x.c.inquilino_apelido, x.c.inquilino_cpf, x.i && x.i.nome].some((t) => String(t || '').toLocaleLowerCase('pt-BR').includes(busca)));
+  const porNome = (a, b) => (a.i ? a.i.nome : '~').localeCompare(b.i ? b.i.nome : '~', 'pt-BR') || a.c.inquilino_nome.localeCompare(b.c.inquilino_nome, 'pt-BR');
+  const atuais = todos.filter((x) => R.contratoAtivo(x.c, hoje)).sort(porNome);
+  const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida || '9').localeCompare(String(a.c.data_saida || '9')));
   const anterior = (c) => (c.contrato_anterior_id ? buscar('contratos', c.contrato_anterior_id) : null);
-  const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
-  return `<h1>Inquilinos</h1>
-    <div class="cartao rolagem"><h2>Atuais (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : '-'}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td>
+  const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
+  const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera cobrança)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
+  const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
+  const editar = (c) => (opera() ? link(`#/editar/contratos/${c.id}`, 'Editar') : '');
+  const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
+  return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo inquilino', 'botao') : ''}</div>
+    <form class="acoes" data-form="buscaInquilinos" style="margin-bottom:12px"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="max-width:340px"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Contrato</th><th class="n">Aluguel atual</th><th>Garantia</th><th></th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td>
         <td>${x.c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : `até ${dataBr(x.c.vigencia_fim)}`}</td><td class="n">${reais(R.aluguelAtual(d(), x.c))}</td>
-        <td>${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><h2>Histórico de inquilinos que saíram (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
-      ${anteriores.map((x) => `<tr><td>${x.i ? esc(x.i.nome) : '-'}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td><td>${dataBr(x.c.data_saida)}</td>
-        ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : 'sem cálculo final'}</td>`}</tr>`).join('')
-      || '<tr><td colspan="7" class="suave">Nenhum inquilino saiu ainda.</td></tr>'}</table></div>`;
+        <td>${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td><td class="n">${editar(x.c)}</td></tr>`).join('') || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
+      <p class="suave">Desmarque "Ativo" para parar de gerar cobrança. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
+    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th><th></th></tr>
+      ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td>${dataBr(x.c.data_entrada)}</td><td>${dataBr(x.c.data_saida)}</td>
+        ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
+        <td class="n">${editar(x.c)}</td></tr>`).join('')
+      || '<tr><td colspan="9" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
 }
 
 function telaImprimir(rota) {
@@ -1091,6 +1124,10 @@ export const FORMULARIOS = {
 
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
+  buscaInquilinos(form) {
+    const busca = String(new FormData(form).get('busca') || '').trim();
+    ir(busca ? `#/inquilinos?busca=${encodeURIComponent(busca)}` : '#/inquilinos');
+  },
   filtroHistorico(form) {
     const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
     ir(`#/historico?${q}`);
@@ -1165,7 +1202,7 @@ async function excelDoNumero(ExcelJS, modelo, numero) {
 
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.imovel_id === r.id) ? 'Este imóvel tem inquilinos. Exclua os contratos antes.' : null), voltar: () => '#/imoveis' },
-  contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem faturas emitidas e não pode ser excluído.' : null), voltar: (r) => `#/imovel/${r.imovel_id}` },
+  contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem faturas emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
   cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Esta cobrança tem fatura. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   recebimentos: { checar: (db, r) => (R.faturasDe(db, 'recebimento', r.id).length ? 'Este recebimento tem fatura emitida.' : null) },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta fatura avulsa já tem número.' : null) },

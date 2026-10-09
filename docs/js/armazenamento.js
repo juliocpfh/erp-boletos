@@ -180,6 +180,31 @@ export async function renomearPasta(pai, antigo, novo) {
   await pai.removeEntry(antigo, { recursive: true });
 }
 
+/** Move uma pasta para outra pasta-mãe (ex.: inquilino que mudou de imóvel), com o nome novo. */
+export async function moverPasta(paiAntigo, antigo, paiNovo, novo) {
+  antigo = limparNome(antigo);
+  novo = limparNome(novo);
+  let origem;
+  try {
+    origem = await paiAntigo.getDirectoryHandle(antigo);
+  } catch {
+    await paiNovo.getDirectoryHandle(novo, { create: true });
+    return;
+  }
+  try {
+    await paiNovo.getDirectoryHandle(novo);
+    return; // já existe uma pasta com o nome novo: não mistura conteúdos
+  } catch { /* ok, não existe */ }
+  if (origem.move) {
+    try {
+      await origem.move(paiNovo, novo);
+      return;
+    } catch { /* navegador sem suporte: copia e apaga */ }
+  }
+  await copiarPasta(origem, await paiNovo.getDirectoryHandle(novo, { create: true }));
+  await paiAntigo.removeEntry(antigo, { recursive: true });
+}
+
 // --------------------------------------------------------------------------
 // Exportar / importar tudo em ZIP
 // --------------------------------------------------------------------------
