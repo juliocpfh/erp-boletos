@@ -310,7 +310,7 @@ function telaImovel(i) {
   const tits = d().titularidades.filter((t) => t.imovel_id === i.id).sort((a, b) => String(b.data).localeCompare(String(a.data)));
   const grupo = i.grupo_id ? buscar('imoveis', i.grupo_id) : null;
   return `<div class="cabecalho"><h1>${esc(i.nome)}</h1><div class="acoes">
-      ${opera() ? `${link(`#/novo/contratos?imovel=${i.id}`, 'Novo inquilino', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
+      ${opera() ? `${link(`#/novo/vinculos?imovel=${i.id}`, 'Vincular inquilino', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo', 'Excluir este imóvel? Os arquivos da pasta são mantidos.') : ''}</div></div>
     <div class="endereco">📍 ${esc(endereco(i))}</div>
     ${caixaVerificar(i.verificar)}
@@ -550,6 +550,7 @@ function telaContrato(c) {
 // --------------------------------------------------------------------------
 const opcoesGrupos = () => ordenar(d().imoveis.filter((i) => i.tipo === 'airbnb'), 'nome').map((g) => [String(g.id), g.nome]);
 
+let antesDoVinculo = null;
 const CADASTROS = {
   imoveis: {
     titulo: (r, q) => (r ? `Editar ${r.tipo === 'airbnb' ? 'grupo Airbnb' : 'imóvel'}` : (q.tipo === 'airbnb' ? 'Novo grupo Airbnb' : 'Novo imóvel')),
@@ -577,12 +578,12 @@ const CADASTROS = {
         .sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
         .map((c) => [String(c.id), `${c.inquilino_nome} (${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)})`]);
       const imoveis = ordenar(d().imoveis.filter((i) => i.tipo !== 'airbnb'), 'nome').map((i) => [String(i.id), i.nome]);
-      return F.CONTRATO.filter((c) => !(r && c.soNovo))
+      return F.CONTRATO.filter((c) => r || !c.soEditar)
         .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c));
     },
     padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
     valores: (r) => ({ ...r, ativo: r.ativo !== false }),
-    voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
+    voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     base: (r) => (r ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form) {
@@ -611,12 +612,8 @@ const CADASTROS = {
         aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo}": ${e.message}`, 'aviso');
       }
     },
-    salvar(db, dados, q, r) {
-      if (!r) return R.novoContrato(db, dados, login(), dados.inquilino_nome);
-      R.atualizar(db, 'contratos', r.id, dados, login(), dados.inquilino_nome || r.inquilino_nome);
-      return R.buscar(db, 'contratos', r.id);
-    },
-    destino: (salvo) => (R.temFiador(salvo) && !R.fiadoresDo(d(), salvo.id).length ? `#/novo/fiadores?contrato=${salvo.id}` : `#/contrato/${salvo.id}`),
+    destino: (salvo, q) => (R.temFiador(salvo) && !R.fiadoresDo(d(), salvo.id).length ? `#/novo/fiadores?contrato=${salvo.id}`
+      : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}&contrato=${salvo.id}` : `#/contrato/${salvo.id}`),
   },
   correcoes: {
     titulo: (r, q) => `Correção do aluguel - ${buscar('contratos', q.contrato).inquilino_nome}`,
@@ -758,6 +755,26 @@ const CADASTROS = {
     },
     salvar: (db, dados, q) => R.trocarGarantia(db, Number(q.contrato), dados, login()),
   },
+  vinculos: {
+    titulo: (r, q) => `Vincular inquilino - ${buscar('imoveis', q.imovel).nome}`,
+    campos: () => {
+      const ops = d().contratos.filter((c) => !c.imovel_id).sort((a, b) => (b.ativo !== false) - (a.ativo !== false) || a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
+        .map((c) => [String(c.id), `${c.inquilino_nome}${c.ativo === false ? ' (inativo)' : ''}`]);
+      return F.VINCULO.map((c) => (c.nome === 'contrato_id' ? { ...c, opcoes: ops } : c));
+    },
+    padrao: (q) => { const c = q.contrato ? buscar('contratos', q.contrato) : null; return { contrato_id: c ? c.id : null, data_entrada: (c && c.data_entrada) || C.hojeIso() }; },
+    aviso: (r, q) => (d().contratos.some((c) => !c.imovel_id) ? '' : 'Não há inquilino cadastrado sem imóvel. Cadastre o inquilino primeiro (link abaixo do formulário).'),
+    extraHtml: (r, q) => `<p class="suave" style="margin-top:12px">O inquilino não está na lista? ${link(`#/novo/contratos?vincular=${q.imovel}`, 'Cadastrar novo inquilino')}</p>`,
+    voltar: (r, q) => `#/imovel/${q.imovel}`,
+    salvar(db, dados, q) {
+      antesDoVinculo = { ...R.buscar(db, 'contratos', dados.contrato_id) };
+      const c = R.vincularInquilino(db, Number(q.imovel), dados, login());
+      if (c.pasta !== nomePastaContrato(c)) R.atualizar(db, 'contratos', c.id, { pasta: nomePastaContrato(c) }, login(), 'Pasta de arquivos');
+      return c;
+    },
+    depois: (salvo) => CADASTROS.contratos.depois(salvo, antesDoVinculo),
+    destino: (salvo) => `#/contrato/${salvo.id}`,
+  },
   leituras: {
     titulo: (r, q) => `Leitura dos relógios - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
     campos: (r, q) => {
@@ -869,7 +886,7 @@ function telaFormulario(tabela, registro, q, estado) {
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
-      ${F.camposHtml(campos, valores, estado ? estado.erros : {})}${cfg.extraHtml ? cfg.extraHtml(registro) : ''}
+      ${F.camposHtml(campos, valores, estado ? estado.erros : {})}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${cfg.voltar(registro, q)}">Voltar</a></p></form>`;
 }
 

@@ -67,9 +67,17 @@ export const LEITURA = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/** Vincular ao imóvel um inquilino já cadastrado, com a leitura dos relógios na entrada. */
+export const VINCULO = [
+  campo('contrato_id', 'Inquilino', 'opcao', { obrig: true, opcoes: [], ajuda: 'Aparecem os inquilinos cadastrados sem imóvel' }),
+  campo('data_entrada', 'Data de entrada no imóvel', 'data', { obrig: true }),
+  secao('Leitura dos relógios na entrada'),
+  ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
+];
+
 export const CONTRATO = [
   secao('Imóvel e situação'),
-  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], ajuda: 'Deixe em branco para cadastrar o inquilino sem imóvel (não gera cobrança)' }),
+  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soEditar: true, ajuda: 'Para vincular a um imóvel, use "Vincular inquilino" na página do imóvel. Em branco: sem imóvel (não gera cobrança)' }),
   campo('ativo', 'Inquilino ativo', 'simnao', { padrao: true, ajuda: 'Desmarcado: não gera cobrança e vai para a lista de inativos' }),
   secao('Inquilino (responsável pelo contrato)'),
   campo('inquilino_nome', 'Nome completo', 'texto', { obrig: true, largo: true }),
@@ -107,9 +115,6 @@ export const CONTRATO = [
   campo('cobrar_iptu', 'IPTU cobrado do inquilino (entra no boleto)', 'simnao', { padrao: true }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais previstas no contrato', 'area', { ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
-  { ...secao('Leitura dos relógios na entrada'), soNovo: true },
-  ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { soNovo: true,
-    ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'],
     ajuda: 'Os fiadores são cadastrados na página do inquilino depois de salvar' }),

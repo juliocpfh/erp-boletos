@@ -511,11 +511,15 @@ const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id -
 export const leiturasDoImovel = (d, imovelId) => d.leituras.filter((l) => l.imovel_id === imovelId).sort(porData);
 export const leiturasDo = (d, contratoId) => d.leituras.filter((l) => l.contrato_id === contratoId).sort(porData);
 
-/** Novo inquilino: grava o contrato e, se informada, a leitura dos relógios na entrada. */
-export function novoContrato(d, dados, usuario, descricao) {
+/** Vincula ao imóvel um inquilino cadastrado sem imóvel e grava a leitura dos relógios na entrada. */
+export function vincularInquilino(d, imovelId, dados, usuario) {
+  const c = buscar(d, 'contratos', dados.contrato_id);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (c.imovel_id) throw new Error('Este inquilino já está vinculado a um imóvel.');
+  const i = buscar(d, 'imoveis', imovelId);
   const leitura = separarLeitura(dados);
-  const c = inserir(d, 'contratos', dados, usuario, descricao);
-  if (leitura) registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data: c.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
+  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
+  if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
   return c;
 }
 
