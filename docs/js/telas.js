@@ -389,7 +389,9 @@ function caixaGarantia(c) {
   const aplic = R.aplicacoesDo(d(), c.id);
   const sit = R.situacaoAplicacao(d(), c);
   const sug = R.caucaoSugerida(d(), c);
-  let html = `<div class="cartao" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>`;
+  const trocas = R.trocasGarantiaDo(d(), c.id);
+  const anteriores = R.fiadoresAnterioresDo(d(), c.id);
+  let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar tipo de garantia') : ''}</div>`;
   if (R.temCaucao(c)) {
     html += `<div class="grade">${item('Caução dada', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)}`)}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
@@ -408,9 +410,17 @@ function caixaGarantia(c) {
     html += `<h3>Fiadores</h3><table><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th></th></tr>
       ${fiadores.map((f) => `<tr><td><b>${esc(f.nome)}</b>${f.endereco ? `<br><span class="suave">${esc(f.endereco)}</span>` : ''}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td>
         <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
-        <td class="n">${opera() ? `${link(`#/editar/fiadores/${f.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'fiadores', id: f.id }, 'perigo pequeno', 'Excluir este fiador?')}` : ''}</td></tr>`).join('')
+        <td class="n">${opera() ? `${link(`#/novo/fiadores?contrato=${c.id}&substitui=${f.id}`, 'Trocar fiador')} ${link(`#/editar/fiadores/${f.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'fiadores', id: f.id }, 'perigo pequeno', 'Excluir este fiador? Para registrar uma substituição, use "Trocar fiador".')}` : ''}</td></tr>`).join('')
       || '<tr><td colspan="4" class="suave">Nenhum fiador cadastrado.</td></tr>'}</table>
       ${opera() ? `<p>${link(`#/novo/fiadores?contrato=${c.id}`, 'Adicionar fiador')}</p>` : ''}`;
+  }
+  if (anteriores.length) {
+    html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Saiu em</th><th>Substituído por</th></tr>
+      ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td></tr>`).join('')}</table>`;
+  }
+  if (trocas.length) {
+    html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th></tr>
+      ${trocas.map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td></tr>`).join('')}</table>`;
   }
   if (sit.total || aplic.length) {
     html += `<h3>Onde o valor foi aplicado</h3>
@@ -660,9 +670,16 @@ const CADASTROS = {
     },
   },
   fiadores: {
-    titulo: (r, q) => `Fiador - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.FIADOR,
-    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    titulo: (r, q) => `${q.substitui ? 'Trocar fiador' : 'Fiador'} - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: (r, q) => (q && q.substitui ? F.TROCA_FIADOR : F.FIADOR),
+    padrao: (q) => (q.substitui ? { data_troca: C.hojeIso() } : {}),
+    aviso: (r, q) => (q && q.substitui ? `Substitui ${buscar('fiadores', q.substitui).nome}, que fica guardado em "Fiadores anteriores".` : ''),
+    fixos: (r, q) => (r || q.substitui ? {} : { contrato_id: Number(q.contrato) }),
+    salvar(db, dados, q, r) {
+      if (q.substitui) return R.trocarFiador(db, Number(q.substitui), dados, login());
+      if (r) { R.atualizar(db, 'fiadores', r.id, dados, login(), `Fiador ${dados.nome}`); return R.buscar(db, 'fiadores', r.id); }
+      return R.inserir(db, 'fiadores', dados, login(), `Fiador ${dados.nome}`);
+    },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
     descricao: (dados) => `Fiador ${dados.nome}`,
   },
@@ -696,6 +713,19 @@ const CADASTROS = {
       dados.valor_anterior = anterior;
       if (dados.complemento === null) dados.complemento = dados.valor_novo - anterior;
     },
+  },
+  trocas_garantia: {
+    titulo: (r, q) => `Trocar tipo de garantia - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    campos: () => F.TROCA_GARANTIA,
+    padrao: (q) => ({ data: C.hojeIso(), caucao_meses: buscar('contratos', q.contrato).caucao_meses || null }),
+    aviso: (r, q) => { const c = buscar('contratos', q.contrato); const v = R.valorGarantia(d(), c); return `Garantia atual: ${c.garantia_tipo || 'não informada'}${v ? ` de ${reais(v)}` : ''}. Ela fica guardada no histórico do contrato.`; },
+    voltar: (r, q) => `#/contrato/${q.contrato}`,
+    destino: (salvo, q) => (R.temFiador({ garantia_tipo: salvo.tipo_novo }) && !R.fiadoresDo(d(), Number(q.contrato)).length ? `#/novo/fiadores?contrato=${q.contrato}` : `#/contrato/${q.contrato}`),
+    ajustar(dados, erros) {
+      if (dados.garantia_tipo === 'Caução' && !(dados.caucao_valor > 0)) erros.caucao_valor = 'Informe o valor da caução';
+      if (R.temDeposito(dados) && !(dados.deposito_valor > 0)) erros.deposito_valor = 'Informe o valor do depósito';
+    },
+    salvar: (db, dados, q) => R.trocarGarantia(db, Number(q.contrato), dados, login()),
   },
   renovacoes: {
     titulo: (r, q) => `Renovação / novo valor - ${buscar('contratos', q.contrato).inquilino_nome}`,
@@ -789,7 +819,8 @@ function telaFormulario(tabela, registro, q, estado) {
     valores = F.paraFormulario(campos, { ...padroes, ...(cfg.padrao ? cfg.padrao(q) : {}) });
   }
   const base = cfg.base ? cfg.base(registro) : null;
-  return `<h1>${esc(cfg.titulo(registro, q))}</h1>${cfg.aviso ? `<div class="alerta info">${esc(cfg.aviso(registro, q))}</div>` : ''}
+  const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
+  return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
       ${F.camposHtml(campos, valores, estado ? estado.erros : {})}${cfg.extraHtml ? cfg.extraHtml(registro) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${cfg.voltar(registro, q)}">Voltar</a></p></form>`;
@@ -1138,7 +1169,7 @@ export const FORMULARIOS = {
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     const salvo = await alterar((db) => {
-      if (cfg.salvar) return cfg.salvar(db, dados, rota.q);
+      if (cfg.salvar) return cfg.salvar(db, dados, rota.q, registro);
       if (registro) {
         R.atualizar(db, tabela, registro.id, dados, login(), descricao);
         return R.buscar(db, tabela, registro.id);
@@ -1292,7 +1323,7 @@ export const ACOES = {
         for (const t of ['participacoes', 'seguros']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || null);
     });

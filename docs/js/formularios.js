@@ -166,6 +166,15 @@ export const FIADOR = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+export const TROCA_FIADOR = [campo('data_troca', 'Data da troca', 'data', { obrig: true }), ...FIADOR];
+
+export const TROCA_GARANTIA = [
+  campo('data', 'Data da troca', 'data', { obrig: true }),
+  ...CONTRATO.filter((c) => ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'deposito_valor', 'deposito_data', 'deposito_uso'].includes(c.nome))
+    .map((c) => (c.nome === 'garantia_tipo' ? { ...c, rotulo: 'Nova garantia', ajuda: 'Os fiadores são cadastrados depois, na página do inquilino' } : c)),
+  campo('observacoes', 'O que aconteceu com a garantia anterior', 'area', { ajuda: 'Ex.: caução devolvida em 10/10/2026 por PIX' }),
+];
+
 export const APLICACAO = [
   campo('data', 'Data da aplicação', 'data', { obrig: true }),
   campo('emitente_id', 'Empresa onde foi aplicado', 'opcao', { obrig: true, opcoes: [] }),

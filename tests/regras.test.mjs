@@ -237,3 +237,23 @@ test('seguro é do imóvel: cobrado de quem está no imóvel no mês, e migra se
   assert.equal(seg(l, '2026-04'), 10000);
   assert.equal(seg(l, '2026-05'), 10000);
 });
+
+test('troca de garantia e de fiador ficam no histórico', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'X', data_entrada: '2024-01-01', aluguel_inicial: 200000,
+    garantia_tipo: 'Caução', caucao_valor: 600000, caucao_data: '2024-01-01', caucao_meses: 3 }, 'julio');
+  R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2025-01-01', valor_novo: 630000 }, 'julio');
+  R.trocarGarantia(d, c.id, { data: '2026-01-10', garantia_tipo: 'Fiador', observacoes: 'caução devolvida' }, 'julio');
+  const ct = R.buscar(d, 'contratos', c.id);
+  assert.equal(ct.garantia_tipo, 'Fiador');
+  assert.equal(R.valorGarantia(d, ct), 0);
+  assert.deepEqual(R.trocasGarantiaDo(d, c.id).map((t) => [t.tipo_anterior, t.tipo_novo, t.valor_anterior]), [['Caução', 'Fiador', 630000]]);
+  const f1 = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador A' }, 'julio');
+  R.trocarFiador(d, f1.id, { data_troca: '2026-05-01', nome: 'Fiador B' }, 'julio');
+  assert.deepEqual(R.fiadoresDo(d, c.id).map((f) => f.nome), ['Fiador B']);
+  assert.deepEqual(R.fiadoresAnterioresDo(d, c.id).map((f) => [f.nome, f.data_saida]), [['Fiador A', '2026-05-01']]);
+  assert.throws(() => R.trocarFiador(d, f1.id, { data_troca: '2026-06-01', nome: 'C' }, 'julio'));
+  // volta para caução: correções da caução antiga não contam
+  R.trocarGarantia(d, c.id, { data: '2026-07-01', garantia_tipo: 'Caução', caucao_valor: 700000, caucao_data: '2026-07-01' }, 'julio');
+  assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 700000);
+});
