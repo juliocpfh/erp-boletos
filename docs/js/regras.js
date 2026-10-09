@@ -33,6 +33,14 @@ export function normalizar(d) {
     }
     for (const k of ['fiador_nome', 'fiador_cpf', 'fiador_rg', 'fiador_telefone', 'fiador_email', 'fiador_endereco']) delete c[k];
   }
+  // o seguro obrigatório era do inquilino; agora é do imóvel
+  for (const s of d.seguros) {
+    if (!s.imovel_id && s.contrato_id) {
+      const c = d.contratos.find((x) => x.id === s.contrato_id);
+      if (c) s.imovel_id = c.imovel_id;
+    }
+    delete s.contrato_id;
+  }
   return d;
 }
 
@@ -190,6 +198,15 @@ function parcelasDoMes(lista, comp, rotulo) {
   return [total, rotulos.join('; ')];
 }
 
+export const segurosDoImovel = (d, imovelId) => d.seguros.filter((s) => imovelId && s.imovel_id === imovelId);
+
+/** O seguro do imóvel entra na cobrança do inquilino que está no imóvel no mês (o mais recente, se trocou no meio do mês). */
+function pagaSeguroNoMes(d, contrato, comp) {
+  const ocupando = d.contratos.filter((c) => c.imovel_id === contrato.imovel_id && c.ativo !== false && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0);
+  const ultimo = ocupando.sort((a, b) => b.data_entrada.localeCompare(a.data_entrada) || b.id - a.id)[0];
+  return ultimo ? ultimo.id === contrato.id : true;
+}
+
 /** Calcula (sem gravar) a cobrança de um contrato numa competência. */
 export function montarCobranca(d, contrato, comp) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
@@ -197,7 +214,7 @@ export function montarCobranca(d, contrato, comp) {
   const [iptu, iptuRot] = contrato.cobrar_iptu
     ? parcelasDoMes(d.iptus.filter((i) => i.imovel_id === contrato.imovel_id), comp, (i) => `IPTU ${i.ano}`)
     : [0, ''];
-  const [seguro, seguroRot] = parcelasDoMes(d.seguros.filter((s) => s.contrato_id === contrato.id), comp,
+  const [seguro, seguroRot] = parcelasDoMes(pagaSeguroNoMes(d, contrato, comp) ? segurosDoImovel(d, contrato.imovel_id) : [], comp,
     (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`);
   const alvo = competenciaReserva(contrato);
   const reserva = alvo && comp >= alvo ? saldoReserva(d, contrato) : 0;
@@ -495,7 +512,7 @@ function alertaAplicacao(d, c) {
 
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
   const datas = correcoesDo(d, contrato.id).map((c) => c.data_vigencia);
-  const seguros = d.seguros.filter((s) => s.contrato_id === contrato.id);
+  const seguros = segurosDoImovel(d, contrato.imovel_id);
   return [
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     alertas.alertaCorrecao(dataBaseCorrecao(contrato), hoje, datas),

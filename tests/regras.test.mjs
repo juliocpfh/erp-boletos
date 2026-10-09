@@ -132,7 +132,7 @@ test('texto do boleto no formato do banco', () => {
   const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'INQUILINO EXEMPLO', data_entrada: '2026-06-15',
     vigencia_inicio: '2026-06-15', aluguel_inicial: 364445, dia_vencimento: 5, cobranca_mes_seguinte: true, bonificacao: true,
     desconto_pontualidade_percentual: 10, taxa_boleto: 850, multa_percentual: 2, juros_mensal_percentual: 1, cobrar_iptu: false }, 'julio');
-  R.inserir(d, 'seguros', { contrato_id: c.id, seguradora: 'Bradesco', vigencia_inicio: '2026-06-15', vigencia_fim: '2027-06-15',
+  R.inserir(d, 'seguros', { imovel_id: casa.id, seguradora: 'Bradesco', vigencia_inicio: '2026-06-15', vigencia_fim: '2027-06-15',
     valor_total: 22500, num_parcelas: 4, primeira_competencia: '2026-06' }, 'julio');
   R.gerarCobrancas(d, '2026-08', 'julio');
   const cb = d.cobrancas[0];
@@ -216,4 +216,24 @@ test('taxa do boleto para todos: inquilinos ativos e cobranças em aberto do mê
   assert.equal(R.buscar(d, 'contratos', c.id).taxa_boleto, 850);
   assert.equal(d.cobrancas.find((x) => x.competencia === '2026-08').taxa_boleto, 850);
   assert.equal(R.buscar(d, 'cobrancas', jul.id).taxa_boleto, 350);
+});
+
+test('seguro é do imóvel: cobrado de quem está no imóvel no mês, e migra seguros antigos', () => {
+  const d = R.bancoVazio();
+  const loja = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Loja 2' }, 'julio');
+  const base = { imovel_id: loja.id, aluguel_inicial: 139000, dia_vencimento: 1, cobranca_mes_seguinte: true, cobrar_iptu: false };
+  const v = R.inserir(d, 'contratos', { ...base, inquilino_nome: 'Antigo', data_entrada: '2026-01-27', data_saida: '2026-04-26' }, 'julio');
+  const l = R.inserir(d, 'contratos', { ...base, inquilino_nome: 'Novo', data_entrada: '2026-04-27' }, 'julio');
+  // seguro gravado no formato antigo (no contrato do primeiro inquilino)
+  d.seguros.push({ id: 1, contrato_id: v.id, seguradora: 'Allianz', vigencia_inicio: '2026-01-27', vigencia_fim: '2027-01-27',
+    valor_total: 60000, num_parcelas: 6, primeira_competencia: '2026-02' });
+  R.normalizar(d);
+  assert.equal(d.seguros[0].imovel_id, loja.id);
+  assert.equal(d.seguros[0].contrato_id, undefined);
+  for (const comp of ['2026-03', '2026-04', '2026-05']) R.gerarCobrancas(d, comp, 'julio');
+  const seg = (c, comp) => d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp)?.seguro;
+  assert.equal(seg(v, '2026-03'), 10000);
+  assert.equal(seg(v, '2026-04'), 0);
+  assert.equal(seg(l, '2026-04'), 10000);
+  assert.equal(seg(l, '2026-05'), 10000);
 });
