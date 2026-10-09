@@ -10,7 +10,9 @@ a { color: var(--primaria); text-decoration: none; }
 a:hover { text-decoration: underline; }
 header.topo { background: var(--primaria-escura); color: #fff; padding: 0 20px; display: flex;
   align-items: center; gap: 24px; flex-wrap: wrap; min-height: 56px; }
-header.topo .marca { font-weight: 700; font-size: 17px; color: #fff; }
+header.topo .marca { font-weight: 700; font-size: 17px; color: #fff; display: flex; align-items: center; gap: 10px; }
+header.topo .marca img { height: 40px; max-width: 160px; object-fit: contain; background: #fff; border-radius: 6px; padding: 3px 6px; }
+.logo-previa { max-height: 96px; max-width: 320px; border: 1px solid var(--borda); border-radius: 8px; padding: 6px; background: #fff; }
 header.topo nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
 header.topo nav a { color: #dbe4ff; padding: 6px 10px; border-radius: 6px; }
 header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }

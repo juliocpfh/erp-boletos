@@ -8,7 +8,7 @@ export const TABELAS = {
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Cobrança', recebimentos: 'Recebimento Airbnb',
   faturas: 'Fatura', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
-  renovacoes: 'Renovação / novo valor', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
+  renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
   arquivos: 'Arquivo', banco: 'Banco de dados',
 };
 
@@ -139,7 +139,14 @@ export const GARANTIAS = ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + 
 export const temCaucao = (c) => c.garantia_tipo === 'Caução';
 export const temDeposito = (c) => ['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo);
 export const temFiador = (c) => ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo);
-export const fiadoresDo = (d, contratoId) => d.fiadores.filter((f) => f.contrato_id === contratoId);
+/** Fiadores atuais do contrato (os substituídos ficam guardados com data de saída). */
+export const fiadoresDo = (d, contratoId) => d.fiadores.filter((f) => f.contrato_id === contratoId && !f.data_saida);
+export const fiadoresAnterioresDo = (d, contratoId) => d.fiadores.filter((f) => f.contrato_id === contratoId && f.data_saida)
+  .sort((a, b) => b.data_saida.localeCompare(a.data_saida));
+export const trocasGarantiaDo = (d, contratoId) => d.trocas_garantia.filter((x) => x.contrato_id === contratoId)
+  .sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id);
+/** Correções da caução atual (as anteriores a uma nova caução, após troca de garantia, não contam). */
+const correcoesCaucaoAtual = (d, c) => correcoesGarantiaDo(d, c.id).filter((x) => x.data >= (c.caucao_data || ''));
 export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
 export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.contrato_id === contratoId)
@@ -148,7 +155,7 @@ export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.cont
 /** Valor atual da garantia em dinheiro (caução corrigida ou depósito). */
 export function valorGarantia(d, c) {
   if (temCaucao(c)) {
-    const cs = correcoesGarantiaDo(d, c.id);
+    const cs = correcoesCaucaoAtual(d, c);
     return cs.length ? cs[cs.length - 1].valor_novo : (c.caucao_valor || 0);
   }
   if (temDeposito(c)) return c.deposito_valor || 0;
@@ -446,6 +453,31 @@ export function registrarRenovacao(d, contratoId, dados, usuario) {
   return r;
 }
 
+const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'deposito_valor', 'deposito_data', 'deposito_uso'];
+
+/** Troca o tipo de garantia (ex.: caução → fiador) guardando a anterior no histórico do contrato. */
+export function trocarGarantia(d, contratoId, dados, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, c[k] ?? null]));
+  const texto = `Garantia: ${c.garantia_tipo || 'não informada'} → ${dados.garantia_tipo}`;
+  const r = inserir(d, 'trocas_garantia', { contrato_id: c.id, data: dados.data, tipo_anterior: c.garantia_tipo || '', tipo_novo: dados.garantia_tipo,
+    valor_anterior: valorGarantia(d, c), anterior, observacoes: dados.observacoes || '' }, usuario, texto);
+  const novo = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, dados[k] ?? null]));
+  atualizar(d, 'contratos', c.id, novo, usuario, texto);
+  return r;
+}
+
+/** Substitui um fiador: o antigo fica guardado com data de saída e o novo entra no lugar. */
+export function trocarFiador(d, fiadorId, dados, usuario) {
+  const antigo = buscar(d, 'fiadores', fiadorId);
+  if (!antigo || antigo.data_saida) throw new Error('Este fiador já foi substituído.');
+  const { data_troca: data, ...novo } = dados;
+  const r = inserir(d, 'fiadores', { ...novo, contrato_id: antigo.contrato_id, data_entrada: data, substitui_id: antigo.id }, usuario,
+    `Fiador ${antigo.nome} substituído por ${novo.nome}`);
+  atualizar(d, 'fiadores', antigo.id, { data_saida: data, substituido_por_id: r.id }, usuario, `Fiador substituído por ${novo.nome}`);
+  return r;
+}
+
 export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && !cb.data_pagamento);
 
 /** Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. */
@@ -454,14 +486,53 @@ export function calcularEncerramento(garantia, indicePercentual, debitos) {
   return { garantia_corrigida: corrigida, saldo: corrigida - (debitos || 0) };
 }
 
+// --------------------------------------------------------------------------
+// Leitura dos relógios (água, energia, gás)
+// --------------------------------------------------------------------------
+const RELOGIOS = [['agua', 'água'], ['energia', 'energia'], ['gas', 'gás']];
+
+/** Tira de `dados` os campos leitura_agua/energia/gas e devolve { agua, energia, gas }, ou null se vierem vazios. */
+export function separarLeitura(dados) {
+  const v = {};
+  for (const [k] of RELOGIOS) {
+    v[k] = dados[`leitura_${k}`] || '';
+    delete dados[`leitura_${k}`];
+  }
+  return RELOGIOS.some(([k]) => v[k]) ? v : null;
+}
+
+export const textoLeitura = (l) => RELOGIOS.filter(([k]) => l[k]).map(([k, t]) => `${t} ${l[k]}`).join(' · ');
+
+export function registrarLeitura(d, dados, usuario) {
+  return inserir(d, 'leituras', dados, usuario, `${dados.momento}: ${textoLeitura(dados)}`);
+}
+
+const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+export const leiturasDoImovel = (d, imovelId) => d.leituras.filter((l) => l.imovel_id === imovelId).sort(porData);
+export const leiturasDo = (d, contratoId) => d.leituras.filter((l) => l.contrato_id === contratoId).sort(porData);
+
+/** Vincula ao imóvel um inquilino cadastrado sem imóvel e grava a leitura dos relógios na entrada. */
+export function vincularInquilino(d, imovelId, dados, usuario) {
+  const c = buscar(d, 'contratos', dados.contrato_id);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (c.imovel_id) throw new Error('Este inquilino já está vinculado a um imóvel.');
+  const i = buscar(d, 'imoveis', imovelId);
+  const leitura = separarLeitura(dados);
+  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
+  if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
+  return c;
+}
+
 export function encerrarContrato(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
+  const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
   if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
   const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
     `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
   atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
+  if (leitura) registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data: dados.data_saida, momento: 'Saída do inquilino', ...leitura, observacoes: '' }, usuario);
   return r;
 }
 
@@ -495,7 +566,7 @@ export function cadeiaDeContratos(d, c) {
 // --------------------------------------------------------------------------
 function alertaCaucao(d, c) {
   if (!temCaucao(c) || !c.caucao_valor) return null;
-  const ultimaCaucao = correcoesGarantiaDo(d, c.id).map((x) => x.data).pop() || c.caucao_data || '';
+  const ultimaCaucao = correcoesCaucaoAtual(d, c).map((x) => x.data).pop() || c.caucao_data || '';
   const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
   if (!correcao) return null;
   const sug = caucaoSugerida(d, c, correcao.data_vigencia);
