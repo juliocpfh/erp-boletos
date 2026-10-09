@@ -64,7 +64,9 @@ test('reserva abate a cobrança sem passar do valor', () => {
 });
 
 test('multa e juros separados, pro rata dia', () => {
-  assert.deepEqual(C.multaEJuros(100000, '2026-08-10', '2026-08-25', 10, 1), { dias: 15, multa: 10000, juros: 500 });
+  assert.deepEqual(C.multaEJuros(100000, '2026-08-10', '2026-08-25', 10, 1), { dias: 15, multa: 10000, juros: 495 });
+  // como no boleto do banco: R$ 3.800,20 com 1% ao mês = R$ 1,26 ao dia
+  assert.equal(C.jurosAoDia(380020, 1), 126);
   assert.deepEqual(C.multaEJuros(100000, '2026-08-10', '2026-08-10', 10, 1), { dias: 0, multa: 0, juros: 0 });
 });
 
@@ -76,9 +78,9 @@ test('liquidação e valor da nota fiscal', () => {
   assert.equal(emDia.valor_nf, 121500);
   const atraso = C.liquidar(cb, '2026-08-20');
   assert.equal(atraso.multa, 14850);
-  assert.equal(atraso.juros, 495);
-  assert.equal(atraso.valor_devido, 148500 + 14850 + 495);
-  assert.equal(atraso.valor_nf, 135000 + 14850 + 495);
+  assert.equal(atraso.juros, 490);
+  assert.equal(atraso.valor_devido, 148500 + 14850 + 490);
+  assert.equal(atraso.valor_nf, 135000 + 14850 + 490);
 });
 
 test('divisão da fatura entre as empresas', () => {

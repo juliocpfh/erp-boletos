@@ -37,11 +37,11 @@ test('pagamento em atraso guarda multa e juros separados e valor da nota', () =>
   R.gerarCobrancas(d, '2026-07', 'julio');
   const r = R.registrarPagamento(d, 2, '2026-08-20', null, 'julio');
   const cb = d.cobrancas[1];
-  // aberto sem desconto: 1350 + 100 + 3,50 = 1453,50; multa 145,35; juros 4,85
+  // aberto sem desconto: 1350 + 100 + 3,50 = 1453,50; multa 145,35; juros 0,48 ao dia × 10
   assert.equal(cb.situacao, 'Paga com atraso');
   assert.equal(cb.multa, 14535);
-  assert.equal(cb.juros, 485);
-  assert.equal(cb.valor_nf, 135000 + 14535 + 485);
+  assert.equal(cb.juros, 480);
+  assert.equal(cb.valor_nf, 135000 + 14535 + 480);
   assert.equal(r.dias_atraso, 10);
 });
 
@@ -124,4 +124,75 @@ test('histórico registra quem alterou o quê', () => {
   assert.equal(h.usuario, 'maria');
   assert.deepEqual(h.detalhes.data_saida, { de: null, para: '2026-12-15' });
   assert.equal(d.atualizado_por, 'maria');
+});
+
+test('texto do boleto no formato do banco', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 01', endereco: 'Rua Prof. Nilo Brandão, 117' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'INQUILINO EXEMPLO', data_entrada: '2026-06-15',
+    vigencia_inicio: '2026-06-15', aluguel_inicial: 364445, dia_vencimento: 5, cobranca_mes_seguinte: true, bonificacao: true,
+    desconto_pontualidade_percentual: 10, taxa_boleto: 850, multa_percentual: 2, juros_mensal_percentual: 1, cobrar_iptu: false }, 'julio');
+  R.inserir(d, 'seguros', { contrato_id: c.id, seguradora: 'Bradesco', vigencia_inicio: '2026-06-15', vigencia_fim: '2027-06-15',
+    valor_total: 22500, num_parcelas: 4, primeira_competencia: '2026-06' }, 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const cb = d.cobrancas[0];
+  cb.iptu = 9100;
+  const b = R.dadosBoleto(d, cb);
+  assert.equal(b.descricao, 'ALUGUEL RS3.644,45\nCOM BONF. RS3.280,00\nIPTU RS91,00 SEGURO3/4 RS56,25');
+  assert.equal(b.valor, 380020);
+  assert.equal(b.desconto, 36445);
+  assert.equal(b.juros_ao_dia, 126);
+  assert.equal(b.numero_documento, 'CASA01');
+});
+
+test('bonificação desligada, renovação com novo valor, caução e saída', () => {
+  const d = R.bancoVazio();
+  for (const n of ['ANK', 'JCK']) R.inserir(d, 'emitentes', { nome: `${n} ADMINISTRADORA`, razao_social: n, ativo: true }, 'julio');
+  const i = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Venezuela', endereco: 'Rua Venezuela, 526' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ruy', data_entrada: '2024-09-01', vigencia_inicio: '2024-09-01',
+    data_base_correcao: '2024-10-01', prazo_tipo: 'Determinado', vigencia_fim: '2027-09-01', aluguel_inicial: 492800,
+    bonificacao: false, desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_valor: 1344000,
+    caucao_data: '2024-09-01', caucao_meses: 3, dia_vencimento: 1 }, 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  assert.equal(d.cobrancas[0].desconto, 0);
+  // aluguel corrigido: a caução precisa ser corrigida também
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2025-10-01', indice: 'IPCA', percentual: 5.13, valor_anterior: 492800, valor_novo: 518083 }, 'julio');
+  assert.ok(R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Correção da caução'));
+  R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2025-10-01', valor_novo: 1413255 }, 'julio');
+  assert.ok(!R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Correção da caução'));
+  assert.equal(R.valorGarantia(d, c), 1413255);
+  // aplicação 50/50 nas empresas
+  assert.ok(R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Aplicação da garantia'));
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, data: '2025-10-02', emitente_id: 1, valor: 706627 }, 'julio');
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, data: '2025-10-02', emitente_id: 2, valor: 706628 }, 'julio');
+  assert.ok(R.situacaoAplicacao(d, c).ok);
+  // renovação para prazo indeterminado com novo valor negociado
+  R.registrarRenovacao(d, c.id, { data: '2027-09-01', tipo: 'Passou a prazo indeterminado', novo_valor: 600000 }, 'julio');
+  assert.equal(c.prazo_tipo, 'Indeterminado');
+  assert.equal(R.aluguelAtual(d, c, '2027-09-15'), 600000);
+  assert.ok(d.historico.some((h) => h.tabela === 'renovacoes' && h.contrato_id === c.id));
+  // saída com garantia corrigida pela poupança
+  R.encerrarContrato(d, c.id, { data_saida: '2027-12-31', garantia_valor: 1413255, indice_percentual: 10, debitos: 100000 }, 'julio');
+  const e = R.encerramentoDo(d, c.id);
+  assert.equal(e.garantia_corrigida, 1554581);
+  assert.equal(e.saldo, 1454581);
+  assert.equal(c.data_saida, '2027-12-31');
+});
+
+test('fatura avulsa entra na mesma sequência, dividida entre as empresas ativas', () => {
+  const d = R.bancoVazio();
+  for (const n of ['ANK', 'JCK']) R.inserir(d, 'emitentes', { nome: `${n} ADMINISTRADORA`, razao_social: n, ativo: true }, 'julio');
+  d.proxima_fatura = 200;
+  R.inserir(d, 'avulsas', { data_pagamento: '2026-10-05', valor: 100001, tomador_nome: 'AIRBNB', descricao: 'Airbnb setembro' }, 'julio');
+  const r = R.numerarFaturas(d, 'julio');
+  assert.equal(r.problema, null);
+  assert.deepEqual(d.faturas.map((f) => [f.numero, f.valor]), [[200, 50001], [200, 50000]]);
+});
+
+test('contratos ligados por alteração de titular', () => {
+  const d = R.bancoVazio();
+  const v = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'Vinicius', data_entrada: '2026-01-27' }, 'julio');
+  const l = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'Licia', data_entrada: '2026-04-27', contrato_anterior_id: v.id }, 'julio');
+  assert.deepEqual(R.cadeiaDeContratos(d, l).antes.map((x) => x.inquilino_nome), ['Vinicius']);
+  assert.deepEqual(R.cadeiaDeContratos(d, v).depois.map((x) => x.inquilino_nome), ['Licia']);
 });
