@@ -1135,6 +1135,11 @@ function telaEmpresas() {
     ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
     || '<tr><td colspan="6" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a fatura e o percentual de cada uma (ex.: 50% / 50%).</p></div>
+    <div class="cartao"><h2>Logo da empresa</h2>
+      <p class="suave">Aparece no topo de todas as páginas do sistema.</p>
+      ${d().logo ? `<p><img class="logo-previa" src="${esc(d().logo)}" alt="Logo atual"></p>` : '<p class="suave">Nenhuma logo enviada.</p>'}
+      ${podeUsuario('admin') ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? 'Trocar logo' : 'Enviar logo'}</button>
+        ${d().logo ? botao('removerLogo', 'Remover logo', {}, 'perigo pequeno', 'Remover a logo?') : ''}</form>` : ''}</div>
     <div class="cartao"><h2>Numeração das faturas</h2>
       <p>Próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
       ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
@@ -1189,6 +1194,30 @@ async function telaDados() {
 // --------------------------------------------------------------------------
 // Envio de formulários
 // --------------------------------------------------------------------------
+/** Reduz a imagem da logo (até 400×120) e devolve como data URL PNG, guardada no próprio banco de dados. */
+async function reduzirImagem(arquivo) {
+  if (!podeUsuario('admin')) throw new Error('Só administradores podem alterar a logo.');
+  const url = URL.createObjectURL(arquivo);
+  try {
+    const img = await new Promise((ok, falha) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => falha(new Error('Não consegui abrir a imagem. Use PNG, JPG, SVG ou WEBP.'));
+      i.src = url;
+    });
+    const largura = img.naturalWidth || 400;
+    const altura = img.naturalHeight || 120;
+    const escala = Math.min(1, 400 / largura, 120 / altura);
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(largura * escala));
+    cv.height = Math.max(1, Math.round(altura * escala));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export const FORMULARIOS = {
   async primeiroAcesso(form) {
     const f = new FormData(form);
@@ -1289,6 +1318,18 @@ export const FORMULARIOS = {
   filtroHistorico(form) {
     const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
     ir(`#/historico?${q}`);
+  },
+
+  async logo(form) {
+    const arquivo = new FormData(form).get('arquivo');
+    if (!arquivo || !arquivo.size) throw new Error('Escolha o arquivo da logo.');
+    const dataUrl = await reduzirImagem(arquivo);
+    await alterar((db) => {
+      R.registrar(db, login(), 'Alteração', null, null, db.logo ? 'Logo da empresa trocada' : 'Logo da empresa enviada');
+      db.logo = dataUrl;
+    });
+    aviso('Logo salva.');
+    await mostrar();
   },
 
   async proximaFatura(form) {
@@ -1393,6 +1434,15 @@ export const ACOES = {
     });
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();
+  },
+
+  async removerLogo() {
+    if (!podeUsuario('admin')) throw new Error('Só administradores podem alterar a logo.');
+    await alterar((db) => {
+      R.registrar(db, login(), 'Exclusão', null, null, 'Logo da empresa removida');
+      delete db.logo;
+    });
+    await mostrar();
   },
 
   async alternarAtivo({ id }) {
