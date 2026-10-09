@@ -16,7 +16,7 @@ header.topo nav a { color: #dbe4ff; padding: 6px 10px; border-radius: 6px; }
 header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }
 header.topo .conta { font-size: 13px; color: #dbe4ff; text-align: right; }
 header.topo .conta a { color: #fff; }
-.faixa-atualizacao { background: #e8edfb; color: var(--primaria-escura); font-size: 13px; padding: 6px 20px; }
+.faixa { background: #e8edfb; color: var(--primaria-escura); font-size: 13px; padding: 6px 20px; }
 main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
 h1 { font-size: 24px; margin: 4px 0 16px; }
 h2 { font-size: 18px; margin: 0 0 12px; }
@@ -36,7 +36,7 @@ th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--bord
 th { font-size: 12px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
 td.n, th.n { text-align: right; white-space: nowrap; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
-.tabela-rolagem { overflow-x: auto; }
+.rolagem { overflow-x: auto; }
 .endereco { background: var(--destaque); border-left: 5px solid #eab308; padding: 10px 14px; font-size: 18px;
   font-weight: 600; border-radius: 6px; margin-bottom: 16px; }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 18px; }
@@ -61,8 +61,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .formulario .largo { grid-column: 1 / -1; }
 .formulario h3 { grid-column: 1 / -1; border-bottom: 1px solid var(--borda); padding-bottom: 4px; margin-top: 18px; }
 label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-input[type=text], input[type=email], input[type=url], input[type=tel], input[type=date], input[type=month],
-input[type=password], input[type=number], input[type=file], select, textarea {
+input:not([type=checkbox]):not([type=radio]), select, textarea {
   width: 100%; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 6px; font: inherit; background: #fff; }
 textarea { min-height: 80px; }
 .check { display: flex; gap: 8px; align-items: center; font-weight: 600; padding-top: 22px; }
@@ -79,32 +78,52 @@ textarea { min-height: 80px; }
 .detalhes { font-size: 12px; color: var(--suave); }
 .detalhes code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; }
 .mes-nav { display: flex; gap: 8px; align-items: center; }
-.pagamento-form { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-.pagamento-form input[type=date] { width: 140px; padding: 3px 6px; }
-.pagamento-form input[type=text] { width: 100px; padding: 3px 6px; }
+.pagamento { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.pagamento input[type=date] { width: 140px; padding: 3px 6px; }
+.pagamento input[name=valor] { width: 100px; padding: 3px 6px; }
 .demonstrativo { background: #fff; max-width: 800px; margin: 0 auto 24px; padding: 24px; border: 1px solid var(--borda); }
 .demonstrativo table td, .demonstrativo table th { padding: 5px 6px; }
 
-/* Fatura de locação (layout da planilha) */
-.fatura { background: #fff; width: 190mm; margin: 0 auto 24px; padding: 10mm; border: 1px solid #000; color: #000; font-size: 13px; }
-.fatura .linha { display: flex; justify-content: space-between; gap: 12px; }
-.fatura .empresa { font-size: 20px; font-weight: 700; }
-.fatura .titulo-fatura { font-size: 18px; font-weight: 700; text-align: right; }
-.fatura .bloco { border: 1px solid #000; padding: 6px 8px; margin-top: 10px; }
-.fatura .bloco-titulo { font-weight: 700; background: #e5e7eb; margin: -6px -8px 6px; padding: 4px 8px; border-bottom: 1px solid #000; }
-.fatura table th, .fatura table td { border: 1px solid #000; padding: 4px 6px; color: #000; font-size: 12px; }
-.fatura .total-fatura { text-align: right; font-size: 15px; font-weight: 700; margin-top: 8px; }
-.fatura .canhoto { border-top: 1px dashed #000; margin-top: 22px; padding-top: 10px; }
-.fatura .assinaturas { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin-top: 26px; text-align: center; }
-.fatura .assinaturas div { border-top: 1px solid #000; padding-top: 3px; font-size: 11px; }
+/* Fatura de locação: mesmo desenho da planilha LOJA1 */
+.fatura-xls { background: #fff; width: max-content; margin: 0 auto 24px; padding: 12px; color: #000;
+  font-family: Bahnschrift, "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.15; }
+.fatura-xls table { width: auto; table-layout: fixed; border-collapse: collapse; }
+.fatura-xls td { border: 0; padding: 0 3px; vertical-align: middle; overflow: hidden; white-space: nowrap; color: #000; }
+.fatura-xls td.be { border-left: 1px solid #000; }
+.fatura-xls td.bd { border-right: 1px solid #000; }
+.fatura-xls td.bt { border-top: 1px solid #000; }
+.fatura-xls td.bb { border-bottom: 1px solid #000; }
+.fatura-xls td.centro { text-align: center; }
+.fatura-xls td.topo { vertical-align: top; }
+.fatura-xls td.preto { background: #000; }
+.fatura-xls .f-empresa { font-size: 24pt; font-weight: 700; text-decoration: underline; }
+.fatura-xls .f-titulo { font-size: 14pt; }
+.fatura-xls .f-num { font-size: 16pt; font-weight: 700; }
+.fatura-xls .f-10 { font-size: 10pt; }
+.fatura-xls .f-11 { font-size: 11pt; }
+.fatura-xls .f-12, .fatura-xls td.f-12 { font-size: 12pt; }
+.fatura-xls .f-light { font-weight: 300; }
+.fatura-xls .f-canhoto { font-size: 8pt; vertical-align: top; white-space: normal; }
+.fatura-xls .moeda { display: block; text-align: right; }
+.impressao { max-width: none; }
+.fora td { background: #fef2f2; }
+.nw { white-space: nowrap; }
+.pre { white-space: pre-wrap; }
+.maior { font-size: 18px; font-weight: 700; }
+label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
+label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.cobrancas td { font-size: 14px; }
+a.cartao { color: inherit; display: block; }
+a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 
 .so-impressao { display: none; }
+@page { size: A4; margin: 10mm; }
 @media print {
-  header.topo, .faixa-atualizacao, .nao-imprimir, .mensagens { display: none !important; }
+  header.topo, .faixa, .nao-imprimir, #mensagens { display: none !important; }
   body { background: #fff; }
   main { max-width: none; padding: 0; }
   .so-impressao { display: block; }
-  .demonstrativo, .fatura { border: 0; margin: 0; page-break-after: always; }
-  .fatura { border: 1px solid #000; }
+  .demonstrativo, .fatura-xls { border: 0; margin: 0 auto; break-after: page; }
+  .fatura-xls { padding: 0; zoom: .88; }
   .cartao { border: 0; padding: 0; }
 }
