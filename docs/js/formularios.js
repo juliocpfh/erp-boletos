@@ -45,7 +45,7 @@ export const GRUPO_AIRBNB = [
   campo('nome', 'Nome do grupo', 'texto', { obrig: true, ajuda: 'Ex.: Airbnb' }),
   campo('endereco', 'Endereço', 'texto', { obrig: true, largo: true }),
   campo('cidade', 'Cidade (município)'),
-  secao('Cliente que aparece na fatura (tomador)'),
+  secao('Cliente que aparece na NF (tomador)'),
   campo('cliente_nome', 'Nome do cliente', 'texto', { obrig: true, largo: true, ajuda: 'Ex.: AIRBNB PLATAFORMA DIGITAL LTDA' }),
   campo('cliente_documento', 'CPF / CNPJ do cliente'),
   campo('cliente_telefone', 'Telefone do cliente', 'tel'),
@@ -77,8 +77,8 @@ export const VINCULO = [
 
 export const CONTRATO = [
   secao('Imóvel e situação'),
-  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soEditar: true, ajuda: 'Para vincular a um imóvel, use "Vincular inquilino" na página do imóvel. Em branco: sem imóvel (não gera cobrança)' }),
-  campo('ativo', 'Inquilino ativo', 'simnao', { padrao: true, ajuda: 'Desmarcado: não gera cobrança e vai para a lista de inativos' }),
+  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soEditar: true, ajuda: 'Para vincular a um imóvel, use "Vincular inquilino" na página do imóvel. Em branco: sem imóvel (não gera boleto)' }),
+  campo('ativo', 'Inquilino ativo', 'simnao', { padrao: true, ajuda: 'Desmarcado: não gera boleto e vai para a lista de inativos' }),
   secao('Inquilino (responsável pelo contrato)'),
   campo('inquilino_nome', 'Nome completo', 'texto', { obrig: true, largo: true }),
   campo('inquilino_apelido', 'Apelido'),
@@ -101,7 +101,7 @@ export const CONTRATO = [
   secao('Correção anual'),
   campo('indice_correcao', 'Índice de correção previsto no contrato', 'opcao', { opcoes: INDICES }),
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
-  secao('Valores e cobrança'),
+  secao('Valores e boleto'),
   campo('aluguel_inicial', 'Aluguel inicial (valor cheio, histórico)', 'dinheiro', { obrig: true }),
   campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true, padrao: 10 }),
   campo('cobranca_mes_seguinte', 'O aluguel do mês vence no mês seguinte', 'simnao', { padrao: true, ajuda: 'Marcado: aluguel de julho vence em agosto' }),
@@ -134,7 +134,7 @@ export const CONTRATO = [
 ];
 
 export const CORRECAO = [
-  campo('data_vigencia', 'Vale a partir de', 'data', { obrig: true, ajuda: 'A cobrança de um mês usa o valor vigente no dia 1º daquele mês' }),
+  campo('data_vigencia', 'Vale a partir de', 'data', { obrig: true, ajuda: 'O boleto de um mês usa o valor vigente no dia 1º daquele mês' }),
   campo('indice', 'Índice', 'opcao', { opcoes: INDICES }),
   campo('percentual', 'Percentual do índice (%)', 'pct', { ajuda: 'Informe o percentual ou o novo valor' }),
   campo('valor_novo', 'Novo valor do aluguel', 'dinheiro'),
@@ -178,10 +178,10 @@ export const RECEBIMENTO = [
   campo('unidade_id', 'Unidade', 'opcao', { opcoes: [] }),
   campo('periodo_inicio', 'Período: de', 'data'),
   campo('periodo_fim', 'Período: até', 'data'),
-  campo('tomador_nome', 'Cliente na fatura', 'texto', { obrig: true, largo: true }),
+  campo('tomador_nome', 'Cliente na NF', 'texto', { obrig: true, largo: true }),
   campo('tomador_documento', 'CPF / CNPJ do cliente'),
   campo('tomador_telefone', 'Telefone do cliente', 'tel'),
-  campo('tomador_endereco', 'Endereço na fatura', 'texto', { largo: true, ajuda: 'Em branco: endereço da unidade' }),
+  campo('tomador_endereco', 'Endereço na NF', 'texto', { largo: true, ajuda: 'Em branco: endereço da unidade' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -239,24 +239,24 @@ export const ENCERRAMENTO = [
 
 export const AVULSA = [
   campo('data_pagamento', 'Data em que o dinheiro entrou', 'data', { obrig: true }),
-  campo('valor', 'Valor da fatura', 'dinheiro', { obrig: true }),
+  campo('valor', 'Valor da NF', 'dinheiro', { obrig: true }),
   campo('descricao', 'Descrição', 'texto', { largo: true, ajuda: 'Ex.: Airbnb outubro, aluguel de vaga, reembolso' }),
   campo('imovel_id', 'Imóvel (opcional)', 'opcao', { opcoes: [], ajuda: 'Se escolher, usa as empresas e o endereço do imóvel' }),
   campo('periodo_inicio', 'Período: de', 'data'),
   campo('periodo_fim', 'Período: até', 'data'),
-  campo('tomador_nome', 'Cliente na fatura', 'texto', { obrig: true, largo: true }),
+  campo('tomador_nome', 'Cliente na NF', 'texto', { obrig: true, largo: true }),
   campo('tomador_documento', 'CPF / CNPJ do cliente'),
   campo('tomador_telefone', 'Telefone do cliente', 'tel'),
-  campo('tomador_endereco', 'Endereço na fatura', 'texto', { largo: true }),
+  campo('tomador_endereco', 'Endereço na NF', 'texto', { largo: true }),
   campo('municipio', 'Município', 'texto', { padrao: 'CURITIBA' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
 export const EMITENTE = [
-  campo('nome', 'Nome no topo da fatura', 'texto', { obrig: true, ajuda: 'Ex.: ANK ADMINISTRADORA' }),
+  campo('nome', 'Nome no topo da NF', 'texto', { obrig: true, ajuda: 'Ex.: ANK ADMINISTRADORA' }),
   campo('razao_social', 'Razão social', 'texto', { obrig: true, largo: true }),
   campo('cnpj', 'CNPJ'),
-  campo('endereco', 'Endereço (como aparece na fatura)', 'texto', { largo: true }),
+  campo('endereco', 'Endereço (como aparece na NF)', 'texto', { largo: true }),
   campo('municipio', 'Município do serviço', 'texto', { padrao: 'CURITIBA' }),
   campo('aba_modelo', 'Aba no modelo Excel', 'texto', { ajuda: 'Nome da aba do modelo para esta empresa (ex.: ANK)' }),
   campo('ativo', 'Ativa', 'simnao', { padrao: true }),
@@ -276,8 +276,8 @@ export const COBRANCA = [
   campo('iptu', 'IPTU', 'dinheiro'),
   campo('seguro', 'Seguro', 'dinheiro'),
   campo('taxa_boleto', 'Taxa do boleto', 'dinheiro'),
-  campo('outros', 'Outros valores', 'dinheiro'),
-  campo('outros_descricao', 'Descrição de outros valores'),
+  campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
+  campo('outros_descricao', 'Motivo do ajuste', 'texto', { ajuda: 'Ex.: reforma do banheiro, acerto do mês anterior' }),
   campo('reserva_utilizada', 'Reserva utilizada', 'dinheiro'),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct'),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct'),

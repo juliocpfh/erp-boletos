@@ -1,8 +1,8 @@
 // Alertas do painel: correção anual, seguro, reserva e fim de vigência.
 import { compBr, competenciaDe, dataBr, diasEntre, reais, somarAnos, somarDias, somarMeses } from './calculos.js';
 
-export const ANTECEDENCIA_CORRECAO = 30; // avisar um mês antes do aniversário do contrato
-export const ANTECEDENCIA_SEGURO = 30;
+export const ANTECEDENCIA_CORRECAO = 60; // avisar dois meses antes do aniversário do contrato
+export const ANTECEDENCIA_SEGURO = 60;
 export const ANTECEDENCIA_VIGENCIA = 60;
 
 /** [último aniversário já ocorrido (ou null no 1º ano), próximo aniversário]. */
@@ -19,8 +19,8 @@ export function aniversarios(inicio, hoje) {
 export function alertaCorrecao(inicio, hoje, datasCorrecoes) {
   if (!inicio) return null;
   const [ultimo, proximo] = aniversarios(inicio, hoje);
-  // considera feita a correção registrada a partir de um mês antes do aniversário
-  const jaCorrigido = (aniv) => datasCorrecoes.some((d) => d >= somarDias(aniv, -31));
+  // considera feita a correção registrada dentro da antecedência do aviso
+  const jaCorrigido = (aniv) => datasCorrecoes.some((d) => d >= somarDias(aniv, -(ANTECEDENCIA_CORRECAO + 1)));
   if (ultimo && !jaCorrigido(ultimo)) {
     return { nivel: 'perigo', tipo: 'Correção do aluguel',
       texto: `Contrato fez aniversário em ${dataBr(ultimo)} e a correção ainda não foi registrada.` };
@@ -62,7 +62,7 @@ export function alertaReserva(reservaValor, saldo, competenciaAlvo, hoje) {
   const proxima = somarMeses(competenciaDe(hoje), 1);
   if (competenciaAlvo <= proxima) {
     return { nivel: 'info', tipo: 'Reserva do imóvel',
-      texto: `Reserva de ${reais(saldo)} será usada para abater a cobrança de ${compBr(competenciaAlvo)}.` };
+      texto: `Reserva de ${reais(saldo)} será usada para abater o boleto de ${compBr(competenciaAlvo)}.` };
   }
   return null;
 }

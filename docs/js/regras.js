@@ -5,10 +5,10 @@ import * as C from './calculos.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
-  iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Cobrança', recebimentos: 'Recebimento Airbnb',
-  faturas: 'Fatura', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
+  iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Boleto', recebimentos: 'Recebimento Airbnb',
+  faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
-  renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'Fatura avulsa',
+  renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   arquivos: 'Arquivo', banco: 'Banco de dados',
 };
 
@@ -255,7 +255,7 @@ export function gerarCobrancas(d, comp, usuario) {
     }
     const dados = montarCobranca(d, contrato, comp);
     if (dados) {
-      inserir(d, 'cobrancas', dados, usuario, `Cobrança ${C.compBr(comp)} gerada para ${contrato.inquilino_nome}`);
+      inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
       geradas += 1;
     }
   }
@@ -285,7 +285,7 @@ export function aplicarTaxaBoleto(d, valor, comp, usuario, hoje = C.hojeIso()) {
 export function registrarPagamento(d, cobrancaId, dataPagamento, valorPago, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (faturasDe(d, 'cobranca', cb.id).length) {
-    throw new Error('Esta cobrança já tem fatura emitida. Desfaça o pagamento antes de alterar.');
+    throw new Error('Este boleto já tem NF emitida. Desfaça o pagamento antes de alterar.');
   }
   const r = C.liquidar(cb, dataPagamento);
   atualizar(d, 'cobrancas', cb.id, {
@@ -312,7 +312,7 @@ export const participacoesDo = (d, imovelId) => d.participacoes.filter((p) => p.
 
 export function cancelarFaturas(d, tipo, id, usuario) {
   for (const f of faturasDe(d, tipo, id)) {
-    atualizar(d, 'faturas', f.id, { situacao: 'Cancelada' }, usuario, `Fatura nº ${numeroFatura(f.numero)} cancelada`);
+    atualizar(d, 'faturas', f.id, { situacao: 'Cancelada' }, usuario, `NF nº ${numeroFatura(f.numero)} cancelada`);
   }
 }
 
@@ -357,7 +357,7 @@ export function baseDaFatura(d, tipo, registro) {
       : (imovel ? participacoesDo(d, imovel.id) : d.emitentes.filter((e) => e.ativo)
         .map((e, _, l) => ({ emitente_id: e.id, percentual: 100 / l.length })));
     return {
-      imovel, valor: registro.valor, partes, origem: 'a fatura avulsa',
+      imovel, valor: registro.valor, partes, origem: 'a NF avulsa',
       periodo_inicio: registro.periodo_inicio || registro.data_pagamento,
       periodo_fim: registro.periodo_fim || registro.data_pagamento,
       descricao: `Avulsa · ${registro.tomador_nome}${registro.descricao ? ` · ${registro.descricao}` : ''}`,
@@ -385,10 +385,10 @@ export function enderecoCompleto(imovel) {
 
 function problemaDaFatura(d, base) {
   const partes = base.partes;
-  if (!partes.length) return `Defina em ${base.origem} quais empresas emitem a fatura.`;
+  if (!partes.length) return `Defina em ${base.origem} quais empresas emitem a NF.`;
   const soma = partes.reduce((s, p) => s + p.percentual, 0);
   if (Math.abs(soma - 100) > 1e-6) return `Os percentuais das empresas em ${base.origem} somam ${soma}%, e precisam somar 100%.`;
-  if (!(base.valor > 0)) return `Valor da fatura zerado em ${base.descricao}.`;
+  if (!(base.valor > 0)) return `Valor da NF zerado em ${base.descricao}.`;
   return null;
 }
 
@@ -420,7 +420,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
         periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
         tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento,
         tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, situacao: 'Emitida',
-      }, usuario, `Fatura nº ${numeroFatura(numero)} · ${e.nome} · ${base.descricao}`);
+      }, usuario, `NF nº ${numeroFatura(numero)} · ${e.nome} · ${base.descricao}`);
     });
     d.proxima_fatura = numero + 1;
     numeradas.push({ numero, ...p, descricao: base.descricao });
@@ -476,6 +476,16 @@ export function trocarFiador(d, fiadorId, dados, usuario) {
     `Fiador ${antigo.nome} substituído por ${novo.nome}`);
   atualizar(d, 'fiadores', antigo.id, { data_saida: data, substituido_por_id: r.id }, usuario, `Fiador substituído por ${novo.nome}`);
   return r;
+}
+
+/** Ajuste do mês no boleto: cobrança adicional (valor positivo) ou ressarcimento (negativo), com o motivo no histórico. */
+export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  if (cb.data_pagamento) throw new Error('Este boleto já foi pago. Desfaça o pagamento antes de ajustar.');
+  const texto = valor ? `${valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'} de ${C.reais(Math.abs(valor))} no boleto ${C.compBr(cb.competencia)}${motivo ? `: ${motivo}` : ''}`
+    : `Ajuste do boleto ${C.compBr(cb.competencia)} retirado`;
+  atualizar(d, 'cobrancas', cb.id, { outros: valor, outros_descricao: valor ? motivo : '' }, usuario, texto);
+  return cb;
 }
 
 export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && !cb.data_pagamento);
@@ -637,7 +647,7 @@ export function dadosBoleto(d, cb) {
     const parc = /(\d+\/\d+)/.exec(cb.seguro_parcela || '');
     extras.push(`SEGURO${parc ? parc[1] : ''} ${rs(cb.seguro)}`);
   }
-  if (cb.outros) extras.push(`${(cb.outros_descricao || 'OUTROS').toLocaleUpperCase('pt-BR')} ${rs(cb.outros)}`);
+  if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
   if (extras.length) linhas.push(extras.join(' '));
   const valor = t.a_pagar_sem_desconto;
