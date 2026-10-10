@@ -209,9 +209,9 @@ export const TELAS = {
       <div class="numeros">
         ${n(d().imoveis.filter((i) => i.tipo !== 'airbnb').length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/imoveis')}
-        ${n(abertas.length, 'cobranças em aberto', '#/cobrancas')}
+        ${n(abertas.length, 'boletos em aberto', '#/cobrancas')}
         ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/cobrancas')}
-        ${n(pend.length, 'pagamentos aguardando nº de fatura', '#/faturas')}
+        ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
       </div>
       <div class="cartao"><h2>Alertas</h2>
         ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
@@ -231,12 +231,13 @@ export const TELAS = {
       const grupo = i.grupo_id ? buscar('imoveis', i.grupo_id) : null;
       return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a>${grupo ? `<br>${etiqueta(grupo.nome, 'info')}` : ''}</td><td>${esc(R.enderecoCompleto(i))}</td>
         <td>${atual ? `<a href="#/contrato/${atual.id}">${esc(atual.inquilino_nome)}</a>${atual.inquilino_apelido ? ` <span class="suave">(${esc(atual.inquilino_apelido)})</span>` : ''}` : (grupo ? '<span class="suave">Airbnb</span>' : etiqueta('Vago', 'aviso'))}</td>
-        <td class="n">${atual ? reais(R.aluguelAtual(d(), atual)) : '-'}</td></tr>`;
+        <td class="n">${atual ? reais(R.aluguelAtual(d(), atual)) : '-'}</td>
+        <td class="n">${atual ? aluguelBonificado(atual) : '-'}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${opera() ? `${link('#/novo/imoveis', 'Novo imóvel', 'botao')} ${link('#/novo/imoveis?tipo=airbnb', 'Novo grupo Airbnb')}` : ''}</div></div>
-      <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual</th></tr>
-      ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}</table></div>
-      ${grupos.length ? `<div class="cartao"><h2>Grupos Airbnb</h2><table><tr><th>Grupo</th><th>Cliente na fatura</th><th>Unidades</th></tr>
+      <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel cheio</th><th class="n">Aluguel bonificado</th></tr>
+      ${linhas || '<tr><td colspan="5" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}</table></div>
+      ${grupos.length ? `<div class="cartao"><h2>Grupos Airbnb</h2><table><tr><th>Grupo</th><th>Cliente na NF</th><th>Unidades</th></tr>
         ${grupos.map((g) => `<tr><td><a href="#/imovel/${g.id}"><b>${esc(g.nome)}</b></a></td><td>${esc(g.cliente_nome || '')}</td><td>${d().imoveis.filter((i) => i.grupo_id === g.id).map((i) => esc(i.nome)).join(', ') || '-'}</td></tr>`).join('')}</table></div>` : ''}`;
   },
 
@@ -262,7 +263,7 @@ export const TELAS = {
   cobrancas: (rota) => telaCobrancas(rota.q.comp || competenciaPadrao()),
   cobranca(rota) {
     const cb = buscar('cobrancas', rota.partes[1]);
-    return cb ? telaCobranca(cb) : '<h1>Cobrança não encontrada</h1>';
+    return cb ? telaCobranca(cb) : '<h1>Boleto não encontrado</h1>';
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   imprimir: (rota) => telaImprimir(rota),
@@ -276,7 +277,7 @@ export const TELAS = {
     return `<div class="cabecalho"><h1>Usuários</h1>${link('#/novo/usuarios', 'Novo usuário', 'botao')}</div>
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>
       ${ordenar(d().usuarios, 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}</td><td class="n">${link(`#/editar/usuarios/${u.id}`, 'Editar')}</td></tr>`).join('')}</table>
-      <p class="suave">Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera faturas. Consulta: só vê.</p></div>`;
+      <p class="suave">Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>`;
   },
   'minha-senha': () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label>Senha atual</label><input type="password" name="atual"></p>
@@ -291,10 +292,10 @@ function caixaEmpresas(i) {
   const partes = R.participacoesDo(d(), i.id);
   const soma = partes.reduce((s, p) => s + p.percentual, 0);
   const emitentes = d().emitentes.filter((e) => e.ativo);
-  return `<div class="cartao" id="empresas"><h2>Empresas que emitem a fatura</h2>
+  return `<div class="cartao" id="empresas"><h2>Empresas que emitem a NF</h2>
     <table><tr><th>Empresa</th><th class="n">Percentual</th><th></th></tr>
     ${partes.map((p) => { const e = buscar('emitentes', p.emitente_id); return `<tr><td>${esc(e.nome)} · ${esc(e.razao_social)}</td><td class="n">${pct(p.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Remover', { tabela: 'participacoes', id: p.id }, 'perigo pequeno', 'Remover esta empresa do imóvel?') : ''}</td></tr>`; }).join('')
-    || '<tr><td colspan="3" class="suave">Nenhuma empresa definida. Sem isso não é possível numerar as faturas.</td></tr>'}
+    || '<tr><td colspan="3" class="suave">Nenhuma empresa definida. Sem isso não é possível numerar as NFs.</td></tr>'}
     ${partes.length ? `<tr class="total"><td>Total</td><td class="n">${pct(soma)}</td><td></td></tr>` : ''}</table>
     ${partes.length && Math.abs(soma - 100) > 1e-9 ? '<div class="alerta perigo">Os percentuais precisam somar 100%.</div>' : ''}
     ${opera() ? (emitentes.length ? `<form data-form="participacao" data-imovel="${i.id}" class="acoes" style="margin-top:10px">
@@ -326,11 +327,11 @@ function telaImovel(i) {
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
       <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th></tr>
-      ${contratos.map((c) => `<tr class="${c.verificar ? 'amarelo' : ''}"><td><input type="checkbox" title="Inquilino ativo (gera cobrança)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}></td>
+      ${contratos.map((c) => `<tr class="${c.verificar ? 'amarelo' : ''}"><td><input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}></td>
         <td><a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}<br><span class="suave">📁 ${esc(c.pasta || nomePastaContrato(c))}</span></td>
         <td>${dataBr(c.data_entrada)}</td><td>${dataBr(c.data_saida)}</td><td class="n">${reais(R.aluguelAtual(d(), c))}</td>
         <td>${R.contratoAtivo(c, hoje) ? etiqueta('Atual', 'ok') : etiqueta('Encerrado', 'neutra')} ${c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
-    </table></div><p class="suave">Desmarque "Ativo" para não gerar cobrança para o inquilino.</p></div>
+    </table></div><p class="suave">Desmarque "Ativo" para não gerar boleto para o inquilino.</p></div>
     ${caixaEmpresas(i)}
     ${caixaLeituras(R.leiturasDoImovel(d(), i.id), opera() ? link(`#/novo/leituras?imovel=${i.id}`, 'Registrar leitura') : '', true)}
     ${caixaSeguros(i)}
@@ -354,16 +355,16 @@ function telaGrupoAirbnb(g) {
       ${opera() ? `${link(`#/novo/recebimentos?imovel=${g.id}`, 'Lançar recebimento', 'botao')} ${link(`#/editar/imoveis/${g.id}`, 'Editar grupo', 'botao secundario')}` : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: g.id }, 'perigo', 'Excluir este grupo?') : ''}</div></div>
     <div class="endereco">📍 ${esc(endereco(g))}</div>
-    <div class="cartao"><div class="grade">${item('Cliente na fatura', esc(g.cliente_nome || '-'))}${item('CPF / CNPJ', esc(g.cliente_documento || '-'))}${item('Telefone', esc(g.cliente_telefone || '-'))}${item('Endereço do cliente', esc(g.cliente_endereco || 'endereço da unidade'))}</div></div>
+    <div class="cartao"><div class="grade">${item('Cliente na NF', esc(g.cliente_nome || '-'))}${item('CPF / CNPJ', esc(g.cliente_documento || '-'))}${item('Telefone', esc(g.cliente_telefone || '-'))}${item('Endereço do cliente', esc(g.cliente_endereco || 'endereço da unidade'))}</div></div>
     <div class="cartao"><h2>Unidades do grupo</h2>
       <p>${unidades.map((u) => `<a href="#/imovel/${u.id}">${esc(u.nome)}</a>`).join(' · ') || '<span class="suave">Nenhuma unidade. Em cada imóvel, use "Editar imóvel" e escolha este grupo.</span>'}</p></div>
     ${caixaEmpresas(g)}
-    <div class="cartao"><h2>Recebimentos</h2><p class="suave">Cada recebimento entra na sequência das faturas pela data em que o dinheiro entrou.</p>
-      <div class="rolagem"><table><tr><th>Entrou em</th><th>Unidade</th><th>Período</th><th>Cliente</th><th class="n">Valor</th><th>Fatura</th><th></th></tr>
+    <div class="cartao"><h2>Recebimentos</h2><p class="suave">Cada recebimento entra na sequência das NFs pela data em que o dinheiro entrou.</p>
+      <div class="rolagem"><table><tr><th>Entrou em</th><th>Unidade</th><th>Período</th><th>Cliente</th><th class="n">Valor</th><th>NF</th><th></th></tr>
       ${recs.map((r) => { const fs = R.faturasDe(d(), 'recebimento', r.id); const u = r.unidade_id ? buscar('imoveis', r.unidade_id) : null; return `<tr><td>${dataBr(r.data_pagamento)}</td><td>${esc(u ? u.nome : '-')}</td>
         <td>${r.periodo_inicio ? `${dataBr(r.periodo_inicio)} a ${dataBr(r.periodo_fim)}` : '-'}</td><td>${esc(r.tomador_nome)}</td><td class="n">${reais(r.valor)}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : '<span class="suave">aguardando nº</span>'}</td>
-        <td class="n">${opera() && !fs.length ? `${link(`#/editar/recebimentos/${r.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'recebimentos', id: r.id }, 'perigo pequeno', 'Excluir este recebimento?')}` : ''}${opera() && fs.length ? botao('cancelarRecebimento', 'Cancelar fatura', { id: r.id }, 'perigo pequeno', 'Cancelar a fatura deste recebimento? O número não será reaproveitado.') : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="suave">Nenhum recebimento lançado.</td></tr>'}
+        <td class="n">${opera() && !fs.length ? `${link(`#/editar/recebimentos/${r.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'recebimentos', id: r.id }, 'perigo pequeno', 'Excluir este recebimento?')}` : ''}${opera() && fs.length ? botao('cancelarRecebimento', 'Cancelar NF', { id: r.id }, 'perigo pequeno', 'Cancelar a NF deste recebimento? O número não será reaproveitado.') : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="suave">Nenhum recebimento lançado.</td></tr>'}
       </table></div></div>
     ${caixaArquivos('imovel', g.id, 'Documentos do grupo', 'documentos')}
     <div class="cartao"><h2>Histórico</h2>${tabelaHistorico(ultimos((h) => h.imovel_id === g.id))}</div>`;
@@ -382,6 +383,13 @@ function selosContrato(c) {
     ${etiqueta(`Correção anual: ${c.indice_correcao || 'índice não informado'}${base ? ` · todo ${dataBr(base).slice(0, 5)}` : ''}`, 'ok')}
     ${etiqueta(`Garantia: ${c.garantia_tipo || 'não informada'}`, 'neutra')}
     ${R.contratoAtivo(c) ? '' : etiqueta('Encerrado', 'perigo')}</div>`;
+}
+
+/** Aluguel atual com a bonificação de pontualidade (o que o inquilino paga em dia, sem IPTU e seguro). */
+function aluguelBonificado(c) {
+  const aluguel = R.aluguelAtual(d(), c);
+  if (c.bonificacao === false) return `<span class="suave">sem bonificação</span>`;
+  return `<b>${reais(aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c)))}</b>`;
 }
 
 const caixaVerificar = (texto) => (texto ? `<div class="verificar"><b>A verificar:</b> ${esc(texto).replace(/\n/g, '<br>')}</div>` : '');
@@ -483,7 +491,7 @@ function caixaSeguros(i) {
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span></td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
-    <p class="suave">As parcelas entram na cobrança do inquilino que estiver no imóvel no mês de cada parcela.</p></div>`;
+    <p class="suave">As parcelas entram no boleto do inquilino que estiver no imóvel no mês de cada parcela.</p></div>`;
 }
 
 function telaContrato(c) {
@@ -502,9 +510,9 @@ function telaContrato(c) {
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
-      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todas as suas cobranças?') : ''}</div></div>
+      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
-    ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera cobrança.</div>` : ''}
+    ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${selosContrato(c)}
     ${caixaVerificar(c.verificar)}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
@@ -534,8 +542,8 @@ function telaContrato(c) {
       <table><tr><th>Data</th><th>O que aconteceu</th><th>Novo término</th><th class="n">Novo valor</th><th>Obs.</th></tr>
       ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td></tr>`).join('')
       || '<tr><td colspan="5" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
-    <div class="cartao"><h2>Cobranças</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
-      ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a></td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : '-'}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhuma cobrança gerada ainda. Gere na tela "Cobranças".</td></tr>'}</table></div></div>
+    <div class="cartao"><h2>Boletos</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
+      ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a></td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : '-'}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div></div>
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
@@ -693,7 +701,7 @@ const CADASTROS = {
     voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
     descricao: (dados) => `Recebimento de ${reais(dados.valor)} em ${dataBr(dados.data_pagamento)}`,
     ajustar(dados, erros, r) {
-      if (r && R.faturasDe(d(), 'recebimento', r.id).length) erros.valor = 'Já tem fatura emitida';
+      if (r && R.faturasDe(d(), 'recebimento', r.id).length) erros.valor = 'Já tem NF emitida';
       if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
     },
   },
@@ -816,18 +824,18 @@ const CADASTROS = {
         debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n'),
       };
     },
-    aviso: (r, q) => 'Confira a cobrança do último mês: com a data de saída preenchida, o aluguel do mês de saída é gerado proporcional aos dias. A garantia é corrigida pelo índice da poupança que você informar.',
+    aviso: (r, q) => 'Confira o boleto do último mês: com a data de saída preenchida, o aluguel do mês de saída é gerado proporcional aos dias. A garantia é corrigida pelo índice da poupança que você informar.',
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     ajustar(dados) { for (const k of ['garantia_valor', 'indice_percentual', 'debitos']) if (dados[k] === null) dados[k] = 0; },
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
   },
   avulsas: {
-    titulo: (r) => (r ? 'Editar fatura avulsa' : 'Nova fatura avulsa'),
+    titulo: (r) => (r ? 'Editar NF avulsa' : 'Nova NF avulsa'),
     campos: () => F.AVULSA.map((c) => (c.nome === 'imovel_id' ? { ...c, opcoes: ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]) } : c)),
     voltar: () => '#/faturas',
-    descricao: (dados) => `Fatura avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
+    descricao: (dados) => `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
     ajustar(dados, erros, r) {
-      if (r && R.faturasDe(d(), 'avulsa', r.id).length) erros.valor = 'Já tem número de fatura';
+      if (r && R.faturasDe(d(), 'avulsa', r.id).length) erros.valor = 'Já tem número de NF';
       if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
     },
   },
@@ -859,10 +867,10 @@ const CADASTROS = {
     },
   },
   cobrancas: {
-    titulo: (r) => `Alterar cobrança ${compBr(r.competencia)} - ${buscar('contratos', r.contrato_id).inquilino_nome}`,
+    titulo: (r) => `Alterar boleto ${compBr(r.competencia)} - ${buscar('contratos', r.contrato_id).inquilino_nome}`,
     campos: () => F.COBRANCA,
     voltar: (r) => `#/cobranca/${r.id}`,
-    descricao: () => 'Valores da cobrança alterados',
+    descricao: () => 'Valores do boleto alterados',
     ajustar(dados, erros, r) {
       if (r.data_pagamento) erros.vencimento = 'Desfaça o pagamento antes de alterar os valores';
       for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
@@ -909,20 +917,20 @@ function telaCobrancas(comp) {
   const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id));
   const pend = R.pendentesDeFatura(d());
   const soma = (f) => lista.reduce((s, x) => s + f(x), 0);
-  return `<div class="cabecalho"><h1>Cobranças de ${compBr(comp)}</h1>
+  return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
-    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as faturas: a numeração segue a ordem das datas de pagamento.</p>
-    ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem cobrança neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar cobranças de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
+    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+    ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() ? `<form data-form="taxaBoleto" data-comp="${comp}" class="cartao acoes" style="align-items:center">
       <label for="taxa_todos"><b>Taxa de emissão do boleto para todos</b></label>
       <input id="taxa_todos" name="valor" inputmode="decimal" value="${esc(C.reais(taxaMaisComum(), false))}" style="width:120px">
       <button class="secundario">Aplicar a todos</button>
-      <span class="suave">Vale para todos os inquilinos ativos e para as cobranças ainda não pagas de ${compBr(comp)}.</span></form>` : ''}
-    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de fatura. ${botao('numerar', 'Numerar faturas agora', {}, 'pequeno')}</div>` : ''}
+      <span class="suave">Vale para todos os inquilinos ativos e para os boletos ainda não pagos de ${compBr(comp)}.</span></form>` : ''}
+    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
-      <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>Fatura</th></tr>
+      <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
@@ -936,11 +944,11 @@ function telaCobrancas(comp) {
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}</td></tr>`).join('')
-      || `<tr><td colspan="8" class="suave">Nenhuma cobrança gerada para ${compBr(comp)}.</td></tr>`}
+      || `<tr><td colspan="8" class="suave">Nenhum boleto gerado para ${compBr(comp)}.</td></tr>`}
       ${lista.length ? `<tr class="total"><td colspan="2">Total</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ''}
     </table></div>
     ${lista.length ? `<div class="acoes"><a class="botao secundario" target="_blank" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir demonstrativos do mês</a>
-      <a class="botao secundario" href="#/faturas">Ver faturas</a></div>` : ''}`;
+      <a class="botao secundario" href="#/faturas">Ver NFs</a></div>` : ''}`;
 }
 
 function demonstrativo(cb) {
@@ -948,7 +956,7 @@ function demonstrativo(cb) {
   const i = buscar('imoveis', c.imovel_id);
   const t = R.totais(cb);
   const linha = (txt, v) => `<tr><td>${txt}</td><td class="n">${v}</td></tr>`;
-  return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo de cobrança de aluguel</h2><div class="suave">Competência ${compBr(cb.competencia)}</div></div>
+  return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto de aluguel</h2><div class="suave">Competência ${compBr(cb.competencia)}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
     <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
@@ -957,7 +965,8 @@ function demonstrativo(cb) {
       ${cb.iptu ? linha(`IPTU${cb.iptu_parcela ? ` (${esc(cb.iptu_parcela)})` : ''}`, reais(cb.iptu)) : ''}
       ${cb.seguro ? linha(`Seguro obrigatório${cb.seguro_parcela ? ` (${esc(cb.seguro_parcela)})` : ''}`, reais(cb.seguro)) : ''}
       ${cb.taxa_boleto ? linha('Tarifa de emissão do boleto', reais(cb.taxa_boleto)) : ''}
-      ${cb.outros ? linha(esc(cb.outros_descricao || 'Outros'), reais(cb.outros)) : ''}
+      ${cb.outros > 0 ? linha(`Cobrança adicional${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, reais(cb.outros)) : ''}
+      ${cb.outros < 0 ? linha(`(-) Ressarcimento${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, `- ${reais(-cb.outros)}`) : ''}
       <tr class="total"><td>Total sem desconto</td><td class="n">${reais(t.total_sem_desconto)}</td></tr>
       ${cb.desconto ? linha('(-) Desconto de pontualidade, se pago até o vencimento', `- ${reais(cb.desconto)}`) : ''}
       ${cb.reserva_utilizada ? linha('(-) Reserva paga na visita, abatida neste mês', `- ${reais(cb.reserva_utilizada)}`) : ''}
@@ -965,6 +974,20 @@ function demonstrativo(cb) {
       <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
+}
+
+/** Ajuste do mês: cobrança adicional ou ressarcimento (reforma, acerto etc.). Fica no histórico. */
+function caixaAjuste(cb) {
+  if (!opera() || cb.data_pagamento) return '';
+  const tipo = cb.outros < 0 ? 'ressarcimento' : 'adicional';
+  return `<div class="cartao"><h2>Ajuste deste mês</h2>
+    <p class="suave">Para corrigir o valor do boleto: cobrar algo a mais ou devolver/descontar um valor (reforma, acerto do mês anterior etc.). Fica registrado no histórico do inquilino.</p>
+    <form data-form="ajuste" data-id="${cb.id}" class="acoes">
+      <select name="tipo" style="width:auto"><option value="adicional" ${tipo === 'adicional' ? 'selected' : ''}>Cobrança adicional (+)</option><option value="ressarcimento" ${tipo === 'ressarcimento' ? 'selected' : ''}>Ressarcimento (−)</option></select>
+      <input name="valor" inputmode="decimal" placeholder="Valor" value="${cb.outros ? esc(F.dinheiroTexto(Math.abs(cb.outros))) : ''}" style="width:130px">
+      <input name="motivo" placeholder="Motivo (ex.: reforma do banheiro)" value="${esc(cb.outros_descricao || '')}" style="flex:1;min-width:220px">
+      <button class="secundario">Salvar ajuste</button>
+      ${cb.outros ? botao('tirarAjuste', 'Tirar ajuste', { id: cb.id }, 'perigo pequeno', 'Tirar o ajuste deste boleto?') : ''}</form></div>`;
 }
 
 function caixaBoleto(cb) {
@@ -986,23 +1009,23 @@ function telaCobranca(cb) {
   const fs = R.faturasDe(d(), 'cobranca', cb.id, false);
   const validas = fs.filter((f) => f.situacao === 'Emitida');
   const sim = cb.data_pagamento ? null : C.liquidar(cb, C.hojeIso());
-  return `<div class="nao-imprimir"><p class="suave"><a href="#/cobrancas?comp=${cb.competencia}">← Cobranças de ${compBr(cb.competencia)}</a> · <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></p>
-    <div class="cabecalho"><h1>Cobrança ${compBr(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
+  return `<div class="nao-imprimir"><p class="suave"><a href="#/cobrancas?comp=${cb.competencia}">← Boletos de ${compBr(cb.competencia)}</a> · <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></p>
+    <div class="cabecalho"><h1>Boleto ${compBr(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>
-      ${opera() && !cb.data_pagamento ? `${link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir esta cobrança?')}` : ''}</div></div></div>
+      ${opera() && !cb.data_pagamento ? `${link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir este boleto?')}` : ''}</div></div></div>
     ${demonstrativo(cb)}
-    <div class="nao-imprimir">${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
+    <div class="nao-imprimir">${caixaAjuste(cb)}${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
       ${cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
         ${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}
         ${item('Valor recebido', reais(cb.valor_pago))}${item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>`)}</div>
-        <p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro e tarifa não entram.</p>
-        ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A fatura será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
+        <p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>
+        ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`} · nota fiscal ${reais(sim.valor_nf)}</p>
         ${opera() ? `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Data do pagamento</label><input type="date" name="data" value="${C.hojeIso()}"><label>Valor pago (opcional)</label><input name="valor" inputmode="decimal"><button>Confirmar pagamento</button></form>` : ''}`}</div>
-    <div class="cartao"><h2>Faturas</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
+    <div class="cartao"><h2>NFs</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${R.numeroFatura(f.numero)}</td><td>${esc(buscar('emitentes', f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === 'Emitida' ? 'ok' : 'perigo')}</td></tr>`).join('')
-      || `<tr><td colspan="7" class="suave">${cb.data_pagamento ? 'Aguardando numeração (tela Faturas).' : 'Confirme o pagamento para gerar a fatura.'}</td></tr>`}</table>
-      ${validas.length ? `<p class="acoes">${link(`#/imprimir/faturas?numero=${validas[0].numero}`, 'Ver / imprimir fatura', 'botao')} ${botao('excel', 'Baixar Excel', { numero: validas[0].numero })}</p>` : ''}</div></div>`;
+      || `<tr><td colspan="7" class="suave">${cb.data_pagamento ? 'Aguardando numeração (tela NF).' : 'Confirme o pagamento para gerar a NF.'}</td></tr>`}</table>
+      ${validas.length ? `<p class="acoes">${link(`#/imprimir/faturas?numero=${validas[0].numero}`, 'Ver / imprimir NF', 'botao')} ${botao('excel', 'Baixar Excel', { numero: validas[0].numero })}</p>` : ''}</div></div>`;
 }
 
 // --------------------------------------------------------------------------
@@ -1035,33 +1058,33 @@ function telaFaturas(mes) {
   const ultima = R.ultimaFatura(d());
   const doMes = d().faturas.filter((f) => f.emissao.slice(0, 7) === mes);
   const grupos = agruparPorNumero(doMes);
-  return `<div class="cabecalho"><h1>Faturas emitidas em ${compBr(mes)}</h1>
+  return `<div class="cabecalho"><h1>NFs emitidas em ${compBr(mes)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/faturas?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
       <form data-form="irMesFatura" class="acoes"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/faturas?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a></div></div>
     <div class="cartao"><h2>Pagamentos aguardando número</h2>
-      <p class="suave">Última fatura: ${ultima ? `<b>Nº ${R.numeroFatura(ultima.numero)}</b> de ${dataBr(ultima.emissao)}` : 'nenhuma ainda'} · próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. A numeração segue a data em que o dinheiro entrou, e a data de emissão é a data do pagamento.</p>
-      ${pend.length ? `<table><tr><th>Ordem</th><th>Pagamento em</th><th>Origem</th><th class="n">Valor da fatura</th></tr>
-        ${pend.map((p, n) => { const b = R.baseDaFatura(d(), p.tipo, p.registro); return `<tr class="${ultima && p.data < ultima.emissao ? 'fora' : ''}"><td>${R.numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p.data)}${ultima && p.data < ultima.emissao ? ` ${etiqueta('anterior à última fatura', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td><td class="n">${reais(b.valor)}</td></tr>`; }).join('')}</table>
-        ${opera() ? `<p>${botao('numerar', 'Numerar estas faturas', {}, '')}</p>` : ''}`
+      <p class="suave">Última NF: ${ultima ? `<b>Nº ${R.numeroFatura(ultima.numero)}</b> de ${dataBr(ultima.emissao)}` : 'nenhuma ainda'} · próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. A numeração segue a data em que o dinheiro entrou, e a data de emissão é a data do pagamento.</p>
+      ${pend.length ? `<table><tr><th>Ordem</th><th>Pagamento em</th><th>Origem</th><th class="n">Valor da NF</th></tr>
+        ${pend.map((p, n) => { const b = R.baseDaFatura(d(), p.tipo, p.registro); return `<tr class="${ultima && p.data < ultima.emissao ? 'fora' : ''}"><td>${R.numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p.data)}${ultima && p.data < ultima.emissao ? ` ${etiqueta('anterior à última NF', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td><td class="n">${reais(b.valor)}</td></tr>`; }).join('')}</table>
+        ${opera() ? `<p>${botao('numerar', 'Numerar estas NFs', {}, '')}</p>` : ''}`
       : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
     <div class="cartao rolagem"><table><tr><th>Nº</th><th>Emissão</th><th>Cliente</th><th>Origem</th><th>Empresas</th><th class="n">Total</th><th>Situação</th><th></th></tr>
       ${grupos.map(([n, fs]) => `<tr><td><b>${R.numeroFatura(n)}</b></td><td>${dataBr(fs[0].emissao)}</td><td>${esc(fs[0].tomador_nome)}</td><td>${origemTexto(fs[0])}</td>
         <td>${fs.map((f) => `${esc(buscar('emitentes', f.emitente_id).nome)}: ${reais(f.valor)}`).join('<br>')}</td><td class="n">${reais(fs.reduce((s, f) => s + f.valor, 0))}</td>
         <td>${etiqueta(fs[0].situacao, fs[0].situacao === 'Emitida' ? 'ok' : 'perigo')}</td>
-        <td class="n nw">${fs[0].situacao === 'Emitida' ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${fs[0].origem_tipo === 'avulsa' && opera() ? ` ${botao('cancelarAvulsa', 'Cancelar', { id: fs[0].origem_id }, 'perigo pequeno', 'Cancelar esta fatura avulsa? O número não será reaproveitado.')}` : ''}` : ''}</td></tr>`).join('')
-      || `<tr><td colspan="8" class="suave">Nenhuma fatura emitida em ${compBr(mes)}.</td></tr>`}</table></div>
-    ${grupos.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as faturas de ${compBr(mes)}</a> ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}`;
+        <td class="n nw">${fs[0].situacao === 'Emitida' ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${fs[0].origem_tipo === 'avulsa' && opera() ? ` ${botao('cancelarAvulsa', 'Cancelar', { id: fs[0].origem_id }, 'perigo pequeno', 'Cancelar esta NF avulsa? O número não será reaproveitado.')}` : ''}` : ''}</td></tr>`).join('')
+      || `<tr><td colspan="8" class="suave">Nenhuma NF emitida em ${compBr(mes)}.</td></tr>`}</table></div>
+    ${grupos.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}`;
 }
 
 function caixaAvulsas() {
   const pend = d().avulsas.filter((a) => !R.faturasDe(d(), 'avulsa', a.id).length);
-  return `<div class="cartao"><div class="cabecalho"><h2>Faturas avulsas</h2>${opera() ? link('#/novo/avulsas', 'Nova fatura avulsa', 'botao') : ''}</div>
+  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? link('#/novo/avulsas', 'Nova NF avulsa', 'botao') : ''}</div>
     <p class="suave">Para notas fora da regra: a nota mensal geral do AIRBNB, ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
       ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || '')}</td><td class="n">${reais(a.valor)}</td>
-        <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'avulsas', id: a.id }, 'perigo pequeno', 'Excluir esta fatura avulsa?')}` : ''}</td></tr>`).join('')}</table>` : ''}</div>`;
+        <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'avulsas', id: a.id }, 'perigo pequeno', 'Excluir esta NF avulsa?')}` : ''}</td></tr>`).join('')}</table>` : ''}</div>`;
 }
 
 /** Inquilinos atuais e anteriores, com o resumo da saída. */
@@ -1075,7 +1098,7 @@ function telaInquilinos(q) {
   const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida || '9').localeCompare(String(a.c.data_saida || '9')));
   const anterior = (c) => (c.contrato_anterior_id ? buscar('contratos', c.contrato_anterior_id) : null);
   const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
-  const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera cobrança)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
+  const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
   const editar = (c) => (opera() ? link(`#/editar/contratos/${c.id}`, 'Editar') : '');
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
@@ -1085,7 +1108,7 @@ function telaInquilinos(q) {
       ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td>
         <td>${x.c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : `até ${dataBr(x.c.vigencia_fim)}`}</td><td class="n">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td>${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td><td class="n">${editar(x.c)}</td></tr>`).join('') || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
-      <p class="suave">Desmarque "Ativo" para parar de gerar cobrança. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
+      <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th><th></th></tr>
       ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td>${dataBr(x.c.data_entrada)}</td><td>${dataBr(x.c.data_saida)}</td>
         ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
@@ -1109,7 +1132,7 @@ function telaIptu(ano) {
   return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
     <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela no aluguel de</th><th></th></tr>${linhas}</table>
-    <p class="suave">As parcelas entram sozinhas nas cobranças dos inquilinos que pagam IPTU, a partir do mês da 1ª parcela.</p></div>`;
+    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do mês da 1ª parcela.</p></div>`;
 }
 
 function telaImprimir(rota) {
@@ -1117,30 +1140,30 @@ function telaImprimir(rota) {
   const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
   if (tipo === 'demonstrativos') {
     const lista = d().cobrancas.filter((x) => x.competencia === rota.q.comp);
-    return `<div class="impressao">${voltar}${lista.map(demonstrativo).join('') || '<p>Nenhuma cobrança.</p>'}</div>`;
+    return `<div class="impressao">${voltar}${lista.map(demonstrativo).join('') || '<p>Nenhum boleto.</p>'}</div>`;
   }
   let fs = d().faturas.filter((f) => f.situacao === 'Emitida');
   fs = rota.q.numero ? fs.filter((f) => f.numero === Number(rota.q.numero)) : fs.filter((f) => f.emissao.slice(0, 7) === rota.q.mes);
   fs.sort((a, b) => a.numero - b.numero || a.id - b.id);
   return `<div class="impressao">${voltar}${rota.q.numero && fs.length ? `<p class="nao-imprimir">${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
-    ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma fatura.</p>'}</div>`;
+    ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma NF.</p>'}</div>`;
 }
 
 // --------------------------------------------------------------------------
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 function telaEmpresas() {
-  return `<div class="cabecalho"><h1>Empresas que emitem as faturas</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
+  return `<div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
     || '<tr><td colspan="6" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
-    <p class="suave">Em cada imóvel você define quais empresas emitem a fatura e o percentual de cada uma (ex.: 50% / 50%).</p></div>
+    <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
     <div class="cartao"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema.</p>
       ${d().logo ? `<p><img class="logo-previa" src="${esc(d().logo)}" alt="Logo atual"></p>` : '<p class="suave">Nenhuma logo enviada.</p>'}
       ${podeUsuario('admin') ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? 'Trocar logo' : 'Enviar logo'}</button>
         ${d().logo ? botao('removerLogo', 'Remover logo', {}, 'perigo pequeno', 'Remover a logo?') : ''}</form>` : ''}</div>
-    <div class="cartao"><h2>Numeração das faturas</h2>
+    <div class="cartao"><h2>Numeração das NFs</h2>
       <p>Próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
       ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
 }
@@ -1185,7 +1208,7 @@ async function telaDados() {
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>
-    <div class="cartao"><h2>Modelo Excel da fatura</h2>
+    <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK).'}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>
       <form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao('removerModelo', 'Voltar ao modelo padrão', {}, 'perigo pequeno', 'Voltar ao modelo padrão?') : ''}</form></div>` : ''}`;
@@ -1302,10 +1325,21 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  async ajuste(form) {
+    const f = new FormData(form);
+    const valor = Math.abs(C.centavos(String(f.get('valor') || '').trim()));
+    if (!valor) throw new Error('Informe o valor do ajuste.');
+    const motivo = String(f.get('motivo') || '').trim();
+    if (!motivo) throw new Error('Informe o motivo do ajuste (fica no histórico).');
+    await alterar((db) => R.ajustarBoleto(db, Number(form.dataset.id), f.get('tipo') === 'ressarcimento' ? -valor : valor, motivo, login()));
+    aviso('Ajuste salvo e registrado no histórico.');
+    await mostrar();
+  },
+
   async taxaBoleto(form) {
     const valor = C.centavos(String(new FormData(form).get('valor') || '0'));
     const r = await alterar((db) => R.aplicarTaxaBoleto(db, valor, form.dataset.comp, login()));
-    aviso(`Taxa do boleto de ${reais(valor)} aplicada: ${r.contratos} inquilino(s) alterado(s) e ${r.cobrancas} cobrança(s) em aberto de ${compBr(form.dataset.comp)} atualizada(s).`);
+    aviso(`Taxa do boleto de ${reais(valor)} aplicada: ${r.contratos} inquilino(s) alterado(s) e ${r.cobrancas} boleto(s) em aberto de ${compBr(form.dataset.comp)} atualizado(s).`);
     await mostrar();
     return null;
   },
@@ -1336,9 +1370,9 @@ export const FORMULARIOS = {
     const n = Number(new FormData(form).get('numero'));
     if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
     const ultima = R.ultimaFatura(E.d);
-    if (ultima && n <= ultima.numero && !confirm(`Já existe a fatura nº ${R.numeroFatura(ultima.numero)}. Usar ${R.numeroFatura(n)} mesmo assim vai repetir números. Continuar?`)) return;
+    if (ultima && n <= ultima.numero && !confirm(`Já existe a NF nº ${R.numeroFatura(ultima.numero)}. Usar ${R.numeroFatura(n)} mesmo assim vai repetir números. Continuar?`)) return;
     await alterar((db) => {
-      R.registrar(db, login(), 'Alteração', 'faturas', null, 'Próximo número de fatura', { proxima_fatura: { de: db.proxima_fatura, para: n } });
+      R.registrar(db, login(), 'Alteração', 'faturas', null, 'Próximo número de NF', { proxima_fatura: { de: db.proxima_fatura, para: n } });
       db.proxima_fatura = n;
     });
     aviso('Numeração atualizada.');
@@ -1372,7 +1406,7 @@ export const FORMULARIOS = {
     }
     const dir = await E.pasta.getDirectoryHandle(S.PASTA_MODELOS, { create: true });
     await S.escreverTexto(dir, S.MODELO_FATURA, arq);
-    await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, `Modelo Excel da fatura enviado (abas: ${wb.worksheets.map((w) => w.name).join(', ')})`));
+    await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, `Modelo Excel da NF enviado (abas: ${wb.worksheets.map((w) => w.name).join(', ')})`));
     aviso('Modelo salvo.');
     await mostrar();
   },
@@ -1387,24 +1421,24 @@ async function modeloFatura() {
     return await (await (await dir.getFileHandle(S.MODELO_FATURA)).getFile()).arrayBuffer();
   } catch {
     const r = await fetch('modelos/fatura-modelo.xlsx');
-    if (!r.ok) throw new Error('Modelo da fatura não encontrado.');
+    if (!r.ok) throw new Error('Modelo da NF não encontrado.');
     return r.arrayBuffer();
   }
 }
 
 async function excelDoNumero(ExcelJS, modelo, numero) {
   const fs = E.d.faturas.filter((f) => f.numero === Number(numero) && f.situacao === 'Emitida').sort((a, b) => a.id - b.id);
-  if (!fs.length) throw new Error('Fatura não encontrada.');
+  if (!fs.length) throw new Error('NF não encontrada.');
   const blob = await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes);
-  return { blob, nome: S.limparNome(`Fatura ${R.numeroFatura(numero)} - ${fs[0].tomador_nome}.xlsx`) };
+  return { blob, nome: S.limparNome(`NF ${R.numeroFatura(numero)} - ${fs[0].tomador_nome}.xlsx`) };
 }
 
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.imovel_id === r.id) ? 'Este imóvel tem inquilinos. Exclua os contratos antes.' : null), voltar: () => '#/imoveis' },
-  contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem faturas emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
-  cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Esta cobrança tem fatura. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
-  recebimentos: { checar: (db, r) => (R.faturasDe(db, 'recebimento', r.id).length ? 'Este recebimento tem fatura emitida.' : null) },
-  avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta fatura avulsa já tem número.' : null) },
+  contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
+  cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
+  recebimentos: { checar: (db, r) => (R.faturasDe(db, 'recebimento', r.id).length ? 'Este recebimento tem NF emitida.' : null) },
+  avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
 };
 
@@ -1445,6 +1479,12 @@ export const ACOES = {
     await mostrar();
   },
 
+  async tirarAjuste({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    await alterar((db) => R.ajustarBoleto(db, Number(id), 0, '', login()));
+    await mostrar();
+  },
+
   async alternarAtivo({ id }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar.');
     await alterar((db) => {
@@ -1463,13 +1503,13 @@ export const ACOES = {
 
   async cancelarAvulsa({ id }) {
     await alterar((db) => R.cancelarFaturas(db, 'avulsa', Number(id), login()));
-    aviso('Fatura cancelada. O número não será reaproveitado.');
+    aviso('NF cancelada. O número não será reaproveitado.');
     await mostrar();
   },
 
   async gerarCobrancas({ comp }) {
     const r = await alterar((db) => R.gerarCobrancas(db, comp, login()));
-    aviso(`${r.geradas} cobrança(s) gerada(s) para ${compBr(comp)}.`);
+    aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
     await mostrar();
   },
 
@@ -1481,7 +1521,7 @@ export const ACOES = {
 
   async cancelarRecebimento({ id }) {
     await alterar((db) => R.cancelarFaturas(db, 'recebimento', Number(id), login()));
-    aviso('Fatura cancelada. Corrija o recebimento e numere de novo.');
+    aviso('NF cancelada. Corrija o recebimento e numere de novo.');
     await mostrar();
   },
 
@@ -1489,10 +1529,10 @@ export const ACOES = {
     let r = await alterar((db) => R.numerarFaturas(db, login()));
     if (r.foraDeOrdem.length) {
       const lista = r.foraDeOrdem.map((p) => `${dataBr(p.data)}`).join(', ');
-      if (!confirm(`A última fatura (nº ${R.numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista}.\n\nNumerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
+      if (!confirm(`A última NF (nº ${R.numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista}.\n\nNumerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
       r = await alterar((db) => R.numerarFaturas(db, login(), { forcar: true }));
     }
-    if (r.numeradas.length) aviso(`Faturas numeradas: ${r.numeradas.map((n) => R.numeroFatura(n.numero)).join(', ')}.`);
+    if (r.numeradas.length) aviso(`NFs numeradas: ${r.numeradas.map((n) => R.numeroFatura(n.numero)).join(', ')}.`);
     if (r.problema) aviso(r.problema, 'erro');
     await mostrar();
   },
@@ -1512,7 +1552,7 @@ export const ACOES = {
       const { blob, nome } = await excelDoNumero(ExcelJS, modelo, n);
       zip.file(nome, blob);
     }
-    baixar(await zip.generateAsync({ type: 'blob' }), `Faturas ${mes}.zip`);
+    baixar(await zip.generateAsync({ type: 'blob' }), `NFs ${mes}.zip`);
   },
 
   async exportar() {

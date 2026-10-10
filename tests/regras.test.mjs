@@ -276,3 +276,18 @@ test('vincular inquilino ao imóvel grava a leitura dos relógios; a saída tamb
   R.vincularInquilino(d, casa.id, { contrato_id: y.id, data_entrada: '2026-03-01', leitura_agua: '' }, 'julio');
   assert.equal(d.leituras.length, 2);
 });
+
+test('ajuste do mês no boleto: adicional ou ressarcimento, com histórico e na descrição', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const cb = d.cobrancas[0];
+  const antes = R.totais(cb).a_pagar_pontual;
+  R.ajustarBoleto(d, cb.id, -15000, 'Reforma do banheiro', 'julio');
+  assert.equal(R.totais(cb).a_pagar_pontual, antes - 15000);
+  assert.match(R.dadosBoleto(d, cb).descricao, /REFORMA DO BANHEIRO -RS150,00/);
+  assert.match(d.historico.at(-1).descricao, /Ressarcimento de R\$\s?150,00 no boleto 07\/2026: Reforma do banheiro/);
+  R.ajustarBoleto(d, cb.id, 5000, 'Conserto', 'julio');
+  assert.match(R.dadosBoleto(d, cb).descricao, /CONSERTO RS50,00/);
+  R.registrarPagamento(d, cb.id, '2026-08-05', null, 'julio');
+  assert.throws(() => R.ajustarBoleto(d, cb.id, 0, '', 'julio'));
+});

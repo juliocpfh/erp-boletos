@@ -89,7 +89,8 @@ test('divisão da fatura entre as empresas', () => {
 });
 
 test('alertas de correção, seguro e reserva', () => {
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-09-15', []), null);
+  assert.equal(A.alertaCorrecao('2025-11-01', '2026-08-15', []), null);
+  assert.equal(A.alertaCorrecao('2025-11-01', '2026-09-15', []).nivel, 'aviso'); // 60 dias antes
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-10-05', []).nivel, 'aviso');
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', []).nivel, 'perigo');
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', ['2026-11-01']), null);
