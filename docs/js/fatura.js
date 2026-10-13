@@ -8,6 +8,21 @@ const LARGURAS = [2, 8, 6.8, 6.2, 8, 11.2, 4.7, 6.7, 5.8, 6, 13, 6, 15.5];
 const ALTURAS = { 3: 50.25, 7: 9.95, 9: 9.95, 10: 20.1, 11: 20.1, 12: 20.1, 13: 9.95, 14: 9.95, 15: 9.95, 16: 30, 17: 30, 18: 30, 27: 30, 28: 30, 29: 30, 30: 30, 31: 30, 32: 3.75, 33: 20.1, 34: 20.1 };
 
 const maiusc = (t) => String(t || '').toLocaleUpperCase('pt-BR');
+const corta = (t, n) => String(t || '').slice(0, n);
+/** Linhas da caixa grande de observações (linhas 27 a 31 da planilha), até 90 caracteres cada. */
+export function linhasObservacoes(texto, porLinha = 90, maxLinhas = 5) {
+  const linhas = [];
+  for (const par of String(texto || '').split(/\r?\n/)) {
+    let atual = '';
+    for (const palavra of par.split(/\s+/).filter(Boolean)) {
+      const p = palavra.slice(0, porLinha);
+      if (atual && `${atual} ${p}`.length > porLinha) { linhas.push(atual); atual = p; } else atual = atual ? `${atual} ${p}` : p;
+    }
+    linhas.push(atual);
+  }
+  while (linhas.length && !linhas.at(-1)) linhas.pop();
+  return linhas.slice(0, maxLinhas);
+}
 
 /**
  * Linhas da fatura. Cada célula: [colspan, conteúdo, classes]. As classes de borda imitam a planilha:
@@ -25,9 +40,9 @@ function linhas(f, emitente) {
     7: [vazio(13, 'be bd bt bb')],
     8: [[1, '', 'be bt'], [9, 'TOMADOR DE SERVIÇO', 'bt bd f-11'], [1, '', 'be bd bt'], [2, '', 'bt bd']],
     9: [[1, '', 'be'], [9, '', 'bd'], [1, '', 'be bd'], [2, '', 'bd']],
-    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(f.tomador_nome))}</b>`, 'bd f-12 f-light'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
+    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, 60)))}</b>`, 'bd f-12 f-light'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
     11: [[1, '', 'be'], [3, '<b>CPF</b>', 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
-    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(f.tomador_endereco))}</b>`, 'bd bb f-12 f-light'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
+    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, 70)))}</b>`, 'bd bb f-12 f-light'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
     13: [vazio(13, 'be bd bt bb')],
     14: [vazio(13, 'be bd bt bb')],
     15: [vazio(13, 'be bd bt preto')],
@@ -37,7 +52,7 @@ function linhas(f, emitente) {
     ...Object.fromEntries([19, 20, 21, 23, 24, 25].map((r) => [r, [[1, '', 'be bd'], [1, '', 'be bd'], [3, '', 'be bd'], [1, '', 'be bd'], [1, '', 'be bd'], [3, '', 'be bd'], [2, '', 'be bd'], [1, '', `be bd${r === 25 ? ' bb' : ''}`]]])),
     22: [[1, '', 'be bd'], [1, '1', 'be bd centro f-12 f-light'], [3, 'LOCAÇÃO DE IMÓVEL', 'be bd centro f-12 f-light'], [1, esc(maiusc(f.municipio)), 'be bd centro f-12 f-light'], [1, 'UN', 'be bd centro f-12 f-light'], [3, '1', 'be bd centro f-12 f-light'], [2, `<span class="moeda">${reais(f.valor)}</span>`, 'be bd f-12 f-light'], [1, `<span class="moeda">${reais(f.valor)}</span>`, 'be bd f-12 f-light']],
     26: [[1, '', 'be bt bb'], [5, '', 'bt bb'], [6, '<b>VALOR TOTAL DA FATURA</b>', 'be bd bt bb centro f-12 f-light'], [1, `<b class="moeda">${reais(f.valor)}</b>`, 'be bd bt bb f-12 f-light']],
-    ...Object.fromEntries([27, 28, 29, 30, 31].map((r) => [r, [[13, '', 'be bd']]])),
+    ...Object.fromEntries([27, 28, 29, 30, 31].map((r, n) => [r, [[1, '', 'be'], [12, esc(linhasObservacoes(f.observacoes)[n] || ''), 'bd f-11 f-light']]])),
     32: [vazio(13, 'be bd preto')],
     33: [[10, `RECEBEMOS DE ${esc(maiusc(f.tomador_nome))} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`, 'be bd f-canhoto'], [3, '<b>FATURA DE LOCAÇÃO</b>', 'be bd centro f-12']],
     34: [[4, 'DATA DO RECEBIMENTO', 'be bd bt f-canhoto'], [6, 'IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR', 'be bd bt f-canhoto'], [3, `<b>${num}</b>`, 'be bd bt centro f-12']],
@@ -88,12 +103,13 @@ export async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
     set('B6', e.endereco || '');
     set('L4', num);
     set('L5', `Emissão: ${dataBr(f.emissao)}`);
-    set('E10', maiusc(f.tomador_nome));
+    set('E10', maiusc(corta(f.tomador_nome, 60)));
     set('L10', f.tomador_telefone || '');
     set('E11', f.tomador_documento || '');
-    set('E12', maiusc(f.tomador_endereco));
+    set('E12', maiusc(corta(f.tomador_endereco, 70)));
+    linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
     set('G16', `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`);
-    set('F22', maiusc(f.municipio));
+    set('F22', maiusc(corta(f.municipio, 25)));
     set('K22', valor);
     set('M22', { formula: 'K22', result: valor });
     set('M26', { formula: 'M22', result: valor });

@@ -10,8 +10,9 @@ Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam nu
 
 1. Abra o endereço no **Google Chrome** ou no **Microsoft Edge**, no computador. Firefox, Safari e celular não conseguem gravar em pastas.
 2. Crie uma pasta, por exemplo `OneDrive\Imoveis`, e clique em **Escolher a pasta dos dados**. O navegador pede permissão para editar a pasta: autorize.
-3. Na primeira vez, crie o usuário administrador. Os demais usuários são cadastrados em **Usuários**.
+3. Na primeira vez, crie o usuário administrador. Os demais usuários clicam em **Pedir acesso** na tela de login, e o administrador aprova (ou recusa) em **Usuários**, onde também cria e bloqueia usuários.
 4. Nos próximos acessos, o navegador lembra a pasta e só pede para confirmar a permissão.
+5. O login fica lembrado neste navegador, em todas as abas, por 12 horas sem uso, até clicar em **Sair**.
 
 ## O que fica na pasta
 
@@ -19,7 +20,7 @@ Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam nu
 |---|---|
 | `imoveis-dados.json` | O banco de dados. Cada alteração é gravada na hora. |
 | `backups/` | Uma cópia por dia (últimos 30 dias) e uma cópia antes de cada importação. |
-| `arquivos/<Imóvel>/` | `Documentos do imóvel` (matrícula, IPTU), `Anúncio` (fotos) e uma pasta por inquilino: `Nome (entrada a saída)`. |
+| `arquivos/<Imóvel>/` | `Documentos do imóvel` (matrícula), `IPTU (guias)`, `Seguro (apólices)`, `Reformas`, `Anúncio` (fotos) e uma pasta por inquilino: `Nome (entrada a saída)`. |
 | `modelos/fatura-modelo.xlsx` | Opcional: modelo Excel da fatura enviado em Dados e backup. |
 
 Em **Dados e backup** é possível baixar tudo (banco e anexos) em um ZIP e importar um ZIP em outra pasta.
@@ -34,13 +35,19 @@ Em **Dados e backup** é possível baixar tudo (banco e anexos) em um ZIP e impo
 
 - **Aluguel proporcional:** no mês de entrada ou saída, aluguel e desconto de pontualidade são proporcionais aos dias.
 - **Reserva:** o valor dado na visita é abatido no primeiro aluguel ou no mês escolhido.
-- **Multa e juros:** multa % sobre o aluguel sem desconto e juros % ao mês pro rata dia, mostrados separados com percentual e valor.
+- **Bonificação:** digite o aluguel com bonificação e o % é calculado (ou o contrário). O desconto bate no centavo com o valor digitado.
+- **Carência:** meses sem aluguel, escolhendo se cobra IPTU, seguro e tarifa nesse período.
+- **Multa e juros:** multa % sobre o valor sem desconto e juros % ao mês pro rata dia. Num pagamento atrasado, a multa e os juros entram no boleto do mês seguinte (ajustável em "Alterar valores").
+- **Data contábil:** ao confirmar o pagamento, informe o dia em que o dinheiro entrou (é a data da NF). "Pagou em dia" tira multa e juros quando o banco só compensou depois do vencimento.
+- **Boletos acompanham o cadastro:** ao mudar contrato, correção, IPTU ou seguro, os boletos em aberto são recalculados (os alterados à mão ficam como estão).
 - **Valor da nota:** pago em dia = aluguel − desconto; pago com atraso = aluguel + multa + juros. IPTU, seguro e tarifa do boleto não entram.
-- **Numeração das faturas:** ao confirmar o pagamento com a data em que o dinheiro entrou, ele vai para a fila. Em **Numerar faturas**, os pagamentos recebem números contínuos e crescentes na ordem das datas de pagamento, e a data de emissão é a data do pagamento. Um pagamento com data anterior à última fatura emitida só é numerado com confirmação. Números cancelados não são reaproveitados.
+- **Numeração das faturas:** os pagamentos recebem números contínuos e crescentes na ordem da data contábil. Um pagamento com data anterior à última NF só é numerado com confirmação. Uma NF pode ser cancelada (o número não volta) e a cancelada pode ser apagada da lista. "Desfazer numeração a partir do nº" retira as NFs daquele número em diante para corrigir e numerar de novo com os mesmos números. Inquilino marcado "sem NF" só tem o pagamento controlado.
 - **Empresas:** cada imóvel define as empresas que emitem a fatura e o percentual de cada uma (ex.: ANK 50% e JCK 50%). As faturas de um pagamento têm o mesmo número, uma por empresa.
-- **Airbnb:** um grupo Airbnb reúne as unidades e tem o cliente que aparece na fatura. Cada recebimento entra na mesma sequência de numeração.
-- **Fatura:** a tela e a impressão seguem o desenho da planilha LOJA1. Também é possível baixar cada fatura (ou todas do mês) em Excel, preenchido a partir do modelo.
-- **Alertas:** correção um mês antes do aniversário do contrato, renovação do seguro, uso da reserva e fim da vigência.
+- **Airbnb:** é lançado como NF avulsa, com a data em que o dinheiro entrou, e entra na mesma sequência. Os antigos grupos Airbnb foram convertidos sozinhos em NFs avulsas.
+- **Fatura:** a tela e a impressão seguem o desenho da planilha LOJA1, com as observações na caixa grande. Dá para imprimir ou exportar as selecionadas ou todas do mês, em PDF (um arquivo por empresa, "ANK Loja 1 0123.pdf") ou em Excel.
+- **IPTU:** quando o imóvel está vazio (ou o IPTU não é cobrado do inquilino), a parcela fica com o proprietário, com alerta 15 dias antes do vencimento até ser marcada como paga. Se o proprietário quitou à vista, escolhe-se como cobrar do inquilino que entrar depois.
+- **Resultados:** retorno de cada imóvel sobre o valor do imóvel + reformas, a partir dos pagamentos registrados.
+- **Alertas:** correção, seguro, reserva, fim da vigência, fiador com vínculo terminando, garantia não aplicada integralmente, IPTU do proprietário e pedido de volta da titularidade depois da saída do inquilino.
 
 ## Publicar o endereço (uma vez)
 

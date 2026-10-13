@@ -60,6 +60,8 @@ export function alertaSeguro(inicio, hoje, seguros) {
 export function alertaReserva(reservaValor, saldo, competenciaAlvo, hoje) {
   if (!(reservaValor > 0) || !(saldo > 0) || !competenciaAlvo) return null;
   const proxima = somarMeses(competenciaDe(hoje), 1);
+  // reserva marcada para um mês que já passou: não fica mais nos alertas
+  if (competenciaAlvo < somarMeses(competenciaDe(hoje), -1)) return null;
   if (competenciaAlvo <= proxima) {
     return { nivel: 'info', tipo: 'Reserva do imóvel',
       texto: `Reserva de ${reais(saldo)} será usada para abater o boleto de ${compBr(competenciaAlvo)}.` };

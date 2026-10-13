@@ -79,8 +79,28 @@ test('liquidação e valor da nota fiscal', () => {
   const atraso = C.liquidar(cb, '2026-08-20');
   assert.equal(atraso.multa, 14850);
   assert.equal(atraso.juros, 490);
-  assert.equal(atraso.valor_devido, 148500 + 14850 + 490);
+  assert.equal(atraso.valor_devido, 148500); // multa e juros vão para o boleto seguinte
   assert.equal(atraso.valor_nf, 135000 + 14850 + 490);
+  // pagou no vencimento, mas o banco compensou depois: sem multa e juros, com desconto
+  const compensado = C.liquidar(cb, '2026-08-13', true);
+  assert.deepEqual([compensado.pontual, compensado.multa, compensado.valor_nf], [true, 0, 121500]);
+});
+
+test('valores digitados com milhar sem centavos e prazo em meses', () => {
+  assert.equal(C.centavos('1.350'), 135000);
+  assert.equal(C.centavos('12.345.678'), 1234567800);
+  assert.equal(C.centavos('1.35'), 135);
+  assert.equal(C.fimDoPrazo('2025-02-01', 30), '2027-07-31');
+  assert.equal(C.fimDoPrazo('2024-01-31', 1), '2024-02-28');
+  assert.equal(C.mesesDoPrazo('2025-02-01', '2027-07-31'), 30);
+  assert.equal(C.mesesDoPrazo('2024-09-01', '2027-09-01'), 36);
+});
+
+test('bonificação pelo aluguel bonificado bate no centavo', () => {
+  for (const [base, bonif] of [[364445, 328000], [999999, 912345], [135000, 121500], [10000000, 9123457]]) {
+    const p = C.percentualPorBonificado(base, bonif);
+    assert.equal(base - C.descontoPorPercentual(base, p), bonif);
+  }
 });
 
 test('divisão da fatura entre as empresas', () => {
