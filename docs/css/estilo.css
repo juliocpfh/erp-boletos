@@ -155,3 +155,8 @@ tr.cancelada td { color: var(--suave); text-decoration: line-through; }
 tr.cancelada td:last-child, tr.cancelada td:nth-last-child(2) { text-decoration: none; }
 .cartao.destaque { border-color: #f59e0b; background: #fffbeb; }
 .contador { background: #f59e0b; color: #fff; border-radius: 999px; padding: 0 6px; font-size: 12px; font-weight: 700; }
+
+/* Boleto de controle: inquilino que não emite NF e não conta nos resultados */
+.alerta.controle { border-color: #7c3aed; background: #f5f3ff; }
+.etiqueta.controle { background: #ede9fe; color: #5b21b6; }
+tr.linha-controle td { background: #faf8ff; }

@@ -9,7 +9,7 @@ export const TABELAS = {
   faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
-  reformas: 'Reforma / investimento', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -551,6 +551,12 @@ export const numeroFatura = (n) => String(n).padStart(4, '0');
 /** O inquilino precisa de NF? (há inquilinos para quem só se controla o pagamento) */
 export const geraNf = (c) => !c || c.gerar_nf !== false;
 
+/** Imóvel ocupado só por inquilino(s) de boleto de controle: não emite NF, as empresas não se aplicam. */
+export function imovelSoControle(d, imovelId, hoje = C.hojeIso()) {
+  const atuais = d.contratos.filter((c) => c.imovel_id === imovelId && c.ativo !== false && contratoAtivo(c, hoje));
+  return atuais.length > 0 && atuais.every((c) => !geraNf(c));
+}
+
 /** Cobranças pagas e NFs avulsas que ainda não têm NF, na ordem do pagamento. */
 export function pendentesDeFatura(d) {
   const lista = [];
@@ -1032,6 +1038,10 @@ export function dadosBoleto(d, cb) {
 // --------------------------------------------------------------------------
 // Resultados financeiros por imóvel
 // --------------------------------------------------------------------------
+/** Solicitações do inquilino (pequenos reparos e pedidos), das mais recentes para as mais antigas. */
+export const solicitacoesDo = (d, contratoId) => d.solicitacoes.filter((x) => x.contrato_id === contratoId)
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+
 export const reformasDo = (d, imovelId) => d.reformas.filter((r) => r.imovel_id === imovelId)
   .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
 
@@ -1059,7 +1069,7 @@ export function resultadosFinanceiros(d, de, ate) {
     const receita = aluguel + avulsas;
     const resultado = receita - iptu;
     const base = (i.valor_imovel || 0) + investido;
-    return { imovel: i, receita, aluguel, avulsas, iptu, reformasPeriodo, investido, resultado, base, meses,
+    return { imovel: i, receita, aluguel, avulsas, iptu, reformasPeriodo, investido, resultado, base, meses, controle: imovelSoControle(d, i.id, ate),
       retornoAnual: base ? (resultado * 12 / meses / base) * 100 : null, mesesPagos: pagas.length };
   }).sort((a, b) => (b.retornoAnual ?? -Infinity) - (a.retornoAnual ?? -Infinity));
 }

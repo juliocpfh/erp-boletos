@@ -44,6 +44,18 @@ export const IMOVEL = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/** Histórico de solicitações do inquilino: pequenos reparos e pedidos, com o que foi feito. */
+export const SOLICITACAO = [
+  campo('data', 'Data do pedido', 'data', { obrig: true }),
+  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Aberta', opcoes: ['Aberta', 'Em andamento', 'Concluída', 'Não atendida'] }),
+  campo('descricao', 'O que o inquilino pediu', 'area', { obrig: true, largo: true, ajuda: 'Ex.: vazamento na torneira da cozinha' }),
+  campo('providencia', 'O que foi feito', 'area', { largo: true }),
+  campo('responsavel', 'Quem fez (prestador)'),
+  campo('data_conclusao', 'Concluído em', 'data'),
+  campo('valor', 'Custo', 'dinheiro'),
+  campo('pago_por', 'Custo por conta de', 'opcao', { opcoes: ['Proprietário', 'Inquilino', 'Sem custo'] }),
+];
+
 export const REFORMA = [
   campo('data', 'Data', 'data', { obrig: true }),
   campo('descricao', 'O que foi feito', 'texto', { obrig: true, largo: true, ajuda: 'Ex.: troca do telhado, pintura completa' }),
