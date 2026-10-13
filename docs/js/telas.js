@@ -140,15 +140,16 @@ function mensagemAuto(el, html) {
   if (caixa) caixa.innerHTML = html;
 }
 
-/** Preenche só os campos vazios do formulário; devolve os rótulos preenchidos. */
-function preencherVazios(form, valores) {
+/** Preenche só os campos vazios do formulário (ou ainda com o valor padrão); devolve os rótulos preenchidos. */
+function preencherVazios(form, valores, padroes = {}) {
   const feitos = [];
   for (const [nome, valor] of Object.entries(valores)) {
     const alvo = nome && form.querySelector(`[name="${nome}"]`);
-    if (!alvo || !valor || String(alvo.value).trim()) continue;
+    if (!alvo || !valor || alvo.type === 'checkbox' || String(alvo.value) === String(valor)) continue;
+    if (String(alvo.value).trim() && String(alvo.value) !== String(padroes[nome] ?? '')) continue;
     alvo.value = valor;
     alvo.dispatchEvent(new Event('change', { bubbles: true }));
-    feitos.push((form.querySelector(`label[for="${alvo.id}"]`) || {}).textContent || nome);
+    feitos.push(((form.querySelector(`label[for="${alvo.id}"]`) || {}).textContent || nome).replace(/\s*\*$/, ''));
   }
   return feitos;
 }
@@ -215,7 +216,21 @@ function procurarPessoa(el) {
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
 }
 
+/** Inquilino novo: ao escolher o imóvel, as condições do inquilino anterior entram nos campos vazios. */
+function ligarImovelDoInquilinoNovo(raiz) {
+  const sel = raiz.querySelector('form[data-form=cadastro] select[name=imovel_id]');
+  if (!sel || !/^#\/novo\/contratos/.test(location.hash)) return;
+  sel.addEventListener('change', () => {
+    const anterior = sel.value && R.ultimoContratoDoImovel(d(), Number(sel.value));
+    if (!anterior) return mensagemAuto(sel, '');
+    const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
+    const feitos = preencherVazios(sel.form, F.paraFormulario(campos, R.condicoesDoAnterior(d(), anterior)), F.paraFormulario(campos, null));
+    mensagemAuto(sel, feitos.length ? `Copiado do inquilino anterior (${esc(anterior.inquilino_nome)}): ${esc(feitos.join(', '))}. Confira os valores.` : '');
+  });
+}
+
 function ligarCamposAutomaticos(raiz) {
+  ligarImovelDoInquilinoNovo(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
     el.addEventListener('input', () => {
       const novo = F.mascarar(el.dataset.mascara, el.value);
@@ -720,16 +735,31 @@ function caixaSeguros(i) {
 }
 
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
+/** Botões para gerar cada documento de entrada (contrato, vistoria de entrada, recibo das chaves). */
+function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
+  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  return {
+    doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', cls),
+    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria', cls)} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar vistoria', cls) : ''}`
+      : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada', cls) : ''),
+    doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar termo de entrega das chaves', cls),
+  };
+}
+
+/** Topo da página do inquilino novo: o que falta dos documentos de entrada, com os botões para gerar. */
+function faixaDocumentosEntrada(c) {
+  if (!c.docs_entrada || !R.contratoAtivo(c)) return '';
+  const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]);
+  if (!falta.length) return '';
+  const g = geradoresDocumentos(c, 'botao pequeno');
+  return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase('pt-BR')).join(', '))}.
+    <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(' ')} ${link(`#/contrato/${c.id}?ir=documentos`, 'Marcar como assinado', 'botao secundario pequeno')}</div></div>`;
+}
+
 function caixaDocumentos(c) {
   const hoje = C.hojeIso();
   const vistorias = R.vistoriasDo(d(), c.id);
-  const entrada = vistorias.find((v) => v.tipo === 'Entrada');
-  const gerar = {
-    doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato'),
-    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria')} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar') : ''}`
-      : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada') : ''),
-    doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar recibo'),
-  };
+  const gerar = geradoresDocumentos(c);
   const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc(nome)}</b></td>
     <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'aviso' : 'neutra')}</td>
     <td class="nw">${gerar[k]}</td>
@@ -753,7 +783,7 @@ function telaContrato(c) {
   const aluguel = R.aluguelAtual(d(), c);
   const pctBonif = R.percentualBonificacao(c);
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => a.tipo !== 'A verificar') : [];
+  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Documentos de entrada'].includes(a.tipo)) : [];
   const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
   const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
   const cadeia = R.cadeiaDeContratos(d(), c);
@@ -767,12 +797,14 @@ function telaContrato(c) {
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
+      ${link(`#/contrato/${c.id}?ir=documentos`, 'Documentos de entrada e vistorias', 'botao secundario')}
       ${link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
+    ${faixaDocumentosEntrada(c)}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
@@ -871,14 +903,19 @@ const CADASTROS = {
       const i = buscar('imoveis', r ? r.imovel_id : Number(q.imovel));
       return `${r ? 'Editar' : 'Novo'} inquilino${i ? ` - ${i.nome}` : ''}`;
     },
-    campos: (r) => {
+    campos: (r, q = {}) => {
       const ops = d().contratos.filter((c) => !r || c.id !== r.id)
         .sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
         .map((c) => [String(c.id), `${c.inquilino_nome} (${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)})`]);
-      const imoveis = ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]);
+      const hoje = C.hojeIso();
+      const vago = (i) => !d().contratos.some((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && (!r || c.id !== r.id));
+      const imoveis = ordenar(d().imoveis, 'nome').map((i) => [String(i.id), `${i.nome}${!r && vago(i) ? ' · vago' : ''}`]);
       const semFiadorNoForm = r && R.fiadoresDo(d(), r.id).length; // fiadores já cadastrados: gerencia na página do inquilino
-      return comListas(F.CONTRATO.filter((c) => (r || !c.soEditar) && !(semFiadorNoForm && c.fiador))
-        .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c)));
+      // inquilino novo: escolhe o imóvel aqui mesmo (pelo "Vincular inquilino" do imóvel, o vínculo vem depois)
+      const imovelNoNovo = (c) => c.nome === 'imovel_id' && !q.vincular;
+      return comListas(F.CONTRATO.filter((c) => (r || !c.soEditar || imovelNoNovo(c)) && !(semFiadorNoForm && c.fiador))
+        .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops }
+          : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis, ...(r ? {} : { ajuda: 'Escolha o imóvel deste inquilino. As condições do inquilino anterior do imóvel entram nos campos vazios. Em branco: sem imóvel (não gera boleto)' }) } : c)));
     },
     padrao: (q) => {
       if (q.imovel) return { imovel_id: Number(q.imovel) };
@@ -1329,7 +1366,7 @@ const FORA_DO_PADRAO = 0.3;
 /** Avisos do cadastro do inquilino: aluguel muito diferente do anterior, imóvel ainda ocupado, entrada muito no futuro. */
 function conferirContrato(dados, r, q) {
   const out = [];
-  const imovelId = r ? r.imovel_id : Number(q.vincular || q.imovel) || null;
+  const imovelId = r ? r.imovel_id : Number(dados.imovel_id || q.vincular || q.imovel) || null;
   const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id))
     .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] : null;
   const base = r ? r.aluguel_inicial : anterior ? R.aluguelAtual(d(), anterior) : null;

@@ -531,7 +531,7 @@ export function camposHtml(campos, valores = {}, erros = {}) {
     return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''}" ${se}>
       <label for="${id}">${esc(c.rotulo)}${c.obrig ? ' *' : ''}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}
-      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
+      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa || c.nome === 'imovel_id' ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
   });
   return `<div class="formulario">${partes.join('')}</div>`;
 }
