@@ -276,10 +276,44 @@ export function competenciaReserva(contrato) {
   return contrato.reserva_competencia || C.competenciaDe(contrato.data_entrada);
 }
 
+/** ``ignorar``: id de um boleto, ou função (boleto) => true para os boletos que não contam (os que estão sendo recalculados). */
+const ignorados = (ignorar) => (typeof ignorar === 'function' ? ignorar : (cb) => cb.id === ignorar);
+
 export function saldoReserva(d, contrato, ignorarCobranca = null) {
-  const usado = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && cb.id !== ignorarCobranca)
+  const fora = ignorados(ignorarCobranca);
+  const usado = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !fora(cb))
     .reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
   return Math.max((contrato.reserva_valor || 0) - usado, 0);
+}
+
+/**
+ * Reserva que pode abater o boleto da competência ``comp``: começa exatamente no aluguel marcado e, se sobrar
+ * (reserva maior que o boleto), segue nos meses seguintes. Nunca "pula" para um mês depois do marcado: se o boleto
+ * do mês marcado já foi pago sem ela, ou não está no sistema, ela fica parada e aparece um aviso para escolher outro mês.
+ */
+export function reservaParaCompetencia(d, contrato, comp, ignorar = null) {
+  const alvo = competenciaReserva(contrato);
+  if (!alvo || comp < alvo) return 0;
+  if (comp > alvo) {
+    const fora = ignorados(ignorar);
+    const comecou = d.cobrancas.some((cb) => cb.contrato_id === contrato.id && !fora(cb) && cb.competencia >= alvo && cb.competencia < comp && cb.reserva_utilizada > 0);
+    if (!comecou) return 0;
+  }
+  return saldoReserva(d, contrato, ignorar);
+}
+
+/** Reserva que não foi usada no mês marcado (boleto já pago sem ela, ou mês fora do sistema): pede para escolher outro mês. */
+export function alertaReservaParada(d, contrato) {
+  const alvo = competenciaReserva(contrato);
+  const saldo = alvo ? saldoReserva(d, contrato) : 0;
+  if (!(saldo > 0)) return null;
+  const doContrato = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id);
+  if (doContrato.some((cb) => cb.reserva_utilizada > 0)) return null;
+  const doAlvo = doContrato.find((cb) => cb.competencia === alvo);
+  const motivo = doAlvo && doAlvo.data_pagamento ? `o boleto de ${C.compBr(alvo)} já foi pago sem ela`
+    : !doAlvo && doContrato.some((cb) => cb.competencia > alvo) ? `o boleto de ${C.compBr(alvo)} não está no sistema` : '';
+  return motivo ? { nivel: 'aviso', tipo: 'Reserva do imóvel', ancora: 'reserva',
+    texto: `Reserva de ${C.reais(saldo)} marcada para o aluguel de ${C.compBr(alvo)} não foi usada: ${motivo}. Em "Editar", escolha em "Usar a reserva no aluguel de" o mês do boleto em aberto que deve receber o desconto.` } : null;
 }
 
 function parcelasDoMes(lista, comp, rotulo) {
@@ -440,8 +474,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     ? parcelasDoMes(pagaSeguroNoMes(d, contrato, comp) ? segurosDoImovel(d, contrato.imovel_id) : [], comp,
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
-  const alvo = competenciaReserva(contrato);
-  const reserva = alvo && comp >= alvo ? saldoReserva(d, contrato, ignorarCobranca) : 0;
+  const reserva = reservaParaCompetencia(d, contrato, comp, ignorarCobranca);
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
@@ -489,11 +522,18 @@ const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'alugue
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   let n = 0;
-  const lista = d.cobrancas.filter((cb) => !cb.data_pagamento && !cb.editado_manual && filtro(cb))
+  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual;
+  const escolhidos = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb));
+  // a reserva liga os meses do contrato: com reserva, todos os boletos em aberto dele são refeitos juntos
+  const comReserva = new Set(escolhidos.map((cb) => cb.contrato_id).filter((id) => (buscar(d, 'contratos', id) || {}).reserva_valor > 0));
+  const lista = d.cobrancas.filter((cb) => abertos(cb) && (filtro(cb) || comReserva.has(cb.contrato_id)))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
+  // a reserva que estava num boleto ainda não refeito fica livre para um mês anterior
+  const pendentes = new Set(lista.map((cb) => cb.id));
   for (const cb of lista) {
     const c = buscar(d, 'contratos', cb.contrato_id);
-    const novo = c && montarCobranca(d, c, cb.competencia, cb.id);
+    const novo = c && montarCobranca(d, c, cb.competencia, (x) => pendentes.has(x.id));
+    pendentes.delete(cb.id);
     if (!novo) continue;
     const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
     if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) n += 1;
@@ -1020,7 +1060,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     alertaReajuste(d, contrato, hoje),
     alertaCaucao(d, contrato),
-    alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
+    alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
