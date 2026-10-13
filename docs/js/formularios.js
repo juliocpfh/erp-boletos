@@ -203,14 +203,13 @@ export const SEGURO = [
 
 export const IPTU = [
   campo('ano', 'Ano', 'inteiro', { obrig: true }),
-  campo('valor_total', 'Valor total do IPTU', 'dinheiro', { obrig: true }),
+  campo('valor_total', 'Valor total do IPTU parcelado', 'dinheiro', { obrig: true, ajuda: 'É o valor repassado ao inquilino, mesmo quando o proprietário paga à vista com desconto' }),
   campo('num_parcelas', 'Número de parcelas', 'inteiro', { obrig: true, padrao: 10 }),
   campo('valor_parcela', 'Valor fixo cobrado por parcela (opcional)', 'dinheiro', { ajuda: 'Ex.: arredondar para R$ 213,00. Em branco: total ÷ parcelas' }),
-  campo('primeira_competencia', 'Cobrar 1ª parcela no aluguel de', 'mes', { obrig: true }),
-  campo('vencimento_primeira', 'Vencimento da 1ª parcela na prefeitura', 'data', { ajuda: 'As demais vencem no mesmo dia dos meses seguintes. Usado nos alertas de imóvel vazio' }),
+  campo('vencimento_primeira', 'Vencimento da 1ª parcela na prefeitura', 'data', { obrig: true, ajuda: 'As demais vencem no mesmo dia dos meses seguintes. Cada parcela entra no último boleto do inquilino que vence até a data da guia' }),
   secao('Pagamento à vista pelo proprietário'),
   campo('pago_avista', 'Proprietário quitou o IPTU à vista (cota única)', 'simnao'),
-  campo('valor_avista', 'Valor pago à vista', 'dinheiro', quando('pago_avista', '1')),
+  campo('valor_avista', 'Valor pago à vista (com desconto)', 'dinheiro', { ...quando('pago_avista', '1'), ajuda: 'O inquilino continua pagando o valor parcelado' }),
   campo('data_quitacao', 'Data da quitação', 'data', { ...quando('pago_avista', '1'), ajuda: 'Em branco: ainda não pago (fica nos alertas)' }),
   campo('cobranca_inquilino', 'Como cobrar do inquilino que entrar depois', 'opcao', { ...quando('pago_avista', '1'), padrao: 'Parcelas normais nos meses em que ocupar',
     opcoes: ['Parcelas normais nos meses em que ocupar', 'Proporcional: 1/12 do valor por mês ocupado no ano', 'Não cobrar do inquilino'] }),

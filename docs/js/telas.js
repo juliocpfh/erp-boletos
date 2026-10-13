@@ -332,8 +332,8 @@ function tabelaIptu(p) {
     if (pc.paga) return `${etiqueta(`paga em ${dataBr(pc.paga)}`, 'ok')} ${opera() ? botao('iptuPago', 'desfazer', { id: p.id, n: pc.n, data: '' }, 'link-botao', 'Desfazer o pagamento desta parcela?') : ''}`;
     return opera() ? `<form data-form="iptuPago" data-id="${p.id}" data-n="${pc.n}" class="pagamento"><input type="date" name="data" value="${C.hojeIso()}"><button class="pequeno">Paga</button></form>` : etiqueta('em aberto', 'perigo');
   };
-  return `<div class="rolagem"><table><tr><th>Parcela</th><th>No aluguel de</th><th>Vencimento</th><th class="n">Valor</th><th>Quem arca</th><th>Pagamento pelo proprietário</th></tr>
-    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${compBr(pc.comp)}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td class="n">${reais(pc.valor)}</td>
+  return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vencimento na prefeitura</th><th>No boleto do aluguel de</th><th class="n">Valor</th><th>Quem arca</th><th>Pagamento pelo proprietário</th></tr>
+    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.comp ? compBr(pc.comp) : '-'}</td><td class="n">${reais(pc.valor)}</td>
       <td>${p.pago_avista ? etiqueta('Proprietário (à vista)', 'aviso') : pagador(pc)}</td><td>${situ(pc)}</td></tr>`).join('')}</table></div>`;
 }
 
@@ -776,7 +776,7 @@ const CADASTROS = {
       // novo ano: parte do ano anterior (mesmas parcelas, 1ª parcela no mesmo mês)
       const ano = Number(q.ano) || new Date().getFullYear();
       const ant = d().iptus.filter((p) => p.imovel_id === Number(q.imovel) && p.ano < ano).sort((a, b) => b.ano - a.ano)[0];
-      return ant ? { ano, num_parcelas: ant.num_parcelas, primeira_competencia: `${ano}${ant.primeira_competencia.slice(4)}` } : { ano };
+      return ant ? { ano, num_parcelas: ant.num_parcelas, vencimento_primeira: ant.vencimento_primeira ? C.somarAnos(ant.vencimento_primeira, ano - ant.ano) : null } : { ano };
     },
     aviso: (r, q) => {
       const iid = r ? r.imovel_id : Number(q.imovel);
@@ -1281,15 +1281,15 @@ function telaIptu(ano) {
     const varia = p && ant && ant.valor_total ? ((p.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace('.', ',') : null;
     const acao = !opera() ? '' : p ? link(`#/editar/iptus/${p.id}?de=iptu`, 'Editar') : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno');
     return `<tr class="${p ? '' : 'amarelo'}"><td><a href="#/imovel/${i.id}?ir=iptu">${esc(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
-      <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p ? compBr(p.primeira_competencia) : '-'}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
+      <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p && p.vencimento_primeira ? dataBr(p.vencimento_primeira) : p ? `<span class="suave">aluguel de ${compBr(p.primeira_competencia)}</span>` : '-'}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
   }).join('');
   const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
   const alertas = R.alertasIptu(d()).filter((a) => a.texto.includes(`IPTU ${ano}`));
   return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.imovel)}</b> ${esc(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join('')}
-    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela no aluguel de</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
-    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do mês da 1ª parcela. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
+    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>Vencimento da 1ª parcela</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
+    <p class="suave">Cada parcela entra sozinha no último boleto do inquilino que vence até a data da guia na prefeitura, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
 }
 
 function telaResultados(q) {
