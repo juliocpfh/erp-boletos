@@ -622,3 +622,30 @@ test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e mud
   assert.equal(d.cobrancas[1].reserva_utilizada, 0);
   assert.match(R.alertaReservaParada(d, c).texto, /já foi pago sem ela/);
 });
+
+test('reserva presa num boleto mais novo: sai ao gerar o mês certo, também de boleto alterado à mão; boleto pago só avisa', () => {
+  const novo = () => {
+    const d = R.bancoVazio();
+    const i = R.inserir(d, 'imoveis', { nome: 'Casa' }, 'j');
+    const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'X', data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01', aluguel_inicial: 200000,
+      dia_vencimento: 10, reserva_valor: 50000, reserva_competencia: '2026-08' }, 'j');
+    R.gerarCobrancas(d, '2026-10', 'j');
+    d.cobrancas[0].reserva_utilizada = 50000; // ficou em outubro (versão antiga)
+    return { d, c };
+  };
+  let { d, c } = novo();
+  d.cobrancas[0].editado_manual = true;
+  R.gerarCobrancas(d, '2026-08', 'j');
+  assert.deepEqual(d.cobrancas.map((x) => [x.competencia, x.reserva_utilizada]), [['2026-10', 0], ['2026-08', 50000]]);
+  assert.equal(d.cobrancas[0].editado_manual, true, 'os outros valores digitados à mão ficam');
+  ({ d, c } = novo());
+  R.gerarCobrancas(d, '2026-08', 'j');
+  d.cobrancas[0].reserva_utilizada = 50000; d.cobrancas[1].reserva_utilizada = 0;
+  assert.equal(R.realocarReserva(d, c, 'j'), 2);
+  assert.deepEqual(d.cobrancas.map((x) => x.reserva_utilizada), [0, 50000]);
+  ({ d, c } = novo());
+  R.registrarPagamento(d, d.cobrancas[0].id, '2026-11-10', null, 'j', { pagouEmDia: true });
+  R.gerarCobrancas(d, '2026-08', 'j');
+  assert.equal(d.cobrancas[0].reserva_utilizada, 50000, 'boleto pago não muda');
+  assert.match(R.alertaReservaParada(d, c).texto, /está no boleto de 10\/2026, que já foi pago, mas deveria abater o de 08\/2026/);
+});

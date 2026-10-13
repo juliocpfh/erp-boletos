@@ -302,13 +302,41 @@ export function reservaParaCompetencia(d, contrato, comp, ignorar = null) {
   return saldoReserva(d, contrato, ignorar);
 }
 
+/**
+ * Redistribui a reserva pelos boletos em aberto do contrato (também os alterados à mão: só o campo da reserva muda),
+ * do mês marcado em diante. Boleto já pago fica como está. Devolve quantos boletos mudaram.
+ */
+export function realocarReserva(d, contrato, usuario) {
+  if (!(contrato.reserva_valor > 0)) return 0;
+  const abertos = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento)
+    .sort((a, b) => a.competencia.localeCompare(b.competencia));
+  const livres = new Set(abertos.map((cb) => cb.id));
+  let n = 0;
+  for (const cb of abertos) {
+    const disponivel = reservaParaCompetencia(d, contrato, cb.competencia, (x) => livres.has(x.id));
+    const usar = cb.carencia ? 0 : C.totaisCobranca(cb, disponivel).reserva_utilizada;
+    livres.delete(cb.id);
+    if ((cb.reserva_utilizada || 0) !== usar) {
+      atualizar(d, 'cobrancas', cb.id, { reserva_utilizada: usar }, usuario, `Boleto ${C.compBr(cb.competencia)}: reserva ${usar ? `de ${C.reais(usar)} aplicada` : 'retirada'}`);
+      n += 1;
+    }
+  }
+  return n;
+}
+
 /** Reserva que não foi usada no mês marcado (boleto já pago sem ela, ou mês fora do sistema): pede para escolher outro mês. */
 export function alertaReservaParada(d, contrato) {
   const alvo = competenciaReserva(contrato);
-  const saldo = alvo ? saldoReserva(d, contrato) : 0;
-  if (!(saldo > 0)) return null;
+  if (!alvo) return null;
+  const saldo = saldoReserva(d, contrato);
   const doContrato = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id);
-  if (doContrato.some((cb) => cb.reserva_utilizada > 0)) return null;
+  const presa = doContrato.find((cb) => cb.reserva_utilizada > 0 && cb.data_pagamento && cb.competencia > alvo);
+  const alvoAberto = doContrato.find((cb) => cb.competencia === alvo && !cb.data_pagamento);
+  if (presa && alvoAberto) {
+    return { nivel: 'aviso', tipo: 'Reserva do imóvel', ancora: 'reserva',
+      texto: `A reserva de ${C.reais(presa.reserva_utilizada)} está no boleto de ${C.compBr(presa.competencia)}, que já foi pago, mas deveria abater o de ${C.compBr(alvo)}. Para mudar: desfaça o pagamento de ${C.compBr(presa.competencia)} e clique em "Reaplicar a reserva"; ou deixe como está escolhendo ${C.compBr(presa.competencia)} em "Usar a reserva no aluguel de".` };
+  }
+  if (!(saldo > 0) || doContrato.some((cb) => cb.reserva_utilizada > 0)) return null;
   const doAlvo = doContrato.find((cb) => cb.competencia === alvo);
   const motivo = doAlvo && doAlvo.data_pagamento ? `o boleto de ${C.compBr(alvo)} já foi pago sem ela`
     : !doAlvo && doContrato.some((cb) => cb.competencia > alvo) ? `o boleto de ${C.compBr(alvo)} não está no sistema` : '';
@@ -507,6 +535,8 @@ export function gerarCobrancas(d, comp, usuario) {
     if (dados) {
       inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
       geradas += 1;
+      // gerou um mês anterior a boletos que já existiam: a reserva vai para o mês certo
+      realocarReserva(d, contrato, usuario);
     }
   }
   return { geradas, existentes };
@@ -538,6 +568,7 @@ export function recalcularCobrancas(d, filtro, usuario) {
     const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
     if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) n += 1;
   }
+  for (const id of comReserva) n += realocarReserva(d, buscar(d, 'contratos', id), usuario);
   return n;
 }
 

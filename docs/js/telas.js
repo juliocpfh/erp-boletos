@@ -78,20 +78,47 @@ export function nomePastaContrato(c) {
   return S.limparNome(`${c.inquilino_nome} (${fmt(c.data_entrada)} a ${fmt(c.data_saida)})`);
 }
 
+/** Guias do IPTU por ano: o id junta imóvel e ano (imóvel 5, 2026 → 52026), numa subpasta do ano. */
+const idGuiasDoAno = (imovelId, ano) => imovelId * 10000 + ano;
+function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(id / 10000) : id; }
+
 async function pastaDoEscopo(escopo, id) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'contrato') {
     const c = buscar('contratos', id);
     return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c)]);
   }
-  const i = buscar('imoveis', id);
+  const i = buscar('imoveis', imovelDoEscopo(escopo, id));
+  if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)]);
   return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS]);
 }
 
-function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false) {
+/**
+ * Primeiro IPTU lançado depois da separação por ano: as guias que estavam soltas na pasta do IPTU são do ano
+ * anterior, e vão para a pasta dele (se ele estiver lançado). Isso acontece uma vez só por imóvel; o que não
+ * tiver ano fica em "Guias anteriores", no histórico.
+ */
+async function guardarGuiasSoltas(imovelId, anoNovo) {
+  const imovel = buscar('imoveis', imovelId);
+  if (imovel.guias_iptu_por_ano) return 0;
+  await alterar((db) => R.atualizar(db, 'imoveis', imovelId, { guias_iptu_por_ano: true }, login(), 'Guias do IPTU separadas por ano'));
+  const anterior = d().iptus.filter((p) => p.imovel_id === imovelId && p.ano < anoNovo).sort((a, b) => b.ano - a.ano)[0];
+  if (!anterior) return 0;
+  const solta = await pastaDoEscopo('iptu', imovelId);
+  const arquivos = await S.listar(solta);
+  if (!arquivos.length) return 0;
+  const destino = await pastaDoEscopo('iptuano', idGuiasDoAno(imovelId, anterior.ano));
+  for (const a of arquivos) {
+    await S.salvarArquivo(destino, new File([await S.abrirArquivo(solta, a.nome)], a.nome));
+    await solta.removeEntry(a.nome);
+  }
+  return arquivos.length;
+}
+
+function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}</div>`;
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}</div>`;
 }
 
 const urls = [];
@@ -290,19 +317,41 @@ export const TELAS = {
     if (!pctEl || !valEl) return;
     const form = pctEl.closest('form');
     const aluguel = raiz.querySelector('[name=aluguel_inicial]');
-    const base = () => (form.dataset.base ? Number(form.dataset.base) : (() => { try { return C.centavos(aluguel.value); } catch { return NaN; } })());
-    const num = (t) => { try { return C.numero(t); } catch { return NaN; } };
-    const cent = (t) => { try { return C.centavos(t); } catch { return NaN; } };
+    const num = (t) => { try { return t.trim() === '' ? NaN : C.numero(t); } catch { return NaN; } };
+    const cent = (t) => { try { return t.trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
+    // aluguel sobre o qual vale o %: o atual, quando já houve correção (fixo); senão, o aluguel cheio digitado
+    const base = () => (form.dataset.base ? Number(form.dataset.base) : aluguel ? cent(aluguel.value) : NaN);
+    const avisar = (texto) => {
+      valEl.classList.toggle('doc-invalido', !!texto);
+      const caixa = valEl.closest('div').querySelector('.erro-bonif') || valEl.closest('div').appendChild(Object.assign(document.createElement('div'), { className: 'erro-campo erro-bonif' }));
+      caixa.textContent = texto;
+    };
+    // nada aqui pode "travar" o formulário: qualquer valor estranho só limpa o campo calculado e avisa
     const doPct = () => {
-      const b = base(); const p = num(pctEl.value);
-      valEl.value = Number.isFinite(b) && Number.isFinite(p) && pctEl.value !== '' ? F.dinheiroTexto(b - C.descontoPorPercentual(b, p)) : '';
+      try {
+        const b = base(); const p = num(pctEl.value);
+        const ok = Number.isFinite(b) && b > 0 && Number.isFinite(p) && p >= 0 && p <= 100;
+        valEl.value = ok ? F.dinheiroTexto(b - C.descontoPorPercentual(b, p)) : '';
+        avisar(Number.isFinite(p) && (p < 0 || p > 100) ? 'O % precisa ficar entre 0 e 100' : '');
+      } catch { valEl.value = ''; }
+    };
+    const doValor = () => {
+      try {
+        const b = base(); const v = cent(valEl.value);
+        if (!Number.isFinite(b) || !(b > 0) || !Number.isFinite(v)) { pctEl.value = ''; avisar(''); return; }
+        if (v < 0 || v > b) { pctEl.value = ''; avisar(`O aluguel com bonificação precisa ficar entre R$ 0,00 e ${reais(b)} (aluguel cheio)`); return; }
+        pctEl.value = F.pctTexto(Math.round(C.percentualPorBonificado(b, v) * 10000) / 10000);
+        avisar('');
+      } catch { pctEl.value = ''; }
     };
     pctEl.addEventListener('input', doPct);
-    valEl.addEventListener('input', () => {
-      const b = base(); const v = cent(valEl.value);
-      pctEl.value = Number.isFinite(b) && b && Number.isFinite(v) && valEl.value !== '' ? F.pctTexto(C.percentualPorBonificado(b, v)) : '';
-    });
-    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', doPct);
+    valEl.addEventListener('input', doValor);
+    // mudou o aluguel cheio: o % fica e o aluguel com bonificação acompanha
+    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', () => { if (pctEl.value.trim() !== '') doPct(); else if (valEl.value.trim() !== '') doValor(); });
+    if (form.dataset.base) {
+      const nota = valEl.closest('div').querySelector('.ajuda');
+      if (nota) nota.textContent = `O % vale sobre o aluguel atual de ${reais(Number(form.dataset.base))} (já corrigido). Digite o valor que o inquilino paga em dia: o % é calculado.`;
+    }
     if (pctEl.value !== '' && valEl.value === '') doPct();
   },
 
@@ -510,12 +559,17 @@ function tabelaIptu(p) {
 
 function caixaIptu(i) {
   const iptus = d().iptus.filter((p) => p.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
+  const ano = (p, atual) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
+      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
+      ${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}
+      ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Anexe aqui a guia (carnê) deste ano. Ao lançar o IPTU do próximo ano, estas guias passam para o histórico.' : '', true)}`;
+  const [atual, ...anteriores] = iptus;
   return `<div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, 'Lançar IPTU do ano') : ''}</div>
     <p class="suave">Quando o imóvel está vazio (ou o IPTU não é cobrado do inquilino), a parcela fica por conta do proprietário: marque aqui quando pagar. As parcelas em aberto aparecem nos alertas 15 dias antes do vencimento.</p>
-    ${iptus.map((p) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
-      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
-      ${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}`).join('') || '<p class="suave">Nenhum IPTU lançado.</p>'}
-    ${caixaArquivos('iptu', i.id, 'Guias do IPTU', 'guias-iptu', 'Anexe aqui a guia (carnê) do IPTU de cada ano.', true)}</div>`;
+    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? '' : caixaArquivos('iptu', i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, 'guias-iptu', '', true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos('iptu', i.id, 'Guias do IPTU', 'guias-iptu', 'Pode anexar a guia aqui; ao lançar o IPTU do ano ela vai para o histórico do ano anterior.', true)}`}
+    ${atual ? `<details class="historico-iptu"><summary><b>Histórico do IPTU</b> <span class="suave">· anos anteriores e as guias de cada ano (${anteriores.length} ano(s))</span></summary>
+      ${anteriores.map((p) => ano(p, false)).join('')}
+      ${i.guias_iptu_por_ano ? caixaArquivos('iptu', i.id, 'Guias anteriores', 'guias-iptu-anteriores', 'Guias anexadas antes de haver IPTU lançado por ano.', true, false) : ''}</details>` : ''}</div>`;
 }
 
 function caixaReformas(i) {
@@ -825,7 +879,9 @@ function telaContrato(c) {
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>` : ''}
+      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+        <p class="suave">${(() => { const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0); return usos.length ? `Abatida em: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : 'Ainda não abatida em nenhum boleto.'; })()}
+          ${opera() ? botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno') : ''}</p>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaIncluso(c)}
     ${caixaSolicitacoes(c)}
@@ -922,7 +978,7 @@ const CADASTROS = {
       const anterior = q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
       return anterior ? R.condicoesDoAnterior(d(), anterior) : {};
     },
-    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome,
+    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
@@ -934,9 +990,10 @@ const CADASTROS = {
     },
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
-    base: (r) => (r ? R.aluguelAtual(d(), r) : null),
+    // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
+    base: (r) => (r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form) {
-      const base = r ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
+      const base = r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
       if (dados.bonificacao && bonificadoTexto) {
         // o aluguel bonificado digitado manda: o % é calculado sem arredondar, para o desconto bater no centavo
@@ -1072,6 +1129,15 @@ const CADASTROS = {
     voltar: (r, q) => (q && q.de === 'iptu' ? `#/iptu?ano=${r ? r.ano : q.ano}` : `#/imovel/${r ? r.imovel_id : q.imovel}`),
     destino: (salvo, q) => (q.de === 'iptu' ? `#/iptu?ano=${salvo.ano}` : `#/imovel/${salvo.imovel_id}`),
     descricao: (dados) => `IPTU ${dados.ano}`,
+    async depois(salvo, antigo) {
+      if (antigo) return;
+      try {
+        const n = await guardarGuiasSoltas(salvo.imovel_id, salvo.ano);
+        if (n) aviso(`${n} guia(s) já anexada(s) foram para o histórico do IPTU do ano anterior. Anexe a guia de ${salvo.ano} no IPTU ${salvo.ano}.`, 'info');
+      } catch (e) {
+        aviso(`Não consegui mover as guias antigas para o histórico: ${e.message}`, 'aviso');
+      }
+    },
   },
   titularidades: {
     titulo: (r, q) => `Troca de titularidade - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
@@ -1289,7 +1355,10 @@ const CADASTROS = {
       for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
       dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
-      if (dados.reserva_utilizada > disp) erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}`;
+      if (dados.reserva_utilizada > disp) {
+        const outros = d().cobrancas.filter((x) => x.contrato_id === r.contrato_id && x.id !== r.id && x.reserva_utilizada > 0);
+        erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}${outros.length ? ` (está no boleto de ${outros.map((x) => compBr(x.competencia)).join(', ')}). Para trocar de mês, use "Reaplicar a reserva" na página do inquilino` : ''}`;
+      }
     },
   },
 };
@@ -1439,6 +1508,20 @@ const ORDENS_BOLETO = {
   valor: (a, b) => b.t.a_pagar_pontual - a.t.a_pagar_pontual,
 };
 
+/** Baixa em lote separada por vencimento: só dá para confirmar juntos boletos que vencem no mesmo dia. */
+function caixaBaixaLote(lista, hoje) {
+  const abertos = lista.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência');
+  if (!abertos.length) return '';
+  const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
+  return `<details class="cartao baixa-lote" ${grupos.length ? 'open' : ''}><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· separada por vencimento, para não misturar boletos</span></summary>
+    ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
+      <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${v < hoje ? etiqueta('vencido', 'perigo') : ''} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
+        <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
+      <div class="lista-baixa">${xs.map((x) => `<label class="check-mini"><input type="checkbox" name="ids" value="${x.cb.id}"> ${esc(x.i.nome)} · ${esc(x.c.inquilino_nome)} · ${reais(x.t.a_pagar_pontual)}</label>`).join('')}</div>
+      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto"><button class="pequeno">Confirmar os marcados como pagos em dia</button></div></form>`).join('')}
+    <p class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha da tabela.</p></details>`;
+}
+
 function telaCobrancas(comp, ordem = 'vencimento') {
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
@@ -1465,17 +1548,14 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
-    ${lista.length && opera() && lista.some((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência') ? `<form class="acoes barra-nf baixa-lote" data-form="baixaLote">
-      <b>Baixa em lote:</b> marque os boletos na primeira coluna; entraram em <input type="date" name="data" value="${hoje}" style="width:auto">
-      <button class="pequeno">Confirmar os selecionados como pagos em dia</button>
-      <span class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha.</span></form>` : ''}
+    ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <span class="suave">Ordenar por:</span> ${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'botao pequeno' : 'botao secundario pequeno')).join(' ')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
-        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (demonstrativo ou baixa em lote)"></td>
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
@@ -2487,10 +2567,13 @@ export const FORMULARIOS = {
   },
 
   async baixaLote(form) {
-    const data = String(new FormData(form).get('data') || '');
+    const fd = new FormData(form);
+    const data = String(fd.get('data') || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data em que o dinheiro entrou.');
-    const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((el) => Number(el.dataset.boleto));
-    if (!ids.length) throw new Error('Marque os boletos na primeira coluna.');
+    const ids = fd.getAll('ids').map(Number);
+    if (!ids.length) throw new Error('Marque os boletos deste vencimento que foram pagos.');
+    const vencs = new Set(ids.map((id) => (buscar('cobrancas', id) || {}).vencimento));
+    if (vencs.size > 1) throw new Error('Confirme juntos só boletos do mesmo vencimento.');
     confirmarAvisos(data > C.hojeIso() ? [`A data (${dataBr(data)}) está no futuro.`] : []);
     let r;
     await alterar((db) => { r = R.baixarEmLote(db, ids, data, login()); });
@@ -3001,6 +3084,16 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Tira a reserva dos boletos em aberto e aplica de novo a partir do mês marcado (também nos alterados à mão). */
+  async reaplicarReserva({ id }) {
+    const n = await alterar((db) => R.realocarReserva(db, R.buscar(db, 'contratos', Number(id)), login()));
+    const c = buscar('contratos', id);
+    const alerta = R.alertaReservaParada(d(), c);
+    aviso(n ? `Reserva reaplicada: ${n} boleto(s) ajustado(s).` : 'A reserva já estava nos boletos certos.', n ? 'ok' : 'info');
+    if (alerta) aviso(alerta.texto, 'aviso');
+    await mostrar();
+  },
+
   async desmarcarDocumento({ contrato, campo }) {
     await alterar((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
     await mostrar();
@@ -3387,7 +3480,7 @@ export const ACOES = {
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
     for (const f of el.files) nomes.push(await S.salvarArquivo(dir, f));
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: Number(id) };
+    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
     await mostrar();
@@ -3406,7 +3499,7 @@ export const ACOES = {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const dir = await pastaDoEscopo(escopo, Number(id));
     await dir.removeEntry(nome);
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: Number(id) };
+    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
     await alterar((db) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `Arquivo excluído: ${nome}`, null, vinc));
     await mostrar();
   },
