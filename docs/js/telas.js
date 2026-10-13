@@ -1766,7 +1766,7 @@ const numerosSelecionados = () => {
   return ns;
 };
 
-/** PDF de uma NF (uma empresa), com o nome "EMPRESA IMÓVEL NÚMERO.pdf". */
+/** PDF de uma NF (uma empresa), com o nome "NÚMERO - EMPRESA IMÓVEL.pdf" (ex.: "0123 - ANK Loja 1.pdf"). */
 async function pdfDaFatura(f) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
   const e = buscar('emitentes', f.emitente_id);
@@ -1782,7 +1782,7 @@ async function pdfDaFatura(f) {
     if (h > 277) { w = (w * 277) / h; h = 277; }
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (210 - w) / 2, 10, w, h);
     const imovel = R.imovelDaFatura(E.d, f);
-    const nome = S.limparNome(`${siglaEmpresa(e)} ${imovel ? imovel.nome : f.tomador_nome} ${R.numeroFatura(f.numero)}`);
+    const nome = S.limparNome(`${R.numeroFatura(f.numero)} - ${siglaEmpresa(e)} ${imovel ? imovel.nome : f.tomador_nome}`);
     return { blob: pdf.output('blob'), nome: `${nome}.pdf` };
   } finally {
     caixa.remove();
