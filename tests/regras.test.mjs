@@ -286,7 +286,8 @@ test('ajuste do mês no boleto: adicional ou ressarcimento, com histórico e na 
 });
 
 test('atraso de verdade: banco cobra multa e juros no boleto e a NF sai com o valor a mais', () => {
-  const { d } = base();
+  const { d, c } = base();
+  c.reserva_competencia = '2026-07'; // o boleto de junho (1º aluguel) não está no teste: a reserva fica marcada para julho
   R.gerarCobrancas(d, '2026-07', 'julio');
   R.gerarCobrancas(d, '2026-08', 'julio');
   // venceu 10/08, pagou 15/08, entrou na conta 18/08: juros até o dia em que pagou, NF com a data contábil
@@ -577,4 +578,47 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(cond.aluguel_inicial, R.aluguelAtual(d, c));
   assert.equal(cond.inquilino_nome, undefined, 'a pessoa não é copiada');
   assert.equal(R.ultimoContratoDoImovel(d, loja.id).id, c.id);
+});
+
+test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e muda de mês ao recalcular', () => {
+  const novo = (comp) => {
+    const d = R.bancoVazio();
+    const i = R.inserir(d, 'imoveis', { nome: 'Casa' }, 'j');
+    const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'X', data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01', aluguel_inicial: 200000,
+      dia_vencimento: 10, reserva_valor: 50000, reserva_competencia: comp }, 'j');
+    return { d, c };
+  };
+  // agosto (mês marcado) fora do sistema: outubro não pega a reserva, e aparece o aviso
+  let { d, c } = novo('2026-08');
+  R.gerarCobrancas(d, '2026-10', 'j');
+  assert.equal(d.cobrancas[0].reserva_utilizada, 0);
+  assert.match(R.alertaReservaParada(d, c).texto, /08\/2026 não foi usada: o boleto de 08\/2026 não está no sistema/);
+  // muda o mês marcado para outubro: o recálculo aplica
+  c.reserva_competencia = '2026-10';
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'j');
+  assert.equal(d.cobrancas[0].reserva_utilizada, 50000);
+  assert.equal(R.alertaReservaParada(d, c), null);
+  // setembro e outubro em aberto: trocar de outubro para setembro move a reserva, mesmo recalculando só um mês
+  ({ d, c } = novo('2026-10'));
+  R.gerarCobrancas(d, '2026-09', 'j');
+  R.gerarCobrancas(d, '2026-10', 'j');
+  c.reserva_competencia = '2026-09';
+  R.recalcularCobrancas(d, (cb) => cb.competencia === '2026-10', 'j');
+  assert.deepEqual(d.cobrancas.map((x) => [x.competencia, x.reserva_utilizada]), [['2026-09', 50000], ['2026-10', 0]]);
+  // reserva maior que o boleto: o que sobra segue para o mês seguinte
+  ({ d, c } = novo('2026-09'));
+  c.reserva_valor = 300000;
+  R.gerarCobrancas(d, '2026-09', 'j');
+  R.gerarCobrancas(d, '2026-10', 'j');
+  const [set, out] = d.cobrancas;
+  assert.equal(set.reserva_utilizada + out.reserva_utilizada, 300000);
+  assert.ok(out.reserva_utilizada > 0);
+  // boleto do mês marcado já pago sem a reserva: ela fica parada, com aviso
+  ({ d, c } = novo('2026-09'));
+  R.gerarCobrancas(d, '2026-09', 'j');
+  d.cobrancas[0].reserva_utilizada = 0;
+  R.registrarPagamento(d, d.cobrancas[0].id, '2026-10-10', null, 'j', { pagouEmDia: true });
+  R.gerarCobrancas(d, '2026-10', 'j');
+  assert.equal(d.cobrancas[1].reserva_utilizada, 0);
+  assert.match(R.alertaReservaParada(d, c).texto, /já foi pago sem ela/);
 });
