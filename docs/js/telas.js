@@ -288,6 +288,7 @@ export const TELAS = {
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
+  calendario: (rota) => telaCalendario(rota.q.mes || C.competenciaDe(C.hojeIso())),
   imprimir: (rota) => telaImprimir(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
@@ -1381,6 +1382,27 @@ function telaIptu(ano) {
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.imovel)}</b> ${esc(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join('')}
     <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela: prefeitura / inquilino</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
     <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do boleto que vence no mês informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
+}
+
+/** Calendário do mês: boletos, IPTU, seguros, aniversários e fins de contrato e de fiador, dia a dia. */
+function telaCalendario(mes) {
+  const hoje = C.hojeIso();
+  const eventos = R.eventosDoMes(d(), mes, hoje);
+  const dias = [...new Set(eventos.map((e) => e.data))];
+  const semana = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const conta = (tipo) => eventos.filter((e) => e.tipo === tipo).length;
+  const destino = (e) => (e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
+    : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/imovel/${e.imovel_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
+  return `<div class="cabecalho"><h1>Calendário de ${compBr(mes)}</h1>
+      <div class="acoes"><a class="botao secundario" href="#/calendario?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
+      ${link(`#/calendario?mes=${C.competenciaDe(hoje)}`, 'Hoje')}
+      <a class="botao secundario" href="#/calendario?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a></div></div>
+    <div class="selos">${['Boleto', 'IPTU', 'Seguro', 'Correção', 'Fim do contrato', 'Fiador'].filter(conta).map((t) => etiqueta(`${t}: ${conta(t)}`, 'neutra')).join(' ')}</div>
+    <div class="cartao">${dias.map((dia) => `<div class="dia-cal ${dia === hoje ? 'hoje' : dia < hoje ? 'passado' : ''}">
+        <div class="data-cal"><b>${dataBr(dia).slice(0, 5)}</b><br><span class="suave">${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</span></div>
+        <div class="eventos-cal">${eventos.filter((e) => e.data === dia).map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div></div>`).join('')
+      || '<p class="suave">Nada vence neste mês.</p>'}</div>
+    <p class="suave">Boletos: os já gerados e os previstos pelos contratos ativos (pelo dia de vencimento). IPTU: pelo vencimento da guia na prefeitura. Clique num item para abrir.</p>`;
 }
 
 function telaResultados(q) {

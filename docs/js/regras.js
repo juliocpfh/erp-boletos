@@ -1103,3 +1103,70 @@ export function resultadosFinanceiros(d, de, ate) {
       retornoAnual: base ? (resultado * 12 / meses / base) * 100 : null, mesesPagos: pagas.length };
   }).sort((a, b) => (b.retornoAnual ?? -Infinity) - (a.retornoAnual ?? -Infinity));
 }
+
+// --------------------------------------------------------------------------
+// Calendário do mês: tudo que vence ou acontece no mês
+// --------------------------------------------------------------------------
+/**
+ * Eventos do mês ("AAAA-MM"), em ordem de data: boletos (gerados ou previstos), parcelas do IPTU na prefeitura,
+ * fim do seguro, aniversário do contrato (correção), fim do contrato e fim do vínculo do fiador.
+ * Cada evento: { data, tipo, texto, imovel_id, contrato_id, situacao: 'ok' | 'aviso' | 'perigo' | 'neutra' }.
+ */
+export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
+  const [ini, fim] = C.limitesCompetencia(mes);
+  const no = (data) => data && data >= ini && data <= fim;
+  const nomeImovel = (id) => (d.imoveis.find((i) => i.id === id) || {}).nome || '';
+  const ev = [];
+  // boletos que vencem no mês (os já gerados, e os previstos dos inquilinos ativos)
+  const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
+  for (const c of ativos) {
+    for (const comp of [C.somarMeses(mes, -1), mes]) {
+      if (C.diasOcupados(comp, c.data_entrada, c.data_saida) === 0) continue;
+      const cb = d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp);
+      const venc = cb ? cb.vencimento : C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+      if (!no(venc)) continue;
+      const pago = cb && cb.data_pagamento;
+      ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null,
+        texto: `${c.inquilino_nome} · aluguel de ${C.compBr(comp)}${cb ? ` · ${C.reais(totais(cb).a_pagar_pontual)}` : ' · boleto ainda não gerado'}${geraNf(c) ? '' : ' · boleto de controle'}`,
+        situacao: pago ? 'ok' : !cb ? 'neutra' : venc < hoje ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(cb.data_pagamento)}` : !cb ? 'previsto' : venc < hoje ? 'vencido' : 'em aberto' });
+    }
+  }
+  // IPTU na prefeitura
+  for (const p of d.iptus) {
+    for (const pc of parcelasIptu(d, p)) {
+      if (!no(pc.vencimento)) continue;
+      ev.push({ data: pc.vencimento, tipo: 'IPTU', imovel_id: p.imovel_id,
+        texto: `${nomeImovel(p.imovel_id)} · IPTU ${p.ano} ${pc.rotulo} · ${C.reais(pc.valor)} · ${pc.proprietario ? 'por conta do proprietário' : `no boleto de ${pc.inquilino.inquilino_nome}`}`,
+        situacao: !pc.proprietario ? 'neutra' : pc.paga ? 'ok' : pc.vencimento < hoje ? 'perigo' : 'aviso',
+        estado: !pc.proprietario ? 'inquilino paga' : pc.paga ? `pago em ${C.dataBr(pc.paga)}` : pc.vencimento < hoje ? 'vencido' : 'a pagar' });
+    }
+  }
+  // seguro obrigatório: fim da vigência
+  for (const s of d.seguros) {
+    if (!no(s.vigencia_fim)) continue;
+    const renovado = d.seguros.some((x) => x.imovel_id === s.imovel_id && x.vigencia_fim > s.vigencia_fim);
+    ev.push({ data: s.vigencia_fim, tipo: 'Seguro', imovel_id: s.imovel_id, texto: `${nomeImovel(s.imovel_id)} · fim do seguro${s.seguradora ? ` ${s.seguradora}` : ''}`,
+      situacao: renovado ? 'ok' : 'aviso', estado: renovado ? 'renovado' : 'renovar' });
+  }
+  for (const c of d.contratos.filter((x) => contratoAtivo(x, hoje) && x.imovel_id)) {
+    // aniversário do contrato (correção anual)
+    const base = dataBaseCorrecao(c);
+    if (base) {
+      const anos = Number(mes.slice(0, 4)) - Number(base.slice(0, 4));
+      const aniv = anos > 0 ? C.somarAnos(base, anos) : null;
+      if (no(aniv)) {
+        const feito = correcoesDo(d, c.id).some((x) => x.data_vigencia >= C.somarDias(aniv, -61));
+        ev.push({ data: aniv, tipo: 'Correção', imovel_id: c.imovel_id, contrato_id: c.id,
+          texto: `${c.inquilino_nome} · ${anos} ano(s) de contrato · correção pelo ${c.indice_correcao || 'índice do contrato'}`, situacao: feito ? 'ok' : 'aviso', estado: feito ? 'corrigido' : 'corrigir' });
+      }
+    }
+    if (c.prazo_tipo !== 'Indeterminado' && no(c.vigencia_fim)) {
+      ev.push({ data: c.vigencia_fim, tipo: 'Fim do contrato', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do prazo do contrato`, situacao: 'aviso', estado: 'renovar ou sair' });
+    }
+    for (const f of d.fiadores.filter((x) => x.contrato_id === c.id && no(x.data_saida) && !x.substituido_por_id)) {
+      ev.push({ data: f.data_saida, tipo: 'Fiador', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do vínculo do fiador ${f.nome}`, situacao: 'aviso', estado: 'providenciar' });
+    }
+  }
+  const ordem = { Boleto: 0, IPTU: 1, Seguro: 2, Correção: 3, 'Fim do contrato': 4, Fiador: 5 };
+  return ev.sort((a, b) => a.data.localeCompare(b.data) || ordem[a.tipo] - ordem[b.tipo] || a.texto.localeCompare(b.texto, 'pt-BR'));
+}
