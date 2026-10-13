@@ -165,10 +165,23 @@ tr.linha-controle td { background: #faf8ff; }
 .alerta.mensagem { position: relative; padding-right: 34px; }
 .alerta.mensagem .fechar { position: absolute; right: 6px; top: 4px; background: none; color: var(--suave); font-size: 18px; padding: 0 6px; line-height: 1.4; }
 
-/* Calendário do mês */
-.dia-cal { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--borda); }
-.dia-cal:last-child { border-bottom: 0; }
-.dia-cal.hoje { background: #eff6ff; margin: 0 -18px; padding: 10px 18px; }
-.dia-cal.passado .data-cal { opacity: .6; }
-.data-cal { min-width: 78px; }
-.eventos-cal { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+/* Calendário do mês (Painel) */
+.cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-sem { font-size: 12px; color: var(--suave); text-transform: uppercase; text-align: center; padding: 2px 0; }
+.cal-dia { min-height: 84px; border: 1px solid var(--borda); border-radius: 6px; padding: 4px; background: #fff; overflow: hidden; }
+.cal-dia.vazio { border: 0; background: none; }
+.cal-dia.com-eventos { cursor: pointer; }
+.cal-dia.com-eventos:hover, .cal-dia.selecionado { border-color: var(--primaria); box-shadow: 0 0 0 1px var(--primaria); }
+.cal-dia.hoje { background: #eff6ff; }
+.cal-dia.hoje .cal-num { background: var(--primaria); color: #fff; border-radius: 999px; display: inline-block; min-width: 22px; text-align: center; }
+.cal-num { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.cal-ev { font-size: 11px; line-height: 1.25; padding: 1px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-ev.ok { background: #dcfce7; color: var(--ok); }
+.cal-ev.aviso { background: #fef3c7; color: var(--aviso); }
+.cal-ev.perigo { background: #fee2e2; color: var(--perigo); }
+.cal-ev.neutra { background: #f1f5f9; color: var(--suave); }
+.cal-mais { font-size: 11px; color: var(--suave); }
+.agenda-dia { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--primaria); border-radius: 8px; background: #f8fafc; }
+.agenda-dia h3 { margin-top: 0; }
+.evento-cal { margin-bottom: 6px; }
+@media (max-width: 700px) { .cal-dia { min-height: 48px; } .cal-ev { font-size: 0; height: 6px; padding: 0; } }

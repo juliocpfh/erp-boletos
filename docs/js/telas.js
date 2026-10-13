@@ -218,7 +218,7 @@ export const TELAS = {
     </form></div></main>`,
 
   // ------------------------------------------------------------------------
-  painel() {
+  painel(rota) {
     const hoje = C.hojeIso();
     const alertas = R.todosAlertas(d(), hoje);
     const pend = R.pendentesDeFatura(d());
@@ -232,6 +232,7 @@ export const TELAS = {
         ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/cobrancas')}
         ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
       </div>
+      ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
       <div class="cartao"><h2>Alertas</h2>
         ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
@@ -288,7 +289,7 @@ export const TELAS = {
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
-  calendario: (rota) => telaCalendario(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
@@ -1384,25 +1385,37 @@ function telaIptu(ano) {
     <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do boleto que vence no mês informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
 }
 
-/** Calendário do mês: boletos, IPTU, seguros, aniversários e fins de contrato e de fiador, dia a dia. */
-function telaCalendario(mes) {
-  const hoje = C.hojeIso();
+/**
+ * Calendário do mês no Painel: grade com os dias; em cada dia, os vencimentos e alertas (cor da situação).
+ * Clicar no dia abre logo abaixo a agenda completa daquele dia.
+ */
+function calendarioDoPainel(mes, hoje) {
   const eventos = R.eventosDoMes(d(), mes, hoje);
-  const dias = [...new Set(eventos.map((e) => e.data))];
-  const semana = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-  const conta = (tipo) => eventos.filter((e) => e.tipo === tipo).length;
+  const porDia = new Map();
+  for (const e of eventos) { if (!porDia.has(e.data)) porDia.set(e.data, []); porDia.get(e.data).push(e); }
   const destino = (e) => (e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
     : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/imovel/${e.imovel_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
-  return `<div class="cabecalho"><h1>Calendário de ${compBr(mes)}</h1>
-      <div class="acoes"><a class="botao secundario" href="#/calendario?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
-      ${link(`#/calendario?mes=${C.competenciaDe(hoje)}`, 'Hoje')}
-      <a class="botao secundario" href="#/calendario?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a></div></div>
-    <div class="selos">${['Boleto', 'IPTU', 'Seguro', 'Correção', 'Fim do contrato', 'Fiador'].filter(conta).map((t) => etiqueta(`${t}: ${conta(t)}`, 'neutra')).join(' ')}</div>
-    <div class="cartao">${dias.map((dia) => `<div class="dia-cal ${dia === hoje ? 'hoje' : dia < hoje ? 'passado' : ''}">
-        <div class="data-cal"><b>${dataBr(dia).slice(0, 5)}</b><br><span class="suave">${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</span></div>
-        <div class="eventos-cal">${eventos.filter((e) => e.data === dia).map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div></div>`).join('')
-      || '<p class="suave">Nada vence neste mês.</p>'}</div>
-    <p class="suave">Boletos: os já gerados e os previstos pelos contratos ativos (pelo dia de vencimento). IPTU: pelo vencimento da guia na prefeitura. Clique num item para abrir.</p>`;
+  const curto = (e) => `${e.tipo} ${e.texto.split(' · ')[0]}`;
+  const [ini] = C.limitesCompetencia(mes);
+  const vazios = C.paraData(ini).getUTCDay();
+  const celulas = [...Array(vazios)].map(() => '<div class="cal-dia vazio"></div>');
+  for (let n = 1; n <= C.diasNoMes(mes); n += 1) {
+    const dia = `${mes}-${String(n).padStart(2, '0')}`;
+    const evs = porDia.get(dia) || [];
+    celulas.push(`<div class="cal-dia ${dia === hoje ? 'hoje' : ''} ${evs.length ? 'com-eventos' : ''}" ${evs.length ? `data-acao="abrirDia" data-dia="${dia}" title="Ver a agenda do dia"` : ''}>
+      <div class="cal-num">${n}</div>
+      ${evs.slice(0, 3).map((e) => `<div class="cal-ev ${e.situacao}">${esc(curto(e))}</div>`).join('')}
+      ${evs.length > 3 ? `<div class="cal-mais">+${evs.length - 3}</div>` : ''}</div>`);
+  }
+  const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje ? '' : 'hidden'}>
+      <h3>${dataBr(dia)} · ${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</h3>
+      ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div>`).join('');
+  return `<div class="cartao" id="calendario"><div class="cabecalho"><h2>Calendário de ${compBr(mes)}</h2>
+      <div class="acoes">${link(`#/?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`)} ${link('#/', 'Mês atual')} ${link(`#/?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`)}</div></div>
+    <div class="cal-grade">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
+    ${agendas || ''}
+    <p class="suave">Clique num dia para ver a agenda completa. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
 }
 
 function telaResultados(q) {
@@ -2000,6 +2013,18 @@ export const ACOES = {
     await alterar((db) => R.apagarCanceladas(db, Number(numero), login()));
     aviso(`NF nº ${R.numeroFatura(numero)} apagada da lista.`);
     await mostrar();
+  },
+
+  /** Calendário do Painel: mostra a agenda do dia clicado (clicar de novo fecha). */
+  abrirDia({ dia }) {
+    const alvo = document.querySelector(`[data-agenda="${dia}"]`);
+    const abrir = alvo && alvo.hidden;
+    document.querySelectorAll('[data-agenda]').forEach((el) => { el.hidden = true; });
+    document.querySelectorAll('.cal-dia.selecionado').forEach((el) => el.classList.remove('selecionado'));
+    if (abrir) {
+      alvo.hidden = false;
+      document.querySelector(`.cal-dia[data-dia="${dia}"]`).classList.add('selecionado');
+    }
   },
 
   imprimirDemonstrativos({ comp }) {
