@@ -6,6 +6,57 @@ export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 const campo = (nome, rotulo, tipo = 'texto', extra = {}) => ({ nome, rotulo, tipo, ...extra });
 const secao = (titulo) => ({ secao: titulo });
 
+// --------------------------------------------------------------------------
+// CPF, CNPJ, CEP e telefone: máscara ao digitar e conferência dos dígitos ao salvar
+// --------------------------------------------------------------------------
+export const soDigitos = (v) => String(v || '').replace(/\D/g, '');
+
+export function cpfValido(v) {
+  const n = soDigitos(v);
+  if (n.length !== 11 || /^(\d)\1{10}$/.test(n)) return false;
+  const dv = (k) => { let s = 0; for (let i = 0; i < k; i += 1) s += Number(n[i]) * (k + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(n[9]) && dv(10) === Number(n[10]);
+}
+
+export function cnpjValido(v) {
+  const n = soDigitos(v);
+  if (n.length !== 14 || /^(\d)\1{13}$/.test(n)) return false;
+  const dv = (k) => { const pesos = k === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]; const s = pesos.reduce((t, p, i) => t + p * Number(n[i]), 0) % 11; return s < 2 ? 0 : 11 - s; };
+  return dv(12) === Number(n[12]) && dv(13) === Number(n[13]);
+}
+
+/** Formata enquanto digita (e ao salvar). */
+export function mascarar(tipo, v) {
+  const n = soDigitos(v);
+  if (tipo === 'cep') return n.slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
+  if (tipo === 'tel') {
+    const t = n.slice(0, 11);
+    if (t.length <= 2) return t;
+    return t.length > 10 ? t.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3') : t.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3').replace(/-$/, '');
+  }
+  const cpf = (x) => x.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2');
+  const cnpj = (x) => x.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+  if (tipo === 'cpf') return cpf(n.slice(0, 11));
+  if (tipo === 'cnpj') return cnpj(n.slice(0, 14));
+  return n.length <= 11 ? cpf(n) : cnpj(n.slice(0, 14)); // cpfcnpj
+}
+
+/** Confere o documento: devolve a mensagem de erro, ou '' se está certo. */
+export function conferirDocumento(tipo, v) {
+  const n = soDigitos(v);
+  if (tipo === 'cep') return n.length === 8 ? '' : 'CEP com 8 números';
+  if (tipo === 'cpf') return cpfValido(n) ? '' : 'CPF inválido (confira os números)';
+  if (tipo === 'cnpj') return cnpjValido(n) ? '' : 'CNPJ inválido (confira os números)';
+  if (n.length === 11) return cpfValido(n) ? '' : 'CPF inválido (confira os números)';
+  if (n.length === 14) return cnpjValido(n) ? '' : 'CNPJ inválido (confira os números)';
+  return 'Informe um CPF (11 números) ou CNPJ (14 números)';
+}
+const DOCUMENTOS = ['cpf', 'cnpj', 'cpfcnpj', 'cep'];
+
+/** CEP que preenche o endereço (ViaCEP) e CNPJ que preenche a empresa (BrasilAPI): só os campos vazios. */
+const PREENCHE_CEP = (endereco, bairro, cidade) => ({ preencher: { fonte: 'cep', endereco, bairro, cidade } });
+const PREENCHE_CNPJ = (alvos) => ({ preencher: { fonte: 'cnpj', ...alvos } });
+
 /** Mostra o campo só quando outro campo tem um destes valores (caixa de seleção marcada = '1'). */
 const quando = (campoNome, ...valores) => ({ mostrarSe: { campo: campoNome, valores } });
 const GARANTIA_FIADOR = quando('garantia_tipo', 'Fiador', 'Fiador + depósito');
@@ -19,7 +70,7 @@ export const IMOVEL = [
   campo('complemento', 'Complemento', 'texto', { max: 25 }),
   campo('bairro', 'Bairro'),
   campo('cidade', 'Cidade (município)', 'texto', { max: LIMITES.municipio }),
-  campo('cep', 'CEP'),
+  campo('cep', 'CEP', 'cep', { ...PREENCHE_CEP('endereco', 'bairro', 'cidade'), ajuda: 'Digite o CEP para preencher rua, bairro e cidade' }),
   secao('Registros'),
   campo('matricula', 'Matrícula'),
   campo('sublote', 'Identificação do sublote', 'texto', { ajuda: 'Para imóveis que são sublotes internos. Ex.: Sublote 3' }),
@@ -104,7 +155,7 @@ const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
 
 export const FIADOR = [
   campo('nome', 'Nome', 'texto', { obrig: true, largo: true }),
-  campo('cpf', 'CPF'),
+  campo('cpf', 'CPF', 'cpf', { buscarPessoa: true }),
   campo('rg', 'RG'),
   campo('telefone', 'Telefone', 'tel'),
   campo('email', 'E-mail', 'email'),
@@ -139,7 +190,7 @@ export const CONTRATO = [
   campo('inquilino_telefone', 'Telefone', 'tel'),
   campo('inquilino_whatsapp', 'Este telefone é WhatsApp', 'simnao'),
   campo('inquilino_email', 'E-mail', 'email'),
-  campo('inquilino_cpf', 'CPF / CNPJ'),
+  campo('inquilino_cpf', 'CPF / CNPJ', 'cpfcnpj', { buscarPessoa: true, ...PREENCHE_CNPJ({ nome: 'inquilino_nome', endereco: 'inquilino_endereco' }) }),
   campo('inquilino_rg', 'RG / inscrição estadual'),
   ...qualificacao('inquilino_', quando('inquilino_tipo', 'Pessoa física'), false),
   campo('inquilino_endereco', 'Endereço (residência, comercial ou sede da empresa)', 'texto', { largo: true }),
@@ -149,7 +200,7 @@ export const CONTRATO = [
   campo('contrato_anterior_id', 'Continua o contrato de', 'opcao', { opcoes: [], ajuda: 'Ex.: alteração de titular. Liga o histórico dos dois inquilinos' }),
   { secao: 'Representante da empresa (pessoa física)', ...PJ },
   campo('representante_nome', 'Nome do representante', 'texto', { largo: true, ...PJ, ajuda: 'Obrigatório para empresa: sócio ou responsável que assina' }),
-  campo('representante_cpf', 'CPF do representante', 'texto', PJ),
+  campo('representante_cpf', 'CPF do representante', 'cpf', PJ),
   campo('representante_rg', 'RG do representante', 'texto', PJ),
   campo('representante_cargo', 'Cargo', 'texto', PJ),
   ...qualificacao('representante_', PJ),
@@ -158,7 +209,7 @@ export const CONTRATO = [
   secao('Inquilino solidário'),
   campo('tem_solidario', 'Tem inquilino solidário', 'simnao', { virtual: true, ajuda: 'Marque para cadastrar quem assina o contrato junto' }),
   campo('solidario_nome', 'Nome do inquilino solidário', 'texto', { largo: true, ...SOLIDARIO, ajuda: 'O boleto continua saindo no nome do inquilino principal' }),
-  campo('solidario_cpf', 'CPF / CNPJ do solidário', 'texto', SOLIDARIO),
+  campo('solidario_cpf', 'CPF / CNPJ do solidário', 'cpfcnpj', SOLIDARIO),
   campo('solidario_rg', 'RG do solidário', 'texto', SOLIDARIO),
   campo('solidario_telefone', 'Telefone do solidário', 'tel', SOLIDARIO),
   campo('solidario_email', 'E-mail do solidário', 'email', SOLIDARIO),
@@ -328,7 +379,7 @@ export const AVULSA = [
 export const EMITENTE = [
   campo('nome', 'Nome no topo da NF', 'texto', { obrig: true, ajuda: 'Ex.: ANK ADMINISTRADORA' }),
   campo('razao_social', 'Razão social', 'texto', { obrig: true, largo: true }),
-  campo('cnpj', 'CNPJ'),
+  campo('cnpj', 'CNPJ', 'cnpj', PREENCHE_CNPJ({ razao: 'razao_social', nome: 'nome', endereco: 'endereco', sede: 'endereco_sede' })),
   campo('endereco', 'Endereço (como aparece na NF)', 'texto', { largo: true }),
   campo('municipio', 'Município do serviço', 'texto', { padrao: 'CURITIBA' }),
   campo('aba_modelo', 'Aba no modelo Excel', 'texto', { ajuda: 'Nome da aba do modelo para esta empresa (ex.: ANK)' }),
@@ -338,7 +389,7 @@ export const EMITENTE = [
   campo('representante_nome', 'Representante que assina', 'texto', { largo: true, ajuda: 'Ex.: AIDA APARECIDA NUNES KRASINSKI' }),
   campo('representante_cargo', 'Cargo do representante', 'texto', { padrao: 'sócia administradora' }),
   campo('representante_rg', 'RG do representante'),
-  campo('representante_cpf', 'CPF do representante'),
+  campo('representante_cpf', 'CPF do representante', 'cpf'),
   ...qualificacao('representante_', {}, false),
 ];
 
@@ -391,7 +442,8 @@ export function paraFormulario(campos, registro) {
 }
 
 /** Converte o formulário enviado. Devolve { dados, erros }. */
-export function ler(campos, form) {
+/** ``antigo``: registro em edição; documento que já estava salvo e não mudou não é barrado (dados antigos). */
+export function ler(campos, form, antigo = null) {
   const fd = form instanceof FormData ? form : new FormData(form);
   const dados = {};
   const erros = {};
@@ -424,7 +476,13 @@ export function ler(campos, form) {
         const u = /^https?:\/\//i.test(bruto) ? bruto : `https://${bruto}`;
         if (/\s/.test(u) || !u.includes('.')) throw new Error();
         dados[c.nome] = u;
-      } else if (c.tipo === 'opcao' && c.nome.endsWith('_id')) dados[c.nome] = Number(bruto);
+      } else if (DOCUMENTOS.includes(c.tipo)) {
+        const igualAntes = antigo && soDigitos(antigo[c.nome]) === soDigitos(bruto);
+        const erro = igualAntes ? '' : conferirDocumento(c.tipo, bruto);
+        if (erro) { erros[c.nome] = erro; dados[c.nome] = bruto; continue; }
+        dados[c.nome] = igualAntes ? antigo[c.nome] : mascarar(c.tipo, bruto);
+      } else if (c.tipo === 'tel') dados[c.nome] = [10, 11].includes(soDigitos(bruto).length) ? mascarar('tel', bruto) : bruto;
+      else if (c.tipo === 'opcao' && c.nome.endsWith('_id')) dados[c.nome] = Number(bruto);
       else dados[c.nome] = c.max ? bruto.slice(0, c.max) : bruto;
     } catch {
       erros[c.nome] = 'Valor inválido';
@@ -465,14 +523,15 @@ export function camposHtml(campos, valores = {}, erros = {}) {
     } else {
       // link fica como texto: o navegador recusaria "onedrive.live.com/..." sem https://, e ler() completa sozinho
       const tipo = { data: 'date', mes: 'month', email: 'email', tel: 'tel' }[c.tipo] || 'text';
-      const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ['pct', 'inteiro'].includes(c.tipo) ? 'inputmode="decimal"' : '';
+      const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ['pct', 'inteiro'].includes(c.tipo) ? 'inputmode="decimal"'
+        : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : '';
       entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${max} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;
     }
     return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''}" ${se}>
       <label for="${id}">${esc(c.rotulo)}${c.obrig ? ' *' : ''}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}
-      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}</div>`;
+      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
   });
   return `<div class="formulario">${partes.join('')}</div>`;
 }

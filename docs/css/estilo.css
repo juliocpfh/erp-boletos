@@ -253,3 +253,10 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 .contrato .ct-fotos img { width: 100%; max-height: 7.5cm; object-fit: contain; }
 .contrato .ct-fotos-grande img { width: auto; max-width: 100%; max-height: 10cm; }
 .contrato .ct-fotos figcaption { font-size: 12px; font-style: italic; color: #555; }
+.ajuda-auto { font-size: 12px; color: var(--primaria-escura, #1e40af); margin-top: 3px; }
+.ajuda-auto:empty { display: none; }
+input.doc-invalido { border-color: var(--perigo); }
+.fechamento { margin: 0; padding-left: 22px; }
+.fechamento li { padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.fechamento li.feito > .cabecalho b { color: var(--suave); }
+.baixa-lote { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; }

@@ -552,3 +552,29 @@ test('contas nossas: imóvel vago, até 2 meses depois de alugar, depois só as 
   c.data_saida = '2026-11-15';
   assert.equal(R.contasPermitidas(d, loja.id, '2026-11').motivo, 'vago', 'mês da saída');
 });
+
+test('fechamento do mês, baixa em lote e condições do inquilino anterior', () => {
+  const { d, loja, c } = base(); // entrada 07/06/2026, vencimento no mês seguinte
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  let et = R.etapasFechamento(d, '2026-08', '2026-08-20');
+  const por = (k) => et.find((e) => e.chave === k);
+  assert.equal(por('boletos').feito, true);
+  assert.equal(por('pagamentos').pendentes, 1);
+  const cb = d.cobrancas.find((x) => x.competencia === '2026-07');
+  const r = R.baixarEmLote(d, [cb.id, cb.id], '2026-08-10', 'julio');
+  assert.equal(r.feitos.length, 1);
+  assert.equal(r.pulados.length, 1, 'o segundo já estava pago');
+  assert.equal(R.buscar(d, 'cobrancas', cb.id).multa, 0);
+  et = R.etapasFechamento(d, '2026-08', '2026-08-20');
+  assert.equal(et.find((e) => e.chave === 'pagamentos').feito, true);
+  R.marcarEtapaFechamento(d, '2026-08', 'contas', true, 'julio');
+  assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
+  const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').find((e) => e.tipo === 'Fechamento');
+  assert.equal(ev.data, '2026-08-31');
+  c.conta_agua = 'Incluso no aluguel';
+  const cond = R.condicoesDoAnterior(d, c);
+  assert.equal(cond.conta_agua, 'Incluso no aluguel');
+  assert.equal(cond.aluguel_inicial, R.aluguelAtual(d, c));
+  assert.equal(cond.inquilino_nome, undefined, 'a pessoa não é copiada');
+  assert.equal(R.ultimoContratoDoImovel(d, loja.id).id, c.id);
+});
