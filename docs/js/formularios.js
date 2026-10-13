@@ -95,6 +95,7 @@ const fiadoresNoCadastro = () => [1, 2].flatMap((n) => [
 ]);
 
 const PJ = quando('inquilino_tipo', 'Pessoa jurídica (empresa)');
+const SOLIDARIO = quando('tem_solidario', '1');
 
 export const CONTRATO = [
   secao('Imóvel e situação'),
@@ -121,12 +122,13 @@ export const CONTRATO = [
   campo('representante_cargo', 'Cargo', 'texto', PJ),
   campo('representante_telefone', 'Telefone do representante', 'tel', PJ),
   campo('representante_email', 'E-mail do representante', 'email', PJ),
-  secao('Inquilino solidário (se houver)'),
-  campo('solidario_nome', 'Nome do inquilino solidário', 'texto', { largo: true, ajuda: 'Assina o contrato junto. O boleto continua saindo no nome do inquilino principal' }),
-  campo('solidario_cpf', 'CPF / CNPJ do solidário'),
-  campo('solidario_rg', 'RG do solidário'),
-  campo('solidario_telefone', 'Telefone do solidário', 'tel'),
-  campo('solidario_email', 'E-mail do solidário', 'email'),
+  secao('Inquilino solidário'),
+  campo('tem_solidario', 'Tem inquilino solidário', 'simnao', { virtual: true, ajuda: 'Marque para cadastrar quem assina o contrato junto' }),
+  campo('solidario_nome', 'Nome do inquilino solidário', 'texto', { largo: true, ...SOLIDARIO, ajuda: 'O boleto continua saindo no nome do inquilino principal' }),
+  campo('solidario_cpf', 'CPF / CNPJ do solidário', 'texto', SOLIDARIO),
+  campo('solidario_rg', 'RG do solidário', 'texto', SOLIDARIO),
+  campo('solidario_telefone', 'Telefone do solidário', 'tel', SOLIDARIO),
+  campo('solidario_email', 'E-mail do solidário', 'email', SOLIDARIO),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'] }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', quando('garantia_tipo', 'Caução')),
@@ -161,8 +163,8 @@ export const CONTRATO = [
   campo('indice_correcao', 'Índice de correção previsto no contrato', 'opcao', { lista: 'indices', ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
   secao('O que está incluso no contrato'),
-  campo('cobrar_iptu', 'IPTU cobrado do inquilino (entra no boleto)', 'simnao', { padrao: true }),
-  campo('cobrar_seguro', 'Seguro obrigatório cobrado do inquilino (entra no boleto)', 'simnao', { padrao: true }),
+  campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
+  campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais previstas no contrato', 'area', { ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Carência de aluguel'),

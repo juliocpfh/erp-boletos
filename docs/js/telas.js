@@ -522,8 +522,8 @@ function caixaIncluso(c) {
   const sit = (v) => (!v ? '<span class="suave">não informado</span>'
     : v === 'Incluso no aluguel' ? etiqueta(v, 'ok') : v === 'Por conta do inquilino' ? etiqueta(v, 'info') : etiqueta(v, 'neutra'));
   return `<div class="cartao"><h2>O que está incluso no contrato</h2><div class="grade">
-    ${item('IPTU', c.cobrar_iptu ? etiqueta('Cobrado do inquilino', 'aviso') : etiqueta('Não cobrado', 'neutra'))}
-    ${item('Seguro obrigatório', c.cobrar_seguro !== false ? etiqueta('Cobrado do inquilino', 'aviso') : etiqueta('Não cobrado', 'neutra'))}
+    ${item('IPTU', sit(c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])))}
+    ${item('Seguro obrigatório', sit(c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])))}
     ${F.CONTAS.map(([k, t]) => item(t, sit(c[k]))).join('')}</div>
     ${c.contas_adicionais ? `<h3>Contas adicionais</h3><p class="pre">${esc(c.contas_adicionais)}</p>` : ''}</div>`;
 }
@@ -659,7 +659,8 @@ const CADASTROS = {
         .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c)));
     },
     padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
-    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, cobrar_seguro: r.cobrar_seguro !== false,
+    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome,
+      conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
     aviso: (r) => (r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: anexe o termo assinado em "Arquivos do inquilino".' : ''),
@@ -686,6 +687,12 @@ const CADASTROS = {
       }
       if (dados.carencia_meses < 0) erros.carencia_meses = 'Valor inválido';
       if (dados.inquilino_tipo === 'Pessoa jurídica (empresa)' && !dados.representante_nome) erros.representante_nome = 'Empresa precisa do representante (pessoa física)';
+      // solidário só vale com a caixa marcada
+      if (new FormData(form).get('tem_solidario') !== '1') for (const k of ['solidario_nome', 'solidario_cpf', 'solidario_rg', 'solidario_telefone', 'solidario_email']) dados[k] = null;
+      else if (!dados.solidario_nome) erros.solidario_nome = 'Informe o nome do inquilino solidário';
+      // só "por conta do inquilino" entra no boleto
+      dados.cobrar_iptu = dados.conta_iptu === R.SITUACOES[0];
+      dados.cobrar_seguro = dados.conta_seguro === R.SITUACOES[0];
       // fiadores digitados no próprio cadastro
       fiadoresNovos = [];
       for (const n of [1, 2]) {

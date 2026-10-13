@@ -12,6 +12,9 @@ export const TABELAS = {
   reformas: 'Reforma / investimento', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
+/** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
+export const SITUACOES = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+
 /** Listas de opções que o usuário pode editar (incluir e remover itens). */
 export const LISTAS = {
   concessionarias: { nome: 'concessionárias', padrao: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] },
@@ -41,6 +44,11 @@ export function normalizar(d) {
       if (c && !c.vistoria_link) c.vistoria_link = i.vistoria_link;
       if (c) delete i.vistoria_link;
     }
+  }
+  // IPTU e seguro no contrato viraram escolha (por conta do inquilino / incluso no aluguel / não tem)
+  for (const c of d.contratos) {
+    if (c.conta_iptu === undefined) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
+    if (c.conta_seguro === undefined) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
   }
   migrarAirbnb(d);
   // versão 1 guardava um único fiador dentro do contrato
@@ -826,7 +834,7 @@ const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_apelido', 
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
-  'cobrar_iptu', 'cobrar_seguro', 'gerar_nf', 'garantia_tipo'];
+  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo'];
 
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
