@@ -327,7 +327,7 @@ document.addEventListener('click', async (ev) => {
 
 document.addEventListener('change', async (ev) => {
   if (ev.target.matches('input[data-marcar-todas]')) {
-    document.querySelectorAll('input[data-nf]').forEach((x) => { x.checked = ev.target.checked; });
+    document.querySelectorAll(`input[data-${ev.target.dataset.marcarTodas || 'nf'}]`).forEach((x) => { x.checked = ev.target.checked; });
     return;
   }
   const el = ev.target.closest('input[data-upload]');

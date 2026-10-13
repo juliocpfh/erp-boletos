@@ -12,6 +12,9 @@ export const TABELAS = {
   reformas: 'Reforma / investimento', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
+/** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
+export const SITUACOES = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+
 /** Listas de opções que o usuário pode editar (incluir e remover itens). */
 export const LISTAS = {
   concessionarias: { nome: 'concessionárias', padrao: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] },
@@ -35,6 +38,17 @@ export function normalizar(d) {
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
     for (const k of ['anuncio_link', 'anuncio_data', 'grupo_id']) delete i[k];
+    // a vistoria de entrada passou a ser do contrato: vai para o inquilino mais recente do imóvel
+    if (i.vistoria_link) {
+      const c = d.contratos.filter((x) => x.imovel_id === i.id).sort((a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada)))[0];
+      if (c && !c.vistoria_link) c.vistoria_link = i.vistoria_link;
+      if (c) delete i.vistoria_link;
+    }
+  }
+  // IPTU e seguro no contrato viraram escolha (por conta do inquilino / incluso no aluguel / não tem)
+  for (const c of d.contratos) {
+    if (c.conta_iptu === undefined) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
+    if (c.conta_seguro === undefined) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
   }
   migrarAirbnb(d);
   // versão 1 guardava um único fiador dentro do contrato
@@ -302,41 +316,65 @@ export function emCarencia(c, comp) {
 // --------------------------------------------------------------------------
 export const COBRANCA_IPTU_QUITADO = ['Parcelas normais nos meses em que ocupar', 'Proporcional: 1/12 do valor por mês ocupado no ano', 'Não cobrar do inquilino'];
 
-/** Valor da parcela do IPTU que entra no boleto da competência (com a regra de IPTU quitado à vista). */
-export function iptuNaCompetencia(p, comp) {
+/** Valores das parcelas do IPTU parcelado (o que é repassado ao inquilino). */
+const valoresIptu = (p) => (p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : C.parcelas(p.valor_total, p.num_parcelas));
+/** Vencimento da parcela n na prefeitura (as seguintes vencem no mesmo dia dos meses seguintes). */
+const vencimentoParcela = (p, n) => (p.vencimento_primeira ? C.somarMesesData(p.vencimento_primeira, n - 1) : null);
+
+/** Mês ("AAAA-MM") em que vence o boleto do inquilino com a parcela n: o informado para a 1ª, depois um por mês. */
+export const mesBoletoDaParcela = (p, n) => (p.primeiro_vencimento_boleto ? C.somarMeses(p.primeiro_vencimento_boleto, n - 1) : null);
+
+/**
+ * Competência (aluguel de) do inquilino em que a parcela n entra: a do boleto que vence no mês informado.
+ * Para quem paga o aluguel no mês seguinte ao de uso, é o mês anterior. Independe do vencimento na prefeitura,
+ * que muda conforme a entrega do carnê. IPTU antigo usa o "cobrar 1ª parcela no aluguel de".
+ */
+export function competenciaDaParcela(p, n, c = {}) {
+  const mes = mesBoletoDaParcela(p, n);
+  if (mes) return c.cobranca_mes_seguinte === false ? mes : C.somarMeses(mes, -1);
+  return p.primeira_competencia ? C.somarMeses(p.primeira_competencia, n - 1) : null;
+}
+
+/**
+ * Parcela do IPTU que entra no boleto do inquilino na competência: [número, valor] ou [null, 0].
+ * O inquilino paga sempre o valor parcelado, mesmo quando o proprietário quitou à vista com desconto
+ * (o proprietário financiou o inquilino; a diferença fica com ele).
+ */
+export function iptuNaCompetencia(p, comp, c = {}) {
   if (p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[2]) return [null, 0];
   if (p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1]) {
     if (Number(comp.slice(0, 4)) !== Number(p.ano)) return [null, 0];
     const mes = Number(comp.slice(5, 7));
-    return [mes, C.parcelas(p.valor_avista || p.valor_total, 12)[mes - 1]];
+    return [mes, C.parcelas(p.valor_total, 12)[mes - 1]];
   }
-  const [n, v] = C.parcelaNaCompetencia(p.valor_total, p.num_parcelas, p.primeira_competencia, comp);
-  return [n, n && p.valor_parcela > 0 ? p.valor_parcela : v];
+  const valores = valoresIptu(p);
+  for (let n = 1; n <= valores.length; n += 1) if (competenciaDaParcela(p, n, c) === comp) return [n, valores[n - 1]];
+  return [null, 0];
 }
 
-/** Inquilino que paga o IPTU no mês (cobrado no boleto), ou null quando o custo fica com o proprietário. */
-function inquilinoPagaIptu(d, imovelId, comp) {
-  return d.contratos.find((c) => c.imovel_id === imovelId && c.ativo !== false && c.cobrar_iptu
-    && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0) || null;
+/** Inquilino que paga a parcela n no boleto (e em qual competência), ou null quando fica com o proprietário. */
+function inquilinoDaParcela(d, p, n) {
+  for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+    const comp = competenciaDaParcela(p, n, c);
+    if (comp && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return { contrato: c, comp };
+  }
+  return null;
 }
 
 /**
  * Parcelas do IPTU na prefeitura, com quem arca com cada uma (inquilino no boleto ou proprietário, quando o
  * imóvel está vazio ou o IPTU não é cobrado) e se o proprietário já pagou.
- * Quitado à vista: uma linha só (cota única).
+ * Quitado à vista: uma linha só (cota única, com o valor pago à vista).
  */
 export function parcelasIptu(d, p) {
   if (p.pago_avista) {
-    return [{ n: 0, rotulo: 'Cota única', comp: p.primeira_competencia || `${p.ano}-02`, valor: p.valor_avista || p.valor_total,
+    return [{ n: 0, rotulo: 'Cota única', comp: null, valor: p.valor_avista || p.valor_total,
       vencimento: p.vencimento_primeira || null, proprietario: true, paga: p.data_quitacao || null }];
   }
-  const valores = p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : C.parcelas(p.valor_total, p.num_parcelas);
-  return valores.map((valor, i) => {
-    const comp = C.somarMeses(p.primeira_competencia, i);
-    const inq = inquilinoPagaIptu(d, p.imovel_id, comp);
-    return { n: i + 1, rotulo: `${i + 1}ª`, comp, valor, inquilino: inq,
-      vencimento: p.vencimento_primeira ? C.somarMesesData(p.vencimento_primeira, i) : null,
-      proprietario: !inq, paga: (p.pagas || {})[i + 1] || null };
+  return valoresIptu(p).map((valor, i) => {
+    const quem = inquilinoDaParcela(d, p, i + 1);
+    return { n: i + 1, rotulo: `${i + 1}ª`, comp: quem ? quem.comp : null, mesBoleto: mesBoletoDaParcela(p, i + 1), valor, inquilino: quem ? quem.contrato : null,
+      vencimento: vencimentoParcela(p, i + 1), proprietario: !quem, paga: (p.pagas || {})[i + 1] || null };
   });
 }
 
@@ -349,7 +387,7 @@ export function alertasIptu(d, hoje = C.hojeIso()) {
     if (!i) continue;
     for (const pc of parcelasIptu(d, p)) {
       if (!pc.proprietario || pc.paga) continue;
-      const venc = pc.vencimento || `${pc.comp}-10`;
+      const venc = pc.vencimento || `${mesBoletoDaParcela(p, Math.max(pc.n, 1)) || (p.primeira_competencia ? C.somarMeses(p.primeira_competencia, Math.max(pc.n, 1)) : `${p.ano}-02`)}-10`;
       const faltam = C.diasEntre(hoje, venc);
       if (faltam > 15) continue;
       lista.push({ nivel: faltam < 0 ? 'perigo' : 'aviso', tipo: 'IPTU do proprietário', imovel_id: i.id, imovel: i.nome, inquilino: '', ancora: 'iptu',
@@ -389,7 +427,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
   const iptuRots = [];
   if (contrato.cobrar_iptu && cobra('iptu')) {
     for (const p of d.iptus.filter((i) => i.imovel_id === contrato.imovel_id)) {
-      const [n, v] = iptuNaCompetencia(p, comp);
+      const [n, v] = iptuNaCompetencia(p, comp, contrato);
       if (n) {
         // no mês de entrada ou saída, o IPTU também é proporcional aos dias, como o aluguel
         iptu += C.aluguelProporcional(v, dias, diasMes);
@@ -796,7 +834,7 @@ const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_apelido', 
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
-  'cobrar_iptu', 'cobrar_seguro', 'gerar_nf', 'garantia_tipo'];
+  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo'];
 
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
@@ -1006,7 +1044,8 @@ export function resultadosFinanceiros(d, de, ate) {
   const meses = Math.max(1, C.mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
   const dentro = (x) => x && x >= de && x <= ate;
   return d.imoveis.map((i) => {
-    const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id).map((c) => c.id));
+    // boleto de controle (inquilino sem NF) não entra no resultado financeiro
+    const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
     const pagas = d.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
     const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
     const avulsas = d.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
