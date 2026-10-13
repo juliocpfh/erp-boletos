@@ -199,3 +199,33 @@ tr.linha-controle td { background: #faf8ff; }
 .nf-externa[open] { display: block; margin-top: 6px; }
 .nf-externa summary { display: inline; cursor: pointer; list-style: none; }
 .nf-externa summary::-webkit-details-marker { display: none; }
+
+/* Contrato de locação gerado pelo modelo: logo de fundo bem suave, logo pequena na capa e as empresas no rodapé */
+.contrato { position: relative; background: #fff; max-width: 820px; margin: 0 auto; padding: 48px 64px 90px; border: 1px solid var(--borda);
+  font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.55; color: #111; overflow: hidden; }
+.contrato .ct-marca { position: absolute; top: 380px; left: 50%; width: 60%; transform: translateX(-50%); opacity: .07; pointer-events: none; z-index: 0; }
+.contrato > *:not(.ct-marca) { position: relative; z-index: 1; }
+.contrato .ct-capa { text-align: center; margin: 0 0 18px; }
+.contrato .ct-capa img { max-width: 150px; max-height: 70px; }
+.contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
+.contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
+.contrato .ct-par { text-align: justify; text-indent: 1cm; margin: 0 0 9px; }
+.contrato .ct-direita { text-align: right; margin: 22px 0 30px; }
+.contrato .ct-rodape { position: absolute; bottom: 24px; left: 64px; right: 64px; border-top: 1px solid #999; padding-top: 5px; text-align: center; font-size: 11px; color: #666; }
+.contrato .ct-pagina, .contrato .ct-pagina td { border: 0; padding: 0; width: 100%; border-collapse: collapse; background: none; }
+.contrato .ct-pagina td { display: block; }
+.contrato .ct-espaco-rodape { height: 0; }
+.ct-assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 42px 40px; margin-top: 30px; }
+.ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
+.ct-assina .ct-linha { border-top: 1px solid #111; margin: 40px 0 6px; }
+textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
+@media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-assinaturas { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
+@media print {
+  @page { size: A4; margin: 2.2cm 2.2cm 1.2cm 2.8cm; }
+  .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
+  .contrato .ct-marca { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
+  /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
+  .contrato .ct-pagina td { display: table-cell; }
+  .contrato .ct-espaco-rodape { height: 1.5cm; }
+  .contrato .ct-rodape { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; }
+}

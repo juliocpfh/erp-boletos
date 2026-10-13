@@ -29,6 +29,7 @@ export const IMOVEL = [
   campo('sanepar_matricula', 'Matrícula Sanepar'),
   campo('sanepar_hidrometro', 'Código do hidrômetro Sanepar'),
   campo('administradora_nome', 'Administradora do condomínio'),
+  campo('area_comum', 'Pátio e portão eletrônico de uso comum', 'simnao', { ajuda: 'Marcado: o contrato inclui as cláusulas de frente desobstruída, pátio comum e portão eletrônico' }),
   campo('gas_relogio', 'Relógio de gás (nº / identificação)'),
   campo('internet', 'Contrato de internet ou nº do telefone'),
   secao('Área e energia'),
@@ -88,6 +89,18 @@ export const VINCULO = [
   ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
 ];
 
+/** Qualificação da pessoa no contrato (nacionalidade, estado civil, profissão, nascimento, endereço). */
+export const GENEROS = ['Masculino', 'Feminino'];
+export const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'Separado(a)', 'União estável'];
+const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
+  campo(`${prefixo}genero`, 'Sexo (para o contrato)', 'opcao', { opcoes: GENEROS, ...extra }),
+  campo(`${prefixo}nacionalidade`, 'Nacionalidade', 'texto', { padrao: 'brasileira', ...extra }),
+  campo(`${prefixo}estado_civil`, 'Estado civil', 'opcao', { opcoes: ESTADOS_CIVIS, ...extra }),
+  campo(`${prefixo}profissao`, 'Profissão', 'texto', extra),
+  campo(`${prefixo}nascimento`, 'Data de nascimento', 'data', extra),
+  ...(comEndereco ? [campo(`${prefixo}endereco`, 'Endereço (residência ou comercial)', 'texto', { largo: true, ...extra })] : []),
+];
+
 export const FIADOR = [
   campo('nome', 'Nome', 'texto', { obrig: true, largo: true }),
   campo('cpf', 'CPF'),
@@ -95,6 +108,8 @@ export const FIADOR = [
   campo('telefone', 'Telefone', 'tel'),
   campo('email', 'E-mail', 'email'),
   campo('endereco', 'Endereço', 'texto', { largo: true }),
+  ...qualificacao('', {}, false),
+  campo('imovel_garantia', 'Imóvel do fiador (endereço, matrícula e registro)', 'area', { largo: true, ajuda: 'Ex.: Rua Abílio Peixoto, 359, Curitiba/PR, matrícula 53.271 da 9ª Circunscrição. Aparece no contrato' }),
   campo('data_entrada', 'Início do vínculo', 'data', { ajuda: 'Em branco: desde o início do contrato' }),
   campo('data_saida', 'Fim do vínculo', 'data', { ajuda: 'Em branco: até o fim do contrato. Depois desta data vai para "Fiadores anteriores"' }),
   campo('observacoes', 'Observações', 'area'),
@@ -125,6 +140,8 @@ export const CONTRATO = [
   campo('inquilino_email', 'E-mail', 'email'),
   campo('inquilino_cpf', 'CPF / CNPJ'),
   campo('inquilino_rg', 'RG / inscrição estadual'),
+  ...qualificacao('inquilino_', quando('inquilino_tipo', 'Pessoa física'), false),
+  campo('inquilino_endereco', 'Endereço (residência, comercial ou sede da empresa)', 'texto', { largo: true }),
   campo('responsavel_nome', 'Outro contato (se houver)'),
   campo('responsavel_telefone', 'Telefone do contato', 'tel'),
   campo('responsavel_email', 'E-mail do contato', 'email'),
@@ -134,6 +151,7 @@ export const CONTRATO = [
   campo('representante_cpf', 'CPF do representante', 'texto', PJ),
   campo('representante_rg', 'RG do representante', 'texto', PJ),
   campo('representante_cargo', 'Cargo', 'texto', PJ),
+  ...qualificacao('representante_', PJ),
   campo('representante_telefone', 'Telefone do representante', 'tel', PJ),
   campo('representante_email', 'E-mail do representante', 'email', PJ),
   secao('Inquilino solidário'),
@@ -143,6 +161,7 @@ export const CONTRATO = [
   campo('solidario_rg', 'RG do solidário', 'texto', SOLIDARIO),
   campo('solidario_telefone', 'Telefone do solidário', 'tel', SOLIDARIO),
   campo('solidario_email', 'E-mail do solidário', 'email', SOLIDARIO),
+  ...qualificacao('solidario_', SOLIDARIO),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'] }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', quando('garantia_tipo', 'Caução')),
@@ -156,12 +175,16 @@ export const CONTRATO = [
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
+  secao('Objeto da locação (para o contrato)'),
+  campo('finalidade', 'Finalidade', 'opcao', { padrao: 'Residencial', opcoes: ['Residencial', 'Não residencial'] }),
+  campo('atividade', 'Atividade do estabelecimento', 'texto', { ...quando('finalidade', 'Não residencial'), ajuda: 'Ex.: studio de beleza' }),
+  campo('descricao_objeto', 'Descrição do imóvel no contrato', 'texto', { largo: true, ajuda: 'Ex.: um apartamento mobiliado, com utensílios de cozinha e decoração; ou uma loja comercial, sem vaga de garagem' }),
   secao('Datas e prazo'),
   campo('data_entrada', 'Data de entrada', 'data', { obrig: true }),
   campo('data_saida', 'Data de saída', 'data', { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
   campo('vigencia_inicio', 'Início do contrato', 'data', { obrig: true }),
   campo('prazo_tipo', 'Prazo', 'opcao', { obrig: true, padrao: 'Determinado', opcoes: ['Determinado', 'Indeterminado'] }),
-  campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ...quando('prazo_tipo', 'Determinado'), ajuda: 'Ex.: 30. O fim do contrato é calculado a partir do início' }),
+  campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ...quando('prazo_tipo', 'Determinado'), ajuda: 'Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia)' }),
   campo('renovacao_automatica', 'Renovação automática', 'simnao'),
   secao('Valores e boleto'),
   campo('aluguel_inicial', 'Aluguel inicial (valor cheio, histórico)', 'dinheiro', { obrig: true }),
@@ -309,6 +332,13 @@ export const EMITENTE = [
   campo('municipio', 'Município do serviço', 'texto', { padrao: 'CURITIBA' }),
   campo('aba_modelo', 'Aba no modelo Excel', 'texto', { ajuda: 'Nome da aba do modelo para esta empresa (ex.: ANK)' }),
   campo('ativo', 'Ativa', 'simnao', { padrao: true }),
+  secao('Para o contrato de locação'),
+  campo('endereco_sede', 'Endereço da sede (por extenso)', 'texto', { largo: true, ajuda: 'Ex.: Rua Professor Nilo Brandão, nº 117, São Lourenço, Curitiba, Paraná' }),
+  campo('representante_nome', 'Representante que assina', 'texto', { largo: true, ajuda: 'Ex.: AIDA APARECIDA NUNES KRASINSKI' }),
+  campo('representante_cargo', 'Cargo do representante', 'texto', { padrao: 'sócia administradora' }),
+  campo('representante_rg', 'RG do representante'),
+  campo('representante_cpf', 'CPF do representante'),
+  ...qualificacao('representante_', {}, false),
 ];
 
 export const USUARIO = [

@@ -87,9 +87,12 @@ test('valores digitados com milhar sem centavos e prazo em meses', () => {
   assert.equal(C.centavos('1.350'), 135000);
   assert.equal(C.centavos('12.345.678'), 1234567800);
   assert.equal(C.centavos('1.35'), 135);
-  assert.equal(C.fimDoPrazo('2025-02-01', 30), '2027-07-31');
-  assert.equal(C.fimDoPrazo('2024-01-31', 1), '2024-02-28');
-  assert.equal(C.mesesDoPrazo('2025-02-01', '2027-07-31'), 30);
+  // o término é o mesmo dia, X meses depois (05/09/2026 + 30 meses = 05/03/2029)
+  assert.equal(C.fimDoPrazo('2025-02-01', 30), '2027-08-01');
+  assert.equal(C.fimDoPrazo('2026-09-05', 30), '2029-03-05');
+  assert.equal(C.fimDoPrazo('2024-01-31', 1), '2024-02-29');
+  assert.equal(C.mesesDoPrazo('2025-02-01', '2027-08-01'), 30);
+  assert.equal(C.mesesDoPrazo('2025-02-01', '2027-07-31'), 30, 'contratos antigos, que terminavam um dia antes');
   assert.equal(C.mesesDoPrazo('2024-09-01', '2027-09-01'), 36);
 });
 

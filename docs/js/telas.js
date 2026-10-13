@@ -6,8 +6,10 @@ import {
 import * as S from './armazenamento.js';
 import { conferirSenha, novoSal, PAPEIS, resumoSenha } from './auth.js';
 import * as C from './calculos.js';
+import * as K from './contratos.js';
 import { faturaExcel, faturaHtml, linhasObservacoes } from './fatura.js';
 import * as F from './formularios.js';
+import { MODELOS_PADRAO } from './modelos-contrato.js';
 import * as R from './regras.js';
 
 const { esc } = F;
@@ -293,6 +295,9 @@ export const TELAS = {
   reajustes: (rota) => telaReajustes(rota.q),
   calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
+  'contrato-gerar': (rota) => telaGerarContrato(rota),
+  'modelos-contrato': () => telaModelos(),
+  'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
@@ -602,6 +607,7 @@ function telaContrato(c) {
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
+      ${link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
@@ -1565,6 +1571,16 @@ function telaImprimir(rota) {
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${cartaReajuste(c, rota.q.comp)}</div>`;
   }
+  if (tipo === 'contrato') {
+    const m = contratoMontado(rota.q);
+    if (!m) return '<p>Inquilino não encontrado.</p>';
+    const falta = K.pendenciasDoContrato(d(), m.c);
+    return `<div class="impressao">
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('contratoWord', 'Baixar Word', {}, 'secundario')}
+        <a class="botao secundario" href="#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}">Voltar</a></div>
+      ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
+      ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.dados.rodape })}</div>`;
+  }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
@@ -1581,13 +1597,134 @@ function telaImprimir(rota) {
 }
 
 // --------------------------------------------------------------------------
+// Contrato de locação gerado a partir de um modelo
+// --------------------------------------------------------------------------
+/** Testemunhas usadas da última vez (só neste computador). */
+function testemunhasLembradas() {
+  try { return JSON.parse(localStorage.getItem('testemunhas_contrato')) || {}; } catch { return {}; }
+}
+
+function contratoMontado(q) {
+  const c = buscar('contratos', q.contrato);
+  if (!c) return null;
+  const modelos = K.modelosDe(d());
+  const modelo = modelos.find((m) => m.id === Number(q.modelo)) || modelos[0];
+  const testemunhas = [[q.t1, q.c1], [q.t2, q.c2]].map(([nome, cpf]) => ({ nome: nome || '', cpf: cpf || '' }));
+  const dados = K.dadosDoContrato(d(), c, { data: q.data || C.hojeIso(), testemunhas });
+  return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
+}
+
+function telaGerarContrato(rota) {
+  const c = buscar('contratos', rota.partes[1]);
+  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  const modelos = K.modelosDe(d());
+  const naoRes = c.finalidade === 'Não residencial';
+  const sugerido = Number(rota.q.modelo) || (modelos.find((m) => /n[ãa]o residencial|comercial/i.test(m.nome) === naoRes) || modelos[0]).id;
+  const t = testemunhasLembradas();
+  const falta = K.pendenciasDoContrato(d(), c);
+  const garantia = c.garantia_tipo || 'Sem garantia';
+  return `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Gerar contrato de locação</h1>
+    ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o contrato sai com o espaço em branco): ${falta.map(esc).join('; ')}.
+      ${opera() ? ` ${link(`#/editar/contratos/${c.id}`, 'Completar o cadastro')}` : ''}</div>` : '<div class="alerta ok">Cadastro completo para o contrato.</div>'}
+    <form class="cartao formulario" data-form="gerarContrato">
+      <input type="hidden" name="contrato" value="${c.id}">
+      <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>
+      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc(rota.q.data || C.hojeIso())}"></div>
+      <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
+      <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+      <div class="check"><button>Ver contrato</button></div></form>
+    <div class="cartao"><h2>O que entra automaticamente</h2>
+      <p>Finalidade: <b>${esc(c.finalidade || 'Residencial')}</b> · Garantia: <b>${esc(garantia)}</b>${c.solidario_nome ? ' · com locatário solidário' : ''} ·
+        Locadoras: <b>${esc(K.dadosDoContrato(d(), c).locadoras.map((e) => e.nome).join(' e '))}</b></p>
+      <p class="suave">As partes, valores por extenso, prazo, índice, encargos, garantia e assinaturas vêm do cadastro. Na tela do contrato, use <b>Imprimir / salvar em PDF</b> ou <b>Baixar Word</b> para ajustar algum detalhe antes de assinar.
+        Os textos ficam em ${link('#/modelos-contrato', 'Modelos de contrato', '')}.</p></div>`;
+}
+
+const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um modelo</b></summary>
+  <ul>
+    <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
+      {finalidade} {atividade} {prazo_meses} {data_inicio} {data_fim} {aluguel_cheio} {aluguel_bonificado} {bonificacao_percentual} {dia_vencimento} {indice}
+      {multa} {juros} {tarifa_boleto} {encargos_inquilino} {encargos_inclusos} {caucao_valor} {caucao_meses} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>.</li>
+    <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
+      <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto
+      area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
+    <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
+    <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
+      <code>#i.</code> numera os itens do início.</li>
+    <li>Linha começando com <code># </code>: título; <code>## </code>: seção; <code>&gt; </code>: alinhado à direita. <code>**texto**</code>: negrito.
+      Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
+  </ul></details>`;
+
+function telaModelos() {
+  const salvos = d().modelos_contrato.length > 0;
+  const modelos = K.modelosDe(d());
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? link('#/modelo-contrato/novo', 'Novo modelo', 'botao') : ''}</div>
+    <div class="cartao"><table><tr><th>Modelo</th><th></th></tr>
+    ${modelos.map((m) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
+      ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
+      ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
+      ${podeUsuario('admin') && salvos ? botao('excluirModelo', 'Excluir', { id: m.id }, 'perigo pequeno', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`).join('')}</table>
+    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>. Edite à vontade: os modelos ficam guardados no banco de dados${salvos ? '' : ' (por enquanto, os padrões do sistema)'}.</p></div>
+    ${AJUDA_MODELO}`;
+}
+
+function telaModelo(rota) {
+  const id = rota.partes[1];
+  const m = id === 'novo' ? { id: '', nome: '', texto: '' } : K.modelosDe(d()).find((x) => String(x.id) === id);
+  if (!m) return '<h1>Modelo não encontrado</h1>';
+  return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
+    <h1>${m.id === '' ? 'Novo modelo de contrato' : `Modelo: ${esc(m.nome)}`}</h1>
+    <form class="cartao" data-form="modeloContrato">
+      <input type="hidden" name="id" value="${esc(m.id)}">
+      <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>
+      <p><label>Texto</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
+      <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-contrato">Cancelar</a></div></form>
+    ${AJUDA_MODELO}`;
+}
+
+/** Na primeira alteração, os modelos padrão passam a ficar no banco (e podem ser editados). Devolve o id real. */
+function modelosNoBanco(db, id) {
+  if (!db.modelos_contrato.length) {
+    for (const p of MODELOS_PADRAO) R.inserir(db, 'modelos_contrato', { nome: p.nome, texto: p.texto, padrao: p.nome }, login(), `Modelo de contrato "${p.nome}" (padrão)`);
+  }
+  if (id < 0) {
+    const p = MODELOS_PADRAO[-id - 1];
+    const m = p && db.modelos_contrato.find((x) => x.padrao === p.nome);
+    return m ? m.id : null;
+  }
+  return id;
+}
+
+/** Logo do banco (data URL) → PNG em bytes e tamanho, para o Word. */
+async function logoPng() {
+  if (!d().logo) return null;
+  const img = new Image();
+  img.src = d().logo;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const g = canvas.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const png = async () => new Uint8Array(await (await new Promise((ok) => canvas.toBlob(ok, 'image/png'))).arrayBuffer());
+  const bytes = await png();
+  // marca-d'água: a mesma logo quase transparente (7%), para ficar suave em qualquer leitor de Word
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  g.globalAlpha = 0.07;
+  g.drawImage(img, 0, 0);
+  return { bytes, marca: await png(), largura: canvas.width, altura: canvas.height };
+}
+
+// --------------------------------------------------------------------------
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 function telaEmpresas() {
   return `<div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
-    <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
-    ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
-    || '<tr><td colspan="6" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
+    <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
+    ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
     <div class="cartao"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema.</p>
@@ -1640,6 +1777,7 @@ async function telaDados() {
       <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
       <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
       ${window.VERSAO_OFFLINE ? '' : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
+    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
@@ -1678,6 +1816,28 @@ async function reduzirImagem(arquivo) {
 }
 
 export const FORMULARIOS = {
+  gerarContrato(form) {
+    const f = Object.fromEntries(new FormData(form));
+    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== ''));
+    ir(`#/imprimir/contrato?${q}`);
+  },
+
+  async modeloContrato(form) {
+    const f = new FormData(form);
+    const nome = String(f.get('nome') || '').trim();
+    const texto = String(f.get('texto') || '');
+    if (!nome || !texto.trim()) throw new Error('Preencha o nome e o texto do modelo.');
+    const id = Number(f.get('id') || 0);
+    await alterar((db) => {
+      const real = id ? modelosNoBanco(db, id) : null;
+      if (real) R.atualizar(db, 'modelos_contrato', real, { nome, texto }, login(), `Modelo de contrato "${nome}"`);
+      else R.inserir(db, 'modelos_contrato', { nome, texto }, login(), `Modelo de contrato "${nome}"`);
+    });
+    aviso('Modelo salvo.');
+    ir('#/modelos-contrato');
+  },
+
   async primeiroAcesso(form) {
     const f = new FormData(form);
     const nome = String(f.get('nome')).trim();
@@ -1995,6 +2155,44 @@ export const ACOES = {
   reabrir: () => reabrirPastaLembrada(),
   sair: () => sair(),
   imprimir: () => window.print(),
+
+  async contratoWord() {
+    const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
+    const m = contratoMontado(q);
+    if (!m) throw new Error('Inquilino não encontrado.');
+    const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
+    const i = buscar('imoveis', m.c.imovel_id);
+    const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.dados.rodape, titulo: `Contrato de locação - ${m.c.inquilino_nome}` });
+    baixar(blob, `Contrato - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+  },
+
+  async copiarModelo({ id }) {
+    let novo;
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', modelosNoBanco(db, Number(id)));
+      novo = R.inserir(db, 'modelos_contrato', { nome: `Cópia de ${m.nome}`, texto: m.texto }, login(), `Modelo de contrato "Cópia de ${m.nome}"`);
+    });
+    ir(`#/modelo-contrato/${novo.id}`);
+  },
+
+  async restaurarModelo({ id }) {
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', Number(id));
+      const p = MODELOS_PADRAO.find((x) => x.nome === m.padrao);
+      R.atualizar(db, 'modelos_contrato', m.id, { texto: p.texto }, login(), `Modelo de contrato "${m.nome}" voltou ao texto padrão`);
+    });
+    aviso('Texto padrão restaurado.');
+    await mostrar();
+  },
+
+  async excluirModelo({ id }) {
+    if (!podeUsuario('admin')) throw new Error('Só administradores podem excluir modelos.');
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', Number(id));
+      if (m) R.excluir(db, 'modelos_contrato', m.id, login(), `Modelo de contrato "${m.nome}" excluído`);
+    });
+    await mostrar();
+  },
   voltar: () => history.back(),
 
   async excluir({ tabela, id }) {
