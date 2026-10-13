@@ -776,7 +776,8 @@ const CADASTROS = {
       // novo ano: parte do ano anterior (mesmas parcelas, 1ª parcela no mesmo mês)
       const ano = Number(q.ano) || new Date().getFullYear();
       const ant = d().iptus.filter((p) => p.imovel_id === Number(q.imovel) && p.ano < ano).sort((a, b) => b.ano - a.ano)[0];
-      return ant ? { ano, num_parcelas: ant.num_parcelas, vencimento_primeira: ant.vencimento_primeira ? C.somarAnos(ant.vencimento_primeira, ano - ant.ano) : null } : { ano };
+      return ant ? { ano, num_parcelas: ant.num_parcelas, primeira_competencia: ant.primeira_competencia ? `${ano}${ant.primeira_competencia.slice(4)}` : null,
+        vencimento_primeira: ant.vencimento_primeira ? C.somarAnos(ant.vencimento_primeira, ano - ant.ano) : null } : { ano };
     },
     aviso: (r, q) => {
       const iid = r ? r.imovel_id : Number(q.imovel);
@@ -1281,15 +1282,15 @@ function telaIptu(ano) {
     const varia = p && ant && ant.valor_total ? ((p.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace('.', ',') : null;
     const acao = !opera() ? '' : p ? link(`#/editar/iptus/${p.id}?de=iptu`, 'Editar') : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno');
     return `<tr class="${p ? '' : 'amarelo'}"><td><a href="#/imovel/${i.id}?ir=iptu">${esc(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
-      <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p && p.vencimento_primeira ? dataBr(p.vencimento_primeira) : p ? `<span class="suave">aluguel de ${compBr(p.primeira_competencia)}</span>` : '-'}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
+      <td class="n">${varia !== null ? `${varia}%` : '-'}</td><td>${p ? `${p.vencimento_primeira ? dataBr(p.vencimento_primeira) : '-'}<br><span class="suave">inquilino a partir do aluguel de ${compBr(p.primeira_competencia)}</span>` : '-'}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
   }).join('');
   const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
   const alertas = R.alertasIptu(d()).filter((a) => a.texto.includes(`IPTU ${ano}`));
   return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.imovel)}</b> ${esc(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join('')}
-    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>Vencimento da 1ª parcela</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
-    <p class="suave">Cada parcela entra sozinha no último boleto do inquilino que vence até a data da guia na prefeitura, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
+    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela: prefeitura / inquilino</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
+    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do primeiro mês de cobrança informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
 }
 
 function telaResultados(q) {
