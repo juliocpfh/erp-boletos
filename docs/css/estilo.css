@@ -264,3 +264,5 @@ input.doc-invalido { border-color: var(--perigo); }
 .grupo-baixa { border-top: 1px solid #bbf7d0; padding: 8px 0; }
 .lista-baixa { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0; }
 .lista-baixa .check-mini { font-weight: 400; }
+.historico-iptu { margin-top: 14px; border-top: 1px solid var(--borda); padding-top: 8px; }
+.historico-iptu summary { cursor: pointer; }

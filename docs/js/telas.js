@@ -78,20 +78,47 @@ export function nomePastaContrato(c) {
   return S.limparNome(`${c.inquilino_nome} (${fmt(c.data_entrada)} a ${fmt(c.data_saida)})`);
 }
 
+/** Guias do IPTU por ano: o id junta imóvel e ano (imóvel 5, 2026 → 52026), numa subpasta do ano. */
+const idGuiasDoAno = (imovelId, ano) => imovelId * 10000 + ano;
+function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(id / 10000) : id; }
+
 async function pastaDoEscopo(escopo, id) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'contrato') {
     const c = buscar('contratos', id);
     return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c)]);
   }
-  const i = buscar('imoveis', id);
+  const i = buscar('imoveis', imovelDoEscopo(escopo, id));
+  if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)]);
   return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS]);
 }
 
-function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false) {
+/**
+ * Primeiro IPTU lançado depois da separação por ano: as guias que estavam soltas na pasta do IPTU são do ano
+ * anterior, e vão para a pasta dele (se ele estiver lançado). Isso acontece uma vez só por imóvel; o que não
+ * tiver ano fica em "Guias anteriores", no histórico.
+ */
+async function guardarGuiasSoltas(imovelId, anoNovo) {
+  const imovel = buscar('imoveis', imovelId);
+  if (imovel.guias_iptu_por_ano) return 0;
+  await alterar((db) => R.atualizar(db, 'imoveis', imovelId, { guias_iptu_por_ano: true }, login(), 'Guias do IPTU separadas por ano'));
+  const anterior = d().iptus.filter((p) => p.imovel_id === imovelId && p.ano < anoNovo).sort((a, b) => b.ano - a.ano)[0];
+  if (!anterior) return 0;
+  const solta = await pastaDoEscopo('iptu', imovelId);
+  const arquivos = await S.listar(solta);
+  if (!arquivos.length) return 0;
+  const destino = await pastaDoEscopo('iptuano', idGuiasDoAno(imovelId, anterior.ano));
+  for (const a of arquivos) {
+    await S.salvarArquivo(destino, new File([await S.abrirArquivo(solta, a.nome)], a.nome));
+    await solta.removeEntry(a.nome);
+  }
+  return arquivos.length;
+}
+
+function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}</div>`;
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}</div>`;
 }
 
 const urls = [];
@@ -532,12 +559,17 @@ function tabelaIptu(p) {
 
 function caixaIptu(i) {
   const iptus = d().iptus.filter((p) => p.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
+  const ano = (p, atual) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
+      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
+      ${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}
+      ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Anexe aqui a guia (carnê) deste ano. Ao lançar o IPTU do próximo ano, estas guias passam para o histórico.' : '', true)}`;
+  const [atual, ...anteriores] = iptus;
   return `<div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, 'Lançar IPTU do ano') : ''}</div>
     <p class="suave">Quando o imóvel está vazio (ou o IPTU não é cobrado do inquilino), a parcela fica por conta do proprietário: marque aqui quando pagar. As parcelas em aberto aparecem nos alertas 15 dias antes do vencimento.</p>
-    ${iptus.map((p) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
-      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
-      ${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}`).join('') || '<p class="suave">Nenhum IPTU lançado.</p>'}
-    ${caixaArquivos('iptu', i.id, 'Guias do IPTU', 'guias-iptu', 'Anexe aqui a guia (carnê) do IPTU de cada ano.', true)}</div>`;
+    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? '' : caixaArquivos('iptu', i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, 'guias-iptu', '', true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos('iptu', i.id, 'Guias do IPTU', 'guias-iptu', 'Pode anexar a guia aqui; ao lançar o IPTU do ano ela vai para o histórico do ano anterior.', true)}`}
+    ${atual ? `<details class="historico-iptu"><summary><b>Histórico do IPTU</b> <span class="suave">· anos anteriores e as guias de cada ano (${anteriores.length} ano(s))</span></summary>
+      ${anteriores.map((p) => ano(p, false)).join('')}
+      ${i.guias_iptu_por_ano ? caixaArquivos('iptu', i.id, 'Guias anteriores', 'guias-iptu-anteriores', 'Guias anexadas antes de haver IPTU lançado por ano.', true, false) : ''}</details>` : ''}</div>`;
 }
 
 function caixaReformas(i) {
@@ -1095,6 +1127,15 @@ const CADASTROS = {
     voltar: (r, q) => (q && q.de === 'iptu' ? `#/iptu?ano=${r ? r.ano : q.ano}` : `#/imovel/${r ? r.imovel_id : q.imovel}`),
     destino: (salvo, q) => (q.de === 'iptu' ? `#/iptu?ano=${salvo.ano}` : `#/imovel/${salvo.imovel_id}`),
     descricao: (dados) => `IPTU ${dados.ano}`,
+    async depois(salvo, antigo) {
+      if (antigo) return;
+      try {
+        const n = await guardarGuiasSoltas(salvo.imovel_id, salvo.ano);
+        if (n) aviso(`${n} guia(s) já anexada(s) foram para o histórico do IPTU do ano anterior. Anexe a guia de ${salvo.ano} no IPTU ${salvo.ano}.`, 'info');
+      } catch (e) {
+        aviso(`Não consegui mover as guias antigas para o histórico: ${e.message}`, 'aviso');
+      }
+    },
   },
   titularidades: {
     titulo: (r, q) => `Troca de titularidade - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
@@ -3424,7 +3465,7 @@ export const ACOES = {
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
     for (const f of el.files) nomes.push(await S.salvarArquivo(dir, f));
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: Number(id) };
+    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
     await mostrar();
@@ -3443,7 +3484,7 @@ export const ACOES = {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const dir = await pastaDoEscopo(escopo, Number(id));
     await dir.removeEntry(nome);
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: Number(id) };
+    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
     await alterar((db) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `Arquivo excluído: ${nome}`, null, vinc));
     await mostrar();
   },
