@@ -1064,7 +1064,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   lista.push(...alertasIptu(d, hoje));
   for (const x of inadimplencia(d, hoje).devedores) {
     const i = buscar(d, 'imoveis', x.contrato.imovel_id);
-    lista.push({ nivel: x.diasMax > 30 ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
+    lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
       texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).` });
   }
   return lista.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
@@ -1323,6 +1323,8 @@ export function reajustesEntre(d, de, ate) {
 // --------------------------------------------------------------------------
 // Inadimplência: boletos vencidos e não pagos, por inquilino, e histórico de atrasos
 // --------------------------------------------------------------------------
+/** A partir de quantos dias de atraso o devedor fica em vermelho. */
+export const DIAS_VERMELHO = 5;
 /**
  * Devedores: inquilinos com boleto vencido e não pago (carência sem valor não conta), com o valor de hoje
  * (multa e juros até hoje). Histórico: pagamentos com atraso nos últimos 12 meses, para ver quem costuma atrasar.
