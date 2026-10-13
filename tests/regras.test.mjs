@@ -535,3 +535,20 @@ test('contas pagas por nós abatem do resultado do imóvel', () => {
   const fora = R.resultadosFinanceiros(d, '2026-08-01', '2026-08-31').find((x) => x.imovel.id === loja.id);
   assert.equal(fora.contas, 0, 'conta entra pela data do pagamento');
 });
+
+test('contas nossas: imóvel vago, até 2 meses depois de alugar, depois só as incluídas no contrato', () => {
+  const { d, loja } = base(); // inquilino entrou em 07/06/2026
+  const c = d.contratos[0];
+  assert.equal(R.contasPermitidas(d, loja.id, '2026-05').motivo, 'vago');
+  assert.equal(R.contasPermitidas(d, loja.id, '2026-06').motivo, 'vago', 'vago até o dia 6');
+  assert.equal(R.contasPermitidas(d, loja.id, '2026-07').motivo, 'alugou');
+  assert.equal(R.contasPermitidas(d, loja.id, '2026-08').motivo, 'alugou');
+  const set = R.contasPermitidas(d, loja.id, '2026-09');
+  assert.deepEqual([set.motivo, set.tipos], ['inquilino', []]);
+  c.conta_condominio = 'Incluso no aluguel';
+  assert.deepEqual(R.contasPermitidas(d, loja.id, '2026-09').tipos, ['Condomínio']);
+  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Água', valor: 5000 }], 'julio'), /inquilino paga Água/);
+  R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Condomínio', valor: 45000 }], 'julio');
+  c.data_saida = '2026-11-15';
+  assert.equal(R.contasPermitidas(d, loja.id, '2026-11').motivo, 'vago', 'mês da saída');
+});
