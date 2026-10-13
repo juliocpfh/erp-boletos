@@ -593,7 +593,7 @@ export function baseDaFatura(d, tipo, registro) {
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${C.compBr(registro.competencia)}`, observacoes: registro.observacoes_nf || '',
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
-      partes: participacoesDo(d, imovel.id), origem: `o imóvel "${imovel.nome}"`,
+      partes: participacoesDo(d, imovel.id), origem: `no imóvel "${imovel.nome}"`,
     };
   }
   if (tipo === 'avulsa') {
@@ -602,7 +602,7 @@ export function baseDaFatura(d, tipo, registro) {
       : (imovel ? participacoesDo(d, imovel.id) : d.emitentes.filter((e) => e.ativo)
         .map((e, _, l) => ({ emitente_id: e.id, percentual: 100 / l.length })));
     return {
-      imovel, valor: registro.valor, partes, origem: 'a NF avulsa',
+      imovel, valor: registro.valor, partes, origem: 'na NF avulsa',
       periodo_inicio: registro.periodo_inicio || registro.data_pagamento,
       periodo_fim: registro.periodo_fim || registro.data_pagamento,
       descricao: `Avulsa · ${registro.tomador_nome}${registro.descricao ? ` · ${registro.descricao}` : ''}`, observacoes: registro.observacoes_nf || '',
@@ -631,9 +631,9 @@ export function enderecoCompleto(imovel) {
 
 function problemaDaFatura(d, base) {
   const partes = base.partes;
-  if (!partes.length) return `Defina em ${base.origem} quais empresas emitem a NF.`;
+  if (!partes.length) return `Defina ${base.origem} quais empresas emitem a NF.`;
   const soma = partes.reduce((s, p) => s + p.percentual, 0);
-  if (Math.abs(soma - 100) > 1e-6) return `Os percentuais das empresas em ${base.origem} somam ${soma}%, e precisam somar 100%.`;
+  if (Math.abs(soma - 100) > 1e-6) return `Os percentuais das empresas ${base.origem} somam ${soma}%, e precisam somar 100%.`;
   if (!(base.valor > 0)) return `Valor da NF zerado em ${base.descricao}.`;
   return null;
 }
@@ -674,6 +674,40 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
     numeradas.push({ numero, ...p, descricao: base.descricao });
   }
   return { numeradas, foraDeOrdem: [], problema: null, ultima };
+}
+
+/**
+ * NF já emitida fora do sistema: registra o número (e a data de emissão) para um pagamento da fila, dividido entre
+ * as empresas como na numeração normal, sem gastar um número novo. Se o número passar do próximo da sequência,
+ * a sequência continua a partir dele.
+ */
+export function registrarNfExterna(d, tipo, id, numero, emissao, usuario) {
+  const n = Number(numero);
+  if (!Number.isInteger(n) || n < 1) throw new Error('Informe o número da NF.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(emissao || ''))) throw new Error('Informe a data de emissão da NF.');
+  if (d.faturas.some((f) => f.numero === n && f.situacao === 'Emitida')) throw new Error(`Já existe NF nº ${numeroFatura(n)} emitida no sistema.`);
+  const registro = buscar(d, tipo === 'cobranca' ? 'cobrancas' : 'avulsas', id);
+  if (!registro) throw new Error('Pagamento não encontrado.');
+  if (faturasDe(d, tipo, registro.id).length) throw new Error('Este pagamento já tem NF.');
+  if (tipo === 'cobranca' && !registro.data_pagamento) throw new Error('Confirme o pagamento antes.');
+  const base = baseDaFatura(d, tipo, registro);
+  const problema = problemaDaFatura(d, base);
+  if (problema) throw new Error(problema);
+  const valores = C.dividir(base.valor, base.partes.map((x) => x.percentual));
+  base.partes.forEach((parte, i) => {
+    const e = buscar(d, 'emitentes', parte.emitente_id);
+    inserir(d, 'faturas', {
+      numero: n, emissao, origem_tipo: tipo, origem_id: registro.id, emitente_id: e.id, percentual: parte.percentual, valor: valores[i],
+      periodo_inicio: base.periodo_inicio, periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
+      tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento, tomador_telefone: base.tomador.telefone,
+      tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', externa: true,
+    }, usuario, `NF nº ${numeroFatura(n)} emitida fora do sistema · ${e.nome} · ${base.descricao}`);
+  });
+  if (n >= d.proxima_fatura) {
+    registrar(d, usuario, 'Alteração', 'faturas', null, 'Próximo número de NF após NF emitida fora do sistema', { proxima_fatura: { de: d.proxima_fatura, para: n + 1 } });
+    d.proxima_fatura = n + 1;
+  }
+  return n;
 }
 
 /** Cancela as NFs de um número (o pagamento volta para a fila e recebe um número novo). O número não é reaproveitado. */
@@ -1028,6 +1062,11 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     if (i.verificar) lista.push({ nivel: 'aviso', tipo: 'A verificar', texto: i.verificar, imovel_id: i.id, imovel: i.nome, inquilino: '' });
   }
   lista.push(...alertasIptu(d, hoje));
+  for (const x of inadimplencia(d, hoje).devedores) {
+    const i = buscar(d, 'imoveis', x.contrato.imovel_id);
+    lista.push({ nivel: x.diasMax > 30 ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
+      texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).` });
+  }
   return lista.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
 }
 
@@ -1279,4 +1318,36 @@ export function reajustesEntre(d, de, ate) {
     }
   }
   return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
+}
+
+// --------------------------------------------------------------------------
+// Inadimplência: boletos vencidos e não pagos, por inquilino, e histórico de atrasos
+// --------------------------------------------------------------------------
+/**
+ * Devedores: inquilinos com boleto vencido e não pago (carência sem valor não conta), com o valor de hoje
+ * (multa e juros até hoje). Histórico: pagamentos com atraso nos últimos 12 meses, para ver quem costuma atrasar.
+ */
+export function inadimplencia(d, hoje = C.hojeIso()) {
+  const porContrato = new Map();
+  for (const cb of d.cobrancas) {
+    if (cb.data_pagamento || cb.situacao === 'Carência' || !(cb.vencimento < hoje)) continue;
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    if (!c) continue;
+    if (!porContrato.has(c.id)) porContrato.set(c.id, { contrato: c, boletos: [] });
+    const r = C.liquidar(cb, hoje);
+    porContrato.get(c.id).boletos.push({ cobranca: cb, dias: C.diasEntre(cb.vencimento, hoje), valor: totais(cb).a_pagar_sem_desconto, hojeValor: r.valor_devido });
+  }
+  const devedores = [...porContrato.values()].map((x) => ({ ...x,
+    boletos: x.boletos.sort((a, b) => a.cobranca.vencimento.localeCompare(b.cobranca.vencimento)),
+    total: x.boletos.reduce((s, b) => s + b.valor, 0), totalHoje: x.boletos.reduce((s, b) => s + b.hojeValor, 0),
+    diasMax: Math.max(...x.boletos.map((b) => b.dias)) })).sort((a, b) => b.diasMax - a.diasMax || b.totalHoje - a.totalHoje);
+  const desde = C.somarMeses(C.competenciaDe(hoje), -12);
+  const historico = d.contratos.filter((c) => contratoAtivo(c, hoje) && c.imovel_id).map((c) => {
+    const pagos = d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.data_pagamento && cb.vencimento.slice(0, 7) >= desde);
+    const atrasados = pagos.filter((cb) => cb.dias_atraso > 0);
+    return { contrato: c, pagos: pagos.length, atrasados: atrasados.length,
+      mediaDias: atrasados.length ? Math.round(atrasados.reduce((s, cb) => s + cb.dias_atraso, 0) / atrasados.length) : 0,
+      maiorAtraso: Math.max(0, ...atrasados.map((cb) => cb.dias_atraso)) };
+  }).filter((x) => x.atrasados).sort((a, b) => b.atrasados - a.atrasados || b.mediaDias - a.mediaDias);
+  return { devedores, historico, total: devedores.reduce((s, x) => s + x.total, 0), totalHoje: devedores.reduce((s, x) => s + x.totalHoje, 0) };
 }

@@ -193,3 +193,9 @@ tr.linha-controle td { background: #faf8ff; }
 .carta-tabela { margin: 14px 0; }
 .carta-tabela td, .carta-tabela th { padding: 6px 10px; }
 @media print { .carta { border: 0; padding: 0; } }
+
+/* NF emitida fora do sistema */
+.nf-externa { display: inline-block; text-align: left; }
+.nf-externa[open] { display: block; margin-top: 6px; }
+.nf-externa summary { display: inline; cursor: pointer; list-style: none; }
+.nf-externa summary::-webkit-details-marker { display: none; }
