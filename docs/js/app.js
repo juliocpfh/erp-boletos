@@ -129,17 +129,19 @@ export function carregarScript(url, global) {
     const s = document.createElement('script');
     s.src = url;
     s.onload = () => ok(window[global]);
-    s.onerror = () => erro(new Error('Sem internet para carregar um componente. Tente de novo.'));
+    s.onerror = () => erro(new Error('Não consegui carregar um componente do programa. Recarregue a página.'));
     document.head.appendChild(s);
   });
   return scripts[url];
 }
-export const excelJs = () => carregarScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js', 'ExcelJS');
-export const jsZip = () => carregarScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 'JSZip');
+// Componentes de terceiros ficam dentro do programa (pasta vendor): não dependem de outro site.
+// Na versão de arquivo único (sem internet) eles já vêm carregados e carregarScript só devolve o que existe.
+export const excelJs = () => carregarScript('vendor/exceljs.min.js', 'ExcelJS');
+export const jsZip = () => carregarScript('vendor/jszip.min.js', 'JSZip');
 export async function bibliotecasPdf() {
   const [h2c, jspdf] = await Promise.all([
-    carregarScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'html2canvas'),
-    carregarScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'jspdf'),
+    carregarScript('vendor/html2canvas.min.js', 'html2canvas'),
+    carregarScript('vendor/jspdf.umd.min.js', 'jspdf'),
   ]);
   return { html2canvas: h2c, jsPDF: jspdf.jsPDF };
 }
@@ -225,7 +227,7 @@ function rotaAtual() {
 function atualizarFaixa() {
   const el = document.getElementById('faixa');
   if (!el || !E.d) return;
-  el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta`;
+  el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split('-').reverse().join('/')}` : ''}`;
 }
 
 const MENU = [
