@@ -1,8 +1,9 @@
 // Telas do sistema (HTML), formulários e ações dos botões.
 import {
-  E, alterar, aviso, baixar, bibliotecasPdf, criarBanco, entrar, escolherPasta, excelJs, ir, jsZip, login, mostrar, podeUsuario,
-  reabrirPastaLembrada, renovarUsuario, sair,
+  E, alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, criarBanco, entrar, escolherPasta, excelJs, ir, jsZip, login, mostrar,
+  naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, renovarUsuario, sair,
 } from './app.js';
+import * as B from './backup-seguro.js';
 import * as S from './armazenamento.js';
 import { conferirSenha, novoSal, PAPEIS, resumoSenha } from './auth.js';
 import * as C from './calculos.js';
@@ -126,8 +127,12 @@ async function renomearNoDisco(paiPartes, antigo, novo) {
 // --------------------------------------------------------------------------
 // Telas de abertura
 // --------------------------------------------------------------------------
+const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
+
 export const TELAS = {
   _listaArquivos: listaArquivos,
+  restaurarBackup: () => telaRestaurarBackup(),
+  'backup-seguro': () => telaBackupSeguro(),
 
   _ligarDesconto(raiz) {
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
@@ -184,6 +189,7 @@ export const TELAS = {
       ${lembrada ? `<p><button data-acao="reabrir">Abrir a pasta "${esc(lembrada.name)}"</button></p><p class="suave">ou</p>` : ''}
       <p><button class="${lembrada ? 'secundario' : ''}" data-acao="escolherPasta">Escolher a pasta dos dados</button></p>
       <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>OneDrive\\Imoveis</b>, e escolha ela. Para usar os mesmos dados em outro computador, escolha lá a mesma pasta do OneDrive.</p>
+      ${LINK_RESTAURAR}
     </div></main>`;
   },
 
@@ -199,7 +205,7 @@ export const TELAS = {
       <p><label>Senha (mínimo 6 caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
       <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
       <button>Criar e entrar</button> ${botao('escolherPasta', 'Escolher outra pasta')}
-    </form></div></main>`,
+    </form>${LINK_RESTAURAR}</div></main>`,
 
   login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b></p>
@@ -207,7 +213,7 @@ export const TELAS = {
       <p><label>Login</label><input name="login" autofocus autocomplete="username"></p>
       <p><label>Senha</label><input type="password" name="senha" autocomplete="current-password"></p>
       <button>Entrar</button> ${botao('escolherPasta', 'Trocar de pasta')}
-    </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p></div></main>`,
+    </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
 
   pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Pedir acesso</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. O administrador recebe o pedido em Usuários e libera o acesso.</p>
@@ -234,6 +240,8 @@ export const TELAS = {
         ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/inadimplencia')}
         ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
       </div>
+      ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
+      ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
       <div class="cartao"><h2>Alertas</h2>
         ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
@@ -297,6 +305,7 @@ export const TELAS = {
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
   'modelos-contrato': () => telaModelos(),
+  vistoria: (rota) => telaVistoria(rota),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
@@ -404,7 +413,7 @@ function telaImovel(i) {
       ${item('UC Copel / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Matrícula Sanepar / Código hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
       ${item('Administradora do condomínio', esc(i.administradora_nome || '-'))}${item('Relógio de gás', esc(i.gas_relogio || '-'))}
       ${item('Internet / telefone', esc(i.internet || '-'))}
-      ${item('Pasta de arquivos', esc(i.pasta || '-'))}</div>
+      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Chaves e controles', i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
       <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th><th>NF ou controle</th></tr>
@@ -587,6 +596,34 @@ function caixaSeguros(i) {
     ${caixaArquivos('seguro', i.id, 'Apólices', 'apolices', 'Anexe aqui o PDF da apólice.', true)}</div>`;
 }
 
+/** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
+function caixaDocumentos(c) {
+  const hoje = C.hojeIso();
+  const vistorias = R.vistoriasDo(d(), c.id);
+  const entrada = vistorias.find((v) => v.tipo === 'Entrada');
+  const gerar = {
+    doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato'),
+    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria')} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar') : ''}`
+      : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada') : ''),
+    doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar recibo'),
+  };
+  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc(nome)}</b></td>
+    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'aviso' : 'neutra')}</td>
+    <td class="nw">${gerar[k]}</td>
+    <td class="n nw">${!opera() ? '' : c[k] ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente?`)
+    : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${hoje}" style="width:auto"><button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join('');
+  return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Documentos de entrada e vistorias</h2>
+      ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
+    <div class="rolagem"><table>${linhas}</table></div>
+    ${vistorias.length ? `<h3>Vistorias</h3><table><tr><th>Tipo</th><th>Data</th><th></th></tr>${vistorias.map((v) => `<tr><td>${esc(v.tipo)}</td><td>${dataBr(v.data)}</td>
+      <td class="n nw">${link(`#/imprimir/vistoria?id=${v.id}`, 'Ver / imprimir')} ${opera() ? link(`#/vistoria/${v.id}`, 'Editar') : ''}
+      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'vistorias', id: v.id }, 'perigo pequeno', `Excluir a vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')} de ${dataBr(v.data)}?`) : ''}</td></tr>`).join('')}</table>` : ''}
+    <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
+    : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
+    ${c.docs_entrada ? '' : '<p class="suave">Inquilino cadastrado antes deste controle: os documentos pendentes não geram alerta.</p>'}</div>`;
+}
+
 function telaContrato(c) {
   const i = buscar('imoveis', c.imovel_id);
   const hoje = C.hojeIso();
@@ -656,7 +693,7 @@ function telaContrato(c) {
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}
-    <div class="cartao" id="vistoria"><h2>Fotos da vistoria de entrada</h2>${c.vistoria_link ? `<p><a class="botao" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a></p><p class="suave">${esc(c.vistoria_link)}</p>` : `<p class="suave">Nenhum link cadastrado. Use "Editar" e cole o link da pasta na nuvem onde está o .rar das fotos.</p>`}</div>
+    ${caixaDocumentos(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ', contrato social e cartão CNPJ da empresa, documentos do representante' : ''}${c.solidario_nome ? ', documentos do inquilino solidário' : ''} etc.`)}
     <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>
     ${caixaSaida(c)}`;
@@ -760,7 +797,8 @@ const CADASTROS = {
       for (const n of [1, 2]) {
         const f = Object.fromEntries(F.CAMPOS_FIADOR.map((c) => [c.nome, dados[`fiador${n}_${c.nome}`] ?? null]));
         F.CAMPOS_FIADOR.forEach((c) => delete dados[`fiador${n}_${c.nome}`]);
-        const algum = Object.values(f).some((v) => v);
+        // a nacionalidade já vem preenchida ("brasileira"): sozinha não conta como fiador digitado
+        const algum = Object.entries(f).some(([k, v]) => v && k !== 'nacionalidade');
         if (!algum || !R.temFiador(dados)) continue;
         if (!f.nome) erros[`fiador${n}_nome`] = 'Informe o nome do fiador';
         else fiadoresNovos.push(f);
@@ -777,7 +815,7 @@ const CADASTROS = {
       if (r) {
         R.atualizar(db, 'contratos', r.id, dados, login(), dados.inquilino_nome);
         c = R.buscar(db, 'contratos', r.id);
-      } else c = R.inserir(db, 'contratos', dados, login(), dados.inquilino_nome);
+      } else c = R.inserir(db, 'contratos', { ...dados, docs_entrada: true }, login(), dados.inquilino_nome);
       for (const f of fiadoresNovos) R.inserir(db, 'fiadores', { ...f, contrato_id: c.id }, login(), `Fiador ${f.nome}`);
       fiadoresNovos = [];
       return c;
@@ -1571,15 +1609,18 @@ function telaImprimir(rota) {
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${cartaReajuste(c, rota.q.comp)}</div>`;
   }
-  if (tipo === 'contrato') {
-    const m = contratoMontado(rota.q);
-    if (!m) return '<p>Inquilino não encontrado.</p>';
+  if (['contrato', 'vistoria', 'chaves'].includes(tipo)) {
+    const m = documentoMontado(tipo, rota.q);
+    if (!m) return '<p>Registro não encontrado.</p>';
     const falta = K.pendenciasDoContrato(d(), m.c);
+    const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
     return `<div class="impressao">
-      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('contratoWord', 'Baixar Word', {}, 'secundario')}
-        <a class="botao secundario" href="#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}">Voltar</a></div>
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
+        ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
+        <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
-      ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.dados.rodape })}</div>`;
+      ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
+      ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
   }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
@@ -1612,6 +1653,86 @@ function contratoMontado(q) {
   const testemunhas = [[q.t1, q.c1], [q.t2, q.c2]].map(([nome, cpf]) => ({ nome: nome || '', cpf: cpf || '' }));
   const dados = K.dadosDoContrato(d(), c, { data: q.data || C.hojeIso(), testemunhas });
   return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
+}
+
+/** Contrato, vistoria ou recibo das chaves, prontos para a tela, o PDF e o Word. */
+function documentoMontado(tipo, q) {
+  if (tipo === 'contrato') {
+    const m = contratoMontado(q);
+    return m && { ...m, rodape: m.dados.rodape, nome: 'Contrato' };
+  }
+  if (tipo === 'vistoria') {
+    const v = buscar('vistorias', q.id);
+    const c = v && buscar('contratos', v.contrato_id);
+    if (!c) return null;
+    const momento = v.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
+    const leitura = R.leiturasDo(d(), c.id).find((l) => l.momento === momento) || null;
+    return { c, v, ...K.vistoriaBlocos(d(), c, v, leitura), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
+  }
+  const c = buscar('contratos', q.contrato);
+  if (!c) return null;
+  const chaves = chavesDoContrato(c);
+  return { c, temChaves: !!chaves.trim(), ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves' };
+}
+
+/** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
+function chavesDoContrato(c) {
+  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  return (entrada && entrada.chaves) || (buscar('imoveis', c.imovel_id) || {}).chaves || '';
+}
+
+/** Roteiro por cômodo: o que conferir em cada um (o que ficar sem preencher não sai no documento). */
+const ROTEIRO_BASE = ['Piso e rodapé', 'Paredes e teto (pintura, manchas, fissuras, furos)', 'Porta, fechadura e chave', 'Janela, vidros, grade e trinco',
+  'Tomadas e interruptores (quantidade e voltagem)', 'Iluminação (luminárias e lâmpadas)'];
+const ROTEIROS = {
+  Sala: [...ROTEIRO_BASE, 'Cortinas / persianas', 'Móveis e decoração (item, quantidade e estado)'],
+  Quarto: [...ROTEIRO_BASE, 'Guarda-roupa / armários (portas, gavetas, trilhos)', 'Cortina / blackout', 'Cama, colchão e roupa de cama', 'Outros móveis e decoração'],
+  Cozinha: [...ROTEIRO_BASE, 'Revestimento e rejunte', 'Pia, cuba e torneira', 'Armários (portas e gavetas)', 'Eletrodomésticos (marca, estado e funcionamento)', 'Utensílios (conforme fotos)'],
+  Banheiro: [...ROTEIRO_BASE, 'Revestimento e rejunte', 'Vaso sanitário, assento e descarga', 'Pia, gabinete e torneira', 'Box e chuveiro (voltagem / potência)', 'Ducha higiênica',
+    'Acessórios (papeleira, porta-toalhas, saboneteira, lixeira)', 'Espelho', 'Exaustor'],
+  Lavanderia: [...ROTEIRO_BASE, 'Tanque e torneiras', 'Varal', 'Quadro de disjuntores', 'Máquina de lavar e outros itens'],
+  Corredor: ['Piso e rodapé', 'Paredes e teto', 'Portas', 'Iluminação'],
+  Escada: ['Piso / degraus', 'Paredes e teto', 'Corrimão', 'Porta de acesso e trancas', 'Iluminação'],
+  'Área externa': ['Piso', 'Muros e pintura / textura', 'Tanque e torneiras externas', 'Tomadas externas', 'Iluminação', 'Caixa de gordura / esgoto'],
+  Fachada: ['Muros, portão e pintura', 'Beiral, calhas e rufos', 'Telhado', 'Forro externo', 'Grades e janelas', 'Iluminação e tomadas externas', 'Jardim, vasos e outros itens'],
+  Garagem: ['Piso', 'Portão eletrônico, controles e motor', 'Vagas (quantidade, marcadas ou não)', 'Iluminação', 'Depósito / outros'],
+};
+const roteiroTexto = (comodo) => `## ${comodo}\n${ROTEIROS[comodo].map((x) => `- ${x}: `).join('\n')}\n`;
+
+function telaVistoria(rota) {
+  const id = rota.partes[1];
+  const v = id === 'novo' ? null : buscar('vistorias', id);
+  if (id !== 'novo' && !v) return '<h1>Vistoria não encontrada</h1>';
+  const c = buscar('contratos', v ? v.contrato_id : rota.q.contrato);
+  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
+  const i = buscar('imoveis', c.imovel_id) || {};
+  const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
+  // ponto de partida: na saída, a vistoria de entrada deste inquilino; na entrada, a última vistoria do imóvel
+  const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
+  const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
+  const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
+  return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
+    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
+    ${tipo === 'Saída' ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
+    <form class="cartao" data-form="vistoria">
+      <input type="hidden" name="id" value="${v ? v.id : ''}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
+      <div class="formulario">
+        <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data)}" required></div>
+        <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
+        ${tipo === 'Entrada' ? `<div><label>Dias para o inquilino contestar</label><input type="number" name="prazo_dias" min="1" value="${esc(v ? v.prazo_dias || 3 : 3)}"></div>` : ''}
+      </div>
+      <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
+        <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
+      ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
+      <p><label>Descritivo do imóvel</label>
+        <span class="suave">Uma linha por item. <code>## SALA</code> abre um cômodo; <code>- item: estado</code> vira marcador. Item do roteiro que ficar sem preencher (termina em ":") não sai no documento.
+        Use sempre as mesmas palavras para o estado: <b>novo · ótimo estado · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
+        <span class="acoes" style="margin:8px 0">Inserir roteiro: ${Object.keys(ROTEIROS).map((k) => `<button type="button" class="secundario pequeno" data-acao="inserirRoteiro" data-comodo="${esc(k)}">${esc(k)}</button>`).join('')}</span>
+        <textarea name="descritivo" class="texto-modelo">${valor('descritivo')}</textarea></p>
+      <p><label>Condições gerais</label><textarea name="condicoes" rows="6">${valor('condicoes', K.VISTORIA_CONDICOES)}</textarea></p>
+      <div class="acoes"><button>Salvar e ver o documento</button><a class="botao secundario" href="#/contrato/${c.id}?ir=documentos">Cancelar</a></div></form>`;
 }
 
 function telaGerarContrato(rota) {
@@ -1718,6 +1839,65 @@ async function logoPng() {
 }
 
 // --------------------------------------------------------------------------
+// Backup seguro do administrador
+// --------------------------------------------------------------------------
+const tamanho = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+
+const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
+    <div><label>Arquivo de backup (.bkp)</label><input type="file" name="arquivo" accept="${B.EXTENSAO}"></div>
+    <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
+    <div class="check"><button>Abrir e baixar o ZIP</button></div></form>
+  <p class="suave">O backup aberto vira um ZIP igual ao do "Exportar tudo". Para voltar os dados: escolha a pasta dos dados (pode ser uma pasta nova e vazia), crie o administrador se pedir e use <b>Dados e backup → Importar ZIP</b>.
+    Os usuários e senhas antigos voltam junto. Se o programa também deu problema, abra a cópia dele que fica na pasta do backup seguro, em <b>${B.PASTA_PROGRAMA}</b>.</p>`;
+
+function telaRestaurarBackup() {
+  return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
+    <h1>Restaurar backup seguro</h1>
+    <p>Use em caso de erro geral: escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos; <b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia) e digite a senha do backup.</p>
+    ${FORM_RESTAURAR}
+    <p><a href="#/">Voltar</a></p></div></main>`;
+}
+
+async function telaBackupSeguro() {
+  if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
+  if (!E.seguro || !E.seguro.chave) {
+    const nova = E.pastaSeguraNova;
+    const chaveExistente = nova ? await B.lerChave(nova) : null;
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+      ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao('reconectarSeguro', 'Reconectar', {}, 'pequeno')}</div>` : ''}
+      <div class="cartao"><h2>1. Escolha a pasta segura</h2>
+        <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, no seu OneDrive pessoal ou num HD externo). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
+        <p>${botao('escolherPastaSegura', nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : 'Escolher a pasta segura', {}, nova ? 'secundario' : '')}</p></div>
+      ${nova ? `<div class="cartao"><h2>2. ${chaveExistente ? 'Digite a senha do backup' : 'Crie a senha do backup'}</h2>
+        ${chaveExistente ? `<p>Esta pasta já tem backups seguros (chave criada em ${new Date(chaveExistente.criada_em).toLocaleDateString('pt-BR')}). Digite a senha para ligar este computador a ela.</p>`
+    : '<div class="alerta aviso"><b>Guarde esta senha em local seguro.</b> Ela é pedida só para restaurar. Sem ela, nenhum backup pode ser aberto, nem por você nem pelo suporte. Use pelo menos 8 caracteres.</div>'}
+        <form data-form="configurarSeguro" class="formulario">
+          <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="new-password"></div>
+          ${chaveExistente ? '' : '<div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div>'}
+          <div class="check"><button>${chaveExistente ? 'Conectar' : 'Criar e fazer o primeiro backup'}</button></div></form></div>` : ''}
+      <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
+  }
+  const lista = await B.listarBackups(E.seguro.dir);
+  const ultimo = (pasta) => lista.find((x) => x.pasta === pasta);
+  const quando = (x) => (x ? new Date(x.alterado).toLocaleString('pt-BR') : 'nenhum ainda');
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+    ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ''}
+    <div class="cartao"><div class="grade">
+      ${item('Pasta segura (só neste computador)', esc(E.seguro.dir.name))}
+      ${item('Última cópia do banco', quando(ultimo(B.PASTA_DIARIO)))}
+      ${item('Último backup completo', quando(ultimo(B.PASTA_SEMANAL)))}
+      ${item('Guarda', `${B.MANTER_DIARIOS} cópias diárias, ${B.MANTER_SEMANAIS} completos semanais e 1 completo por mês durante ${B.MANTER_MENSAIS} meses`)}</div>
+      <p class="suave">A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.
+        O completo semanal é feito sozinho quando o sistema é aberto e já passou uma semana do último. Os arquivos são cifrados: sem a senha do backup ninguém consegue abrir.</p>
+      <div class="acoes">${botao('backupCompletoAgora', 'Fazer backup completo agora', {}, '')}
+        ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div></div>
+    <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
+    <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
+      ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${new Date(x.alterado).toLocaleString('pt-BR')}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
+}
+
+// --------------------------------------------------------------------------
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 function telaEmpresas() {
@@ -1777,6 +1957,10 @@ async function telaDados() {
       <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
       <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
       ${window.VERSAO_OFFLINE ? '' : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
+    ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.</p>
+      <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
+      ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
@@ -1816,6 +2000,77 @@ async function reduzirImagem(arquivo) {
 }
 
 export const FORMULARIOS = {
+  async configurarSeguro(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    const dir = E.pastaSeguraNova;
+    if (!dir) throw new Error('Escolha a pasta segura primeiro.');
+    const f = new FormData(form);
+    const senha = String(f.get('senha') || '');
+    let chave = await B.lerChave(dir);
+    if (chave) {
+      if (!(await B.conferirSenha(chave, senha))) throw new Error('Senha do backup incorreta.');
+    } else {
+      if (senha !== String(f.get('senha2') || '')) throw new Error('As duas senhas precisam ser iguais.');
+      chave = await B.criarChave(senha);
+      await B.gravarChave(dir, chave);
+    }
+    await S.lembrarPastaSegura(dir);
+    E.pastaSeguraNova = null;
+    await conectarSeguro(false);
+    await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, 'Backup seguro ligado neste computador', null, {}, false));
+    await backupCompletoSeguro();
+    aviso('Backup seguro ligado. Primeiro backup completo gravado.');
+    await mostrar();
+  },
+
+  async restaurarSeguro(form) {
+    const f = new FormData(form);
+    const arq = f.get('arquivo');
+    if (!arq || !arq.size) throw new Error('Escolha o arquivo de backup.');
+    const { info, dados } = await B.decifrar(await arq.arrayBuffer(), String(f.get('senha') || ''));
+    const data = (info.criado_em || '').slice(0, 10);
+    let blob;
+    if (info.tipo === 'completo') blob = new Blob([dados], { type: 'application/zip' });
+    else {
+      const JSZip = await jsZip();
+      const zip = new JSZip();
+      zip.file(S.ARQUIVO_BANCO, dados);
+      blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    }
+    baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
+    aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+  },
+
+  async marcarDocumento(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new Error('Informe a data.');
+    await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login()));
+    await mostrar();
+  },
+
+  async vistoria(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new Error('Informe a data da vistoria.');
+    const c = buscar('contratos', f.contrato);
+    const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
+      chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '' };
+    if (f.tipo === 'Entrada') dados.prazo_dias = Number(f.prazo_dias) || 3;
+    if (f.tipo === 'Saída') {
+      const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
+      dados.comparar_com = entrada ? entrada.data : null;
+    }
+    let id = Number(f.id) || null;
+    await alterar((db) => {
+      const desc = `${c.inquilino_nome}: vistoria de ${f.tipo.toLocaleLowerCase('pt-BR')}`;
+      if (id) R.atualizar(db, 'vistorias', id, dados, login(), desc);
+      else id = R.inserir(db, 'vistorias', dados, login(), desc).id;
+      if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim() }, login(), 'Chaves e controles do imóvel');
+      if (dados.link_fotos && f.tipo === 'Entrada' && !c.vistoria_link) R.atualizar(db, 'contratos', c.id, { vistoria_link: dados.link_fotos }, login(), `${c.inquilino_nome}: link das fotos da vistoria`);
+    });
+    aviso('Vistoria salva.');
+    ir(`#/imprimir/vistoria?id=${id}`);
+  },
+
   gerarContrato(form) {
     const f = Object.fromEntries(new FormData(form));
     try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
@@ -2096,6 +2351,7 @@ const TABELAS_EXCLUSAO = {
   seguros: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
+  vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
 };
 
 /** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
@@ -2156,14 +2412,65 @@ export const ACOES = {
   sair: () => sair(),
   imprimir: () => window.print(),
 
-  async contratoWord() {
-    const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
-    const m = contratoMontado(q);
-    if (!m) throw new Error('Inquilino não encontrado.');
+  async documentoWord() {
+    const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
+    const m = documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    if (!m) throw new Error('Registro não encontrado.');
     const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
     const i = buscar('imoveis', m.c.imovel_id);
-    const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.dados.rodape, titulo: `Contrato de locação - ${m.c.inquilino_nome}` });
-    baixar(blob, `Contrato - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+    const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.rodape, titulo: `${m.nome} - ${m.c.inquilino_nome}` });
+    baixar(blob, `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+  },
+
+  async escolherPastaSegura() {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    try {
+      E.pastaSeguraNova = E.teste ? await pastaSeguraDeTeste() : await window.showDirectoryPicker({ id: 'backup-seguro', mode: 'readwrite' });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      throw e;
+    }
+    if (E.pasta && (await E.pasta.isSameEntry(E.pastaSeguraNova))) {
+      E.pastaSeguraNova = null;
+      throw new Error('Escolha uma pasta diferente da pasta dos dados.');
+    }
+    await mostrar();
+  },
+
+  async reconectarSeguro() {
+    if (await conectarSeguro(true)) {
+      naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+      aviso('Backup seguro reconectado.');
+    } else aviso('O acesso à pasta segura não foi liberado.', 'erro');
+    await mostrar();
+  },
+
+  async backupCompletoAgora() {
+    aviso('Gravando o backup completo…', 'info');
+    await backupCompletoSeguro();
+    if (E.seguroErro) throw new Error(E.seguroErro);
+    aviso('Backup completo gravado na pasta segura.');
+    await mostrar();
+  },
+
+  async desconectarSeguro() {
+    await S.esquecerPastaSegura();
+    E.seguro = null;
+    aviso('Backup seguro desligado neste computador.');
+    await mostrar();
+  },
+
+  async desmarcarDocumento({ contrato, campo }) {
+    await alterar((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
+    await mostrar();
+  },
+
+  /** Vistoria: acrescenta o roteiro do cômodo no fim do descritivo. */
+  inserirRoteiro({ comodo }) {
+    const t = document.querySelector('textarea[name=descritivo]');
+    t.value = `${t.value.replace(/\s*$/, '')}${t.value.trim() ? '\n\n' : ''}${roteiroTexto(comodo)}`;
+    t.focus();
+    t.scrollTop = t.scrollHeight;
   },
 
   async copiarModelo({ id }) {
@@ -2208,7 +2515,7 @@ export const ACOES = {
         for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || reg.descricao || null);
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());

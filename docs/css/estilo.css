@@ -211,6 +211,8 @@ tr.linha-controle td { background: #faf8ff; }
 .contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
 .contrato .ct-par { text-align: justify; text-indent: 1cm; margin: 0 0 9px; }
 .contrato .ct-direita { text-align: right; margin: 22px 0 30px; }
+.contrato .ct-subsecao { font-size: 15px; margin: 16px 0 4px; }
+.contrato .ct-item { margin: 0 0 3px; }
 .contrato .ct-rodape { position: absolute; bottom: 24px; left: 64px; right: 64px; border-top: 1px solid #999; padding-top: 5px; text-align: center; font-size: 11px; color: #666; }
 .contrato .ct-pagina, .contrato .ct-pagina td { border: 0; padding: 0; width: 100%; border-collapse: collapse; background: none; }
 .contrato .ct-pagina td { display: block; }

@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -905,11 +905,11 @@ export function vincularInquilino(d, imovelId, dados, usuario) {
   const leitura = separarLeitura(dados);
   if (c.imovel_id) {
     const novo = Object.fromEntries([...CAMPOS_PESSOA, ...CAMPOS_CONDICOES].filter((k) => c[k] !== undefined).map((k) => [k, c[k]]));
-    Object.assign(novo, { imovel_id: i.id, data_entrada: dados.data_entrada, vigencia_inicio: dados.data_entrada, ativo: true });
+    Object.assign(novo, { imovel_id: i.id, data_entrada: dados.data_entrada, vigencia_inicio: dados.data_entrada, ativo: true, docs_entrada: true });
     if (novo.prazo_tipo !== 'Indeterminado' && novo.prazo_meses > 0) novo.vigencia_fim = C.fimDoPrazo(dados.data_entrada, novo.prazo_meses);
     c = inserir(d, 'contratos', novo, usuario, `${c.inquilino_nome}: novo contrato no imóvel ${i.nome} (também aluga outro imóvel)`);
   } else {
-    atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
+    atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
   }
   if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
   return c;
@@ -1009,8 +1009,37 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
+    alertaDocumentosEntrada(contrato),
   ].filter(Boolean);
 }
+
+// --------------------------------------------------------------------------
+// Documentos de entrada do inquilino: contrato, vistoria e recibo das chaves
+// --------------------------------------------------------------------------
+export const DOCUMENTOS_ENTRADA = [
+  ['doc_contrato_em', 'Contrato de locação', 'assinado'],
+  ['doc_vistoria_em', 'Vistoria de entrada', 'assinada'],
+  ['doc_chaves_em', 'Recibo de entrega das chaves', 'assinado'],
+];
+
+/** Inquilino novo (cadastrado a partir desta versão): avisa enquanto faltar algum dos três documentos. */
+export function alertaDocumentosEntrada(c) {
+  if (!c.docs_entrada || c.ativo === false || c.data_saida) return null;
+  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
+}
+
+export function marcarDocumento(d, contratoId, campo, data, usuario) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  atualizar(d, 'contratos', c.id, { [campo]: data || null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+const porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+export const vistoriasDo = (d, contratoId) => d.vistorias.filter((v) => v.contrato_id === contratoId).sort(porDataVistoria);
+/** Vistoria mais recente do imóvel (para começar a próxima a partir dela). */
+export const ultimaVistoriaDoImovel = (d, imovelId) => d.vistorias.filter((v) => v.imovel_id === imovelId).sort(porDataVistoria)[0] || null;
 
 /** Seguro obrigatório é do imóvel: só cobra apólice enquanto houver inquilino ativo nele. */
 export function alertaSeguroImovel(d, i, hoje = C.hojeIso()) {

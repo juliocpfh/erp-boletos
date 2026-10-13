@@ -315,6 +315,8 @@ export function contratoHtml(blocos, { logo, rodape }) {
     if (b.tipo === 'titulo') return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
     if (b.tipo === 'secao') return `<h2 class="ct-secao">${runsHtml(b.runs)}</h2>`;
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
+    if (b.tipo === 'subsecao') return `<h3 class="ct-subsecao">${runsHtml(b.runs)}</h3>`;
+    if (b.tipo === 'item') return `<p class="ct-item">${runsHtml(b.runs)}</p>`;
     if (b.tipo === 'assinaturas') {
       return `<div class="ct-assinaturas">${b.pessoas.map((p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escH(p.nome)}</b>${p.doc ? `<br>${escH(p.doc)}` : ''}${p.extra ? `<br>${escH(p.extra)}` : ''}<br>${escH(p.papel)}</div>`).join('')}</div>`;
     }
@@ -363,6 +365,8 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }));
     else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }));
     else if (b.tipo === 'direita') corpo.push(parX(b.runs, { alinhar: 'right', antes: 240, depois: 480 }));
+    else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }));
+    else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
     else if (b.tipo === 'assinaturas') {
       for (const p of b.pessoas) {
         corpo.push(parX([{ t: '_____________________________________________', b: false }], { alinhar: 'center', antes: 600, depois: 0 }));
@@ -413,3 +417,76 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
 
 /** Modelos do banco; na primeira vez, os padrões (Residencial e Não residencial). */
 export const modelosDe = (d) => (d.modelos_contrato && d.modelos_contrato.length ? d.modelos_contrato : MODELOS_PADRAO.map((m, i) => ({ id: -(i + 1), ...m })));
+
+// --------------------------------------------------------------------------
+// Vistoria e recibo de entrega das chaves (mesmo papel timbrado do contrato)
+// --------------------------------------------------------------------------
+export const VISTORIA_INTRO = 'O presente relatório acusará as condições do imóvel; a ausência de qualquer observação indicará que está funcionando sem avarias.';
+export const VISTORIA_CONDICOES = `Imóvel entregue limpo.
+Parte elétrica e hidráulica em perfeito funcionamento, exceto os pontos descritos acima.
+Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os pontos descritos acima e/ou registrados nas fotos da vistoria.`;
+
+const p = (t) => ({ tipo: 'paragrafo', runs: negritos(t) });
+const it = (t) => ({ tipo: 'item', runs: negritos(t) });
+const linhasDe = (texto) => String(texto || '').replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+
+/** Cabeçalho comum: imóvel, locadoras e locatário. */
+function cabecalhoDoc(d, c, dados) {
+  const imovel = d.imoveis.find((i) => i.id === c.imovel_id) || {};
+  const pj = c.inquilino_tipo === 'Pessoa jurídica (empresa)';
+  const descr = c.descricao_objeto ? `${c.descricao_objeto.charAt(0).toLocaleUpperCase('pt-BR')}${c.descricao_objeto.slice(1)}, no endereço ` : '';
+  return [
+    it(`**IMÓVEL:** ${descr}${dados.campos.endereco_imovel || imovel.nome || ''}`),
+    it(`**${dados.locadoras.length > 1 ? 'LOCADORAS' : 'LOCADORA'}:** ${dados.locadoras.map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}`).join('; ')}`),
+    it(`**LOCATÁRIO:** ${dados.campos.inquilino_nome}${c.inquilino_cpf ? `, ${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : ''}${c.solidario_nome ? `; **LOCATÁRIO SOLIDÁRIO:** ${c.solidario_nome.toLocaleUpperCase('pt-BR')}${c.solidario_cpf ? `, CPF ${c.solidario_cpf}` : ''}` : ''}`),
+  ];
+}
+
+/** Texto do descritivo: "## CÔMODO" vira subtítulo, "- item" vira marcador, as demais linhas ficam como estão. */
+export function descritivoBlocos(texto) {
+  // item do roteiro que ficou sem preencher ("- Piso e rodapé:") não sai no documento
+  return linhasDe(texto).filter((l) => !/^[-•*]\s+[^:]*:$/.test(l)).map((l) => {
+    if (l.startsWith('## ')) return { tipo: 'subsecao', runs: negritos(l.slice(3).toLocaleUpperCase('pt-BR')) };
+    if (/^[-•*]\s+/.test(l)) return it(`• ${l.replace(/^[-•*]\s+/, '')}`);
+    return it(l);
+  });
+}
+
+/**
+ * Vistoria de entrada ou de saída. ``v``: registro da tabela vistorias; ``leitura``: leitura dos relógios do dia (ou null).
+ * Assinam as locadoras, o locatário, o solidário e os fiadores.
+ */
+export function vistoriaBlocos(d, c, v, leitura = null) {
+  const dados = dadosDoContrato(d, c, { data: v.data });
+  const saida = v.tipo === 'Saída';
+  const blocos = [{ tipo: 'titulo', runs: negritos(`VISTORIA DE ${saida ? 'SAÍDA' : 'ENTRADA'}`) }, ...cabecalhoDoc(d, c, dados)];
+  blocos.push(it(`**DATA DA VISTORIA:** ${dataPorExtenso(v.data)}`));
+  blocos.push(p(`${VISTORIA_INTRO} ${v.link_fotos ? `Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail: ${v.link_fotos}` : 'Para mais detalhes, verifique as fotos em anexo.'}`));
+  if (saida && v.comparar_com) blocos.push(p(`Esta vistoria de saída compara o imóvel com a vistoria de entrada de ${dataPorExtenso(v.comparar_com)}. Os itens marcados como **DIFERENÇA** são de responsabilidade do LOCATÁRIO, conforme o contrato.`));
+  const chaves = linhasDe(v.chaves);
+  if (chaves.length) blocos.push({ tipo: 'secao', runs: negritos(saida ? 'CHAVES E CONTROLES DEVOLVIDOS' : 'CHAVES E CONTROLES ENTREGUES') }, ...chaves.map((l) => it(`• ${l}`)));
+  if (leitura) {
+    const rel = [['agua', 'Água'], ['energia', 'Energia'], ['gas', 'Gás']].filter(([k]) => leitura[k]).map(([k, t]) => `${t}: ${leitura[k]}`);
+    if (rel.length) blocos.push({ tipo: 'secao', runs: negritos('LEITURA DOS RELÓGIOS') }, it(rel.join('   ·   ')));
+  }
+  blocos.push({ tipo: 'secao', runs: negritos('DESCRITIVO DO IMÓVEL') }, ...descritivoBlocos(v.descritivo));
+  blocos.push({ tipo: 'secao', runs: negritos('CONDIÇÕES GERAIS') }, ...linhasDe(v.condicoes).map(it));
+  if (!saida) {
+    blocos.push(it(`O LOCATÁRIO tem ${numeroComExtenso(v.prazo_dias || 3)} dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.`));
+    blocos.push(it('O imóvel deve ser devolvido nas mesmas condições descritas neste documento.'));
+  }
+  blocos.push({ tipo: 'direita', runs: negritos(`${dados.campos.cidade}, ${dados.campos.data_assinatura}.`) });
+  blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => !a.papel.startsWith('TESTEMUNHA')) });
+  return { blocos, rodape: dados.rodape };
+}
+
+/** Recibo de entrega das chaves ao locatário (com espaço para data e hora do recebimento). */
+export function reciboChavesBlocos(d, c, chaves, data = '') {
+  const dados = dadosDoContrato(d, c, { data: data || undefined });
+  const blocos = [{ tipo: 'titulo', runs: negritos('RECIBO DE ENTREGA DAS CHAVES') }, ...cabecalhoDoc(d, c, dados)];
+  blocos.push(p(`O LOCATÁRIO declara, para os devidos fins, que neste ato recebe as chaves do imóvel acima descrito, locado conforme o contrato de locação assinado, e que, a partir deste momento, é responsável pela sua utilização e conservação, assumindo as obrigações civis que forem de sua responsabilidade.`));
+  blocos.push({ tipo: 'secao', runs: negritos('RELAÇÃO DE CHAVES E CONTROLES ENTREGUES') }, ...(linhasDe(chaves).length ? linhasDe(chaves).map((l) => it(`• ${l}`)) : [it('• ______________________________________________'), it('• ______________________________________________')]));
+  blocos.push(it(data ? `Data do recebimento: ${dataPorExtenso(data)}, às ____:____.` : 'Data do recebimento: _____/_____/_________, às ____:____.'));
+  blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => ['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO', 'LOCADORA'].includes(a.papel)) });
+  return { blocos, rodape: dados.rodape };
+}

@@ -30,6 +30,7 @@ export const IMOVEL = [
   campo('sanepar_hidrometro', 'Código do hidrômetro Sanepar'),
   campo('administradora_nome', 'Administradora do condomínio'),
   campo('area_comum', 'Pátio e portão eletrônico de uso comum', 'simnao', { ajuda: 'Marcado: o contrato inclui as cláusulas de frente desobstruída, pátio comum e portão eletrônico' }),
+  campo('chaves', 'Chaves e controles entregues ao inquilino', 'area', { ajuda: 'Um por linha, com a quantidade (ex.: 01 Chave tetra da porta de entrada). Entra na vistoria e no recibo de entrega das chaves' }),
   campo('gas_relogio', 'Relógio de gás (nº / identificação)'),
   campo('internet', 'Contrato de internet ou nº do telefone'),
   secao('Área e energia'),

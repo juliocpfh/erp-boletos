@@ -67,3 +67,28 @@ test('pendências do cadastro antes de gerar', () => {
   assert.ok(falta.includes('inquilino: estado civil'));
   assert.ok(falta.includes('descrição do imóvel no contrato'));
 });
+
+test('vistoria: cabeçalho, chaves, roteiro sem preencher fica de fora, assinaturas', () => {
+  const { d, c } = base({ garantia_tipo: 'Fiador' });
+  R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'José', cpf: '1' }, 'j');
+  const v = { tipo: 'Entrada', data: '2026-09-04', link_fotos: 'https://x/fotos', chaves: '01 Controle remoto\n02 Chaves tetra',
+    descritivo: '## Sala\n- Piso e rodapé: bom estado\n- Paredes e teto: \nMobília em bom estado:\n- Sofá 2 lugares', condicoes: 'Imóvel entregue limpo.', prazo_dias: 3 };
+  const t = texto(K.vistoriaBlocos(d, c, v, { agua: '123', energia: '456' }).blocos);
+  assert.match(t, /^VISTORIA DE ENTRADA/);
+  assert.match(t, /LOCADORAS: ANK .*; JCK /);
+  assert.match(t, /• 01 Controle remoto/);
+  assert.match(t, /Água: 123/);
+  assert.match(t, /SALA\n• Piso e rodapé: bom estado\nMobília em bom estado:\n• Sofá 2 lugares/);
+  assert.doesNotMatch(t, /Paredes e teto/);
+  assert.match(t, /3 \(três\) dias/);
+  assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO, FIADOR\]/);
+});
+
+test('recibo de entrega das chaves', () => {
+  const { d, c } = base();
+  const t = texto(K.reciboChavesBlocos(d, c, '01 Chave tetra').blocos);
+  assert.match(t, /^RECIBO DE ENTREGA DAS CHAVES/);
+  assert.match(t, /• 01 Chave tetra/);
+  assert.match(t, /Data do recebimento: _____/);
+  assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO\]$/);
+});

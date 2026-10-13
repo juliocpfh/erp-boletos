@@ -505,3 +505,16 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
   assert.equal(cb.iptu, 8000); // 1ª parcela, proporcional aos 24 dias de junho
   assert.equal(R.parcelasIptu(d, p)[0].mesBoleto, '2026-07');
 });
+
+test('documentos de entrada: alerta só para inquilino novo, até marcar os três', () => {
+  const { d, c } = base();
+  assert.equal(R.alertaDocumentosEntrada(c), null, 'inquilino antigo não gera alerta');
+  c.docs_entrada = true;
+  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/);
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio');
+  assert.match(R.alertaDocumentosEntrada(c).texto, /^falta recibo de entrega das chaves/);
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio');
+  assert.equal(R.alertaDocumentosEntrada(c), null);
+  assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
+});
