@@ -649,3 +649,36 @@ test('reserva presa num boleto mais novo: sai ao gerar o mês certo, também de 
   assert.equal(d.cobrancas[0].reserva_utilizada, 50000, 'boleto pago não muda');
   assert.match(R.alertaReservaParada(d, c).texto, /está no boleto de 10\/2026, que já foi pago, mas deveria abater o de 08\/2026/);
 });
+
+test('ressarcimento de taxa do condomínio: abate no boleto do mês seguinte ao pagamento, gasto nos resultados ou fora da NF', () => {
+  const { d, loja, c } = base(); // vencimento dia 10 do mês seguinte à competência
+  c.conta_condominio = 'Por conta do inquilino';
+  c.reserva_valor = 0;
+  // inquilino pagou o condomínio de julho (com fundo de obras) em 05/08: abate no boleto que vence em setembro = competência 08
+  assert.equal(R.competenciaDoAbatimento(c, '2026-08-05'), '2026-08');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-07', descricao: 'Fundo de obras', valor: 15000, data_pagamento: '2026-08-05', competencia_abatimento: '2026-08' }, 'julio');
+  const cb = R.aplicarRessarcimentos(d, c, '2026-08', 'julio');
+  const t = R.totais(cb);
+  assert.equal(cb.ressarcimento, 15000);
+  assert.equal(t.a_pagar_pontual, 135000 - 13500 + 10000 + 350 - 15000);
+  assert.match(R.dadosBoleto(d, cb).descricao, /RESSARCIMENTO CONDOMÍNIO -RS150,00/);
+  // NF com o aluguel cheio; o ressarcimento conta como gasto
+  R.registrarPagamento(d, cb.id, '2026-09-10', null, 'julio', { pagouEmDia: true });
+  assert.equal(cb.valor_nf, 135000 - 13500);
+  const res = R.resultadosFinanceiros(d, '2026-09-01', '2026-09-30').find((x) => x.imovel.id === loja.id);
+  assert.equal(res.contas, 15000);
+  // opção: sai da NF (e não conta de novo como gasto)
+  d.ressarcimento_abate_nf = true;
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-08', descricao: 'Fundo de obras', valor: 15000, data_pagamento: '2026-09-05', competencia_abatimento: '2026-09' }, 'julio');
+  const cb2 = R.aplicarRessarcimentos(d, c, '2026-09', 'julio');
+  R.registrarPagamento(d, cb2.id, '2026-10-10', null, 'julio', { pagouEmDia: true });
+  assert.equal(cb2.valor_nf, 135000 - 13500 - 15000);
+  assert.equal(R.resultadosFinanceiros(d, '2026-10-01', '2026-10-31').find((x) => x.imovel.id === loja.id).contas, 0);
+  // alerta mensal para conferir o condomínio
+  assert.match(R.alertaCondominio(c, '2026-11-03').texto, /condomínio de 10\/2026/);
+  R.marcarCondominioConferido(d, c.id, '2026-10', 'julio');
+  assert.equal(R.alertaCondominio(c, '2026-11-03'), null);
+  assert.equal(R.alertaCondominio({ ...c, conta_condominio: 'Não tem' }, '2026-11-03'), null);
+});

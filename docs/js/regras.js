@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -503,6 +503,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
   const reserva = reservaParaCompetencia(d, contrato, comp, ignorarCobranca);
+  const ressarc = ressarcimentosNoBoleto(d, contrato.id, comp);
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
@@ -516,6 +517,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
     seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, outros: 0, outros_descricao: '',
     reserva_utilizada: r.reserva_utilizada, carencia,
+    ressarcimento: ressarc.valor, ressarcimento_descricao: ressarc.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && ressarc.valor > 0,
     multa_percentual: contrato.multa_percentual || 0, juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
     situacao: carencia && r.a_pagar_pontual <= 0 ? 'Carência' : 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null,
     valor_nf: null,
@@ -544,7 +546,7 @@ export function gerarCobrancas(d, comp, usuario) {
 
 /** Campos que o recálculo atualiza (o ajuste do mês, as observações e o vencimento alterado à mão ficam). */
 const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'aluguel', 'desconto', 'iptu', 'iptu_parcela', 'seguro',
-  'seguro_parcela', 'taxa_boleto', 'reserva_utilizada', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
+  'seguro_parcela', 'taxa_boleto', 'reserva_utilizada', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
@@ -1096,6 +1098,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
     alertaDocumentosEntrada(contrato),
+    alertaCondominio(contrato, hoje),
   ].filter(Boolean);
 }
 
@@ -1209,6 +1212,7 @@ export function dadosBoleto(d, cb) {
   if (cb.taxa_boleto) extras.push(`TARIFA ${rs(cb.taxa_boleto)}`);
   if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
+  if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
   if (extras.length) linhas.push(extras.join(' '));
   const valor = t.a_pagar_sem_desconto;
   return {
@@ -1251,7 +1255,9 @@ export function resultadosFinanceiros(d, de, ate) {
     const todasReformas = reformasDo(d, i.id);
     const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
     const investido = todasReformas.filter((r) => String(r.data) <= ate).reduce((s, r) => s + r.valor, 0);
-    const contas = d.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0);
+    // contas pagas por nós + ressarcimentos de condomínio abatidos em boletos pagos no período (se não saíram da NF)
+    const contas = d.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0)
+      + pagas.filter((cb) => !cb.ressarcimento_na_nf).reduce((s, cb) => s + (cb.ressarcimento || 0), 0);
     const receita = aluguel + avulsas;
     const resultado = receita - iptu - contas;
     const base = (i.valor_imovel || 0) + investido;
@@ -1323,6 +1329,62 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
 }
 
 // --------------------------------------------------------------------------
+// Ressarcimento de condomínio: taxas do proprietário que o inquilino pagou no boleto do condomínio
+// (Lei 8.245/91, art. 22, X: despesas extraordinárias). Abatem no boleto do aluguel do mês seguinte ao pagamento.
+// --------------------------------------------------------------------------
+export const TAXAS_DO_PROPRIETARIO = ['Fundo de obras', 'Constituição do fundo de reserva', 'Chamada extra (obra)', 'Obra na estrutura / reforma',
+  'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação', 'Outra'];
+export const inquilinoPagaCondominio = (c) => c.conta_condominio === SITUACOES[0];
+export const ressarcimentosDo = (d, contratoId) => d.ressarcimentos.filter((r) => r.contrato_id === contratoId)
+  .sort((a, b) => String(b.competencia_condominio).localeCompare(String(a.competencia_condominio)) || b.id - a.id);
+
+/** Competência do boleto que vence no mês seguinte ao pagamento da taxa pelo inquilino. */
+export function competenciaDoAbatimento(c, dataPagamento) {
+  const vence = C.somarMeses(C.competenciaDe(dataPagamento), 1);
+  return c.cobranca_mes_seguinte !== false ? C.somarMeses(vence, -1) : vence;
+}
+
+function ressarcimentosNoBoleto(d, contratoId, comp) {
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp);
+  return { valor: lista.reduce((t, r) => t + r.valor, 0), descricao: lista.map((r) => `${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)})`).join('; ') };
+}
+
+/** Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. */
+export function condominioAConferir(c, hoje = C.hojeIso()) {
+  if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje)) return null;
+  const ultimo = C.somarMeses(C.competenciaDe(hoje), -1); // o mês que acabou: o inquilino já pagou o condomínio dele
+  const inicio = C.competenciaDe(c.data_entrada || hoje);
+  const proximo = c.condominio_conferido_ate ? C.somarMeses(c.condominio_conferido_ate, 1) : (inicio > ultimo ? null : ultimo);
+  return proximo && proximo <= ultimo ? proximo : null;
+}
+
+export function alertaCondominio(c, hoje = C.hojeIso()) {
+  const mes = condominioAConferir(c, hoje);
+  return mes ? { nivel: 'info', tipo: 'Condomínio', ancora: 'ressarcimentos',
+    texto: `Confira o boleto do condomínio de ${C.compBr(mes)}${mes < C.somarMeses(C.competenciaDe(hoje), -1) ? ' em diante' : ''}: taxas do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…) pagas pelo inquilino devem ser ressarcidas no próximo boleto.` } : null;
+}
+
+/**
+ * Coloca os ressarcimentos no boleto do mês do abatimento, se ele já existe e está em aberto. Boleto alterado à mão
+ * recebe só o ressarcimento (os outros valores digitados ficam). Devolve o boleto, ou null se ainda não foi gerado.
+ */
+export function aplicarRessarcimentos(d, contrato, comp, usuario) {
+  const cb = d.cobrancas.find((x) => x.contrato_id === contrato.id && x.competencia === comp);
+  if (!cb || cb.data_pagamento) return cb || null;
+  const r = ressarcimentosNoBoleto(d, contrato.id, comp);
+  atualizar(d, 'cobrancas', cb.id, { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && r.valor > 0 },
+    usuario, `Boleto ${C.compBr(comp)}: ressarcimento de condomínio ${r.valor ? C.reais(r.valor) : 'retirado'}`);
+  return cb;
+}
+
+export function marcarCondominioConferido(d, contratoId, mes, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c.condominio_conferido_ate || mes > c.condominio_conferido_ate) {
+    atualizar(d, 'contratos', c.id, { condominio_conferido_ate: mes }, usuario, `${c.inquilino_nome}: condomínio de ${C.compBr(mes)} conferido`);
+  }
+}
+
+// --------------------------------------------------------------------------
 // Fechamento do mês: as rotinas em ordem, com o que falta em cada uma
 // --------------------------------------------------------------------------
 /**
@@ -1350,6 +1412,11 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
     { chave: 'pagamentos', titulo: `Conferir os pagamentos dos boletos de ${C.compBr(comp)}`, pendentes: emAberto.length,
       detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
     { chave: 'nfs', titulo: 'Numerar as NFs dos pagamentos', pendentes: nfs, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
+    (() => {
+      const conferir = ativos.filter((c) => { const m = condominioAConferir(c, hoje); return m && m <= comp; });
+      return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
+        detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : 'nada a conferir', link: conferir.length === 1 ? `#/contrato/${conferir[0].id}?ir=ressarcimentos` : '#/inquilinos' };
+    })(),
     { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length, manual: true,
       detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
   ];

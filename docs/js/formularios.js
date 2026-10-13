@@ -120,6 +120,17 @@ export const REFORMA = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/** Taxa do proprietário (condomínio) paga pelo inquilino: volta para ele no boleto do aluguel. */
+export const RESSARCIMENTO = [
+  campo('competencia_condominio', 'Mês do boleto do condomínio', 'mes', { obrig: true }),
+  campo('descricao', 'Taxa', 'opcao', { obrig: true, opcoes: ['Fundo de obras', 'Constituição do fundo de reserva', 'Chamada extra (obra)', 'Obra na estrutura / reforma',
+    'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação', 'Outra'] }),
+  campo('detalhe', 'Detalhe (opcional)', 'texto', { ajuda: 'Ex.: parcela 3/10 do fundo de obras' }),
+  campo('valor', 'Valor pago pelo inquilino', 'dinheiro', { obrig: true }),
+  campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { obrig: true }),
+  campo('competencia_abatimento', 'Abater no boleto do aluguel de', 'mes', { ajuda: 'Em branco: o boleto que vence no mês seguinte ao pagamento' }),
+];
+
 /** Contas do imóvel e quem paga cada uma, conforme o contrato. */
 export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_condominio', 'Condomínio'], ['conta_internet', 'Internet / TV']];
 export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];

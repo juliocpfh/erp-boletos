@@ -216,9 +216,10 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // Composição da cobrança
 // --------------------------------------------------------------------------
-export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0 }, reservaDisponivel = 0) {
+export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0 }, reservaDisponivel = 0) {
   const encargos = iptu + seguro + taxa_boleto + outros;
-  const totalSemDesconto = aluguel + encargos;
+  // ressarcimento ao inquilino (ex.: taxa extraordinária do condomínio que ele pagou e é do proprietário)
+  const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
   const totalPontual = totalSemDesconto - desconto;
   const reserva = Math.min(reservaDisponivel, Math.max(totalPontual, 0));
   return {
@@ -285,7 +286,8 @@ export function liquidar(cobranca, pagamento) {
   return {
     dias_atraso: dias, pontual, multa, juros,
     valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto + multa + juros,
-    valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual),
+    // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas)
+    valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0),
   };
 }
 
