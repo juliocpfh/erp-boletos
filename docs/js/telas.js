@@ -879,7 +879,9 @@ function telaContrato(c) {
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>` : ''}
+      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+        <p class="suave">${(() => { const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0); return usos.length ? `Abatida em: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : 'Ainda não abatida em nenhum boleto.'; })()}
+          ${opera() ? botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno') : ''}</p>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaIncluso(c)}
     ${caixaSolicitacoes(c)}
@@ -1353,7 +1355,10 @@ const CADASTROS = {
       for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
       dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
-      if (dados.reserva_utilizada > disp) erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}`;
+      if (dados.reserva_utilizada > disp) {
+        const outros = d().cobrancas.filter((x) => x.contrato_id === r.contrato_id && x.id !== r.id && x.reserva_utilizada > 0);
+        erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}${outros.length ? ` (está no boleto de ${outros.map((x) => compBr(x.competencia)).join(', ')}). Para trocar de mês, use "Reaplicar a reserva" na página do inquilino` : ''}`;
+      }
     },
   },
 };
@@ -3076,6 +3081,16 @@ export const ACOES = {
 
   async etapaFechamento({ mes, etapa, feito }) {
     await alterar((db) => R.marcarEtapaFechamento(db, mes, etapa, feito === '1', login()));
+    await mostrar();
+  },
+
+  /** Tira a reserva dos boletos em aberto e aplica de novo a partir do mês marcado (também nos alterados à mão). */
+  async reaplicarReserva({ id }) {
+    const n = await alterar((db) => R.realocarReserva(db, R.buscar(db, 'contratos', Number(id)), login()));
+    const c = buscar('contratos', id);
+    const alerta = R.alertaReservaParada(d(), c);
+    aviso(n ? `Reserva reaplicada: ${n} boleto(s) ajustado(s).` : 'A reserva já estava nos boletos certos.', n ? 'ok' : 'info');
+    if (alerta) aviso(alerta.texto, 'aviso');
     await mostrar();
   },
 
