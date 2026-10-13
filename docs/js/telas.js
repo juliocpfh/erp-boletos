@@ -1312,12 +1312,19 @@ function telaResultados(q) {
   const ate = q.ate || hoje;
   const de = q.de || C.somarDias(C.somarMesesData(ate, -12), 1);
   const lista = R.resultadosFinanceiros(d(), de, ate);
+  const ano = Number(hoje.slice(0, 4));
+  const atalhos = [
+    ['Últimos 12 meses', C.somarDias(C.somarMesesData(hoje, -12), 1), hoje],
+    ['Este ano', `${ano}-01-01`, hoje],
+    ['Ano passado', `${ano - 1}-01-01`, `${ano - 1}-12-31`],
+    ['Últimos 5 anos', C.somarDias(C.somarAnos(hoje, -5), 1), hoje],
+  ].map(([t, a, b]) => link(`#/resultados?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
   const tot = (k) => lista.reduce((s, x) => s + x[k], 0);
   const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
   return `<h1>Resultados financeiros</h1>
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
-      ${link(`#/resultados?de=${hoje.slice(0, 4)}-01-01&ate=${hoje}`, 'Este ano')} ${link(`#/resultados?de=${Number(hoje.slice(0, 4)) - 1}-01-01&ate=${Number(hoje.slice(0, 4)) - 1}-12-31`, 'Ano passado')}</form>
+      ${atalhos}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
       ${lista.map((x, n) => `<tr><td>${x.retornoAnual !== null ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span></td>
         <td class="n">${x.base ? reais(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais(x.aluguel)}</td><td class="n">${reais(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais(x.iptu)}` : '-'}</td>
