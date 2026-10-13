@@ -260,3 +260,7 @@ input.doc-invalido { border-color: var(--perigo); }
 .fechamento li { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .fechamento li.feito > .cabecalho b { color: var(--suave); }
 .baixa-lote { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; }
+.baixa-lote summary { cursor: pointer; }
+.grupo-baixa { border-top: 1px solid #bbf7d0; padding: 8px 0; }
+.lista-baixa { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0; }
+.lista-baixa .check-mini { font-weight: 400; }

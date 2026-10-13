@@ -290,19 +290,41 @@ export const TELAS = {
     if (!pctEl || !valEl) return;
     const form = pctEl.closest('form');
     const aluguel = raiz.querySelector('[name=aluguel_inicial]');
-    const base = () => (form.dataset.base ? Number(form.dataset.base) : (() => { try { return C.centavos(aluguel.value); } catch { return NaN; } })());
-    const num = (t) => { try { return C.numero(t); } catch { return NaN; } };
-    const cent = (t) => { try { return C.centavos(t); } catch { return NaN; } };
+    const num = (t) => { try { return t.trim() === '' ? NaN : C.numero(t); } catch { return NaN; } };
+    const cent = (t) => { try { return t.trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
+    // aluguel sobre o qual vale o %: o atual, quando já houve correção (fixo); senão, o aluguel cheio digitado
+    const base = () => (form.dataset.base ? Number(form.dataset.base) : aluguel ? cent(aluguel.value) : NaN);
+    const avisar = (texto) => {
+      valEl.classList.toggle('doc-invalido', !!texto);
+      const caixa = valEl.closest('div').querySelector('.erro-bonif') || valEl.closest('div').appendChild(Object.assign(document.createElement('div'), { className: 'erro-campo erro-bonif' }));
+      caixa.textContent = texto;
+    };
+    // nada aqui pode "travar" o formulário: qualquer valor estranho só limpa o campo calculado e avisa
     const doPct = () => {
-      const b = base(); const p = num(pctEl.value);
-      valEl.value = Number.isFinite(b) && Number.isFinite(p) && pctEl.value !== '' ? F.dinheiroTexto(b - C.descontoPorPercentual(b, p)) : '';
+      try {
+        const b = base(); const p = num(pctEl.value);
+        const ok = Number.isFinite(b) && b > 0 && Number.isFinite(p) && p >= 0 && p <= 100;
+        valEl.value = ok ? F.dinheiroTexto(b - C.descontoPorPercentual(b, p)) : '';
+        avisar(Number.isFinite(p) && (p < 0 || p > 100) ? 'O % precisa ficar entre 0 e 100' : '');
+      } catch { valEl.value = ''; }
+    };
+    const doValor = () => {
+      try {
+        const b = base(); const v = cent(valEl.value);
+        if (!Number.isFinite(b) || !(b > 0) || !Number.isFinite(v)) { pctEl.value = ''; avisar(''); return; }
+        if (v < 0 || v > b) { pctEl.value = ''; avisar(`O aluguel com bonificação precisa ficar entre R$ 0,00 e ${reais(b)} (aluguel cheio)`); return; }
+        pctEl.value = F.pctTexto(Math.round(C.percentualPorBonificado(b, v) * 10000) / 10000);
+        avisar('');
+      } catch { pctEl.value = ''; }
     };
     pctEl.addEventListener('input', doPct);
-    valEl.addEventListener('input', () => {
-      const b = base(); const v = cent(valEl.value);
-      pctEl.value = Number.isFinite(b) && b && Number.isFinite(v) && valEl.value !== '' ? F.pctTexto(C.percentualPorBonificado(b, v)) : '';
-    });
-    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', doPct);
+    valEl.addEventListener('input', doValor);
+    // mudou o aluguel cheio: o % fica e o aluguel com bonificação acompanha
+    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', () => { if (pctEl.value.trim() !== '') doPct(); else if (valEl.value.trim() !== '') doValor(); });
+    if (form.dataset.base) {
+      const nota = valEl.closest('div').querySelector('.ajuda');
+      if (nota) nota.textContent = `O % vale sobre o aluguel atual de ${reais(Number(form.dataset.base))} (já corrigido). Digite o valor que o inquilino paga em dia: o % é calculado.`;
+    }
     if (pctEl.value !== '' && valEl.value === '') doPct();
   },
 
@@ -922,7 +944,7 @@ const CADASTROS = {
       const anterior = q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
       return anterior ? R.condicoesDoAnterior(d(), anterior) : {};
     },
-    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome,
+    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
@@ -934,9 +956,10 @@ const CADASTROS = {
     },
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
-    base: (r) => (r ? R.aluguelAtual(d(), r) : null),
+    // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
+    base: (r) => (r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form) {
-      const base = r ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
+      const base = r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
       if (dados.bonificacao && bonificadoTexto) {
         // o aluguel bonificado digitado manda: o % é calculado sem arredondar, para o desconto bater no centavo
@@ -1439,6 +1462,20 @@ const ORDENS_BOLETO = {
   valor: (a, b) => b.t.a_pagar_pontual - a.t.a_pagar_pontual,
 };
 
+/** Baixa em lote separada por vencimento: só dá para confirmar juntos boletos que vencem no mesmo dia. */
+function caixaBaixaLote(lista, hoje) {
+  const abertos = lista.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência');
+  if (!abertos.length) return '';
+  const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
+  return `<details class="cartao baixa-lote" ${grupos.length ? 'open' : ''}><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· separada por vencimento, para não misturar boletos</span></summary>
+    ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
+      <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${v < hoje ? etiqueta('vencido', 'perigo') : ''} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
+        <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
+      <div class="lista-baixa">${xs.map((x) => `<label class="check-mini"><input type="checkbox" name="ids" value="${x.cb.id}"> ${esc(x.i.nome)} · ${esc(x.c.inquilino_nome)} · ${reais(x.t.a_pagar_pontual)}</label>`).join('')}</div>
+      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto"><button class="pequeno">Confirmar os marcados como pagos em dia</button></div></form>`).join('')}
+    <p class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha da tabela.</p></details>`;
+}
+
 function telaCobrancas(comp, ordem = 'vencimento') {
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
@@ -1465,17 +1502,14 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
-    ${lista.length && opera() && lista.some((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência') ? `<form class="acoes barra-nf baixa-lote" data-form="baixaLote">
-      <b>Baixa em lote:</b> marque os boletos na primeira coluna; entraram em <input type="date" name="data" value="${hoje}" style="width:auto">
-      <button class="pequeno">Confirmar os selecionados como pagos em dia</button>
-      <span class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha.</span></form>` : ''}
+    ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <span class="suave">Ordenar por:</span> ${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'botao pequeno' : 'botao secundario pequeno')).join(' ')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
-        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (demonstrativo ou baixa em lote)"></td>
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
@@ -2487,10 +2521,13 @@ export const FORMULARIOS = {
   },
 
   async baixaLote(form) {
-    const data = String(new FormData(form).get('data') || '');
+    const fd = new FormData(form);
+    const data = String(fd.get('data') || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data em que o dinheiro entrou.');
-    const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((el) => Number(el.dataset.boleto));
-    if (!ids.length) throw new Error('Marque os boletos na primeira coluna.');
+    const ids = fd.getAll('ids').map(Number);
+    if (!ids.length) throw new Error('Marque os boletos deste vencimento que foram pagos.');
+    const vencs = new Set(ids.map((id) => (buscar('cobrancas', id) || {}).vencimento));
+    if (vencs.size > 1) throw new Error('Confirme juntos só boletos do mesmo vencimento.');
     confirmarAvisos(data > C.hojeIso() ? [`A data (${dataBr(data)}) está no futuro.`] : []);
     let r;
     await alterar((db) => { r = R.baixarEmLote(db, ids, data, login()); });
