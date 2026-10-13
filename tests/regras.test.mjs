@@ -419,7 +419,7 @@ test('mesmo inquilino em dois imóveis: contrato novo com os dados da pessoa', (
   Object.assign(c, { prazo_tipo: 'Determinado', prazo_meses: 30 });
   const novo = R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01', leitura_agua: '10' }, 'julio');
   assert.notEqual(novo.id, c.id);
-  assert.deepEqual([novo.imovel_id, novo.inquilino_cpf, novo.aluguel_inicial, novo.vigencia_fim], [casa.id, c.inquilino_cpf, 135000, '2029-02-28']);
+  assert.deepEqual([novo.imovel_id, novo.inquilino_cpf, novo.aluguel_inicial, novo.vigencia_fim], [casa.id, c.inquilino_cpf, 135000, '2029-03-01']);
   assert.equal(R.buscar(d, 'contratos', c.id).imovel_id, 1);
   assert.deepEqual(R.outrosContratosDaPessoa(d, novo, '2026-09-10').map((x) => x.id), [c.id]);
   assert.equal(d.leituras.at(-1).contrato_id, novo.id);
@@ -504,4 +504,17 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
   assert.equal(cb.vencimento.slice(0, 7), '2026-07');
   assert.equal(cb.iptu, 8000); // 1ª parcela, proporcional aos 24 dias de junho
   assert.equal(R.parcelasIptu(d, p)[0].mesBoleto, '2026-07');
+});
+
+test('documentos de entrada: alerta só para inquilino novo, até marcar os três', () => {
+  const { d, c } = base();
+  assert.equal(R.alertaDocumentosEntrada(c), null, 'inquilino antigo não gera alerta');
+  c.docs_entrada = true;
+  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/);
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio');
+  assert.match(R.alertaDocumentosEntrada(c).texto, /^falta recibo de entrega das chaves/);
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio');
+  assert.equal(R.alertaDocumentosEntrada(c), null);
+  assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
 });

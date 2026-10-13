@@ -1,13 +1,16 @@
 // Telas do sistema (HTML), formulários e ações dos botões.
 import {
-  E, alterar, aviso, baixar, bibliotecasPdf, criarBanco, entrar, escolherPasta, excelJs, ir, jsZip, login, mostrar, podeUsuario,
-  reabrirPastaLembrada, renovarUsuario, sair,
+  E, alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, criarBanco, entrar, escolherPasta, excelJs, ir, jsZip, login, mostrar,
+  naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, renovarUsuario, sair,
 } from './app.js';
+import * as B from './backup-seguro.js';
 import * as S from './armazenamento.js';
 import { conferirSenha, novoSal, PAPEIS, resumoSenha } from './auth.js';
 import * as C from './calculos.js';
+import * as K from './contratos.js';
 import { faturaExcel, faturaHtml, linhasObservacoes } from './fatura.js';
 import * as F from './formularios.js';
+import { MODELOS_PADRAO } from './modelos-contrato.js';
 import * as R from './regras.js';
 
 const { esc } = F;
@@ -124,8 +127,12 @@ async function renomearNoDisco(paiPartes, antigo, novo) {
 // --------------------------------------------------------------------------
 // Telas de abertura
 // --------------------------------------------------------------------------
+const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
+
 export const TELAS = {
   _listaArquivos: listaArquivos,
+  restaurarBackup: () => telaRestaurarBackup(),
+  'backup-seguro': () => telaBackupSeguro(),
 
   _ligarDesconto(raiz) {
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
@@ -182,6 +189,7 @@ export const TELAS = {
       ${lembrada ? `<p><button data-acao="reabrir">Abrir a pasta "${esc(lembrada.name)}"</button></p><p class="suave">ou</p>` : ''}
       <p><button class="${lembrada ? 'secundario' : ''}" data-acao="escolherPasta">Escolher a pasta dos dados</button></p>
       <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>OneDrive\\Imoveis</b>, e escolha ela. Para usar os mesmos dados em outro computador, escolha lá a mesma pasta do OneDrive.</p>
+      ${LINK_RESTAURAR}
     </div></main>`;
   },
 
@@ -197,7 +205,7 @@ export const TELAS = {
       <p><label>Senha (mínimo 6 caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
       <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
       <button>Criar e entrar</button> ${botao('escolherPasta', 'Escolher outra pasta')}
-    </form></div></main>`,
+    </form>${LINK_RESTAURAR}</div></main>`,
 
   login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b></p>
@@ -205,7 +213,7 @@ export const TELAS = {
       <p><label>Login</label><input name="login" autofocus autocomplete="username"></p>
       <p><label>Senha</label><input type="password" name="senha" autocomplete="current-password"></p>
       <button>Entrar</button> ${botao('escolherPasta', 'Trocar de pasta')}
-    </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p></div></main>`,
+    </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
 
   pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Pedir acesso</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. O administrador recebe o pedido em Usuários e libera o acesso.</p>
@@ -218,7 +226,7 @@ export const TELAS = {
     </form></div></main>`,
 
   // ------------------------------------------------------------------------
-  painel() {
+  painel(rota) {
     const hoje = C.hojeIso();
     const alertas = R.todosAlertas(d(), hoje);
     const pend = R.pendentesDeFatura(d());
@@ -229,9 +237,12 @@ export const TELAS = {
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/imoveis')}
         ${n(abertas.length, 'boletos em aberto', '#/cobrancas')}
-        ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/cobrancas')}
+        ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/inadimplencia')}
         ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
       </div>
+      ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
+      ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
+      ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
       <div class="cartao"><h2>Alertas</h2>
         ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
@@ -247,12 +258,19 @@ export const TELAS = {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const atual = atuais[0];
       return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a>${i.sublote ? `<br><span class="suave">${esc(i.sublote)}</span>` : ''}</td><td>${esc(R.enderecoCompleto(i))}</td>
-        <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
+        <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
         <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
       <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual (bonificado)</th></tr>
-      ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}</table></div>`;
+      ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
+      ${linhas ? (() => {
+    const t = R.totaisImoveis(d(), hoje);
+    return `<tr class="total"><td colspan="3">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
+      <tr class="total"><td colspan="3">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
+        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td></tr>`;
+  })() : ''}</table>
+      <p class="suave">Valores bonificados (o que o inquilino paga em dia); no total esperado, o valor cheio vem antes e o bonificado entre parênteses. O total com 100% locado soma os aluguéis atuais bonificados e o último aluguel bonificado de cada imóvel vago; entre parênteses, quanto falta para chegar nele. Boletos de controle não entram.</p></div>`;
   },
 
   imovel(rota) {
@@ -274,14 +292,21 @@ export const TELAS = {
     return telaFormulario(rota.partes[1], r, rota.q, estado);
   },
 
-  cobrancas: (rota) => telaCobrancas(rota.q.comp || competenciaPadrao()),
+  cobrancas: (rota) => telaCobrancas(rota.q.comp || competenciaPadrao(), rota.q.ordem),
   cobranca(rota) {
     const cb = buscar('cobrancas', rota.partes[1]);
     return cb ? telaCobranca(cb) : '<h1>Boleto não encontrado</h1>';
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
+  inadimplencia: () => telaInadimplencia(),
+  reajustes: (rota) => telaReajustes(rota.q),
+  calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
+  'contrato-gerar': (rota) => telaGerarContrato(rota),
+  'modelos-contrato': () => telaModelos(),
+  vistoria: (rota) => telaVistoria(rota),
+  'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
@@ -311,6 +336,11 @@ export const TELAS = {
 // Imóvel
 // --------------------------------------------------------------------------
 function caixaEmpresas(i) {
+  if (R.imovelSoControle(d(), i.id)) {
+    return `<div class="cartao" id="empresas"><h2>Empresas que emitem a NF</h2>
+      <div class="alerta controle"><b>Não se aplica.</b> O inquilino atual é boleto de controle: este imóvel não emite NF.
+      As empresas que estavam definidas ficam guardadas e voltam a valer se o inquilino passar a emitir NF.</div></div>`;
+  }
   const partes = R.participacoesDo(d(), i.id);
   const soma = partes.reduce((s, p) => s + p.percentual, 0);
   const emitentes = d().emitentes.filter((e) => e.ativo);
@@ -372,6 +402,7 @@ function telaImovel(i) {
       ${opera() ? `${link(`#/novo/vinculos?imovel=${i.id}`, 'Vincular inquilino', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo', 'Excluir este imóvel? Os arquivos da pasta são mantidos.') : ''}</div></div>
     <div class="endereco">📍 ${esc(endereco(i))}</div>
+    ${R.imovelSoControle(d(), i.id) ? `<div class="alerta controle"><b>Boleto de controle.</b> O inquilino atual ${AVISO_CONTROLE}</div>` : ''}
     ${caixaVerificar(i.verificar)}
     <div class="cartao"><div class="grade">
       ${item('Valor do imóvel', i.valor_imovel ? `${reais(i.valor_imovel)}${i.valor_data ? ` <span class="suave">(${dataBr(i.valor_data)})</span>` : ''}` : '-')}
@@ -379,10 +410,10 @@ function telaImovel(i) {
       ${item('Área útil', i.area_util ? `${F.pctTexto(i.area_util)} m²` : '-')}${item('Área total', i.area_total ? `${F.pctTexto(i.area_total)} m²` : '-')}
       ${item('Energia', esc([i.energia_ligada ? (i.energia_ligada === 'Sim' ? 'ligada' : 'desligada') : '', i.energia_tipo].filter(Boolean).join(' · ') || '-'))}
       ${item('Matrícula', esc(i.matricula || '-'))}${item('Inscrição IPTU', esc(i.inscricao_iptu || '-'))}
-      ${item('UC Copel', esc(i.copel_uc || '-'))}${item('Matrícula Sanepar', esc(i.sanepar_matricula || '-'))}
+      ${item('UC Copel / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Matrícula Sanepar / Código hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
       ${item('Administradora do condomínio', esc(i.administradora_nome || '-'))}${item('Relógio de gás', esc(i.gas_relogio || '-'))}
       ${item('Internet / telefone', esc(i.internet || '-'))}
-      ${item('Pasta de arquivos', esc(i.pasta || '-'))}</div>
+      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Chaves e controles', i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
       <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th><th>NF ou controle</th></tr>
@@ -391,7 +422,7 @@ function telaImovel(i) {
         <td>${dataBr(c.data_entrada)}</td><td>${dataBr(c.data_saida)}</td><td class="n">${reais(R.aluguelAtual(d(), c))}</td>
         <td>${R.contratoAtivo(c, hoje) ? etiqueta('Atual', 'ok') : etiqueta('Encerrado', 'neutra')} ${c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : ''}</td>
         <td><label class="check-mini" title="Desmarcado: boleto de controle (não gera NF nem entra nas somas e nos resultados)"><input type="checkbox" data-acao="alternarNf" data-id="${c.id}" ${R.geraNf(c) ? 'checked' : ''} ${opera() ? '' : 'disabled'}> emite NF</label>
-          ${R.geraNf(c) ? '' : `<br>${etiqueta('boleto de controle', 'neutra')}`}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
+          ${R.geraNf(c) ? '' : `<br>${seloControle()}`}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
     </table></div><p class="suave">Desmarque "Ativo" para não gerar boleto para o inquilino. Desmarque "emite NF" para boleto de controle: o pagamento é acompanhado, mas não gera NF nem entra nas somas dos boletos e nos resultados.</p></div>
     ${caixaIptu(i)}
     ${caixaSeguros(i)}
@@ -422,7 +453,8 @@ function selosContrato(c) {
     ${c.inquilino_tipo === 'Pessoa jurídica (empresa)' ? etiqueta('Empresa (PJ)', 'info') : ''}
     ${c.solidario_nome ? etiqueta(`Solidário: ${c.solidario_nome}`, 'neutra') : ''}
     ${c.possui_aditivos ? etiqueta('Possui termo aditivo', 'aviso') : ''}
-    ${c.gerar_nf === false ? etiqueta('Sem NF', 'neutra') : ''}
+    ${(() => { const n = R.solicitacoesDo(d(), c.id).filter((x) => ['Aberta', 'Em andamento'].includes(x.situacao || 'Aberta')).length; return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, 'perigo')}</a>` : ''; })()}
+    ${c.gerar_nf === false ? seloControle() : ''}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ''}`, 'aviso') : ''}
     ${c.renovacao_automatica ? etiqueta('Renovação automática', 'neutra') : ''}
     ${etiqueta(`Correção anual: ${c.indice_correcao || 'índice não informado'}${base ? ` · todo ${dataBr(base).slice(0, 5)}` : ''}`, 'ok')}
@@ -435,6 +467,10 @@ function valorBonificado(c) {
   const aluguel = R.aluguelAtual(d(), c);
   return aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c));
 }
+
+/** Selo e aviso do boleto de controle (inquilino que não emite NF e não conta nos resultados). */
+const seloControle = () => etiqueta('Boleto de controle · sem NF · fora dos resultados', 'controle');
+const AVISO_CONTROLE = 'não emite NF. O pagamento é acompanhado (em dia ou atrasado), mas não gera NF e não conta nas somas dos boletos nem nos resultados financeiros.';
 
 const caixaVerificar = (texto) => (texto ? `<div class="verificar"><b>A verificar:</b> ${esc(texto).replace(/\n/g, '<br>')}</div>` : '');
 
@@ -531,6 +567,21 @@ function caixaIncluso(c) {
     ${c.contas_adicionais ? `<h3>Contas adicionais</h3><p class="pre">${esc(c.contas_adicionais)}</p>` : ''}</div>`;
 }
 
+/** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
+function caixaSolicitacoes(c) {
+  const lista = R.solicitacoesDo(d(), c.id);
+  const cor = { Aberta: 'perigo', 'Em andamento': 'aviso', Concluída: 'ok', 'Não atendida': 'neutra' };
+  return `<div class="cartao" id="solicitacoes"><div class="cabecalho"><h2>Histórico de solicitações do inquilino</h2>${opera() ? link(`#/novo/solicitacoes?contrato=${c.id}`, 'Registrar solicitação') : ''}</div>
+    <p class="suave">Pequenos reparos e pedidos do inquilino: o que pediu, o que foi feito, quem fez e quanto custou.</p>
+    <div class="rolagem"><table><tr><th>Data</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
+    ${lista.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="pre">${esc(x.descricao)}</td>
+      <td class="pre">${esc(x.providencia || '')}${x.responsavel ? `<br><span class="suave">${esc(x.responsavel)}</span>` : ''}</td>
+      <td>${etiqueta(x.situacao || 'Aberta', cor[x.situacao] || 'neutra')}${x.data_conclusao ? `<br><span class="suave">em ${dataBr(x.data_conclusao)}</span>` : ''}</td>
+      <td class="n">${x.valor ? `${reais(x.valor)}${x.pago_por ? `<br><span class="suave">${esc(x.pago_por)}</span>` : ''}` : '-'}</td>
+      <td class="n nw">${opera() ? `${link(`#/editar/solicitacoes/${x.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'solicitacoes', id: x.id }, 'perigo pequeno', 'Excluir esta solicitação?')}` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="suave">Nenhuma solicitação registrada.</td></tr>'}</table></div></div>`;
+}
+
 /** Seguro obrigatório: fica no imóvel e é cobrado do inquilino que estiver nele no mês da parcela. */
 function caixaSeguros(i) {
   if (!i) return '';
@@ -543,6 +594,34 @@ function caixaSeguros(i) {
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
     <p class="suave">As parcelas entram no boleto do inquilino que estiver no imóvel no mês de cada parcela (se o contrato dele inclui o seguro).</p>
     ${caixaArquivos('seguro', i.id, 'Apólices', 'apolices', 'Anexe aqui o PDF da apólice.', true)}</div>`;
+}
+
+/** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
+function caixaDocumentos(c) {
+  const hoje = C.hojeIso();
+  const vistorias = R.vistoriasDo(d(), c.id);
+  const entrada = vistorias.find((v) => v.tipo === 'Entrada');
+  const gerar = {
+    doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato'),
+    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria')} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar') : ''}`
+      : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada') : ''),
+    doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar recibo'),
+  };
+  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc(nome)}</b></td>
+    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'aviso' : 'neutra')}</td>
+    <td class="nw">${gerar[k]}</td>
+    <td class="n nw">${!opera() ? '' : c[k] ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente?`)
+    : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${hoje}" style="width:auto"><button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join('');
+  return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Documentos de entrada e vistorias</h2>
+      ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
+    <div class="rolagem"><table>${linhas}</table></div>
+    ${vistorias.length ? `<h3>Vistorias</h3><table><tr><th>Tipo</th><th>Data</th><th></th></tr>${vistorias.map((v) => `<tr><td>${esc(v.tipo)}</td><td>${dataBr(v.data)}</td>
+      <td class="n nw">${link(`#/imprimir/vistoria?id=${v.id}`, 'Ver / imprimir')} ${opera() ? link(`#/vistoria/${v.id}`, 'Editar') : ''}
+      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'vistorias', id: v.id }, 'perigo pequeno', `Excluir a vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')} de ${dataBr(v.data)}?`) : ''}</td></tr>`).join('')}</table>` : ''}
+    <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
+    : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
+    ${c.docs_entrada ? '' : '<p class="suave">Inquilino cadastrado antes deste controle: os documentos pendentes não geram alerta.</p>'}</div>`;
 }
 
 function telaContrato(c) {
@@ -565,9 +644,11 @@ function telaContrato(c) {
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
+      ${link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
+    ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
@@ -592,8 +673,11 @@ function telaContrato(c) {
       ${c.reserva_valor > 0 ? `<h3>Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaIncluso(c)}
+    ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
+      ${(() => { const r = R.reajustePendente(d(), c); if (!r) { const p = R.primeiroMesCheio(c); return p ? `<p class="suave">Reajuste no 13º mês cheio: aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
+    return `<div class="alerta aviso"><b>Reajuste do aluguel de ${compBr(r.competencia)}</b> (${r.anos} ano(s)) ${botoesReajuste(c, r)}</div>`; })()}
       <table><tr><th>Vale a partir de</th><th>Previsto no contrato</th><th>Índice usado</th><th class="n">%</th><th class="n">Valor anterior</th><th class="n">Novo valor</th><th></th></tr>
       <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="4" class="suave">Valor inicial do contrato</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
       ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${esc(x.indice_contrato || '-')}</td><td>${x.indice === 'Negociado' ? etiqueta('Negociado', 'aviso') : `${esc(x.indice || '-')}${x.data_indice ? ` <span class="suave">(${compBr(x.data_indice)})</span>` : ''}`}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
@@ -604,15 +688,15 @@ function telaContrato(c) {
         <td class="n">${opera() ? botao('excluirRenovacao', 'Excluir', { id: r.id }, 'perigo pequeno', `Excluir este registro${r.novo_valor ? ' e o novo valor negociado' : ''}? A data de término do contrato não volta sozinha: confira em "Editar".`) : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
     <div class="cartao"><h2>Boletos</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
-      ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}</td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}${x.pagou_em_dia ? ` ${etiqueta('pagou em dia', 'ok')}` : ''}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? '<span class="suave">sem NF</span>' : '-')}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div></div>
+      ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}</td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}${x.pagou_em_dia ? ` ${etiqueta('pagou em dia', 'ok')}` : ''}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div></div>
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}
-    ${caixaSaida(c)}
-    <div class="cartao" id="vistoria"><h2>Fotos da vistoria de entrada</h2>${c.vistoria_link ? `<p><a class="botao" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a></p><p class="suave">${esc(c.vistoria_link)}</p>` : `<p class="suave">Nenhum link cadastrado. Use "Editar" e cole o link da pasta na nuvem onde está o .rar das fotos.</p>`}</div>
+    ${caixaDocumentos(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ', contrato social e cartão CNPJ da empresa, documentos do representante' : ''}${c.solidario_nome ? ', documentos do inquilino solidário' : ''} etc.`)}
-    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
+    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>
+    ${caixaSaida(c)}`;
 }
 
 // --------------------------------------------------------------------------
@@ -624,6 +708,7 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 let antesDoVinculo = null;
 let fiadoresNovos = [];
 let avisoAditivo = '';
+let guardarModeloAirbnb = false;
 const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -637,6 +722,17 @@ const CADASTROS = {
     },
     async depois(salvo, antigo) {
       if (antigo && antigo.pasta && antigo.pasta !== salvo.pasta) await renomearNoDisco([], antigo.pasta, salvo.pasta);
+    },
+  },
+  solicitacoes: {
+    titulo: (r, q) => `Solicitação do inquilino - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: () => F.SOLICITACAO,
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    padrao: () => ({ data: C.hojeIso() }),
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes`,
+    descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
+    ajustar(dados) {
+      if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
     },
   },
   reformas: {
@@ -701,7 +797,8 @@ const CADASTROS = {
       for (const n of [1, 2]) {
         const f = Object.fromEntries(F.CAMPOS_FIADOR.map((c) => [c.nome, dados[`fiador${n}_${c.nome}`] ?? null]));
         F.CAMPOS_FIADOR.forEach((c) => delete dados[`fiador${n}_${c.nome}`]);
-        const algum = Object.values(f).some((v) => v);
+        // a nacionalidade já vem preenchida ("brasileira"): sozinha não conta como fiador digitado
+        const algum = Object.entries(f).some(([k, v]) => v && k !== 'nacionalidade');
         if (!algum || !R.temFiador(dados)) continue;
         if (!f.nome) erros[`fiador${n}_nome`] = 'Informe o nome do fiador';
         else fiadoresNovos.push(f);
@@ -718,7 +815,7 @@ const CADASTROS = {
       if (r) {
         R.atualizar(db, 'contratos', r.id, dados, login(), dados.inquilino_nome);
         c = R.buscar(db, 'contratos', r.id);
-      } else c = R.inserir(db, 'contratos', dados, login(), dados.inquilino_nome);
+      } else c = R.inserir(db, 'contratos', { ...dados, docs_entrada: true }, login(), dados.inquilino_nome);
       for (const f of fiadoresNovos) R.inserir(db, 'fiadores', { ...f, contrato_id: c.id }, login(), `Fiador ${f.nome}`);
       fiadoresNovos = [];
       return c;
@@ -956,13 +1053,27 @@ const CADASTROS = {
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
   },
   avulsas: {
-    titulo: (r) => (r ? 'Editar NF avulsa' : 'Nova NF avulsa'),
+    titulo: (r, q) => (r ? 'Editar NF avulsa' : q.modelo === 'airbnb' ? 'Nova NF avulsa do Airbnb' : 'Nova NF avulsa'),
     campos: () => F.AVULSA.map((c) => (c.nome === 'imovel_id' ? { ...c, opcoes: ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]) } : c)),
+    // Airbnb: vem preenchida com os dados padrão (todos podem ser mudados aqui)
+    padrao: (q) => ({ data_pagamento: C.hojeIso(), ...(q.modelo === 'airbnb' ? R.modeloAirbnb(d()) : {}) }),
+    aviso: (r, q) => (!r && q.modelo === 'airbnb' ? 'Dados do Airbnb já preenchidos: confira, informe a data em que o dinheiro entrou e o valor. Pode mudar qualquer campo.' : ''),
+    extraHtml: (r, q) => (!r && q.modelo === 'airbnb' ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : ''),
     voltar: () => '#/faturas',
     descricao: (dados) => `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
-    ajustar(dados, erros, r) {
+    ajustar(dados, erros, r, form) {
       if (r && R.faturasDe(d(), 'avulsa', r.id).length) erros.valor = 'Já tem número de NF';
       if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
+      guardarModeloAirbnb = new FormData(form).get('salvar_modelo') === '1';
+    },
+    salvar(db, dados, q, r) {
+      if (guardarModeloAirbnb) {
+        db.modelo_airbnb = Object.fromEntries(R.CAMPOS_MODELO_AIRBNB.map((k) => [k, dados[k] ?? '']));
+        R.registrar(db, login(), 'Alteração', 'avulsas', null, 'Padrão da NF avulsa do Airbnb alterado', db.modelo_airbnb);
+      }
+      guardarModeloAirbnb = false;
+      if (r) { R.atualizar(db, 'avulsas', r.id, dados, login(), `NF avulsa: ${dados.tomador_nome}`); return R.buscar(db, 'avulsas', r.id); }
+      return R.inserir(db, 'avulsas', dados, login(), `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`);
     },
   },
   emitentes: {
@@ -1049,37 +1160,53 @@ function formPagamento(cb, compacto) {
     <p class="suave">A data contábil é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
 }
 
-function telaCobrancas(comp) {
+const nomeI = (x) => (x.i ? x.i.nome : '');
+/** Ordenações da lista de boletos (o padrão é a data de vencimento). */
+const ORDENS_BOLETO = {
+  vencimento: (a, b) => a.cb.vencimento.localeCompare(b.cb.vencimento) || nomeI(a).localeCompare(nomeI(b), 'pt-BR'),
+  imovel: (a, b) => nomeI(a).localeCompare(nomeI(b), 'pt-BR'),
+  inquilino: (a, b) => a.c.inquilino_nome.localeCompare(b.c.inquilino_nome, 'pt-BR'),
+  valor: (a, b) => b.t.a_pagar_pontual - a.t.a_pagar_pontual,
+};
+
+function telaCobrancas(comp, ordem = 'vencimento') {
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
     const c = buscar('contratos', cb.contrato_id);
     return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: R.faturasDe(d(), 'cobranca', cb.id) };
-  }).sort((a, b) => (a.i ? a.i.nome : '').localeCompare(b.i ? b.i.nome : '', 'pt-BR'));
+  }).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
   const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id));
   const pend = R.pendentesDeFatura(d());
   // boleto de controle (inquilino sem NF) não entra nas somas
   const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
   const controle = lista.filter((x) => !R.geraNf(x.c)).length;
+  // reajuste no aluguel seguinte: a carta vai junto com este boleto
+  const proxima = C.somarMeses(comp, 1);
+  const reajustes = new Map(lista.map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, proxima)]).filter(([, r]) => r && !r.corrigido));
   // botões de impressão em cima e embaixo da lista
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
       <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>`;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
-      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
+      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, -1)}&ordem=${ordem}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
-      <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
+      <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}&ordem=${ordem}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+    ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(proxima)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha). ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
-    ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>` : ''}
+    ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
+      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <span class="suave">Ordenar por:</span> ${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
+    .map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'botao pequeno' : 'botao secundario pequeno')).join(' ')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
-      ${lista.map(({ cb, c, i, t, fs }) => `<tr>
+      ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
         <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
-        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : ` ${etiqueta('controle', 'neutra')}`}
+        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
-          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}</td>
+          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
+          ${reajustes.has(c.id) ? `<br>${etiqueta(`reajuste no aluguel de ${compBr(proxima)}`, 'aviso')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${proxima}`, reajustes.get(c.id).carta ? 'Carta (enviada ✓)' : 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
@@ -1088,7 +1215,7 @@ function telaCobrancas(comp) {
           : cb.situacao === 'Carência' ? situacao('Carência') : (opera() ? formPagamento(cb, true) : situacao(cb.situacao))}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
-        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) ? '<span class="suave">sem NF</span>' : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}</td></tr>`).join('')
+        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}</td></tr>`).join('')
       || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr(comp)}.</td></tr>`}
       ${lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ''}
     </table></div>
@@ -1158,6 +1285,7 @@ function telaCobranca(cb) {
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>
       ${opera() && !cb.data_pagamento ? `${link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir este boleto?')}` : ''}</div></div>
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
+    ${R.geraNf(c) ? '' : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
     ${demonstrativo(cb)}
     <div class="nao-imprimir">${caixaAjuste(cb)}${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
       ${cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
@@ -1170,6 +1298,7 @@ function telaCobranca(cb) {
     <div class="cartao"><h2>NFs</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${R.numeroFatura(f.numero)}</td><td>${esc(buscar('emitentes', f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === 'Emitida' ? 'ok' : 'perigo')}</td></tr>`).join('')
       || `<tr><td colspan="7" class="suave">${!R.geraNf(c) ? 'Este inquilino não emite NF (só controle do pagamento).' : cb.data_pagamento ? 'Aguardando numeração (tela NF).' : 'Confirme o pagamento para gerar a NF.'}</td></tr>`}</table>
+      ${cb.data_pagamento && !validas.length && R.geraNf(c) && opera() ? `<p>${formNfExterna('cobranca', cb.id, cb.data_pagamento)}</p>` : ''}
       ${validas.length ? `<p class="acoes">${link(`#/imprimir/faturas?numero=${validas[0].numero}`, 'Ver / imprimir NF', 'botao')} ${botao('excel', 'Baixar Excel', { numero: validas[0].numero })}</p>` : ''}</div></div>`;
 }
 
@@ -1198,6 +1327,11 @@ function agruparPorNumero(faturas) {
 }
 
 /** Nome curto da empresa no PDF (ex.: ANK). */
+/** "Já emitida fora do sistema": número e data de emissão de uma NF feita antes/fora da plataforma. */
+const formNfExterna = (tipo, id, data) => `<details class="nf-externa"><summary class="link-botao">Já emitida</summary>
+  <form data-form="nfExterna" data-tipo="${tipo}" data-id="${id}" class="acoes"><input type="number" name="numero" min="1" placeholder="nº da NF" style="width:110px">
+  <input type="date" name="emissao" value="${data}" title="Data de emissão da NF" style="width:150px"><button class="pequeno">Registrar</button></form></details>`;
+
 const siglaEmpresa = (e) => (e.aba_modelo || e.nome.split(/\s+/)[0]).toLocaleUpperCase('pt-BR');
 
 function telaFaturas(mes) {
@@ -1215,7 +1349,9 @@ function telaFaturas(mes) {
       ${pend.length ? `<table><tr><th>Ordem</th><th>Pagamento em</th><th>Origem</th><th>Observações na NF</th><th class="n">Valor da NF</th><th></th></tr>
         ${pend.map((p, n) => { const b = R.baseDaFatura(d(), p.tipo, p.registro); return `<tr class="${ultima && p.data < ultima.emissao ? 'fora' : ''}"><td>${R.numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p.data)}${ultima && p.data < ultima.emissao ? ` ${etiqueta('anterior à última NF', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td>
           <td class="suave">${esc(b.observacoes || '')}</td><td class="n">${reais(b.valor)}</td>
-          <td class="n">${opera() ? link(p.tipo === 'cobranca' ? `#/editar/cobrancas/${p.registro.id}?nf=1` : `#/editar/avulsas/${p.registro.id}`, 'Corrigir') : ''}</td></tr>`; }).join('')}</table>
+          <td class="n">${opera() ? `${link(p.tipo === 'cobranca' ? `#/editar/cobrancas/${p.registro.id}?nf=1` : `#/editar/avulsas/${p.registro.id}`, 'Corrigir')}
+            ${formNfExterna(p.tipo, p.registro.id, p.data)}` : ''}</td></tr>`; }).join('')}</table>
+        <p class="suave">Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
         ${opera() ? `<p>${botao('numerar', 'Numerar estas NFs', {}, '')}</p>` : ''}`
       : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
@@ -1223,7 +1359,7 @@ function telaFaturas(mes) {
       ${emitidas.length ? `<div class="acoes barra-nf"><label class="check-mini"><input type="checkbox" data-marcar-todas> selecionar todas</label>
         ${botao('imprimirSelecionadas', 'Imprimir selecionadas')} ${botao('pdfSelecionadas', 'PDF das selecionadas (uma por empresa)')} ${botao('excelSelecionadas', 'Excel das selecionadas')}</div>` : ''}
       <table><tr><th></th><th>Nº</th><th>Emissão</th><th>Cliente</th><th>Origem</th><th>Empresas</th><th class="n">Total</th><th>Situação</th><th></th></tr>
-      ${grupos.map(([n, fs]) => { const ok = fs[0].situacao === 'Emitida'; return `<tr class="${ok ? '' : 'cancelada'}"><td>${ok ? `<input type="checkbox" data-nf="${n}">` : ''}</td><td><b>${R.numeroFatura(n)}</b></td><td>${dataBr(fs[0].emissao)}</td><td>${esc(fs[0].tomador_nome)}</td><td>${origemTexto(fs[0])}</td>
+      ${grupos.map(([n, fs]) => { const ok = fs[0].situacao === 'Emitida'; return `<tr class="${ok ? '' : 'cancelada'}"><td>${ok ? `<input type="checkbox" data-nf="${n}">` : ''}</td><td><b>${R.numeroFatura(n)}</b>${fs[0].externa ? `<br>${etiqueta('fora do sistema', 'neutra')}` : ''}</td><td>${dataBr(fs[0].emissao)}</td><td>${esc(fs[0].tomador_nome)}</td><td>${origemTexto(fs[0])}</td>
         <td>${fs.map((f) => `${esc(buscar('emitentes', f.emitente_id).nome)}: ${reais(f.valor)}${ok ? ` ${botao('pdf', `PDF ${esc(siglaEmpresa(buscar('emitentes', f.emitente_id)))}`, { id: f.id }, 'link-botao')}` : ''}`).join('<br>')}</td><td class="n">${reais(fs.reduce((s, f) => s + f.valor, 0))}</td>
         <td>${etiqueta(fs[0].situacao, ok ? 'ok' : 'perigo')}</td>
         <td class="n nw">${ok ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${opera() ? ` ${botao('cancelarNumero', 'Cancelar', { numero: n }, 'perigo pequeno', `Cancelar a NF nº ${R.numeroFatura(n)}? O pagamento volta para a fila e recebe um número novo. O número ${R.numeroFatura(n)} não será reaproveitado.`)}` : ''}`
@@ -1246,7 +1382,7 @@ function caixaRenumerar() {
 
 function caixaAvulsas() {
   const pend = d().avulsas.filter((a) => !R.faturasDe(d(), 'avulsa', a.id).length);
-  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? link('#/novo/avulsas', 'Nova NF avulsa', 'botao') : ''}</div>
+  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link('#/novo/avulsas?modelo=airbnb', 'Nova NF avulsa do Airbnb', 'botao')} ${link('#/novo/avulsas', 'Nova NF avulsa', 'botao secundario')}</div>` : ''}</div>
     <p class="suave">Para recebimentos fora do boleto, como o faturamento do Airbnb (lançamento esporádico com a data em que o dinheiro entrou) ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
       ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || '')}</td><td class="n">${reais(a.valor)}</td>
@@ -1263,7 +1399,7 @@ function telaInquilinos(q) {
   const atuais = todos.filter((x) => R.contratoAtivo(x.c, hoje)).sort(porNome);
   const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida || '9').localeCompare(String(a.c.data_saida || '9')));
   const anterior = (c) => (c.contrato_anterior_id ? buscar('contratos', c.contrato_anterior_id) : null);
-  const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
+  const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
   const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
   const editar = (c) => (opera() ? link(`#/editar/contratos/${c.id}`, 'Editar') : '');
@@ -1310,11 +1446,135 @@ function telaIptu(ano) {
     <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do boleto que vence no mês informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
 }
 
+/**
+ * Calendário do mês no Painel: grade com os dias; em cada dia, os vencimentos e alertas (cor da situação).
+ * Clicar no dia abre logo abaixo a agenda completa daquele dia.
+ */
+function calendarioDoPainel(mes, hoje) {
+  const eventos = R.eventosDoMes(d(), mes, hoje);
+  const porDia = new Map();
+  for (const e of eventos) { if (!porDia.has(e.data)) porDia.set(e.data, []); porDia.get(e.data).push(e); }
+  const destino = (e) => (e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
+    : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/imovel/${e.imovel_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
+  const curto = (e) => `${e.tipo} ${e.texto.split(' · ')[0]}`;
+  const [ini] = C.limitesCompetencia(mes);
+  const vazios = C.paraData(ini).getUTCDay();
+  const celulas = [...Array(vazios)].map(() => '<div class="cal-dia vazio"></div>');
+  for (let n = 1; n <= C.diasNoMes(mes); n += 1) {
+    const dia = `${mes}-${String(n).padStart(2, '0')}`;
+    const evs = porDia.get(dia) || [];
+    celulas.push(`<div class="cal-dia ${dia === hoje ? 'hoje' : ''} ${evs.length ? 'com-eventos' : ''}" ${evs.length ? `data-acao="abrirDia" data-dia="${dia}" title="Ver a agenda do dia"` : ''}>
+      <div class="cal-num">${n}</div>
+      ${evs.slice(0, 3).map((e) => `<div class="cal-ev ${e.situacao}">${esc(curto(e))}</div>`).join('')}
+      ${evs.length > 3 ? `<div class="cal-mais">+${evs.length - 3}</div>` : ''}</div>`);
+  }
+  const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje ? '' : 'hidden'}>
+      <h3>${dataBr(dia)} · ${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</h3>
+      ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div>`).join('');
+  return `<div class="cartao" id="calendario"><div class="cabecalho"><h2>Calendário de ${compBr(mes)}</h2>
+      <div class="acoes">${link(`#/?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`)} ${link('#/', 'Mês atual')} ${link(`#/?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`)}</div></div>
+    <div class="cal-grade">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
+    ${agendas || ''}
+    <p class="suave">Clique num dia para ver a agenda completa. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const dataExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
+
+/** Botões do reajuste de um contrato numa competência (gerar carta, marcar enviada, aplicar correção). */
+function botoesReajuste(c, r, naCarta = false) {
+  if (r.corrigido) return etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok');
+  return `${naCarta ? '' : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, 'Gerar carta', 'botao pequeno')}
+    ${opera() ? botao('cartaEnviada', r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : 'Marcar carta enviada', { contrato: c.id, comp: r.competencia, enviada: r.carta ? '' : '1' }, r.carta ? 'link-botao' : 'secundario pequeno', r.carta ? 'Desfazer o envio da carta?' : '') : ''}
+    ${opera() ? botao('aplicarReajuste', 'Aplicar correção', { contrato: c.id, comp: r.competencia }, 'secundario pequeno', `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`) : ''}`;
+}
+
+/** Reajustes: índices acumulados informados por vocês e os contratos que corrigem nos próximos meses. */
+function telaReajustes(q) {
+  const atual = C.competenciaDe(C.hojeIso());
+  const de = q.de || C.somarMeses(atual, -2);
+  const ate = q.ate || C.somarMeses(atual, 3);
+  const lista = R.reajustesEntre(d(), de, ate);
+  const indices = [...d().indices_acumulados].sort((a, b) => b.mes_ref.localeCompare(a.mes_ref) || a.indice.localeCompare(b.indice)).slice(0, 36);
+  const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
+  return `<h1>Reajustes do aluguel</h1>
+    <p class="suave">O aluguel é corrigido no 13º mês cheio do contrato (se começou no meio do mês, o primeiro mês não conta) e a cada 12 meses depois. A carta vai junto com o boleto do mês anterior ao corrigido.</p>
+    <div class="cartao"><h2>Índices acumulados em 12 meses</h2>
+      <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
+      ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join('')}</select>
+        <input type="month" name="mes_ref" value="${atual}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>` : ''}
+      <table style="margin-top:8px"><tr><th>Índice</th><th>Acumulado até</th><th class="n">12 meses</th><th></th></tr>
+      ${indices.map((x) => `<tr><td>${esc(x.indice)}</td><td>${compBr(x.mes_ref)}</td><td class="n">${pct(x.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'indices_acumulados', id: x.id }, 'perigo pequeno', 'Excluir este índice?') : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
+    <div class="cartao rolagem"><div class="cabecalho"><h2>Reajustes de ${compBr(de)} a ${compBr(ate)}</h2>
+      <div class="acoes">${link(`#/reajustes?de=${C.somarMeses(de, -3)}&ate=${C.somarMeses(ate, -3)}`, '← anteriores')} ${link(`#/reajustes?de=${C.somarMeses(de, 3)}&ate=${C.somarMeses(ate, 3)}`, 'seguintes →')}</div></div>
+      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual</th><th class="n">Novo</th><th>Carta e correção</th></tr>
+      ${lista.map((r) => { const k = r.calculo; const i = buscar('imoveis', r.contrato.imovel_id); return `<tr><td><b>${compBr(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr(C.somarMeses(r.competencia, -1))}</span></td>
+        <td><a href="#/contrato/${r.contrato.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(r.contrato.inquilino_nome)} · ${r.anos} ano(s)</td>
+        <td>${esc(k.indiceContrato || 'não informado')}${k.escolhido ? `<br><span class="suave">usa ${esc(k.escolhido.indice)} ${pct(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo')}` : ''}</td>
+        <td class="n">${reais(k.atual)}${k.bonificacao ? `<br><span class="suave">${reais(k.atualBonificado)}</span>` : ''}</td>
+        <td class="n">${k.novo !== null ? `<b>${reais(k.novo)}</b>${k.bonificacao ? `<br><span class="suave">${reais(k.novoBonificado)}</span>` : ''}` : '-'}</td>
+        <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="suave">Nenhum reajuste no período.</td></tr>'}</table>
+      <p class="suave">Valores: cheio e, embaixo, com bonificação.</p></div>`;
+}
+
+/** Carta de reajuste com a logo: felicitações por mais um ano e os novos valores. */
+function cartaReajuste(c, comp) {
+  const i = buscar('imoveis', c.imovel_id);
+  const r = R.reajusteNaCompetencia(d(), c, comp);
+  const k = R.calcularReajuste(d(), c, comp);
+  const parte = i && R.participacoesDo(d(), i.id)[0];
+  const empresa = (parte && buscar('emitentes', parte.emitente_id)) || d().emitentes.find((e) => e.ativo) || { nome: '' };
+  const anterior = C.somarMeses(comp, -1);
+  const vencNovo = C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+  if (k.percentual === null) {
+    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}. ${link('#/reajustes', 'Informar em Reajustes')}</div>`;
+  }
+  const varios = k.usados.length > 1;
+  return `<div class="carta">
+    ${d().logo ? `<p><img class="carta-logo" src="${esc(d().logo)}" alt="Logo"></p>` : ''}
+    <p class="carta-data">${esc((i && i.cidade) || 'Curitiba')}, ${dataExtenso(C.hojeIso())}.</p>
+    <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
+    <p>Com o aluguel de <b>${MESES[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
+    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc(k.indiceContrato)}</b> acumulado nos últimos 12 meses${varios ? `: ${k.usados.map((u) => `<b>${esc(u.indice)} ${pct(u.registro.percentual)}</b>`).join(' e ')}. Aplicaremos <b>${pct(k.percentual)}</b>` : ` (até ${compBr(k.escolhido.registro.mes_ref)}): <b>${pct(k.percentual)}</b>`}.</p>
+    <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
+      <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
+      ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ''}</table>
+    <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>
+    <p>Ficamos à disposição para qualquer dúvida.</p>
+    <p>Atenciosamente,<br><b>${esc(empresa.nome)}</b></p></div>`;
+}
+
+/** Inadimplência: quem está devendo, há quantos dias, quanto hoje; e quem costuma atrasar. */
+function telaInadimplencia() {
+  const hoje = C.hojeIso();
+  const r = R.inadimplencia(d(), hoje);
+  const imovelDe = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || '';
+  return `<div class="cabecalho"><h1>Inadimplência</h1>${link('#/cobrancas', 'Ver boletos')}</div>
+    <div class="numeros">
+      <div class="cartao"><div class="grande">${r.devedores.length}</div>inquilino(s) em atraso</div>
+      <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
+      <div class="cartao"><div class="grande">${reais(r.total)}</div>em aberto (valor do boleto)</div>
+      <div class="cartao"><div class="grande">${reais(r.totalHoje)}</div>hoje, com multa e juros</div></div>
+    <div class="cartao rolagem"><h2>Em atraso agora</h2><table><tr><th>Imóvel / inquilino</th><th>Boletos vencidos</th><th class="n">Dias (mais antigo)</th><th class="n">Em aberto</th><th class="n">Hoje, com multa e juros</th></tr>
+      ${r.devedores.map((x) => `<tr class="${x.diasMax > R.DIAS_VERMELHO ? 'fora' : ''}"><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}${x.contrato.inquilino_telefone ? `<br><span class="suave">${esc(x.contrato.inquilino_telefone)}</span>` : ''}${R.geraNf(x.contrato) ? '' : `<br>${etiqueta('boleto de controle', 'controle')}`}</td>
+        <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join('<br>')}</td>
+        <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td></tr>`).join('')
+      || '<tr><td colspan="5" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
+      <p class="suave">Mais de ${R.DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel.</p></div>
+    <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
+      ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
+        <td class="n">${x.atrasados} de ${x.pagos}</td><td class="n">${x.mediaDias} dia(s)</td><td class="n">${x.maiorAtraso} dia(s)</td></tr>`).join('')
+      || '<tr><td colspan="4" class="suave">Ninguém pagou com atraso nos últimos 12 meses.</td></tr>'}</table>
+      <p class="suave">Conta os boletos pagos depois do vencimento (quem marcou "pagou em dia" não conta).</p></div>`;
+}
+
 function telaResultados(q) {
   const hoje = C.hojeIso();
   const ate = q.ate || hoje;
   const de = q.de || C.somarDias(C.somarMesesData(ate, -12), 1);
-  const lista = R.resultadosFinanceiros(d(), de, ate);
+  // imóveis só com boleto de controle vão para o fim, sem posição no ranking
+  const lista = R.resultadosFinanceiros(d(), de, ate).sort((a, b) => a.controle - b.controle);
   const ano = Number(hoje.slice(0, 4));
   const atalhos = [
     ['Últimos 12 meses', C.somarDias(C.somarMesesData(hoje, -12), 1), hoje],
@@ -1322,14 +1582,14 @@ function telaResultados(q) {
     ['Ano passado', `${ano - 1}-01-01`, `${ano - 1}-12-31`],
     ['Últimos 5 anos', C.somarDias(C.somarAnos(hoje, -5), 1), hoje],
   ].map(([t, a, b]) => link(`#/resultados?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
-  const tot = (k) => lista.reduce((s, x) => s + x[k], 0);
+  const tot = (k) => lista.filter((x) => !x.controle).reduce((s, x) => s + x[k], 0);
   const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
   return `<h1>Resultados financeiros</h1>
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
-      ${lista.map((x, n) => `<tr><td>${x.retornoAnual !== null ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span></td>
+      ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span>${x.controle ? `<br>${etiqueta('boleto de controle: não conta', 'controle')}` : ''}</td>
         <td class="n">${x.base ? reais(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais(x.aluguel)}</td><td class="n">${reais(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais(x.iptu)}` : '-'}</td>
         <td class="n"><b>${reais(x.resultado)}</b></td><td class="n"><b>${pctTxt(x.retornoAnual)}</b>${x.retornoAnual ? `<div class="barra"><span style="width:${Math.max(2, (x.retornoAnual / maior) * 100).toFixed(0)}%"></span></div>` : ''}</td>
         <td class="n">${x.reformasPeriodo ? reais(x.reformasPeriodo) : '-'}</td></tr>`).join('') || '<tr><td colspan="9" class="suave">Nenhum imóvel.</td></tr>'}
@@ -1341,6 +1601,27 @@ function telaResultados(q) {
 function telaImprimir(rota) {
   const tipo = rota.partes[1];
   const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
+  if (tipo === 'carta') {
+    const c = buscar('contratos', rota.q.contrato);
+    if (!c) return '<p>Inquilino não encontrado.</p>';
+    const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
+    return `<div class="impressao">${voltar}
+      ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
+      ${cartaReajuste(c, rota.q.comp)}</div>`;
+  }
+  if (['contrato', 'vistoria', 'chaves'].includes(tipo)) {
+    const m = documentoMontado(tipo, rota.q);
+    if (!m) return '<p>Registro não encontrado.</p>';
+    const falta = K.pendenciasDoContrato(d(), m.c);
+    const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
+    return `<div class="impressao">
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
+        ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
+        <a class="botao secundario" href="${volta}">Voltar</a></div>
+      ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
+      ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
+      ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
+  }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
@@ -1357,13 +1638,273 @@ function telaImprimir(rota) {
 }
 
 // --------------------------------------------------------------------------
+// Contrato de locação gerado a partir de um modelo
+// --------------------------------------------------------------------------
+/** Testemunhas usadas da última vez (só neste computador). */
+function testemunhasLembradas() {
+  try { return JSON.parse(localStorage.getItem('testemunhas_contrato')) || {}; } catch { return {}; }
+}
+
+function contratoMontado(q) {
+  const c = buscar('contratos', q.contrato);
+  if (!c) return null;
+  const modelos = K.modelosDe(d());
+  const modelo = modelos.find((m) => m.id === Number(q.modelo)) || modelos[0];
+  const testemunhas = [[q.t1, q.c1], [q.t2, q.c2]].map(([nome, cpf]) => ({ nome: nome || '', cpf: cpf || '' }));
+  const dados = K.dadosDoContrato(d(), c, { data: q.data || C.hojeIso(), testemunhas });
+  return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
+}
+
+/** Contrato, vistoria ou recibo das chaves, prontos para a tela, o PDF e o Word. */
+function documentoMontado(tipo, q) {
+  if (tipo === 'contrato') {
+    const m = contratoMontado(q);
+    return m && { ...m, rodape: m.dados.rodape, nome: 'Contrato' };
+  }
+  if (tipo === 'vistoria') {
+    const v = buscar('vistorias', q.id);
+    const c = v && buscar('contratos', v.contrato_id);
+    if (!c) return null;
+    const momento = v.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
+    const leitura = R.leiturasDo(d(), c.id).find((l) => l.momento === momento) || null;
+    return { c, v, ...K.vistoriaBlocos(d(), c, v, leitura), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
+  }
+  const c = buscar('contratos', q.contrato);
+  if (!c) return null;
+  const chaves = chavesDoContrato(c);
+  return { c, temChaves: !!chaves.trim(), ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves' };
+}
+
+/** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
+function chavesDoContrato(c) {
+  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  return (entrada && entrada.chaves) || (buscar('imoveis', c.imovel_id) || {}).chaves || '';
+}
+
+/** Roteiro por cômodo: o que conferir em cada um (o que ficar sem preencher não sai no documento). */
+const ROTEIRO_BASE = ['Piso e rodapé', 'Paredes e teto (pintura, manchas, fissuras, furos)', 'Porta, fechadura e chave', 'Janela, vidros, grade e trinco',
+  'Tomadas e interruptores (quantidade e voltagem)', 'Iluminação (luminárias e lâmpadas)'];
+const ROTEIROS = {
+  Sala: [...ROTEIRO_BASE, 'Cortinas / persianas', 'Móveis e decoração (item, quantidade e estado)'],
+  Quarto: [...ROTEIRO_BASE, 'Guarda-roupa / armários (portas, gavetas, trilhos)', 'Cortina / blackout', 'Cama, colchão e roupa de cama', 'Outros móveis e decoração'],
+  Cozinha: [...ROTEIRO_BASE, 'Revestimento e rejunte', 'Pia, cuba e torneira', 'Armários (portas e gavetas)', 'Eletrodomésticos (marca, estado e funcionamento)', 'Utensílios (conforme fotos)'],
+  Banheiro: [...ROTEIRO_BASE, 'Revestimento e rejunte', 'Vaso sanitário, assento e descarga', 'Pia, gabinete e torneira', 'Box e chuveiro (voltagem / potência)', 'Ducha higiênica',
+    'Acessórios (papeleira, porta-toalhas, saboneteira, lixeira)', 'Espelho', 'Exaustor'],
+  Lavanderia: [...ROTEIRO_BASE, 'Tanque e torneiras', 'Varal', 'Quadro de disjuntores', 'Máquina de lavar e outros itens'],
+  Corredor: ['Piso e rodapé', 'Paredes e teto', 'Portas', 'Iluminação'],
+  Escada: ['Piso / degraus', 'Paredes e teto', 'Corrimão', 'Porta de acesso e trancas', 'Iluminação'],
+  'Área externa': ['Piso', 'Muros e pintura / textura', 'Tanque e torneiras externas', 'Tomadas externas', 'Iluminação', 'Caixa de gordura / esgoto'],
+  Fachada: ['Muros, portão e pintura', 'Beiral, calhas e rufos', 'Telhado', 'Forro externo', 'Grades e janelas', 'Iluminação e tomadas externas', 'Jardim, vasos e outros itens'],
+  Garagem: ['Piso', 'Portão eletrônico, controles e motor', 'Vagas (quantidade, marcadas ou não)', 'Iluminação', 'Depósito / outros'],
+};
+const roteiroTexto = (comodo) => `## ${comodo}\n${ROTEIROS[comodo].map((x) => `- ${x}: `).join('\n')}\n`;
+
+function telaVistoria(rota) {
+  const id = rota.partes[1];
+  const v = id === 'novo' ? null : buscar('vistorias', id);
+  if (id !== 'novo' && !v) return '<h1>Vistoria não encontrada</h1>';
+  const c = buscar('contratos', v ? v.contrato_id : rota.q.contrato);
+  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
+  const i = buscar('imoveis', c.imovel_id) || {};
+  const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
+  // ponto de partida: na saída, a vistoria de entrada deste inquilino; na entrada, a última vistoria do imóvel
+  const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
+  const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
+  const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
+  return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
+    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
+    ${tipo === 'Saída' ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
+    <form class="cartao" data-form="vistoria">
+      <input type="hidden" name="id" value="${v ? v.id : ''}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
+      <div class="formulario">
+        <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data)}" required></div>
+        <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
+        ${tipo === 'Entrada' ? `<div><label>Dias para o inquilino contestar</label><input type="number" name="prazo_dias" min="1" value="${esc(v ? v.prazo_dias || 3 : 3)}"></div>` : ''}
+      </div>
+      <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
+        <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
+      ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
+      <p><label>Descritivo do imóvel</label>
+        <span class="suave">Uma linha por item. <code>## SALA</code> abre um cômodo; <code>- item: estado</code> vira marcador. Item do roteiro que ficar sem preencher (termina em ":") não sai no documento.
+        Use sempre as mesmas palavras para o estado: <b>novo · ótimo estado · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
+        <span class="acoes" style="margin:8px 0">Inserir roteiro: ${Object.keys(ROTEIROS).map((k) => `<button type="button" class="secundario pequeno" data-acao="inserirRoteiro" data-comodo="${esc(k)}">${esc(k)}</button>`).join('')}</span>
+        <textarea name="descritivo" class="texto-modelo">${valor('descritivo')}</textarea></p>
+      <p><label>Condições gerais</label><textarea name="condicoes" rows="6">${valor('condicoes', K.VISTORIA_CONDICOES)}</textarea></p>
+      <div class="acoes"><button>Salvar e ver o documento</button><a class="botao secundario" href="#/contrato/${c.id}?ir=documentos">Cancelar</a></div></form>`;
+}
+
+function telaGerarContrato(rota) {
+  const c = buscar('contratos', rota.partes[1]);
+  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  const modelos = K.modelosDe(d());
+  const naoRes = c.finalidade === 'Não residencial';
+  const sugerido = Number(rota.q.modelo) || (modelos.find((m) => /n[ãa]o residencial|comercial/i.test(m.nome) === naoRes) || modelos[0]).id;
+  const t = testemunhasLembradas();
+  const falta = K.pendenciasDoContrato(d(), c);
+  const garantia = c.garantia_tipo || 'Sem garantia';
+  return `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Gerar contrato de locação</h1>
+    ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o contrato sai com o espaço em branco): ${falta.map(esc).join('; ')}.
+      ${opera() ? ` ${link(`#/editar/contratos/${c.id}`, 'Completar o cadastro')}` : ''}</div>` : '<div class="alerta ok">Cadastro completo para o contrato.</div>'}
+    <form class="cartao formulario" data-form="gerarContrato">
+      <input type="hidden" name="contrato" value="${c.id}">
+      <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>
+      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc(rota.q.data || C.hojeIso())}"></div>
+      <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
+      <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+      <div class="check"><button>Ver contrato</button></div></form>
+    <div class="cartao"><h2>O que entra automaticamente</h2>
+      <p>Finalidade: <b>${esc(c.finalidade || 'Residencial')}</b> · Garantia: <b>${esc(garantia)}</b>${c.solidario_nome ? ' · com locatário solidário' : ''} ·
+        Locadoras: <b>${esc(K.dadosDoContrato(d(), c).locadoras.map((e) => e.nome).join(' e '))}</b></p>
+      <p class="suave">As partes, valores por extenso, prazo, índice, encargos, garantia e assinaturas vêm do cadastro. Na tela do contrato, use <b>Imprimir / salvar em PDF</b> ou <b>Baixar Word</b> para ajustar algum detalhe antes de assinar.
+        Os textos ficam em ${link('#/modelos-contrato', 'Modelos de contrato', '')}.</p></div>`;
+}
+
+const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um modelo</b></summary>
+  <ul>
+    <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
+      {finalidade} {atividade} {prazo_meses} {data_inicio} {data_fim} {aluguel_cheio} {aluguel_bonificado} {bonificacao_percentual} {dia_vencimento} {indice}
+      {multa} {juros} {tarifa_boleto} {encargos_inquilino} {encargos_inclusos} {caucao_valor} {caucao_meses} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>.</li>
+    <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
+      <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto
+      area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
+    <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
+    <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
+      <code>#i.</code> numera os itens do início.</li>
+    <li>Linha começando com <code># </code>: título; <code>## </code>: seção; <code>&gt; </code>: alinhado à direita. <code>**texto**</code>: negrito.
+      Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
+  </ul></details>`;
+
+function telaModelos() {
+  const salvos = d().modelos_contrato.length > 0;
+  const modelos = K.modelosDe(d());
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? link('#/modelo-contrato/novo', 'Novo modelo', 'botao') : ''}</div>
+    <div class="cartao"><table><tr><th>Modelo</th><th></th></tr>
+    ${modelos.map((m) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
+      ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
+      ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
+      ${podeUsuario('admin') && salvos ? botao('excluirModelo', 'Excluir', { id: m.id }, 'perigo pequeno', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`).join('')}</table>
+    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>. Edite à vontade: os modelos ficam guardados no banco de dados${salvos ? '' : ' (por enquanto, os padrões do sistema)'}.</p></div>
+    ${AJUDA_MODELO}`;
+}
+
+function telaModelo(rota) {
+  const id = rota.partes[1];
+  const m = id === 'novo' ? { id: '', nome: '', texto: '' } : K.modelosDe(d()).find((x) => String(x.id) === id);
+  if (!m) return '<h1>Modelo não encontrado</h1>';
+  return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
+    <h1>${m.id === '' ? 'Novo modelo de contrato' : `Modelo: ${esc(m.nome)}`}</h1>
+    <form class="cartao" data-form="modeloContrato">
+      <input type="hidden" name="id" value="${esc(m.id)}">
+      <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>
+      <p><label>Texto</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
+      <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-contrato">Cancelar</a></div></form>
+    ${AJUDA_MODELO}`;
+}
+
+/** Na primeira alteração, os modelos padrão passam a ficar no banco (e podem ser editados). Devolve o id real. */
+function modelosNoBanco(db, id) {
+  if (!db.modelos_contrato.length) {
+    for (const p of MODELOS_PADRAO) R.inserir(db, 'modelos_contrato', { nome: p.nome, texto: p.texto, padrao: p.nome }, login(), `Modelo de contrato "${p.nome}" (padrão)`);
+  }
+  if (id < 0) {
+    const p = MODELOS_PADRAO[-id - 1];
+    const m = p && db.modelos_contrato.find((x) => x.padrao === p.nome);
+    return m ? m.id : null;
+  }
+  return id;
+}
+
+/** Logo do banco (data URL) → PNG em bytes e tamanho, para o Word. */
+async function logoPng() {
+  if (!d().logo) return null;
+  const img = new Image();
+  img.src = d().logo;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const g = canvas.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const png = async () => new Uint8Array(await (await new Promise((ok) => canvas.toBlob(ok, 'image/png'))).arrayBuffer());
+  const bytes = await png();
+  // marca-d'água: a mesma logo quase transparente (7%), para ficar suave em qualquer leitor de Word
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  g.globalAlpha = 0.07;
+  g.drawImage(img, 0, 0);
+  return { bytes, marca: await png(), largura: canvas.width, altura: canvas.height };
+}
+
+// --------------------------------------------------------------------------
+// Backup seguro do administrador
+// --------------------------------------------------------------------------
+const tamanho = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+
+const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
+    <div><label>Arquivo de backup (.bkp)</label><input type="file" name="arquivo" accept="${B.EXTENSAO}"></div>
+    <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
+    <div class="check"><button>Abrir e baixar o ZIP</button></div></form>
+  <p class="suave">O backup aberto vira um ZIP igual ao do "Exportar tudo". Para voltar os dados: escolha a pasta dos dados (pode ser uma pasta nova e vazia), crie o administrador se pedir e use <b>Dados e backup → Importar ZIP</b>.
+    Os usuários e senhas antigos voltam junto. Se o programa também deu problema, abra a cópia dele que fica na pasta do backup seguro, em <b>${B.PASTA_PROGRAMA}</b>.</p>`;
+
+function telaRestaurarBackup() {
+  return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
+    <h1>Restaurar backup seguro</h1>
+    <p>Use em caso de erro geral: escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos; <b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia) e digite a senha do backup.</p>
+    ${FORM_RESTAURAR}
+    <p><a href="#/">Voltar</a></p></div></main>`;
+}
+
+async function telaBackupSeguro() {
+  if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
+  if (!E.seguro || !E.seguro.chave) {
+    const nova = E.pastaSeguraNova;
+    const chaveExistente = nova ? await B.lerChave(nova) : null;
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+      ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao('reconectarSeguro', 'Reconectar', {}, 'pequeno')}</div>` : ''}
+      <div class="cartao"><h2>1. Escolha a pasta segura</h2>
+        <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, no seu OneDrive pessoal ou num HD externo). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
+        <p>${botao('escolherPastaSegura', nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : 'Escolher a pasta segura', {}, nova ? 'secundario' : '')}</p></div>
+      ${nova ? `<div class="cartao"><h2>2. ${chaveExistente ? 'Digite a senha do backup' : 'Crie a senha do backup'}</h2>
+        ${chaveExistente ? `<p>Esta pasta já tem backups seguros (chave criada em ${new Date(chaveExistente.criada_em).toLocaleDateString('pt-BR')}). Digite a senha para ligar este computador a ela.</p>`
+    : '<div class="alerta aviso"><b>Guarde esta senha em local seguro.</b> Ela é pedida só para restaurar. Sem ela, nenhum backup pode ser aberto, nem por você nem pelo suporte. Use pelo menos 8 caracteres.</div>'}
+        <form data-form="configurarSeguro" class="formulario">
+          <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="new-password"></div>
+          ${chaveExistente ? '' : '<div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div>'}
+          <div class="check"><button>${chaveExistente ? 'Conectar' : 'Criar e fazer o primeiro backup'}</button></div></form></div>` : ''}
+      <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
+  }
+  const lista = await B.listarBackups(E.seguro.dir);
+  const ultimo = (pasta) => lista.find((x) => x.pasta === pasta);
+  const quando = (x) => (x ? new Date(x.alterado).toLocaleString('pt-BR') : 'nenhum ainda');
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+    ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ''}
+    <div class="cartao"><div class="grade">
+      ${item('Pasta segura (só neste computador)', esc(E.seguro.dir.name))}
+      ${item('Última cópia do banco', quando(ultimo(B.PASTA_DIARIO)))}
+      ${item('Último backup completo', quando(ultimo(B.PASTA_SEMANAL)))}
+      ${item('Guarda', `${B.MANTER_DIARIOS} cópias diárias, ${B.MANTER_SEMANAIS} completos semanais e 1 completo por mês durante ${B.MANTER_MENSAIS} meses`)}</div>
+      <p class="suave">A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.
+        O completo semanal é feito sozinho quando o sistema é aberto e já passou uma semana do último. Os arquivos são cifrados: sem a senha do backup ninguém consegue abrir.</p>
+      <div class="acoes">${botao('backupCompletoAgora', 'Fazer backup completo agora', {}, '')}
+        ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div></div>
+    <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
+    <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
+      ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${new Date(x.alterado).toLocaleString('pt-BR')}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
+}
+
+// --------------------------------------------------------------------------
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 function telaEmpresas() {
   return `<div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
-    <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
-    ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
-    || '<tr><td colspan="6" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
+    <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
+    ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
     <div class="cartao"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema.</p>
@@ -1416,6 +1957,11 @@ async function telaDados() {
       <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
       <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
       ${window.VERSAO_OFFLINE ? '' : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
+    ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.</p>
+      <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
+      ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
+    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
@@ -1454,6 +2000,99 @@ async function reduzirImagem(arquivo) {
 }
 
 export const FORMULARIOS = {
+  async configurarSeguro(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    const dir = E.pastaSeguraNova;
+    if (!dir) throw new Error('Escolha a pasta segura primeiro.');
+    const f = new FormData(form);
+    const senha = String(f.get('senha') || '');
+    let chave = await B.lerChave(dir);
+    if (chave) {
+      if (!(await B.conferirSenha(chave, senha))) throw new Error('Senha do backup incorreta.');
+    } else {
+      if (senha !== String(f.get('senha2') || '')) throw new Error('As duas senhas precisam ser iguais.');
+      chave = await B.criarChave(senha);
+      await B.gravarChave(dir, chave);
+    }
+    await S.lembrarPastaSegura(dir);
+    E.pastaSeguraNova = null;
+    await conectarSeguro(false);
+    await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, 'Backup seguro ligado neste computador', null, {}, false));
+    await backupCompletoSeguro();
+    aviso('Backup seguro ligado. Primeiro backup completo gravado.');
+    await mostrar();
+  },
+
+  async restaurarSeguro(form) {
+    const f = new FormData(form);
+    const arq = f.get('arquivo');
+    if (!arq || !arq.size) throw new Error('Escolha o arquivo de backup.');
+    const { info, dados } = await B.decifrar(await arq.arrayBuffer(), String(f.get('senha') || ''));
+    const data = (info.criado_em || '').slice(0, 10);
+    let blob;
+    if (info.tipo === 'completo') blob = new Blob([dados], { type: 'application/zip' });
+    else {
+      const JSZip = await jsZip();
+      const zip = new JSZip();
+      zip.file(S.ARQUIVO_BANCO, dados);
+      blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    }
+    baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
+    aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+  },
+
+  async marcarDocumento(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new Error('Informe a data.');
+    await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login()));
+    await mostrar();
+  },
+
+  async vistoria(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new Error('Informe a data da vistoria.');
+    const c = buscar('contratos', f.contrato);
+    const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
+      chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '' };
+    if (f.tipo === 'Entrada') dados.prazo_dias = Number(f.prazo_dias) || 3;
+    if (f.tipo === 'Saída') {
+      const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
+      dados.comparar_com = entrada ? entrada.data : null;
+    }
+    let id = Number(f.id) || null;
+    await alterar((db) => {
+      const desc = `${c.inquilino_nome}: vistoria de ${f.tipo.toLocaleLowerCase('pt-BR')}`;
+      if (id) R.atualizar(db, 'vistorias', id, dados, login(), desc);
+      else id = R.inserir(db, 'vistorias', dados, login(), desc).id;
+      if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim() }, login(), 'Chaves e controles do imóvel');
+      if (dados.link_fotos && f.tipo === 'Entrada' && !c.vistoria_link) R.atualizar(db, 'contratos', c.id, { vistoria_link: dados.link_fotos }, login(), `${c.inquilino_nome}: link das fotos da vistoria`);
+    });
+    aviso('Vistoria salva.');
+    ir(`#/imprimir/vistoria?id=${id}`);
+  },
+
+  gerarContrato(form) {
+    const f = Object.fromEntries(new FormData(form));
+    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== ''));
+    ir(`#/imprimir/contrato?${q}`);
+  },
+
+  async modeloContrato(form) {
+    const f = new FormData(form);
+    const nome = String(f.get('nome') || '').trim();
+    const texto = String(f.get('texto') || '');
+    if (!nome || !texto.trim()) throw new Error('Preencha o nome e o texto do modelo.');
+    const id = Number(f.get('id') || 0);
+    await alterar((db) => {
+      const real = id ? modelosNoBanco(db, id) : null;
+      if (real) R.atualizar(db, 'modelos_contrato', real, { nome, texto }, login(), `Modelo de contrato "${nome}"`);
+      else R.inserir(db, 'modelos_contrato', { nome, texto }, login(), `Modelo de contrato "${nome}"`);
+    });
+    aviso('Modelo salvo.');
+    ir('#/modelos-contrato');
+  },
+
   async primeiroAcesso(form) {
     const f = new FormData(form);
     const nome = String(f.get('nome')).trim();
@@ -1585,6 +2224,28 @@ export const FORMULARIOS = {
     aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
     await mostrar();
   },
+  async nfExterna(form) {
+    const f = new FormData(form);
+    const n = await alterar((db) => R.registrarNfExterna(db, form.dataset.tipo, Number(form.dataset.id), f.get('numero'), String(f.get('emissao') || ''), login()));
+    aviso(`NF nº ${R.numeroFatura(n)} registrada (emitida fora do sistema).`);
+    await mostrar();
+  },
+
+  async indiceAcumulado(form) {
+    const f = new FormData(form);
+    const indice = String(f.get('indice') || '');
+    const mesRef = String(f.get('mes_ref') || '');
+    if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new Error('Informe o mês até onde vai o acumulado.');
+    const percentual = C.numero(f.get('percentual'));
+    if (String(f.get('percentual') || '').trim() === '') throw new Error('Informe o percentual acumulado em 12 meses.');
+    await alterar((db) => {
+      const existente = db.indices_acumulados.find((x) => x.indice === indice && x.mes_ref === mesRef);
+      if (existente) R.atualizar(db, 'indices_acumulados', existente.id, { percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
+      else R.inserir(db, 'indices_acumulados', { indice, mes_ref: mesRef, percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
+    });
+    aviso('Índice salvo.');
+    await mostrar();
+  },
   filtroResultados(form) {
     const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
     ir(`#/resultados?${q}`);
@@ -1690,6 +2351,7 @@ const TABELAS_EXCLUSAO = {
   seguros: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
+  vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
 };
 
 /** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
@@ -1707,7 +2369,7 @@ const numerosSelecionados = () => {
   return ns;
 };
 
-/** PDF de uma NF (uma empresa), com o nome "EMPRESA IMÓVEL NÚMERO.pdf". */
+/** PDF de uma NF (uma empresa), com o nome "NÚMERO - EMPRESA IMÓVEL.pdf" (ex.: "0123 - ANK Loja 1.pdf"). */
 async function pdfDaFatura(f) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
   const e = buscar('emitentes', f.emitente_id);
@@ -1723,7 +2385,7 @@ async function pdfDaFatura(f) {
     if (h > 277) { w = (w * 277) / h; h = 277; }
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (210 - w) / 2, 10, w, h);
     const imovel = R.imovelDaFatura(E.d, f);
-    const nome = S.limparNome(`${siglaEmpresa(e)} ${imovel ? imovel.nome : f.tomador_nome} ${R.numeroFatura(f.numero)}`);
+    const nome = S.limparNome(`${R.numeroFatura(f.numero)} - ${siglaEmpresa(e)} ${imovel ? imovel.nome : f.tomador_nome}`);
     return { blob: pdf.output('blob'), nome: `${nome}.pdf` };
   } finally {
     caixa.remove();
@@ -1749,6 +2411,95 @@ export const ACOES = {
   reabrir: () => reabrirPastaLembrada(),
   sair: () => sair(),
   imprimir: () => window.print(),
+
+  async documentoWord() {
+    const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
+    const m = documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    if (!m) throw new Error('Registro não encontrado.');
+    const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
+    const i = buscar('imoveis', m.c.imovel_id);
+    const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.rodape, titulo: `${m.nome} - ${m.c.inquilino_nome}` });
+    baixar(blob, `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+  },
+
+  async escolherPastaSegura() {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    try {
+      E.pastaSeguraNova = E.teste ? await pastaSeguraDeTeste() : await window.showDirectoryPicker({ id: 'backup-seguro', mode: 'readwrite' });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      throw e;
+    }
+    if (E.pasta && (await E.pasta.isSameEntry(E.pastaSeguraNova))) {
+      E.pastaSeguraNova = null;
+      throw new Error('Escolha uma pasta diferente da pasta dos dados.');
+    }
+    await mostrar();
+  },
+
+  async reconectarSeguro() {
+    if (await conectarSeguro(true)) {
+      naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+      aviso('Backup seguro reconectado.');
+    } else aviso('O acesso à pasta segura não foi liberado.', 'erro');
+    await mostrar();
+  },
+
+  async backupCompletoAgora() {
+    aviso('Gravando o backup completo…', 'info');
+    await backupCompletoSeguro();
+    if (E.seguroErro) throw new Error(E.seguroErro);
+    aviso('Backup completo gravado na pasta segura.');
+    await mostrar();
+  },
+
+  async desconectarSeguro() {
+    await S.esquecerPastaSegura();
+    E.seguro = null;
+    aviso('Backup seguro desligado neste computador.');
+    await mostrar();
+  },
+
+  async desmarcarDocumento({ contrato, campo }) {
+    await alterar((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
+    await mostrar();
+  },
+
+  /** Vistoria: acrescenta o roteiro do cômodo no fim do descritivo. */
+  inserirRoteiro({ comodo }) {
+    const t = document.querySelector('textarea[name=descritivo]');
+    t.value = `${t.value.replace(/\s*$/, '')}${t.value.trim() ? '\n\n' : ''}${roteiroTexto(comodo)}`;
+    t.focus();
+    t.scrollTop = t.scrollHeight;
+  },
+
+  async copiarModelo({ id }) {
+    let novo;
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', modelosNoBanco(db, Number(id)));
+      novo = R.inserir(db, 'modelos_contrato', { nome: `Cópia de ${m.nome}`, texto: m.texto }, login(), `Modelo de contrato "Cópia de ${m.nome}"`);
+    });
+    ir(`#/modelo-contrato/${novo.id}`);
+  },
+
+  async restaurarModelo({ id }) {
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', Number(id));
+      const p = MODELOS_PADRAO.find((x) => x.nome === m.padrao);
+      R.atualizar(db, 'modelos_contrato', m.id, { texto: p.texto }, login(), `Modelo de contrato "${m.nome}" voltou ao texto padrão`);
+    });
+    aviso('Texto padrão restaurado.');
+    await mostrar();
+  },
+
+  async excluirModelo({ id }) {
+    if (!podeUsuario('admin')) throw new Error('Só administradores podem excluir modelos.');
+    await alterar((db) => {
+      const m = R.buscar(db, 'modelos_contrato', Number(id));
+      if (m) R.excluir(db, 'modelos_contrato', m.id, login(), `Modelo de contrato "${m.nome}" excluído`);
+    });
+    await mostrar();
+  },
   voltar: () => history.back(),
 
   async excluir({ tabela, id }) {
@@ -1764,7 +2515,7 @@ export const ACOES = {
         for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || reg.descricao || null);
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
@@ -1904,6 +2655,32 @@ export const ACOES = {
     await alterar((db) => R.apagarCanceladas(db, Number(numero), login()));
     aviso(`NF nº ${R.numeroFatura(numero)} apagada da lista.`);
     await mostrar();
+  },
+
+  async aplicarReajuste({ contrato, comp }) {
+    const n = await alterar((db) => {
+      R.aplicarReajuste(db, Number(contrato), comp, login());
+      return R.recalcularCobrancas(db, (cb) => cb.contrato_id === Number(contrato), login());
+    });
+    aviso(`Correção registrada a partir do aluguel de ${compBr(comp)}.${n ? ` ${n} boleto(s) em aberto recalculado(s).` : ''}`);
+    await mostrar();
+  },
+
+  async cartaEnviada({ contrato, comp, enviada }) {
+    await alterar((db) => R.marcarCartaEnviada(db, Number(contrato), comp, enviada === '1', login()));
+    await mostrar();
+  },
+
+  /** Calendário do Painel: mostra a agenda do dia clicado (clicar de novo fecha). */
+  abrirDia({ dia }) {
+    const alvo = document.querySelector(`[data-agenda="${dia}"]`);
+    const abrir = alvo && alvo.hidden;
+    document.querySelectorAll('[data-agenda]').forEach((el) => { el.hidden = true; });
+    document.querySelectorAll('.cal-dia.selecionado').forEach((el) => el.classList.remove('selecionado'));
+    if (abrir) {
+      alvo.hidden = false;
+      document.querySelector(`.cal-dia[data-dia="${dia}"]`).classList.add('selecionado');
+    }
   },
 
   imprimirDemonstrativos({ comp }) {

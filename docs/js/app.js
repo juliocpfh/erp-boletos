@@ -1,6 +1,7 @@
 // Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
 import { conferirSenha, novoSal, pode, resumoSenha } from './auth.js';
+import * as B from './backup-seguro.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
@@ -12,6 +13,9 @@ export const E = {
   usuario: null,
   teste: new URLSearchParams(location.search).has('teste'),
   backupFeito: false,
+  seguro: null, // backup seguro: { dir, chave } conectado, ou { dir, desconectado } sem permissão neste momento
+  seguroErro: '',
+  pastaSeguraNova: null, // pasta escolhida na tela do backup seguro, antes de criar/digitar a senha
 };
 
 export const login = () => (E.usuario ? E.usuario.login : 'sistema');
@@ -70,12 +74,70 @@ export async function alterar(fn) {
   copia.revisao = (copia.revisao || 0) + 1;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
+  if (E.seguro && E.seguro.chave) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, copia));
   if (!E.backupFeito) {
     E.backupFeito = true;
     S.backupDiario(E.pasta, copia).catch(() => {});
   }
   atualizarFaixa();
   return resultado;
+}
+
+// --------------------------------------------------------------------------
+// Backup seguro (segunda pasta do administrador): cópia cifrada a cada gravação e completo semanal
+// --------------------------------------------------------------------------
+let filaSegura = Promise.resolve();
+/** Uma gravação na pasta segura por vez; erro não atrapalha o uso do sistema (aparece para o administrador). */
+export function naFilaSegura(fn) {
+  filaSegura = filaSegura.then(fn).then(() => { E.seguroErro = ''; }).catch((e) => {
+    console.error(e);
+    E.seguroErro = e.message || String(e);
+  });
+  return filaSegura;
+}
+
+export async function pastaSeguraDeTeste() {
+  const raiz = await navigator.storage.getDirectory();
+  return raiz.getDirectoryHandle('teste-backup-seguro', { create: true });
+}
+
+/** Liga o backup seguro se este computador tem a pasta lembrada e a permissão (``pedir``: só com clique do usuário). */
+export async function conectarSeguro(pedir = false) {
+  const h = await S.pastaSeguraLembrada();
+  if (!h) {
+    E.seguro = null;
+    return false;
+  }
+  if (!(await S.temPermissao(h, pedir))) {
+    E.seguro = { dir: h, desconectado: true };
+    return false;
+  }
+  const chave = await B.lerChave(h);
+  E.seguro = chave ? { dir: h, chave } : null;
+  return !!chave;
+}
+
+/** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado, e uma cópia do programa sem internet. */
+export function backupCompletoSeguro() {
+  return naFilaSegura(async () => {
+    if (!E.seguro || !E.seguro.chave || !E.pasta || !E.d) return;
+    const JSZip = await jsZip();
+    const zip = await S.exportarZip(JSZip, E.pasta, E.d);
+    await B.gravarCompleto(E.seguro.dir, E.seguro.chave, new Uint8Array(await zip.arrayBuffer()));
+    if (!window.VERSAO_OFFLINE) {
+      try {
+        const r = await fetch('offline/administracao-imoveis.html', { cache: 'no-store' });
+        if (r.ok) await B.gravarPrograma(E.seguro.dir, await r.text());
+      } catch { /* sem internet: fica a cópia anterior do programa */ }
+    }
+  });
+}
+
+/** Ao abrir a pasta: cópia do banco do dia e, se já passou uma semana, o backup completo. */
+async function rotinaSegura() {
+  if (!(await conectarSeguro(false)) || !E.d) return;
+  naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+  if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
 }
 
 async function verificarMudancasExternas() {
@@ -96,17 +158,33 @@ async function verificarMudancasExternas() {
 // --------------------------------------------------------------------------
 // Mensagens e utilidades de tela
 // --------------------------------------------------------------------------
+// Mensagens do topo: confirmações somem sozinhas em alguns segundos; erros ficam até fechar no ×.
+// Uma mensagem aparece numa tela só (não volta na próxima página).
 let mensagens = [];
+let proximaMensagem = 1;
 export function aviso(texto, tipo = 'ok') {
-  mensagens.push({ texto, tipo });
+  const m = { id: proximaMensagem++, texto, tipo };
+  mensagens.push(m);
   desenharMensagens();
+  if (tipo !== 'erro') setTimeout(() => fecharMensagem(m.id), tipo === 'aviso' ? 15000 : 6000);
+}
+
+function fecharMensagem(id) {
+  mensagens = mensagens.filter((x) => x.id !== id);
+  const el = document.querySelector(`#mensagens [data-msg="${id}"]`);
+  if (el) el.remove();
 }
 
 function desenharMensagens() {
   const el = document.getElementById('mensagens');
   if (!el) return;
-  el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo}">${esc(m.texto)}</div>`).join('');
+  el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo} mensagem" data-msg="${m.id}">${esc(m.texto)}<button type="button" class="fechar" title="Fechar" data-fechar-msg="${m.id}">×</button></div>`).join('');
 }
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-fechar-msg]');
+  if (b) fecharMensagem(Number(b.dataset.fecharMsg));
+});
 
 export function ir(hash) {
   if (location.hash === hash) mostrar();
@@ -160,6 +238,7 @@ export async function abrirPasta(handle) {
   E.backupFeito = false;
   E.usuario = usuarioDaSessao();
   await mostrar();
+  rotinaSegura().catch((e) => { E.seguroErro = e.message; });
 }
 
 export async function escolherPasta() {
@@ -231,14 +310,14 @@ function atualizarFaixa() {
 }
 
 const MENU = [
-  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/iptu', 'IPTU', '^iptu$'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/cobrancas', 'Boletos', 'cobranca'],
+  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/iptu', 'IPTU', '^iptu$'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'],
   ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', 'resultados'], ['#/empresas', 'Empresas', 'empresa'], ['#/historico', 'Histórico', 'historico'],
   ['#/dados', 'Dados e backup', 'dados'],
 ];
 
 function layout(conteudo, rota) {
   // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
-  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'seguros'].includes(rota.partes[1]);
+  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'solicitacoes'].includes(rota.partes[1]);
   const deIptu = ['novo', 'editar'].includes(rota.partes[0]) && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
   const atual = deInquilino ? 'inquilino' : deIptu ? 'iptu' : rota.partes[0] || '';
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
@@ -256,7 +335,8 @@ export async function mostrar(estadoForm = null) {
   const rota = rotaAtual();
   try {
     let html;
-    if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
+    if (rota.partes[0] === 'restaurar-backup') html = await TELAS.restaurarBackup();
+    else if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
     else if (!E.pasta) html = await TELAS.inicio();
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
     else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();

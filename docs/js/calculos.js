@@ -100,16 +100,16 @@ export function somarMesesData(isoData, meses) {
   return `${alvo}-${String(Math.min(Number(isoData.slice(8, 10)), diasNoMes(alvo))).padStart(2, '0')}`;
 }
 
-/** Fim do contrato: início + meses - 1 dia (01/02/2025 + 30 meses = 31/07/2027). */
+/** Fim do contrato: o mesmo dia, X meses depois, como nos contratos (05/09/2026 + 30 meses = 05/03/2029). */
 export function fimDoPrazo(inicio, meses) {
-  return somarDias(somarMesesData(inicio, meses), -1);
+  return somarMesesData(inicio, meses);
 }
 
-/** Meses entre o início e o fim do contrato (o inverso de fimDoPrazo, arredondado). */
+/** Meses entre o início e o fim do contrato (o inverso de fimDoPrazo; aceita também o fim um dia antes). */
 export function mesesDoPrazo(inicio, fim) {
   if (!inicio || !fim) return null;
-  const m = mesesEntre(inicio.slice(0, 7), somarDias(fim, 1).slice(0, 7));
-  for (const x of [m, m - 1, m + 1]) if (x > 0 && fimDoPrazo(inicio, x) === fim) return x;
+  const m = mesesEntre(inicio.slice(0, 7), fim.slice(0, 7));
+  for (const x of [m, m + 1, m - 1]) if (x > 0 && (fimDoPrazo(inicio, x) === fim || somarDias(fimDoPrazo(inicio, x), -1) === fim)) return x;
   return Math.max(1, m);
 }
 
