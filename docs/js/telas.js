@@ -760,6 +760,22 @@ function caixaIncluso(c) {
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
+/** Taxas do proprietário pagas pelo inquilino no condomínio: o que já foi ressarcido e o botão para lançar. */
+function caixaRessarcimentos(c) {
+  const lista = R.ressarcimentosDo(d(), c.id);
+  if (!R.inquilinoPagaCondominio(c) && !lista.length) return '';
+  const aConferir = R.condominioAConferir(c);
+  return `<div class="cartao" id="ressarcimentos"><div class="cabecalho"><h2>Condomínio: taxas do proprietário (ressarcimento)</h2>
+      ${opera() ? link(`#/novo/ressarcimentos?contrato=${c.id}`, 'Lançar ressarcimento') : ''}</div>
+    <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui: o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${d().ressarcimento_abate_nf ? ' e também sai do valor da NF' : ' e conta como gasto nos Resultados (a NF sai com o aluguel cheio)'}.</p>
+    ${aConferir ? `<div class="alerta info">Condomínio de ${compBr(aConferir)} ainda não conferido. ${opera() ? botao('condominioConferido', `Conferido: sem taxa do proprietário em ${compBr(aConferir)}`, { id: c.id, mes: aConferir }, 'secundario pequeno') : ''}</div>`
+    : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.</p>` : ''}
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto de</th><th></th></tr>
+      ${lista.map((x) => { const cb = d().cobrancas.find((b) => b.contrato_id === c.id && b.competencia === x.competencia_abatimento); return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td>
+        <td>${compBr(x.competencia_abatimento)} ${cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : etiqueta('no boleto em aberto', 'info')) : etiqueta('entra quando o boleto for gerado', 'neutra')}</td>
+        <td class="n nw">${opera() && !(cb && cb.data_pagamento) ? `${link(`#/editar/ressarcimentos/${x.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'ressarcimentos', id: x.id }, 'perigo pequeno', 'Excluir este ressarcimento?')}` : ''}</td></tr>`; }).join('')}</table></div>` : ''}</div>`;
+}
+
 function caixaSolicitacoes(c) {
   const lista = R.solicitacoesDo(d(), c.id);
   const cor = { Aberta: 'perigo', 'Em andamento': 'aviso', Concluída: 'ok', 'Não atendida': 'neutra' };
@@ -884,6 +900,7 @@ function telaContrato(c) {
           ${opera() ? botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno') : ''}</p>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaIncluso(c)}
+    ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
@@ -934,6 +951,35 @@ const CADASTROS = {
     async depois(salvo, antigo) {
       if (antigo && antigo.pasta && antigo.pasta !== salvo.pasta) await renomearNoDisco([], antigo.pasta, salvo.pasta);
     },
+  },
+  ressarcimentos: {
+    titulo: (r, q) => `Ressarcimento de condomínio - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: () => F.RESSARCIMENTO,
+    padrao: () => ({ competencia_condominio: C.somarMeses(C.competenciaDe(C.hojeIso()), -1) }),
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    aviso: () => 'Taxas extraordinárias do condomínio são do proprietário (Lei 8.245/91, art. 22, X): fundo de obras, constituição do fundo de reserva, obras na estrutura, pintura de fachada, equipamentos de segurança, paisagismo das áreas comuns, indenizações trabalhistas de antes da locação. Se o inquilino pagou no boleto do condomínio, o valor volta para ele no boleto do aluguel.',
+    ajustar(dados, erros, r, form, q) {
+      const c = buscar('contratos', r ? r.contrato_id : q.contrato);
+      if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
+      if (dados.descricao === 'Outra' && !dados.detalhe) erros.detalhe = 'Diga qual é a taxa';
+      if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
+      const cb = d().cobrancas.find((x) => x.contrato_id === c.id && x.competencia === dados.competencia_abatimento);
+      if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
+        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
+      }
+      if (dados.detalhe) dados.descricao = `${dados.descricao === 'Outra' ? '' : `${dados.descricao}: `}${dados.detalhe}`;
+    },
+    salvar(db, dados, q, r) {
+      const anterior = r ? r.competencia_abatimento : null;
+      let salvo;
+      if (r) { R.atualizar(db, 'ressarcimentos', r.id, dados, login(), `Ressarcimento de condomínio ${dados.descricao}`); salvo = R.buscar(db, 'ressarcimentos', r.id); }
+      else salvo = R.inserir(db, 'ressarcimentos', dados, login(), `Ressarcimento de condomínio ${dados.descricao}`);
+      const c = R.buscar(db, 'contratos', salvo.contrato_id);
+      for (const comp of new Set([anterior, salvo.competencia_abatimento].filter(Boolean))) R.aplicarRessarcimentos(db, c, comp, login());
+      R.marcarCondominioConferido(db, c.id, salvo.competencia_condominio, login());
+      return salvo;
+    },
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`,
   },
   solicitacoes: {
     titulo: (r, q) => `Solicitação do inquilino - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
@@ -1595,6 +1641,7 @@ function demonstrativo(cb) {
       <tr class="total"><td>Total sem desconto</td><td class="n">${reais(t.total_sem_desconto)}</td></tr>
       ${cb.desconto ? linha('(-) Desconto de pontualidade, se pago até o vencimento', `- ${reais(cb.desconto)}`) : ''}
       ${cb.reserva_utilizada ? linha('(-) Reserva paga na visita, abatida neste mês', `- ${reais(cb.reserva_utilizada)}`) : ''}
+      ${cb.ressarcimento ? linha(`(-) Ressarcimento de taxa do condomínio (${esc(cb.ressarcimento_descricao || '')})`, `- ${reais(cb.ressarcimento)}`) : ''}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou em dia; compensado depois)' : ''}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ''}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
@@ -2428,6 +2475,11 @@ function telaEmpresas() {
       ${d().logo ? `<p><img class="logo-previa" src="${esc(d().logo)}" alt="Logo atual"></p>` : '<p class="suave">Nenhuma logo enviada.</p>'}
       ${podeUsuario('admin') ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? 'Trocar logo' : 'Enviar logo'}</button>
         ${d().logo ? botao('removerLogo', 'Remover logo', {}, 'perigo pequeno', 'Remover a logo?') : ''}</form>` : ''}</div>
+    <div class="cartao"><h2>Ressarcimento de taxas do condomínio</h2>
+      <p>Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. ${d().ressarcimento_abate_nf
+    ? '<b>Hoje: o ressarcimento sai do valor da NF</b> (a NF fica com o aluguel menos a taxa) e não conta de novo como gasto.' : '<b>Hoje: a NF sai com o aluguel cheio</b> e o ressarcimento conta como gasto do imóvel nos Resultados.'}</p>
+      <p class="suave">Confirme com o contador qual forma usar. A mudança vale para os boletos gerados ou recalculados daqui em diante.</p>
+      ${podeUsuario('admin') ? botao('ressarcimentoNaNf', d().ressarcimento_abate_nf ? 'Passar a emitir a NF com o aluguel cheio' : 'Passar a abater o ressarcimento da NF', { valor: d().ressarcimento_abate_nf ? '' : '1' }, 'secundario pequeno', 'Mudar a forma da NF nos ressarcimentos de condomínio?') : ''}</div>
     <div class="cartao"><h2>Numeração das NFs</h2>
       <p>Próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
       ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
@@ -2926,6 +2978,12 @@ const TABELAS_EXCLUSAO = {
   encerramentos: { admin: true },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   despesas: {},
+  ressarcimentos: {
+    checar: (db, r) => ((db.cobrancas.find((cb) => cb.contrato_id === r.contrato_id && cb.competencia === r.competencia_abatimento) || {}).data_pagamento
+      ? 'Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes.' : null),
+    depois: (db, r) => R.aplicarRessarcimentos(db, R.buscar(db, 'contratos', r.contrato_id), r.competencia_abatimento, login()),
+    voltar: (r) => `#/contrato/${r.contrato_id}?ir=ressarcimentos`,
+  },
 };
 
 /** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
@@ -3094,6 +3152,22 @@ export const ACOES = {
     await mostrar();
   },
 
+  async ressarcimentoNaNf({ valor }) {
+    if (!podeUsuario('admin')) throw new Error('Só administradores mudam esta opção.');
+    await alterar((db) => {
+      db.ressarcimento_abate_nf = valor === '1';
+      R.registrar(db, login(), 'Alteração', 'banco', null, `Ressarcimento de condomínio ${valor === '1' ? 'abate o valor da NF' : 'não abate a NF (conta como gasto)'}`, null, {}, false);
+      // boletos em aberto com ressarcimento passam a seguir a opção nova
+      for (const cb of db.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0)) R.atualizar(db, 'cobrancas', cb.id, { ressarcimento_na_nf: valor === '1' }, login(), 'Ressarcimento na NF');
+    });
+    await mostrar();
+  },
+
+  async condominioConferido({ id, mes }) {
+    await alterar((db) => R.marcarCondominioConferido(db, Number(id), mes, login()));
+    await mostrar();
+  },
+
   async desmarcarDocumento({ contrato, campo }) {
     await alterar((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
     await mostrar();
@@ -3149,10 +3223,11 @@ export const ACOES = {
         for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
+        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'ressarcimentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
       }
       R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || reg.descricao || null);
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
+      if (cfg.depois) cfg.depois(db, reg);
     });
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();
@@ -3443,6 +3518,11 @@ export const ACOES = {
     E.d.despesas.filter((x) => x.data_pagamento >= de && x.data_pagamento <= ate)
       .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)))
       .forEach((x) => wc.addRow([(buscar('imoveis', x.imovel_id) || {}).nome || '', compBr(x.competencia), x.tipo, r(x.valor), new Date(`${x.data_pagamento}T12:00:00`), x.observacoes || '']));
+    // ressarcimentos de condomínio abatidos em boletos pagos no período (quando não saíram da NF)
+    E.d.cobrancas.filter((cb) => cb.ressarcimento > 0 && !cb.ressarcimento_na_nf && cb.data_pagamento >= de && cb.data_pagamento <= ate).forEach((cb) => {
+      const c = buscar('contratos', cb.contrato_id) || {};
+      wc.addRow([(buscar('imoveis', c.imovel_id) || {}).nome || '', compBr(cb.competencia), 'Ressarcimento condomínio', r(cb.ressarcimento), new Date(`${cb.data_pagamento}T12:00:00`), cb.ressarcimento_descricao || '']);
+    });
     wc.getColumn(4).numFmt = moeda;
     wc.getColumn(5).numFmt = 'dd/mm/yyyy';
     const buf = await wb.xlsx.writeBuffer();
