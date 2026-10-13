@@ -83,13 +83,31 @@ test('liquidação e valor da nota fiscal', () => {
   assert.equal(atraso.valor_nf, 135000 + 14850 + 490);
 });
 
+test('valores digitados com milhar sem centavos e prazo em meses', () => {
+  assert.equal(C.centavos('1.350'), 135000);
+  assert.equal(C.centavos('12.345.678'), 1234567800);
+  assert.equal(C.centavos('1.35'), 135);
+  assert.equal(C.fimDoPrazo('2025-02-01', 30), '2027-07-31');
+  assert.equal(C.fimDoPrazo('2024-01-31', 1), '2024-02-28');
+  assert.equal(C.mesesDoPrazo('2025-02-01', '2027-07-31'), 30);
+  assert.equal(C.mesesDoPrazo('2024-09-01', '2027-09-01'), 36);
+});
+
+test('bonificação pelo aluguel bonificado bate no centavo', () => {
+  for (const [base, bonif] of [[364445, 328000], [999999, 912345], [135000, 121500], [10000000, 9123457]]) {
+    const p = C.percentualPorBonificado(base, bonif);
+    assert.equal(base - C.descontoPorPercentual(base, p), bonif);
+  }
+});
+
 test('divisão da fatura entre as empresas', () => {
   assert.deepEqual(C.dividir(135000, [50, 50]), [67500, 67500]);
   assert.deepEqual(C.dividir(121501, [50, 50]), [60751, 60750]);
 });
 
 test('alertas de correção, seguro e reserva', () => {
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-09-15', []), null);
+  assert.equal(A.alertaCorrecao('2025-11-01', '2026-08-15', []), null);
+  assert.equal(A.alertaCorrecao('2025-11-01', '2026-09-15', []).nivel, 'aviso'); // 60 dias antes
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-10-05', []).nivel, 'aviso');
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', []).nivel, 'perigo');
   assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', ['2026-11-01']), null);

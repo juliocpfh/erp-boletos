@@ -15,6 +15,45 @@ export const E = {
 };
 
 export const login = () => (E.usuario ? E.usuario.login : 'sistema');
+
+// --------------------------------------------------------------------------
+// Sessão: o login fica lembrado neste navegador (todas as abas) por 12 horas sem uso, até clicar em Sair.
+// Antes ficava só na aba (sessionStorage): cada aba nova (impressão, Ctrl+clique) pedia login de novo.
+// --------------------------------------------------------------------------
+const SESSAO = 'imoveis-sessao';
+const DURACAO_SESSAO = 12 * 3600 * 1000;
+
+function lerSessao() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSAO) || 'null');
+    return s && s.ate > Date.now() ? s.login : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarSessao(loginTexto) {
+  try {
+    if (loginTexto) localStorage.setItem(SESSAO, JSON.stringify({ login: loginTexto, ate: Date.now() + DURACAO_SESSAO }));
+    else localStorage.removeItem(SESSAO);
+  } catch { /* navegador sem armazenamento: pede login de novo */ }
+}
+
+/** Usuário da sessão lembrada, se ainda estiver ativo no banco. */
+const usuarioDaSessao = () => {
+  const salvo = lerSessao();
+  return (E.d && salvo && E.d.usuarios.find((u) => u.login === salvo && u.ativo && !u.pendente)) || null;
+};
+
+// Sair numa aba sai de todas; entrar numa aba vale para as outras.
+window.addEventListener('storage', (ev) => {
+  if (ev.key !== SESSAO || !E.d) return;
+  const u = usuarioDaSessao();
+  if ((u && u.login) !== (E.usuario && E.usuario.login)) {
+    E.usuario = u;
+    mostrar();
+  }
+});
 export const podeUsuario = (papel) => pode(E.usuario, papel);
 
 // --------------------------------------------------------------------------
@@ -45,6 +84,7 @@ async function verificarMudancasExternas() {
     const disco = await S.lerBanco(E.pasta);
     if (disco && disco.revisao !== E.d.revisao) {
       E.d = disco;
+      renovarUsuario();
       atualizarFaixa();
       const editando = document.querySelector('main form[data-form]');
       if (editando) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
@@ -96,6 +136,13 @@ export function carregarScript(url, global) {
 }
 export const excelJs = () => carregarScript('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js', 'ExcelJS');
 export const jsZip = () => carregarScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', 'JSZip');
+export async function bibliotecasPdf() {
+  const [h2c, jspdf] = await Promise.all([
+    carregarScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'html2canvas'),
+    carregarScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'jspdf'),
+  ]);
+  return { html2canvas: h2c, jsPDF: jspdf.jsPDF };
+}
 
 // --------------------------------------------------------------------------
 // Abertura: escolher pasta, primeiro acesso e login
@@ -108,17 +155,14 @@ async function pastaDeTeste() {
 export async function abrirPasta(handle) {
   E.pasta = handle;
   E.d = await S.lerBanco(handle);
-  E.usuario = null;
   E.backupFeito = false;
-  const salvo = sessionStorage.getItem('usuario');
-  if (E.d && salvo) E.usuario = E.d.usuarios.find((u) => u.login === salvo && u.ativo) || null;
+  E.usuario = usuarioDaSessao();
   await mostrar();
 }
 
 export async function escolherPasta() {
   try {
     const h = E.teste ? await pastaDeTeste() : await S.escolherPasta();
-    sessionStorage.removeItem('usuario');
     await abrirPasta(h);
   } catch (e) {
     if (e.name !== 'AbortError') aviso(e.message, 'erro');
@@ -142,20 +186,30 @@ export async function criarBanco(nome, loginTexto, senha) {
   await S.gravarBanco(E.pasta, novo);
   E.d = novo;
   E.usuario = u;
-  sessionStorage.setItem('usuario', u.login);
+  gravarSessao(u.login);
 }
 
 export async function entrar(loginTexto, senha) {
   E.d = await S.lerBanco(E.pasta);
-  const u = E.d.usuarios.find((x) => x.login === loginTexto && x.ativo);
+  const u = E.d.usuarios.find((x) => x.login === loginTexto);
   if (!(await conferirSenha(u, senha))) throw new Error('Login ou senha incorretos.');
+  if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
+  if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
   E.usuario = u;
-  sessionStorage.setItem('usuario', u.login);
+  gravarSessao(u.login);
+}
+
+/** Atualiza o usuário logado depois de alterar o cadastro dele (ou sai, se foi bloqueado). */
+export function renovarUsuario() {
+  if (!E.usuario) return;
+  const u = E.d.usuarios.find((x) => x.id === E.usuario.id && x.ativo && !x.pendente) || null;
+  E.usuario = u;
+  gravarSessao(u && u.login);
 }
 
 export function sair() {
   E.usuario = null;
-  sessionStorage.removeItem('usuario');
+  gravarSessao(null);
   ir('#/');
 }
 
@@ -175,8 +229,8 @@ function atualizarFaixa() {
 }
 
 const MENU = [
-  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/cobrancas', 'Cobranças', 'cobranca'], ['#/iptu', 'IPTU', '^iptu$'],
-  ['#/faturas', 'Faturas', 'fatura'], ['#/empresas', 'Empresas', 'empresa'], ['#/historico', 'Histórico', 'historico'],
+  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/iptu', 'IPTU', '^iptu$'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/cobrancas', 'Boletos', 'cobranca'],
+  ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', 'resultados'], ['#/empresas', 'Empresas', 'empresa'], ['#/historico', 'Histórico', 'historico'],
   ['#/dados', 'Dados e backup', 'dados'],
 ];
 
@@ -186,7 +240,7 @@ function layout(conteudo, rota) {
   const deIptu = ['novo', 'editar'].includes(rota.partes[0]) && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
   const atual = deInquilino ? 'inquilino' : deIptu ? 'iptu' : rota.partes[0] || '';
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
-    + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários</a>` : '');
+    + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
   return `<header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a><nav>${menu}</nav>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
@@ -203,8 +257,9 @@ export async function mostrar(estadoForm = null) {
     if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
     else if (!E.pasta) html = await TELAS.inicio();
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
-    else if (!E.usuario) html = TELAS.login();
+    else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();
     else {
+      gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
       const tela = TELAS[nome];
       const conteudo = tela ? await tela(rota, estadoForm) : '<h1>Página não encontrada</h1>';
@@ -215,6 +270,9 @@ export async function mostrar(estadoForm = null) {
     desenharMensagens();
     mensagens = [];
     await montarExtras(app);
+    // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel)
+    const alvo = rota.q.ir && document.getElementById(rota.q.ir);
+    if (alvo) alvo.scrollIntoView({ block: 'start' });
   } catch (e) {
     console.error(e);
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
@@ -266,6 +324,10 @@ document.addEventListener('click', async (ev) => {
 });
 
 document.addEventListener('change', async (ev) => {
+  if (ev.target.matches('input[data-marcar-todas]')) {
+    document.querySelectorAll('input[data-nf]').forEach((x) => { x.checked = ev.target.checked; });
+    return;
+  }
   const el = ev.target.closest('input[data-upload]');
   if (!el || !el.files.length) return;
   try {
@@ -273,6 +335,23 @@ document.addEventListener('change', async (ev) => {
   } catch (e) {
     aviso(e.message, 'erro');
   }
+});
+
+// Campos em R$: ao sair do campo, mostra com milhar e centavos (1350 → 1.350,00).
+document.addEventListener('focusout', (ev) => {
+  const el = ev.target;
+  if (!el.matches || !el.matches('input[data-dinheiro]') || !el.value.trim()) return;
+  try {
+    el.value = C.reais(C.centavos(el.value), false);
+  } catch { /* deixa como está: o formulário avisa o valor inválido */ }
+});
+
+// Enter no campo "incluir na lista" clica no OK (sem enviar o formulário).
+document.addEventListener('keydown', (ev) => {
+  const el = ev.target;
+  if (ev.key !== 'Enter' || !el.matches || !el.matches('input[data-lista-novo]')) return;
+  ev.preventDefault();
+  el.parentElement.querySelector('[data-acao=incluirNaLista]').click();
 });
 
 window.addEventListener('hashchange', () => mostrar());

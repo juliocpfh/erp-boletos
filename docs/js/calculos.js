@@ -14,6 +14,7 @@ export function centavos(texto) {
   if (typeof texto === 'number') return arred(texto * 100);
   let t = String(texto).replace(/R\$|\s/g, '');
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // "1.350" = mil trezentos e cinquenta reais
   const n = Number(t);
   if (!Number.isFinite(n)) throw new Error(`Valor inválido: ${texto}`);
   return arred(n * 100);
@@ -93,6 +94,25 @@ export function mesesEntre(inicio, fim) {
   return (a2 - a1) * 12 + (m2 - m1);
 }
 
+/** Data somada de meses (31/01 + 1 mês = 28 ou 29/02). */
+export function somarMesesData(isoData, meses) {
+  const alvo = somarMeses(isoData.slice(0, 7), meses);
+  return `${alvo}-${String(Math.min(Number(isoData.slice(8, 10)), diasNoMes(alvo))).padStart(2, '0')}`;
+}
+
+/** Fim do contrato: início + meses - 1 dia (01/02/2025 + 30 meses = 31/07/2027). */
+export function fimDoPrazo(inicio, meses) {
+  return somarDias(somarMesesData(inicio, meses), -1);
+}
+
+/** Meses entre o início e o fim do contrato (o inverso de fimDoPrazo, arredondado). */
+export function mesesDoPrazo(inicio, fim) {
+  if (!inicio || !fim) return null;
+  const m = mesesEntre(inicio.slice(0, 7), somarDias(fim, 1).slice(0, 7));
+  for (const x of [m, m - 1, m + 1]) if (x > 0 && fimDoPrazo(inicio, x) === fim) return x;
+  return Math.max(1, m);
+}
+
 export function diasNoMes(comp) {
   const [a, m] = comp.split('-').map(Number);
   return new Date(Date.UTC(a, m, 0)).getUTCDate();
@@ -144,6 +164,15 @@ export function descontoPorPercentual(base, percentual) {
 export function percentualPorDesconto(base, valor) {
   if (!base) return 0;
   return Math.round(((valor * 100) / base) * 10000) / 10000;
+}
+
+/**
+ * Percentual de bonificação a partir do aluguel bonificado digitado, sem arredondar,
+ * para que o desconto recalculado dê exatamente o valor digitado.
+ */
+export function percentualPorBonificado(base, bonificado) {
+  if (!base) return 0;
+  return ((base - bonificado) * 100) / base;
 }
 
 // --------------------------------------------------------------------------
@@ -244,7 +273,10 @@ export function valorNotaFiscal(aluguel, desconto, multa = 0, juros = 0, pontual
   return pontual ? aluguel - desconto : aluguel + multa + juros;
 }
 
-/** Quanto pagar numa data e o valor da nota fiscal. */
+/**
+ * Quanto pagar e o valor da nota fiscal, com multa e juros contados até ``pagamento`` (o dia em que o inquilino pagou).
+ * Em dia: com o desconto. Atrasado: valor cheio + multa + juros, como o banco cobra no próprio boleto.
+ */
 export function liquidar(cobranca, pagamento) {
   const t = totaisCobranca(cobranca, cobranca.reserva_utilizada || 0);
   const { dias, multa, juros } = multaEJuros(t.a_pagar_sem_desconto, cobranca.vencimento, pagamento,
