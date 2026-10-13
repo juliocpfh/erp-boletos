@@ -92,3 +92,22 @@ test('recibo de entrega das chaves', () => {
   assert.match(t, /Data do recebimento: _____/);
   assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO\]$/);
 });
+
+test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', () => {
+  const modelo = K.lerModeloVistoria('## Sala\nTeto\nParedes\nMóvel:\nMóvel: sofá cinza\n\n## Banheiro\nHidráulica\n## Vazio');
+  assert.deepEqual(modelo, [{ comodo: 'Sala', itens: ['Teto', 'Paredes', 'Móvel: sofá cinza'] }, { comodo: 'Banheiro', itens: ['Hidráulica'] }]);
+  assert.equal(K.piorou('Bom', 'Avaria'), true);
+  assert.equal(K.piorou('Bom', 'Ótimo'), false);
+  assert.equal(K.piorou('', 'Avaria'), false);
+  const { d, c } = base();
+  const entrada = [{ comodo: 'Sala', item: 'Teto', situacao: 'Bom', obs: '' }, { comodo: 'Sala', item: 'Paredes', situacao: 'Marcas de uso', obs: 'riscos' }, { comodo: 'Sala', item: 'Piso', situacao: '', obs: '' }];
+  const ve = { tipo: 'Entrada', data: '2026-09-04', itens: entrada, condicoes: '' };
+  const be = K.vistoriaBlocos(d, c, ve, null, { fachada: { src: 'x', bytes: new Uint8Array(), largura: 4, altura: 3 } }).blocos;
+  const tab = be.find((b) => b.tipo === 'tabela');
+  assert.deepEqual(tab.linhas, [['Teto', 'Bom', ''], ['Paredes', 'Marcas de uso', 'riscos']], 'item sem situação fica de fora');
+  assert.equal(be.filter((b) => b.tipo === 'fotos').length, 1);
+  const vs = { tipo: 'Saída', data: '2029-03-05', comparar_com: '2026-09-04', itens: [{ comodo: 'Sala', item: 'Teto', situacao: 'Avaria', obs: 'infiltração' }, { comodo: 'Sala', item: 'Paredes', situacao: 'Marcas de uso', obs: '' }], condicoes: '' };
+  const ts = K.vistoriaBlocos(d, c, vs, null, {}, entrada).blocos.find((b) => b.tipo === 'tabela');
+  assert.deepEqual(ts.cabecalho, ['Item', 'Na entrada', 'Na saída', 'Observação']);
+  assert.deepEqual(ts.destaques, [true, false]);
+});

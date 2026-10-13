@@ -317,6 +317,12 @@ export function contratoHtml(blocos, { logo, rodape }) {
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
     if (b.tipo === 'subsecao') return `<h3 class="ct-subsecao">${runsHtml(b.runs)}</h3>`;
     if (b.tipo === 'item') return `<p class="ct-item">${runsHtml(b.runs)}</p>`;
+    if (b.tipo === 'tabela') {
+      return `<table class="ct-tabela"><tr>${b.cabecalho.map((h) => `<th>${escH(h)}</th>`).join('')}</tr>${b.linhas.map((l, i) => `<tr class="${b.destaques && b.destaques[i] ? 'ct-destaque' : ''}">${l.map((x) => `<td>${escH(x)}</td>`).join('')}</tr>`).join('')}</table>`;
+    }
+    if (b.tipo === 'fotos') {
+      return `<div class="ct-fotos ${b.grande ? 'ct-fotos-grande' : ''}">${b.fotos.map((f) => `<figure><img src="${escH(f.src)}" alt="${escH(f.legenda)}"><figcaption>${escH(f.legenda)}</figcaption></figure>`).join('')}</div>`;
+    }
     if (b.tipo === 'assinaturas') {
       return `<div class="ct-assinaturas">${b.pessoas.map((p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escH(p.nome)}</b>${p.doc ? `<br>${escH(p.doc)}` : ''}${p.extra ? `<br>${escH(p.extra)}` : ''}<br>${escH(p.papel)}</div>`).join('')}</div>`;
     }
@@ -360,18 +366,52 @@ function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, transparencia =
 export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
   const prop = logo ? logo.altura / logo.largura : 0;
   const corpo = [];
+  const midias = []; // fotos (JPEG) do documento
+  let idDesenho = 10;
+  const foto = (f, larguraCm) => {
+    midias.push(f.bytes);
+    const n = midias.length;
+    return imagemX((idDesenho += 1), `rIdFoto${n}`, larguraCm, larguraCm * (f.altura / f.largura));
+  };
+  const celula = (conteudo, largura, { cab = false, destaque = false, borda = true } = {}) => `<w:tc><w:tcPr><w:tcW w:w="${largura}" w:type="dxa"/>`
+    + `${borda ? '' : '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'}`
+    + `${cab ? '<w:shd w:val="clear" w:color="auto" w:fill="E5E7EB"/>' : destaque ? '<w:shd w:val="clear" w:color="auto" w:fill="FEF3C7"/>' : ''}</w:tcPr>${conteudo}</w:tc>`;
+  const parCel = (t, { b = false, centro = false, rPr = '' } = {}) => `<w:p><w:pPr><w:spacing w:before="20" w:after="20" w:line="260" w:lineRule="auto"/>${centro ? '<w:jc w:val="center"/>' : ''}</w:pPr>${runX({ t, b }, rPr)}</w:p>`;
   if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="240"/><w:jc w:val="center"/></w:pPr>${imagemX(1, 'rIdLogo', 4, 4 * prop)}</w:p>`);
   for (const b of blocos) {
     if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }));
     else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }));
     else if (b.tipo === 'direita') corpo.push(parX(b.runs, { alinhar: 'right', antes: 240, depois: 480 }));
-    else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }));
+    else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
     else if (b.tipo === 'assinaturas') {
       for (const p of b.pessoas) {
         corpo.push(parX([{ t: '_____________________________________________', b: false }], { alinhar: 'center', antes: 600, depois: 0 }));
         const linhas = [{ t: p.nome, b: true }, ...[p.doc, p.extra, p.papel].filter(Boolean).map((t) => ({ t, b: false }))];
         corpo.push(`<w:p><w:pPr><w:keepLines/><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${linhas.map((l, i) => (i ? '<w:r><w:br/></w:r>' : '') + runX(l)).join('')}</w:p>`);
+      }
+    } else if (b.tipo === 'tabela') {
+      const total = 9000;
+      const larguras = b.cabecalho.length === 4 ? [2900, 1500, 1500, 3100] : [3200, 1800, 4000];
+      const grade = `<w:tblGrid>${larguras.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
+      const bordas = `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map((x) => `<w:${x} w:val="single" w:sz="4" w:space="0" w:color="BBBBBB"/>`).join('')}</w:tblBorders>`;
+      const linhas = [`<w:tr><w:trPr><w:tblHeader/></w:trPr>${b.cabecalho.map((h, i) => celula(parCel(h, { b: true, rPr: '<w:sz w:val="20"/>' }), larguras[i], { cab: true })).join('')}</w:tr>`,
+        ...b.linhas.map((l, n) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${l.map((x, i) => celula(parCel(x, { rPr: '<w:sz w:val="20"/>' }), larguras[i], { destaque: b.destaques && b.destaques[n] })).join('')}</w:tr>`)];
+      corpo.push(`<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${bordas}<w:tblLayout w:type="fixed"/></w:tblPr>${grade}${linhas.join('')}</w:tbl>`);
+      corpo.push('<w:p><w:pPr><w:spacing w:after="60"/></w:pPr></w:p>');
+    } else if (b.tipo === 'fotos') {
+      if (b.grande) {
+        for (const f of b.fotos) {
+          corpo.push(`<w:p><w:pPr><w:spacing w:before="120" w:after="40"/><w:jc w:val="center"/></w:pPr>${foto(f, 12)}</w:p>`);
+          corpo.push(parX([{ t: f.legenda, b: false }], { alinhar: 'center', depois: 160, rPr: '<w:i/><w:sz w:val="18"/>' }));
+        }
+      } else {
+        const pares = [];
+        for (let i = 0; i < b.fotos.length; i += 2) pares.push(b.fotos.slice(i, i + 2));
+        const linhas = pares.map((par) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${[0, 1].map((i) => celula(par[i]
+          ? `<w:p><w:pPr><w:spacing w:before="80" w:after="20"/><w:jc w:val="center"/></w:pPr>${foto(par[i], 7.2)}</w:p>${parCel(par[i].legenda, { centro: true, rPr: '<w:i/><w:sz w:val="18"/>' })}`
+          : '<w:p/>', 4500, { borda: false })).join('')}</w:tr>`);
+        corpo.push(`<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>${linhas.join('')}</w:tbl>`);
       }
     } else corpo.push(parX(b.runs, { recuo: 567 }));
   }
@@ -386,7 +426,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>';
   const zip = new JSZip();
   zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'
+    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'
     + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
     + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
     + '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
@@ -401,13 +441,15 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + '<Relationship Id="rIdEstilos" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
     + '<Relationship Id="rIdCab" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'
     + '<Relationship Id="rIdRod" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
-    + `${logo ? `<Relationship Id="rIdLogo" Type="${img}" Target="media/logo.png"/>` : ''}</Relationships>`);
+    + `${logo ? `<Relationship Id="rIdLogo" Type="${img}" Target="media/logo.png"/>` : ''}`
+    + `${midias.map((m, i) => `<Relationship Id="rIdFoto${i + 1}" Type="${img}" Target="media/foto${i + 1}.jpeg"/>`).join('')}</Relationships>`);
   zip.file('word/_rels/header1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + `${logo ? `<Relationship Id="rIdMarca" Type="${img}" Target="media/marca.png"/>` : ''}</Relationships>`);
   zip.file('word/document.xml', documento);
   zip.file('word/styles.xml', estilos);
   zip.file('word/header1.xml', cabecalho);
   zip.file('word/footer1.xml', rodapeX);
+  midias.forEach((m, i) => zip.file(`word/media/foto${i + 1}.jpeg`, m));
   if (logo) {
     zip.file('word/media/logo.png', logo.bytes);
     zip.file('word/media/marca.png', logo.marca || logo.bytes);
@@ -456,12 +498,50 @@ export function descritivoBlocos(texto) {
  * Vistoria de entrada ou de saída. ``v``: registro da tabela vistorias; ``leitura``: leitura dos relógios do dia (ou null).
  * Assinam as locadoras, o locatário, o solidário e os fiadores.
  */
-export function vistoriaBlocos(d, c, v, leitura = null) {
+export const SITUACOES_VISTORIA = ['Novo', 'Ótimo', 'Bom', 'Marcas de uso', 'Avaria', 'Não funciona', 'Não se aplica'];
+const GRAU = { Novo: 0, 'Ótimo': 1, Bom: 2, 'Marcas de uso': 3, Avaria: 4, 'Não funciona': 5 };
+/** Na saída, o item piorou em relação à entrada? */
+export const piorou = (entrada, saida) => GRAU[saida] !== undefined && GRAU[entrada] !== undefined && GRAU[saida] > GRAU[entrada];
+
+export const FOTOS_VISTORIA = [['fachada', 'Fachada'], ['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás'], ['disjuntores', 'Quadro de disjuntores']];
+
+/** Modelo de vistoria do imóvel (texto): "## Cômodo" e um item por linha. Linha terminada em ":" (ex.: "Móvel:") fica de fora. */
+export function lerModeloVistoria(texto) {
+  const comodos = [];
+  for (const l of linhasDe(texto)) {
+    if (l.startsWith('## ')) comodos.push({ comodo: l.slice(3).trim(), itens: [] });
+    else if (!/:$/.test(l)) {
+      if (!comodos.length) comodos.push({ comodo: 'Geral', itens: [] });
+      comodos.at(-1).itens.push(l.replace(/^[-•*]\s+/, ''));
+    }
+  }
+  return comodos.filter((x) => x.itens.length);
+}
+
+/** Itens marcados na vistoria agrupados por cômodo, na ordem em que aparecem. */
+function itensPorComodo(itens) {
+  const grupos = [];
+  for (const x of itens || []) {
+    if (!x.situacao && !x.obs) continue;
+    let g = grupos.find((y) => y.comodo === x.comodo);
+    if (!g) grupos.push((g = { comodo: x.comodo, itens: [] }));
+    g.itens.push(x);
+  }
+  return grupos;
+}
+
+/**
+ * Vistoria de entrada ou de saída. ``v``: registro da tabela vistorias; ``leitura``: leitura dos relógios do dia (ou null);
+ * ``fotos``: { fachada, agua, energia, gas, disjuntores } com { src, bytes, largura, altura } (as que existirem).
+ * ``entradaItens``: na saída, os itens da vistoria de entrada (para comparar).
+ */
+export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens = null) {
   const dados = dadosDoContrato(d, c, { data: v.data });
   const saida = v.tipo === 'Saída';
   const blocos = [{ tipo: 'titulo', runs: negritos(`VISTORIA DE ${saida ? 'SAÍDA' : 'ENTRADA'}`) }, ...cabecalhoDoc(d, c, dados)];
   blocos.push(it(`**DATA DA VISTORIA:** ${dataPorExtenso(v.data)}`));
   blocos.push(p(`${VISTORIA_INTRO} ${v.link_fotos ? `Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail: ${v.link_fotos}` : 'Para mais detalhes, verifique as fotos em anexo.'}`));
+  if (fotos.fachada) blocos.push({ tipo: 'fotos', grande: true, fotos: [{ ...fotos.fachada, legenda: 'Fachada do imóvel' }] });
   if (saida && v.comparar_com) blocos.push(p(`Esta vistoria de saída compara o imóvel com a vistoria de entrada de ${dataPorExtenso(v.comparar_com)}. Os itens marcados como **DIFERENÇA** são de responsabilidade do LOCATÁRIO, conforme o contrato.`));
   const chaves = linhasDe(v.chaves);
   if (chaves.length) blocos.push({ tipo: 'secao', runs: negritos(saida ? 'CHAVES E CONTROLES DEVOLVIDOS' : 'CHAVES E CONTROLES ENTREGUES') }, ...chaves.map((l) => it(`• ${l}`)));
@@ -469,7 +549,24 @@ export function vistoriaBlocos(d, c, v, leitura = null) {
     const rel = [['agua', 'Água'], ['energia', 'Energia'], ['gas', 'Gás']].filter(([k]) => leitura[k]).map(([k, t]) => `${t}: ${leitura[k]}`);
     if (rel.length) blocos.push({ tipo: 'secao', runs: negritos('LEITURA DOS RELÓGIOS') }, it(rel.join('   ·   ')));
   }
-  blocos.push({ tipo: 'secao', runs: negritos('DESCRITIVO DO IMÓVEL') }, ...descritivoBlocos(v.descritivo));
+  const registros = FOTOS_VISTORIA.filter(([k]) => k !== 'fachada' && fotos[k]).map(([k, t]) => ({ ...fotos[k], legenda: t }));
+  if (registros.length) blocos.push({ tipo: 'secao', runs: negritos('REGISTROS: RELÓGIOS E QUADRO DE DISJUNTORES') }, { tipo: 'fotos', fotos: registros });
+  blocos.push({ tipo: 'secao', runs: negritos('DESCRITIVO DO IMÓVEL') });
+  const grupos = itensPorComodo(v.itens);
+  const daEntrada = new Map((entradaItens || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
+  for (const g of grupos) {
+    blocos.push({ tipo: 'subsecao', runs: negritos(g.comodo.toLocaleUpperCase('pt-BR')) });
+    if (saida && entradaItens) {
+      const linhas = g.itens.map((x) => [x.item, daEntrada.get(`${x.comodo}|${x.item}`) || '—', x.situacao || '—', x.obs || '']);
+      blocos.push({ tipo: 'tabela', cabecalho: ['Item', 'Na entrada', 'Na saída', 'Observação'], linhas,
+        destaques: g.itens.map((x) => piorou(daEntrada.get(`${x.comodo}|${x.item}`), x.situacao)) });
+    } else blocos.push({ tipo: 'tabela', cabecalho: ['Item', 'Situação', 'Observação'], linhas: g.itens.map((x) => [x.item, x.situacao || '—', x.obs || '']) });
+  }
+  if (grupos.length && linhasDe(v.descritivo).length) blocos.push({ tipo: 'subsecao', runs: negritos('OUTRAS OBSERVAÇÕES') });
+  blocos.push(...descritivoBlocos(v.descritivo));
+  if (saida && entradaItens && grupos.some((g) => g.itens.some((x) => piorou(daEntrada.get(`${x.comodo}|${x.item}`), x.situacao)))) {
+    blocos.push(it('Os itens destacados pioraram em relação à vistoria de entrada.'));
+  }
   blocos.push({ tipo: 'secao', runs: negritos('CONDIÇÕES GERAIS') }, ...linhasDe(v.condicoes).map(it));
   if (!saida) {
     blocos.push(it(`O LOCATÁRIO tem ${numeroComExtenso(v.prazo_dias || 3)} dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.`));

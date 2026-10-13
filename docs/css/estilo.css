@@ -231,3 +231,25 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
   .contrato .ct-espaco-rodape { height: 1.5cm; }
   .contrato .ct-rodape { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; }
 }
+.destaque-contas { font-weight: 700; }
+
+/* Vistoria: grade por cômodo, tabelas e fotos no documento */
+.vistoria-comodo { border: 1px solid var(--borda); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
+.vistoria-comodo h3 { margin: 4px 0; }
+.grade-vistoria select { width: auto; min-width: 150px; }
+.grade-vistoria select.piorou { border-color: #f59e0b; background: #fef3c7; }
+.contrato .ct-tabela { width: 100%; border-collapse: collapse; margin: 4px 0 10px; font-size: 13px; }
+.contrato .ct-tabela { table-layout: fixed; }
+.contrato .ct-tabela th:first-child { width: 36%; }
+.contrato .ct-tabela th:nth-child(2) { width: 17%; }
+.contrato .ct-tabela th:nth-child(3):not(:last-child) { width: 17%; }
+.contrato .ct-subsecao { break-after: avoid; }
+.contrato .ct-tabela th, .contrato .ct-tabela td { border: 1px solid #bbb; padding: 3px 6px; text-align: left; }
+.contrato .ct-tabela th { background: #e5e7eb; }
+.contrato .ct-tabela tr.ct-destaque td { background: #fef3c7; font-weight: 600; }
+.contrato .ct-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 14px; break-inside: avoid; }
+.contrato .ct-fotos.ct-fotos-grande { grid-template-columns: 1fr; justify-items: center; }
+.contrato .ct-fotos figure { margin: 0; text-align: center; break-inside: avoid; }
+.contrato .ct-fotos img { width: 100%; max-height: 7.5cm; object-fit: contain; }
+.contrato .ct-fotos-grande img { width: auto; max-width: 100%; max-height: 10cm; }
+.contrato .ct-fotos figcaption { font-size: 12px; font-style: italic; color: #555; }

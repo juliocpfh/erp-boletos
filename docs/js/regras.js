@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -1165,12 +1165,46 @@ export function resultadosFinanceiros(d, de, ate) {
     const todasReformas = reformasDo(d, i.id);
     const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
     const investido = todasReformas.filter((r) => String(r.data) <= ate).reduce((s, r) => s + r.valor, 0);
+    const contas = d.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0);
     const receita = aluguel + avulsas;
-    const resultado = receita - iptu;
+    const resultado = receita - iptu - contas;
     const base = (i.valor_imovel || 0) + investido;
-    return { imovel: i, receita, aluguel, avulsas, iptu, reformasPeriodo, investido, resultado, base, meses, controle: imovelSoControle(d, i.id, ate),
+    return { imovel: i, receita, aluguel, avulsas, iptu, contas, reformasPeriodo, investido, resultado, base, meses, controle: imovelSoControle(d, i.id, ate),
       retornoAnual: base ? (resultado * 12 / meses / base) * 100 : null, mesesPagos: pagas.length };
   }).sort((a, b) => (b.retornoAnual ?? -Infinity) - (a.retornoAnual ?? -Infinity));
+}
+
+// --------------------------------------------------------------------------
+// Contas pagas por nós (imóvel vago, ou contas incluídas no aluguel): abatem do resultado
+// --------------------------------------------------------------------------
+export const TIPOS_DESPESA = ['Água', 'Luz', 'Gás', 'Condomínio', 'Internet', 'Outra'];
+
+export const despesasDo = (d, imovelId) => d.despesas.filter((x) => x.imovel_id === imovelId)
+  .sort((a, b) => String(b.competencia).localeCompare(String(a.competencia)) || String(b.data_pagamento).localeCompare(String(a.data_pagamento)) || b.id - a.id);
+
+/** Último valor lançado de cada tipo (para sugerir no próximo mês). */
+export function ultimosValores(d, imovelId) {
+  const out = {};
+  for (const x of despesasDo(d, imovelId)) if (!(x.tipo in out)) out[x.tipo] = x;
+  return out;
+}
+
+/** Contas que o inquilino atual não paga: as marcadas "Incluso no aluguel" (ou todas, se o imóvel está vago). */
+export function contasPorNossaConta(d, imovelId, hoje = C.hojeIso()) {
+  const atual = d.contratos.find((c) => c.imovel_id === imovelId && contratoAtivo(c, hoje));
+  if (!atual) return { vago: true, inclusas: [] };
+  const nomes = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
+  return { vago: false, inclusas: Object.entries(nomes).filter(([k]) => atual[k] === SITUACOES[1]).map(([, t]) => t) };
+}
+
+/** Lança várias contas do mesmo imóvel de uma vez. ``linhas``: [{ tipo, valor (centavos), data_pagamento, observacoes }]. */
+export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
+  const i = buscar(d, 'imoveis', imovelId);
+  if (!i) throw new Error('Imóvel não encontrado.');
+  const novas = linhas.filter((l) => l.valor > 0);
+  if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta.');
+  return novas.map((l) => inserir(d, 'despesas', { imovel_id: i.id, competencia, tipo: l.tipo, valor: l.valor, data_pagamento: l.data_pagamento || C.hojeIso(),
+    observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} paga por nós (${C.reais(l.valor)})`));
 }
 
 // --------------------------------------------------------------------------

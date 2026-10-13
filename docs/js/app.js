@@ -410,6 +410,10 @@ document.addEventListener('change', async (ev) => {
     document.querySelectorAll(`input[data-${ev.target.dataset.marcarTodas || 'nf'}]`).forEach((x) => { x.checked = ev.target.checked; });
     return;
   }
+  if (ev.target.matches('input[data-trocar-mes]') && ev.target.value) {
+    ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
+    return;
+  }
   const el = ev.target.closest('input[data-upload]');
   if (!el || !el.files.length) return;
   try {
