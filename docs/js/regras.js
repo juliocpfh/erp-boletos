@@ -35,6 +35,12 @@ export function normalizar(d) {
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
     for (const k of ['anuncio_link', 'anuncio_data', 'grupo_id']) delete i[k];
+    // a vistoria de entrada passou a ser do contrato: vai para o inquilino mais recente do imóvel
+    if (i.vistoria_link) {
+      const c = d.contratos.filter((x) => x.imovel_id === i.id).sort((a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada)))[0];
+      if (c && !c.vistoria_link) c.vistoria_link = i.vistoria_link;
+      if (c) delete i.vistoria_link;
+    }
   }
   migrarAirbnb(d);
   // versão 1 guardava um único fiador dentro do contrato
@@ -1006,7 +1012,8 @@ export function resultadosFinanceiros(d, de, ate) {
   const meses = Math.max(1, C.mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
   const dentro = (x) => x && x >= de && x <= ate;
   return d.imoveis.map((i) => {
-    const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id).map((c) => c.id));
+    // boleto de controle (inquilino sem NF) não entra no resultado financeiro
+    const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
     const pagas = d.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
     const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
     const avulsas = d.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
