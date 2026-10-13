@@ -1193,8 +1193,34 @@ export function ultimosValores(d, imovelId) {
 export function contasPorNossaConta(d, imovelId, hoje = C.hojeIso()) {
   const atual = d.contratos.find((c) => c.imovel_id === imovelId && contratoAtivo(c, hoje));
   if (!atual) return { vago: true, inclusas: [] };
-  const nomes = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
-  return { vago: false, inclusas: Object.entries(nomes).filter(([k]) => atual[k] === SITUACOES[1]).map(([, t]) => t) };
+  return { vago: false, inclusas: Object.entries(NOMES_CONTAS).filter(([k]) => atual[k] === SITUACOES[1]).map(([, t]) => t) };
+}
+
+/** Contrato ocupando o imóvel no dia (pela entrada e saída). */
+const ocupadoEm = (d, imovelId, dia) => d.contratos.some((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= dia
+  && (c.data_saida ? c.data_saida >= dia : c.ativo !== false));
+export const MESES_DEPOIS_DE_ALUGAR = 2;
+const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
+
+/**
+ * Contas que podem ser lançadas como nossas no mês da conta ``comp``:
+ * - imóvel vago em algum dia do mês: todas;
+ * - até 2 meses depois de um imóvel vago ser alugado (contas do período vago chegam atrasadas): todas;
+ * - fora disso: só as que o contrato do inquilino diz "Incluso no aluguel".
+ * Devolve { tipos, motivo }.
+ */
+export function contasPermitidas(d, imovelId, comp) {
+  const [ini, fim] = C.limitesCompetencia(comp);
+  for (let dia = ini; dia <= fim; dia = C.somarDias(dia, 1)) {
+    if (!ocupadoEm(d, imovelId, dia)) return { tipos: [...TIPOS_DESPESA], motivo: 'vago' };
+  }
+  const limite = C.limitesCompetencia(C.somarMeses(comp, -MESES_DEPOIS_DE_ALUGAR))[0];
+  const recente = d.contratos.find((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada >= limite && c.data_entrada <= fim
+    && !ocupadoEm(d, imovelId, C.somarDias(c.data_entrada, -1)));
+  if (recente) return { tipos: [...TIPOS_DESPESA], motivo: 'alugou', contrato: recente };
+  const atuais = d.contratos.filter((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= fim && (c.data_saida ? c.data_saida >= ini : c.ativo !== false));
+  const tipos = [...new Set(atuais.flatMap((c) => Object.entries(NOMES_CONTAS).filter(([k]) => c[k] === SITUACOES[1]).map(([, t]) => t)))];
+  return { tipos, motivo: tipos.length ? 'incluso' : 'inquilino' };
 }
 
 /** Lança várias contas do mesmo imóvel de uma vez. ``linhas``: [{ tipo, valor (centavos), data_pagamento, observacoes }]. */
@@ -1203,6 +1229,9 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
   if (!i) throw new Error('Imóvel não encontrado.');
   const novas = linhas.filter((l) => l.valor > 0);
   if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta.');
+  const { tipos } = contasPermitidas(d, i.id, competencia);
+  const fora = novas.filter((l) => !tipos.includes(l.tipo)).map((l) => l.tipo);
+  if (fora.length) throw new Error(`Em ${C.compBr(competencia)} o inquilino paga ${fora.join(', ')}, conforme o contrato. Só entram contas que são nossas.`);
   return novas.map((l) => inserir(d, 'despesas', { imovel_id: i.id, competencia, tipo: l.tipo, valor: l.valor, data_pagamento: l.data_pagamento || C.hojeIso(),
     observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} paga por nós (${C.reais(l.valor)})`));
 }

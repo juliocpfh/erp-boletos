@@ -1467,8 +1467,8 @@ function calendarioDoPainel(mes, hoje) {
     const evs = porDia.get(dia) || [];
     celulas.push(`<div class="cal-dia ${dia === hoje ? 'hoje' : ''} ${evs.length ? 'com-eventos' : ''}" ${evs.length ? `data-acao="abrirDia" data-dia="${dia}" title="Ver a agenda do dia"` : ''}>
       <div class="cal-num">${n}</div>
-      ${evs.slice(0, 3).map((e) => `<div class="cal-ev ${e.situacao}">${esc(curto(e))}</div>`).join('')}
-      ${evs.length > 3 ? `<div class="cal-mais">+${evs.length - 3}</div>` : ''}</div>`);
+      ${evs.slice(0, 7).map((e) => `<div class="cal-ev ${e.situacao}" title="${esc(`${e.tipo}: ${e.texto} (${e.estado})`)}">${esc(curto(e))}</div>`).join('')}
+      ${evs.length > 7 ? `<div class="cal-mais">+${evs.length - 7}</div>` : ''}</div>`);
   }
   const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje ? '' : 'hidden'}>
@@ -1478,7 +1478,7 @@ function calendarioDoPainel(mes, hoje) {
       <div class="acoes">${link(`#/?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`)} ${link('#/', 'Mês atual')} ${link(`#/?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`)}</div></div>
     <div class="cal-grade">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
     ${agendas || ''}
-    <p class="suave">Clique num dia para ver a agenda completa. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+    <p class="suave">Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -1572,21 +1572,30 @@ function telaInadimplencia() {
 }
 
 /** Contas que nós pagamos num imóvel: lançar o mês de uma vez e ver os lançamentos. */
+/** Mês sugerido para lançar contas: o atual, ou o mais recente (até 2 meses atrás) que tenha conta nossa. */
+function mesComContas(imovelId) {
+  const atual = C.competenciaDe(C.hojeIso());
+  for (let k = 0; k <= R.MESES_DEPOIS_DE_ALUGAR; k += 1) {
+    const m = C.somarMeses(atual, -k);
+    if (R.contasPermitidas(d(), imovelId, m).tipos.length) return m;
+  }
+  return atual;
+}
+
 function telaContas(rota) {
   const i = buscar('imoveis', rota.partes[1]);
   if (!i) return '<h1>Imóvel não encontrado</h1>';
-  const comp = rota.q.comp || C.competenciaDe(C.hojeIso());
+  const comp = rota.q.comp || mesComContas(i.id);
   const ultimos = R.ultimosValores(d(), i.id);
-  const situacao = R.contasPorNossaConta(d(), i.id);
-  const sugeridos = new Set(situacao.vago ? ['Água', 'Luz'] : situacao.inclusas);
-  for (const t of Object.keys(ultimos)) sugeridos.add(t);
+  const permitidas = R.contasPermitidas(d(), i.id, comp);
   const doMes = R.despesasDo(d(), i.id).filter((x) => x.competencia === comp);
   const hoje = C.hojeIso();
   const lista = R.despesasDo(d(), i.id).slice(0, 60);
   const linha = (tipo, n) => {
     const u = ultimos[tipo];
     const ja = doMes.filter((x) => x.tipo === tipo).reduce((t, x) => t + x.valor, 0);
-    return `<tr class="${sugeridos.has(tipo) ? '' : 'suave'}"><td><b>${esc(tipo)}</b>${tipo === 'Outra' ? '' : ''}<input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
+    if (!permitidas.tipos.includes(tipo)) return '';
+    return `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
       <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="${u ? F.dinheiroTexto(u.valor) : '0,00'}" style="width:130px"></td>
       <td><input type="date" name="data_${n}" value="${hoje}" style="width:auto"></td>
       <td><input name="obs_${n}" placeholder="${tipo === 'Outra' ? 'qual conta? (ex.: taxa de lixo)' : 'opcional'}"></td>
@@ -1594,17 +1603,21 @@ function telaContas(rota) {
   };
   return `<p class="suave"><a href="#/resultados">← Resultados</a> · <a href="#/imovel/${i.id}">${esc(i.nome)}</a></p>
     <h1>Contas pagas por nós · ${esc(i.nome)}</h1>
-    <div class="alerta info">${situacao.vago ? '<b>Imóvel vago hoje:</b> as contas de água, luz, gás, condomínio etc. são nossas.'
-    : situacao.inclusas.length ? `<b>Incluído no aluguel do inquilino atual:</b> ${esc(situacao.inclusas.join(', '))}.` : 'O inquilino atual paga as contas. Lance aqui só o que nós pagamos.'}
+    <div class="alerta ${permitidas.tipos.length ? 'info' : 'aviso'}">${{
+    vago: `<b>Imóvel vago em ${compBr(comp)}:</b> as contas são nossas.`,
+    alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : '')} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ''}): até ${R.MESES_DEPOIS_DE_ALUGAR} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
+    incluso: `<b>Pelo contrato do inquilino</b>, estas contas estão incluídas no aluguel e são nossas: ${esc(permitidas.tipos.join(', '))}.`,
+    inquilino: `<b>Em ${compBr(comp)} o inquilino paga todas as contas</b>, conforme o contrato. Não há conta nossa para lançar neste mês.`,
+  }[permitidas.motivo]}
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
       <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${comp}" style="width:auto" data-trocar-mes="${i.id}">
-        <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
+        ${permitidas.tipos.length ? '<button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button>' : ''}</div>
       <div class="rolagem"><table><tr><th>Conta</th><th>Valor pago</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
       <p class="suave">Preencha só as contas pagas. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
-      <div class="acoes"><button>Lançar</button></div></form>
+      ${permitidas.tipos.length ? '<div class="acoes"><button>Lançar</button></div>' : ''}</form>
     <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th></th></tr>
       ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td>
         <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'despesas', id: x.id }, 'perigo pequeno', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : ''}</td></tr>`).join('')
@@ -1633,7 +1646,7 @@ function telaResultados(q) {
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Contas pagas por nós</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
       ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span>${x.controle ? `<br>${etiqueta('boleto de controle: não conta', 'controle')}` : ''}</td>
         <td class="n">${x.base ? reais(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais(x.aluguel)}</td><td class="n">${reais(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais(x.iptu)}` : '-'}</td>
-        <td class="n nw">${x.contas ? `<a href="#/contas/${x.imovel.id}">- ${reais(x.contas)}</a>` : '-'}${opera() ? `<br>${link(`#/contas/${x.imovel.id}`, '+ incluir contas', `link-botao${R.contasPorNossaConta(d(), x.imovel.id).vago || R.contasPorNossaConta(d(), x.imovel.id).inclusas.length ? ' destaque-contas' : ''}`)}` : ''}</td>
+        <td class="n nw">${x.contas ? `<a href="#/contas/${x.imovel.id}">- ${reais(x.contas)}</a>` : '-'}${opera() && R.contasPermitidas(d(), x.imovel.id, mesComContas(x.imovel.id)).tipos.length ? `<br>${link(`#/contas/${x.imovel.id}`, '+ incluir contas', 'link-botao destaque-contas')}` : ''}</td>
         <td class="n"><b>${reais(x.resultado)}</b></td><td class="n"><b>${pctTxt(x.retornoAnual)}</b>${x.retornoAnual ? `<div class="barra"><span style="width:${Math.max(2, (x.retornoAnual / maior) * 100).toFixed(0)}%"></span></div>` : ''}</td>
         <td class="n">${x.reformasPeriodo ? reais(x.reformasPeriodo) : '-'}</td></tr>`).join('') || '<tr><td colspan="10" class="suave">Nenhum imóvel.</td></tr>'}
       <tr class="total"><td></td><td>Total</td><td class="n">${reais(tot('base'))}</td><td class="n">${reais(tot('aluguel'))}</td><td class="n">${reais(tot('avulsas'))}</td><td class="n">${reais(tot('iptu'))}</td><td class="n">${reais(tot('contas'))}</td><td class="n">${reais(tot('resultado'))}</td>
@@ -2050,7 +2063,7 @@ async function telaBackupSeguro() {
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 function telaEmpresas() {
-  return `<div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
     || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
@@ -2076,7 +2089,7 @@ function telaHistorico(q) {
     lista = lista.filter((h) => `${h.descricao || ''} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase('pt-BR').includes(t));
   }
   const usuarios = [...new Set(d().historico.map((h) => h.usuario))].sort();
-  return `<h1>Histórico de alterações</h1>
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
     <form class="cartao formulario" data-form="filtroHistorico">
       <div><label>Usuário</label><select name="usuario"><option value=""></option>${usuarios.map((u) => `<option ${q.usuario === u ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></div>
       <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(R.TABELAS).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -2093,7 +2106,7 @@ async function telaDados() {
     await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
     modeloProprio = true;
   } catch { /* usa o modelo padrão */ }
-  return `<h1>Dados e backup</h1>
+  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Pasta dos dados', esc(E.pasta.name))}${item('Banco criado em', new Date(d().criado_em).toLocaleString('pt-BR'))}
