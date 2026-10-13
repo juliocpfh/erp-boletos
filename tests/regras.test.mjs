@@ -23,7 +23,8 @@ test('gera cobranças com proporcional, IPTU e reserva', () => {
   assert.equal(cb.dias_cobrados, 24);
   assert.equal(cb.aluguel, 108000);
   assert.equal(cb.desconto, 10800);
-  assert.equal(cb.iptu, 10000);
+  assert.equal(cb.iptu, 8000); // IPTU também proporcional: 24 de 30 dias de R$ 100,00
+  assert.match(cb.iptu_parcela, /proporcional 24\/30 dias/);
   assert.equal(cb.reserva_utilizada, 50000);
   assert.equal(cb.vencimento, '2026-07-10');
   R.gerarCobrancas(d, '2026-07', 'julio');
@@ -284,27 +285,23 @@ test('ajuste do mês no boleto: adicional ou ressarcimento, com histórico e na 
   assert.throws(() => R.ajustarBoleto(d, cb.id, 0, '', 'julio'));
 });
 
-test('atraso: multa e juros entram no boleto seguinte (já gerado ou a gerar) e saem se desfizer', () => {
-  const { d, c } = base();
+test('atraso de verdade: banco cobra multa e juros no boleto e a NF sai com o valor a mais', () => {
+  const { d } = base();
   R.gerarCobrancas(d, '2026-07', 'julio');
   R.gerarCobrancas(d, '2026-08', 'julio');
-  const jul = d.cobrancas[0];
-  const ago = d.cobrancas[1];
-  R.registrarPagamento(d, jul.id, '2026-08-20', null, 'julio');
-  assert.equal(ago.multa_anterior, jul.multa + jul.juros);
-  assert.equal(jul.multa_cobrada_em, ago.id);
-  assert.match(R.dadosBoleto(d, ago).descricao, /MULTA E JUROS MÊS ANTERIOR/);
-  R.estornarPagamento(d, jul.id, 'julio');
-  assert.equal(ago.multa_anterior, 0);
-  // boleto seguinte ainda não existe: entra quando for gerado
-  R.excluir(d, 'cobrancas', ago.id, 'julio');
-  R.registrarPagamento(d, jul.id, '2026-08-20', null, 'julio');
-  R.gerarCobrancas(d, '2026-08', 'julio');
-  const novo = d.cobrancas.find((x) => x.competencia === '2026-08');
-  assert.equal(novo.multa_anterior, jul.multa + jul.juros);
-  assert.equal(R.buscar(d, 'cobrancas', jul.id).multa_cobrada_em, novo.id);
-  assert.equal(R.recalcularCobrancas(d, () => true, 'julio'), 0); // estável
-  assert.equal(c.id, novo.contrato_id);
+  // venceu 10/08, pagou 15/08, entrou na conta 18/08: juros até o dia em que pagou, NF com a data contábil
+  const r = R.registrarPagamento(d, 1, '2026-08-18', null, 'julio', { dataPagou: '2026-08-15' });
+  const cb = d.cobrancas[0];
+  // julho abate a reserva de R$ 500,00: valor cheio 1.453,50 - 500,00 = 953,50; multa 10% e juros 1% a.m. × 5 dias
+  assert.deepEqual([cb.dias_atraso, cb.multa, cb.juros, cb.data_pagou], [5, 9535, 155, '2026-08-15']);
+  assert.equal(cb.valor_pago, 95350 + 9535 + 155);
+  assert.equal(cb.valor_nf, 135000 + 9535 + 155);
+  assert.equal(r.pontual, false);
+  assert.equal(d.cobrancas[1].iptu, 10000); // nada vai para o boleto seguinte
+  assert.equal(R.totais(d.cobrancas[1]).a_pagar_pontual, 135000 - 13500 + 10000 + 350);
+  R.numerarFaturas(d, 'julio');
+  assert.equal(d.faturas[0].emissao, '2026-08-18');
+  assert.throws(() => R.registrarPagamento(d, 2, '2026-09-10', null, 'julio', { dataPagou: '2026-09-12' }));
 });
 
 test('pagou em dia com compensação depois: sem multa, NF na data contábil', () => {
@@ -354,6 +351,33 @@ test('inquilino sem NF: controla o pagamento mas não entra na numeração', () 
   assert.equal(R.numerarFaturas(d, 'julio').numeradas.length, 0);
 });
 
+test('voltar a última numeração, incluir pagamento esquecido de data intermediária e numerar de novo', () => {
+  const { d } = base();
+  d.proxima_fatura = 50;
+  for (const comp of ['2026-06', '2026-07', '2026-08', '2026-09']) R.gerarCobrancas(d, comp, 'julio');
+  R.registrarPagamento(d, 1, '2026-07-05', null, 'julio');
+  R.numerarFaturas(d, 'julio'); // ciclo 1: nº 50
+  R.registrarPagamento(d, 2, '2026-08-05', null, 'julio');
+  R.registrarPagamento(d, 4, '2026-10-05', null, 'julio');
+  d.cobrancas[1].observacoes_nf = 'Obs. de julho';
+  R.numerarFaturas(d, 'julio'); // ciclo 2: nº 51 e 52
+  assert.deepEqual(R.ultimoCicloDeNumeracao(d), { lote: 2, de: 51, ate: 52, qtd: 2, emissoes: ['2026-08-05', '2026-10-05'] });
+  R.desfazerUltimaNumeracao(d, 'julio');
+  assert.equal(d.proxima_fatura, 51);
+  assert.deepEqual([...new Set(d.faturas.map((f) => f.numero))], [50]);
+  // o pagamento de setembro tinha passado despercebido
+  R.registrarPagamento(d, 3, '2026-09-05', null, 'julio');
+  R.numerarFaturas(d, 'julio');
+  const porNumero = (n) => d.faturas.find((f) => f.numero === n);
+  assert.deepEqual([51, 52, 53].map((n) => porNumero(n).emissao), ['2026-08-05', '2026-09-05', '2026-10-05']);
+  assert.equal(porNumero(51).observacoes, 'Obs. de julho');
+  // voltar de novo e depois o ciclo anterior
+  R.desfazerUltimaNumeracao(d, 'julio');
+  R.desfazerUltimaNumeracao(d, 'julio');
+  assert.deepEqual([d.faturas.length, d.proxima_fatura], [0, 50]);
+  assert.throws(() => R.desfazerUltimaNumeracao(d, 'julio'));
+});
+
 test('cancelar, apagar e desfazer numeração para reemitir com os mesmos números', () => {
   const { d } = base();
   d.proxima_fatura = 10;
@@ -384,8 +408,9 @@ test('listas editáveis: inclui, não remove o que está em uso e avisa onde', (
   assert.throws(() => R.removerDaLista(d, 'concessionarias', 'Compagas', 'julio'), /Loja 1/);
   R.removerDaLista(d, 'concessionarias', 'Supergasbras', 'julio');
   assert.equal(R.lista(d, 'concessionarias').includes('Supergasbras'), false);
-  c.indice_correcao = 'IPCA/IGP-M';
-  assert.throws(() => R.removerDaLista(d, 'indices', 'IPCA/IGP-M', 'julio'), /Maria Exemplo/);
+  assert.ok(R.lista(d, 'indices').includes('IGP-M/IPCA (o maior)'));
+  c.indice_correcao = 'IGP-M/IPCA (o maior)';
+  assert.throws(() => R.removerDaLista(d, 'indices', 'IGP-M/IPCA (o maior)', 'julio'), /Maria Exemplo/);
 });
 
 test('mesmo inquilino em dois imóveis: contrato novo com os dados da pessoa', () => {

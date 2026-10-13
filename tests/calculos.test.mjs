@@ -79,11 +79,8 @@ test('liquidação e valor da nota fiscal', () => {
   const atraso = C.liquidar(cb, '2026-08-20');
   assert.equal(atraso.multa, 14850);
   assert.equal(atraso.juros, 490);
-  assert.equal(atraso.valor_devido, 148500); // multa e juros vão para o boleto seguinte
+  assert.equal(atraso.valor_devido, 148500 + 14850 + 490);
   assert.equal(atraso.valor_nf, 135000 + 14850 + 490);
-  // pagou no vencimento, mas o banco compensou depois: sem multa e juros, com desconto
-  const compensado = C.liquidar(cb, '2026-08-13', true);
-  assert.deepEqual([compensado.pontual, compensado.multa, compensado.valor_nf], [true, 0, 121500]);
 });
 
 test('valores digitados com milhar sem centavos e prazo em meses', () => {

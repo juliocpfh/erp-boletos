@@ -15,7 +15,7 @@ export const TABELAS = {
 /** Listas de opções que o usuário pode editar (incluir e remover itens). */
 export const LISTAS = {
   concessionarias: { nome: 'concessionárias', padrao: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] },
-  indices: { nome: 'índices de correção', padrao: ['IGP-M', 'IPCA', 'IPCA/IGP-M', 'INPC', 'IVAR', 'IGP-DI', 'Poupança'] },
+  indices: { nome: 'índices de correção', padrao: ['IGP-M', 'IPCA', 'IGP-M/IPCA (o maior)', 'INPC', 'IVAR', 'IGP-DI', 'Poupança'] },
 };
 
 export function bancoVazio() {
@@ -378,14 +378,11 @@ function pagaSeguroNoMes(d, contrato, comp) {
   return ultimo ? ultimo.id === contrato.id : true;
 }
 
-/** Multa e juros de pagamentos atrasados que ainda não foram cobrados num boleto seguinte. */
-const multasPendentes = (d, contratoId, antesDe) => d.cobrancas.filter((x) => x.contrato_id === contratoId && x.data_pagamento
-  && (x.multa || 0) + (x.juros || 0) > 0 && !x.multa_cobrada_em && x.competencia < antesDe);
-
 /** Calcula (sem gravar) a cobrança de um contrato numa competência. */
 export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0) return null;
+  const diasMes = C.diasNoMes(comp);
   const carencia = emCarencia(contrato, comp);
   const cobra = (item) => !carencia || contrato[`carencia_cobrar_${item}`];
   let iptu = 0;
@@ -394,8 +391,9 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     for (const p of d.iptus.filter((i) => i.imovel_id === contrato.imovel_id)) {
       const [n, v] = iptuNaCompetencia(p, comp);
       if (n) {
-        iptu += v;
-        iptuRots.push(p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1] ? `IPTU ${p.ano} 1/12 (${C.compBr(comp)})` : `IPTU ${p.ano} parc. ${n}/${p.num_parcelas}`);
+        // no mês de entrada ou saída, o IPTU também é proporcional aos dias, como o aluguel
+        iptu += C.aluguelProporcional(v, dias, diasMes);
+        iptuRots.push(`${p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1] ? `IPTU ${p.ano} 1/12 (${C.compBr(comp)})` : `IPTU ${p.ano} parc. ${n}/${p.num_parcelas}`}${dias < diasMes ? ` proporcional ${dias}/${diasMes} dias de ${C.reais(v)}` : ''}`);
       }
     }
   }
@@ -403,40 +401,25 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     ? parcelasDoMes(pagaSeguroNoMes(d, contrato, comp) ? segurosDoImovel(d, contrato.imovel_id) : [], comp,
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
-  const multas = multasPendentes(d, contrato.id, comp);
-  const multaAnterior = multas.reduce((s, x) => s + (x.multa || 0) + (x.juros || 0), 0);
   const alvo = competenciaReserva(contrato);
   const reserva = alvo && comp >= alvo ? saldoReserva(d, contrato, ignorarCobranca) : 0;
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
     descontoPercentual: percentualBonificacao(contrato), iptu, seguro,
-    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, multaAnterior, reservaDisponivel: reserva,
+    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, reservaDisponivel: reserva,
   });
-  const iptuRot = iptuRots.join('; ');
   return {
     contrato_id: contrato.id, competencia: comp,
     vencimento: C.vencimentoDaCompetencia(comp, contrato.dia_vencimento || 10, contrato.cobranca_mes_seguinte !== false),
     dias_cobrados: r.dias_cobrados, dias_mes: r.dias_mes, aluguel_mensal: r.aluguel_mensal,
-    aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRot, seguro: r.seguro,
+    aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
     seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, outros: 0, outros_descricao: '',
-    multa_anterior: multaAnterior, multa_anterior_de: multas.map((x) => ({ id: x.id, valor: (x.multa || 0) + (x.juros || 0) })),
     reserva_utilizada: r.reserva_utilizada, carencia,
     multa_percentual: contrato.multa_percentual || 0, juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
     situacao: carencia && r.a_pagar_pontual <= 0 ? 'Carência' : 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null,
     valor_nf: null,
   };
-}
-
-/** Marca a multa e os juros dos meses anteriores como cobrados neste boleto. */
-function marcarMultasCobradas(d, cb, usuario) {
-  for (const { id } of cb.multa_anterior_de || []) {
-    atualizar(d, 'cobrancas', id, { multa_cobrada_em: cb.id }, usuario, `Multa e juros cobrados no boleto ${C.compBr(cb.competencia)}`);
-  }
-}
-
-function soltarMultasCobradas(d, cb) {
-  for (const x of d.cobrancas) if (x.multa_cobrada_em === cb.id) x.multa_cobrada_em = null;
 }
 
 export function gerarCobrancas(d, comp, usuario) {
@@ -450,8 +433,7 @@ export function gerarCobrancas(d, comp, usuario) {
     }
     const dados = montarCobranca(d, contrato, comp);
     if (dados) {
-      const cb = inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
-      marcarMultasCobradas(d, cb, usuario);
+      inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
       geradas += 1;
     }
   }
@@ -460,31 +442,22 @@ export function gerarCobrancas(d, comp, usuario) {
 
 /** Campos que o recálculo atualiza (o ajuste do mês, as observações e o vencimento alterado à mão ficam). */
 const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'aluguel', 'desconto', 'iptu', 'iptu_parcela', 'seguro',
-  'seguro_parcela', 'taxa_boleto', 'multa_anterior', 'multa_anterior_de', 'reserva_utilizada', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
-
-const somaMultas = (lista) => (lista || []).reduce((s, x) => s + (x.valor || 0), 0);
+  'seguro_parcela', 'taxa_boleto', 'reserva_utilizada', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
- * com o cadastro. Boleto alterado à mão ("Alterar valores") só recebe a multa e os juros de atrasos novos,
- * mantendo o que foi digitado. Devolve quantos mudaram.
+ * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está. Devolve quantos mudaram.
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   let n = 0;
-  const lista = d.cobrancas.filter((cb) => !cb.data_pagamento && filtro(cb))
+  const lista = d.cobrancas.filter((cb) => !cb.data_pagamento && !cb.editado_manual && filtro(cb))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
   for (const cb of lista) {
     const c = buscar(d, 'contratos', cb.contrato_id);
-    if (!c) continue;
-    soltarMultasCobradas(d, cb);
-    const novo = montarCobranca(d, c, cb.competencia, cb.id);
+    const novo = c && montarCobranca(d, c, cb.competencia, cb.id);
     if (!novo) continue;
-    const dados = cb.editado_manual
-      ? { multa_anterior: (cb.multa_anterior || 0) + somaMultas(novo.multa_anterior_de) - somaMultas(cb.multa_anterior_de), multa_anterior_de: novo.multa_anterior_de }
-      : Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
-    if (dados.multa_anterior_de && JSON.stringify(dados.multa_anterior_de) === JSON.stringify(cb.multa_anterior_de || [])) dados.multa_anterior_de = cb.multa_anterior_de;
+    const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
     if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) n += 1;
-    marcarMultasCobradas(d, buscar(d, 'cobrancas', cb.id), usuario);
   }
   return n;
 }
@@ -492,37 +465,32 @@ export function recalcularCobrancas(d, filtro, usuario) {
 export const totais = (cb) => C.totaisCobranca(cb, cb.reserva_utilizada || 0);
 
 /**
- * Confirma o pagamento. ``dataPagamento`` é a data contábil (quando o dinheiro entrou): é a data de emissão da NF.
- * ``pagouEmDia``: o inquilino pagou até o vencimento e o banco só compensou depois (sem multa e juros).
- * Atraso: a multa e os juros vão para o boleto seguinte (o que já existir em aberto, ou o próximo a ser gerado).
+ * Confirma o pagamento. ``dataContabil`` é o dia em que o dinheiro entrou na conta: é a data de emissão da NF
+ * e a ordem da numeração (pode ser alguns dias depois do pagamento).
+ * ``pagouEmDia``: o inquilino pagou até o vencimento, só a compensação foi depois: sem multa e juros, com desconto.
+ * ``dataPagou``: dia em que o inquilino pagou, quando atrasou (multa e juros até esse dia). Em branco: a data contábil.
+ * Atraso de verdade: o banco já cobra multa e juros no próprio boleto, e a NF sai com esse valor a mais.
  */
-export function registrarPagamento(d, cobrancaId, dataPagamento, valorPago, usuario, { pagouEmDia = false } = {}) {
+export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuario, { pagouEmDia = false, dataPagou = null } = {}) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (faturasDe(d, 'cobranca', cb.id).length) {
     throw new Error('Este boleto já tem NF emitida. Desfaça o pagamento antes de alterar.');
   }
-  const r = C.liquidar(cb, dataPagamento, pagouEmDia);
+  if (dataPagou && dataPagou > dataContabil) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+  const r = C.liquidar(cb, pagouEmDia ? cb.vencimento : (dataPagou || dataContabil));
+  const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
   atualizar(d, 'cobrancas', cb.id, {
-    data_pagamento: dataPagamento, valor_pago: valorPago ?? r.valor_devido, dias_atraso: r.dias_atraso,
-    multa: r.multa, juros: r.juros, valor_nf: r.valor_nf, pagou_em_dia: !!pagouEmDia && dataPagamento > cb.vencimento,
+    data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
+    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: r.valor_nf, pagou_em_dia: compensadoDepois,
     situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso',
-  }, usuario, pagouEmDia && dataPagamento > cb.vencimento ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataPagamento)})` : 'Pagamento confirmado');
-  if (r.multa + r.juros > 0) {
-    recalcularCobrancas(d, (x) => x.contrato_id === cb.contrato_id && x.competencia > cb.competencia, usuario);
-  }
+  }, usuario, compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado');
   return r;
 }
 
 export function estornarPagamento(d, cobrancaId, usuario) {
-  const cb = buscar(d, 'cobrancas', cobrancaId);
-  if (cb.multa_cobrada_em) {
-    const prox = buscar(d, 'cobrancas', cb.multa_cobrada_em);
-    if (prox && prox.data_pagamento) throw new Error(`A multa e os juros deste atraso já foram pagos no boleto ${C.compBr(prox.competencia)}. Desfaça aquele pagamento antes.`);
-  }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
-  atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null,
-    juros: null, valor_nf: null, pagou_em_dia: false, multa_cobrada_em: null, situacao: 'Em aberto' }, usuario, 'Pagamento desfeito');
-  recalcularCobrancas(d, (x) => x.contrato_id === cb.contrato_id && x.competencia > cb.competencia, usuario);
+  atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
+    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto' }, usuario, 'Pagamento desfeito');
 }
 
 // --------------------------------------------------------------------------
@@ -632,6 +600,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
   const foraDeOrdem = ultima ? pendentes.filter((p) => p.data < ultima.emissao) : [];
   if (foraDeOrdem.length && !forcar) return { numeradas: [], foraDeOrdem, problema: null, ultima };
   const numeradas = [];
+  const lote = (d.ultimo_lote || 0) + 1; // cada clique em "Numerar" é um ciclo, que pode ser desfeito inteiro
   for (const p of pendentes) {
     const base = baseDaFatura(d, p.tipo, p.registro);
     const problema = problemaDaFatura(d, base);
@@ -646,10 +615,11 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) 
         percentual: parte.percentual, valor: valores[i], periodo_inicio: base.periodo_inicio,
         periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
         tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento,
-        tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida',
+        tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', lote,
       }, usuario, `NF nº ${numeroFatura(numero)} · ${e.nome} · ${base.descricao}`);
     });
     d.proxima_fatura = numero + 1;
+    d.ultimo_lote = lote;
     numeradas.push({ numero, ...p, descricao: base.descricao });
   }
   return { numeradas, foraDeOrdem: [], problema: null, ultima };
@@ -670,6 +640,35 @@ export function apagarCanceladas(d, numero, usuario) {
   if (fs.some((f) => f.situacao !== 'Cancelada')) throw new Error('Só é possível apagar NF cancelada. Cancele antes.');
   for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} cancelada apagada da lista`);
   return fs.length;
+}
+
+/** Última numeração (último clique em "Numerar") que ainda pode ser desfeita: { lote, de, ate, qtd, emissao }. */
+export function ultimoCicloDeNumeracao(d) {
+  const comLote = d.faturas.filter((f) => f.lote);
+  if (!comLote.length) return null;
+  const lote = Math.max(...comLote.map((f) => f.lote));
+  const fs = comLote.filter((f) => f.lote === lote);
+  const nums = [...new Set(fs.map((f) => f.numero))].sort((a, b) => a - b);
+  return { lote, de: nums[0], ate: nums.at(-1), qtd: nums.length, emissoes: [fs.map((f) => f.emissao).sort()[0], fs.map((f) => f.emissao).sort().at(-1)] };
+}
+
+/**
+ * Volta a última numeração inteira: as NFs daquele ciclo saem da lista (ficam no Histórico), os pagamentos voltam
+ * para a fila com tudo o que foi preenchido (observações, dados do cliente vêm do cadastro) e o próximo número volta
+ * a ser o primeiro do ciclo. Assim dá para corrigir, incluir um pagamento de data intermediária e numerar de novo.
+ * Pode repetir para voltar ciclos anteriores.
+ */
+export function desfazerUltimaNumeracao(d, usuario) {
+  const ciclo = ultimoCicloDeNumeracao(d);
+  if (!ciclo) throw new Error('Não há numeração para desfazer.');
+  const fs = d.faturas.filter((f) => f.lote === ciclo.lote);
+  if (d.faturas.some((f) => f.lote !== ciclo.lote && f.numero >= ciclo.de)) {
+    throw new Error(`Há NFs de outra numeração com número ${numeroFatura(ciclo.de)} ou maior. Use "a partir do nº".`);
+  }
+  for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
+  registrar(d, usuario, 'Alteração', 'faturas', null, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`, { proxima_fatura: { de: d.proxima_fatura, para: ciclo.de } });
+  d.proxima_fatura = ciclo.de;
+  return ciclo;
 }
 
 /**
@@ -979,7 +978,6 @@ export function dadosBoleto(d, cb) {
     extras.push(`SEGURO${parc ? parc[1] : ''} ${rs(cb.seguro)}`);
   }
   if (cb.taxa_boleto) extras.push(`TARIFA ${rs(cb.taxa_boleto)}`);
-  if (cb.multa_anterior) extras.push(`MULTA E JUROS MÊS ANTERIOR ${rs(cb.multa_anterior)}`);
   if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
   if (extras.length) linhas.push(extras.join(' '));

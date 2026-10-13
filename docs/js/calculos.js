@@ -216,8 +216,8 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // Composição da cobrança
 // --------------------------------------------------------------------------
-export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, multa_anterior = 0 }, reservaDisponivel = 0) {
-  const encargos = iptu + seguro + taxa_boleto + outros + (multa_anterior || 0);
+export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0 }, reservaDisponivel = 0) {
+  const encargos = iptu + seguro + taxa_boleto + outros;
   const totalSemDesconto = aluguel + encargos;
   const totalPontual = totalSemDesconto - desconto;
   const reserva = Math.min(reservaDisponivel, Math.max(totalPontual, 0));
@@ -232,12 +232,12 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
 }
 
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
-  seguro = 0, taxaBoleto = 0, outros = 0, multaAnterior = 0, reservaDisponivel = 0 }) {
+  seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0 }) {
   const diasMes = diasNoMes(competencia);
   const dias = diasOcupados(competencia, entrada, saida);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
   const desconto = descontoPorPercentual(aluguel, descontoPercentual);
-  const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros, multa_anterior: multaAnterior };
+  const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };
   return {
     competencia, dias_cobrados: dias, dias_mes: diasMes, aluguel_mensal: aluguelMensal, ...itens,
     ...totaisCobranca(itens, reservaDisponivel),
@@ -274,20 +274,17 @@ export function valorNotaFiscal(aluguel, desconto, multa = 0, juros = 0, pontual
 }
 
 /**
- * Quanto pagar numa data e o valor da nota fiscal.
- * ``pagouEmDia``: o inquilino pagou até o vencimento, mas o dinheiro entrou depois (compensação do banco):
- * sem multa e juros, com o desconto.
- * A multa e os juros de um atraso entram no boleto do mês seguinte (não no valor recebido agora).
+ * Quanto pagar e o valor da nota fiscal, com multa e juros contados até ``pagamento`` (o dia em que o inquilino pagou).
+ * Em dia: com o desconto. Atrasado: valor cheio + multa + juros, como o banco cobra no próprio boleto.
  */
-export function liquidar(cobranca, pagamento, pagouEmDia = false) {
+export function liquidar(cobranca, pagamento) {
   const t = totaisCobranca(cobranca, cobranca.reserva_utilizada || 0);
-  const r = multaEJuros(t.a_pagar_sem_desconto, cobranca.vencimento, pagamento,
+  const { dias, multa, juros } = multaEJuros(t.a_pagar_sem_desconto, cobranca.vencimento, pagamento,
     cobranca.multa_percentual, cobranca.juros_mensal_percentual);
-  const { dias, multa, juros } = pagouEmDia ? { dias: 0, multa: 0, juros: 0 } : r;
   const pontual = dias === 0;
   return {
     dias_atraso: dias, pontual, multa, juros,
-    valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto,
+    valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto + multa + juros,
     valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual),
   };
 }

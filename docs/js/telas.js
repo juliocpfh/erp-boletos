@@ -988,7 +988,7 @@ const CADASTROS = {
         if (R.faturasDe(d(), 'cobranca', r.id).length) erros.observacoes_nf = 'A NF já foi numerada. Cancele a NF (ou desfaça a numeração) antes de corrigir';
         return;
       }
-      for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'multa_anterior', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
+      for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
       dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
       if (dados.reserva_utilizada > disp) erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}`;
@@ -1017,14 +1017,19 @@ function telaFormulario(tabela, registro, q, estado) {
 // --------------------------------------------------------------------------
 // Cobranças do mês
 // --------------------------------------------------------------------------
-/** Formulário de confirmação do pagamento: data contábil (vira a data da NF) e "pagou em dia" (sem multa e juros). */
+/**
+ * Confirmação do pagamento: data contábil (entrada no banco, vira a data da NF), "pagou em dia" (compensou depois,
+ * sem multa e juros) e, se atrasou de verdade, o dia em que pagou (multa e juros até esse dia, como o banco cobra).
+ */
 function formPagamento(cb, compacto) {
-  const emDia = `<label class="check-mini" title="O inquilino pagou até o vencimento, mas o banco só compensou depois: sem multa e juros, com desconto"><input type="checkbox" name="em_dia" value="1"> pagou em dia</label>`;
+  const emDia = `<label class="check-mini" title="Pagou até o vencimento e o banco só compensou depois: sem multa e juros, com desconto"><input type="checkbox" name="em_dia" value="1"> pagou em dia</label>`;
   if (compacto) {
-    return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><input type="date" name="data" value="${C.hojeIso()}" title="Data contábil: dia em que o dinheiro entrou no banco (é a data da NF)"><input name="valor" placeholder="valor pago" title="Opcional: valor efetivamente recebido" inputmode="decimal" data-dinheiro>${emDia}<button class="pequeno">Confirmar</button></form>`;
+    return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><input type="date" name="data" value="${C.hojeIso()}" title="Data contábil: dia em que o dinheiro entrou na conta (é a data da NF)"><input name="valor" placeholder="valor pago" title="Opcional: valor efetivamente recebido" inputmode="decimal" data-dinheiro>${emDia}<button class="pequeno">Confirmar</button></form>`;
   }
-  return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Data contábil (entrada no banco)</label><input type="date" name="data" value="${C.hojeIso()}"><label>Valor pago (opcional)</label><input name="valor" inputmode="decimal" data-dinheiro placeholder="0,00">${emDia}<button>Confirmar pagamento</button></form>
-    <p class="suave">A data contábil é a data de emissão da NF. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}) e o banco compensou depois: não cobra multa e juros. Se pagou atrasado, a multa e os juros entram no boleto do mês seguinte.</p>`;
+  return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${C.hojeIso()}">
+    <label>Pagou em (se atrasou)</label><input type="date" name="pagou" title="Opcional: dia em que o inquilino pagou. Em branco: a data contábil">
+    <label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" data-dinheiro placeholder="0,00">${emDia}<button>Confirmar pagamento</button></form>
+    <p class="suave">A data contábil é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
 }
 
 function telaCobrancas(comp) {
@@ -1050,7 +1055,7 @@ function telaCobrancas(comp) {
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
-          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}${cb.multa_anterior ? `<br>${etiqueta(`multa/juros mês anterior ${reais(cb.multa_anterior)}`, 'aviso')}` : ''}</td>
+          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
@@ -1081,7 +1086,6 @@ function demonstrativo(cb) {
       ${cb.iptu ? linha(`IPTU${cb.iptu_parcela ? ` (${esc(cb.iptu_parcela)})` : ''}`, reais(cb.iptu)) : ''}
       ${cb.seguro ? linha(`Seguro obrigatório${cb.seguro_parcela ? ` (${esc(cb.seguro_parcela)})` : ''}`, reais(cb.seguro)) : ''}
       ${cb.taxa_boleto ? linha('Tarifa de emissão do boleto', reais(cb.taxa_boleto)) : ''}
-      ${cb.multa_anterior ? linha('Multa e juros do pagamento atrasado do mês anterior', reais(cb.multa_anterior)) : ''}
       ${cb.outros > 0 ? linha(`Cobrança adicional${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, reais(cb.outros)) : ''}
       ${cb.outros < 0 ? linha(`(-) Ressarcimento${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, `- ${reais(-cb.outros)}`) : ''}
       <tr class="total"><td>Total sem desconto</td><td class="n">${reais(t.total_sem_desconto)}</td></tr>
@@ -1089,7 +1093,7 @@ function demonstrativo(cb) {
       ${cb.reserva_utilizada ? linha('(-) Reserva paga na visita, abatida neste mês', `- ${reais(cb.reserva_utilizada)}`) : ''}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
-    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou em dia; compensado depois)' : ''}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)} (cobrados no boleto seguinte)` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
+    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou em dia; compensado depois)' : ''}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ''}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
 }
 
@@ -1136,7 +1140,7 @@ function telaCobranca(cb) {
       ${cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
         ${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}
         ${item('Valor recebido', reais(cb.valor_pago))}${item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>`)}</div>
-        <p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto). A multa e os juros entram no boleto seguinte` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.${cb.multa_cobrada_em ? ` Multa e juros cobrados no ${link(`#/cobranca/${cb.multa_cobrada_em}`, 'boleto seguinte', '')}.` : ''}</p>
+        <p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`} · nota fiscal ${reais(sim.valor_nf)}</p>
         ${opera() && cb.situacao !== 'Carência' ? formPagamento(cb, false) : ''}`}</div>
@@ -1203,9 +1207,18 @@ function telaFaturas(mes) {
           : (podeUsuario('admin') ? botao('apagarCanceladas', 'Apagar', { numero: n }, 'perigo pequeno', `Apagar a NF cancelada nº ${R.numeroFatura(n)} da lista? Fica só o registro no Histórico.`) : '')}</td></tr>`; }).join('')
       || `<tr><td colspan="9" class="suave">Nenhuma NF emitida em ${compBr(mes)}.</td></tr>`}</table></div>
     ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('pdfMes', 'Baixar todas em PDF (ZIP)', { mes })} ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
-    ${opera() && ultima ? `<div class="cartao"><h2>Corrigir e numerar de novo</h2>
-      <p class="suave">Emitiu NFs erradas? Desfaça a numeração a partir de um número: todas as NFs com esse número ou maior são retiradas, os pagamentos voltam para a fila acima, você corrige o que precisar (botão "Corrigir" ou no cadastro do inquilino) e numera de novo, reaproveitando os mesmos números.</p>
-      <form data-form="desfazerNumeracao" class="acoes"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ultima.numero}" style="width:120px"><button class="perigo">Desfazer numeração</button></form></div>` : ''}`;
+    ${opera() && ultima ? caixaRenumerar() : ''}`;
+}
+
+/** Voltar a última numeração (ciclo) para corrigir, incluir um pagamento esquecido e numerar de novo. */
+function caixaRenumerar() {
+  const ciclo = R.ultimoCicloDeNumeracao(d());
+  return `<div class="cartao"><h2>Corrigir e numerar de novo</h2>
+    <p class="suave">Emitiu NFs com algo errado, ou passou despercebido um pagamento de data intermediária? Volte a última numeração: as NFs daquele ciclo saem da lista, os pagamentos voltam para a fila acima com o que já foi preenchido, você corrige (botão "Corrigir"), inclui o que faltou e clica de novo em "Numerar estas NFs". Os números são reaproveitados, na ordem das datas. Dá para repetir e voltar ciclos anteriores.</p>
+    ${ciclo ? `<p>${botao('desfazerUltimaNumeracao', `Voltar a última numeração: nº ${R.numeroFatura(ciclo.de)}${ciclo.ate !== ciclo.de ? ` a ${R.numeroFatura(ciclo.ate)}` : ''} (${ciclo.qtd} NF${ciclo.qtd > 1 ? 's' : ''}, pagamentos de ${dataBr(ciclo.emissoes[0])}${ciclo.emissoes[1] !== ciclo.emissoes[0] ? ` a ${dataBr(ciclo.emissoes[1])}` : ''})`, {}, 'perigo',
+      `Voltar a numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)}? Essas NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(ciclo.de)}.`)}</p>` : '<p class="suave">As NFs atuais foram numeradas antes desta função existir: use a opção abaixo.</p>'}
+    <details><summary class="suave">Outra opção: desfazer a partir de um número</summary>
+      <form data-form="desfazerNumeracao" class="acoes" style="margin-top:8px"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ciclo ? ciclo.de : (R.ultimaFatura(d()) || {}).numero || 1}" style="width:120px"><button class="perigo secundario">Desfazer a partir deste número</button></form></details></div>`;
 }
 
 function caixaAvulsas() {
@@ -1501,9 +1514,10 @@ export const FORMULARIOS = {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
     const valor = String(f.get('valor') || '').trim() ? C.centavos(f.get('valor')) : null;
     const pagouEmDia = f.get('em_dia') === '1';
-    const r = await alterar((db) => R.registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia }));
+    const dataPagou = String(f.get('pagou') || '') || null;
+    const r = await alterar((db) => R.registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia, dataPagou }));
     aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
-      : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)} vão para o boleto seguinte. Valor da nota: ${reais(r.valor_nf)}.`, r.pontual ? 'ok' : 'aviso');
+      : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
     await mostrar();
   },
 
@@ -1821,6 +1835,12 @@ export const ACOES = {
       return;
     }
     await redesenharFormulario(el, {}, lista);
+  },
+
+  async desfazerUltimaNumeracao() {
+    const ciclo = await alterar((db) => R.desfazerUltimaNumeracao(db, login()));
+    aviso(`Numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)} desfeita. Corrija o que precisar, inclua o que faltou e clique em "Numerar estas NFs".`);
+    await mostrar();
   },
 
   async cancelarNumero({ numero }) {
