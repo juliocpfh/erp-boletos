@@ -1404,20 +1404,19 @@ function telaInquilinos(q) {
   const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
   const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
-  const editar = (c) => (opera() ? link(`#/editar/contratos/${c.id}`, 'Editar') : '');
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo inquilino', 'botao') : ''}</div>
     <form class="acoes" data-form="buscaInquilinos" style="margin-bottom:12px"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="max-width:340px"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Contrato</th><th class="n">Aluguel atual</th><th>Garantia</th><th></th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td>${dataBr(x.c.data_entrada)}</td>
-        <td>${x.c.prazo_tipo === 'Indeterminado' ? etiqueta('Indeterminado', 'aviso') : `até ${dataBr(x.c.vigencia_fim)}`}</td><td class="n">${reais(R.aluguelAtual(d(), x.c))}</td>
-        <td>${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td><td class="n">${editar(x.c)}</td></tr>`).join('') || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td>
+        <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${x.c.vigencia_inicio ? `${dataBr(x.c.vigencia_inicio)} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr(x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
+        <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
-    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th><th></th></tr>
-      ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td>${dataBr(x.c.data_entrada)}</td><td>${dataBr(x.c.data_saida)}</td>
+    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
+      ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
         ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
-        <td class="n">${editar(x.c)}</td></tr>`).join('')
-      || '<tr><td colspan="9" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
+</tr>`).join('')
+      || '<tr><td colspan="8" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
 }
 
 function telaIptu(ano) {
@@ -1630,7 +1629,7 @@ function telaResultados(q) {
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
   return `<h1>Resultados financeiros</h1>
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
-      ${atalhos}</form>
+      ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Contas pagas por nós</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
       ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span>${x.controle ? `<br>${etiqueta('boleto de controle: não conta', 'controle')}` : ''}</td>
         <td class="n">${x.base ? reais(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais(x.aluguel)}</td><td class="n">${reais(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais(x.iptu)}` : '-'}</td>
@@ -2982,6 +2981,50 @@ export const ACOES = {
     const ExcelJS = await excelJs();
     const { blob, nome } = await excelDoNumero(ExcelJS, await modeloFatura(), numero);
     baixar(blob, nome);
+  },
+
+  /** Resultados financeiros do período em Excel: uma aba com o ranking e outra com as contas pagas por nós. */
+  async excelResultados({ de, ate }) {
+    const ExcelJS = await excelJs();
+    const lista = R.resultadosFinanceiros(E.d, de, ate).sort((a, b) => a.controle - b.controle);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Resultados');
+    const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+    ws.addRow([`Resultados financeiros de ${dataBr(de)} a ${dataBr(ate)}`]).font = { bold: true, size: 14 };
+    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')}`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([]);
+    const colunas = [['Posição', 9], ['Imóvel', 30], ['Valor do imóvel + reformas', 22], ['Aluguel recebido', 18], ['NFs avulsas', 15], ['IPTU pago pelo proprietário', 22],
+      ['Contas pagas por nós', 20], ['Resultado', 18], ['Retorno ao ano', 15], ['Reformas no período', 18], ['Pagamentos', 12], ['Observação', 30]];
+    const cab = ws.addRow(colunas.map(([t]) => t));
+    cab.font = { bold: true };
+    cab.alignment = { wrapText: true, vertical: 'middle' };
+    cab.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } }; });
+    colunas.forEach(([, w], i) => { ws.getColumn(i + 1).width = w; });
+    const r = (v) => v / 100;
+    lista.forEach((x, n) => ws.addRow([x.retornoAnual !== null && !x.controle ? n + 1 : '', x.imovel.nome, r(x.base), r(x.aluguel), r(x.avulsas), -r(x.iptu), -r(x.contas), r(x.resultado),
+      x.retornoAnual === null ? '' : x.retornoAnual / 100, r(x.reformasPeriodo), x.mesesPagos, x.controle ? 'boleto de controle: não conta' : (x.base ? '' : 'informe o valor do imóvel')]));
+    const conta = lista.filter((x) => !x.controle);
+    const soma = (k) => r(conta.reduce((t, x) => t + x[k], 0));
+    const base = conta.reduce((t, x) => t + x.base, 0);
+    const resultado = conta.reduce((t, x) => t + x.resultado, 0);
+    const meses = lista[0] ? lista[0].meses : 12;
+    const tot = ws.addRow(['', 'Total', soma('base'), soma('aluguel'), soma('avulsas'), -soma('iptu'), -soma('contas'), soma('resultado'), base ? (resultado * 12 / meses / base) : '', soma('reformasPeriodo'), '', '']);
+    tot.font = { bold: true };
+    tot.eachCell((c) => { c.border = { top: { style: 'medium' } }; });
+    for (const col of [3, 4, 5, 6, 7, 8, 10]) ws.getColumn(col).numFmt = moeda;
+    ws.getColumn(9).numFmt = '0.00%';
+    ws.views = [{ state: 'frozen', ySplit: 4 }];
+    // contas pagas por nós no período, uma por linha
+    const wc = wb.addWorksheet('Contas pagas por nós');
+    wc.addRow(['Imóvel', 'Mês da conta', 'Conta', 'Valor', 'Pago em', 'Observação']).font = { bold: true };
+    [30, 14, 14, 15, 13, 40].forEach((w, i) => { wc.getColumn(i + 1).width = w; });
+    E.d.despesas.filter((x) => x.data_pagamento >= de && x.data_pagamento <= ate)
+      .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)))
+      .forEach((x) => wc.addRow([(buscar('imoveis', x.imovel_id) || {}).nome || '', compBr(x.competencia), x.tipo, r(x.valor), new Date(`${x.data_pagamento}T12:00:00`), x.observacoes || '']));
+    wc.getColumn(4).numFmt = moeda;
+    wc.getColumn(5).numFmt = 'dd/mm/yyyy';
+    const buf = await wb.xlsx.writeBuffer();
+    baixar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Resultados ${de} a ${ate}.xlsx`);
   },
 
   async excelMes({ mes }) {
