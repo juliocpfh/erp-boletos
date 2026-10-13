@@ -446,9 +446,10 @@ test('IPTU: parcelas de imóvel vazio ficam com o proprietário, com alerta até
   assert.equal(alertas.filter((a) => a.nivel === 'aviso').length, 1);
   R.marcarIptuPago(d, p.id, 4, '2026-05-10', 'julio');
   assert.equal(R.alertasIptu(d, '2026-05-05').filter((a) => a.nivel === 'aviso').length, 0);
-  // quitado à vista: inquilino que entrar paga 1/12 por mês ocupado
-  Object.assign(p, { pago_avista: true, valor_avista: 120000, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[1] });
-  assert.deepEqual(R.iptuNaCompetencia(p, '2026-11'), [11, 10000]);
+  // quitado à vista com desconto: o inquilino paga 1/12 do valor PARCELADO por mês ocupado (a diferença fica com o proprietário)
+  Object.assign(p, { pago_avista: true, valor_avista: 90000, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[1] });
+  assert.deepEqual(R.iptuNaCompetencia(p, '2026-11'), [11, 8333]);
+  assert.equal(R.parcelasIptu(d, p)[0].valor, 90000); // custo do proprietário: o valor à vista
   assert.deepEqual(R.iptuNaCompetencia(p, '2027-01'), [null, 0]);
   assert.equal(R.alertasIptu(d, '2026-02-10').length, 1);
   R.marcarIptuPago(d, p.id, 0, '2026-02-10', 'julio');
@@ -489,4 +490,18 @@ test('reserva marcada para mês passado sai dos alertas', async () => {
   const A = await import('../docs/js/alertas.js');
   assert.equal(A.alertaReserva(50000, 50000, '2026-03', '2026-10-13'), null);
   assert.ok(A.alertaReserva(50000, 50000, '2026-09', '2026-10-13'));
+});
+
+test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de uso', () => {
+  const { d, c } = base();
+  const p = d.iptus[0];
+  Object.assign(p, { primeira_competencia: null, primeiro_vencimento_boleto: '2026-07', vencimento_primeira: '2026-07-20' });
+  // Maria paga no mês seguinte ao de uso: a 1ª parcela entra no aluguel de junho (boleto vence em julho)
+  assert.equal(R.competenciaDaParcela(p, 1, c), '2026-06');
+  assert.equal(R.competenciaDaParcela(p, 3, { cobranca_mes_seguinte: false }), '2026-09');
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  const cb = d.cobrancas[0];
+  assert.equal(cb.vencimento.slice(0, 7), '2026-07');
+  assert.equal(cb.iptu, 8000); // 1ª parcela, proporcional aos 24 dias de junho
+  assert.equal(R.parcelasIptu(d, p)[0].mesBoleto, '2026-07');
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="1f0dd8d1b47ca7ff">
+<meta name="fontes" content="96e19cb65f7f20ed">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -690,6 +690,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     COBRANCA_IPTU_QUITADO: () => COBRANCA_IPTU_QUITADO,
     GARANTIAS: () => GARANTIAS,
     LISTAS: () => LISTAS,
+    SITUACOES: () => SITUACOES,
     TABELAS: () => TABELAS,
     TIPOS_RENOVACAO: () => TIPOS_RENOVACAO,
     ajustarBoleto: () => ajustarBoleto,
@@ -710,6 +711,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     cancelarNumero: () => cancelarNumero,
     caucaoSugerida: () => caucaoSugerida,
     cobrancasEmAberto: () => cobrancasEmAberto,
+    competenciaDaParcela: () => competenciaDaParcela,
     competenciaReserva: () => competenciaReserva,
     contratoAtivo: () => contratoAtivo,
     correcoesDo: () => correcoesDo,
@@ -738,6 +740,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     leiturasDoImovel: () => leiturasDoImovel,
     lista: () => lista,
     marcarIptuPago: () => marcarIptuPago,
+    mesBoletoDaParcela: () => mesBoletoDaParcela,
     montarCobranca: () => montarCobranca,
     normalizar: () => normalizar,
     numerarFaturas: () => numerarFaturas,
@@ -1173,6 +1176,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     banco: "Banco de dados",
     listas: "Lista de opções"
   };
+  var SITUACOES = ["Por conta do inquilino", "Incluso no aluguel", "Não tem"];
   var LISTAS = {
     concessionarias: { nome: "concessionárias", padrao: ["Copel", "Sanepar", "Supergasbras", "Condomínio"] },
     indices: { nome: "índices de correção", padrao: ["IGP-M", "IPCA", "IGP-M/IPCA (o maior)", "INPC", "IVAR", "IGP-DI", "Poupança"] }
@@ -1200,6 +1204,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     for (const i of d2.imoveis) {
       if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
       for (const k of ["anuncio_link", "anuncio_data", "grupo_id"]) delete i[k];
+      if (i.vistoria_link) {
+        const c = d2.contratos.filter((x) => x.imovel_id === i.id).sort((a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada)))[0];
+        if (c && !c.vistoria_link) c.vistoria_link = i.vistoria_link;
+        if (c) delete i.vistoria_link;
+      }
+    }
+    for (const c of d2.contratos) {
+      if (c.conta_iptu === void 0) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
+      if (c.conta_seguro === void 0) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
     }
     migrarAirbnb(d2);
     for (const c of d2.contratos) {
@@ -1433,43 +1446,55 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return !!p && comp >= p[0] && comp <= p[1];
   }
   var COBRANCA_IPTU_QUITADO = ["Parcelas normais nos meses em que ocupar", "Proporcional: 1/12 do valor por mês ocupado no ano", "Não cobrar do inquilino"];
-  function iptuNaCompetencia(p, comp) {
+  var valoresIptu = (p) => p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : parcelas(p.valor_total, p.num_parcelas);
+  var vencimentoParcela = (p, n) => p.vencimento_primeira ? somarMesesData(p.vencimento_primeira, n - 1) : null;
+  var mesBoletoDaParcela = (p, n) => p.primeiro_vencimento_boleto ? somarMeses(p.primeiro_vencimento_boleto, n - 1) : null;
+  function competenciaDaParcela(p, n, c = {}) {
+    const mes = mesBoletoDaParcela(p, n);
+    if (mes) return c.cobranca_mes_seguinte === false ? mes : somarMeses(mes, -1);
+    return p.primeira_competencia ? somarMeses(p.primeira_competencia, n - 1) : null;
+  }
+  function iptuNaCompetencia(p, comp, c = {}) {
     if (p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[2]) return [null, 0];
     if (p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1]) {
       if (Number(comp.slice(0, 4)) !== Number(p.ano)) return [null, 0];
       const mes = Number(comp.slice(5, 7));
-      return [mes, parcelas(p.valor_avista || p.valor_total, 12)[mes - 1]];
+      return [mes, parcelas(p.valor_total, 12)[mes - 1]];
     }
-    const [n, v] = parcelaNaCompetencia(p.valor_total, p.num_parcelas, p.primeira_competencia, comp);
-    return [n, n && p.valor_parcela > 0 ? p.valor_parcela : v];
+    const valores = valoresIptu(p);
+    for (let n = 1; n <= valores.length; n += 1) if (competenciaDaParcela(p, n, c) === comp) return [n, valores[n - 1]];
+    return [null, 0];
   }
-  function inquilinoPagaIptu(d2, imovelId, comp) {
-    return d2.contratos.find((c) => c.imovel_id === imovelId && c.ativo !== false && c.cobrar_iptu && diasOcupados(comp, c.data_entrada, c.data_saida) > 0) || null;
+  function inquilinoDaParcela(d2, p, n) {
+    for (const c of d2.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+      const comp = competenciaDaParcela(p, n, c);
+      if (comp && diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return { contrato: c, comp };
+    }
+    return null;
   }
   function parcelasIptu(d2, p) {
     if (p.pago_avista) {
       return [{
         n: 0,
         rotulo: "Cota única",
-        comp: p.primeira_competencia || `${p.ano}-02`,
+        comp: null,
         valor: p.valor_avista || p.valor_total,
         vencimento: p.vencimento_primeira || null,
         proprietario: true,
         paga: p.data_quitacao || null
       }];
     }
-    const valores = p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : parcelas(p.valor_total, p.num_parcelas);
-    return valores.map((valor, i) => {
-      const comp = somarMeses(p.primeira_competencia, i);
-      const inq = inquilinoPagaIptu(d2, p.imovel_id, comp);
+    return valoresIptu(p).map((valor, i) => {
+      const quem = inquilinoDaParcela(d2, p, i + 1);
       return {
         n: i + 1,
         rotulo: `${i + 1}ª`,
-        comp,
+        comp: quem ? quem.comp : null,
+        mesBoleto: mesBoletoDaParcela(p, i + 1),
         valor,
-        inquilino: inq,
-        vencimento: p.vencimento_primeira ? somarMesesData(p.vencimento_primeira, i) : null,
-        proprietario: !inq,
+        inquilino: quem ? quem.contrato : null,
+        vencimento: vencimentoParcela(p, i + 1),
+        proprietario: !quem,
         paga: (p.pagas || {})[i + 1] || null
       };
     });
@@ -1482,7 +1507,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       if (!i) continue;
       for (const pc of parcelasIptu(d2, p)) {
         if (!pc.proprietario || pc.paga) continue;
-        const venc = pc.vencimento || `${pc.comp}-10`;
+        const venc = pc.vencimento || `${mesBoletoDaParcela(p, Math.max(pc.n, 1)) || (p.primeira_competencia ? somarMeses(p.primeira_competencia, Math.max(pc.n, 1)) : `${p.ano}-02`)}-10`;
         const faltam = diasEntre(hoje, venc);
         if (faltam > 15) continue;
         lista2.push({
@@ -1524,7 +1549,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const iptuRots = [];
     if (contrato.cobrar_iptu && cobra("iptu")) {
       for (const p of d2.iptus.filter((i) => i.imovel_id === contrato.imovel_id)) {
-        const [n, v] = iptuNaCompetencia(p, comp);
+        const [n, v] = iptuNaCompetencia(p, comp, contrato);
         if (n) {
           iptu += aluguelProporcional(v, dias, diasMes);
           iptuRots.push(`${p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1] ? `IPTU ${p.ano} 1/12 (${compBr(comp)})` : `IPTU ${p.ano} parc. ${n}/${p.num_parcelas}`}${dias < diasMes ? ` proporcional ${dias}/${diasMes} dias de ${reais(v)}` : ""}`);
@@ -1964,6 +1989,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     "juros_mensal_percentual",
     "cobrar_iptu",
     "cobrar_seguro",
+    "conta_iptu",
+    "conta_seguro",
     "gerar_nf",
     "garantia_tipo"
   ];
@@ -2148,7 +2175,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const meses = Math.max(1, mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
     const dentro = (x) => x && x >= de && x <= ate;
     return d2.imoveis.map((i) => {
-      const contratos = new Set(d2.contratos.filter((c) => c.imovel_id === i.id).map((c) => c.id));
+      const contratos = new Set(d2.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
       const pagas = d2.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
       const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
       const avulsas = d2.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
@@ -2473,28 +2500,28 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     campo("nome", "Nome do imóvel", "texto", { obrig: true, ajuda: "Ex.: Loja 1 - Nilo Brandão" }),
     campo("endereco", "Endereço", "texto", { obrig: true, largo: true, max: 55, ajuda: "Aparece na NF junto com o complemento" }),
     campo("complemento", "Complemento", "texto", { max: 25 }),
-    campo("sublote", "Identificação do sublote", "texto", { ajuda: "Para imóveis que são sublotes internos. Ex.: Sublote 3" }),
     campo("bairro", "Bairro"),
     campo("cidade", "Cidade (município)", "texto", { max: LIMITES.municipio }),
     campo("cep", "CEP"),
-    secao("Valor do imóvel"),
-    campo("valor_imovel", "Valor do imóvel (R$)", "dinheiro", { ajuda: "Usado na página Resultados para o retorno sobre o valor" }),
-    campo("valor_data", "Data do valor", "data", { ajuda: "Data da compra ou da avaliação" }),
+    secao("Registros"),
+    campo("matricula", "Matrícula"),
+    campo("sublote", "Identificação do sublote", "texto", { ajuda: "Para imóveis que são sublotes internos. Ex.: Sublote 3" }),
+    campo("inscricao_iptu", "Inscrição imobiliária (IPTU)"),
+    campo("copel_uc", "Unidade consumidora Copel"),
+    campo("sanepar_matricula", "Matrícula Sanepar"),
+    campo("administradora_nome", "Administradora do condomínio"),
+    campo("gas_relogio", "Relógio de gás (nº / identificação)"),
+    campo("internet", "Contrato de internet ou nº do telefone"),
     secao("Área e energia"),
     campo("area_util", "Área útil (m²)", "pct"),
     campo("area_total", "Área total (m²)", "pct"),
     campo("energia_ligada", "Energia ligada", "opcao", { opcoes: ["Sim", "Não"] }),
     campo("energia_tipo", "Tipo de ligação da energia", "opcao", { opcoes: ["Monofásica", "Bifásica", "Trifásica"] }),
-    secao("Registros"),
-    campo("matricula", "Matrícula"),
-    campo("inscricao_iptu", "Inscrição imobiliária (IPTU)"),
-    campo("copel_uc", "Unidade consumidora Copel"),
-    campo("sanepar_matricula", "Matrícula Sanepar"),
-    campo("administradora_nome", "Administradora do condomínio"),
+    secao("Valor do imóvel"),
+    campo("valor_imovel", "Valor do imóvel (R$)", "dinheiro", { ajuda: "Usado na página Resultados para o retorno sobre o valor" }),
+    campo("valor_data", "Data do valor", "data", { ajuda: "Data da compra ou da avaliação" }),
     secao("Último anúncio"),
     campo("anuncio_descricao", "Descrição do anúncio", "area", { largo: true }),
-    secao("Vistoria de entrada"),
-    campo("vistoria_link", "Link da pasta de fotos da vistoria de entrada", "url", { largo: true, ajuda: "Cole o link da pasta na nuvem (OneDrive, Google Drive) onde está o .rar das fotos" }),
     secao("Observações"),
     campo("verificar", "Pontos a verificar (aparece em amarelo)", "area"),
     campo("observacoes", "Observações", "area")
@@ -2546,11 +2573,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     }))
   ]);
   var PJ = quando("inquilino_tipo", "Pessoa jurídica (empresa)");
+  var SOLIDARIO = quando("tem_solidario", "1");
   var CONTRATO = [
     secao("Imóvel e situação"),
     campo("imovel_id", "Imóvel", "opcao", { opcoes: [], soEditar: true, ajuda: 'Para vincular a um imóvel, use "Vincular inquilino" na página do imóvel. Em branco: sem imóvel (não gera boleto)' }),
     campo("ativo", "Inquilino ativo", "simnao", { padrao: true, ajuda: "Desmarcado: não gera boleto e vai para a lista de inativos" }),
-    campo("gerar_nf", "Emitir NF para este inquilino", "simnao", { padrao: true, ajuda: "Desmarcado: o pagamento é controlado (em dia ou atrasado), mas não entra na numeração das NFs" }),
+    campo("gerar_nf", "Emite NF (desmarcado: boleto de controle)", "simnao", { padrao: true, ajuda: "Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados" }),
     secao("Inquilino (responsável pelo contrato)"),
     campo("inquilino_tipo", "Tipo", "opcao", { obrig: true, padrao: "Pessoa física", opcoes: ["Pessoa física", "Pessoa jurídica (empresa)"] }),
     campo("inquilino_nome", "Nome completo / razão social", "texto", { obrig: true, largo: true, max: LIMITES.tomador_nome, ajuda: "O boleto e a NF saem neste nome" }),
@@ -2571,43 +2599,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     campo("representante_cargo", "Cargo", "texto", PJ),
     campo("representante_telefone", "Telefone do representante", "tel", PJ),
     campo("representante_email", "E-mail do representante", "email", PJ),
-    secao("Inquilino solidário (se houver)"),
-    campo("solidario_nome", "Nome do inquilino solidário", "texto", { largo: true, ajuda: "Assina o contrato junto. O boleto continua saindo no nome do inquilino principal" }),
-    campo("solidario_cpf", "CPF / CNPJ do solidário"),
-    campo("solidario_rg", "RG do solidário"),
-    campo("solidario_telefone", "Telefone do solidário", "tel"),
-    campo("solidario_email", "E-mail do solidário", "email"),
-    secao("Datas e prazo"),
-    campo("data_entrada", "Data de entrada", "data", { obrig: true }),
-    campo("data_saida", "Data de saída", "data", { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
-    campo("vigencia_inicio", "Início do contrato", "data", { obrig: true }),
-    campo("prazo_tipo", "Prazo", "opcao", { obrig: true, padrao: "Determinado", opcoes: ["Determinado", "Indeterminado"] }),
-    campo("prazo_meses", "Prazo do contrato (meses)", "inteiro", { ...quando("prazo_tipo", "Determinado"), ajuda: "Ex.: 30. O fim do contrato é calculado a partir do início" }),
-    campo("renovacao_automatica", "Renovação automática", "simnao"),
-    secao("Correção anual"),
-    campo("indice_correcao", "Índice de correção previsto no contrato", "opcao", { lista: "indices", ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
-    campo("data_base_correcao", "Data-base da correção", "data", { ajuda: "O alerta de correção usa o aniversário desta data. Em branco: início do contrato" }),
-    secao("Valores e boleto"),
-    campo("aluguel_inicial", "Aluguel inicial (valor cheio, histórico)", "dinheiro", { obrig: true }),
-    campo("dia_vencimento", "Dia do vencimento", "inteiro", { obrig: true, padrao: 10 }),
-    campo("cobranca_mes_seguinte", "O aluguel do mês vence no mês seguinte", "simnao", { padrao: true, ajuda: "Marcado: aluguel de julho vence em agosto" }),
-    campo("bonificacao", "Tem bonificação (desconto) por pontualidade", "simnao", { padrao: true }),
-    campo("aluguel_bonificado", "Aluguel com bonificação (R$)", "dinheiro", { virtual: true, vinculo: "desconto", ajuda: "Digite o valor que o inquilino paga em dia: o % é calculado" }),
-    campo("desconto_pontualidade_percentual", "Bonificação (%)", "pct", { vinculo: "desconto", ajuda: "Ou digite o % e o aluguel com bonificação é calculado" }),
-    campo("taxa_boleto", "Tarifa de emissão do boleto (R$)", "dinheiro", { ajuda: "Entra no boleto e na descrição do boleto" }),
-    campo("multa_percentual", "Multa por atraso (%)", "pct", { padrao: 2 }),
-    campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { padrao: 1 }),
-    secao("Carência de aluguel"),
-    campo("carencia_meses", "Meses de carência", "inteiro", { ajuda: "Nestes meses o aluguel não é cobrado. Em branco: sem carência" }),
-    campo("carencia_inicio", "Carência a partir do aluguel de", "mes", { ajuda: "Em branco: mês de entrada" }),
-    campo("carencia_cobrar_iptu", "Na carência, cobrar o IPTU", "simnao"),
-    campo("carencia_cobrar_seguro", "Na carência, cobrar o seguro", "simnao"),
-    campo("carencia_cobrar_taxa", "Na carência, cobrar a tarifa do boleto", "simnao"),
-    secao("O que está incluso no contrato"),
-    campo("cobrar_iptu", "IPTU cobrado do inquilino (entra no boleto)", "simnao", { padrao: true }),
-    campo("cobrar_seguro", "Seguro obrigatório cobrado do inquilino (entra no boleto)", "simnao", { padrao: true }),
-    ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA })),
-    campo("contas_adicionais", "Contas ou cobranças adicionais previstas no contrato", "area", { ajuda: "Ex.: taxa de lixo, limpeza da área comum, rateio de água" }),
+    secao("Inquilino solidário"),
+    campo("tem_solidario", "Tem inquilino solidário", "simnao", { virtual: true, ajuda: "Marque para cadastrar quem assina o contrato junto" }),
+    campo("solidario_nome", "Nome do inquilino solidário", "texto", { largo: true, ...SOLIDARIO, ajuda: "O boleto continua saindo no nome do inquilino principal" }),
+    campo("solidario_cpf", "CPF / CNPJ do solidário", "texto", SOLIDARIO),
+    campo("solidario_rg", "RG do solidário", "texto", SOLIDARIO),
+    campo("solidario_telefone", "Telefone do solidário", "tel", SOLIDARIO),
+    campo("solidario_email", "E-mail do solidário", "email", SOLIDARIO),
     secao("Garantia"),
     campo("garantia_tipo", "Tipo de garantia", "opcao", { obrig: true, opcoes: ["Caução", "Depósito garantia", "Fiador", "Fiador + depósito", "Seguro fiança", "Sem garantia"] }),
     campo("caucao_valor", "Valor da caução", "dinheiro", quando("garantia_tipo", "Caução")),
@@ -2621,6 +2619,39 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     campo("reserva_valor", "Valor da reserva", "dinheiro"),
     campo("reserva_data", "Data da reserva", "data"),
     campo("reserva_competencia", "Usar a reserva no aluguel de", "mes", { ajuda: "Em branco: usa no primeiro aluguel" }),
+    secao("Datas e prazo"),
+    campo("data_entrada", "Data de entrada", "data", { obrig: true }),
+    campo("data_saida", "Data de saída", "data", { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
+    campo("vigencia_inicio", "Início do contrato", "data", { obrig: true }),
+    campo("prazo_tipo", "Prazo", "opcao", { obrig: true, padrao: "Determinado", opcoes: ["Determinado", "Indeterminado"] }),
+    campo("prazo_meses", "Prazo do contrato (meses)", "inteiro", { ...quando("prazo_tipo", "Determinado"), ajuda: "Ex.: 30. O fim do contrato é calculado a partir do início" }),
+    campo("renovacao_automatica", "Renovação automática", "simnao"),
+    secao("Valores e boleto"),
+    campo("aluguel_inicial", "Aluguel inicial (valor cheio, histórico)", "dinheiro", { obrig: true }),
+    campo("dia_vencimento", "Dia do vencimento", "inteiro", { obrig: true, padrao: 10 }),
+    campo("cobranca_mes_seguinte", "O aluguel do mês vence no mês seguinte", "simnao", { padrao: true, ajuda: "Marcado: aluguel de julho vence em agosto" }),
+    campo("bonificacao", "Tem bonificação (desconto) por pontualidade", "simnao", { padrao: true }),
+    campo("aluguel_bonificado", "Aluguel com bonificação (R$)", "dinheiro", { virtual: true, vinculo: "desconto", ajuda: "Digite o valor que o inquilino paga em dia: o % é calculado" }),
+    campo("desconto_pontualidade_percentual", "Bonificação (%)", "pct", { vinculo: "desconto", ajuda: "Ou digite o % e o aluguel com bonificação é calculado" }),
+    campo("taxa_boleto", "Tarifa de emissão do boleto (R$)", "dinheiro", { ajuda: "Entra no boleto e na descrição do boleto" }),
+    campo("multa_percentual", "Multa por atraso (%)", "pct", { padrao: 2 }),
+    campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { padrao: 1 }),
+    secao("Correção anual"),
+    campo("indice_correcao", "Índice de correção previsto no contrato", "opcao", { lista: "indices", ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
+    campo("data_base_correcao", "Data-base da correção", "data", { ajuda: "O alerta de correção usa o aniversário desta data. Em branco: início do contrato" }),
+    secao("O que está incluso no contrato"),
+    campo("conta_iptu", "IPTU", "opcao", { obrig: true, padrao: "Por conta do inquilino", opcoes: SITUACOES_CONTA, ajuda: "Por conta do inquilino: as parcelas entram no boleto" }),
+    campo("conta_seguro", "Seguro obrigatório", "opcao", { obrig: true, padrao: "Por conta do inquilino", opcoes: SITUACOES_CONTA, ajuda: "Por conta do inquilino: as parcelas entram no boleto" }),
+    ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA })),
+    campo("contas_adicionais", "Contas ou cobranças adicionais previstas no contrato", "area", { ajuda: "Ex.: taxa de lixo, limpeza da área comum, rateio de água" }),
+    secao("Carência de aluguel"),
+    campo("carencia_meses", "Meses de carência", "inteiro", { ajuda: "Nestes meses o aluguel não é cobrado. Em branco: sem carência" }),
+    campo("carencia_inicio", "Carência a partir do aluguel de", "mes", { ajuda: "Em branco: mês de entrada" }),
+    campo("carencia_cobrar_iptu", "Na carência, cobrar o IPTU", "simnao"),
+    campo("carencia_cobrar_seguro", "Na carência, cobrar o seguro", "simnao"),
+    campo("carencia_cobrar_taxa", "Na carência, cobrar a tarifa do boleto", "simnao"),
+    secao("Vistoria de entrada"),
+    campo("vistoria_link", "Link da pasta de fotos da vistoria de entrada", "url", { largo: true, ajuda: "Cole o link da pasta na nuvem (OneDrive, Google Drive) onde está o .rar das fotos" }),
     secao("Termo aditivo"),
     campo("possui_aditivos", "O contrato possui termo aditivo", "simnao", { ajuda: 'Marcado sozinho quando muda o vencimento ou a garantia. Anexe o termo em "Arquivos do inquilino"' }),
     secao("Observações"),
@@ -2648,14 +2679,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   ];
   var IPTU = [
     campo("ano", "Ano", "inteiro", { obrig: true }),
-    campo("valor_total", "Valor total do IPTU", "dinheiro", { obrig: true }),
+    campo("valor_total", "Valor total do IPTU parcelado", "dinheiro", { obrig: true, ajuda: "É o valor repassado ao inquilino, mesmo quando o proprietário paga à vista com desconto" }),
     campo("num_parcelas", "Número de parcelas", "inteiro", { obrig: true, padrao: 10 }),
     campo("valor_parcela", "Valor fixo cobrado por parcela (opcional)", "dinheiro", { ajuda: "Ex.: arredondar para R$ 213,00. Em branco: total ÷ parcelas" }),
-    campo("primeira_competencia", "Cobrar 1ª parcela no aluguel de", "mes", { obrig: true }),
-    campo("vencimento_primeira", "Vencimento da 1ª parcela na prefeitura", "data", { ajuda: "As demais vencem no mesmo dia dos meses seguintes. Usado nos alertas de imóvel vazio" }),
+    campo("vencimento_primeira", "Vencimento da 1ª parcela na prefeitura", "data", { ajuda: "Data da guia. As demais vencem no mesmo dia dos meses seguintes. Usado no controle e nos alertas do que o proprietário paga" }),
+    campo("primeiro_vencimento_boleto", "Mês de vencimento do 1º boleto do inquilino com IPTU", "mes", { obrig: true, ajuda: "Ex.: 2026-03 = a 1ª parcela entra no boleto que vence em março. As demais seguem mês a mês, pelo número de parcelas" }),
     secao("Pagamento à vista pelo proprietário"),
     campo("pago_avista", "Proprietário quitou o IPTU à vista (cota única)", "simnao"),
-    campo("valor_avista", "Valor pago à vista", "dinheiro", quando("pago_avista", "1")),
+    campo("valor_avista", "Valor pago à vista (com desconto)", "dinheiro", { ...quando("pago_avista", "1"), ajuda: "O inquilino continua pagando o valor parcelado" }),
     campo("data_quitacao", "Data da quitação", "data", { ...quando("pago_avista", "1"), ajuda: "Em branco: ainda não pago (fica nos alertas)" }),
     campo("cobranca_inquilino", "Como cobrar do inquilino que entrar depois", "opcao", {
       ...quando("pago_avista", "1"),
@@ -3128,7 +3159,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     },
     primeiroAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Primeiro acesso</h1>
-    <p class="suave">Pasta: <b>${esc2(E.pasta.name)}</b>. Crie o usuário administrador. Depois ele cadastra os demais.</p>
+    <p class="suave">Pasta: <b>${esc2(E.pasta.name)}</b>. Esta pasta ainda não tem dados: crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos 6 caracteres). Depois o administrador libera os demais em Usuários.</p>
+    <div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
+      Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
+      Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>
     <form data-form="primeiroAcesso">
       <p><label>Seu nome</label><input name="nome" autofocus></p>
       <p><label>Login</label><input name="login" autocomplete="username"></p>
@@ -3260,8 +3294,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       if (pc.paga) return `${etiqueta(`paga em ${dataBr2(pc.paga)}`, "ok")} ${opera() ? botao("iptuPago", "desfazer", { id: p.id, n: pc.n, data: "" }, "link-botao", "Desfazer o pagamento desta parcela?") : ""}`;
       return opera() ? `<form data-form="iptuPago" data-id="${p.id}" data-n="${pc.n}" class="pagamento"><input type="date" name="data" value="${hojeIso()}"><button class="pequeno">Paga</button></form>` : etiqueta("em aberto", "perigo");
     };
-    return `<div class="rolagem"><table><tr><th>Parcela</th><th>No aluguel de</th><th>Vencimento</th><th class="n">Valor</th><th>Quem arca</th><th>Pagamento pelo proprietário</th></tr>
-    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${compBr2(pc.comp)}</td><td>${pc.vencimento ? dataBr2(pc.vencimento) : '<span class="suave">-</span>'}</td><td class="n">${reais2(pc.valor)}</td>
+    return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vencimento na prefeitura</th><th>Boleto que vence em</th><th class="n">Valor</th><th>Quem arca</th><th>Pagamento pelo proprietário</th></tr>
+    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr2(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr2(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr2(pc.comp)}</span>` : "-"}</td><td class="n">${reais2(pc.valor)}</td>
       <td>${p.pago_avista ? etiqueta("Proprietário (à vista)", "aviso") : pagador(pc)}</td><td>${situ(pc)}</td></tr>`).join("")}</table></div>`;
   }
   function caixaIptu(i) {
@@ -3302,20 +3336,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       ${item("Energia", esc2([i.energia_ligada ? i.energia_ligada === "Sim" ? "ligada" : "desligada" : "", i.energia_tipo].filter(Boolean).join(" · ") || "-"))}
       ${item("Matrícula", esc2(i.matricula || "-"))}${item("Inscrição IPTU", esc2(i.inscricao_iptu || "-"))}
       ${item("UC Copel", esc2(i.copel_uc || "-"))}${item("Matrícula Sanepar", esc2(i.sanepar_matricula || "-"))}
-      ${item("Administradora do condomínio", esc2(i.administradora_nome || "-"))}
+      ${item("Administradora do condomínio", esc2(i.administradora_nome || "-"))}${item("Relógio de gás", esc2(i.gas_relogio || "-"))}
+      ${item("Internet / telefone", esc2(i.internet || "-"))}
       ${item("Pasta de arquivos", esc2(i.pasta || "-"))}</div>
       ${i.observacoes ? `<p class="pre">${esc2(i.observacoes)}</p>` : ""}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
-      <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th></tr>
+      <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th><th>NF ou controle</th></tr>
       ${contratos.map((c) => `<tr class="${c.verificar ? "amarelo" : ""}"><td><input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? "checked" : ""} ${opera() ? "" : "disabled"}></td>
         <td><a href="#/contrato/${c.id}"><b>${esc2(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc2(c.inquilino_apelido)})</span>` : ""}<br><span class="suave">📁 ${esc2(c.pasta || nomePastaContrato(c))}</span></td>
         <td>${dataBr2(c.data_entrada)}</td><td>${dataBr2(c.data_saida)}</td><td class="n">${reais2(aluguelAtual(d(), c))}</td>
-        <td>${contratoAtivo(c, hoje) ? etiqueta("Atual", "ok") : etiqueta("Encerrado", "neutra")} ${c.prazo_tipo === "Indeterminado" ? etiqueta("Indeterminado", "aviso") : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
-    </table></div><p class="suave">Desmarque "Ativo" para não gerar boleto para o inquilino.</p></div>
-    ${caixaEmpresas(i)}
-    ${caixaLeituras(leiturasDoImovel(d(), i.id), opera() ? link(`#/novo/leituras?imovel=${i.id}`, "Registrar leitura") : "", true)}
-    ${caixaSeguros(i)}
+        <td>${contratoAtivo(c, hoje) ? etiqueta("Atual", "ok") : etiqueta("Encerrado", "neutra")} ${c.prazo_tipo === "Indeterminado" ? etiqueta("Indeterminado", "aviso") : ""}</td>
+        <td><label class="check-mini" title="Desmarcado: boleto de controle (não gera NF nem entra nas somas e nos resultados)"><input type="checkbox" data-acao="alternarNf" data-id="${c.id}" ${geraNf(c) ? "checked" : ""} ${opera() ? "" : "disabled"}> emite NF</label>
+          ${geraNf(c) ? "" : `<br>${etiqueta("boleto de controle", "neutra")}`}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
+    </table></div><p class="suave">Desmarque "Ativo" para não gerar boleto para o inquilino. Desmarque "emite NF" para boleto de controle: o pagamento é acompanhado, mas não gera NF nem entra nas somas dos boletos e nos resultados.</p></div>
     ${caixaIptu(i)}
+    ${caixaSeguros(i)}
+    ${caixaLeituras(leiturasDoImovel(d(), i.id), opera() ? link(`#/novo/leituras?imovel=${i.id}`, "Registrar leitura") : "", true)}
     <div class="cartao" id="titularidade"><div class="cabecalho"><h2>Troca de titularidade (água, energia, gás, condomínio)</h2>${opera() ? link(`#/novo/titularidades?imovel=${i.id}`, "Registrar protocolo") : ""}</div>
       ${lembretes.map((a) => `<div class="alerta ${a.nivel}"><b>${esc2(a.tipo)}</b> ${esc2(a.texto)}</div>`).join("")}
       <div class="rolagem"><table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Inquilino</th><th>Protocolo</th><th>Situação</th><th></th></tr>
@@ -3324,11 +3360,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       return `<tr><td>${dataBr2(t.data)}</td><td>${esc2(t.concessionaria)}</td><td>${esc2(t.tipo || "-")}</td><td>${esc2(c ? c.inquilino_nome : "Proprietário")}</td><td><b>${esc2(t.protocolo || "-")}</b></td><td>${esc2(t.situacao || "-")}</td>
         <td class="n">${opera() ? `${link(`#/editar/titularidades/${t.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "titularidades", id: t.id }, "perigo pequeno", "Excluir este registro?")}` : ""}</td></tr>`;
     }).join("") || '<tr><td colspan="7" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div></div>
+    ${caixaEmpresas(i)}
     ${caixaReformas(i)}
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc2(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos("anuncio", i.id, "Fotos do último anúncio", "anuncio")}
     ${caixaArquivos("imovel", i.id, "Documentos do imóvel", "documentos", "Matrícula, cadastro do IPTU e outros documentos do imóvel.")}
-    <div class="cartao" id="vistoria"><h2>Fotos da vistoria de entrada</h2>${i.vistoria_link ? `<p><a class="botao" href="${esc2(i.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a></p><p class="suave">${esc2(i.vistoria_link)}</p>` : '<p class="suave">Nenhum link cadastrado. Use "Editar imóvel" e cole o link da pasta na nuvem.</p>'}</div>
     <div class="cartao"><h2>Histórico do imóvel</h2>${tabelaHistorico(ultimos((h) => h.imovel_id === i.id))}</div>`;
   }
   function selosContrato(c) {
@@ -3432,8 +3468,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   function caixaIncluso(c) {
     const sit = (v) => !v ? '<span class="suave">não informado</span>' : v === "Incluso no aluguel" ? etiqueta(v, "ok") : v === "Por conta do inquilino" ? etiqueta(v, "info") : etiqueta(v, "neutra");
     return `<div class="cartao"><h2>O que está incluso no contrato</h2><div class="grade">
-    ${item("IPTU", c.cobrar_iptu ? etiqueta("Cobrado do inquilino", "aviso") : etiqueta("Não cobrado", "neutra"))}
-    ${item("Seguro obrigatório", c.cobrar_seguro !== false ? etiqueta("Cobrado do inquilino", "aviso") : etiqueta("Não cobrado", "neutra"))}
+    ${item("IPTU", sit(c.conta_iptu || (c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1])))}
+    ${item("Seguro obrigatório", sit(c.conta_seguro || (c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0])))}
     ${CONTAS.map(([k, t]) => item(t, sit(c[k]))).join("")}</div>
     ${c.contas_adicionais ? `<h3>Contas adicionais</h3><p class="pre">${esc2(c.contas_adicionais)}</p>` : ""}</div>`;
   }
@@ -3516,6 +3552,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr2(t.data)}</td><td>${esc2(t.concessionaria)}</td><td>${esc2(t.tipo || "-")}</td><td><b>${esc2(t.protocolo || "-")}</b></td><td>${esc2(t.situacao || "-")}</td></tr>`).join("") || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaLeituras(leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, "Registrar leitura") : "", false)}
     ${caixaSaida(c)}
+    <div class="cartao" id="vistoria"><h2>Fotos da vistoria de entrada</h2>${c.vistoria_link ? `<p><a class="botao" href="${esc2(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a></p><p class="suave">${esc2(c.vistoria_link)}</p>` : `<p class="suave">Nenhum link cadastrado. Use "Editar" e cole o link da pasta na nuvem onde está o .rar das fotos.</p>`}</div>
     ${caixaArquivos("contrato", c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, "arquivos", `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ", contrato social e cartão CNPJ da empresa, documentos do representante" : ""}${c.solidario_nome ? ", documentos do inquilino solidário" : ""} etc.`)}
     <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? " e dos contratos ligados" : ""}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
   }
@@ -3562,7 +3599,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         ...r,
         ativo: r.ativo !== false,
         gerar_nf: r.gerar_nf !== false,
-        cobrar_seguro: r.cobrar_seguro !== false,
+        tem_solidario: !!r.solidario_nome,
+        conta_iptu: r.conta_iptu || (r.cobrar_iptu ? SITUACOES[0] : SITUACOES[1]),
+        conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0]),
         inquilino_tipo: r.inquilino_tipo || "Pessoa física",
         prazo_meses: r.prazo_meses || mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
         aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r)
@@ -3593,6 +3632,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         }
         if (dados.carencia_meses < 0) erros.carencia_meses = "Valor inválido";
         if (dados.inquilino_tipo === "Pessoa jurídica (empresa)" && !dados.representante_nome) erros.representante_nome = "Empresa precisa do representante (pessoa física)";
+        if (new FormData(form).get("tem_solidario") !== "1") for (const k of ["solidario_nome", "solidario_cpf", "solidario_rg", "solidario_telefone", "solidario_email"]) dados[k] = null;
+        else if (!dados.solidario_nome) erros.solidario_nome = "Informe o nome do inquilino solidário";
+        dados.cobrar_iptu = dados.conta_iptu === SITUACOES[0];
+        dados.cobrar_seguro = dados.conta_seguro === SITUACOES[0];
         fiadoresNovos = [];
         for (const n of [1, 2]) {
           const f = Object.fromEntries(CAMPOS_FIADOR.map((c) => [c.nome, dados[`fiador${n}_${c.nome}`] ?? null]));
@@ -3681,12 +3724,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     iptus: {
       titulo: (r, q) => `IPTU - ${buscar2("imoveis", r ? r.imovel_id : q.imovel).nome}`,
       campos: () => IPTU,
+      // IPTU lançado antes guardava o mês de uso: mostra o mês de vencimento do boleto (o seguinte)
+      valores: (r) => ({ ...r, primeiro_vencimento_boleto: r.primeiro_vencimento_boleto || (r.primeira_competencia ? somarMeses(r.primeira_competencia, 1) : null) }),
       fixos: (r, q) => r ? {} : { imovel_id: Number(q.imovel) },
       recalcular: (salvo, db) => (cb) => (buscar(db, "contratos", cb.contrato_id) || {}).imovel_id === salvo.imovel_id,
       padrao: (q) => {
         const ano = Number(q.ano) || (/* @__PURE__ */ new Date()).getFullYear();
         const ant = d().iptus.filter((p) => p.imovel_id === Number(q.imovel) && p.ano < ano).sort((a, b) => b.ano - a.ano)[0];
-        return ant ? { ano, num_parcelas: ant.num_parcelas, primeira_competencia: `${ano}${ant.primeira_competencia.slice(4)}` } : { ano };
+        const mesAnt = ant && (ant.primeiro_vencimento_boleto || ant.primeira_competencia && somarMeses(ant.primeira_competencia, 1));
+        return ant ? {
+          ano,
+          num_parcelas: ant.num_parcelas,
+          primeiro_vencimento_boleto: mesAnt ? `${ano}${mesAnt.slice(4)}` : null,
+          vencimento_primeira: ant.vencimento_primeira ? somarAnos(ant.vencimento_primeira, ano - ant.ano) : null
+        } : { ano };
       },
       aviso: (r, q) => {
         const iid = r ? r.imovel_id : Number(q.imovel);
@@ -3968,7 +4019,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     }).sort((a, b) => (a.i ? a.i.nome : "").localeCompare(b.i ? b.i.nome : "", "pt-BR"));
     const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista2.some((x) => x.c.id === c.id));
     const pend = pendentesDeFatura(d());
-    const soma = (f) => lista2.reduce((s, x) => s + f(x), 0);
+    const soma = (f) => lista2.filter((x) => geraNf(x.c)).reduce((s, x) => s + f(x), 0);
+    const controle = lista2.filter((x) => !geraNf(x.c)).length;
+    const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
+      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>`;
     return `<div class="cabecalho"><h1>Boletos de ${compBr2(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${somarMeses(comp, -1)}">← ${compBr2(somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -3977,10 +4031,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc2(c.inquilino_nome)).join(", ")}. ${botao("gerarCobrancas", `Gerar boletos de ${compBr2(comp)}`, { comp }, "pequeno")}</div>` : ""}
     ${opera() && lista2.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao("recalcularMes", `Recalcular boletos em aberto de ${compBr2(comp)} pelo cadastro`, { comp }, "secundario pequeno", "Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.")}</p>` : ""}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
+    ${lista2.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas">
-      <tr><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
+      <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista2.map(({ cb, c, i, t, fs }) => `<tr>
-        <td><a href="#/cobranca/${cb.id}"><b>${esc2(i.nome)}</b></a><br>${esc2(c.inquilino_nome)}
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
+        <td><a href="#/cobranca/${cb.id}"><b>${esc2(i.nome)}</b></a><br>${esc2(c.inquilino_nome)}${geraNf(c) ? "" : ` ${etiqueta("controle", "neutra")}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, "info")}` : ""}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais2(cb.reserva_utilizada)}`, "aviso")}` : ""}
           ${cb.carencia ? `<br>${etiqueta("carência", "aviso")}` : ""}</td>
@@ -3991,11 +4047,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <td>${cb.data_pagamento ? `${situacao(cb.situacao)}${cb.pagou_em_dia ? ` ${etiqueta("pagou em dia", "ok")}` : ""}<br><span class="suave">entrou em ${dataBr2(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ""}<br>recebido ${reais2(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao("estornar", "Desfazer", { id: cb.id }, "secundario pequeno", "Desfazer este pagamento?")}` : ""}` : cb.situacao === "Carência" ? situacao("Carência") : opera() ? formPagamento(cb, true) : situacao(cb.situacao)}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais2(cb.valor_nf) : "-"}</td>
-        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${numeroFatura(fs[0].numero)}`) : !geraNf(c) ? '<span class="suave">sem NF</span>' : cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : "-"}</td></tr>`).join("") || `<tr><td colspan="8" class="suave">Nenhum boleto gerado para ${compBr2(comp)}.</td></tr>`}
-      ${lista2.length ? `<tr class="total"><td colspan="2">Total</td><td class="n">${reais2(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais2(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ""}
+        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${numeroFatura(fs[0].numero)}`) : !geraNf(c) ? '<span class="suave">sem NF</span>' : cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : "-"}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr2(comp)}.</td></tr>`}
+      ${lista2.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais2(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais2(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ""}
     </table></div>
-    ${lista2.length ? `<div class="acoes"><a class="botao secundario" target="_blank" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir demonstrativos do mês</a>
-      <a class="botao secundario" href="#/faturas">Ver NFs</a></div>` : ""}`;
+    ${lista2.length ? `<div class="acoes">${impressao}</div>` : ""}`;
   }
   function demonstrativo(cb) {
     const c = buscar2("contratos", cb.contrato_id);
@@ -4188,27 +4243,34 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const varia = p && ant && ant.valor_total ? ((p.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace(".", ",") : null;
       const acao = !opera() ? "" : p ? link(`#/editar/iptus/${p.id}?de=iptu`, "Editar") : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, "botao pequeno");
       return `<tr class="${p ? "" : "amarelo"}"><td><a href="#/imovel/${i.id}?ir=iptu">${esc2(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p)}</b></td>
-      <td class="n">${varia !== null ? `${varia}%` : "-"}</td><td>${p ? compBr2(p.primeira_competencia) : "-"}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
+      <td class="n">${varia !== null ? `${varia}%` : "-"}</td><td>${p ? `${p.vencimento_primeira ? dataBr2(p.vencimento_primeira) : "-"}<br><span class="suave">boletos a partir de ${compBr2(p.primeiro_vencimento_boleto || p.primeira_competencia && somarMeses(p.primeira_competencia, 1))}</span>` : "-"}</td><td>${proprietario(p)}</td><td class="n">${acao}</td></tr>`;
     }).join("");
     const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
     const alertas = alertasIptu(d()).filter((a) => a.texto.includes(`IPTU ${ano}`));
     return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, "botao secundario")} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, "botao secundario")}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc2(a.imovel)}</b> ${esc2(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join("")}
-    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela no aluguel de</th><th>Por conta do proprietário</th><th></th></tr>${linhas2}</table>
-    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do mês da 1ª parcela. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
+    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela: prefeitura / inquilino</th><th>Por conta do proprietário</th><th></th></tr>${linhas2}</table>
+    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do boleto que vence no mês informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
   }
   function telaResultados(q) {
     const hoje = hojeIso();
     const ate = q.ate || hoje;
     const de = q.de || somarDias(somarMesesData(ate, -12), 1);
     const lista2 = resultadosFinanceiros(d(), de, ate);
+    const ano = Number(hoje.slice(0, 4));
+    const atalhos = [
+      ["Últimos 12 meses", somarDias(somarMesesData(hoje, -12), 1), hoje],
+      ["Este ano", `${ano}-01-01`, hoje],
+      ["Ano passado", `${ano - 1}-01-01`, `${ano - 1}-12-31`],
+      ["Últimos 5 anos", somarDias(somarAnos(hoje, -5), 1), hoje]
+    ].map(([t, a, b]) => link(`#/resultados?de=${a}&ate=${b}`, t, a === de && b === ate ? "botao pequeno" : "botao secundario pequeno")).join(" ");
     const tot = (k) => lista2.reduce((s, x) => s + x[k], 0);
     const pctTxt = (v) => v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`;
     const maior = Math.max(0, ...lista2.map((x) => x.retornoAnual || 0));
     return `<h1>Resultados financeiros</h1>
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
-      ${link(`#/resultados?de=${hoje.slice(0, 4)}-01-01&ate=${hoje}`, "Este ano")} ${link(`#/resultados?de=${Number(hoje.slice(0, 4)) - 1}-01-01&ate=${Number(hoje.slice(0, 4)) - 1}-12-31`, "Ano passado")}</form>
+      ${atalhos}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
       ${lista2.map((x, n) => `<tr><td>${x.retornoAnual !== null ? n + 1 : ""}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc2(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span></td>
         <td class="n">${x.base ? reais2(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais2(x.aluguel)}</td><td class="n">${reais2(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais2(x.iptu)}` : "-"}</td>
@@ -4216,13 +4278,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         <td class="n">${x.reformasPeriodo ? reais2(x.reformasPeriodo) : "-"}</td></tr>`).join("") || '<tr><td colspan="9" class="suave">Nenhum imóvel.</td></tr>'}
       <tr class="total"><td></td><td>Total</td><td class="n">${reais2(tot("base"))}</td><td class="n">${reais2(tot("aluguel"))}</td><td class="n">${reais2(tot("avulsas"))}</td><td class="n">${reais2(tot("iptu"))}</td><td class="n">${reais2(tot("resultado"))}</td>
         <td class="n">${tot("base") ? pctTxt(tot("resultado") * 12 / (lista2[0] ? lista2[0].meses : 12) / tot("base") * 100) : "-"}</td><td class="n">${reais2(tot("reformasPeriodo"))}</td></tr></table>
-    <p class="suave">Alimentado pelo histórico: aluguel recebido = valor da NF de cada boleto pago no período (aluguel com desconto, ou com multa e juros quando atrasou; sem IPTU, seguro e tarifa, que são repasses), mais as NFs avulsas ligadas ao imóvel. Desconta o IPTU pago pelo proprietário (imóvel vazio). Retorno ao ano = resultado do período convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Cadastre o valor em "Editar imóvel" e as reformas na página do imóvel.</p></div>`;
+    <p class="suave">Alimentado pelo histórico: aluguel recebido = valor da NF de cada boleto pago no período (aluguel com desconto, ou com multa e juros quando atrasou; sem IPTU, seguro e tarifa, que são repasses), mais as NFs avulsas ligadas ao imóvel. Boletos de controle (inquilino sem NF) não entram. Desconta o IPTU pago pelo proprietário (imóvel vazio). Retorno ao ano = resultado do período convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Cadastre o valor em "Editar imóvel" e as reformas na página do imóvel.</p></div>`;
   }
   function telaImprimir(rota) {
     const tipo = rota.partes[1];
     const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
     if (tipo === "demonstrativos") {
-      const lista2 = d().cobrancas.filter((x) => x.competencia === rota.q.comp);
+      const ids = rota.q.ids ? new Set(rota.q.ids.split(",").map(Number)) : null;
+      const nomeImovel = (cb) => (buscar2("imoveis", (buscar2("contratos", cb.contrato_id) || {}).imovel_id) || {}).nome || "";
+      const lista2 = d().cobrancas.filter((x) => x.competencia === rota.q.comp && (!ids || ids.has(x.id))).sort((a, b) => nomeImovel(a).localeCompare(nomeImovel(b), "pt-BR"));
       return `<div class="impressao">${voltar}${lista2.map(demonstrativo).join("") || "<p>Nenhum boleto.</p>"}</div>`;
     }
     let fs = d().faturas.filter((f) => f.situacao === "Emitida");
@@ -4631,6 +4695,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       await alterar((db) => ajustarBoleto(db, Number(id), 0, "", login()));
       await mostrar();
     },
+    async alternarNf({ id }) {
+      if (!opera()) throw new Error("Seu usuário não pode alterar.");
+      await alterar((db) => {
+        const c = buscar(db, "contratos", id);
+        const emite = !geraNf(c);
+        atualizar(db, "contratos", c.id, { gerar_nf: emite }, login(), emite ? "Passa a emitir NF" : "Passa a boleto de controle (sem NF)");
+      });
+      await mostrar();
+    },
     async alternarAtivo({ id }) {
       if (!opera()) throw new Error("Seu usuário não pode alterar.");
       await alterar((db) => {
@@ -4725,6 +4798,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       await alterar((db) => apagarCanceladas(db, Number(numero2), login()));
       aviso(`NF nº ${numeroFatura(numero2)} apagada da lista.`);
       await mostrar();
+    },
+    imprimirDemonstrativos({ comp }) {
+      const ids = [...document.querySelectorAll("input[data-boleto]:checked")].map((x) => x.dataset.boleto);
+      if (!ids.length) throw new Error('Marque pelo menos um imóvel na lista (ou "selecionar todos").');
+      ir(`#/imprimir/demonstrativos?comp=${comp}&ids=${ids.join(",")}`);
     },
     imprimirSelecionadas() {
       const ns = numerosSelecionados();
@@ -5135,7 +5213,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   });
   document.addEventListener("change", async (ev) => {
     if (ev.target.matches("input[data-marcar-todas]")) {
-      document.querySelectorAll("input[data-nf]").forEach((x) => {
+      document.querySelectorAll(`input[data-${ev.target.dataset.marcarTodas || "nf"}]`).forEach((x) => {
         x.checked = ev.target.checked;
       });
       return;
