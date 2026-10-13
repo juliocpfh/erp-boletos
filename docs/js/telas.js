@@ -1378,6 +1378,11 @@ async function telaDados() {
       ${item('Versão do arquivo', `revisão ${d().revisao}`)}</div>
       <p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>
       <p>${botao('escolherPasta', 'Trocar de pasta')}</p></div>
+    <div class="cartao"><h2>Versão para usar sem internet</h2>
+      ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão sem internet de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}
+      <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
+      <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
+      ${window.VERSAO_OFFLINE ? '' : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
@@ -1628,6 +1633,8 @@ async function modeloFatura() {
     const dir = await E.pasta.getDirectoryHandle(S.PASTA_MODELOS);
     return await (await (await dir.getFileHandle(S.MODELO_FATURA)).getFile()).arrayBuffer();
   } catch {
+    // versão de arquivo único: o modelo padrão vem embutido
+    if (window.MODELO_FATURA_BASE64) return Uint8Array.from(atob(window.MODELO_FATURA_BASE64), (ch) => ch.charCodeAt(0)).buffer;
     const r = await fetch('modelos/fatura-modelo.xlsx');
     if (!r.ok) throw new Error('Modelo da NF não encontrado.');
     return r.arrayBuffer();

@@ -14,6 +14,12 @@ Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam nu
 4. Nos próximos acessos, o navegador lembra a pasta e só pede para confirmar a permissão.
 5. O login fica lembrado neste navegador, em todas as abas, por 12 horas sem uso, até clicar em **Sair**.
 
+## Sem internet (arquivo único)
+
+Em **Dados e backup → Baixar a versão sem internet** você baixa `Administração de Imóveis.html`: o programa inteiro num único arquivo (código, componentes de Excel/ZIP/PDF e modelo da NF). Guarde no computador e abra com dois cliques no Chrome ou no Edge. Funciona sem internet e mesmo se o site sair do ar; os dados são os mesmos (escolha a mesma pasta). Quando o programa receber melhorias, baixe o arquivo de novo.
+
+O site e o arquivo único não dependem de nenhum outro serviço: os componentes de terceiros ficam em `docs/vendor/`.
+
 ## O que fica na pasta
 
 | Na pasta | Conteúdo |
@@ -62,7 +68,13 @@ O código fica em `docs/` (HTML, CSS e JavaScript, sem etapa de build). Para tes
 cd docs && python3 -m http.server 8000
 ```
 
-Abra `http://localhost:8000/?teste` para usar uma pasta interna do navegador, sem escolher pasta. Testes das regras de cálculo e numeração:
+Abra `http://localhost:8000/?teste` para usar uma pasta interna do navegador, sem escolher pasta. Depois de mudar o código, gere de novo a versão sem internet (o teste avisa se ela ficar desatualizada):
+
+```
+node tools/gerar-offline.mjs
+```
+
+Testes das regras de cálculo e numeração:
 
 ```
 node --test tests/*.test.mjs
