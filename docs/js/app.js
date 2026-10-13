@@ -247,7 +247,7 @@ function atualizarFaixa() {
 }
 
 const MENU = [
-  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/iptu', 'IPTU', '^iptu$'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/cobrancas', 'Boletos', 'cobranca'],
+  ['#/', 'Painel', ''], ['#/imoveis', 'Imóveis', 'imove|novo|editar'], ['#/iptu', 'IPTU', '^iptu$'], ['#/inquilinos', 'Inquilinos', 'inquilino|contrato'], ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca'],
   ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', 'resultados'], ['#/empresas', 'Empresas', 'empresa'], ['#/historico', 'Histórico', 'historico'],
   ['#/dados', 'Dados e backup', 'dados'],
 ];

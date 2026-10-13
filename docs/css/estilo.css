@@ -185,3 +185,11 @@ tr.linha-controle td { background: #faf8ff; }
 .agenda-dia h3 { margin-top: 0; }
 .evento-cal { margin-bottom: 6px; }
 @media (max-width: 700px) { .cal-dia { min-height: 48px; } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
+
+/* Carta de reajuste */
+.carta { background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
+.carta-logo { max-height: 90px; max-width: 260px; }
+.carta-data { text-align: right; }
+.carta-tabela { margin: 14px 0; }
+.carta-tabela td, .carta-tabela th { padding: 6px 10px; }
+@media print { .carta { border: 0; padding: 0; } }

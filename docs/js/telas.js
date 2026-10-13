@@ -289,6 +289,7 @@ export const TELAS = {
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
+  reajustes: (rota) => telaReajustes(rota.q),
   calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
   empresas: () => telaEmpresas(),
@@ -631,6 +632,8 @@ function telaContrato(c) {
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
+      ${(() => { const r = R.reajustePendente(d(), c); if (!r) { const p = R.primeiroMesCheio(c); return p ? `<p class="suave">Reajuste no 13º mês cheio: aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
+    return `<div class="alerta aviso"><b>Reajuste do aluguel de ${compBr(r.competencia)}</b> (${r.anos} ano(s)) ${botoesReajuste(c, r)}</div>`; })()}
       <table><tr><th>Vale a partir de</th><th>Previsto no contrato</th><th>Índice usado</th><th class="n">%</th><th class="n">Valor anterior</th><th class="n">Novo valor</th><th></th></tr>
       <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="4" class="suave">Valor inicial do contrato</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
       ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${esc(x.indice_contrato || '-')}</td><td>${x.indice === 'Negociado' ? etiqueta('Negociado', 'aviso') : `${esc(x.indice || '-')}${x.data_indice ? ` <span class="suave">(${compBr(x.data_indice)})</span>` : ''}`}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
@@ -1132,6 +1135,9 @@ function telaCobrancas(comp, ordem = 'vencimento') {
   // boleto de controle (inquilino sem NF) não entra nas somas
   const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
   const controle = lista.filter((x) => !R.geraNf(x.c)).length;
+  // reajuste no aluguel seguinte: a carta vai junto com este boleto
+  const proxima = C.somarMeses(comp, 1);
+  const reajustes = new Map(lista.map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, proxima)]).filter(([, r]) => r && !r.corrigido));
   // botões de impressão em cima e embaixo da lista
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
       <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>`;
@@ -1140,6 +1146,7 @@ function telaCobrancas(comp, ordem = 'vencimento') {
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}&ordem=${ordem}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+    ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(proxima)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha). ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
@@ -1153,7 +1160,8 @@ function telaCobrancas(comp, ordem = 'vencimento') {
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
-          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}</td>
+          ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
+          ${reajustes.has(c.id) ? `<br>${etiqueta(`reajuste no aluguel de ${compBr(proxima)}`, 'aviso')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${proxima}`, reajustes.get(c.id).carta ? 'Carta (enviada ✓)' : 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
@@ -1418,6 +1426,72 @@ function calendarioDoPainel(mes, hoje) {
     <p class="suave">Clique num dia para ver a agenda completa. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
 }
 
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const dataExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
+
+/** Botões do reajuste de um contrato numa competência (gerar carta, marcar enviada, aplicar correção). */
+function botoesReajuste(c, r, naCarta = false) {
+  if (r.corrigido) return etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok');
+  return `${naCarta ? '' : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, 'Gerar carta', 'botao pequeno')}
+    ${opera() ? botao('cartaEnviada', r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : 'Marcar carta enviada', { contrato: c.id, comp: r.competencia, enviada: r.carta ? '' : '1' }, r.carta ? 'link-botao' : 'secundario pequeno', r.carta ? 'Desfazer o envio da carta?' : '') : ''}
+    ${opera() ? botao('aplicarReajuste', 'Aplicar correção', { contrato: c.id, comp: r.competencia }, 'secundario pequeno', `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`) : ''}`;
+}
+
+/** Reajustes: índices acumulados informados por vocês e os contratos que corrigem nos próximos meses. */
+function telaReajustes(q) {
+  const atual = C.competenciaDe(C.hojeIso());
+  const de = q.de || C.somarMeses(atual, -2);
+  const ate = q.ate || C.somarMeses(atual, 3);
+  const lista = R.reajustesEntre(d(), de, ate);
+  const indices = [...d().indices_acumulados].sort((a, b) => b.mes_ref.localeCompare(a.mes_ref) || a.indice.localeCompare(b.indice)).slice(0, 36);
+  const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
+  return `<h1>Reajustes do aluguel</h1>
+    <p class="suave">O aluguel é corrigido no 13º mês cheio do contrato (se começou no meio do mês, o primeiro mês não conta) e a cada 12 meses depois. A carta vai junto com o boleto do mês anterior ao corrigido.</p>
+    <div class="cartao"><h2>Índices acumulados em 12 meses</h2>
+      <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
+      ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join('')}</select>
+        <input type="month" name="mes_ref" value="${atual}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>` : ''}
+      <table style="margin-top:8px"><tr><th>Índice</th><th>Acumulado até</th><th class="n">12 meses</th><th></th></tr>
+      ${indices.map((x) => `<tr><td>${esc(x.indice)}</td><td>${compBr(x.mes_ref)}</td><td class="n">${pct(x.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'indices_acumulados', id: x.id }, 'perigo pequeno', 'Excluir este índice?') : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
+    <div class="cartao rolagem"><div class="cabecalho"><h2>Reajustes de ${compBr(de)} a ${compBr(ate)}</h2>
+      <div class="acoes">${link(`#/reajustes?de=${C.somarMeses(de, -3)}&ate=${C.somarMeses(ate, -3)}`, '← anteriores')} ${link(`#/reajustes?de=${C.somarMeses(de, 3)}&ate=${C.somarMeses(ate, 3)}`, 'seguintes →')}</div></div>
+      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual</th><th class="n">Novo</th><th>Carta e correção</th></tr>
+      ${lista.map((r) => { const k = r.calculo; const i = buscar('imoveis', r.contrato.imovel_id); return `<tr><td><b>${compBr(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr(C.somarMeses(r.competencia, -1))}</span></td>
+        <td><a href="#/contrato/${r.contrato.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(r.contrato.inquilino_nome)} · ${r.anos} ano(s)</td>
+        <td>${esc(k.indiceContrato || 'não informado')}${k.escolhido ? `<br><span class="suave">usa ${esc(k.escolhido.indice)} ${pct(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo')}` : ''}</td>
+        <td class="n">${reais(k.atual)}${k.bonificacao ? `<br><span class="suave">${reais(k.atualBonificado)}</span>` : ''}</td>
+        <td class="n">${k.novo !== null ? `<b>${reais(k.novo)}</b>${k.bonificacao ? `<br><span class="suave">${reais(k.novoBonificado)}</span>` : ''}` : '-'}</td>
+        <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="suave">Nenhum reajuste no período.</td></tr>'}</table>
+      <p class="suave">Valores: cheio e, embaixo, com bonificação.</p></div>`;
+}
+
+/** Carta de reajuste com a logo: felicitações por mais um ano e os novos valores. */
+function cartaReajuste(c, comp) {
+  const i = buscar('imoveis', c.imovel_id);
+  const r = R.reajusteNaCompetencia(d(), c, comp);
+  const k = R.calcularReajuste(d(), c, comp);
+  const parte = i && R.participacoesDo(d(), i.id)[0];
+  const empresa = (parte && buscar('emitentes', parte.emitente_id)) || d().emitentes.find((e) => e.ativo) || { nome: '' };
+  const anterior = C.somarMeses(comp, -1);
+  const vencNovo = C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+  if (k.percentual === null) {
+    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}. ${link('#/reajustes', 'Informar em Reajustes')}</div>`;
+  }
+  const varios = k.usados.length > 1;
+  return `<div class="carta">
+    ${d().logo ? `<p><img class="carta-logo" src="${esc(d().logo)}" alt="Logo"></p>` : ''}
+    <p class="carta-data">${esc((i && i.cidade) || 'Curitiba')}, ${dataExtenso(C.hojeIso())}.</p>
+    <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
+    <p>Com o aluguel de <b>${MESES[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
+    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc(k.indiceContrato)}</b> acumulado nos últimos 12 meses${varios ? `: ${k.usados.map((u) => `<b>${esc(u.indice)} ${pct(u.registro.percentual)}</b>`).join(' e ')}. Aplicaremos <b>${pct(k.percentual)}</b>` : ` (até ${compBr(k.escolhido.registro.mes_ref)}): <b>${pct(k.percentual)}</b>`}.</p>
+    <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
+      <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
+      ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ''}</table>
+    <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>
+    <p>Ficamos à disposição para qualquer dúvida.</p>
+    <p>Atenciosamente,<br><b>${esc(empresa.nome)}</b></p></div>`;
+}
+
 function telaResultados(q) {
   const hoje = C.hojeIso();
   const ate = q.ate || hoje;
@@ -1450,6 +1524,14 @@ function telaResultados(q) {
 function telaImprimir(rota) {
   const tipo = rota.partes[1];
   const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
+  if (tipo === 'carta') {
+    const c = buscar('contratos', rota.q.contrato);
+    if (!c) return '<p>Inquilino não encontrado.</p>';
+    const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
+    return `<div class="impressao">${voltar}
+      ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
+      ${cartaReajuste(c, rota.q.comp)}</div>`;
+  }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
@@ -1692,6 +1774,21 @@ export const FORMULARIOS = {
     if (!confirm(`Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`)) return;
     const qtd = await alterar((db) => R.desfazerNumeracao(db, n, login()));
     aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
+    await mostrar();
+  },
+  async indiceAcumulado(form) {
+    const f = new FormData(form);
+    const indice = String(f.get('indice') || '');
+    const mesRef = String(f.get('mes_ref') || '');
+    if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new Error('Informe o mês até onde vai o acumulado.');
+    const percentual = C.numero(f.get('percentual'));
+    if (String(f.get('percentual') || '').trim() === '') throw new Error('Informe o percentual acumulado em 12 meses.');
+    await alterar((db) => {
+      const existente = db.indices_acumulados.find((x) => x.indice === indice && x.mes_ref === mesRef);
+      if (existente) R.atualizar(db, 'indices_acumulados', existente.id, { percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
+      else R.inserir(db, 'indices_acumulados', { indice, mes_ref: mesRef, percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
+    });
+    aviso('Índice salvo.');
     await mostrar();
   },
   filtroResultados(form) {
@@ -2012,6 +2109,20 @@ export const ACOES = {
     if (!podeUsuario('admin')) throw new Error('Só administradores podem apagar NFs.');
     await alterar((db) => R.apagarCanceladas(db, Number(numero), login()));
     aviso(`NF nº ${R.numeroFatura(numero)} apagada da lista.`);
+    await mostrar();
+  },
+
+  async aplicarReajuste({ contrato, comp }) {
+    const n = await alterar((db) => {
+      R.aplicarReajuste(db, Number(contrato), comp, login());
+      return R.recalcularCobrancas(db, (cb) => cb.contrato_id === Number(contrato), login());
+    });
+    aviso(`Correção registrada a partir do aluguel de ${compBr(comp)}.${n ? ` ${n} boleto(s) em aberto recalculado(s).` : ''}`);
+    await mostrar();
+  },
+
+  async cartaEnviada({ contrato, comp, enviada }) {
+    await alterar((db) => R.marcarCartaEnviada(db, Number(contrato), comp, enviada === '1', login()));
     await mostrar();
   },
 

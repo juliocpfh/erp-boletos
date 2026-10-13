@@ -9,7 +9,8 @@ export const TABELAS = {
   faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
-  reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -965,10 +966,9 @@ export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
 }
 
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
-  const datas = correcoesDo(d, contrato.id).map((c) => c.data_vigencia);
   return [
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
-    alertas.alertaCorrecao(dataBaseCorrecao(contrato), hoje, datas),
+    alertaReajuste(d, contrato, hoje),
     alertaCaucao(d, contrato),
     alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
@@ -1149,16 +1149,17 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       situacao: renovado ? 'ok' : 'aviso', estado: renovado ? 'renovado' : 'renovar' });
   }
   for (const c of d.contratos.filter((x) => contratoAtivo(x, hoje) && x.imovel_id)) {
-    // aniversário do contrato (correção anual)
-    const base = dataBaseCorrecao(c);
-    if (base) {
-      const anos = Number(mes.slice(0, 4)) - Number(base.slice(0, 4));
-      const aniv = anos > 0 ? C.somarAnos(base, anos) : null;
-      if (no(aniv)) {
-        const feito = correcoesDo(d, c.id).some((x) => x.data_vigencia >= C.somarDias(aniv, -61));
-        ev.push({ data: aniv, tipo: 'Correção', imovel_id: c.imovel_id, contrato_id: c.id,
-          texto: `${c.inquilino_nome} · ${anos} ano(s) de contrato · correção pelo ${c.indice_correcao || 'índice do contrato'}`, situacao: feito ? 'ok' : 'aviso', estado: feito ? 'corrigido' : 'corrigir' });
-      }
+    // reajuste: no vencimento do boleto anterior ao mês corrigido (é com ele que vai a carta)
+    for (const comp of [C.somarMeses(mes, 1), C.somarMeses(mes, 2)]) {
+      const r = reajusteNaCompetencia(d, c, comp);
+      if (!r) continue;
+      const anterior = C.somarMeses(comp, -1);
+      const cb = d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === anterior);
+      const venc = cb ? cb.vencimento : C.vencimentoDaCompetencia(anterior, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+      if (!no(venc)) continue;
+      ev.push({ data: venc, tipo: 'Reajuste', imovel_id: c.imovel_id, contrato_id: c.id,
+        texto: `${c.inquilino_nome} · carta de reajuste com este boleto · aluguel de ${C.compBr(comp)} corrigido (${r.anos} ano(s), ${c.indice_correcao || 'índice do contrato'})`,
+        situacao: r.corrigido ? 'ok' : r.carta ? 'neutra' : 'aviso', estado: r.corrigido ? 'corrigido' : r.carta ? 'carta enviada' : 'enviar carta' });
     }
     if (c.prazo_tipo !== 'Indeterminado' && no(c.vigencia_fim)) {
       ev.push({ data: c.vigencia_fim, tipo: 'Fim do contrato', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do prazo do contrato`, situacao: 'aviso', estado: 'renovar ou sair' });
@@ -1167,6 +1168,115 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       ev.push({ data: f.data_saida, tipo: 'Fiador', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do vínculo do fiador ${f.nome}`, situacao: 'aviso', estado: 'providenciar' });
     }
   }
-  const ordem = { Boleto: 0, IPTU: 1, Seguro: 2, Correção: 3, 'Fim do contrato': 4, Fiador: 5 };
+  const ordem = { Boleto: 0, Reajuste: 1, IPTU: 2, Seguro: 3, 'Fim do contrato': 4, Fiador: 5 };
   return ev.sort((a, b) => a.data.localeCompare(b.data) || ordem[a.tipo] - ordem[b.tipo] || a.texto.localeCompare(b.texto, 'pt-BR'));
+}
+
+// --------------------------------------------------------------------------
+// Reajuste anual: corrigido no 13º mês cheio, com carta enviada junto do boleto anterior
+// --------------------------------------------------------------------------
+/** Primeiro mês cheio do contrato: o mês da data-base se começou no dia 1º; senão, o mês seguinte. */
+export function primeiroMesCheio(c) {
+  const base = dataBaseCorrecao(c);
+  if (!base) return null;
+  return base.slice(8, 10) === '01' ? base.slice(0, 7) : C.somarMeses(base.slice(0, 7), 1);
+}
+
+/** Competência (aluguel de) do n-ésimo reajuste: o 13º mês cheio, o 25º... */
+export const competenciaDoReajuste = (c, n) => { const p = primeiroMesCheio(c); return p ? C.somarMeses(p, 12 * n) : null; };
+
+/** Correção já registrada para o reajuste da competência (aceita registro até 3 meses antes). */
+const correcaoDoReajuste = (d, c, comp) => correcoesDo(d, c.id).find((x) => x.data_vigencia >= `${C.somarMeses(comp, -3)}-01` && x.data_vigencia <= `${comp}-31`) || null;
+const cartaDoReajuste = (d, c, comp) => d.cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp) || null;
+
+/** Se a competência é a de um reajuste do contrato: { n, anos, competencia, corrigido, carta }. */
+export function reajusteNaCompetencia(d, c, comp) {
+  const p = primeiroMesCheio(c);
+  if (!p || c.prazo_tipo === 'Sem reajuste') return null;
+  const meses = C.mesesEntre(p, comp);
+  if (meses <= 0 || meses % 12 !== 0) return null;
+  const n = meses / 12;
+  return { n, anos: n, competencia: comp, corrigido: correcaoDoReajuste(d, c, comp), carta: cartaDoReajuste(d, c, comp) };
+}
+
+/** Próximo reajuste a tratar: o último que já devia ter acontecido (ou acontece no mês seguinte) e não foi registrado. */
+export function reajustePendente(d, c, hoje = C.hojeIso()) {
+  const p = primeiroMesCheio(c);
+  if (!p) return null;
+  const limite = C.somarMeses(C.competenciaDe(hoje), 1);
+  const n = Math.floor(C.mesesEntre(p, limite) / 12);
+  if (n < 1) return null;
+  const r = reajusteNaCompetencia(d, c, competenciaDoReajuste(c, n));
+  return r && !r.corrigido ? r : null;
+}
+
+/** Alerta do reajuste: um mês antes (enviar a carta com o boleto anterior) ou atrasado. */
+function alertaReajuste(d, c, hoje) {
+  const r = reajustePendente(d, c, hoje);
+  if (!r) return null;
+  const atrasado = r.competencia < C.competenciaDe(hoje);
+  return { nivel: atrasado ? 'perigo' : 'aviso', tipo: 'Reajuste do aluguel',
+    texto: atrasado ? `O aluguel de ${C.compBr(r.competencia)} (${r.anos} ano(s), 13º mês cheio) já devia estar corrigido pelo ${c.indice_correcao || 'índice do contrato'}. Registre a correção.`
+      : `O aluguel de ${C.compBr(r.competencia)} será corrigido pelo ${c.indice_correcao || 'índice do contrato'} (${r.anos} ano(s) de contrato). ${r.carta ? 'Carta enviada; falta aplicar a correção.' : `Envie a carta de reajuste junto com o boleto de ${C.compBr(C.somarMeses(r.competencia, -1))}.`}` };
+}
+
+/** Índice acumulado em 12 meses mais recente até o mês de referência. */
+export function indiceAcumulado(d, nome, ate) {
+  return d.indices_acumulados.filter((x) => x.indice === nome && x.mes_ref <= ate).sort((a, b) => b.mes_ref.localeCompare(a.mes_ref))[0] || null;
+}
+
+/**
+ * Cálculo do reajuste: índices informados (acumulado em 12 meses até o mês anterior ao corrigido), o percentual
+ * aplicado (para "IGP-M/IPCA (o maior)" escolhe o maior; "(o menor)", o menor) e os valores novos, cheio e bonificado.
+ */
+export function calcularReajuste(d, c, comp) {
+  const nome = c.indice_correcao || '';
+  const partes = nome.replace(/\(.*\)/, '').split('/').map((x) => x.trim()).filter(Boolean);
+  const ref = C.somarMeses(comp, -1);
+  const usados = partes.map((p) => ({ indice: p, registro: indiceAcumulado(d, p, ref) }));
+  const faltando = usados.filter((u) => !u.registro).map((u) => u.indice);
+  let escolhido = null;
+  if (!faltando.length && usados.length) {
+    const menor = /menor/i.test(nome);
+    escolhido = usados.reduce((a, b) => (!a || (menor ? b.registro.percentual < a.registro.percentual : b.registro.percentual > a.registro.percentual) ? b : a), null);
+  }
+  const atual = aluguelAtual(d, c, C.somarDias(`${comp}-01`, -1));
+  const pctBonif = percentualBonificacao(c);
+  const bonif = (v) => v - C.descontoPorPercentual(v, pctBonif);
+  const pct = escolhido ? escolhido.registro.percentual : null;
+  const novo = pct === null ? null : C.aplicarCorrecao(atual, pct);
+  return { indiceContrato: nome, usados, faltando, escolhido, percentual: pct, atual, novo, atualBonificado: bonif(atual),
+    novoBonificado: novo === null ? null : bonif(novo), bonificacao: pctBonif > 0, competencia: comp };
+}
+
+/** Registra a correção do reajuste no contrato (vale a partir do dia 1º da competência). */
+export function aplicarReajuste(d, contratoId, comp, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const r = calcularReajuste(d, c, comp);
+  if (r.percentual === null) throw new Error(`Informe o índice acumulado de ${r.faltando.join(' e ')} (até ${C.compBr(C.somarMeses(comp, -1))}) em Reajustes.`);
+  if (correcaoDoReajuste(d, c, comp)) throw new Error('Este reajuste já foi registrado.');
+  return inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: `${comp}-01`, indice: r.escolhido.indice, indice_contrato: r.indiceContrato,
+    data_indice: r.escolhido.registro.mes_ref, percentual: r.percentual, valor_anterior: r.atual, valor_novo: r.novo,
+    observacoes: `Reajuste do 13º mês cheio (${C.compBr(comp)})` }, usuario, `Reajuste ${C.compBr(comp)}: ${C.reais(r.atual)} → ${C.reais(r.novo)} (${r.escolhido.indice} ${C.pct(r.percentual)})`);
+}
+
+/** Marca a carta de reajuste como enviada (ou desfaz). */
+export function marcarCartaEnviada(d, contratoId, comp, enviada, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const atual = cartaDoReajuste(d, c, comp);
+  if (enviada && !atual) inserir(d, 'cartas_reajuste', { contrato_id: c.id, competencia: comp, enviada_em: C.hojeIso() }, usuario, `Carta de reajuste de ${C.compBr(comp)} enviada`);
+  if (!enviada && atual) excluir(d, 'cartas_reajuste', atual.id, usuario, `Carta de reajuste de ${C.compBr(comp)}: envio desfeito`);
+}
+
+/** Reajustes do período (competências), para a tela de Reajustes. */
+export function reajustesEntre(d, de, ate) {
+  const lista = [];
+  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id)) {
+    for (let comp = de; comp <= ate; comp = C.somarMeses(comp, 1)) {
+      if (!contratoAtivo(c, `${comp}-01`)) continue;
+      const r = reajusteNaCompetencia(d, c, comp);
+      if (r) lista.push({ contrato: c, ...r, calculo: calcularReajuste(d, c, comp) });
+    }
+  }
+  return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
 }
