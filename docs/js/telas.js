@@ -129,12 +129,125 @@ async function renomearNoDisco(paiPartes, antigo, novo) {
 // --------------------------------------------------------------------------
 const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
 
+// --------------------------------------------------------------------------
+// Campos que ajudam a preencher: máscara, CEP, CNPJ e pessoa já cadastrada
+// --------------------------------------------------------------------------
+const CAMPOS_PESSOA_FORM = ['nome', 'rg', 'telefone', 'email', 'endereco', 'genero', 'nacionalidade', 'estado_civil', 'profissao', 'nascimento'];
+const titulo = (t) => String(t || '').toLocaleLowerCase('pt-BR').replace(/(^|[\s/(-])(\p{L})/gu, (x, a, b) => a + b.toLocaleUpperCase('pt-BR')).replace(/\b(De|Da|Do|Das|Dos|E)\b/g, (x) => x.toLowerCase());
+
+function mensagemAuto(el, html) {
+  const caixa = el.closest('div').querySelector('[data-auto-msg]');
+  if (caixa) caixa.innerHTML = html;
+}
+
+/** Preenche só os campos vazios do formulário; devolve os rótulos preenchidos. */
+function preencherVazios(form, valores) {
+  const feitos = [];
+  for (const [nome, valor] of Object.entries(valores)) {
+    const alvo = nome && form.querySelector(`[name="${nome}"]`);
+    if (!alvo || !valor || String(alvo.value).trim()) continue;
+    alvo.value = valor;
+    alvo.dispatchEvent(new Event('change', { bubbles: true }));
+    feitos.push((form.querySelector(`label[for="${alvo.id}"]`) || {}).textContent || nome);
+  }
+  return feitos;
+}
+
+async function consultarCep(el, cfg) {
+  const n = F.soDigitos(el.value);
+  if (n.length !== 8) return;
+  mensagemAuto(el, 'Consultando o CEP…');
+  try {
+    const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
+    if (r.erro) return mensagemAuto(el, 'CEP não encontrado.');
+    const feitos = preencherVazios(el.form, { [cfg.endereco]: r.logradouro ? `${r.logradouro}, ` : '', [cfg.bairro]: r.bairro, [cfg.cidade]: r.localidade });
+    mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(', '))}. Complete o número.` : 'CEP conferido.');
+    const end = el.form.querySelector(`[name="${cfg.endereco}"]`);
+    if (feitos.length && end) end.focus();
+  } catch {
+    mensagemAuto(el, 'Não deu para consultar o CEP agora (sem internet?). Preencha à mão.');
+  }
+}
+
+async function consultarCnpj(el, cfg) {
+  const n = F.soDigitos(el.value);
+  if (n.length !== 14 || !F.cnpjValido(n)) return;
+  mensagemAuto(el, 'Consultando o CNPJ…');
+  try {
+    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${n}`);
+    if (!resp.ok) return mensagemAuto(el, 'CNPJ não encontrado na Receita.');
+    const r = await resp.json();
+    const endereco = [[r.descricao_tipo_de_logradouro, r.logradouro].filter(Boolean).join(' '), r.numero, r.complemento, r.bairro].filter(Boolean).map(titulo).join(', ')
+      + (r.municipio ? `, ${titulo(r.municipio)}/${r.uf || ''}` : '');
+    const feitos = preencherVazios(el.form, { [cfg.razao]: r.razao_social, [cfg.nome]: cfg.razao ? (r.nome_fantasia || r.razao_social) : r.razao_social, [cfg.endereco]: endereco, [cfg.sede]: endereco });
+    mensagemAuto(el, `${esc(r.razao_social || '')}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ''}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(', '))}.` : ''}`);
+  } catch {
+    mensagemAuto(el, 'Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.');
+  }
+}
+
+/** Pessoas já cadastradas com este CPF/CNPJ (inquilinos, solidários, representantes e fiadores). */
+function pessoasComDocumento(doc) {
+  const n = F.soDigitos(doc);
+  if (n.length < 11) return [];
+  const [, tabela, id] = (location.hash.split('?')[0].match(/editar\/(\w+)\/(\d+)/) || []);
+  const proprio = (t, r) => tabela === t && Number(id) === r.id;
+  const achados = [];
+  for (const c of d().contratos) {
+    for (const [pref, papel] of [['inquilino_', 'inquilino'], ['solidario_', 'inquilino solidário'], ['representante_', 'representante']]) {
+      if (F.soDigitos(c[`${pref}cpf`]) === n && !(proprio('contratos', c) && pref === 'inquilino_')) {
+        achados.push({ fonte: `contratos:${c.id}:${pref}`, nome: c[`${pref}nome`], papel: `${papel} de ${(buscar('imoveis', c.imovel_id) || {}).nome || 'sem imóvel'}` });
+      }
+    }
+  }
+  for (const f of d().fiadores) {
+    if (F.soDigitos(f.cpf) === n && !proprio('fiadores', f)) achados.push({ fonte: `fiadores:${f.id}:`, nome: f.nome, papel: `fiador de ${(buscar('contratos', f.contrato_id) || {}).inquilino_nome || ''}` });
+  }
+  return achados;
+}
+
+function procurarPessoa(el) {
+  const achados = pessoasComDocumento(el.value);
+  if (!achados.length) return;
+  const alvo = el.name.slice(0, -3); // "inquilino_cpf" → "inquilino_"; "cpf" → ""; "fiador1_cpf" → "fiador1_"
+  const a = achados[0];
+  mensagemAuto(el, `Este documento já está cadastrado: <b>${esc(a.nome)}</b> (${esc(a.papel)}${achados.length > 1 ? ` e mais ${achados.length - 1}` : ''}).
+    <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
+}
+
+function ligarCamposAutomaticos(raiz) {
+  for (const el of raiz.querySelectorAll('input[data-mascara]')) {
+    el.addEventListener('input', () => {
+      const novo = F.mascarar(el.dataset.mascara, el.value);
+      if (novo !== el.value) el.value = novo;
+    });
+    el.addEventListener('change', () => {
+      // o mesmo valor de novo (ex.: ao sair do campo para clicar no botão da mensagem) não refaz a consulta
+      if (el.dataset.conferido === el.value) return;
+      el.dataset.conferido = el.value;
+      const tipo = el.dataset.mascara;
+      const erro = el.value && tipo !== 'tel' ? F.conferirDocumento(tipo, el.value) : '';
+      el.classList.toggle('doc-invalido', !!erro);
+      el.title = erro;
+      if (erro) return mensagemAuto(el, `<span class="erro-campo">${esc(erro)}</span>`);
+      mensagemAuto(el, '');
+      if (el.dataset.preencher) {
+        const cfg = JSON.parse(el.dataset.preencher);
+        if (cfg.fonte === 'cep') consultarCep(el, cfg);
+        else consultarCnpj(el, cfg);
+      }
+      if (el.hasAttribute('data-buscar-pessoa')) procurarPessoa(el);
+    });
+  }
+}
+
 export const TELAS = {
   _listaArquivos: listaArquivos,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
 
   _ligarDesconto(raiz) {
+    ligarCamposAutomaticos(raiz);
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];
     const valorDe = (form, nome) => {
@@ -232,6 +345,9 @@ export const TELAS = {
     const pend = R.pendentesDeFatura(d());
     const abertas = d().cobrancas.filter((c) => c.situacao === 'Em aberto');
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
+    const mesAtual = C.competenciaDe(hoje);
+    const faltamEtapas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito);
+    const incompletos = cadastrosIncompletos();
     return `<h1>Painel</h1>
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
@@ -239,7 +355,10 @@ export const TELAS = {
         ${n(abertas.length, 'boletos em aberto', '#/cobrancas')}
         ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/inadimplencia')}
         ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
+        ${n(incompletos.length, 'cadastros incompletos', '#/pendencias')}
       </div>
+      <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => e.titulo.split(' (')[0]).join('; '))}.` : 'todas as etapas feitas.'}
+        ${link(`#/fechamento?mes=${mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
@@ -308,6 +427,8 @@ export const TELAS = {
   'modelos-contrato': () => telaModelos(),
   vistoria: (rota) => telaVistoria(rota),
   'modelo-vistoria': (rota) => telaModeloVistoria(rota),
+  fechamento: (rota) => telaFechamento(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
@@ -697,8 +818,8 @@ function telaContrato(c) {
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}
     ${caixaDocumentos(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ', contrato social e cartão CNPJ da empresa, documentos do representante' : ''}${c.solidario_nome ? ', documentos do inquilino solidário' : ''} etc.`)}
-    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>
-    ${caixaSaida(c)}`;
+    ${caixaSaida(c)}
+    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
 }
 
 // --------------------------------------------------------------------------
@@ -759,12 +880,21 @@ const CADASTROS = {
       return comListas(F.CONTRATO.filter((c) => (r || !c.soEditar) && !(semFiadorNoForm && c.fiador))
         .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c)));
     },
-    padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
+    padrao: (q) => {
+      if (q.imovel) return { imovel_id: Number(q.imovel) };
+      const anterior = q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
+      return anterior ? R.condicoesDoAnterior(d(), anterior) : {};
+    },
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
-    aviso: (r) => (r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: anexe o termo assinado em "Arquivos do inquilino".' : ''),
+    conferir: conferirContrato,
+    aviso: (r, q) => {
+      if (r) return 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: anexe o termo assinado em "Arquivos do inquilino".';
+      const anterior = q && q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
+      return anterior ? `Condições copiadas do inquilino anterior deste imóvel (${anterior.inquilino_nome}): prazo, índice, vencimento, bonificação, multa e juros, contas inclusas, garantia e finalidade; aluguel sugerido = o atual dele. Preencha a pessoa nova e confira os valores.` : '';
+    },
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     base: (r) => (r ? R.aluguelAtual(d(), r) : null),
@@ -1113,6 +1243,7 @@ const CADASTROS = {
     voltar: (r, q) => (q.nf ? '#/faturas' : `#/cobranca/${r.id}`),
     destino: (salvo, q) => (q.nf ? '#/faturas' : `#/cobranca/${salvo.id}`),
     descricao: (dados, r) => (r.data_pagamento ? 'Observações da NF alteradas' : 'Valores do boleto alterados'),
+    conferir: (dados, r) => (r.data_pagamento ? [] : conferirBoleto(dados, r)),
     ajustar(dados, erros, r) {
       if (r.data_pagamento) {
         if (R.faturasDe(d(), 'cobranca', r.id).length) erros.observacoes_nf = 'A NF já foi numerada. Cancele a NF (ou desfaça a numeração) antes de corrigir';
@@ -1125,6 +1256,106 @@ const CADASTROS = {
     },
   },
 };
+
+// --------------------------------------------------------------------------
+// Fechamento do mês e cadastros incompletos
+// --------------------------------------------------------------------------
+function telaFechamento(mes) {
+  const hoje = C.hojeIso();
+  const etapas = R.etapasFechamento(d(), mes, hoje);
+  const faltam = etapas.filter((e) => !e.feito).length;
+  return `<div class="cabecalho"><h1>Fechamento de ${compBr(mes)}</h1>
+      <div class="acoes">${link(`#/fechamento?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`, 'botao secundario')}
+      ${link(`#/fechamento?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}</div></div>
+    <div class="alerta ${faltam ? 'aviso' : 'ok'}">${faltam ? `Faltam <b>${faltam}</b> de ${etapas.length} etapas.` : 'Fechamento concluído.'} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
+    <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? 'feito' : ''}">
+      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : etiqueta(`${e.pendentes} pendente(s)`, 'aviso')}
+        <div class="suave">${esc(e.detalhe)}</div>
+        ${e.chave === 'contas' && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${mes}`, `Lançar: ${esc(buscar('imoveis', id).nome)}`, 'botao secundario pequeno')).join(' ')}</div>` : ''}</div>
+        <div class="acoes">${link(e.link, 'Abrir', 'botao pequeno')}
+          ${opera() ? (e.marcado ? botao('etapaFechamento', 'Desmarcar', { mes, etapa: e.chave, feito: '' }, 'link-botao') : !e.feito ? botao('etapaFechamento', 'Marcar como feito', { mes, etapa: e.chave, feito: '1' }, 'secundario pequeno') : '') : ''}</div></div></li>`).join('')}</ol>
+    <p class="suave">Os boletos que vencem em ${compBr(mes)} são os da competência ${compBr(C.somarMeses(mes, -1))} (mês de uso). O último dia do mês aparece no calendário do Painel com o que falta.</p></div>`;
+}
+
+/** O que falta nos cadastros para o contrato, a vistoria e a NF saírem completos. */
+function cadastrosIncompletos() {
+  const hoje = C.hojeIso();
+  const out = [];
+  for (const c of d().contratos.filter((x) => x.imovel_id && R.contratoAtivo(x, hoje))) {
+    const falta = K.pendenciasDoContrato(d(), c).filter((t) => !t.endsWith('(em Empresas)'));
+    if (!c.inquilino_telefone) falta.push('telefone');
+    if (!c.inquilino_email) falta.push('e-mail');
+    if (c.docs_entrada) for (const [k, nome] of R.DOCUMENTOS_ENTRADA) if (!c[k]) falta.push(`${nome.toLocaleLowerCase('pt-BR')} (não marcado como assinado)`);
+    if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
+  }
+  for (const i of d().imoveis) {
+    const falta = [];
+    if (!i.cep) falta.push('CEP');
+    if (!i.cidade) falta.push('cidade');
+    if (!i.chaves) falta.push('chaves e controles');
+    if (!K.lerModeloVistoria(i.modelo_vistoria).length) falta.push('modelo de vistoria');
+    if (!R.participacoesDo(d(), i.id).length && !R.imovelSoControle(d(), i.id)) falta.push('empresas que emitem a NF');
+    if (!i.valor_imovel) falta.push('valor do imóvel (para os Resultados)');
+    if (falta.length) out.push({ tipo: 'Imóvel', nome: i.nome, onde: R.enderecoCompleto(i), falta, editar: `#/editar/imoveis/${i.id}`, ver: `#/imovel/${i.id}` });
+  }
+  for (const e of d().emitentes.filter((x) => x.ativo)) {
+    const falta = [['cnpj', 'CNPJ'], ['endereco_sede', 'endereço da sede'], ['representante_nome', 'representante que assina'], ['representante_cpf', 'CPF do representante']]
+      .filter(([k]) => !e[k]).map(([, t]) => t);
+    if (falta.length) out.push({ tipo: 'Empresa', nome: e.nome, onde: e.razao_social || '', falta, editar: `#/editar/emitentes/${e.id}`, ver: '#/empresas' });
+  }
+  return out;
+}
+
+function telaPendencias() {
+  const lista = cadastrosIncompletos();
+  const grupos = ['Inquilino', 'Imóvel', 'Empresa'].map((t) => [t, lista.filter((x) => x.tipo === t)]).filter(([, l]) => l.length);
+  return `<p class="suave"><a href="#/">← Painel</a></p><h1>Cadastros incompletos</h1>
+    <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
+    ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === 'Imóvel' ? 'Imóveis' : t === 'Empresa' ? 'Empresas' : 'Inquilinos'} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
+      ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ''}</td><td>${x.falta.map((f) => etiqueta(f, 'aviso')).join(' ')}</td>
+        <td class="n nw">${opera() || (t === 'Empresa' && podeUsuario('admin')) ? link(x.editar, 'Completar', 'botao pequeno') : ''}</td></tr>`).join('')}</table></div></div>`).join('')
+    || '<div class="alerta ok">Todos os cadastros estão completos.</div>'}`;
+}
+
+/** Avisos antes de salvar: valores fora do padrão. Quem confirma, salva; quem cancela, corrige. */
+function confirmarAvisos(avisos) {
+  if (avisos.length && !confirm(`Confira antes de salvar:\n\n• ${avisos.join('\n• ')}\n\nSalvar assim mesmo?`)) {
+    throw new Error('Nada foi salvo. Corrija o que precisar e salve de novo.');
+  }
+}
+
+const DIAS_FUTURO = 60;
+const FORA_DO_PADRAO = 0.3;
+/** Avisos do cadastro do inquilino: aluguel muito diferente do anterior, imóvel ainda ocupado, entrada muito no futuro. */
+function conferirContrato(dados, r, q) {
+  const out = [];
+  const imovelId = r ? r.imovel_id : Number(q.vincular || q.imovel) || null;
+  const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id))
+    .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] : null;
+  const base = r ? r.aluguel_inicial : anterior ? R.aluguelAtual(d(), anterior) : null;
+  if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > FORA_DO_PADRAO && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
+    const p = Math.round(((dados.aluguel_inicial - base) / base) * 100);
+    out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
+  }
+  if (imovelId && dados.data_entrada) {
+    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.data_entrada && x.data_entrada < dados.data_entrada
+      && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
+    if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
+  }
+  if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), DIAS_FUTURO)) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${DIAS_FUTURO} dias no futuro.`);
+  if (dados.vigencia_inicio && dados.data_entrada && Math.abs(C.diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
+  return out;
+}
+
+/** Avisos ao alterar um boleto: vencimento fora do dia do contrato. */
+function conferirBoleto(dados, r) {
+  const out = [];
+  const c = buscar('contratos', r.contrato_id);
+  if (dados.vencimento && c && c.dia_vencimento && Number(dados.vencimento.slice(8, 10)) !== c.dia_vencimento && dados.vencimento !== r.vencimento) {
+    out.push(`O vencimento ${dataBr(dados.vencimento)} não cai no dia ${c.dia_vencimento}, que é o do contrato.`);
+  }
+  return out;
+}
 
 function telaFormulario(tabela, registro, q, estado) {
   const cfg = CADASTROS[tabela];
@@ -1197,13 +1428,17 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
+    ${lista.length && opera() && lista.some((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência') ? `<form class="acoes barra-nf baixa-lote" data-form="baixaLote">
+      <b>Baixa em lote:</b> marque os boletos na primeira coluna; entraram em <input type="date" name="data" value="${hoje}" style="width:auto">
+      <button class="pequeno">Confirmar os selecionados como pagos em dia</button>
+      <span class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha.</span></form>` : ''}
     ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <span class="suave">Ordenar por:</span> ${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'botao pequeno' : 'botao secundario pequeno')).join(' ')}</div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
-        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (demonstrativo ou baixa em lote)"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
@@ -1367,7 +1602,10 @@ function telaFaturas(mes) {
         <td class="n nw">${ok ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${opera() ? ` ${botao('cancelarNumero', 'Cancelar', { numero: n }, 'perigo pequeno', `Cancelar a NF nº ${R.numeroFatura(n)}? O pagamento volta para a fila e recebe um número novo. O número ${R.numeroFatura(n)} não será reaproveitado.`)}` : ''}`
           : (podeUsuario('admin') ? botao('apagarCanceladas', 'Apagar', { numero: n }, 'perigo pequeno', `Apagar a NF cancelada nº ${R.numeroFatura(n)} da lista? Fica só o registro no Histórico.`) : '')}</td></tr>`; }).join('')
       || `<tr><td colspan="9" class="suave">Nenhuma NF emitida em ${compBr(mes)}.</td></tr>`}</table></div>
-    ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('pdfMes', 'Baixar todas em PDF (ZIP)', { mes })} ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
+    ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" href="#/imprimir/faturas?mes=${mes}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('pdfMes', 'Baixar todas em PDF (ZIP)', { mes })}
+      ${[...new Set(doMes.filter((f) => f.situacao === 'Emitida').map((f) => f.emitente_id))].map((id) => buscar('emitentes', id)).filter(Boolean)
+    .map((e) => botao('pdfMes', `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(' ')}
+      ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
     ${opera() && ultima ? caixaRenumerar() : ''}`;
 }
 
@@ -1456,7 +1694,7 @@ function calendarioDoPainel(mes, hoje) {
   const eventos = R.eventosDoMes(d(), mes, hoje);
   const porDia = new Map();
   for (const e of eventos) { if (!porDia.has(e.data)) porDia.set(e.data, []); porDia.get(e.data).push(e); }
-  const destino = (e) => (e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
+  const destino = (e) => (e.fechamento ? `#/fechamento?mes=${e.fechamento}` : e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
     : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/imovel/${e.imovel_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
   const curto = (e) => `${e.tipo} ${e.texto.split(' · ')[0]}`;
   const [ini] = C.limitesCompetencia(mes);
@@ -2211,6 +2449,18 @@ export const FORMULARIOS = {
     ir(`#/imovel/${i.id}`);
   },
 
+  async baixaLote(form) {
+    const data = String(new FormData(form).get('data') || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data em que o dinheiro entrou.');
+    const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((el) => Number(el.dataset.boleto));
+    if (!ids.length) throw new Error('Marque os boletos na primeira coluna.');
+    confirmarAvisos(data > C.hojeIso() ? [`A data (${dataBr(data)}) está no futuro.`] : []);
+    let r;
+    await alterar((db) => { r = R.baixarEmLote(db, ids, data, login()); });
+    aviso(`${r.feitos.length} pagamento(s) confirmado(s) em dia, com entrada em ${dataBr(data)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ''}`);
+    await mostrar();
+  },
+
   async lancarContas(form) {
     const f = Object.fromEntries(new FormData(form));
     const linhas = R.TIPOS_DESPESA.map((t, n) => {
@@ -2342,10 +2592,11 @@ export const FORMULARIOS = {
     const registro = rota.partes[0] === 'editar' ? buscar(tabela, rota.partes[2]) : null;
     const antigo = registro ? { ...registro } : null;
     const campos = cfg.campos(registro, rota.q);
-    const { dados, erros } = F.ler(campos, form);
+    const { dados, erros } = F.ler(campos, form, registro);
     if (cfg.ajustar && !Object.keys(erros).length) cfg.ajustar(dados, erros, registro, form, rota.q);
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
+    confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     let recalculados = 0;
@@ -2389,6 +2640,11 @@ export const FORMULARIOS = {
     const valor = String(f.get('valor') || '').trim() ? C.centavos(f.get('valor')) : null;
     const pagouEmDia = f.get('em_dia') === '1';
     const dataPagou = String(f.get('pagou') || '') || null;
+    const cb = buscar('cobrancas', form.dataset.id);
+    confirmarAvisos([
+      data > C.hojeIso() ? `A data do pagamento (${dataBr(data)}) está no futuro.` : '',
+      cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
+    ].filter(Boolean));
     const r = await alterar((db) => R.registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia, dataPagou }));
     aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
       : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
@@ -2591,8 +2847,9 @@ async function pdfDaFatura(f) {
 }
 
 /** Todas as NFs (uma por empresa) dos números escolhidos, em PDFs separados dentro de um ZIP. */
-async function baixarPdfs(numeros, nomeZip) {
-  const fs = E.d.faturas.filter((f) => f.situacao === 'Emitida' && numeros.includes(f.numero)).sort((a, b) => a.numero - b.numero || a.id - b.id);
+async function baixarPdfs(numeros, nomeZip, emitenteId = null) {
+  const fs = E.d.faturas.filter((f) => f.situacao === 'Emitida' && numeros.includes(f.numero) && (!emitenteId || f.emitente_id === emitenteId))
+    .sort((a, b) => a.numero - b.numero || a.id - b.id);
   if (!fs.length) throw new Error('Nenhuma NF para exportar.');
   aviso(`Gerando ${fs.length} PDF(s)…`, 'info');
   const JSZip = await jsZip();
@@ -2658,6 +2915,21 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** CPF já cadastrado: copia nome, contato e qualificação da pessoa para os campos deste formulário. */
+  usarPessoa({ fonte, alvo }, el) {
+    const [tabela, id, pref] = fonte.split(':');
+    const r = buscar(tabela, id);
+    const form = el.closest('form');
+    for (const k of CAMPOS_PESSOA_FORM) {
+      const campo = form.querySelector(`[name="${alvo}${k}"]`);
+      const v = r[`${pref}${k}`];
+      if (!campo || v === undefined || v === null || v === '') continue;
+      campo.value = v;
+      campo.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    el.closest('[data-auto-msg]').innerHTML = `Dados de <b>${esc(r[`${pref}nome`])}</b> copiados. Confira antes de salvar.`;
+  },
+
   /** Vistoria: marca o cômodo inteiro ("Bom") ou copia a situação da entrada, só nos itens ainda sem situação. */
   vistoriaTudo({ comodo, valor }) {
     document.querySelectorAll(`select[data-comodo="${comodo}"]`).forEach((el) => {
@@ -2685,6 +2957,11 @@ export const ACOES = {
   repetirContas() {
     const form = document.querySelector('form[data-form=lancarContas]');
     form.querySelectorAll('input[name^=valor_]').forEach((el) => { if (!el.value && el.placeholder && el.placeholder !== '0,00') el.value = el.placeholder; });
+  },
+
+  async etapaFechamento({ mes, etapa, feito }) {
+    await alterar((db) => R.marcarEtapaFechamento(db, mes, etapa, feito === '1', login()));
+    await mostrar();
   },
 
   async desmarcarDocumento({ contrato, campo }) {
@@ -2932,9 +3209,11 @@ export const ACOES = {
     await baixarPdfs(numerosSelecionados(), 'NFs selecionadas');
   },
 
-  async pdfMes({ mes }) {
+  /** Todas as NFs do mês em PDF (ZIP); com ``empresa``, só as daquela empresa (ex.: todas da ANK). */
+  async pdfMes({ mes, empresa }) {
     const ns = [...new Set(E.d.faturas.filter((f) => f.situacao === 'Emitida' && f.emissao.slice(0, 7) === mes).map((f) => f.numero))];
-    await baixarPdfs(ns, `NFs ${mes} PDF`);
+    const e = empresa ? buscar('emitentes', empresa) : null;
+    await baixarPdfs(ns, `NFs ${mes} PDF${e ? ` ${siglaEmpresa(e)}` : ''}`, e ? e.id : null);
   },
 
   async excelSelecionadas() {

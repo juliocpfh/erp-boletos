@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -884,6 +884,21 @@ const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', '
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
   'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade'];
 
+/** Último inquilino do imóvel (pela data de entrada). */
+export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
+  .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
+
+/**
+ * Condições do inquilino anterior do imóvel, para começar o cadastro do próximo: prazo, índice, vencimento,
+ * bonificação, multa e juros, contas inclusas, garantia e finalidade. O aluguel sugerido é o atual do anterior.
+ */
+export function condicoesDoAnterior(d, anterior) {
+  const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
+  const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
+  out.aluguel_inicial = aluguelAtual(d, anterior);
+  return out;
+}
+
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
   const doc = String(c.inquilino_cpf || '').replace(/\D/g, '');
@@ -1237,6 +1252,64 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
 }
 
 // --------------------------------------------------------------------------
+// Fechamento do mês: as rotinas em ordem, com o que falta em cada uma
+// --------------------------------------------------------------------------
+/**
+ * Etapas do fechamento do mês ``mes`` (mês do calendário). Os boletos que vencem neste mês são os da competência
+ * anterior (mês de uso). Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, manual, marcado }.
+ * As automáticas ficam feitas quando não há pendência; as manuais, quando alguém marca.
+ */
+export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
+  const comp = C.somarMeses(mes, -1);
+  const proxima = mes;
+  const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
+  const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
+  const semBoleto = ativos.filter((c) => C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !d.cobrancas.some((x) => x.contrato_id === c.id && x.competencia === comp));
+  const doMes = d.cobrancas.filter((x) => x.competencia === comp);
+  const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== 'Carência');
+  const vencidos = emAberto.filter((x) => x.vencimento < hoje);
+  const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, proxima)).filter((r) => r && !r.corrigido && !r.carta);
+  const nfs = pendentesDeFatura(d).length;
+  const contas = d.imoveis.filter((i) => contasPermitidas(d, i.id, mes).tipos.length && !d.despesas.some((x) => x.imovel_id === i.id && x.competencia === mes));
+  const etapas = [
+    { chave: 'boletos', titulo: `Gerar os boletos de ${C.compBr(comp)} (vencem em ${C.compBr(mes)})`, pendentes: semBoleto.length,
+      detalhe: semBoleto.length ? `sem boleto: ${semBoleto.map((c) => c.inquilino_nome).join(', ')}` : `${doMes.length} boleto(s) gerado(s)`, link: `#/cobrancas?comp=${comp}` },
+    { chave: 'cartas', titulo: `Enviar as cartas de reajuste do aluguel de ${C.compBr(proxima)}`, pendentes: cartas.length,
+      detalhe: cartas.length ? `${cartas.length} carta(s) a enviar` : 'nenhuma carta pendente', link: '#/reajustes' },
+    { chave: 'pagamentos', titulo: `Conferir os pagamentos dos boletos de ${C.compBr(comp)}`, pendentes: emAberto.length,
+      detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
+    { chave: 'nfs', titulo: 'Numerar as NFs dos pagamentos', pendentes: nfs, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
+    { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length, manual: true,
+      detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
+  ];
+  for (const e of etapas) {
+    e.marcado = marcado(e.chave);
+    e.feito = !!e.marcado || (!e.manual && !e.pendentes) || (e.manual && !e.pendentes);
+  }
+  return etapas;
+}
+
+/** Marca (ou desmarca) uma etapa do fechamento como feita. */
+export function marcarEtapaFechamento(d, mes, etapa, feito, usuario) {
+  const atual = d.fechamentos.find((f) => f.competencia === mes && f.etapa === etapa);
+  if (feito && !atual) inserir(d, 'fechamentos', { competencia: mes, etapa, feito_em: C.hojeIso() }, usuario, `Fechamento de ${C.compBr(mes)}: etapa "${etapa}" feita`);
+  if (!feito && atual) excluir(d, 'fechamentos', atual.id, usuario, `Fechamento de ${C.compBr(mes)}: etapa "${etapa}" desmarcada`);
+}
+
+/** Baixa em lote: confirma como "pagou em dia" os boletos escolhidos, com a data em que o dinheiro entrou. */
+export function baixarEmLote(d, ids, dataContabil, usuario) {
+  const feitos = [];
+  const pulados = [];
+  for (const id of ids) {
+    const cb = buscar(d, 'cobrancas', id);
+    if (!cb || cb.data_pagamento || cb.situacao === 'Carência') { if (cb) pulados.push(cb); continue; }
+    registrarPagamento(d, cb.id, dataContabil, null, usuario, { pagouEmDia: true });
+    feitos.push(cb);
+  }
+  return { feitos, pulados };
+}
+
+// --------------------------------------------------------------------------
 // Calendário do mês: tudo que vence ou acontece no mês
 // --------------------------------------------------------------------------
 /**
@@ -1300,7 +1373,14 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       ev.push({ data: f.data_saida, tipo: 'Fiador', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do vínculo do fiador ${f.nome}`, situacao: 'aviso', estado: 'providenciar' });
     }
   }
-  const ordem = { Boleto: 0, Reajuste: 1, IPTU: 2, Seguro: 3, 'Fim do contrato': 4, Fiador: 5 };
+  // fechamento do mês: no último dia, quantas etapas faltam
+  if (fim >= `${hoje.slice(0, 7)}-01`) {
+    const etapas = etapasFechamento(d, mes, hoje);
+    const faltam = etapas.filter((e) => !e.feito).length;
+    ev.push({ data: fim, tipo: 'Fechamento', texto: faltam ? `faltam ${faltam} de ${etapas.length} etapas` : 'concluído',
+      situacao: faltam ? (fim < hoje ? 'perigo' : 'aviso') : 'ok', estado: faltam ? 'a fazer' : 'feito', fechamento: mes });
+  }
+  const ordem = { Boleto: 0, Reajuste: 1, IPTU: 2, Seguro: 3, 'Fim do contrato': 4, Fiador: 5, Fechamento: 6 };
   return ev.sort((a, b) => a.data.localeCompare(b.data) || ordem[a.tipo] - ordem[b.tipo] || a.texto.localeCompare(b.texto, 'pt-BR'));
 }
 
