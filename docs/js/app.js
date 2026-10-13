@@ -96,17 +96,33 @@ async function verificarMudancasExternas() {
 // --------------------------------------------------------------------------
 // Mensagens e utilidades de tela
 // --------------------------------------------------------------------------
+// Mensagens do topo: confirmações somem sozinhas em alguns segundos; erros ficam até fechar no ×.
+// Uma mensagem aparece numa tela só (não volta na próxima página).
 let mensagens = [];
+let proximaMensagem = 1;
 export function aviso(texto, tipo = 'ok') {
-  mensagens.push({ texto, tipo });
+  const m = { id: proximaMensagem++, texto, tipo };
+  mensagens.push(m);
   desenharMensagens();
+  if (tipo !== 'erro') setTimeout(() => fecharMensagem(m.id), tipo === 'aviso' ? 15000 : 6000);
+}
+
+function fecharMensagem(id) {
+  mensagens = mensagens.filter((x) => x.id !== id);
+  const el = document.querySelector(`#mensagens [data-msg="${id}"]`);
+  if (el) el.remove();
 }
 
 function desenharMensagens() {
   const el = document.getElementById('mensagens');
   if (!el) return;
-  el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo}">${esc(m.texto)}</div>`).join('');
+  el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo} mensagem" data-msg="${m.id}">${esc(m.texto)}<button type="button" class="fechar" title="Fechar" data-fechar-msg="${m.id}">×</button></div>`).join('');
 }
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-fechar-msg]');
+  if (b) fecharMensagem(Number(b.dataset.fecharMsg));
+});
 
 export function ir(hash) {
   if (location.hash === hash) mostrar();

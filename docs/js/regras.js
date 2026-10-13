@@ -974,7 +974,31 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
 /** Seguro obrigatório é do imóvel: só cobra apólice enquanto houver inquilino ativo nele. */
 export function alertaSeguroImovel(d, i, hoje = C.hojeIso()) {
   const atual = d.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))[0];
-  return atual ? alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoImovel(d, i.id)) : null;
+  if (!atual || atual.conta_seguro === SITUACOES[2]) return null; // contrato sem seguro ("não tem"): nada a cobrar
+  return alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoImovel(d, i.id));
+}
+
+/**
+ * Totais da lista de imóveis: o esperado por mês (aluguel bonificado dos inquilinos atuais que emitem NF) e o
+ * total com 100% locado (esperado + último aluguel bonificado dos imóveis vagos). Boleto de controle fica fora.
+ */
+export function totaisImoveis(d, hoje = C.hojeIso()) {
+  const bonificado = (c, data) => { const a = aluguelAtual(d, c, data); return a - C.descontoPorPercentual(a, percentualBonificacao(c)); };
+  let esperado = 0;
+  let cheio = 0;
+  let vagos = 0;
+  let qtdVagos = 0;
+  let vagosSemValor = 0;
+  for (const i of d.imoveis) {
+    const atuais = d.contratos.filter((c) => c.imovel_id === i.id && c.ativo !== false && contratoAtivo(c, hoje));
+    if (atuais.length) {
+      for (const c of atuais.filter(geraNf)) { esperado += bonificado(c, hoje); cheio += aluguelAtual(d, c, hoje); }
+      continue;
+    }
+    const ultimo = d.contratos.filter((c) => c.imovel_id === i.id).sort((a, b) => String(b.data_entrada).localeCompare(String(a.data_entrada)))[0];
+    if (ultimo) { vagos += bonificado(ultimo, ultimo.data_saida && ultimo.data_saida < hoje ? ultimo.data_saida : hoje); qtdVagos += 1; } else vagosSemValor += 1;
+  }
+  return { esperado, cheio, vagos, qtdVagos, cemPorCento: esperado + vagos, vagosSemValor };
 }
 
 export function todosAlertas(d, hoje = C.hojeIso()) {

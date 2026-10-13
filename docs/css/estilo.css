@@ -160,3 +160,7 @@ tr.cancelada td:last-child, tr.cancelada td:nth-last-child(2) { text-decoration:
 .alerta.controle { border-color: #7c3aed; background: #f5f3ff; }
 .etiqueta.controle { background: #ede9fe; color: #5b21b6; }
 tr.linha-controle td { background: #faf8ff; }
+
+/* Mensagens do topo com botão de fechar */
+.alerta.mensagem { position: relative; padding-right: 34px; }
+.alerta.mensagem .fechar { position: absolute; right: 6px; top: 4px; background: none; color: var(--suave); font-size: 18px; padding: 0 6px; line-height: 1.4; }
