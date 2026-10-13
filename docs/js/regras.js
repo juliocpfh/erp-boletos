@@ -551,6 +551,12 @@ export const numeroFatura = (n) => String(n).padStart(4, '0');
 /** O inquilino precisa de NF? (há inquilinos para quem só se controla o pagamento) */
 export const geraNf = (c) => !c || c.gerar_nf !== false;
 
+/** Dados que vêm preenchidos na NF avulsa do Airbnb (o usuário pode mudar e guardar como novo padrão). */
+export const MODELO_AIRBNB = { descricao: 'AirBnb', tomador_nome: 'CONSUMIDOR NÃO IDENTIFICADO', tomador_documento: '000.000.000-00',
+  tomador_telefone: '-', tomador_endereco: '-', observacoes_nf: 'AirBnb' };
+export const CAMPOS_MODELO_AIRBNB = [...Object.keys(MODELO_AIRBNB), 'municipio', 'imovel_id'];
+export const modeloAirbnb = (d) => ({ ...MODELO_AIRBNB, ...(d.modelo_airbnb || {}) });
+
 /** Imóvel ocupado só por inquilino(s) de boleto de controle: não emite NF, as empresas não se aplicam. */
 export function imovelSoControle(d, imovelId, hoje = C.hojeIso()) {
   const atuais = d.contratos.filter((c) => c.imovel_id === imovelId && c.ativo !== false && contratoAtivo(c, hoje));

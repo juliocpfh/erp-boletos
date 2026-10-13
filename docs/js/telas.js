@@ -659,6 +659,7 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 let antesDoVinculo = null;
 let fiadoresNovos = [];
 let avisoAditivo = '';
+let guardarModeloAirbnb = false;
 const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -1002,13 +1003,27 @@ const CADASTROS = {
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
   },
   avulsas: {
-    titulo: (r) => (r ? 'Editar NF avulsa' : 'Nova NF avulsa'),
+    titulo: (r, q) => (r ? 'Editar NF avulsa' : q.modelo === 'airbnb' ? 'Nova NF avulsa do Airbnb' : 'Nova NF avulsa'),
     campos: () => F.AVULSA.map((c) => (c.nome === 'imovel_id' ? { ...c, opcoes: ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]) } : c)),
+    // Airbnb: vem preenchida com os dados padrão (todos podem ser mudados aqui)
+    padrao: (q) => ({ data_pagamento: C.hojeIso(), ...(q.modelo === 'airbnb' ? R.modeloAirbnb(d()) : {}) }),
+    aviso: (r, q) => (!r && q.modelo === 'airbnb' ? 'Dados do Airbnb já preenchidos: confira, informe a data em que o dinheiro entrou e o valor. Pode mudar qualquer campo.' : ''),
+    extraHtml: (r, q) => (!r && q.modelo === 'airbnb' ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : ''),
     voltar: () => '#/faturas',
     descricao: (dados) => `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
-    ajustar(dados, erros, r) {
+    ajustar(dados, erros, r, form) {
       if (r && R.faturasDe(d(), 'avulsa', r.id).length) erros.valor = 'Já tem número de NF';
       if (!(dados.valor > 0)) erros.valor = 'Informe o valor';
+      guardarModeloAirbnb = new FormData(form).get('salvar_modelo') === '1';
+    },
+    salvar(db, dados, q, r) {
+      if (guardarModeloAirbnb) {
+        db.modelo_airbnb = Object.fromEntries(R.CAMPOS_MODELO_AIRBNB.map((k) => [k, dados[k] ?? '']));
+        R.registrar(db, login(), 'Alteração', 'avulsas', null, 'Padrão da NF avulsa do Airbnb alterado', db.modelo_airbnb);
+      }
+      guardarModeloAirbnb = false;
+      if (r) { R.atualizar(db, 'avulsas', r.id, dados, login(), `NF avulsa: ${dados.tomador_nome}`); return R.buscar(db, 'avulsas', r.id); }
+      return R.inserir(db, 'avulsas', dados, login(), `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`);
     },
   },
   emitentes: {
@@ -1304,7 +1319,7 @@ function caixaRenumerar() {
 
 function caixaAvulsas() {
   const pend = d().avulsas.filter((a) => !R.faturasDe(d(), 'avulsa', a.id).length);
-  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? link('#/novo/avulsas', 'Nova NF avulsa', 'botao') : ''}</div>
+  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link('#/novo/avulsas?modelo=airbnb', 'Nova NF avulsa do Airbnb', 'botao')} ${link('#/novo/avulsas', 'Nova NF avulsa', 'botao secundario')}</div>` : ''}</div>
     <p class="suave">Para recebimentos fora do boleto, como o faturamento do Airbnb (lançamento esporádico com a data em que o dinheiro entrou) ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
       ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || '')}</td><td class="n">${reais(a.valor)}</td>
