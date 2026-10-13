@@ -207,7 +207,7 @@ export const IPTU = [
   campo('num_parcelas', 'Número de parcelas', 'inteiro', { obrig: true, padrao: 10 }),
   campo('valor_parcela', 'Valor fixo cobrado por parcela (opcional)', 'dinheiro', { ajuda: 'Ex.: arredondar para R$ 213,00. Em branco: total ÷ parcelas' }),
   campo('vencimento_primeira', 'Vencimento da 1ª parcela na prefeitura', 'data', { ajuda: 'Data da guia. As demais vencem no mesmo dia dos meses seguintes. Usado no controle e nos alertas do que o proprietário paga' }),
-  campo('primeira_competencia', 'Primeiro mês de cobrança ao inquilino (aluguel de)', 'mes', { obrig: true, ajuda: 'Boleto em que entra a 1ª parcela. Ex.: 2026-03 = boleto do aluguel de março. As demais seguem mês a mês, pelo número de parcelas' }),
+  campo('primeiro_vencimento_boleto', 'Mês de vencimento do 1º boleto do inquilino com IPTU', 'mes', { obrig: true, ajuda: 'Ex.: 2026-03 = a 1ª parcela entra no boleto que vence em março. As demais seguem mês a mês, pelo número de parcelas' }),
   secao('Pagamento à vista pelo proprietário'),
   campo('pago_avista', 'Proprietário quitou o IPTU à vista (cota única)', 'simnao'),
   campo('valor_avista', 'Valor pago à vista (com desconto)', 'dinheiro', { ...quando('pago_avista', '1'), ajuda: 'O inquilino continua pagando o valor parcelado' }),
