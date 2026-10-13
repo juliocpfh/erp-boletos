@@ -299,6 +299,7 @@ export const TELAS = {
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
+  contas: (rota) => telaContas(rota),
   inadimplencia: () => telaInadimplencia(),
   reajustes: (rota) => telaReajustes(rota.q),
   calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
@@ -306,6 +307,7 @@ export const TELAS = {
   'contrato-gerar': (rota) => telaGerarContrato(rota),
   'modelos-contrato': () => telaModelos(),
   vistoria: (rota) => telaVistoria(rota),
+  'modelo-vistoria': (rota) => telaModeloVistoria(rota),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
@@ -413,7 +415,7 @@ function telaImovel(i) {
       ${item('UC Copel / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Matrícula Sanepar / Código hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
       ${item('Administradora do condomínio', esc(i.administradora_nome || '-'))}${item('Relógio de gás', esc(i.gas_relogio || '-'))}
       ${item('Internet / telefone', esc(i.internet || '-'))}
-      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Chaves e controles', i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
+      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Modelo de vistoria', `${K.lerModeloVistoria(i.modelo_vistoria).length ? `${K.lerModeloVistoria(i.modelo_vistoria).length} cômodo(s)` : '<span class="suave">não montado</span>'} ${opera() ? link(`#/modelo-vistoria/${i.id}`, i.modelo_vistoria ? 'Editar' : 'Montar') : ''}`)}${item('Chaves e controles', i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
       <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th><th>NF ou controle</th></tr>
@@ -1569,6 +1571,46 @@ function telaInadimplencia() {
       <p class="suave">Conta os boletos pagos depois do vencimento (quem marcou "pagou em dia" não conta).</p></div>`;
 }
 
+/** Contas que nós pagamos num imóvel: lançar o mês de uma vez e ver os lançamentos. */
+function telaContas(rota) {
+  const i = buscar('imoveis', rota.partes[1]);
+  if (!i) return '<h1>Imóvel não encontrado</h1>';
+  const comp = rota.q.comp || C.competenciaDe(C.hojeIso());
+  const ultimos = R.ultimosValores(d(), i.id);
+  const situacao = R.contasPorNossaConta(d(), i.id);
+  const sugeridos = new Set(situacao.vago ? ['Água', 'Luz'] : situacao.inclusas);
+  for (const t of Object.keys(ultimos)) sugeridos.add(t);
+  const doMes = R.despesasDo(d(), i.id).filter((x) => x.competencia === comp);
+  const hoje = C.hojeIso();
+  const lista = R.despesasDo(d(), i.id).slice(0, 60);
+  const linha = (tipo, n) => {
+    const u = ultimos[tipo];
+    const ja = doMes.filter((x) => x.tipo === tipo).reduce((t, x) => t + x.valor, 0);
+    return `<tr class="${sugeridos.has(tipo) ? '' : 'suave'}"><td><b>${esc(tipo)}</b>${tipo === 'Outra' ? '' : ''}<input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
+      <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="${u ? F.dinheiroTexto(u.valor) : '0,00'}" style="width:130px"></td>
+      <td><input type="date" name="data_${n}" value="${hoje}" style="width:auto"></td>
+      <td><input name="obs_${n}" placeholder="${tipo === 'Outra' ? 'qual conta? (ex.: taxa de lixo)' : 'opcional'}"></td>
+      <td class="suave nw">${u ? `último: ${reais(u.valor)} (${compBr(u.competencia)})` : ''}${ja ? `<br><b>já lançado neste mês: ${reais(ja)}</b>` : ''}</td></tr>`;
+  };
+  return `<p class="suave"><a href="#/resultados">← Resultados</a> · <a href="#/imovel/${i.id}">${esc(i.nome)}</a></p>
+    <h1>Contas pagas por nós · ${esc(i.nome)}</h1>
+    <div class="alerta info">${situacao.vago ? '<b>Imóvel vago hoje:</b> as contas de água, luz, gás, condomínio etc. são nossas.'
+    : situacao.inclusas.length ? `<b>Incluído no aluguel do inquilino atual:</b> ${esc(situacao.inclusas.join(', '))}.` : 'O inquilino atual paga as contas. Lance aqui só o que nós pagamos.'}
+      O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
+    <form class="cartao" data-form="lancarContas">
+      <input type="hidden" name="imovel" value="${i.id}">
+      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${comp}" style="width:auto" data-trocar-mes="${i.id}">
+        <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
+      <div class="rolagem"><table><tr><th>Conta</th><th>Valor pago</th><th>Pago em</th><th>Observação</th><th></th></tr>
+        ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
+      <p class="suave">Preencha só as contas pagas. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
+      <div class="acoes"><button>Lançar</button></div></form>
+    <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th></th></tr>
+      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td>
+        <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'despesas', id: x.id }, 'perigo pequeno', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : ''}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div></div>`;
+}
+
 function telaResultados(q) {
   const hoje = C.hojeIso();
   const ate = q.ate || hoje;
@@ -1588,17 +1630,18 @@ function telaResultados(q) {
   return `<h1>Resultados financeiros</h1>
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos}</form>
-    <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
+    <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Contas pagas por nós</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
       ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td><td><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a><br><span class="suave">${x.mesesPagos} pagamento(s)</span>${x.controle ? `<br>${etiqueta('boleto de controle: não conta', 'controle')}` : ''}</td>
         <td class="n">${x.base ? reais(x.base) : '<span class="suave">-</span>'}</td><td class="n">${reais(x.aluguel)}</td><td class="n">${reais(x.avulsas)}</td><td class="n">${x.iptu ? `- ${reais(x.iptu)}` : '-'}</td>
+        <td class="n nw">${x.contas ? `<a href="#/contas/${x.imovel.id}">- ${reais(x.contas)}</a>` : '-'}${opera() ? `<br>${link(`#/contas/${x.imovel.id}`, '+ incluir contas', `link-botao${R.contasPorNossaConta(d(), x.imovel.id).vago || R.contasPorNossaConta(d(), x.imovel.id).inclusas.length ? ' destaque-contas' : ''}`)}` : ''}</td>
         <td class="n"><b>${reais(x.resultado)}</b></td><td class="n"><b>${pctTxt(x.retornoAnual)}</b>${x.retornoAnual ? `<div class="barra"><span style="width:${Math.max(2, (x.retornoAnual / maior) * 100).toFixed(0)}%"></span></div>` : ''}</td>
-        <td class="n">${x.reformasPeriodo ? reais(x.reformasPeriodo) : '-'}</td></tr>`).join('') || '<tr><td colspan="9" class="suave">Nenhum imóvel.</td></tr>'}
-      <tr class="total"><td></td><td>Total</td><td class="n">${reais(tot('base'))}</td><td class="n">${reais(tot('aluguel'))}</td><td class="n">${reais(tot('avulsas'))}</td><td class="n">${reais(tot('iptu'))}</td><td class="n">${reais(tot('resultado'))}</td>
+        <td class="n">${x.reformasPeriodo ? reais(x.reformasPeriodo) : '-'}</td></tr>`).join('') || '<tr><td colspan="10" class="suave">Nenhum imóvel.</td></tr>'}
+      <tr class="total"><td></td><td>Total</td><td class="n">${reais(tot('base'))}</td><td class="n">${reais(tot('aluguel'))}</td><td class="n">${reais(tot('avulsas'))}</td><td class="n">${reais(tot('iptu'))}</td><td class="n">${reais(tot('contas'))}</td><td class="n">${reais(tot('resultado'))}</td>
         <td class="n">${tot('base') ? pctTxt((tot('resultado') * 12 / (lista[0] ? lista[0].meses : 12) / tot('base')) * 100) : '-'}</td><td class="n">${reais(tot('reformasPeriodo'))}</td></tr></table>
-    <p class="suave">Alimentado pelo histórico: aluguel recebido = valor da NF de cada boleto pago no período (aluguel com desconto, ou com multa e juros quando atrasou; sem IPTU, seguro e tarifa, que são repasses), mais as NFs avulsas ligadas ao imóvel. Boletos de controle (inquilino sem NF) não entram. Desconta o IPTU pago pelo proprietário (imóvel vazio). Retorno ao ano = resultado do período convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Cadastre o valor em "Editar imóvel" e as reformas na página do imóvel.</p></div>`;
+    <p class="suave">Alimentado pelo histórico: aluguel recebido = valor da NF de cada boleto pago no período (aluguel com desconto, ou com multa e juros quando atrasou; sem IPTU, seguro e tarifa, que são repasses), mais as NFs avulsas ligadas ao imóvel. Boletos de controle (inquilino sem NF) não entram. Desconta o IPTU pago pelo proprietário (imóvel vazio) e as contas pagas por nós (água, luz, gás, condomínio... de imóvel vago ou incluídas no aluguel), pela data do pagamento; lance em "+ incluir contas". Retorno ao ano = resultado do período convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Cadastre o valor em "Editar imóvel" e as reformas na página do imóvel.</p></div>`;
 }
 
-function telaImprimir(rota) {
+async function telaImprimir(rota) {
   const tipo = rota.partes[1];
   const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
   if (tipo === 'carta') {
@@ -1610,7 +1653,7 @@ function telaImprimir(rota) {
       ${cartaReajuste(c, rota.q.comp)}</div>`;
   }
   if (['contrato', 'vistoria', 'chaves'].includes(tipo)) {
-    const m = documentoMontado(tipo, rota.q);
+    const m = await documentoMontado(tipo, rota.q);
     if (!m) return '<p>Registro não encontrado.</p>';
     const falta = K.pendenciasDoContrato(d(), m.c);
     const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
@@ -1619,6 +1662,7 @@ function telaImprimir(rota) {
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
+      ${tipo === 'vistoria' && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ''}
       ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
       ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
   }
@@ -1656,7 +1700,7 @@ function contratoMontado(q) {
 }
 
 /** Contrato, vistoria ou recibo das chaves, prontos para a tela, o PDF e o Word. */
-function documentoMontado(tipo, q) {
+async function documentoMontado(tipo, q) {
   if (tipo === 'contrato') {
     const m = contratoMontado(q);
     return m && { ...m, rodape: m.dados.rodape, nome: 'Contrato' };
@@ -1667,7 +1711,10 @@ function documentoMontado(tipo, q) {
     if (!c) return null;
     const momento = v.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = R.leiturasDo(d(), c.id).find((l) => l.momento === momento) || null;
-    return { c, v, ...K.vistoriaBlocos(d(), c, v, leitura), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
+    const entrada = v.tipo === 'Saída' ? R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada') : null;
+    const fotos = await fotosDaVistoria(v);
+    const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
+    return { c, v, semSituacao, ...K.vistoriaBlocos(d(), c, v, leitura, fotos, entrada ? entrada.itens || [] : null), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
@@ -1712,10 +1759,12 @@ function telaVistoria(rota) {
   const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
   const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
   const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
+  const grade = gradeVistoria(i, v, base, tipo === 'Saída' ? entrada : null);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
     ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
-    ${tipo === 'Saída' ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
+    ${tipo === 'Saída' && !grade ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
+    ${grade ? '' : `<div class="alerta info">Este imóvel ainda não tem <b>modelo de vistoria</b>. ${opera() && i.id ? link(`#/modelo-vistoria/${i.id}`, 'Montar o modelo do imóvel') : ''} Montado uma vez, a vistoria vira só marcar a situação de cada item.</div>`}
     <form class="cartao" data-form="vistoria">
       <input type="hidden" name="id" value="${v ? v.id : ''}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
       <div class="formulario">
@@ -1726,13 +1775,113 @@ function telaVistoria(rota) {
       <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
         <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
       ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
-      <p><label>Descritivo do imóvel</label>
+      ${grade}
+      <h2>Fotos que vão no documento</h2>
+      <p class="suave">A fachada vai na capa; os relógios e o quadro de disjuntores, na página de registros. As fotos gerais e de detalhe continuam no link da nuvem. Enviar outra foto substitui a anterior.</p>
+      <div class="formulario">${K.FOTOS_VISTORIA.map(([k, t]) => `<div><label>${esc(t)}${v && v.fotos && v.fotos[k] ? ' <span class="etiqueta ok">já tem ✓</span>' : ''}</label><input type="file" name="foto_${k}" accept="image/*"></div>`).join('')}</div>
+      <p><label>${grade ? 'Outras observações (opcional)' : 'Descritivo do imóvel'}</label>
         <span class="suave">Uma linha por item. <code>## SALA</code> abre um cômodo; <code>- item: estado</code> vira marcador. Item do roteiro que ficar sem preencher (termina em ":") não sai no documento.
         Use sempre as mesmas palavras para o estado: <b>novo · ótimo estado · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
         <span class="acoes" style="margin:8px 0">Inserir roteiro: ${Object.keys(ROTEIROS).map((k) => `<button type="button" class="secundario pequeno" data-acao="inserirRoteiro" data-comodo="${esc(k)}">${esc(k)}</button>`).join('')}</span>
         <textarea name="descritivo" class="texto-modelo">${valor('descritivo')}</textarea></p>
       <p><label>Condições gerais</label><textarea name="condicoes" rows="6">${valor('condicoes', K.VISTORIA_CONDICOES)}</textarea></p>
       <div class="acoes"><button>Salvar e ver o documento</button><a class="botao secundario" href="#/contrato/${c.id}?ir=documentos">Cancelar</a></div></form>`;
+}
+
+/** Grade da vistoria pelo modelo do imóvel: situação de cada item, com observação. Vazio se o imóvel não tem modelo. */
+function gradeVistoria(i, v, base, entrada) {
+  const chave = (x) => `${x.comodo}|${x.item}`;
+  const anteriores = new Map(((v && v.itens) || (entrada ? [] : base.itens) || []).map((x) => [chave(x), x]));
+  const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [chave(x), x.situacao]));
+  const comodos = K.lerModeloVistoria(i.modelo_vistoria);
+  // itens já marcados que saíram do modelo continuam aparecendo
+  for (const x of anteriores.values()) {
+    let g = comodos.find((y) => y.comodo === x.comodo);
+    if (!g) comodos.push((g = { comodo: x.comodo, itens: [] }));
+    if (!g.itens.includes(x.item)) g.itens.push(x.item);
+  }
+  if (!comodos.length) return '';
+  let k = 0;
+  const opcoes = (sel) => `<option value=""></option>${K.SITUACOES_VISTORIA.map((o) => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('')}`;
+  return `<h2>Situação por cômodo</h2>
+    <p class="suave">Marque a situação de cada item. "Tudo bom" marca o cômodo inteiro; depois mude só o que diverge e anote a observação e o nº da foto. Item sem situação não sai no documento.
+      ${entrada ? 'Na saída, o que ficar pior que na entrada sai destacado.' : ''} ${opera() && i.id ? link(`#/modelo-vistoria/${i.id}`, 'Editar o modelo do imóvel') : ''}</p>
+    ${comodos.map((g, ci) => `<div class="vistoria-comodo"><div class="cabecalho"><h3>${esc(g.comodo)}</h3><div class="acoes">
+      ${botao('vistoriaTudo', 'Tudo bom', { comodo: ci, valor: 'Bom' })}${entrada ? botao('vistoriaTudo', 'Igual à entrada', { comodo: ci, valor: 'entrada' }) : ''}</div></div>
+      <div class="rolagem"><table class="grade-vistoria"><tr><th>Item</th>${entrada ? '<th>Na entrada</th>' : ''}<th>Situação</th><th>Observação / nº da foto</th></tr>
+      ${g.itens.map((item) => {
+    const n = k++;
+    const a = anteriores.get(`${g.comodo}|${item}`) || {};
+    const ent = naEntrada.get(`${g.comodo}|${item}`) || '';
+    return `<tr><td>${esc(item)}<input type="hidden" name="ic_${n}" value="${esc(g.comodo)}"><input type="hidden" name="ii_${n}" value="${esc(item)}"></td>
+      ${entrada ? `<td class="suave">${esc(ent || '—')}</td>` : ''}
+      <td><select name="is_${n}" data-comodo="${ci}" data-entrada="${esc(ent)}" class="${K.piorou(ent, a.situacao) ? 'piorou' : ''}">${opcoes(a.situacao)}</select></td>
+      <td><input name="io_${n}" value="${esc(a.obs || '')}"></td></tr>`;
+  }).join('')}</table></div></div>`).join('')}`;
+}
+
+/** Itens gerais de cada cômodo no modelo de vistoria. Linha terminada em ":" é só um lembrete (não vira item). */
+const GERAIS = ['Teto', 'Paredes', 'Piso', 'Janelas', 'Portas', 'Elétrica'];
+const MODELO_COMODOS = {
+  Sala: [...GERAIS, 'Móvel:'],
+  Quarto: [...GERAIS, 'Móvel:'],
+  Suíte: [...GERAIS, 'Móvel:'],
+  Cozinha: [...GERAIS, 'Hidráulica', 'Cerâmica / revestimento', 'Armários', 'Eletrodoméstico:'],
+  Banheiro: [...GERAIS, 'Hidráulica', 'Cerâmica / revestimento', 'Louças e metais (vaso, pia, torneiras, chuveiro)', 'Box e espelho'],
+  Lavanderia: [...GERAIS, 'Hidráulica', 'Cerâmica / revestimento', 'Tanque', 'Eletrodoméstico:'],
+  Corredor: ['Teto', 'Paredes', 'Piso', 'Portas', 'Elétrica'],
+  Escada: ['Teto', 'Paredes', 'Piso / degraus', 'Corrimão', 'Porta de acesso', 'Elétrica'],
+  'Área externa': ['Piso', 'Muros', 'Portão', 'Elétrica', 'Hidráulica'],
+  Garagem: ['Piso', 'Portão eletrônico e controles', 'Elétrica'],
+  Fachada: ['Muros e pintura', 'Telhado, beiral e calhas', 'Portão', 'Janelas e grades', 'Elétrica externa'],
+};
+
+function telaModeloVistoria(rota) {
+  const i = buscar('imoveis', rota.partes[1]);
+  if (!i) return '<h1>Imóvel não encontrado</h1>';
+  const outros = ordenar(d().imoveis.filter((x) => x.id !== i.id && x.modelo_vistoria), 'nome');
+  const resumo = K.lerModeloVistoria(i.modelo_vistoria);
+  return `<p class="suave"><a href="#/imovel/${i.id}">← ${esc(i.nome)}</a></p>
+    <h1>Modelo de vistoria · ${esc(i.nome)}</h1>
+    <div class="alerta info">Monte uma vez os cômodos deste imóvel e o que verificar em cada um. Na vistoria, você só marca a situação de cada item (novo, ótimo, bom, marcas de uso, avaria…).</div>
+    <form class="cartao" data-form="modeloVistoria"><input type="hidden" name="imovel" value="${i.id}">
+      <p class="suave">Uma linha por item. <code>## Nome do cômodo</code> abre um cômodo (ex.: <code>## Quarto fundos</code>). Para móveis e eletrodomésticos, um por linha com a descrição
+        (ex.: <code>Móvel: sofá 2 lugares cinza</code>, <code>Eletrodoméstico: geladeira Electrolux</code>). Linhas terminadas em ":" são só lembretes e não viram item.</p>
+      <div class="acoes" style="margin:8px 0">Inserir cômodo: ${Object.keys(MODELO_COMODOS).map((x) => `<button type="button" class="secundario pequeno" data-acao="inserirComodoModelo" data-comodo="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+      ${outros.length ? `<div class="acoes" style="margin:8px 0"><label style="margin:0">Copiar de outro imóvel</label><select name="copiar_de" style="width:auto">${outros.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select>
+        <button type="button" class="secundario pequeno" data-acao="copiarModeloVistoria">Copiar</button></div>` : ''}
+      <textarea name="modelo" class="texto-modelo">${esc(i.modelo_vistoria || '')}</textarea>
+      <p class="suave">${resumo.length ? `Salvo: ${resumo.length} cômodo(s), ${resumo.reduce((t, x) => t + x.itens.length, 0)} itens.` : 'Ainda sem modelo.'}</p>
+      <div class="acoes"><button>Salvar modelo</button><a class="botao secundario" href="#/imovel/${i.id}">Cancelar</a></div></form>`;
+}
+
+/** Foto reduzida (até 1600 px, JPEG) para guardar na pasta e pôr no documento. */
+async function reduzirFoto(arquivo) {
+  const img = await createImageBitmap(arquivo);
+  const escala = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.width * escala);
+  canvas.height = Math.round(img.height * escala);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.82));
+}
+
+/** Fotos da vistoria, lidas da pasta do inquilino: { chave: { src, bytes, largura, altura } }. */
+async function fotosDaVistoria(v) {
+  const out = {};
+  if (!v.fotos) return out;
+  let dir;
+  try { dir = await pastaDoEscopo('contrato', v.contrato_id); } catch { return out; }
+  for (const [k, nome] of Object.entries(v.fotos)) {
+    try {
+      const arq = await (await dir.getFileHandle(nome)).getFile();
+      const img = await createImageBitmap(arq);
+      const src = URL.createObjectURL(arq);
+      urls.push(src);
+      out[k] = { src, bytes: new Uint8Array(await arq.arrayBuffer()), largura: img.width, altura: img.height };
+    } catch { /* foto apagada da pasta */ }
+  }
+  return out;
 }
 
 function telaGerarContrato(rota) {
@@ -2041,6 +2190,27 @@ export const FORMULARIOS = {
     aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
   },
 
+  async modeloVistoria(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const i = buscar('imoveis', f.imovel);
+    await alterar((db) => R.atualizar(db, 'imoveis', i.id, { modelo_vistoria: String(f.modelo || '').trim() }, login(), `${i.nome}: modelo de vistoria`));
+    aviso('Modelo de vistoria salvo.');
+    ir(`#/imovel/${i.id}`);
+  },
+
+  async lancarContas(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const linhas = R.TIPOS_DESPESA.map((t, n) => {
+      const texto = String(f[`valor_${n}`] || '').trim();
+      return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : 0, data_pagamento: f[`data_${n}`], observacoes: String(f[`obs_${n}`] || '').trim() };
+    });
+    if (!f.competencia) throw new Error('Informe o mês da conta.');
+    let n = 0;
+    await alterar((db) => { n = R.lancarDespesas(db, Number(f.imovel), f.competencia, linhas, login()).length; });
+    aviso(`${n} conta(s) lançada(s).`);
+    await mostrar();
+  },
+
   async marcarDocumento(form) {
     const f = Object.fromEntries(new FormData(form));
     if (!f.data) throw new Error('Informe a data.');
@@ -2054,6 +2224,20 @@ export const FORMULARIOS = {
     const c = buscar('contratos', f.contrato);
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '' };
+    dados.itens = [];
+    for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
+    // fotos: reduzidas e guardadas na pasta do inquilino (mesmo nome = substitui a anterior)
+    const anterior = Number(f.id) ? buscar('vistorias', f.id) : null;
+    dados.fotos = { ...((anterior && anterior.fotos) || {}) };
+    const novasFotos = K.FOTOS_VISTORIA.filter(([k]) => f[`foto_${k}`] && f[`foto_${k}`].size);
+    if (novasFotos.length) {
+      const dir = await pastaDoEscopo('contrato', c.id);
+      for (const [k] of novasFotos) {
+        const nome = `vistoria-${f.tipo === 'Saída' ? 'saida' : 'entrada'}-${f.data}-${k}.jpg`;
+        await S.escreverTexto(dir, nome, await reduzirFoto(f[`foto_${k}`]));
+        dados.fotos[k] = nome;
+      }
+    }
     if (f.tipo === 'Entrada') dados.prazo_dias = Number(f.prazo_dias) || 3;
     if (f.tipo === 'Saída') {
       const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
@@ -2352,6 +2536,7 @@ const TABELAS_EXCLUSAO = {
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
+  despesas: {},
 };
 
 /** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
@@ -2414,7 +2599,7 @@ export const ACOES = {
 
   async documentoWord() {
     const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
-    const m = documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    const m = await documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
     if (!m) throw new Error('Registro não encontrado.');
     const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
     const i = buscar('imoveis', m.c.imovel_id);
@@ -2458,6 +2643,35 @@ export const ACOES = {
     E.seguro = null;
     aviso('Backup seguro desligado neste computador.');
     await mostrar();
+  },
+
+  /** Vistoria: marca o cômodo inteiro ("Bom") ou copia a situação da entrada, só nos itens ainda sem situação. */
+  vistoriaTudo({ comodo, valor }) {
+    document.querySelectorAll(`select[data-comodo="${comodo}"]`).forEach((el) => {
+      if (el.value) return;
+      el.value = valor === 'entrada' ? el.dataset.entrada || '' : valor;
+    });
+  },
+
+  inserirComodoModelo({ comodo }) {
+    const t = document.querySelector('textarea[name=modelo]');
+    t.value = `${t.value.replace(/\s*$/, '')}${t.value.trim() ? '\n\n' : ''}## ${comodo}\n${MODELO_COMODOS[comodo].join('\n')}\n`;
+    t.focus();
+    t.scrollTop = t.scrollHeight;
+  },
+
+  copiarModeloVistoria() {
+    const sel = document.querySelector('select[name=copiar_de]');
+    const t = document.querySelector('textarea[name=modelo]');
+    const outro = buscar('imoveis', sel.value);
+    if (t.value.trim() && !confirm('Substituir o texto atual pelo modelo do outro imóvel?')) return;
+    t.value = outro.modelo_vistoria || '';
+  },
+
+  /** Contas pagas por nós: preenche cada valor vazio com o último lançado. */
+  repetirContas() {
+    const form = document.querySelector('form[data-form=lancarContas]');
+    form.querySelectorAll('input[name^=valor_]').forEach((el) => { if (!el.value && el.placeholder && el.placeholder !== '0,00') el.value = el.placeholder; });
   },
 
   async desmarcarDocumento({ contrato, campo }) {
@@ -2512,7 +2726,7 @@ export const ACOES = {
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
       if (tabela === 'imoveis') {
-        for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
+        for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') {
         for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));

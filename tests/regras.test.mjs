@@ -518,3 +518,20 @@ test('documentos de entrada: alerta só para inquilino novo, até marcar os trê
   assert.equal(R.alertaDocumentosEntrada(c), null);
   assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
 });
+
+test('contas pagas por nós abatem do resultado do imóvel', () => {
+  const { d, loja } = base();
+  const c = d.contratos[0];
+  assert.equal(R.contasPorNossaConta(d, loja.id, '2026-07-01').vago, false);
+  c.conta_agua = 'Incluso no aluguel';
+  assert.deepEqual(R.contasPorNossaConta(d, loja.id, '2026-07-01').inclusas, ['Água']);
+  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 0 }], 'julio'), /pelo menos uma/);
+  R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Condomínio', valor: 45000, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: 0 }], 'julio');
+  assert.equal(d.despesas.length, 2);
+  assert.equal(R.ultimosValores(d, loja.id)['Condomínio'].valor, 45000);
+  const r = R.resultadosFinanceiros(d, '2026-07-01', '2026-07-31').find((x) => x.imovel.id === loja.id);
+  assert.equal(r.contas, 53540);
+  assert.equal(r.resultado, r.receita - r.iptu - 53540);
+  const fora = R.resultadosFinanceiros(d, '2026-08-01', '2026-08-31').find((x) => x.imovel.id === loja.id);
+  assert.equal(fora.contas, 0, 'conta entra pela data do pagamento');
+});
