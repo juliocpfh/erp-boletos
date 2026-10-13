@@ -261,7 +261,7 @@ export const TELAS = {
         <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
         <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td></tr>`;
     }).join('');
-    return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
+    return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
       <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual (bonificado)</th></tr>
       ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
       ${linhas ? (() => {
@@ -1439,7 +1439,8 @@ function telaIptu(ano) {
   }).join('');
   const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
   const alertas = R.alertasIptu(d()).filter((a) => a.texto.includes(`IPTU ${ano}`));
-  return `<div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
+  return `<p class="suave"><a href="#/imoveis">← Imóveis</a></p>
+    <div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
     ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.imovel)}</b> ${esc(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join('')}
     <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela: prefeitura / inquilino</th><th>Por conta do proprietário</th><th></th></tr>${linhas}</table>
