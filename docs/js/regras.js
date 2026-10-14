@@ -1523,25 +1523,30 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
 }
 
 // --------------------------------------------------------------------------
-// Reajuste anual: corrigido no 13º mês cheio, com carta enviada junto do boleto anterior
+// Reajuste anual: corrigido no 13º mês, com carta enviada junto do boleto anterior
 // --------------------------------------------------------------------------
-/** Primeiro mês cheio do contrato: o mês da data-base se começou no dia 1º; senão, o mês seguinte. */
-export function primeiroMesCheio(c) {
+/**
+ * Mês de aniversário do contrato (1º mês): o mês em que o inquilino entrou (data-base), seja qual for o dia
+ * (dia 1º, 15 ou 30 contam igual). O reajuste vale no 13º mês: o aluguel do mesmo mês, um ano depois.
+ */
+export function mesDeAniversario(c) {
   const base = dataBaseCorrecao(c);
-  if (!base) return null;
-  return base.slice(8, 10) === '01' ? base.slice(0, 7) : C.somarMeses(base.slice(0, 7), 1);
+  return base ? base.slice(0, 7) : null;
 }
 
-/** Competência (aluguel de) do n-ésimo reajuste: o 13º mês cheio, o 25º... */
-export const competenciaDoReajuste = (c, n) => { const p = primeiroMesCheio(c); return p ? C.somarMeses(p, 12 * n) : null; };
+/** Competência (aluguel de) do n-ésimo reajuste: o 13º mês, o 25º... */
+export const competenciaDoReajuste = (c, n) => { const p = mesDeAniversario(c); return p ? C.somarMeses(p, 12 * n) : null; };
 
-/** Correção já registrada para o reajuste da competência (aceita registro até 3 meses antes). */
-const correcaoDoReajuste = (d, c, comp) => correcoesDo(d, c.id).find((x) => x.data_vigencia >= `${C.somarMeses(comp, -3)}-01` && x.data_vigencia <= `${comp}-31`) || null;
+/**
+ * Correção já registrada para o reajuste da competência: aceita registro de até 3 meses antes até 1 mês depois
+ * (contratos que entraram no meio do mês e foram corrigidos pela regra antiga, no mês seguinte).
+ */
+const correcaoDoReajuste = (d, c, comp) => correcoesDo(d, c.id).find((x) => x.data_vigencia >= `${C.somarMeses(comp, -3)}-01` && x.data_vigencia <= `${C.somarMeses(comp, 1)}-31`) || null;
 const cartaDoReajuste = (d, c, comp) => d.cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp) || null;
 
 /** Se a competência é a de um reajuste do contrato: { n, anos, competencia, corrigido, carta }. */
 export function reajusteNaCompetencia(d, c, comp) {
-  const p = primeiroMesCheio(c);
+  const p = mesDeAniversario(c);
   if (!p || c.prazo_tipo === 'Sem reajuste') return null;
   const meses = C.mesesEntre(p, comp);
   if (meses <= 0 || meses % 12 !== 0) return null;
@@ -1551,7 +1556,7 @@ export function reajusteNaCompetencia(d, c, comp) {
 
 /** Próximo reajuste a tratar: o último que já devia ter acontecido (ou acontece no mês seguinte) e não foi registrado. */
 export function reajustePendente(d, c, hoje = C.hojeIso()) {
-  const p = primeiroMesCheio(c);
+  const p = mesDeAniversario(c);
   if (!p) return null;
   const limite = C.somarMeses(C.competenciaDe(hoje), 1);
   const n = Math.floor(C.mesesEntre(p, limite) / 12);
@@ -1566,7 +1571,7 @@ function alertaReajuste(d, c, hoje) {
   if (!r) return null;
   const atrasado = r.competencia < C.competenciaDe(hoje);
   return { nivel: atrasado ? 'perigo' : 'aviso', tipo: 'Reajuste do aluguel',
-    texto: atrasado ? `O aluguel de ${C.compBr(r.competencia)} (${r.anos} ano(s), 13º mês cheio) já devia estar corrigido pelo ${c.indice_correcao || 'índice do contrato'}. Registre a correção.`
+    texto: atrasado ? `O aluguel de ${C.compBr(r.competencia)} (${r.anos} ano(s), 13º mês) já devia estar corrigido pelo ${c.indice_correcao || 'índice do contrato'}. Registre a correção.`
       : `O aluguel de ${C.compBr(r.competencia)} será corrigido pelo ${c.indice_correcao || 'índice do contrato'} (${r.anos} ano(s) de contrato). ${r.carta ? 'Carta enviada; falta aplicar a correção.' : `Envie a carta de reajuste junto com o boleto de ${C.compBr(C.somarMeses(r.competencia, -1))}.`}` };
 }
 
@@ -1607,7 +1612,7 @@ export function aplicarReajuste(d, contratoId, comp, usuario) {
   if (correcaoDoReajuste(d, c, comp)) throw new Error('Este reajuste já foi registrado.');
   return inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: `${comp}-01`, indice: r.escolhido.indice, indice_contrato: r.indiceContrato,
     data_indice: r.escolhido.registro.mes_ref, percentual: r.percentual, valor_anterior: r.atual, valor_novo: r.novo,
-    observacoes: `Reajuste do 13º mês cheio (${C.compBr(comp)})` }, usuario, `Reajuste ${C.compBr(comp)}: ${C.reais(r.atual)} → ${C.reais(r.novo)} (${r.escolhido.indice} ${C.pct(r.percentual)})`);
+    observacoes: `Reajuste do 13º mês (${C.compBr(comp)})` }, usuario, `Reajuste ${C.compBr(comp)}: ${C.reais(r.atual)} → ${C.reais(r.novo)} (${r.escolhido.indice} ${C.pct(r.percentual)})`);
 }
 
 /** Marca a carta de reajuste como enviada (ou desfaz). */
