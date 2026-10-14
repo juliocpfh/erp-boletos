@@ -682,3 +682,26 @@ test('ressarcimento de taxa do condomínio: abate no boleto do mês seguinte ao 
   assert.equal(R.alertaCondominio(c, '2026-11-03'), null);
   assert.equal(R.alertaCondominio({ ...c, conta_condominio: 'Não tem' }, '2026-11-03'), null);
 });
+
+test('reajuste: o mês de entrada conta como 1º mês, qualquer que seja o dia; o aluguel do 13º mês vem corrigido', () => {
+  for (const entrada of ['2025-01-01', '2025-01-15', '2025-01-30']) {
+    const d = R.bancoVazio();
+    const c = R.inserir(d, 'contratos', { inquilino_nome: 'X', data_entrada: entrada, vigencia_inicio: entrada, aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
+    assert.equal(R.mesDeAniversario(c), '2025-01', entrada);
+    assert.equal(R.competenciaDoReajuste(c, 1), '2026-01', entrada);
+    assert.equal(R.competenciaDoReajuste(c, 2), '2027-01');
+    assert.ok(R.reajusteNaCompetencia(d, c, '2026-01'));
+    assert.equal(R.reajusteNaCompetencia(d, c, '2026-02'), null);
+    // aviso em dezembro: a carta vai com o boleto de 12/2025; o boleto do aluguel de 01/2026 vence em 10/02/2026, já corrigido
+    assert.equal(R.reajustePendente(d, c, '2025-12-05').competencia, '2026-01');
+    assert.equal(R.reajustePendente(d, c, '2025-11-05'), null);
+  }
+});
+
+test('reajuste: correção feita pela regra antiga (mês seguinte) não vira reajuste atrasado', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'X', data_entrada: '2025-01-15', vigencia_inicio: '2025-01-15', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-02-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
+  assert.ok(R.reajusteNaCompetencia(d, c, '2026-01').corrigido);
+  assert.equal(R.reajustePendente(d, c, '2026-03-05'), null);
+});
