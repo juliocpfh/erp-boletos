@@ -56,6 +56,9 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .alerta.ok { border-color: var(--ok); background: #f0fdf4; }
 .alerta.erro { border-color: var(--perigo); background: #fef2f2; }
 .alerta b { margin-right: 6px; }
+.alerta.vigencia { border-left-width: 8px; border-color: #b91c1c; background: #fecaca; color: #7f1d1d; font-weight: 600; }
+.alerta.reajuste { border-left-width: 8px; border-color: #ea580c; background: #fed7aa; color: #7c2d12; font-weight: 600; }
+.alerta.vigencia a, .alerta.reajuste a { color: inherit; text-decoration: underline; }
 .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }

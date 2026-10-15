@@ -1186,8 +1186,12 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
       texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).` });
   }
-  return lista.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
+  return lista.sort((a, b) => prioridadeAlerta(a) - prioridadeAlerta(b) || ordem[a.nivel] - ordem[b.nivel]);
 }
+
+/** No topo dos alertas: primeiro a vigência do contrato, depois o reajuste do aluguel; o resto pela gravidade. */
+export const PRIORIDADE_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel'];
+const prioridadeAlerta = (a) => (a.tipo === 'Vigência do contrato' ? 0 : PRIORIDADE_ALERTA.includes(a.tipo) ? 1 : 2);
 
 // --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco
