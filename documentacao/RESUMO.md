@@ -61,6 +61,6 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 
 | Em andamento |
 |---|
-| Nenhum item em andamento encontrado no código (sem `TODO`/`FIXME`). Pendência: confirmar a data de término do contrato (ver `DECISOES.md`) |
+| Nenhum item em andamento encontrado no código (sem `TODO`/`FIXME`). Nenhuma pendência informada pelo usuário |
 
 Ver também: `documentacao/ARQUITETURA.md`, `documentacao/DECISOES.md`, `documentacao/GUIA_DE_MODIFICACAO.md`.
