@@ -26,8 +26,8 @@ Regra prática: `regras.js` e `calculos.js` rodam no Node (são os testados em `
 Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, `arquivos/<imóvel>/...`, `modelos/` (ver `README.md`).
 
 ## Modelo de dados
-- O banco é um objeto: `{ formato: 'imoveis-v1', revisao, seq, historico, listas, <tabela>: [ ... ] }`.
-- As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`…). `bancoVazio()` cria uma lista para cada uma.
+- O banco é um objeto: `{ formato: 'imoveis-v1', revisao, seq, historico, listas, estilos_alertas, <tabela>: [ ... ] }` (`estilos_alertas`: aparência escolhida para cada tipo de alerta).
+- As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`, `aditivos`…). `bancoVazio()` cria uma lista para cada uma.
 - `id` de cada registro vem de `d.seq[tabela]` (em `inserir`).
 - Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
 - `normalizar(d)` em `regras.js` migra bancos antigos ao abrir (campos renomeados, tabelas novas).
@@ -45,10 +45,10 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Ressarcimento de condomínio | `regras.js` → `competenciaDoAbatimento`, `aplicarRessarcimentos`, `condominioAConferir` |
 | Contas pagas por nós | `regras.js` → `contasPermitidas`, `lancarDespesas` |
 | Saída do inquilino | `regras.js` → `encerrarContrato`, `calcularEncerramento` |
-| Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas`, `eventosDoMes`; `alertas.js` |
+| Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas` (ordem por `estiloAlerta`), `salvarEstilosAlertas`, `eventosDoMes`; `alertas.js`; `telas.js` → `classeAlerta` |
 | Fechamento e resultados | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia` |
 | Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir` |
-| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx` |
+| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa` |
 
 ## Fluxo típico: confirmar um pagamento
 1. Tela `#/cobrancas` (`telas.js` → `telaCobrancas`) desenha o form `data-form="pagamento"`.
@@ -85,4 +85,4 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Reajuste (`mesDeAniversario`) | Regra de negócio definida pelo usuário (ver `documentacao/DECISOES.md`) |
 | `auth.js` e `backup-seguro.js` | Mudar parâmetros de cifragem/iterações invalida senhas e backups já gravados |
 | `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js`, `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs` |
-| Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes |
+| Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `contrato-de-locacao-assinado-2026-10-15.pdf` via `salvarAssinado`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes |

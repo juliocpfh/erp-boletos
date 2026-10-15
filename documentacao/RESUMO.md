@@ -40,7 +40,7 @@
 | Tarefa | Comando / passo |
 |---|---|
 | Rodar local | `cd docs && python3 -m http.server 8000` e abrir `http://localhost:8000/?teste` (pasta interna do navegador, sem escolher pasta) |
-| Conferir (sintaxe + testes) | `node tools/checar.mjs` (69 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
+| Conferir (sintaxe + testes) | `node tools/checar.mjs` (72 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
 | Achar código | `node tools/mapa.mjs <trecho>` (função → arquivo e linha) |
 | Versão sem internet | `node tools/checar.mjs --offline` (usa `tools/gerar-offline.mjs`) → `docs/offline/administracao-imoveis.html`; `tests/offline.test.mjs` falha se ela ficar desatualizada |
 | Publicar | Merge em `main`; o GitHub Pages serve a pasta `docs/` (segundo `README.md`). Configuração do Pages: NÃO CONFIRMADO no código |
@@ -54,9 +54,9 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 | Boletos mensais, baixa individual e em lote (por vencimento), recálculo pelo cadastro, boleto de controle (sem NF) |
 | NFs: numeração contínua, divisão entre empresas, cancelar, voltar numeração, NF externa, avulsa (Airbnb), PDF e Excel |
 | Reajuste anual (13º mês a partir do mês de entrada), índices acumulados, carta |
-| Contrato por modelo, vistoria por modelo do imóvel com fotos, recibo de chaves, documentos de entrada |
+| Contrato por modelo, vistoria por modelo do imóvel com fotos, recibo de chaves; documentos de entrada marcados como assinados só com o arquivo anexado; termos aditivos; herança dos documentos na continuação de contrato |
 | Resultados por imóvel (com contas pagas por nós e ressarcimentos de condomínio), Excel |
-| Calendário, fechamento do mês, cadastros incompletos, inadimplência, histórico de alterações |
+| Calendário (com atalho para o fechamento do mês), fechamento do mês, cadastros incompletos, inadimplência, histórico de alterações, alertas com cor/ênfase/prioridade editáveis |
 | Usuários e papéis, backup diário, ZIP, backup seguro cifrado, versão sem internet |
 
 | Em andamento |
