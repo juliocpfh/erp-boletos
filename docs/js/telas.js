@@ -824,9 +824,9 @@ function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
   };
 }
 
-/** Topo da página do inquilino novo: o que falta dos documentos de entrada, com os botões para gerar. */
+/** Topo da página do inquilino: o que falta dos documentos de entrada, com os botões para gerar. */
 function faixaDocumentosEntrada(c) {
-  if (!c.docs_entrada || !R.contratoAtivo(c)) return '';
+  if (!R.contratoAtivo(c)) return '';
   const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]);
   if (!falta.length) return '';
   const g = geradoresDocumentos(c, 'botao pequeno');
@@ -838,12 +838,16 @@ function caixaDocumentos(c) {
   const hoje = C.hojeIso();
   const vistorias = R.vistoriasDo(d(), c.id);
   const gerar = geradoresDocumentos(c);
+  const arq = (k) => c[R.campoArquivoDoc(k)];
   const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc(nome)}</b></td>
-    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'perigo' : 'neutra')}</td>
+    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', 'perigo')}</td>
     <td class="nw">${gerar[k]}</td>
-    <td class="n nw">${!opera() ? '' : c[k] ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente?`)
-    : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${hoje}" style="width:auto"><button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join('');
+    <td class="n nw">${c[k] ? `${arq(k) ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(arq(k))}">📎 ${esc(arq(k))}</a>` : '<span class="suave">sem arquivo</span>'}
+      ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ''}`
+    : !opera() ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${hoje}" style="width:auto">
+        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join('');
   return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Documentos de entrada e vistorias</h2>
       ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
     <div class="rolagem"><table>${linhas}</table></div>
@@ -852,8 +856,8 @@ function caixaDocumentos(c) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'vistorias', id: v.id }, 'perigo pequeno', `Excluir a vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')} de ${dataBr(v.data)}?`) : ''}</td></tr>`).join('')}</table>` : ''}
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
     : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
-    ${caixaArquivos('assinados', c.id, 'Documentos assinados (histórico)', 'assinados', 'Anexe aqui o contrato, a vistoria e o termo de entrega das chaves já assinados (PDF ou foto).', true)}
-    ${c.docs_entrada ? '' : '<p class="suave">Inquilino cadastrado antes deste controle: os documentos pendentes não geram alerta.</p>'}</div>`;
+    <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar".</p>
+    <details><summary>Todos os arquivos assinados guardados</summary>${caixaArquivos('assinados', c.id, 'Documentos assinados', 'assinados', '', true, false)}</details></div>`;
 }
 
 function telaContrato(c) {
@@ -1446,7 +1450,7 @@ function cadastrosIncompletos() {
     const falta = K.pendenciasDoContrato(d(), c).filter((t) => !t.endsWith('(em Empresas)'));
     if (!c.inquilino_telefone) falta.push('telefone');
     if (!c.inquilino_email) falta.push('e-mail');
-    if (c.docs_entrada) for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) if (!c[k]) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
+    for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) if (!c[k]) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
     if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
   }
   for (const i of d().imoveis) {
@@ -2658,7 +2662,15 @@ export const FORMULARIOS = {
   async marcarDocumento(form) {
     const f = Object.fromEntries(new FormData(form));
     if (!f.data) throw new Error('Informe a data.');
-    await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login()));
+    const doc = R.DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
+    const arquivo = form.querySelector('[name=arquivo]').files[0];
+    if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
+    // nome padronizado, sem acento: ex. contrato-de-locacao-assinado-2026-10-15.pdf
+    const ponto = arquivo.name.lastIndexOf('.');
+    const ext = ponto > 0 ? arquivo.name.slice(ponto).toLowerCase() : '';
+    const base = `${doc[1]} ${doc[2]} ${f.data}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const nome = await S.salvarArquivo(await pastaDoEscopo('assinados', Number(f.contrato)), new File([arquivo], `${base}${ext}`));
+    await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
     await mostrar();
   },
 

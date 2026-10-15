@@ -422,6 +422,11 @@ document.addEventListener('change', async (ev) => {
     ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
     return;
   }
+  if (ev.target.matches('input[data-arquivo-doc]')) {
+    const nome = ev.target.closest('label').querySelector('[data-nome-escolhido]');
+    nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
+    return;
+  }
   const el = ev.target.closest('input[data-upload]');
   if (!el || !el.files.length) return;
   try {

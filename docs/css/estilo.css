@@ -117,6 +117,7 @@ textarea { min-height: 80px; }
 .maior { font-size: 18px; font-weight: 700; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
 label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.acoes label.enviar { margin-top: 0; }
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }

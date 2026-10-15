@@ -507,16 +507,21 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
   assert.equal(R.parcelasIptu(d, p)[0].mesBoleto, '2026-07');
 });
 
-test('documentos de entrada: alerta só para inquilino novo, até marcar os três', () => {
+test('documentos de entrada: alerta para todo inquilino ativo, até marcar os três com o arquivo assinado', () => {
   const { d, c } = base();
-  assert.equal(R.alertaDocumentosEntrada(c), null, 'inquilino antigo não gera alerta');
-  c.docs_entrada = true;
-  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/);
-  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio');
-  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio');
+  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/, 'inquilino antigo também gera alerta');
+  assert.throws(() => R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio'), /Anexe o arquivo do contrato de locação assinado/);
+  assert.throws(() => R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio'), /Anexe o arquivo da vistoria de entrada assinada/);
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio', 'contrato-assinado.pdf');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio', 'vistoria-assinada.pdf');
+  assert.equal(c.doc_contrato_arquivo, 'contrato-assinado.pdf');
   assert.match(R.alertaDocumentosEntrada(c).texto, /^falta recibo de entrega das chaves/);
-  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio', 'chaves.jpg');
   assert.equal(R.alertaDocumentosEntrada(c), null);
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
+  assert.equal(c.doc_chaves_arquivo, null, 'desfazer limpa o arquivo');
+  c.data_saida = '2026-09-30';
+  assert.equal(R.alertaDocumentosEntrada(c), null, 'quem saiu não gera alerta');
   assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
 });
 

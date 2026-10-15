@@ -1111,18 +1111,23 @@ export const DOCUMENTOS_ENTRADA = [
   ['doc_chaves_em', 'Recibo de entrega das chaves', 'assinado'],
 ];
 
-/** Inquilino novo (cadastrado a partir desta versão): avisa enquanto faltar algum dos três documentos. */
+/** Arquivo assinado de cada documento: doc_contrato_em → doc_contrato_arquivo. */
+export const campoArquivoDoc = (campo) => campo.replace(/_em$/, '_arquivo');
+
+/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados. */
 export function alertaDocumentosEntrada(c) {
-  if (!c.docs_entrada || c.ativo === false || c.data_saida) return null;
+  if (c.ativo === false || c.data_saida) return null;
   const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
 }
 
-export function marcarDocumento(d, contratoId, campo, data, usuario) {
+/** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
+export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null) {
   const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
   if (!doc) throw new Error('Documento desconhecido.');
+  if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
   const c = buscar(d, 'contratos', contratoId);
-  atualizar(d, 'contratos', c.id, { [campo]: data || null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
 }
 
 const porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
