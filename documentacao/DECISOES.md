@@ -1,0 +1,28 @@
+# Decisões
+
+Fonte: mensagens de commit (`git log`), o código atual e respostas do usuário (marcadas "usuário", em 2026-10-15). Datas = data do commit.
+Quando o motivo ou a alternativa não foi registrado, aparece NÃO CONFIRMADO. Não mude estas regras sem pedido explícito do usuário.
+
+| Data | Decisão | Motivo | Alternativas descartadas |
+|---|---|---|---|
+| 2026-10-09 | Trocar o programa local (Flask + SQLite) por site estático que grava numa pasta do computador | "sem instalação" e dados na pasta escolhida (ex.: OneDrive), segundo o commit | Flask + SQLite local (versão anterior) |
+| 2026-10-09 | Banco num único JSON (`imoveis-dados.json`) com backup diário e ZIP | Sugerido pelo Claude e aceito pelo usuário: sem servidor, funciona na pasta do OneDrive | Flask + SQLite (versão anterior); banco na nuvem (exigiria servidor/serviço externo) |
+| 2026-10-09 | Numeração contínua das NFs pela data em que o dinheiro entrou | Exigência do contador (usuário) | NÃO CONFIRMADO |
+| 2026-10-09 | Juros ao dia truncados "como no banco" (`calculos.js` → `jurosAoDia`) | Seguir a regra do banco, que trunca os juros ao dia (commit e usuário) | Arredondar (daria centavos diferentes do banco) |
+| 2026-10-09 | Senhas com PBKDF2-SHA256 e sal (`auth.js`) | Comentário no código: a senha nunca é gravada | Não avaliadas (detalhe técnico) |
+| 2026-10-09 | Seguro obrigatório pertence ao imóvel, não ao inquilino | Seguro obrigatório por lei, ligado ao imóvel (usuário) | Seguro no inquilino (migrado ao abrir os dados) |
+| 2026-10-13 | Multa e juros cobrados pelo banco no próprio boleto; NF do pagamento atrasado inclui multa e juros; "data contábil" separada da data em que pagou | Como o banco cobra (commit) | Levar multa e juros para o boleto seguinte (removido no mesmo commit) |
+| 2026-10-13 | "Voltar a última numeração" em vez de apagar NFs | Reposicionar a numeração quando se encontra erro em NF e reemitir com os mesmos números (commit e usuário) | Apagar NFs (deixaria buracos na numeração) |
+| 2026-10-13 | Bibliotecas copiadas em `docs/vendor/` e versão offline em arquivo único com teste de hash | Funcionar sem internet e sem o GitHub (commit) | Carregar do jsDelivr (versão anterior) |
+| 2026-10-13 | IPTU cobrado do inquilino a partir do "mês de vencimento do 1º boleto", sempre pelo valor parcelado | Commit: o vencimento na prefeitura muda conforme a entrega do carnê | Cobrar pelo vencimento da guia; usar valor à vista (ambos descartados nos commits do dia) |
+| 2026-10-13 | Boleto de controle (inquilino sem NF) fora das somas e dos resultados | São imóveis de outra propriedade, que não entram nas empresas (usuário) | NÃO CONFIRMADO |
+| 2026-10-13 | Contrato: término no mesmo dia X meses depois (`calculos.js` → `fimDoPrazo`) | EM DÚVIDA (2026-10-15): o usuário disse que começar e terminar "no mesmo dia" é erro e não deve ser permitido; falta confirmar com exemplo se o término deve ser na véspera (ex.: 15/03/2026 + 12 meses = 14/03/2027) antes de mudar | Término na véspera (aceito na leitura por `mesesDoPrazo`) |
+| 2026-10-13 | Contratos gerados por modelos editáveis com linguagem própria (`contratos.js` → `montarContrato`) | Facilitar o uso e a geração de contratos (usuário) | NÃO CONFIRMADO |
+| 2026-10-13 | Backup seguro: segunda pasta só no computador do administrador, cifrada; restauração só com a senha | Garantir o banco de dados sem perder histórico (usuário) | NÃO CONFIRMADO |
+| 2026-10-13 | Contas pagas por nós só nos meses de imóvel vago, até 2 meses depois de alugar, ou quando o contrato diz "Incluso no aluguel" (`contasPermitidas`) | Há locações de vários tipos, com padrões diferentes de quem paga as contas (usuário) | NÃO CONFIRMADO |
+| 2026-10-13 | CPF/CNPJ conferidos pelos dígitos; documento antigo que não mudou não barra a edição (`formularios.js` → `ler`) | Comentário no código. Conferência só auxiliar: se falhar, não é grave (usuário) | Não conferir |
+| 2026-10-13 | Reserva começa exatamente no aluguel marcado e só segue se sobrar; recálculo libera a reserva dos boletos refeitos | Corrigir reserva usada no mês errado (commit) | Usar em qualquer boleto a partir do mês marcado (regra anterior) |
+| 2026-10-13 | Baixa em lote separada por vencimento | Agilidade sem marcar boleto errado (usuário) | Baixa em lote de qualquer seleção (versão anterior) |
+| 2026-10-13 | Guias do IPTU em pastas por ano, com histórico | As guias são lançadas anualmente (usuário) | Uma pasta única de guias (versão anterior) |
+| 2026-10-13 | Ressarcimento de taxa extraordinária do condomínio abatido no boleto seguinte; padrão: NF com aluguel cheio e ressarcimento como gasto; opção de abater da NF em Empresas | Lei 8.245/91, art. 22, X, citada no código | Abater da NF por padrão (deixado como opção, desligada) |
+| 2026-10-14 | Reajuste: o mês de entrada conta como 1º mês, qualquer que seja o dia; o aluguel do 13º mês vem corrigido (`mesDeAniversario`) | Mudança da regra de negócio (commit) | "13º mês cheio": entrada fora do dia 1º contava a partir do mês seguinte (regra anterior, de 2026-10-13) |

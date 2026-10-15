@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node tools/mapa.mjs:*)",
+      "Bash(node tools/checar.mjs:*)",
+      "Bash(node tools/gerar-offline.mjs)",
+      "Bash(node --test:*)",
+      "Bash(npx -y esbuild@0.24.0:*)",
+      "Bash(python3 -m http.server:*)"
+    ]
+  }
+}
