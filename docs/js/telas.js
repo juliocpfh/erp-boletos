@@ -81,12 +81,16 @@ export function nomePastaContrato(c) {
 /** Guias do IPTU por ano: o id junta imóvel e ano (imóvel 5, 2026 → 52026), numa subpasta do ano. */
 const idGuiasDoAno = (imovelId, ano) => imovelId * 10000 + ano;
 function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(id / 10000) : id; }
+/** Documentos de entrada assinados: subpasta dentro da pasta do inquilino. */
+const SUB_ASSINADOS = 'Documentos assinados';
+const escopoDoContrato = (escopo) => escopo === 'contrato' || escopo === 'assinados';
+const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
 async function pastaDoEscopo(escopo, id) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
-  if (escopo === 'contrato') {
+  if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c)]);
+    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : [])]);
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)]);
@@ -114,6 +118,10 @@ async function guardarGuiasSoltas(imovelId, anoNovo) {
   }
   return arquivos.length;
 }
+
+/** Vigência do contrato e reajuste do aluguel ganham cores mais fortes (a vigência é a mais urgente). */
+const DESTAQUE_ALERTA = { 'Vigência do contrato': 'vigencia', 'Reajuste do aluguel': 'reajuste', 'Correção do aluguel': 'reajuste', 'A verificar': 'amarelo' };
+const classeAlerta = (a) => `alerta ${a.nivel} ${DESTAQUE_ALERTA[a.tipo] || ''}`;
 
 function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
@@ -427,7 +435,7 @@ export const TELAS = {
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
       <div class="cartao"><h2>Alertas</h2>
-        ${alertas.map((a) => `<div class="alerta ${a.nivel} ${a.tipo === 'A verificar' ? 'amarelo' : ''}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
         ${tabelaHistorico(ultimos(() => true, 12))}
@@ -831,7 +839,7 @@ function caixaDocumentos(c) {
   const vistorias = R.vistoriasDo(d(), c.id);
   const gerar = geradoresDocumentos(c);
   const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc(nome)}</b></td>
-    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'aviso' : 'neutra')}</td>
+    <td>${c[k] ? etiqueta(`${feito} em ${dataBr(c[k])}`, 'ok') : etiqueta('pendente', c.docs_entrada ? 'perigo' : 'neutra')}</td>
     <td class="nw">${gerar[k]}</td>
     <td class="n nw">${!opera() ? '' : c[k] ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente?`)
     : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
@@ -844,6 +852,7 @@ function caixaDocumentos(c) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'vistorias', id: v.id }, 'perigo pequeno', `Excluir a vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')} de ${dataBr(v.data)}?`) : ''}</td></tr>`).join('')}</table>` : ''}
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
     : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
+    ${caixaArquivos('assinados', c.id, 'Documentos assinados (histórico)', 'assinados', 'Anexe aqui o contrato, a vistoria e o termo de entrega das chaves já assinados (PDF ou foto).', true)}
     ${c.docs_entrada ? '' : '<p class="suave">Inquilino cadastrado antes deste controle: os documentos pendentes não geram alerta.</p>'}</div>`;
 }
 
@@ -878,7 +887,7 @@ function telaContrato(c) {
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
-    ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
+    ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
     <div class="cartao"><h2>Identificação e contato</h2><div class="grade">
       ${item('Telefone', `${esc(c.inquilino_telefone || '-')}${c.inquilino_whatsapp && tel ? ` <a class="etiqueta ok" target="_blank" rel="noopener" href="https://wa.me/${tel.length <= 11 ? `55${tel}` : tel}">WhatsApp</a>` : ''}`)}
       ${item('E-mail', c.inquilino_email ? `<a href="mailto:${esc(c.inquilino_email)}">${esc(c.inquilino_email)}</a>` : '-')}
@@ -1437,7 +1446,7 @@ function cadastrosIncompletos() {
     const falta = K.pendenciasDoContrato(d(), c).filter((t) => !t.endsWith('(em Empresas)'));
     if (!c.inquilino_telefone) falta.push('telefone');
     if (!c.inquilino_email) falta.push('e-mail');
-    if (c.docs_entrada) for (const [k, nome] of R.DOCUMENTOS_ENTRADA) if (!c[k]) falta.push(`${nome.toLocaleLowerCase('pt-BR')} (não marcado como assinado)`);
+    if (c.docs_entrada) for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) if (!c[k]) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
     if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
   }
   for (const i of d().imoveis) {
@@ -1464,7 +1473,7 @@ function telaPendencias() {
   return `<p class="suave"><a href="#/">← Painel</a></p><h1>Cadastros incompletos</h1>
     <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
     ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === 'Imóvel' ? 'Imóveis' : t === 'Empresa' ? 'Empresas' : 'Inquilinos'} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
-      ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ''}</td><td>${x.falta.map((f) => etiqueta(f, 'aviso')).join(' ')}</td>
+      ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ''}</td><td>${x.falta.map((f) => (typeof f === 'string' ? etiqueta(f, 'aviso') : etiqueta(f.texto, f.nivel))).join(' ')}</td>
         <td class="n nw">${opera() || (t === 'Empresa' && podeUsuario('admin')) ? link(x.editar, 'Completar', 'botao pequeno') : ''}</td></tr>`).join('')}</table></div></div>`).join('')
     || '<div class="alerta ok">Todos os cadastros estão completos.</div>'}`;
 }
@@ -3560,7 +3569,7 @@ export const ACOES = {
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
     for (const f of el.files) nomes.push(await S.salvarArquivo(dir, f));
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
+    const vinc = vinculoDoEscopo(escopo, id);
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
     await mostrar();
@@ -3579,7 +3588,7 @@ export const ACOES = {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const dir = await pastaDoEscopo(escopo, Number(id));
     await dir.removeEntry(nome);
-    const vinc = escopo === 'contrato' ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
+    const vinc = vinculoDoEscopo(escopo, id);
     await alterar((db) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `Arquivo excluído: ${nome}`, null, vinc));
     await mostrar();
   },
