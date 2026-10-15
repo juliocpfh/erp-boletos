@@ -260,7 +260,21 @@ function procurarPessoa(el) {
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
 }
 
+/** Inquilino novo que continua o contrato de outro (troca de titular): as condições do contrato anterior entram no formulário. */
+function ligarContinuacaoDeContrato(raiz) {
+  const sel = raiz.querySelector('form[data-form=cadastro] select[name=contrato_anterior_id]');
+  if (!sel || !/^#\/novo\/contratos/.test(location.hash)) return;
+  sel.addEventListener('change', () => {
+    const anterior = sel.value && buscar('contratos', sel.value);
+    if (!anterior) return mensagemAuto(sel, '');
+    const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
+    const feitos = preencherVazios(sel.form, F.paraFormulario(campos, R.condicoesDoContrato(d(), anterior)), F.paraFormulario(campos, null));
+    mensagemAuto(sel, feitos.length ? `Continuação do contrato de ${esc(anterior.inquilino_nome)}: ${esc(feitos.join(', '))} vieram do contrato anterior. Confira os valores.` : '');
+  });
+}
+
 function ligarCamposAutomaticos(raiz) {
+  ligarContinuacaoDeContrato(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
     el.addEventListener('input', () => {
       const novo = F.mascarar(el.dataset.mascara, el.value);
@@ -1050,13 +1064,15 @@ const CADASTROS = {
           : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis, ...(r ? {} : { ajuda: 'Escolha o imóvel deste inquilino. Em branco: sem imóvel (não gera boleto)' }) } : c)));
     },
     // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
-    padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
+    // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
+    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
     conferir: conferirContrato,
-    aviso: (r) => (r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : ''),
+    aviso: (r, q) => (!r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
+      : r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : ''),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
@@ -1292,23 +1308,18 @@ const CADASTROS = {
       return F.VINCULO.map((c) => (c.nome === 'contrato_id' ? { ...c, opcoes: ops } : c));
     },
     padrao: (q) => { const c = q.contrato ? buscar('contratos', q.contrato) : null; return { contrato_id: c ? c.id : null, data_entrada: (c && !c.imovel_id && c.data_entrada) || C.hojeIso() }; },
-    aviso: () => 'Escolha o inquilino. Se ele já aluga outro imóvel, é criado um contrato novo para este imóvel com os dados dele: depois confira os valores.',
+    aviso: () => 'Escolha o inquilino. Se ele já aluga outro imóvel, abre o cadastro de um contrato novo para este imóvel com os dados da pessoa; as condições do contrato são escolhidas de novo.',
     extraHtml: (r, q) => `<p class="suave" style="margin-top:12px">O inquilino não está na lista? ${link(`#/novo/contratos?vincular=${q.imovel}`, 'Cadastrar novo inquilino')}</p>`,
     voltar: (r, q) => `#/imovel/${q.imovel}`,
     salvar(db, dados, q) {
       antesDoVinculo = { ...R.buscar(db, 'contratos', dados.contrato_id) };
+      if (antesDoVinculo.imovel_id) return R.buscar(db, 'contratos', dados.contrato_id); // nada muda: vai para o contrato novo
       const c = R.vincularInquilino(db, Number(q.imovel), dados, login());
       if (c.pasta !== nomePastaContrato(c)) R.atualizar(db, 'contratos', c.id, { pasta: nomePastaContrato(c) }, login(), 'Pasta de arquivos');
       return c;
     },
-    depois: (salvo) => (antesDoVinculo && antesDoVinculo.id === salvo.id ? CADASTROS.contratos.depois(salvo, antesDoVinculo) : null),
-    destino: (salvo) => {
-      if (antesDoVinculo && antesDoVinculo.id !== salvo.id) {
-        aviso('Contrato novo criado para este imóvel com os dados do inquilino. Confira aluguel, datas e garantia e salve.', 'aviso');
-        return `#/editar/contratos/${salvo.id}`;
-      }
-      return `#/contrato/${salvo.id}`;
-    },
+    depois: (salvo) => (antesDoVinculo && !antesDoVinculo.imovel_id ? CADASTROS.contratos.depois(salvo, antesDoVinculo) : null),
+    destino: (salvo, q) => (antesDoVinculo && antesDoVinculo.imovel_id ? `#/novo/contratos?vincular=${q.imovel}&pessoa=${salvo.id}` : `#/contrato/${salvo.id}`),
   },
   leituras: {
     titulo: (r, q) => `Leitura dos relógios - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,

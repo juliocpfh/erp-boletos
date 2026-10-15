@@ -414,16 +414,19 @@ test('listas editáveis: inclui, não remove o que está em uso e avisa onde', (
   assert.throws(() => R.removerDaLista(d, 'indices', 'IGP-M/IPCA (o maior)', 'julio'), /Maria Exemplo/);
 });
 
-test('mesmo inquilino em dois imóveis: contrato novo com os dados da pessoa', () => {
+test('mesmo inquilino em dois imóveis: contrato novo só com os dados da pessoa; continuação traz as condições', () => {
   const { d, c } = base();
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 2', endereco: 'Rua B' }, 'julio');
   Object.assign(c, { prazo_tipo: 'Determinado', prazo_meses: 30 });
-  const novo = R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01', leitura_agua: '10' }, 'julio');
-  assert.notEqual(novo.id, c.id);
-  assert.deepEqual([novo.imovel_id, novo.inquilino_cpf, novo.aluguel_inicial, novo.vigencia_fim], [casa.id, c.inquilino_cpf, 135000, '2029-03-01']);
-  assert.equal(R.buscar(d, 'contratos', c.id).imovel_id, 1);
+  assert.throws(() => R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01' }, 'julio'), /contrato novo/);
+  const pessoa = R.dadosDaPessoa(c);
+  assert.equal(pessoa.inquilino_cpf, c.inquilino_cpf);
+  for (const k of ['aluguel_inicial', 'prazo_meses', 'dia_vencimento', 'indice_correcao', 'garantia_tipo']) assert.equal(pessoa[k], undefined, `${k} não vem`);
+  const novo = R.inserir(d, 'contratos', { ...pessoa, imovel_id: casa.id, data_entrada: '2026-09-01', aluguel_inicial: 200000, dia_vencimento: 5 }, 'julio');
   assert.deepEqual(R.outrosContratosDaPessoa(d, novo, '2026-09-10').map((x) => x.id), [c.id]);
-  assert.equal(d.leituras.at(-1).contrato_id, novo.id);
+  c.conta_agua = 'Incluso no aluguel';
+  const cond = R.condicoesDoContrato(d, c);
+  assert.deepEqual([cond.conta_agua, cond.prazo_meses, cond.aluguel_inicial, cond.inquilino_nome], ['Incluso no aluguel', 30, R.aluguelAtual(d, c), undefined]);
 });
 
 test('saída lembra a titularidade até registrar a volta para o proprietário', () => {

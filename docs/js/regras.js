@@ -957,6 +957,20 @@ const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', '
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
   'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade'];
 
+/** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
+export const dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) => c[k] !== undefined && c[k] !== null).map((k) => [k, c[k]]));
+
+/**
+ * Condições do contrato anterior, para quem continua o contrato dele (ex.: troca de titular): prazo, índice, vencimento,
+ * bonificação, multa e juros, contas, garantia e finalidade. O aluguel é o atual do anterior.
+ */
+export function condicoesDoContrato(d, anterior) {
+  const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
+  const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
+  out.aluguel_inicial = aluguelAtual(d, anterior);
+  return out;
+}
+
 /** Último inquilino do imóvel (pela data de entrada). */
 export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
   .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
@@ -980,14 +994,9 @@ export function vincularInquilino(d, imovelId, dados, usuario) {
   const i = buscar(d, 'imoveis', imovelId);
   if (c.imovel_id === i.id) throw new Error('Este inquilino já está vinculado a este imóvel.');
   const leitura = separarLeitura(dados);
-  if (c.imovel_id) {
-    const novo = Object.fromEntries([...CAMPOS_PESSOA, ...CAMPOS_CONDICOES].filter((k) => c[k] !== undefined).map((k) => [k, c[k]]));
-    Object.assign(novo, { imovel_id: i.id, data_entrada: dados.data_entrada, vigencia_inicio: dados.data_entrada, ativo: true, docs_entrada: true });
-    if (novo.prazo_tipo !== 'Indeterminado' && novo.prazo_meses > 0) novo.vigencia_fim = C.fimDoPrazo(dados.data_entrada, novo.prazo_meses);
-    c = inserir(d, 'contratos', novo, usuario, `${c.inquilino_nome}: novo contrato no imóvel ${i.nome} (também aluga outro imóvel)`);
-  } else {
-    atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
-  }
+  // quem já aluga outro imóvel precisa de um contrato novo, com condições próprias: é feito pelo cadastro do inquilino
+  if (c.imovel_id) throw new Error(`${c.inquilino_nome} já aluga outro imóvel: cadastre um contrato novo para este imóvel (os dados da pessoa vêm preenchidos).`);
+  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
   if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
   return c;
 }
