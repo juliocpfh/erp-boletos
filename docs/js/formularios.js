@@ -275,8 +275,6 @@ export const CONTRATO = [
   campo('carencia_cobrar_taxa', 'Na carência, cobrar a tarifa do boleto', 'simnao'),
   secao('Vistoria de entrada'),
   campo('vistoria_link', 'Link da pasta de fotos da vistoria de entrada', 'url', { largo: true, ajuda: 'Cole o link da pasta na nuvem (OneDrive, Google Drive) onde está o .rar das fotos' }),
-  secao('Termo aditivo'),
-  campo('possui_aditivos', 'O contrato possui termo aditivo', 'simnao', { ajuda: 'Marcado sozinho quando muda o vencimento ou a garantia. Anexe o termo em "Arquivos do inquilino"' }),
   secao('Observações'),
   campo('verificar', 'Pontos a verificar (aparece em amarelo)', 'area'),
   campo('observacoes', 'Observações', 'area'),

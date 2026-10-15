@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -1128,6 +1128,22 @@ export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = n
   if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
   const c = buscar(d, 'contratos', contratoId);
   atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+/** Termos aditivos do contrato (posteriores a ele), do mais recente ao mais antigo. */
+export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId)
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+
+/** Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo". */
+export function registrarAditivo(d, contratoId, { data, assunto, arquivo }, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!data) throw new Error('Informe a data do termo aditivo.');
+  if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+  if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo }, usuario,
+    `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}`);
+  if (!c.possui_aditivos) atualizar(d, 'contratos', c.id, { possui_aditivos: true }, usuario, `${c.inquilino_nome}: possui termo aditivo`);
+  return a;
 }
 
 const porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;

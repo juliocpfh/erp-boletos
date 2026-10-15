@@ -710,3 +710,13 @@ test('reajuste: correção feita pela regra antiga (mês seguinte) não vira rea
   assert.ok(R.reajusteNaCompetencia(d, c, '2026-01').corrigido);
   assert.equal(R.reajustePendente(d, c, '2026-03-05'), null);
 });
+
+test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui termo aditivo"', () => {
+  const { d, c } = base();
+  assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento' }, 'julio'), /Anexe o arquivo/);
+  assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: ' ', arquivo: 'a.pdf' }, 'julio'), /assunto/);
+  R.registrarAditivo(d, c.id, { data: '2026-09-01', assunto: 'Troca da garantia', arquivo: 'a.pdf' }, 'julio');
+  R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento', arquivo: 'b.pdf' }, 'julio');
+  assert.equal(c.possui_aditivos, true);
+  assert.deepEqual(R.aditivosDo(d, c.id).map((a) => a.arquivo), ['b.pdf', 'a.pdf']);
+});
