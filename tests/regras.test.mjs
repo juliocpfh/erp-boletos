@@ -414,16 +414,19 @@ test('listas editáveis: inclui, não remove o que está em uso e avisa onde', (
   assert.throws(() => R.removerDaLista(d, 'indices', 'IGP-M/IPCA (o maior)', 'julio'), /Maria Exemplo/);
 });
 
-test('mesmo inquilino em dois imóveis: contrato novo com os dados da pessoa', () => {
+test('mesmo inquilino em dois imóveis: contrato novo só com os dados da pessoa; continuação traz as condições', () => {
   const { d, c } = base();
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 2', endereco: 'Rua B' }, 'julio');
   Object.assign(c, { prazo_tipo: 'Determinado', prazo_meses: 30 });
-  const novo = R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01', leitura_agua: '10' }, 'julio');
-  assert.notEqual(novo.id, c.id);
-  assert.deepEqual([novo.imovel_id, novo.inquilino_cpf, novo.aluguel_inicial, novo.vigencia_fim], [casa.id, c.inquilino_cpf, 135000, '2029-03-01']);
-  assert.equal(R.buscar(d, 'contratos', c.id).imovel_id, 1);
+  assert.throws(() => R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01' }, 'julio'), /contrato novo/);
+  const pessoa = R.dadosDaPessoa(c);
+  assert.equal(pessoa.inquilino_cpf, c.inquilino_cpf);
+  for (const k of ['aluguel_inicial', 'prazo_meses', 'dia_vencimento', 'indice_correcao', 'garantia_tipo']) assert.equal(pessoa[k], undefined, `${k} não vem`);
+  const novo = R.inserir(d, 'contratos', { ...pessoa, imovel_id: casa.id, data_entrada: '2026-09-01', aluguel_inicial: 200000, dia_vencimento: 5 }, 'julio');
   assert.deepEqual(R.outrosContratosDaPessoa(d, novo, '2026-09-10').map((x) => x.id), [c.id]);
-  assert.equal(d.leituras.at(-1).contrato_id, novo.id);
+  c.conta_agua = 'Incluso no aluguel';
+  const cond = R.condicoesDoContrato(d, c);
+  assert.deepEqual([cond.conta_agua, cond.prazo_meses, cond.aluguel_inicial, cond.inquilino_nome], ['Incluso no aluguel', 30, R.aluguelAtual(d, c), undefined]);
 });
 
 test('saída lembra a titularidade até registrar a volta para o proprietário', () => {
@@ -507,16 +510,21 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
   assert.equal(R.parcelasIptu(d, p)[0].mesBoleto, '2026-07');
 });
 
-test('documentos de entrada: alerta só para inquilino novo, até marcar os três', () => {
+test('documentos de entrada: alerta para todo inquilino ativo, até marcar os três com o arquivo assinado', () => {
   const { d, c } = base();
-  assert.equal(R.alertaDocumentosEntrada(c), null, 'inquilino antigo não gera alerta');
-  c.docs_entrada = true;
-  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/);
-  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio');
-  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio');
+  assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/, 'inquilino antigo também gera alerta');
+  assert.throws(() => R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio'), /Anexe o arquivo do contrato de locação assinado/);
+  assert.throws(() => R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio'), /Anexe o arquivo da vistoria de entrada assinada/);
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio', 'contrato-assinado.pdf');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio', 'vistoria-assinada.pdf');
+  assert.equal(c.doc_contrato_arquivo, 'contrato-assinado.pdf');
   assert.match(R.alertaDocumentosEntrada(c).texto, /^falta recibo de entrega das chaves/);
-  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-09-05', 'julio', 'chaves.jpg');
   assert.equal(R.alertaDocumentosEntrada(c), null);
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
+  assert.equal(c.doc_chaves_arquivo, null, 'desfazer limpa o arquivo');
+  c.data_saida = '2026-09-30';
+  assert.equal(R.alertaDocumentosEntrada(c), null, 'quem saiu não gera alerta');
   assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
 });
 
@@ -572,11 +580,6 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
   const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').find((e) => e.tipo === 'Fechamento');
   assert.equal(ev.data, '2026-08-31');
-  c.conta_agua = 'Incluso no aluguel';
-  const cond = R.condicoesDoAnterior(d, c);
-  assert.equal(cond.conta_agua, 'Incluso no aluguel');
-  assert.equal(cond.aluguel_inicial, R.aluguelAtual(d, c));
-  assert.equal(cond.inquilino_nome, undefined, 'a pessoa não é copiada');
   assert.equal(R.ultimoContratoDoImovel(d, loja.id).id, c.id);
 });
 
@@ -704,4 +707,47 @@ test('reajuste: correção feita pela regra antiga (mês seguinte) não vira rea
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-02-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
   assert.ok(R.reajusteNaCompetencia(d, c, '2026-01').corrigido);
   assert.equal(R.reajustePendente(d, c, '2026-03-05'), null);
+});
+
+test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui termo aditivo"', () => {
+  const { d, c } = base();
+  assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento' }, 'julio'), /Anexe o arquivo/);
+  assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: ' ', arquivo: 'a.pdf' }, 'julio'), /assunto/);
+  R.registrarAditivo(d, c.id, { data: '2026-09-01', assunto: 'Troca da garantia', arquivo: 'a.pdf' }, 'julio');
+  R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento', arquivo: 'b.pdf' }, 'julio');
+  assert.equal(c.possui_aditivos, true);
+  assert.deepEqual(R.aditivosDo(d, c.id).map((a) => a.arquivo), ['b.pdf', 'a.pdf']);
+});
+
+test('documentos de entrada: quem continua o contrato de outro herda os documentos assinados e vê os aditivos anteriores', () => {
+  const { d, c } = base();
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2025-01-10', 'julio', 'contrato.pdf');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2025-01-10', 'julio', 'vistoria.pdf');
+  R.registrarAditivo(d, c.id, { data: '2025-06-01', assunto: 'Troca do vencimento', arquivo: 'ad1.pdf' }, 'julio');
+  R.registrarAditivo(d, c.id, { data: '2025-09-01', assunto: 'Troca da garantia', arquivo: 'ad2.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id,
+    doc_contrato_em: null, doc_contrato_arquivo: null, doc_vistoria_em: null, doc_vistoria_arquivo: null, doc_chaves_em: null }, 'julio');
+  const h = R.documentoEntrada(d, novo, 'doc_contrato_em');
+  assert.equal(h.contrato.id, c.id);
+  assert.equal(h.arquivo, 'contrato.pdf');
+  assert.match(R.alertaDocumentosEntrada(novo, d).texto, /^falta recibo de entrega das chaves\.$/, 'só falta o que o anterior também não tinha');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2025-01-11', 'julio', 'chaves.pdf');
+  assert.equal(R.documentoEntrada(d, novo, 'doc_chaves_em').arquivo, 'chaves.pdf', 'o recibo das chaves também é herdado');
+  assert.equal(R.alertaDocumentosEntrada(novo, d), null);
+  R.marcarDocumento(d, novo.id, 'doc_vistoria_em', '2026-10-15', 'julio', 'vistoria-nova.pdf');
+  assert.equal(R.documentoEntrada(d, novo, 'doc_vistoria_em').contrato.id, novo.id, 'o documento próprio vale mais que o herdado');
+  assert.equal(R.aditivosDo(d, R.cadeiaDeContratos(d, novo).antes[0].id).length, 2, 'mais de um aditivo no histórico');
+});
+
+test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pela prioridade', () => {
+  const { d } = base();
+  assert.deepEqual(R.estiloAlerta(d, 'Vigência do contrato'), { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 });
+  assert.deepEqual(R.estiloAlerta(d, 'Fiador'), { cor: 'Padrão', enfase: 'Normal', prioridade: 3 });
+  R.salvarEstilosAlertas(d, { Fiador: { cor: 'Roxo', enfase: 'Forte', prioridade: '1' }, 'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 } }, 'julio');
+  assert.deepEqual(d.estilos_alertas, { Fiador: { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } }, 'só guarda o que mudou');
+  assert.deepEqual(R.estiloAlerta(d, 'Fiador'), { cor: 'Roxo', enfase: 'Forte', prioridade: 1 });
+  assert.throws(() => R.salvarEstilosAlertas(d, { Fiador: { cor: 'Rosa', enfase: 'Forte', prioridade: 1 } }, 'julio'), /Confira/);
+  R.salvarEstilosAlertas(d, {}, 'julio');
+  assert.deepEqual(d.estilos_alertas, {});
 });

@@ -354,9 +354,11 @@ export async function mostrar(estadoForm = null) {
     desenharMensagens();
     mensagens = [];
     await montarExtras(app);
-    // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel)
+    // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel).
+    // Depois tira o ?ir= do endereço: assim o mesmo atalho funciona de novo e outras ações na página não pulam para a caixa.
     const alvo = rota.q.ir && document.getElementById(rota.q.ir);
     if (alvo) alvo.scrollIntoView({ block: 'start' });
+    if (rota.q.ir) history.replaceState(null, '', location.href.replace(/([?&])ir=[^&]*&?/, '$1').replace(/[?&]$/, ''));
   } catch (e) {
     console.error(e);
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
@@ -420,6 +422,17 @@ document.addEventListener('change', async (ev) => {
     ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
     return;
   }
+  if (ev.target.matches('select[data-previa]')) {
+    const n = ev.target.dataset.previa;
+    const f = ev.target.form;
+    TELAS._previaAlerta(document.getElementById(`previa_${n}`), f[`cor_${n}`].value, f[`enfase_${n}`].value);
+    return;
+  }
+  if (ev.target.matches('input[data-arquivo-doc]')) {
+    const nome = ev.target.closest('label').querySelector('[data-nome-escolhido]');
+    nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
+    return;
+  }
   const el = ev.target.closest('input[data-upload]');
   if (!el || !el.files.length) return;
   try {
@@ -446,7 +459,20 @@ document.addEventListener('keydown', (ev) => {
   el.parentElement.querySelector('[data-acao=incluirNaLista]').click();
 });
 
-window.addEventListener('hashchange', () => mostrar());
+// Página nova começa do topo (com ?ir= a própria tela rola até a caixa).
+window.addEventListener('hashchange', async () => {
+  const ir = rotaAtual().q.ir;
+  await mostrar();
+  if (!ir) scrollTo(0, 0);
+});
+
+// Link para o endereço em que já estamos (ex.: atalho clicado pela 2ª vez): o navegador não avisa a mudança, então desenhamos de novo.
+document.addEventListener('click', (ev) => {
+  const a = ev.target.closest('a[href^="#/"]');
+  if (!a || a.target || ev.ctrlKey || ev.metaKey || ev.shiftKey || a.getAttribute('href') !== location.hash) return;
+  ev.preventDefault();
+  mostrar();
+});
 window.addEventListener('focus', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 

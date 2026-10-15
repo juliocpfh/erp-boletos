@@ -146,17 +146,18 @@ export const LEITURA = [
 
 /** Vincular ao imóvel um inquilino já cadastrado, com a leitura dos relógios na entrada. */
 export const VINCULO = [
-  campo('contrato_id', 'Inquilino', 'opcao', { obrig: true, opcoes: [], ajuda: 'Inquilino que já está em outro imóvel ganha um contrato novo para este imóvel' }),
+  campo('contrato_id', 'Inquilino', 'opcao', { obrig: true, opcoes: [], ajuda: 'Inquilino que já está em outro imóvel: abre o cadastro de um contrato novo para este imóvel (com condições próprias)' }),
   campo('data_entrada', 'Data de entrada no imóvel', 'data', { obrig: true }),
   secao('Leitura dos relógios na entrada'),
   ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
 ];
 
 /** Qualificação da pessoa no contrato (nacionalidade, estado civil, profissão, nascimento, endereço). */
-export const GENEROS = ['Masculino', 'Feminino'];
+/** Sexo para a concordância no contrato; "Neutro" escreve brasileiro(a), solteiro(a), portador(a). */
+export const GENEROS = ['Masculino', 'Feminino', 'Neutro – o(a)'];
 export const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'Separado(a)', 'União estável'];
 const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
-  campo(`${prefixo}genero`, 'Sexo (para o contrato)', 'opcao', { opcoes: GENEROS, ...extra }),
+  campo(`${prefixo}genero`, 'Sexo (para a concordância no contrato)', 'opcao', { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
   campo(`${prefixo}nacionalidade`, 'Nacionalidade', 'texto', { padrao: 'brasileira', ...extra }),
   campo(`${prefixo}estado_civil`, 'Estado civil', 'opcao', { opcoes: ESTADOS_CIVIS, ...extra }),
   campo(`${prefixo}profissao`, 'Profissão', 'texto', extra),
@@ -208,7 +209,7 @@ export const CONTRATO = [
   campo('responsavel_nome', 'Outro contato (se houver)'),
   campo('responsavel_telefone', 'Telefone do contato', 'tel'),
   campo('responsavel_email', 'E-mail do contato', 'email'),
-  campo('contrato_anterior_id', 'Continua o contrato de', 'opcao', { opcoes: [], ajuda: 'Ex.: alteração de titular. Liga o histórico dos dois inquilinos' }),
+  campo('contrato_anterior_id', 'Continua o contrato de', 'opcao', { opcoes: [], ajuda: 'Ex.: alteração de titular. Liga o histórico dos dois inquilinos e traz as condições do contrato anterior (confira)' }),
   { secao: 'Representante da empresa (pessoa física)', ...PJ },
   campo('representante_nome', 'Nome do representante', 'texto', { largo: true, ...PJ, ajuda: 'Obrigatório para empresa: sócio ou responsável que assina' }),
   campo('representante_cpf', 'CPF do representante', 'cpf', PJ),
@@ -251,7 +252,7 @@ export const CONTRATO = [
   campo('renovacao_automatica', 'Renovação automática', 'simnao'),
   secao('Valores e boleto'),
   campo('aluguel_inicial', 'Aluguel inicial (valor cheio, histórico)', 'dinheiro', { obrig: true }),
-  campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true, padrao: 10 }),
+  campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true }),
   campo('cobranca_mes_seguinte', 'O aluguel do mês vence no mês seguinte', 'simnao', { padrao: true, ajuda: 'Marcado: aluguel de julho vence em agosto' }),
   campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true }),
   campo('aluguel_bonificado', 'Aluguel com bonificação (R$)', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Digite o valor que o inquilino paga em dia: o % é calculado' }),
@@ -265,7 +266,7 @@ export const CONTRATO = [
   secao('O que está incluso no contrato'),
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
-  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA })),
+  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais previstas no contrato', 'area', { ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Carência de aluguel'),
   campo('carencia_meses', 'Meses de carência', 'inteiro', { ajuda: 'Nestes meses o aluguel não é cobrado. Em branco: sem carência' }),
@@ -275,8 +276,6 @@ export const CONTRATO = [
   campo('carencia_cobrar_taxa', 'Na carência, cobrar a tarifa do boleto', 'simnao'),
   secao('Vistoria de entrada'),
   campo('vistoria_link', 'Link da pasta de fotos da vistoria de entrada', 'url', { largo: true, ajuda: 'Cole o link da pasta na nuvem (OneDrive, Google Drive) onde está o .rar das fotos' }),
-  secao('Termo aditivo'),
-  campo('possui_aditivos', 'O contrato possui termo aditivo', 'simnao', { ajuda: 'Marcado sozinho quando muda o vencimento ou a garantia. Anexe o termo em "Arquivos do inquilino"' }),
   secao('Observações'),
   campo('verificar', 'Pontos a verificar (aparece em amarelo)', 'area'),
   campo('observacoes', 'Observações', 'area'),
@@ -542,7 +541,7 @@ export function camposHtml(campos, valores = {}, erros = {}) {
     return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''}" ${se}>
       <label for="${id}">${esc(c.rotulo)}${c.obrig ? ' *' : ''}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}
-      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa || c.nome === 'imovel_id' ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
+      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa || ['imovel_id', 'contrato_anterior_id'].includes(c.nome) ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
   });
   return `<div class="formulario">${partes.join('')}</div>`;
 }

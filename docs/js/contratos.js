@@ -74,21 +74,24 @@ export const ordinalPorExtenso = (n) => [ORD_DEZ[Math.floor(n / 10)], ORD_UNID[n
 // --------------------------------------------------------------------------
 // Qualificação das partes
 // --------------------------------------------------------------------------
+// Sexo "Neutro" ou em branco: o texto usa a forma neutra (brasileiro(a), portador(a)...).
 const fem = (p) => p.genero === 'Feminino';
-const gen = (p, m, f) => (fem(p) ? f : m);
+const neutro = (p) => !['Masculino', 'Feminino'].includes(p.genero);
+const gen = (p, m, f) => (neutro(p) ? `${m}(${f.slice(-1)})` : fem(p) ? f : m);
+const flexao = (p) => (neutro(p) ? 'o(a)' : fem(p) ? 'a' : 'o');
 /** "solteiro" / "solteira" a partir de "Solteiro(a)". */
 const estadoCivil = (p) => {
   const e = String(p.estado_civil || '').toLowerCase();
   if (!e) return '';
   if (e === 'união estável') return 'em união estável';
-  return e.replace(/o\(a\)$/, fem(p) ? 'a' : 'o');
+  return e.replace(/o\(a\)$/, flexao(p));
 };
 /** "brasileiro" / "brasileira" (qualquer nacionalidade terminada em o/a segue o gênero). */
 const nacionalidade = (p) => {
   const n = String(p.nacionalidade || '').trim().toLowerCase();
   if (!n) return '';
-  if (/(o|a)$/.test(n) && !/\(/.test(n)) return n.replace(/(o|a)$/, fem(p) ? 'a' : 'o');
-  return n.replace(/o\(a\)$/, fem(p) ? 'a' : 'o');
+  if (/(o|a)$/.test(n) && !/\(/.test(n)) return n.replace(/(o|a)$/, flexao(p));
+  return n.replace(/o\(a\)$/, flexao(p));
 };
 
 /**
@@ -115,7 +118,7 @@ function qualificarEmpresa(nome, cnpj, sede, rep, cargo) {
   if (cnpj) partes.push(`inscrita no CNPJ sob nº ${cnpj}`);
   if (sede) partes.push(`com sede na ${sede}`);
   let t = partes.join(', ');
-  if (rep && rep.nome) t += `, neste ato representada por ${cargo ? `${fem(rep) ? 'sua' : 'seu'} ${cargo}` : 'seu representante legal'}: ${qualificarPessoa(rep)}`;
+  if (rep && rep.nome) t += `, neste ato representada por ${cargo ? `${gen(rep, 'seu', 'sua').replace('seu(a)', 'seu(sua)')} ${cargo}` : 'seu representante legal'}: ${qualificarPessoa(rep)}`;
   return t;
 }
 
@@ -227,7 +230,7 @@ export function pendenciasDoContrato(d, c) {
   const falta = [];
   const pessoa = (pref, rotulo, cond = true) => {
     if (!cond) return;
-    for (const [k, t] of [['genero', 'sexo'], ['estado_civil', 'estado civil'], ['profissao', 'profissão'], ['cpf', 'CPF'], ['endereco', 'endereço']]) if (!c[`${pref}${k}`]) falta.push(`${rotulo}: ${t}`);
+    for (const [k, t] of [['estado_civil', 'estado civil'], ['profissao', 'profissão'], ['cpf', 'CPF'], ['endereco', 'endereço']]) if (!c[`${pref}${k}`]) falta.push(`${rotulo}: ${t}`);
   };
   if (c.inquilino_tipo === 'Pessoa jurídica (empresa)') {
     if (!c.inquilino_cpf) falta.push('empresa: CNPJ');

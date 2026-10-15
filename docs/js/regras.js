@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -957,20 +957,23 @@ const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', '
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
   'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade'];
 
-/** Último inquilino do imóvel (pela data de entrada). */
-export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
-  .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
+/** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
+export const dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) => c[k] !== undefined && c[k] !== null).map((k) => [k, c[k]]));
 
 /**
- * Condições do inquilino anterior do imóvel, para começar o cadastro do próximo: prazo, índice, vencimento,
- * bonificação, multa e juros, contas inclusas, garantia e finalidade. O aluguel sugerido é o atual do anterior.
+ * Condições do contrato anterior, para quem continua o contrato dele (ex.: troca de titular): prazo, índice, vencimento,
+ * bonificação, multa e juros, contas, garantia e finalidade. O aluguel é o atual do anterior.
  */
-export function condicoesDoAnterior(d, anterior) {
+export function condicoesDoContrato(d, anterior) {
   const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
   const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
   out.aluguel_inicial = aluguelAtual(d, anterior);
   return out;
 }
+
+/** Último inquilino do imóvel (pela data de entrada). */
+export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
+  .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
 
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
@@ -991,14 +994,9 @@ export function vincularInquilino(d, imovelId, dados, usuario) {
   const i = buscar(d, 'imoveis', imovelId);
   if (c.imovel_id === i.id) throw new Error('Este inquilino já está vinculado a este imóvel.');
   const leitura = separarLeitura(dados);
-  if (c.imovel_id) {
-    const novo = Object.fromEntries([...CAMPOS_PESSOA, ...CAMPOS_CONDICOES].filter((k) => c[k] !== undefined).map((k) => [k, c[k]]));
-    Object.assign(novo, { imovel_id: i.id, data_entrada: dados.data_entrada, vigencia_inicio: dados.data_entrada, ativo: true, docs_entrada: true });
-    if (novo.prazo_tipo !== 'Indeterminado' && novo.prazo_meses > 0) novo.vigencia_fim = C.fimDoPrazo(dados.data_entrada, novo.prazo_meses);
-    c = inserir(d, 'contratos', novo, usuario, `${c.inquilino_nome}: novo contrato no imóvel ${i.nome} (também aluga outro imóvel)`);
-  } else {
-    atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
-  }
+  // quem já aluga outro imóvel precisa de um contrato novo, com condições próprias: é feito pelo cadastro do inquilino
+  if (c.imovel_id) throw new Error(`${c.inquilino_nome} já aluga outro imóvel: cadastre um contrato novo para este imóvel (os dados da pessoa vêm preenchidos).`);
+  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
   if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
   return c;
 }
@@ -1097,7 +1095,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
-    alertaDocumentosEntrada(contrato),
+    alertaDocumentosEntrada(contrato, d),
     alertaCondominio(contrato, hoje),
   ].filter(Boolean);
 }
@@ -1111,18 +1109,52 @@ export const DOCUMENTOS_ENTRADA = [
   ['doc_chaves_em', 'Recibo de entrega das chaves', 'assinado'],
 ];
 
-/** Inquilino novo (cadastrado a partir desta versão): avisa enquanto faltar algum dos três documentos. */
-export function alertaDocumentosEntrada(c) {
-  if (!c.docs_entrada || c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+/** Arquivo assinado de cada documento: doc_contrato_em → doc_contrato_arquivo. */
+export const campoArquivoDoc = (campo) => campo.replace(/_em$/, '_arquivo');
+
+/**
+ * Situação de um documento de entrada. Quem "continua o contrato de" outro (ex.: troca de titular) herda o documento
+ * assinado no contrato anterior (o mais recente da cadeia), enquanto não tiver um próprio.
+ * Devolve { data, arquivo, contrato } (contrato = de onde veio) ou null se está pendente.
+ */
+export function documentoEntrada(d, c, campo) {
+  const arq = campoArquivoDoc(campo);
+  if (c[campo]) return { data: c[campo], arquivo: c[arq] || null, contrato: c };
+  if (!d) return null;
+  const x = [...cadeiaDeContratos(d, c).antes].reverse().find((a) => a[campo]);
+  return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
+}
+
+/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
+export function alertaDocumentosEntrada(c, d = null) {
+  if (c.ativo === false || c.data_saida) return null;
+  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
 }
 
-export function marcarDocumento(d, contratoId, campo, data, usuario) {
+/** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
+export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null) {
   const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
   if (!doc) throw new Error('Documento desconhecido.');
+  if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
   const c = buscar(d, 'contratos', contratoId);
-  atualizar(d, 'contratos', c.id, { [campo]: data || null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+/** Termos aditivos do contrato (posteriores a ele), do mais recente ao mais antigo. */
+export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId)
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+
+/** Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo". */
+export function registrarAditivo(d, contratoId, { data, assunto, arquivo }, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!data) throw new Error('Informe a data do termo aditivo.');
+  if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+  if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo }, usuario,
+    `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}`);
+  if (!c.possui_aditivos) atualizar(d, 'contratos', c.id, { possui_aditivos: true }, usuario, `${c.inquilino_nome}: possui termo aditivo`);
+  return a;
 }
 
 const porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
@@ -1186,12 +1218,40 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
       texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).` });
   }
-  return lista.sort((a, b) => prioridadeAlerta(a) - prioridadeAlerta(b) || ordem[a.nivel] - ordem[b.nivel]);
+  return lista.sort((a, b) => estiloAlerta(d, a.tipo).prioridade - estiloAlerta(d, b.tipo).prioridade || ordem[a.nivel] - ordem[b.nivel]);
 }
 
-/** No topo dos alertas: primeiro a vigência do contrato, depois o reajuste do aluguel; o resto pela gravidade. */
-export const PRIORIDADE_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel'];
-const prioridadeAlerta = (a) => (a.tipo === 'Vigência do contrato' ? 0 : PRIORIDADE_ALERTA.includes(a.tipo) ? 1 : 2);
+// --------------------------------------------------------------------------
+// Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
+// --------------------------------------------------------------------------
+export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
+  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
+  'Titularidade', 'A verificar'];
+/** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
+export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
+export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
+/** Prioridade: 1 aparece primeiro; empate segue a gravidade. */
+const PADRAO_ALERTA = { cor: 'Padrão', enfase: 'Normal', prioridade: 3 };
+export const ESTILOS_ALERTA_PADRAO = {
+  'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 },
+  'Reajuste do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
+  'Correção do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
+  'A verificar': { cor: 'Amarelo', enfase: 'Normal', prioridade: 3 },
+};
+export const estiloAlerta = (d, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...((d && d.estilos_alertas) || {})[tipo] });
+
+/** Grava a aparência escolhida para cada tipo de alerta (só o que difere do padrão do sistema). */
+export function salvarEstilosAlertas(d, estilos, usuario) {
+  const novo = {};
+  for (const [tipo, e] of Object.entries(estilos)) {
+    const p = Math.round(Number(e.prioridade));
+    if (!CORES_ALERTA.includes(e.cor) || !ENFASES_ALERTA.includes(e.enfase) || !(p >= 1 && p <= 99)) throw new Error(`Confira a cor, a ênfase e a prioridade (1 a 99) de "${tipo}".`);
+    const padrao = estiloAlerta(null, tipo);
+    if (e.cor !== padrao.cor || e.enfase !== padrao.enfase || p !== padrao.prioridade) novo[tipo] = { cor: e.cor, enfase: e.enfase, prioridade: p };
+  }
+  registrar(d, usuario, 'Alteração', null, null, 'Aparência dos alertas', { estilos_alertas: { de: d.estilos_alertas || {}, para: novo } });
+  d.estilos_alertas = novo;
+}
 
 // --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco

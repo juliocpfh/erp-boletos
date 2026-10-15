@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="64e1a74b3a995e49">
+<meta name="fontes" content="5f6b712bbd172310">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -64,9 +64,27 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .alerta.ok { border-color: var(--ok); background: #f0fdf4; }
 .alerta.erro { border-color: var(--perigo); background: #fef2f2; }
 .alerta b { margin-right: 6px; }
-.alerta.vigencia { border-left-width: 8px; border-color: #b91c1c; background: #fecaca; color: #7f1d1d; font-weight: 600; }
-.alerta.reajuste { border-left-width: 8px; border-color: #ea580c; background: #fed7aa; color: #7c2d12; font-weight: 600; }
-.alerta.vigencia a, .alerta.reajuste a { color: inherit; text-decoration: underline; }
+.alerta.cor-vermelho { border-color: #dc2626; background: #fef2f2; }
+.alerta.cor-laranja { border-color: #ea580c; background: #fff7ed; }
+.alerta.cor-amarelo { border-color: #ca8a04; background: #fef9c3; }
+.alerta.cor-verde { border-color: #16a34a; background: #f0fdf4; }
+.alerta.cor-azul { border-color: #2563eb; background: #eff6ff; }
+.alerta.cor-roxo { border-color: #7c3aed; background: #f5f3ff; }
+.alerta.cor-cinza { border-color: #6b7280; background: #f9fafb; }
+.alerta.enfase-forte { border-left-width: 8px; font-weight: 600; }
+.alerta.enfase-forte a { color: inherit; text-decoration: underline; }
+/* cor pela gravidade primeiro; a cor escolhida (cor-*) vem depois e vale mais */
+.alerta.enfase-forte.perigo { background: #fecaca; color: #7f1d1d; }
+.alerta.enfase-forte.aviso { background: #fed7aa; color: #7c2d12; }
+.alerta.enfase-forte.info { background: #bfdbfe; color: #1e3a8a; }
+.alerta.enfase-forte.cor-vermelho { background: #fecaca; color: #7f1d1d; }
+.alerta.enfase-forte.cor-laranja { background: #fed7aa; color: #7c2d12; }
+.alerta.enfase-forte.cor-azul { background: #bfdbfe; color: #1e3a8a; }
+.alerta.enfase-forte.cor-amarelo { background: #fde68a; color: #713f12; }
+.alerta.enfase-forte.cor-verde { background: #bbf7d0; color: #14532d; }
+.alerta.enfase-forte.cor-roxo { background: #ddd6fe; color: #4c1d95; }
+.alerta.enfase-forte.cor-cinza { background: #e5e7eb; color: #1f2937; }
+.alerta.enfase-discreta { border-left-width: 3px; background: #fff; color: var(--suave); font-size: 13px; }
 .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }
@@ -125,6 +143,7 @@ textarea { min-height: 80px; }
 .maior { font-size: 18px; font-weight: 700; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
 label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.acoes label.enviar { margin-top: 0; }
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
@@ -806,18 +825,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   __export(regras_exports, {
     CAMPOS_MODELO_AIRBNB: () => CAMPOS_MODELO_AIRBNB,
     COBRANCA_IPTU_QUITADO: () => COBRANCA_IPTU_QUITADO,
+    CORES_ALERTA: () => CORES_ALERTA,
     DIAS_VERMELHO: () => DIAS_VERMELHO,
     DOCUMENTOS_ENTRADA: () => DOCUMENTOS_ENTRADA,
+    ENFASES_ALERTA: () => ENFASES_ALERTA,
+    ESTILOS_ALERTA_PADRAO: () => ESTILOS_ALERTA_PADRAO,
     GARANTIAS: () => GARANTIAS,
     LISTAS: () => LISTAS,
     MESES_DEPOIS_DE_ALUGAR: () => MESES_DEPOIS_DE_ALUGAR,
     MODELO_AIRBNB: () => MODELO_AIRBNB,
-    PRIORIDADE_ALERTA: () => PRIORIDADE_ALERTA,
     SITUACOES: () => SITUACOES,
     TABELAS: () => TABELAS,
     TAXAS_DO_PROPRIETARIO: () => TAXAS_DO_PROPRIETARIO,
+    TIPOS_ALERTA: () => TIPOS_ALERTA,
     TIPOS_DESPESA: () => TIPOS_DESPESA,
     TIPOS_RENOVACAO: () => TIPOS_RENOVACAO,
+    aditivosDo: () => aditivosDo,
     ajustarBoleto: () => ajustarBoleto,
     alertaCondominio: () => alertaCondominio,
     alertaDocumentosEntrada: () => alertaDocumentosEntrada,
@@ -839,6 +862,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     cadeiaDeContratos: () => cadeiaDeContratos,
     calcularEncerramento: () => calcularEncerramento,
     calcularReajuste: () => calcularReajuste,
+    campoArquivoDoc: () => campoArquivoDoc,
     cancelarFaturas: () => cancelarFaturas,
     cancelarNumero: () => cancelarNumero,
     caucaoSugerida: () => caucaoSugerida,
@@ -847,7 +871,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     competenciaDoAbatimento: () => competenciaDoAbatimento,
     competenciaDoReajuste: () => competenciaDoReajuste,
     competenciaReserva: () => competenciaReserva,
-    condicoesDoAnterior: () => condicoesDoAnterior,
+    condicoesDoContrato: () => condicoesDoContrato,
     condominioAConferir: () => condominioAConferir,
     contasPermitidas: () => contasPermitidas,
     contasPorNossaConta: () => contasPorNossaConta,
@@ -855,14 +879,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     correcoesDo: () => correcoesDo,
     correcoesGarantiaDo: () => correcoesGarantiaDo,
     dadosBoleto: () => dadosBoleto,
+    dadosDaPessoa: () => dadosDaPessoa,
     dataBaseCorrecao: () => dataBaseCorrecao,
     desfazerNumeracao: () => desfazerNumeracao,
     desfazerUltimaNumeracao: () => desfazerUltimaNumeracao,
     despesasDo: () => despesasDo,
+    documentoEntrada: () => documentoEntrada,
     emCarencia: () => emCarencia,
     encerramentoDo: () => encerramentoDo,
     encerrarContrato: () => encerrarContrato,
     enderecoCompleto: () => enderecoCompleto,
+    estiloAlerta: () => estiloAlerta,
     estornarPagamento: () => estornarPagamento,
     etapasFechamento: () => etapasFechamento,
     eventosDoMes: () => eventosDoMes,
@@ -910,6 +937,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     recalcularCobrancas: () => recalcularCobrancas,
     reformasDo: () => reformasDo,
     registrar: () => registrar,
+    registrarAditivo: () => registrarAditivo,
     registrarLeitura: () => registrarLeitura,
     registrarNfExterna: () => registrarNfExterna,
     registrarPagamento: () => registrarPagamento,
@@ -919,6 +947,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ressarcimentosDo: () => ressarcimentosDo,
     resultadosFinanceiros: () => resultadosFinanceiros,
     saldoReserva: () => saldoReserva,
+    salvarEstilosAlertas: () => salvarEstilosAlertas,
     segurosDoImovel: () => segurosDoImovel,
     separarLeitura: () => separarLeitura,
     situacaoAplicacao: () => situacaoAplicacao,
@@ -1321,6 +1350,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     cartas_reajuste: "Carta de reajuste",
     modelos_contrato: "Modelo de contrato",
     vistorias: "Vistoria",
+    aditivos: "Termo aditivo",
     despesas: "Conta paga por nós",
     ressarcimentos: "Ressarcimento de condomínio",
     fechamentos: "Etapa do fechamento do mês",
@@ -2270,13 +2300,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     "finalidade",
     "atividade"
   ];
-  var ultimoContratoDoImovel = (d2, imovelId) => d2.contratos.filter((c) => c.imovel_id === imovelId).sort((a, b) => String(b.data_entrada || "").localeCompare(String(a.data_entrada || "")) || b.id - a.id)[0] || null;
-  function condicoesDoAnterior(d2, anterior) {
+  var dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) => c[k] !== void 0 && c[k] !== null).map((k) => [k, c[k]]));
+  function condicoesDoContrato(d2, anterior) {
     const contas = ["conta_agua", "conta_energia", "conta_gas", "conta_condominio", "conta_internet"];
     const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== void 0 && anterior[k] !== null && anterior[k] !== "").map((k) => [k, anterior[k]]));
     out.aluguel_inicial = aluguelAtual(d2, anterior);
     return out;
   }
+  var ultimoContratoDoImovel = (d2, imovelId) => d2.contratos.filter((c) => c.imovel_id === imovelId).sort((a, b) => String(b.data_entrada || "").localeCompare(String(a.data_entrada || "")) || b.id - a.id)[0] || null;
   function outrosContratosDaPessoa(d2, c, hoje2 = hojeIso()) {
     const doc = String(c.inquilino_cpf || "").replace(/\D/g, "");
     return d2.contratos.filter((x) => x.id !== c.id && contratoAtivo(x, hoje2) && (doc ? String(x.inquilino_cpf || "").replace(/\D/g, "") === doc : x.inquilino_nome.trim().toLocaleLowerCase("pt-BR") === c.inquilino_nome.trim().toLocaleLowerCase("pt-BR")));
@@ -2287,14 +2318,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const i = buscar(d2, "imoveis", imovelId);
     if (c.imovel_id === i.id) throw new Error("Este inquilino já está vinculado a este imóvel.");
     const leitura = separarLeitura(dados);
-    if (c.imovel_id) {
-      const novo = Object.fromEntries([...CAMPOS_PESSOA, ...CAMPOS_CONDICOES].filter((k) => c[k] !== void 0).map((k) => [k, c[k]]));
-      Object.assign(novo, { imovel_id: i.id, data_entrada: dados.data_entrada, vigencia_inicio: dados.data_entrada, ativo: true, docs_entrada: true });
-      if (novo.prazo_tipo !== "Indeterminado" && novo.prazo_meses > 0) novo.vigencia_fim = fimDoPrazo(dados.data_entrada, novo.prazo_meses);
-      c = inserir(d2, "contratos", novo, usuario, `${c.inquilino_nome}: novo contrato no imóvel ${i.nome} (também aluga outro imóvel)`);
-    } else {
-      atualizar(d2, "contratos", c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
-    }
+    if (c.imovel_id) throw new Error(`${c.inquilino_nome} já aluga outro imóvel: cadastre um contrato novo para este imóvel (os dados da pessoa vêm preenchidos).`);
+    atualizar(d2, "contratos", c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
     if (leitura) registrarLeitura(d2, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: "Entrada do inquilino", ...leitura, observacoes: "" }, usuario);
     return c;
   }
@@ -2390,7 +2415,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       contrato.prazo_tipo === "Indeterminado" ? null : alertaVigencia(contrato.vigencia_fim, hoje2),
       alertaFiador(d2, contrato, hoje2),
       alertaAplicacao(d2, contrato),
-      alertaDocumentosEntrada(contrato),
+      alertaDocumentosEntrada(contrato, d2),
       alertaCondominio(contrato, hoje2)
     ].filter(Boolean);
   }
@@ -2399,16 +2424,41 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ["doc_vistoria_em", "Vistoria de entrada", "assinada"],
     ["doc_chaves_em", "Recibo de entrega das chaves", "assinado"]
   ];
-  function alertaDocumentosEntrada(c) {
-    if (!c.docs_entrada || c.ativo === false || c.data_saida) return null;
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
+  var campoArquivoDoc = (campo2) => campo2.replace(/_em$/, "_arquivo");
+  function documentoEntrada(d2, c, campo2) {
+    const arq = campoArquivoDoc(campo2);
+    if (c[campo2]) return { data: c[campo2], arquivo: c[arq] || null, contrato: c };
+    if (!d2) return null;
+    const x = [...cadeiaDeContratos(d2, c).antes].reverse().find((a) => a[campo2]);
+    return x ? { data: x[campo2], arquivo: x[arq] || null, contrato: x } : null;
+  }
+  function alertaDocumentosEntrada(c, d2 = null) {
+    if (c.ativo === false || c.data_saida) return null;
+    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d2, c, k)).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
     return falta.length ? { nivel: "aviso", tipo: "Documentos de entrada", texto: `falta ${falta.join(", ")}.`, ancora: "documentos" } : null;
   }
-  function marcarDocumento(d2, contratoId, campo2, data, usuario) {
+  function marcarDocumento(d2, contratoId, campo2, data, usuario, arquivo = null) {
     const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
     if (!doc) throw new Error("Documento desconhecido.");
+    if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith("a") ? "a" : "o"} ${doc[1].toLocaleLowerCase("pt-BR")} ${doc[2]} antes de marcar.`);
     const c = buscar(d2, "contratos", contratoId);
-    atualizar(d2, "contratos", c.id, { [campo2]: data || null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data ? `${doc[2]} em ${dataBr(data)}` : "voltou a pendente"}`);
+    atualizar(d2, "contratos", c.id, { [campo2]: data || null, [campoArquivoDoc(campo2)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data ? `${doc[2]} em ${dataBr(data)}` : "voltou a pendente"}`);
+  }
+  var aditivosDo = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  function registrarAditivo(d2, contratoId, { data, assunto, arquivo }, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!data) throw new Error("Informe a data do termo aditivo.");
+    if (!String(assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
+    if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+    const a = inserir(
+      d2,
+      "aditivos",
+      { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo },
+      usuario,
+      `${c.inquilino_nome}: termo aditivo de ${dataBr(data)}`
+    );
+    if (!c.possui_aditivos) atualizar(d2, "contratos", c.id, { possui_aditivos: true }, usuario, `${c.inquilino_nome}: possui termo aditivo`);
+    return a;
   }
   var porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
   var vistoriasDo = (d2, contratoId) => d2.vistorias.filter((v) => v.contrato_id === contratoId).sort(porDataVistoria);
@@ -2477,10 +2527,45 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).`
       });
     }
-    return lista3.sort((a, b) => prioridadeAlerta(a) - prioridadeAlerta(b) || ordem[a.nivel] - ordem[b.nivel]);
+    return lista3.sort((a, b) => estiloAlerta(d2, a.tipo).prioridade - estiloAlerta(d2, b.tipo).prioridade || ordem[a.nivel] - ordem[b.nivel]);
   }
-  var PRIORIDADE_ALERTA = ["Vigência do contrato", "Reajuste do aluguel", "Correção do aluguel"];
-  var prioridadeAlerta = (a) => a.tipo === "Vigência do contrato" ? 0 : PRIORIDADE_ALERTA.includes(a.tipo) ? 1 : 2;
+  var TIPOS_ALERTA = [
+    "Vigência do contrato",
+    "Reajuste do aluguel",
+    "Correção do aluguel",
+    "Inadimplência",
+    "Documentos de entrada",
+    "Seguro obrigatório",
+    "IPTU do proprietário",
+    "Reserva do imóvel",
+    "Condomínio",
+    "Fiador",
+    "Aplicação da garantia",
+    "Correção da caução",
+    "Titularidade",
+    "A verificar"
+  ];
+  var CORES_ALERTA = ["Padrão", "Vermelho", "Laranja", "Amarelo", "Verde", "Azul", "Roxo", "Cinza"];
+  var ENFASES_ALERTA = ["Normal", "Forte", "Discreta"];
+  var PADRAO_ALERTA = { cor: "Padrão", enfase: "Normal", prioridade: 3 };
+  var ESTILOS_ALERTA_PADRAO = {
+    "Vigência do contrato": { cor: "Vermelho", enfase: "Forte", prioridade: 1 },
+    "Reajuste do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
+    "Correção do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
+    "A verificar": { cor: "Amarelo", enfase: "Normal", prioridade: 3 }
+  };
+  var estiloAlerta = (d2, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...(d2 && d2.estilos_alertas || {})[tipo] });
+  function salvarEstilosAlertas(d2, estilos, usuario) {
+    const novo = {};
+    for (const [tipo, e] of Object.entries(estilos)) {
+      const p2 = Math.round(Number(e.prioridade));
+      if (!CORES_ALERTA.includes(e.cor) || !ENFASES_ALERTA.includes(e.enfase) || !(p2 >= 1 && p2 <= 99)) throw new Error(`Confira a cor, a ênfase e a prioridade (1 a 99) de "${tipo}".`);
+      const padrao = estiloAlerta(null, tipo);
+      if (e.cor !== padrao.cor || e.enfase !== padrao.enfase || p2 !== padrao.prioridade) novo[tipo] = { cor: e.cor, enfase: e.enfase, prioridade: p2 };
+    }
+    registrar(d2, usuario, "Alteração", null, null, "Aparência dos alertas", { estilos_alertas: { de: d2.estilos_alertas || {}, para: novo } });
+    d2.estilos_alertas = novo;
+  }
   var rs = (c) => `RS${reais(c, false)}`;
   function dadosBoleto(d2, cb) {
     const c = buscar(d2, "contratos", cb.contrato_id);
@@ -3578,15 +3663,15 @@ ${JSON.stringify(cabecalho)}
     campo("observacoes", "Observações", "area")
   ];
   var VINCULO = [
-    campo("contrato_id", "Inquilino", "opcao", { obrig: true, opcoes: [], ajuda: "Inquilino que já está em outro imóvel ganha um contrato novo para este imóvel" }),
+    campo("contrato_id", "Inquilino", "opcao", { obrig: true, opcoes: [], ajuda: "Inquilino que já está em outro imóvel: abre o cadastro de um contrato novo para este imóvel (com condições próprias)" }),
     campo("data_entrada", "Data de entrada no imóvel", "data", { obrig: true }),
     secao("Leitura dos relógios na entrada"),
     ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, "texto", { ajuda: n ? "" : "O número que aparece no relógio. Fica no histórico de leituras do imóvel" }))
   ];
-  var GENEROS = ["Masculino", "Feminino"];
+  var GENEROS = ["Masculino", "Feminino", "Neutro – o(a)"];
   var ESTADOS_CIVIS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "Separado(a)", "União estável"];
   var qualificacao = (prefixo, extra = {}, comEndereco = true) => [
-    campo(`${prefixo}genero`, "Sexo (para o contrato)", "opcao", { opcoes: GENEROS, ...extra }),
+    campo(`${prefixo}genero`, "Sexo (para a concordância no contrato)", "opcao", { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
     campo(`${prefixo}nacionalidade`, "Nacionalidade", "texto", { padrao: "brasileira", ...extra }),
     campo(`${prefixo}estado_civil`, "Estado civil", "opcao", { opcoes: ESTADOS_CIVIS, ...extra }),
     campo(`${prefixo}profissao`, "Profissão", "texto", extra),
@@ -3639,7 +3724,7 @@ ${JSON.stringify(cabecalho)}
     campo("responsavel_nome", "Outro contato (se houver)"),
     campo("responsavel_telefone", "Telefone do contato", "tel"),
     campo("responsavel_email", "E-mail do contato", "email"),
-    campo("contrato_anterior_id", "Continua o contrato de", "opcao", { opcoes: [], ajuda: "Ex.: alteração de titular. Liga o histórico dos dois inquilinos" }),
+    campo("contrato_anterior_id", "Continua o contrato de", "opcao", { opcoes: [], ajuda: "Ex.: alteração de titular. Liga o histórico dos dois inquilinos e traz as condições do contrato anterior (confira)" }),
     { secao: "Representante da empresa (pessoa física)", ...PJ },
     campo("representante_nome", "Nome do representante", "texto", { largo: true, ...PJ, ajuda: "Obrigatório para empresa: sócio ou responsável que assina" }),
     campo("representante_cpf", "CPF do representante", "cpf", PJ),
@@ -3682,7 +3767,7 @@ ${JSON.stringify(cabecalho)}
     campo("renovacao_automatica", "Renovação automática", "simnao"),
     secao("Valores e boleto"),
     campo("aluguel_inicial", "Aluguel inicial (valor cheio, histórico)", "dinheiro", { obrig: true }),
-    campo("dia_vencimento", "Dia do vencimento", "inteiro", { obrig: true, padrao: 10 }),
+    campo("dia_vencimento", "Dia do vencimento", "inteiro", { obrig: true }),
     campo("cobranca_mes_seguinte", "O aluguel do mês vence no mês seguinte", "simnao", { padrao: true, ajuda: "Marcado: aluguel de julho vence em agosto" }),
     campo("bonificacao", "Tem bonificação (desconto) por pontualidade", "simnao", { padrao: true }),
     campo("aluguel_bonificado", "Aluguel com bonificação (R$)", "dinheiro", { virtual: true, vinculo: "desconto", ajuda: "Digite o valor que o inquilino paga em dia: o % é calculado" }),
@@ -3696,7 +3781,7 @@ ${JSON.stringify(cabecalho)}
     secao("O que está incluso no contrato"),
     campo("conta_iptu", "IPTU", "opcao", { obrig: true, padrao: "Por conta do inquilino", opcoes: SITUACOES_CONTA, ajuda: "Por conta do inquilino: as parcelas entram no boleto" }),
     campo("conta_seguro", "Seguro obrigatório", "opcao", { obrig: true, padrao: "Por conta do inquilino", opcoes: SITUACOES_CONTA, ajuda: "Por conta do inquilino: as parcelas entram no boleto" }),
-    ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA })),
+    ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
     campo("contas_adicionais", "Contas ou cobranças adicionais previstas no contrato", "area", { ajuda: "Ex.: taxa de lixo, limpeza da área comum, rateio de água" }),
     secao("Carência de aluguel"),
     campo("carencia_meses", "Meses de carência", "inteiro", { ajuda: "Nestes meses o aluguel não é cobrado. Em branco: sem carência" }),
@@ -3706,8 +3791,6 @@ ${JSON.stringify(cabecalho)}
     campo("carencia_cobrar_taxa", "Na carência, cobrar a tarifa do boleto", "simnao"),
     secao("Vistoria de entrada"),
     campo("vistoria_link", "Link da pasta de fotos da vistoria de entrada", "url", { largo: true, ajuda: "Cole o link da pasta na nuvem (OneDrive, Google Drive) onde está o .rar das fotos" }),
-    secao("Termo aditivo"),
-    campo("possui_aditivos", "O contrato possui termo aditivo", "simnao", { ajuda: 'Marcado sozinho quando muda o vencimento ou a garantia. Anexe o termo em "Arquivos do inquilino"' }),
     secao("Observações"),
     campo("verificar", "Pontos a verificar (aparece em amarelo)", "area"),
     campo("observacoes", "Observações", "area")
@@ -3951,7 +4034,7 @@ ${JSON.stringify(cabecalho)}
       return `<div class="${c.largo ? "largo" : ""} ${erros[c.nome] ? "com-erro" : ""}" ${se}>
       <label for="${id}">${esc(c.rotulo)}${c.obrig ? " *" : ""}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ""}
-      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ""}${c.preencher || c.buscarPessoa || c.nome === "imovel_id" ? '<div class="ajuda-auto" data-auto-msg></div>' : ""}</div>`;
+      ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ""}${c.preencher || c.buscarPessoa || ["imovel_id", "contrato_anterior_id"].includes(c.nome) ? '<div class="ajuda-auto" data-auto-msg></div>' : ""}</div>`;
     });
     return `<div class="formulario">${partes.join("")}</div>`;
   }
@@ -4244,18 +4327,20 @@ ${FINAIS(`
   var ORD_DEZ = ["", "décima", "vigésima", "trigésima", "quadragésima", "quinquagésima", "sexagésima", "septuagésima", "octogésima", "nonagésima"];
   var ordinalPorExtenso = (n) => [ORD_DEZ[Math.floor(n / 10)], ORD_UNID[n % 10]].filter(Boolean).join(" ");
   var fem = (p2) => p2.genero === "Feminino";
-  var gen = (p2, m, f) => fem(p2) ? f : m;
+  var neutro = (p2) => !["Masculino", "Feminino"].includes(p2.genero);
+  var gen = (p2, m, f) => neutro(p2) ? `${m}(${f.slice(-1)})` : fem(p2) ? f : m;
+  var flexao = (p2) => neutro(p2) ? "o(a)" : fem(p2) ? "a" : "o";
   var estadoCivil = (p2) => {
     const e = String(p2.estado_civil || "").toLowerCase();
     if (!e) return "";
     if (e === "união estável") return "em união estável";
-    return e.replace(/o\(a\)$/, fem(p2) ? "a" : "o");
+    return e.replace(/o\(a\)$/, flexao(p2));
   };
   var nacionalidade = (p2) => {
     const n = String(p2.nacionalidade || "").trim().toLowerCase();
     if (!n) return "";
-    if (/(o|a)$/.test(n) && !/\(/.test(n)) return n.replace(/(o|a)$/, fem(p2) ? "a" : "o");
-    return n.replace(/o\(a\)$/, fem(p2) ? "a" : "o");
+    if (/(o|a)$/.test(n) && !/\(/.test(n)) return n.replace(/(o|a)$/, flexao(p2));
+    return n.replace(/o\(a\)$/, flexao(p2));
   };
   function qualificarPessoa(p2) {
     const partes = [String(p2.nome || "").toLocaleUpperCase("pt-BR"), nacionalidade(p2), estadoCivil(p2), p2.profissao];
@@ -4281,7 +4366,7 @@ ${FINAIS(`
     if (cnpj) partes.push(`inscrita no CNPJ sob nº ${cnpj}`);
     if (sede) partes.push(`com sede na ${sede}`);
     let t = partes.join(", ");
-    if (rep && rep.nome) t += `, neste ato representada por ${cargo ? `${fem(rep) ? "sua" : "seu"} ${cargo}` : "seu representante legal"}: ${qualificarPessoa(rep)}`;
+    if (rep && rep.nome) t += `, neste ato representada por ${cargo ? `${gen(rep, "seu", "sua").replace("seu(a)", "seu(sua)")} ${cargo}` : "seu representante legal"}: ${qualificarPessoa(rep)}`;
     return t;
   }
   var ENCARGOS = [
@@ -4413,7 +4498,7 @@ ${FINAIS(`
     const falta = [];
     const pessoa = (pref, rotulo, cond = true) => {
       if (!cond) return;
-      for (const [k, t] of [["genero", "sexo"], ["estado_civil", "estado civil"], ["profissao", "profissão"], ["cpf", "CPF"], ["endereco", "endereço"]]) if (!c[`${pref}${k}`]) falta.push(`${rotulo}: ${t}`);
+      for (const [k, t] of [["estado_civil", "estado civil"], ["profissao", "profissão"], ["cpf", "CPF"], ["endereco", "endereço"]]) if (!c[`${pref}${k}`]) falta.push(`${rotulo}: ${t}`);
     };
     if (c.inquilino_tipo === "Pessoa jurídica (empresa)") {
       if (!c.inquilino_cpf) falta.push("empresa: CNPJ");
@@ -4853,13 +4938,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return escopo === "iptuano" ? Math.floor(id / 1e4) : id;
   }
   var SUB_ASSINADOS = "Documentos assinados";
-  var escopoDoContrato = (escopo) => escopo === "contrato" || escopo === "assinados";
+  var SUB_ADITIVOS = "Termos aditivos";
+  var escopoDoContrato = (escopo) => ["contrato", "assinados", "aditivos"].includes(escopo);
   var vinculoDoEscopo = (escopo, id) => escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar2("contratos", id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) };
   async function pastaDoEscopo(escopo, id) {
     const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
     if (escopoDoContrato(escopo)) {
       const c = buscar2("contratos", id);
-      return subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...escopo === "assinados" ? [SUB_ASSINADOS] : []]);
+      return subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...escopo === "assinados" ? [SUB_ASSINADOS] : escopo === "aditivos" ? [SUB_ADITIVOS] : []]);
     }
     const i = buscar2("imoveis", imovelDoEscopo(escopo, id));
     if (escopo === "iptuano") return subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 1e4)]);
@@ -4881,8 +4967,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return arquivos.length;
   }
-  var DESTAQUE_ALERTA = { "Vigência do contrato": "vigencia", "Reajuste do aluguel": "reajuste", "Correção do aluguel": "reajuste", "A verificar": "amarelo" };
-  var classeAlerta = (a) => `alerta ${a.nivel} ${DESTAQUE_ALERTA[a.tipo] || ""}`;
+  async function salvarAssinado(escopo, contratoId, arquivo, texto2) {
+    const ponto = arquivo.name.lastIndexOf(".");
+    const ext = ponto > 0 ? arquivo.name.slice(ponto).toLowerCase() : "";
+    const base = texto2.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return salvarArquivo(await pastaDoEscopo(escopo, contratoId), new File([arquivo], `${base}${ext}`));
+  }
+  var SEM_ACENTO = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  var classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === "Padrão" ? "" : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
+  var classeAlerta = (a) => classeEstilo(a.nivel, estiloAlerta(d(), a.tipo));
   function caixaArquivos(escopo, id, titulo2, ancora, ajuda = "", dentro = false, enviar = true) {
     return `<div class="${dentro ? "arquivos-dentro" : "cartao"}" id="${ancora}">${dentro ? `<h3>${esc2(titulo2)}</h3>` : `<h2>${esc2(titulo2)}</h2>`}${ajuda ? `<p class="suave">${esc2(ajuda)}</p>` : ""}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
@@ -4990,19 +5083,19 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     mensagemAuto(el, `Este documento já está cadastrado: <b>${esc2(a.nome)}</b> (${esc2(a.papel)}${achados.length > 1 ? ` e mais ${achados.length - 1}` : ""}).
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc2(a.fonte)}" data-alvo="${esc2(alvo)}">Usar os dados cadastrados</button>`);
   }
-  function ligarImovelDoInquilinoNovo(raiz) {
-    const sel = raiz.querySelector("form[data-form=cadastro] select[name=imovel_id]");
+  function ligarContinuacaoDeContrato(raiz) {
+    const sel = raiz.querySelector("form[data-form=cadastro] select[name=contrato_anterior_id]");
     if (!sel || !/^#\/novo\/contratos/.test(location.hash)) return;
     sel.addEventListener("change", () => {
-      const anterior = sel.value && ultimoContratoDoImovel(d(), Number(sel.value));
+      const anterior = sel.value && buscar2("contratos", sel.value);
       if (!anterior) return mensagemAuto(sel, "");
       const campos = CONTRATO.filter((c) => c.nome && c.tipo !== "simnao");
-      const feitos = preencherVazios(sel.form, paraFormulario(campos, condicoesDoAnterior(d(), anterior)), paraFormulario(campos, null));
-      mensagemAuto(sel, feitos.length ? `Copiado do inquilino anterior (${esc2(anterior.inquilino_nome)}): ${esc2(feitos.join(", "))}. Confira os valores.` : "");
+      const feitos = preencherVazios(sel.form, paraFormulario(campos, condicoesDoContrato(d(), anterior)), paraFormulario(campos, null));
+      mensagemAuto(sel, feitos.length ? `Continuação do contrato de ${esc2(anterior.inquilino_nome)}: ${esc2(feitos.join(", "))} vieram do contrato anterior. Confira os valores.` : "");
     });
   }
   function ligarCamposAutomaticos(raiz) {
-    ligarImovelDoInquilinoNovo(raiz);
+    ligarContinuacaoDeContrato(raiz);
     for (const el of raiz.querySelectorAll("input[data-mascara]")) {
       el.addEventListener("input", () => {
         const novo = mascarar(el.dataset.mascara, el.value);
@@ -5027,6 +5120,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
   }
   var TELAS = {
+    _previaAlerta: (el, cor, enfase) => {
+      el.className = classeEstilo("aviso", { cor, enfase });
+    },
     _listaArquivos: listaArquivos,
     restaurarBackup: () => telaRestaurarBackup(),
     "backup-seguro": () => telaBackupSeguro(),
@@ -5188,7 +5284,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ${podeUsuario("admin") && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao("reconectarSeguro", "Reconectar o backup seguro", {}, "secundario pequeno")}</div>` : ""}
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc2(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
       ${calendarioDoPainel(rota.q.mes || competenciaDe(hoje2), hoje2)}
-      <div class="cartao"><h2>Alertas</h2>
+      <div class="cartao"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
         ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc2(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}">${esc2(a.imovel)}${a.inquilino ? ` · ${esc2(a.inquilino)}` : ""}</a>: ${esc2(a.texto)}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
@@ -5252,6 +5348,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     vistoria: (rota) => telaVistoria(rota),
     "modelo-vistoria": (rota) => telaModeloVistoria(rota),
     fechamento: (rota) => telaFechamento(rota.q.mes || competenciaDe(hojeIso())),
+    "alertas-config"() {
+      if (!podeUsuario("admin")) return '<div class="alerta erro">Só administradores mudam a aparência dos alertas.</div>';
+      const opcoes = (lista3, v) => lista3.map((x) => `<option ${x === v ? "selected" : ""}>${esc2(x)}</option>`).join("");
+      const linhas2 = TIPOS_ALERTA.map((t) => [t, estiloAlerta(d(), t)]).sort((a, b) => a[1].prioridade - b[1].prioridade).map(([t, e], n) => `<tr>
+      <td><b>${esc2(t)}</b><input type="hidden" name="tipo_${n}" value="${esc2(t)}"></td>
+      <td><select name="cor_${n}" data-previa="${n}">${opcoes(CORES_ALERTA, e.cor)}</select></td>
+      <td><select name="enfase_${n}" data-previa="${n}">${opcoes(ENFASES_ALERTA, e.enfase)}</select></td>
+      <td><input type="number" name="prioridade_${n}" min="1" max="99" value="${e.prioridade}" style="width:70px"></td>
+      <td style="min-width:260px"><div class="${classeEstilo("aviso", e)}" id="previa_${n}" style="margin:0"><b>${esc2(t)}</b> exemplo de aviso</div></td></tr>`).join("");
+      return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência dos alertas</h1>
+      <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
+        Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
+      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Como fica</th></tr>${linhas2}</table></div>
+        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao("estilosAlertasPadrao", "Voltar ao padrão do sistema", {}, "secundario", "Voltar todos os alertas para a aparência padrão?")} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
+    },
     pendencias: () => telaPendencias(),
     "modelo-contrato": (rota) => telaModelo(rota),
     empresas: () => telaEmpresas(),
@@ -5547,8 +5658,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   function faixaDocumentosEntrada(c) {
-    if (!c.docs_entrada || !contratoAtivo(c)) return "";
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]);
+    if (!contratoAtivo(c)) return "";
+    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d(), c, k));
     if (!falta.length) return "";
     const g = geradoresDocumentos(c, "botao pequeno");
     return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc2(falta.map(([, t]) => t.toLocaleLowerCase("pt-BR")).join(", "))}.
@@ -5558,20 +5669,44 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const hoje2 = hojeIso();
     const vistorias = vistoriasDo(d(), c.id);
     const gerar = geradoresDocumentos(c);
+    const doc = (k) => documentoEntrada(d(), c, k);
+    const herdado = (k) => doc(k) && doc(k).contrato.id !== c.id;
+    const abrir = (k) => doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc2(doc(k).arquivo)}">📎 ${esc2(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>';
     const linhas2 = DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc2(nome)}</b></td>
-    <td>${c[k] ? etiqueta(`${feito} em ${dataBr2(c[k])}`, "ok") : etiqueta("pendente", c.docs_entrada ? "perigo" : "neutra")}</td>
+    <td>${doc(k) ? `${etiqueta(`${feito} em ${dataBr2(doc(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc2(doc(k).contrato.inquilino_nome)}</a></span>` : ""}` : etiqueta("pendente", "perigo")}</td>
     <td class="nw">${gerar[k]}</td>
-    <td class="n nw">${!opera() ? "" : c[k] ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente?`) : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${hoje2}" style="width:auto"><button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join("");
-    return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Documentos de entrada e vistorias</h2>
+    <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
+      ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ""}` : !opera() ? "" : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${hoje2}" style="width:auto">
+        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join("");
+    return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, "Fazer vistoria de saída") : ""}</div>
     <div class="rolagem"><table>${linhas2}</table></div>
     ${vistorias.length ? `<h3>Vistorias</h3><table><tr><th>Tipo</th><th>Data</th><th></th></tr>${vistorias.map((v) => `<tr><td>${esc2(v.tipo)}</td><td>${dataBr2(v.data)}</td>
       <td class="n nw">${link(`#/imprimir/vistoria?id=${v.id}`, "Ver / imprimir")} ${opera() ? link(`#/vistoria/${v.id}`, "Editar") : ""}
       ${podeUsuario("admin") ? botao("excluir", "Excluir", { tabela: "vistorias", id: v.id }, "perigo pequeno", `Excluir a vistoria de ${v.tipo.toLocaleLowerCase("pt-BR")} de ${dataBr2(v.data)}?`) : ""}</td></tr>`).join("")}</table>` : ""}
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc2(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc2(c.vistoria_link)}</span>` : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
-    ${caixaArquivos("assinados", c.id, "Documentos assinados (histórico)", "assinados", "Anexe aqui o contrato, a vistoria e o termo de entrega das chaves já assinados (PDF ou foto).", true)}
-    ${c.docs_entrada ? "" : '<p class="suave">Inquilino cadastrado antes deste controle: os documentos pendentes não geram alerta.</p>'}</div>`;
+    <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar".</p>
+    <details><summary>Todos os arquivos assinados guardados</summary>${caixaArquivos("assinados", c.id, "Documentos assinados", "assinados", "", true, false)}
+      ${cadeiaDeContratos(d(), c).antes.reverse().map((x) => caixaArquivos("assinados", x.id, `Histórico: contrato anterior de ${x.inquilino_nome}`, `assinados-${x.id}`, "", true, false)).join("")}</details>
+    ${caixaAditivos(c)}</div>`;
+  }
+  function caixaAditivos(c) {
+    const lista3 = aditivosDo(d(), c.id);
+    const abrir = (a) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc2(a.arquivo)}">📎 ${esc2(a.arquivo)}</a>`;
+    const anteriores = cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, aditivosDo(d(), x.id)]).filter(([, l]) => l.length);
+    return `<h3 id="aditivos">Termos aditivos</h3>
+    ${c.possui_aditivos && !lista3.length ? '<div class="alerta aviso">O contrato está marcado com "Possui termo aditivo" (mudou o vencimento ou a garantia), mas nenhum termo foi registrado aqui. Registre-o com o arquivo assinado.</div>' : ""}
+    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr2(a.data)}</td><td>${esc2(a.assunto)}</td><td>${abrir(a)}</td>
+      <td class="n">${opera() ? botao("excluir", "Excluir", { tabela: "aditivos", id: a.id }, "perigo pequeno", `Excluir o termo aditivo de ${dataBr2(a.data)}? O arquivo continua guardado na pasta.`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
+    ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc2(x.inquilino_nome)}</a> (${l.length})</summary>
+      <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr2(a.data)}</td><td>${esc2(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join("")}</table></div></details>`).join("")}
+    ${opera() ? `<form data-form="aditivo" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
+      <input type="date" name="data" value="${hojeIso()}" style="width:auto">
+      <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
+      <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <button class="secundario pequeno">Registrar aditivo</button></form>` : ""}`;
   }
   function telaContrato(c) {
     const i = buscar2("imoveis", c.imovel_id);
@@ -5593,8 +5728,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc2(i.nome)}</a> · ` : ""}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc2(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc2(c.inquilino_apelido)})</span>` : ""}</h1><div class="acoes">
       ${opera() ? link(`#/editar/contratos/${c.id}`, "Editar", "botao") : ""}
-      ${link(`#/contrato/${c.id}?ir=documentos`, "Documentos de entrada e vistorias", "botao secundario")}
-      ${link(`#/contrato-gerar/${c.id}`, "Gerar contrato", "botao secundario")}
+      ${link(`#/contrato/${c.id}?ir=documentos`, "Contrato, Vistoria, Termos e Aditivos", "botao secundario")}
       ${podeUsuario("admin") ? botao("excluir", "Excluir", { tabela: "contratos", id: c.id }, "perigo", "Excluir este contrato e todos os seus boletos?") : ""}</div></div>
     ${i ? `<div class="endereco">📍 ${esc2(i.nome)} · ${esc2(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ""}
@@ -5745,13 +5879,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const imoveis = ordenar(d().imoveis, "nome").map((i) => [String(i.id), `${i.nome}${!r && vago(i) ? " · vago" : ""}`]);
         const semFiadorNoForm = r && fiadoresDo(d(), r.id).length;
         const imovelNoNovo = (c) => c.nome === "imovel_id" && !q.vincular;
-        return comListas(CONTRATO.filter((c) => (r || !c.soEditar || imovelNoNovo(c)) && !(semFiadorNoForm && c.fiador)).map((c) => c.nome === "contrato_anterior_id" ? { ...c, opcoes: ops } : c.nome === "imovel_id" ? { ...c, opcoes: imoveis, ...r ? {} : { ajuda: "Escolha o imóvel deste inquilino. As condições do inquilino anterior do imóvel entram nos campos vazios. Em branco: sem imóvel (não gera boleto)" } } : c));
+        return comListas(CONTRATO.filter((c) => (r || !c.soEditar || imovelNoNovo(c)) && !(semFiadorNoForm && c.fiador)).map((c) => c.nome === "contrato_anterior_id" ? { ...c, opcoes: ops } : c.nome === "imovel_id" ? { ...c, opcoes: imoveis, ...r ? {} : { ajuda: "Escolha o imóvel deste inquilino. Em branco: sem imóvel (não gera boleto)" } } : c));
       },
-      padrao: (q) => {
-        if (q.imovel) return { imovel_id: Number(q.imovel) };
-        const anterior = q.vincular && ultimoContratoDoImovel(d(), Number(q.vincular));
-        return anterior ? condicoesDoAnterior(d(), anterior) : {};
-      },
+      // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
+      // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
+      padrao: (q) => ({ ...q.pessoa ? dadosDaPessoa(buscar2("contratos", q.pessoa)) : {}, ...q.imovel ? { imovel_id: Number(q.imovel) } : {} }),
       valores: (r) => ({
         ...r,
         ativo: r.ativo !== false,
@@ -5765,11 +5897,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r)
       }),
       conferir: conferirContrato,
-      aviso: (r, q) => {
-        if (r) return 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: anexe o termo assinado em "Arquivos do inquilino".';
-        const anterior = q && q.vincular && ultimoContratoDoImovel(d(), Number(q.vincular));
-        return anterior ? `Condições copiadas do inquilino anterior deste imóvel (${anterior.inquilino_nome}): prazo, índice, vencimento, bonificação, multa e juros, contas inclusas, garantia e finalidade; aluguel sugerido = o atual dele. Preencha a pessoa nova e confira os valores.` : "";
-      },
+      aviso: (r, q) => !r && q && q.pessoa ? `Contrato novo de ${buscar2("contratos", q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).` : r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : "",
       voltar: (r, q) => r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : "#/inquilinos",
       descricao: (dados, r) => dados.inquilino_nome || r && r.inquilino_nome,
       // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
@@ -5812,7 +5940,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         avisoAditivo = "";
         if (r && (dados.dia_vencimento !== r.dia_vencimento || r.garantia_tipo && dados.garantia_tipo !== r.garantia_tipo)) {
           dados.possui_aditivos = true;
-          avisoAditivo = `Você mudou ${dados.dia_vencimento !== r.dia_vencimento ? "o dia do vencimento" : "a garantia"}: anexe o termo aditivo assinado em "Arquivos do inquilino". O contrato ficou marcado com "Possui termo aditivo".`;
+          avisoAditivo = `Você mudou ${dados.dia_vencimento !== r.dia_vencimento ? "o dia do vencimento" : "a garantia"}: registre o termo aditivo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino). O contrato ficou marcado com "Possui termo aditivo".`;
         }
         dados.pasta = nomePastaContrato({ ...r, ...dados });
       },
@@ -6002,7 +6130,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       aviso: (r, q) => {
         const c = buscar2("contratos", q.contrato);
         const v = valorGarantia(d(), c);
-        return `Garantia atual: ${c.garantia_tipo || "não informada"}${v ? ` de ${reais2(v)}` : ""}. Ela fica guardada no histórico do contrato. A troca exige termo aditivo: depois de salvar, anexe o termo assinado em "Arquivos do inquilino".`;
+        return `Garantia atual: ${c.garantia_tipo || "não informada"}${v ? ` de ${reais2(v)}` : ""}. Ela fica guardada no histórico do contrato. A troca exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).`;
       },
       voltar: (r, q) => `#/contrato/${q.contrato}`,
       destino: (salvo, q) => temFiador({ garantia_tipo: salvo.tipo_novo }) && !fiadoresDo(d(), Number(q.contrato)).length ? `#/novo/fiadores?contrato=${q.contrato}` : `#/contrato/${q.contrato}`,
@@ -6028,23 +6156,18 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const c = q.contrato ? buscar2("contratos", q.contrato) : null;
         return { contrato_id: c ? c.id : null, data_entrada: c && !c.imovel_id && c.data_entrada || hojeIso() };
       },
-      aviso: () => "Escolha o inquilino. Se ele já aluga outro imóvel, é criado um contrato novo para este imóvel com os dados dele: depois confira os valores.",
+      aviso: () => "Escolha o inquilino. Se ele já aluga outro imóvel, abre o cadastro de um contrato novo para este imóvel com os dados da pessoa; as condições do contrato são escolhidas de novo.",
       extraHtml: (r, q) => `<p class="suave" style="margin-top:12px">O inquilino não está na lista? ${link(`#/novo/contratos?vincular=${q.imovel}`, "Cadastrar novo inquilino")}</p>`,
       voltar: (r, q) => `#/imovel/${q.imovel}`,
       salvar(db, dados, q) {
         antesDoVinculo = { ...buscar(db, "contratos", dados.contrato_id) };
+        if (antesDoVinculo.imovel_id) return buscar(db, "contratos", dados.contrato_id);
         const c = vincularInquilino(db, Number(q.imovel), dados, login());
         if (c.pasta !== nomePastaContrato(c)) atualizar(db, "contratos", c.id, { pasta: nomePastaContrato(c) }, login(), "Pasta de arquivos");
         return c;
       },
-      depois: (salvo) => antesDoVinculo && antesDoVinculo.id === salvo.id ? CADASTROS.contratos.depois(salvo, antesDoVinculo) : null,
-      destino: (salvo) => {
-        if (antesDoVinculo && antesDoVinculo.id !== salvo.id) {
-          aviso("Contrato novo criado para este imóvel com os dados do inquilino. Confira aluguel, datas e garantia e salve.", "aviso");
-          return `#/editar/contratos/${salvo.id}`;
-        }
-        return `#/contrato/${salvo.id}`;
-      }
+      depois: (salvo) => antesDoVinculo && !antesDoVinculo.imovel_id ? CADASTROS.contratos.depois(salvo, antesDoVinculo) : null,
+      destino: (salvo, q) => antesDoVinculo && antesDoVinculo.imovel_id ? `#/novo/contratos?vincular=${q.imovel}&pessoa=${salvo.id}` : `#/contrato/${salvo.id}`
     },
     leituras: {
       titulo: (r, q) => `Leitura dos relógios - ${buscar2("imoveis", r ? r.imovel_id : q.imovel).nome}`,
@@ -6201,9 +6324,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
       if (!c.inquilino_telefone) falta.push("telefone");
       if (!c.inquilino_email) falta.push("e-mail");
-      if (c.docs_entrada) {
-        for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) if (!c[k]) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo" });
-      }
+      for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) if (!documentoEntrada(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo" });
       if (falta.length) out.push({ tipo: "Inquilino", nome: c.inquilino_nome, onde: (buscar2("imoveis", c.imovel_id) || {}).nome || "", falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
     }
     for (const i of d().imoveis) {
@@ -6595,7 +6716,7 @@ Salvar assim mesmo?`)) {
     const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje2 ? "" : "hidden"}>
       <h3>${dataBr2(dia)} · ${semana[paraData(dia).getUTCDay()]}${dia === hoje2 ? " · hoje" : ""}</h3>
       ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, "info")} <a href="${destino(e)}">${esc2(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join("")}</div>`).join("");
-    return `<div class="cartao" id="calendario"><div class="cabecalho"><h2>Calendário de ${compBr2(mes)}</h2>
+    return `<div class="cartao" id="calendario"><div class="cabecalho"><div class="acoes"><h2 style="margin:0">Calendário de ${compBr2(mes)}</h2>${link(`#/fechamento?mes=${mes}`, "Abrir o fechamento do mês", "botao pequeno")}</div>
       <div class="acoes">${link(`#/?mes=${somarMeses(mes, -1)}`, `← ${compBr2(somarMeses(mes, -1))}`)} ${link("#/", "Mês atual")} ${link(`#/?mes=${somarMeses(mes, 1)}`, `${compBr2(somarMeses(mes, 1))} →`)}</div></div>
     <div class="cal-grade">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join("")}${celulas.join("")}</div>
     ${agendas || ""}
@@ -7322,7 +7443,22 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     async marcarDocumento(form) {
       const f = Object.fromEntries(new FormData(form));
       if (!f.data) throw new Error("Informe a data.");
-      await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login()));
+      const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
+      const arquivo = form.querySelector("[name=arquivo]").files[0];
+      if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
+      const nome = await salvarAssinado("assinados", Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
+      await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
+      await mostrar();
+    },
+    async aditivo(form) {
+      const f = Object.fromEntries(new FormData(form));
+      const arquivo = form.querySelector("[name=arquivo]").files[0];
+      if (!f.data) throw new Error("Informe a data do termo aditivo.");
+      if (!String(f.assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
+      if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+      const nome = await salvarAssinado("aditivos", Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
+      await alterar((db) => registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome }, login()));
+      aviso("Termo aditivo registrado.");
       await mostrar();
     },
     async vistoria(form) {
@@ -7571,6 +7707,14 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       aviso("Logo salva.");
       await mostrar();
     },
+    async estilosAlertas(form) {
+      const f = Object.fromEntries(new FormData(form));
+      const estilos = {};
+      for (let n = 0; f[`tipo_${n}`] !== void 0; n += 1) estilos[f[`tipo_${n}`]] = { cor: f[`cor_${n}`], enfase: f[`enfase_${n}`], prioridade: f[`prioridade_${n}`] };
+      await alterar((db) => salvarEstilosAlertas(db, estilos, login()));
+      aviso("Aparência dos alertas salva.");
+      ir("#/");
+    },
     async proximaFatura(form) {
       const n = Number(new FormData(form).get("numero"));
       if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
@@ -7641,6 +7785,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     avulsas: { checar: (db, r) => faturasDe(db, "avulsa", r.id).length ? "Esta NF avulsa já tem número." : null },
     encerramentos: { admin: true },
     vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
+    aditivos: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
     despesas: {},
     ressarcimentos: {
       checar: (db, r) => (db.cobrancas.find((cb) => cb.contrato_id === r.contrato_id && cb.competencia === r.competencia_abatimento) || {}).data_pagamento ? "Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes." : null,
@@ -7813,6 +7958,11 @@ ${MODELO_COMODOS[comodo].join("\n")}
       await alterar((db) => marcarCondominioConferido(db, Number(id), mes, login()));
       await mostrar();
     },
+    async estilosAlertasPadrao() {
+      await alterar((db) => salvarEstilosAlertas(db, {}, login()));
+      aviso("Alertas de volta ao padrão do sistema.");
+      await mostrar();
+    },
     async desmarcarDocumento({ contrato, campo: campo2 }) {
       await alterar((db) => marcarDocumento(db, Number(contrato), campo2, null, login()));
       await mostrar();
@@ -7863,7 +8013,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           for (const t of ["participacoes", "seguros", "leituras", "reformas", "iptus", "titularidades", "despesas", "vistorias"]) db[t].filter((p2) => p2.imovel_id === reg.id).forEach((p2) => excluir(db, t, p2.id, login()));
         }
         if (tabela === "contratos") {
-          for (const t of ["cobrancas", "correcoes", "fiadores", "aplicacoes", "correcoes_garantia", "renovacoes", "encerramentos", "trocas_garantia", "leituras", "solicitacoes", "vistorias", "ressarcimentos"]) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => excluir(db, t, x.id, login()));
+          for (const t of ["cobrancas", "correcoes", "fiadores", "aplicacoes", "correcoes_garantia", "renovacoes", "encerramentos", "trocas_garantia", "leituras", "solicitacoes", "vistorias", "aditivos", "ressarcimentos"]) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => excluir(db, t, x.id, login()));
         }
         excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || reg.descricao || null);
         if (cfg.recalcular) recalcularCobrancas(db, cfg.recalcular(db, reg), login());
@@ -8532,6 +8682,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await montarExtras(app);
       const alvo = rota.q.ir && document.getElementById(rota.q.ir);
       if (alvo) alvo.scrollIntoView({ block: "start" });
+      if (rota.q.ir) history.replaceState(null, "", location.href.replace(/([?&])ir=[^&]*&?/, "$1").replace(/[?&]$/, ""));
     } catch (e) {
       console.error(e);
       app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
@@ -8591,6 +8742,17 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
       return;
     }
+    if (ev.target.matches("select[data-previa]")) {
+      const n = ev.target.dataset.previa;
+      const f = ev.target.form;
+      TELAS._previaAlerta(document.getElementById(`previa_${n}`), f[`cor_${n}`].value, f[`enfase_${n}`].value);
+      return;
+    }
+    if (ev.target.matches("input[data-arquivo-doc]")) {
+      const nome = ev.target.closest("label").querySelector("[data-nome-escolhido]");
+      nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : "Anexar";
+      return;
+    }
     const el = ev.target.closest("input[data-upload]");
     if (!el || !el.files.length) return;
     try {
@@ -8613,7 +8775,17 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     ev.preventDefault();
     el.parentElement.querySelector("[data-acao=incluirNaLista]").click();
   });
-  window.addEventListener("hashchange", () => mostrar());
+  window.addEventListener("hashchange", async () => {
+    const ir2 = rotaAtual().q.ir;
+    await mostrar();
+    if (!ir2) scrollTo(0, 0);
+  });
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest('a[href^="#/"]');
+    if (!a || a.target || ev.ctrlKey || ev.metaKey || ev.shiftKey || a.getAttribute("href") !== location.hash) return;
+    ev.preventDefault();
+    mostrar();
+  });
   window.addEventListener("focus", verificarMudancasExternas);
   setInterval(verificarMudancasExternas, 3e4);
   (async function iniciar() {
