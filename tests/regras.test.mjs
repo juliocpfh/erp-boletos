@@ -720,3 +720,21 @@ test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui
   assert.equal(c.possui_aditivos, true);
   assert.deepEqual(R.aditivosDo(d, c.id).map((a) => a.arquivo), ['b.pdf', 'a.pdf']);
 });
+
+test('documentos de entrada: quem continua o contrato de outro herda os documentos assinados e vê os aditivos anteriores', () => {
+  const { d, c } = base();
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2025-01-10', 'julio', 'contrato.pdf');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2025-01-10', 'julio', 'vistoria.pdf');
+  R.registrarAditivo(d, c.id, { data: '2025-06-01', assunto: 'Troca do vencimento', arquivo: 'ad1.pdf' }, 'julio');
+  R.registrarAditivo(d, c.id, { data: '2025-09-01', assunto: 'Troca da garantia', arquivo: 'ad2.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id,
+    doc_contrato_em: null, doc_contrato_arquivo: null, doc_vistoria_em: null, doc_vistoria_arquivo: null, doc_chaves_em: null }, 'julio');
+  const h = R.documentoEntrada(d, novo, 'doc_contrato_em');
+  assert.equal(h.contrato.id, c.id);
+  assert.equal(h.arquivo, 'contrato.pdf');
+  assert.match(R.alertaDocumentosEntrada(novo, d).texto, /^falta recibo de entrega das chaves\.$/, 'só falta o que o anterior também não tinha');
+  R.marcarDocumento(d, novo.id, 'doc_vistoria_em', '2026-10-15', 'julio', 'vistoria-nova.pdf');
+  assert.equal(R.documentoEntrada(d, novo, 'doc_vistoria_em').contrato.id, novo.id, 'o documento próprio vale mais que o herdado');
+  assert.equal(R.aditivosDo(d, R.cadeiaDeContratos(d, novo).antes[0].id).length, 2, 'mais de um aditivo no histórico');
+});

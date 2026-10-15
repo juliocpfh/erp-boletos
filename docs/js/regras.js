@@ -1097,7 +1097,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
-    alertaDocumentosEntrada(contrato),
+    alertaDocumentosEntrada(contrato, d),
     alertaCondominio(contrato, hoje),
   ].filter(Boolean);
 }
@@ -1114,10 +1114,23 @@ export const DOCUMENTOS_ENTRADA = [
 /** Arquivo assinado de cada documento: doc_contrato_em → doc_contrato_arquivo. */
 export const campoArquivoDoc = (campo) => campo.replace(/_em$/, '_arquivo');
 
-/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados. */
-export function alertaDocumentosEntrada(c) {
+/**
+ * Situação de um documento de entrada. Quem "continua o contrato de" outro (ex.: troca de titular) herda o documento
+ * assinado no contrato anterior (o mais recente da cadeia), enquanto não tiver um próprio.
+ * Devolve { data, arquivo, contrato } (contrato = de onde veio) ou null se está pendente.
+ */
+export function documentoEntrada(d, c, campo) {
+  const arq = campoArquivoDoc(campo);
+  if (c[campo]) return { data: c[campo], arquivo: c[arq] || null, contrato: c };
+  if (!d) return null;
+  const x = [...cadeiaDeContratos(d, c).antes].reverse().find((a) => a[campo]);
+  return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
+}
+
+/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
+export function alertaDocumentosEntrada(c, d = null) {
   if (c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
 }
 
