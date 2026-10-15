@@ -961,17 +961,6 @@ const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', '
 export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
   .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
 
-/**
- * Condições do inquilino anterior do imóvel, para começar o cadastro do próximo: prazo, índice, vencimento,
- * bonificação, multa e juros, contas inclusas, garantia e finalidade. O aluguel sugerido é o atual do anterior.
- */
-export function condicoesDoAnterior(d, anterior) {
-  const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
-  const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
-  out.aluguel_inicial = aluguelAtual(d, anterior);
-  return out;
-}
-
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
   const doc = String(c.inquilino_cpf || '').replace(/\D/g, '');

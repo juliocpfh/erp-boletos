@@ -577,11 +577,6 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
   const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').find((e) => e.tipo === 'Fechamento');
   assert.equal(ev.data, '2026-08-31');
-  c.conta_agua = 'Incluso no aluguel';
-  const cond = R.condicoesDoAnterior(d, c);
-  assert.equal(cond.conta_agua, 'Incluso no aluguel');
-  assert.equal(cond.aluguel_inicial, R.aluguelAtual(d, c));
-  assert.equal(cond.inquilino_nome, undefined, 'a pessoa não é copiada');
   assert.equal(R.ultimoContratoDoImovel(d, loja.id).id, c.id);
 });
 

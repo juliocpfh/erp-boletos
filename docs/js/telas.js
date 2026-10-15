@@ -260,21 +260,7 @@ function procurarPessoa(el) {
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
 }
 
-/** Inquilino novo: ao escolher o imóvel, as condições do inquilino anterior entram nos campos vazios. */
-function ligarImovelDoInquilinoNovo(raiz) {
-  const sel = raiz.querySelector('form[data-form=cadastro] select[name=imovel_id]');
-  if (!sel || !/^#\/novo\/contratos/.test(location.hash)) return;
-  sel.addEventListener('change', () => {
-    const anterior = sel.value && R.ultimoContratoDoImovel(d(), Number(sel.value));
-    if (!anterior) return mensagemAuto(sel, '');
-    const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
-    const feitos = preencherVazios(sel.form, F.paraFormulario(campos, R.condicoesDoAnterior(d(), anterior)), F.paraFormulario(campos, null));
-    mensagemAuto(sel, feitos.length ? `Copiado do inquilino anterior (${esc(anterior.inquilino_nome)}): ${esc(feitos.join(', '))}. Confira os valores.` : '');
-  });
-}
-
 function ligarCamposAutomaticos(raiz) {
-  ligarImovelDoInquilinoNovo(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
     el.addEventListener('input', () => {
       const novo = F.mascarar(el.dataset.mascara, el.value);
@@ -1061,23 +1047,16 @@ const CADASTROS = {
       const imovelNoNovo = (c) => c.nome === 'imovel_id' && !q.vincular;
       return comListas(F.CONTRATO.filter((c) => (r || !c.soEditar || imovelNoNovo(c)) && !(semFiadorNoForm && c.fiador))
         .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops }
-          : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis, ...(r ? {} : { ajuda: 'Escolha o imóvel deste inquilino. As condições do inquilino anterior do imóvel entram nos campos vazios. Em branco: sem imóvel (não gera boleto)' }) } : c)));
+          : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis, ...(r ? {} : { ajuda: 'Escolha o imóvel deste inquilino. Em branco: sem imóvel (não gera boleto)' }) } : c)));
     },
-    padrao: (q) => {
-      if (q.imovel) return { imovel_id: Number(q.imovel) };
-      const anterior = q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
-      return anterior ? R.condicoesDoAnterior(d(), anterior) : {};
-    },
+    // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
+    padrao: (q) => (q.imovel ? { imovel_id: Number(q.imovel) } : {}),
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r) }),
     conferir: conferirContrato,
-    aviso: (r, q) => {
-      if (r) return 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).';
-      const anterior = q && q.vincular && R.ultimoContratoDoImovel(d(), Number(q.vincular));
-      return anterior ? `Condições copiadas do inquilino anterior deste imóvel (${anterior.inquilino_nome}): prazo, índice, vencimento, bonificação, multa e juros, contas inclusas, garantia e finalidade; aluguel sugerido = o atual dele. Preencha a pessoa nova e confira os valores.` : '';
-    },
+    aviso: (r) => (r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : ''),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
