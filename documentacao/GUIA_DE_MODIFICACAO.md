@@ -24,7 +24,7 @@
 5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato ou imóvel, inclua-a na exclusão em cascata de `ACOES.excluir`.
 
 ## Adicionar uma tela
-1. `telas.js` → função `telaX(rota)` que devolve HTML em texto; registre em `TELAS` com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros.
+1. `telas.js` → função `telaX(rota)` que devolve HTML em texto; registre em `TELAS` com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`.
 3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES`. Formulários: `<form data-form="nome">` + função em `FORMULARIOS`.
 4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota).
