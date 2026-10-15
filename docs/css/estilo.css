@@ -56,9 +56,27 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .alerta.ok { border-color: var(--ok); background: #f0fdf4; }
 .alerta.erro { border-color: var(--perigo); background: #fef2f2; }
 .alerta b { margin-right: 6px; }
-.alerta.vigencia { border-left-width: 8px; border-color: #b91c1c; background: #fecaca; color: #7f1d1d; font-weight: 600; }
-.alerta.reajuste { border-left-width: 8px; border-color: #ea580c; background: #fed7aa; color: #7c2d12; font-weight: 600; }
-.alerta.vigencia a, .alerta.reajuste a { color: inherit; text-decoration: underline; }
+.alerta.cor-vermelho { border-color: #dc2626; background: #fef2f2; }
+.alerta.cor-laranja { border-color: #ea580c; background: #fff7ed; }
+.alerta.cor-amarelo { border-color: #ca8a04; background: #fef9c3; }
+.alerta.cor-verde { border-color: #16a34a; background: #f0fdf4; }
+.alerta.cor-azul { border-color: #2563eb; background: #eff6ff; }
+.alerta.cor-roxo { border-color: #7c3aed; background: #f5f3ff; }
+.alerta.cor-cinza { border-color: #6b7280; background: #f9fafb; }
+.alerta.enfase-forte { border-left-width: 8px; font-weight: 600; }
+.alerta.enfase-forte a { color: inherit; text-decoration: underline; }
+/* cor pela gravidade primeiro; a cor escolhida (cor-*) vem depois e vale mais */
+.alerta.enfase-forte.perigo { background: #fecaca; color: #7f1d1d; }
+.alerta.enfase-forte.aviso { background: #fed7aa; color: #7c2d12; }
+.alerta.enfase-forte.info { background: #bfdbfe; color: #1e3a8a; }
+.alerta.enfase-forte.cor-vermelho { background: #fecaca; color: #7f1d1d; }
+.alerta.enfase-forte.cor-laranja { background: #fed7aa; color: #7c2d12; }
+.alerta.enfase-forte.cor-azul { background: #bfdbfe; color: #1e3a8a; }
+.alerta.enfase-forte.cor-amarelo { background: #fde68a; color: #713f12; }
+.alerta.enfase-forte.cor-verde { background: #bbf7d0; color: #14532d; }
+.alerta.enfase-forte.cor-roxo { background: #ddd6fe; color: #4c1d95; }
+.alerta.enfase-forte.cor-cinza { background: #e5e7eb; color: #1f2937; }
+.alerta.enfase-discreta { border-left-width: 3px; background: #fff; color: var(--suave); font-size: 13px; }
 .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }

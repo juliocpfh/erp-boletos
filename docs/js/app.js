@@ -422,6 +422,12 @@ document.addEventListener('change', async (ev) => {
     ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
     return;
   }
+  if (ev.target.matches('select[data-previa]')) {
+    const n = ev.target.dataset.previa;
+    const f = ev.target.form;
+    TELAS._previaAlerta(document.getElementById(`previa_${n}`), f[`cor_${n}`].value, f[`enfase_${n}`].value);
+    return;
+  }
   if (ev.target.matches('input[data-arquivo-doc]')) {
     const nome = ev.target.closest('label').querySelector('[data-nome-escolhido]');
     nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';

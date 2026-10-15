@@ -1218,12 +1218,40 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
       texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).` });
   }
-  return lista.sort((a, b) => prioridadeAlerta(a) - prioridadeAlerta(b) || ordem[a.nivel] - ordem[b.nivel]);
+  return lista.sort((a, b) => estiloAlerta(d, a.tipo).prioridade - estiloAlerta(d, b.tipo).prioridade || ordem[a.nivel] - ordem[b.nivel]);
 }
 
-/** No topo dos alertas: primeiro a vigência do contrato, depois o reajuste do aluguel; o resto pela gravidade. */
-export const PRIORIDADE_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel'];
-const prioridadeAlerta = (a) => (a.tipo === 'Vigência do contrato' ? 0 : PRIORIDADE_ALERTA.includes(a.tipo) ? 1 : 2);
+// --------------------------------------------------------------------------
+// Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
+// --------------------------------------------------------------------------
+export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
+  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
+  'Titularidade', 'A verificar'];
+/** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
+export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
+export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
+/** Prioridade: 1 aparece primeiro; empate segue a gravidade. */
+const PADRAO_ALERTA = { cor: 'Padrão', enfase: 'Normal', prioridade: 3 };
+export const ESTILOS_ALERTA_PADRAO = {
+  'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 },
+  'Reajuste do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
+  'Correção do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
+  'A verificar': { cor: 'Amarelo', enfase: 'Normal', prioridade: 3 },
+};
+export const estiloAlerta = (d, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...((d && d.estilos_alertas) || {})[tipo] });
+
+/** Grava a aparência escolhida para cada tipo de alerta (só o que difere do padrão do sistema). */
+export function salvarEstilosAlertas(d, estilos, usuario) {
+  const novo = {};
+  for (const [tipo, e] of Object.entries(estilos)) {
+    const p = Math.round(Number(e.prioridade));
+    if (!CORES_ALERTA.includes(e.cor) || !ENFASES_ALERTA.includes(e.enfase) || !(p >= 1 && p <= 99)) throw new Error(`Confira a cor, a ênfase e a prioridade (1 a 99) de "${tipo}".`);
+    const padrao = estiloAlerta(null, tipo);
+    if (e.cor !== padrao.cor || e.enfase !== padrao.enfase || p !== padrao.prioridade) novo[tipo] = { cor: e.cor, enfase: e.enfase, prioridade: p };
+  }
+  registrar(d, usuario, 'Alteração', null, null, 'Aparência dos alertas', { estilos_alertas: { de: d.estilos_alertas || {}, para: novo } });
+  d.estilos_alertas = novo;
+}
 
 // --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco

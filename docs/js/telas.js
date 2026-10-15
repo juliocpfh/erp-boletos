@@ -128,9 +128,10 @@ async function salvarAssinado(escopo, contratoId, arquivo, texto) {
   return S.salvarArquivo(await pastaDoEscopo(escopo, contratoId), new File([arquivo], `${base}${ext}`));
 }
 
-/** Vigência do contrato e reajuste do aluguel ganham cores mais fortes (a vigência é a mais urgente). */
-const DESTAQUE_ALERTA = { 'Vigência do contrato': 'vigencia', 'Reajuste do aluguel': 'reajuste', 'Correção do aluguel': 'reajuste', 'A verificar': 'amarelo' };
-const classeAlerta = (a) => `alerta ${a.nivel} ${DESTAQUE_ALERTA[a.tipo] || ''}`;
+/** Cor e ênfase de cada tipo de alerta (escolhidas em "Editar" nos alertas do Painel). */
+const SEM_ACENTO = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão' ? '' : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
+const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.tipo));
 
 function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
@@ -301,6 +302,7 @@ function ligarCamposAutomaticos(raiz) {
 }
 
 export const TELAS = {
+  _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
   _listaArquivos: listaArquivos,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
@@ -443,7 +445,7 @@ export const TELAS = {
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
-      <div class="cartao"><h2>Alertas</h2>
+      <div class="cartao"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario('admin') ? link('#/alertas-config', 'Editar', 'botao secundario pequeno') : ''}</div>
         ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
@@ -509,6 +511,22 @@ export const TELAS = {
   vistoria: (rota) => telaVistoria(rota),
   'modelo-vistoria': (rota) => telaModeloVistoria(rota),
   fechamento: (rota) => telaFechamento(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  'alertas-config'() {
+    if (!podeUsuario('admin')) return '<div class="alerta erro">Só administradores mudam a aparência dos alertas.</div>';
+    const opcoes = (lista, v) => lista.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const linhas = R.TIPOS_ALERTA.map((t) => [t, R.estiloAlerta(d(), t)]).sort((a, b) => a[1].prioridade - b[1].prioridade).map(([t, e], n) => `<tr>
+      <td><b>${esc(t)}</b><input type="hidden" name="tipo_${n}" value="${esc(t)}"></td>
+      <td><select name="cor_${n}" data-previa="${n}">${opcoes(R.CORES_ALERTA, e.cor)}</select></td>
+      <td><select name="enfase_${n}" data-previa="${n}">${opcoes(R.ENFASES_ALERTA, e.enfase)}</select></td>
+      <td><input type="number" name="prioridade_${n}" min="1" max="99" value="${e.prioridade}" style="width:70px"></td>
+      <td style="min-width:260px"><div class="${classeEstilo('aviso', e)}" id="previa_${n}" style="margin:0"><b>${esc(t)}</b> exemplo de aviso</div></td></tr>`).join('');
+    return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência dos alertas</h1>
+      <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
+        Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
+      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Como fica</th></tr>${linhas}</table></div>
+        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao('estilosAlertasPadrao', 'Voltar ao padrão do sistema', {}, 'secundario', 'Voltar todos os alertas para a aparência padrão?')} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
+  },
+
   pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
@@ -2949,6 +2967,15 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  async estilosAlertas(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const estilos = {};
+    for (let n = 0; f[`tipo_${n}`] !== undefined; n += 1) estilos[f[`tipo_${n}`]] = { cor: f[`cor_${n}`], enfase: f[`enfase_${n}`], prioridade: f[`prioridade_${n}`] };
+    await alterar((db) => R.salvarEstilosAlertas(db, estilos, login()));
+    aviso('Aparência dos alertas salva.');
+    ir('#/');
+  },
+
   async proximaFatura(form) {
     const n = Number(new FormData(form).get('numero'));
     if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
@@ -3217,6 +3244,12 @@ export const ACOES = {
 
   async condominioConferido({ id, mes }) {
     await alterar((db) => R.marcarCondominioConferido(db, Number(id), mes, login()));
+    await mostrar();
+  },
+
+  async estilosAlertasPadrao() {
+    await alterar((db) => R.salvarEstilosAlertas(db, {}, login()));
+    aviso('Alertas de volta ao padrão do sistema.');
     await mostrar();
   },
 

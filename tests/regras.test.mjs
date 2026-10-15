@@ -739,3 +739,15 @@ test('documentos de entrada: quem continua o contrato de outro herda os document
   assert.equal(R.documentoEntrada(d, novo, 'doc_vistoria_em').contrato.id, novo.id, 'o documento próprio vale mais que o herdado');
   assert.equal(R.aditivosDo(d, R.cadeiaDeContratos(d, novo).antes[0].id).length, 2, 'mais de um aditivo no histórico');
 });
+
+test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pela prioridade', () => {
+  const { d } = base();
+  assert.deepEqual(R.estiloAlerta(d, 'Vigência do contrato'), { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 });
+  assert.deepEqual(R.estiloAlerta(d, 'Fiador'), { cor: 'Padrão', enfase: 'Normal', prioridade: 3 });
+  R.salvarEstilosAlertas(d, { Fiador: { cor: 'Roxo', enfase: 'Forte', prioridade: '1' }, 'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 } }, 'julio');
+  assert.deepEqual(d.estilos_alertas, { Fiador: { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } }, 'só guarda o que mudou');
+  assert.deepEqual(R.estiloAlerta(d, 'Fiador'), { cor: 'Roxo', enfase: 'Forte', prioridade: 1 });
+  assert.throws(() => R.salvarEstilosAlertas(d, { Fiador: { cor: 'Rosa', enfase: 'Forte', prioridade: 1 } }, 'julio'), /Confira/);
+  R.salvarEstilosAlertas(d, {}, 'julio');
+  assert.deepEqual(d.estilos_alertas, {});
+});
