@@ -734,6 +734,9 @@ test('documentos de entrada: quem continua o contrato de outro herda os document
   assert.equal(h.contrato.id, c.id);
   assert.equal(h.arquivo, 'contrato.pdf');
   assert.match(R.alertaDocumentosEntrada(novo, d).texto, /^falta recibo de entrega das chaves\.$/, 'só falta o que o anterior também não tinha');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2025-01-11', 'julio', 'chaves.pdf');
+  assert.equal(R.documentoEntrada(d, novo, 'doc_chaves_em').arquivo, 'chaves.pdf', 'o recibo das chaves também é herdado');
+  assert.equal(R.alertaDocumentosEntrada(novo, d), null);
   R.marcarDocumento(d, novo.id, 'doc_vistoria_em', '2026-10-15', 'julio', 'vistoria-nova.pdf');
   assert.equal(R.documentoEntrada(d, novo, 'doc_vistoria_em').contrato.id, novo.id, 'o documento próprio vale mais que o herdado');
   assert.equal(R.aditivosDo(d, R.cadeiaDeContratos(d, novo).antes[0].id).length, 2, 'mais de um aditivo no histórico');

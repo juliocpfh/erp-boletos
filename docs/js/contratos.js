@@ -74,10 +74,9 @@ export const ordinalPorExtenso = (n) => [ORD_DEZ[Math.floor(n / 10)], ORD_UNID[n
 // --------------------------------------------------------------------------
 // Qualificação das partes
 // --------------------------------------------------------------------------
-// O campo "sexo" saiu do formulário: sem ele, o texto usa a forma neutra (brasileiro(a), portador(a)...).
-// Cadastros antigos com o sexo gravado continuam com a forma certa.
+// Sexo "Neutro" ou em branco: o texto usa a forma neutra (brasileiro(a), portador(a)...).
 const fem = (p) => p.genero === 'Feminino';
-const neutro = (p) => !p.genero;
+const neutro = (p) => !['Masculino', 'Feminino'].includes(p.genero);
 const gen = (p, m, f) => (neutro(p) ? `${m}(${f.slice(-1)})` : fem(p) ? f : m);
 const flexao = (p) => (neutro(p) ? 'o(a)' : fem(p) ? 'a' : 'o');
 /** "solteiro" / "solteira" a partir de "Solteiro(a)". */

@@ -153,8 +153,11 @@ export const VINCULO = [
 ];
 
 /** Qualificação da pessoa no contrato (nacionalidade, estado civil, profissão, nascimento, endereço). */
+/** Sexo para a concordância no contrato; "Neutro" escreve brasileiro(a), solteiro(a), portador(a). */
+export const GENEROS = ['Masculino', 'Feminino', 'Neutro – o(a)'];
 export const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'Separado(a)', 'União estável'];
 const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
+  campo(`${prefixo}genero`, 'Sexo (para a concordância no contrato)', 'opcao', { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
   campo(`${prefixo}nacionalidade`, 'Nacionalidade', 'texto', { padrao: 'brasileira', ...extra }),
   campo(`${prefixo}estado_civil`, 'Estado civil', 'opcao', { opcoes: ESTADOS_CIVIS, ...extra }),
   campo(`${prefixo}profissao`, 'Profissão', 'texto', extra),
