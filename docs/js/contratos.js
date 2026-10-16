@@ -168,7 +168,7 @@ export function dadosDoContrato(d, c, extra = {}) {
   const inquilinoPaga = ENCARGOS.filter(([k]) => (c[k] || (k === 'conta_iptu' ? (c.cobrar_iptu ? 'Por conta do inquilino' : '') : '')) === 'Por conta do inquilino').map(([, t]) => t);
   const inclusos = ENCARGOS.filter(([k]) => c[k] === 'Incluso no aluguel').map(([, t]) => t);
   const endereco = [imovel.endereco, imovel.complemento].filter(Boolean).join(', ');
-  const situado = [endereco, imovel.bairro, imovel.cidade ? `${imovel.cidade}/PR` : ''].filter(Boolean).join(', ');
+  const situado = [endereco, imovel.bairro, imovel.cidade ? `${imovel.cidade}/${imovel.uf || 'PR'}` : ''].filter(Boolean).join(', ');
   const caucaoMeses = c.caucao_meses || (c.caucao_valor && aluguel ? Math.round(c.caucao_valor / bonificado) : 0);
   const campos = {
     locadoras: locadoras.map((e) => qualificarEmpresa(e.razao_social || e.nome, e.cnpj, e.endereco_sede || e.endereco, pessoaDe(e, 'representante_'), e.representante_cargo)).join('; e '),

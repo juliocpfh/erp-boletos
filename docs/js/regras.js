@@ -69,6 +69,10 @@ export function normalizar(d) {
     }
     delete s.contrato_id;
   }
+  // o Estado (UF) do imóvel passou a ser guardado: vem do CEP
+  for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
+  // contrato sem imóvel passou a ter prazo para ser vinculado: os que já existiam contam a partir de hoje
+  for (const c of d.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = C.hojeIso();
   return d;
 }
 
@@ -1103,6 +1107,29 @@ export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
  * Se o inquilino já está em outro imóvel, cria um contrato novo para este imóvel com os dados da pessoa
  * (o mesmo inquilino pode alugar mais de um imóvel). Devolve o contrato vinculado.
  */
+/** Dias que um contrato pode ficar sem imóvel; depois disso ele é apagado sozinho (pedido do usuário). */
+export const DIAS_SEM_IMOVEL = 7;
+
+/** Data em que o contrato sem imóvel será apagado (ex.: sem imóvel desde 10/10 → apagado em 17/10), ou null. */
+export function dataApagarSemImovel(c) {
+  return !c.imovel_id && c.sem_imovel_desde ? C.somarDias(c.sem_imovel_desde, DIAS_SEM_IMOVEL) : null;
+}
+
+/** Contratos sem imóvel há 7 dias ou mais e sem boleto: são apagados ao abrir o sistema. */
+export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
+  return d.contratos.filter((c) => { const data = dataApagarSemImovel(c); return data && data <= hoje && !d.cobrancas.some((x) => x.contrato_id === c.id); });
+}
+
+/** Exclui o contrato e tudo o que pertence a ele (boletos, fiadores, garantia, vistorias...). */
+export function excluirContrato(d, contratoId, usuario, descricao) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) return;
+  for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
+    d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
+  }
+  excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
+}
+
 export function vincularInquilino(d, imovelId, dados, usuario) {
   let c = buscar(d, 'contratos', dados.contrato_id);
   if (!c) throw new Error('Inquilino não encontrado.');
@@ -1111,7 +1138,7 @@ export function vincularInquilino(d, imovelId, dados, usuario) {
   const leitura = separarLeitura(dados);
   // quem já aluga outro imóvel precisa de um contrato novo, com condições próprias: é feito pelo cadastro do inquilino
   if (c.imovel_id) throw new Error(`${c.inquilino_nome} já aluga outro imóvel: cadastre um contrato novo para este imóvel (os dados da pessoa vêm preenchidos).`);
-  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true }, usuario, `Vinculado ao imóvel ${i.nome}`);
+  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true, sem_imovel_desde: null }, usuario, `Vinculado ao imóvel ${i.nome}`);
   if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
   return c;
 }

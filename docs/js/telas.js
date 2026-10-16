@@ -29,7 +29,7 @@ const d = () => E.d;
 const buscar = (t, id) => R.buscar(E.d, t, id);
 const ordenar = (lista, campo) => [...lista].sort((a, b) => String(a[campo] || '').localeCompare(String(b[campo] || ''), 'pt-BR'));
 const competenciaPadrao = () => C.somarMeses(C.competenciaDe(C.hojeIso()), -1);
-const endereco = (i) => [R.enderecoCompleto(i), i.bairro, i.cidade, i.cep ? `CEP ${i.cep}` : ''].filter(Boolean).join(' · ');
+const endereco = (i) => [R.enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}${i.uf ? `/${i.uf}` : ''}` : '', i.cep ? `CEP ${i.cep}` : ''].filter(Boolean).join(' · ');
 
 function multaJurosTexto(cb) {
   if (!cb.data_pagamento) return '';
@@ -87,16 +87,45 @@ const SUB_ADITIVOS = 'Termos aditivos';
 const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos'].includes(escopo);
 const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
-async function pastaDoEscopo(escopo, id) {
+/** Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página). */
+async function pastaDoEscopo(escopo, id, criar = true) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : escopo === 'aditivos' ? [SUB_ADITIVOS] : [])]);
+    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : escopo === 'aditivos' ? [SUB_ADITIVOS] : [])], criar);
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
-  if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)]);
-  return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS]);
+  if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)], criar);
+  return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS], criar);
 }
+
+/**
+ * Limpeza da pasta "Sem imóvel" (uma vez por sessão, ao abrir o Painel):
+ * - contrato que ficou 7 dias sem imóvel (e sem boleto) é apagado, com a pasta dele se estiver vazia;
+ * - pasta vazia que não é de nenhum contrato sem imóvel (ex.: contrato excluído) é apagada.
+ * Pasta com arquivos nunca é apagada sozinha: aparece no aviso do Painel.
+ */
+let limpezaFeita = false;
+async function limparSemImovel() {
+  if (limpezaFeita || !opera() || !E.pasta) return;
+  limpezaFeita = true;
+  const vencidos = R.contratosSemImovelVencidos(d());
+  if (vencidos.length) {
+    await alterar((db) => vencidos.forEach((c) => R.excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel`)));
+    aviso(`Apagado(s) por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(', ')}.`, 'info');
+  }
+  let sem;
+  try { sem = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_SEM_IMOVEL], false); } catch { return; }
+  const usadas = new Set(d().contratos.filter((c) => !c.imovel_id).map((c) => S.limparNome(c.pasta || nomePastaContrato(c))));
+  pastasComArquivos = [];
+  for (const nome of await S.subpastas(sem)) {
+    if (usadas.has(nome)) continue;
+    if (!(await S.apagarPastaVazia(sem, nome))) pastasComArquivos.push(nome);
+  }
+  if (!(await S.subpastas(sem)).length) await S.apagarPastaVazia(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), PASTA_SEM_IMOVEL);
+  if (vencidos.length || pastasComArquivos.length) await mostrar();
+}
+let pastasComArquivos = [];
 
 /**
  * Primeiro IPTU lançado depois da separação por ano: as guias que estavam soltas na pasta do IPTU são do ano
@@ -155,8 +184,9 @@ function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, e
 const urls = [];
 async function listaArquivos(escopo, id) {
   urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
-  const dir = await pastaDoEscopo(escopo, id);
-  const itens = await S.listar(dir);
+  let dir;
+  try { dir = await pastaDoEscopo(escopo, id, false); } catch { dir = null; } // pasta ainda não existe: nada anexado
+  const itens = dir ? await S.listar(dir) : [];
   if (!itens.length) return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
   if (escopo === 'anuncio') {
     const figs = await Promise.all(itens.map(async (a) => {
@@ -223,10 +253,15 @@ async function consultarCep(el, cfg) {
     const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
     if (r.erro) return mensagemAuto(el, 'CEP não encontrado.');
     const feitos = preencherVazios(el.form, { [cfg.endereco]: r.logradouro ? `${r.logradouro}, ` : '', [cfg.bairro]: r.bairro, [cfg.cidade]: r.localidade });
+    // o Estado sempre segue o CEP (mesmo se já estava preenchido)
+    const uf = cfg.uf && el.form.querySelector(`[name="${cfg.uf}"]`);
+    if (uf && r.uf && uf.value !== r.uf) { uf.value = r.uf; feitos.push('Estado'); }
     mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(', '))}. Complete o número.` : 'CEP conferido.');
     const end = el.form.querySelector(`[name="${cfg.endereco}"]`);
     if (feitos.length && end) end.focus();
   } catch {
+    const uf = cfg.uf && el.form.querySelector(`[name="${cfg.uf}"]`);
+    if (uf && C.ufDoCep(n)) uf.value = C.ufDoCep(n); // sem internet, o Estado sai das faixas de CEP
     mensagemAuto(el, 'Não deu para consultar o CEP agora (sem internet?). Preencha à mão.');
   }
 }
@@ -290,8 +325,32 @@ function ligarContinuacaoDeContrato(raiz) {
   });
 }
 
+/** Novo contrato: "Usar o endereço do imóvel" copia o endereço do imóvel escolhido para o endereço do inquilino. */
+function ligarEnderecoDoImovel(raiz) {
+  const caixa = raiz.querySelector('form[data-form=cadastro] input[name=usar_endereco_imovel]');
+  if (!caixa) return;
+  const form = caixa.form;
+  const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
+  const imovelId = () => (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular;
+  const aplicar = () => {
+    const i = imovelId() && buscar('imoveis', imovelId());
+    const campo = form.querySelector('[name=inquilino_endereco]');
+    if (!caixa.checked) return mensagemAuto(caixa, '');
+    if (!i) return mensagemAuto(caixa, 'Escolha primeiro o imóvel deste contrato.');
+    campo.value = enderecoInquilino(i);
+    mensagemAuto(caixa, '');
+  };
+  caixa.addEventListener('change', aplicar);
+  const sel = form.querySelector('[name=imovel_id]');
+  if (sel) sel.addEventListener('change', aplicar);
+}
+
+/** Endereço do imóvel por extenso, para o cadastro do inquilino (ex.: "Rua X, 117, Ap 02, Bairro, Curitiba/PR, CEP 82210-050"). */
+const enderecoInquilino = (i) => [R.enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}${i.uf ? `/${i.uf}` : ''}` : '', i.cep ? `CEP ${i.cep}` : ''].filter(Boolean).join(', ');
+
 function ligarCamposAutomaticos(raiz) {
   ligarContinuacaoDeContrato(raiz);
+  ligarEnderecoDoImovel(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
     el.addEventListener('input', () => {
       const novo = F.mascarar(el.dataset.mascara, el.value);
@@ -439,6 +498,7 @@ export const TELAS = {
 
   // ------------------------------------------------------------------------
   painel(rota) {
+    limparSemImovel().catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, 'aviso'));
     const hoje = C.hojeIso();
     const alertas = R.todosAlertas(d(), hoje);
     const pend = R.pendentesDeFatura(d());
@@ -465,6 +525,8 @@ export const TELAS = {
           <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos</a>`; })()}
       </div>
       ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link('#/pendencias', 'Ver o que falta', 'botao pequeno')}</div>` : ''}
+      ${d().contratos.filter((c) => R.dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join('')}
+      ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(', '))}. Confira e apague à mão se não precisar mais.</div>` : ''}
       <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => e.titulo.split(' (')[0]).join('; '))}.` : 'todas as etapas feitas.'}
         ${link(`#/fechamento?mes=${mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
@@ -974,7 +1036,7 @@ function telaContrato(c) {
       ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
       ${link(`#/contrato/${c.id}?ir=documentos`, 'Contrato, Vistoria, Termos e Aditivos', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
-    ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.</div>`}
+    ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
@@ -1083,6 +1145,8 @@ const CADASTROS = {
     descricao: (dados) => dados.nome,
     ajustar(dados, erros, r) {
       dados.pasta = S.limparNome(dados.nome);
+      // o Estado vem do CEP (ex.: 82210-050 → PR); sem CEP, fica o que foi digitado
+      dados.uf = C.ufDoCep(dados.cep) || (dados.uf ? dados.uf.toUpperCase() : null);
       if (d().imoveis.some((x) => x.id !== (r && r.id) && S.limparNome(x.nome) === dados.pasta)) erros.nome = 'Já existe um imóvel com este nome';
     },
     async depois(salvo, antigo) {
@@ -1160,7 +1224,7 @@ const CADASTROS = {
       // contrato novo: escolhe o imóvel aqui mesmo (pelo "Vincular inquilino" do imóvel, o vínculo vem depois)
       const imovelNoNovo = (c) => c.nome === 'imovel_id' && !q.vincular;
       return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
-        .filter((c) => r || !c.soEditar || imovelNoNovo(c))
+        .filter((c) => (r ? !c.soNovo : !c.soEditar || imovelNoNovo(c)))
         .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops }
           : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis, ...(r ? {} : { ajuda: 'Escolha o imóvel deste inquilino. Em branco: sem imóvel (não gera boleto)' }) } : c)));
     },
@@ -1179,7 +1243,7 @@ const CADASTROS = {
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
     base: (r) => (r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : null),
-    ajustar(dados, erros, r, form) {
+    ajustar(dados, erros, r, form, q = {}) {
       const base = r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
       if (dados.bonificacao && bonificadoTexto) {
@@ -1234,6 +1298,15 @@ const CADASTROS = {
         avisoAditivo = `Você mudou ${dados.dia_vencimento !== r.dia_vencimento ? 'o dia do vencimento' : 'a garantia'}: registre o termo aditivo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino). O contrato ficou marcado com "Possui termo aditivo".`;
       }
       dados.pasta = nomePastaContrato({ ...r, ...dados });
+      // sem imóvel: conta o prazo de 7 dias para vincular (depois o contrato é apagado sozinho)
+      const imovelFinal = r ? dados.imovel_id : dados.imovel_id || Number(q.imovel) || null;
+      dados.sem_imovel_desde = imovelFinal ? null : (r && !r.imovel_id && r.sem_imovel_desde) || C.hojeIso();
+      // "Usar o endereço do imóvel": o endereço do inquilino fica igual ao do imóvel
+      const imovelEndereco = buscar('imoveis', imovelFinal || q.vincular);
+      if (!r && new FormData(form).get('usar_endereco_imovel') === '1') {
+        if (imovelEndereco) dados.inquilino_endereco = enderecoInquilino(imovelEndereco);
+        else erros.inquilino_endereco = 'Escolha o imóvel para usar o endereço dele';
+      }
     },
     // contrato já salvo: grava na pasta atual (se o nome mudar, a pasta inteira é renomeada depois); contrato novo: na pasta que ele vai ter
     async ajustarAsync(dados, erros, r, form) {
@@ -3611,13 +3684,15 @@ export const ACOES = {
       if (tabela === 'imoveis') {
         for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
-      if (tabela === 'contratos') {
-        for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) db[t].filter((x) => x.contrato_id === reg.id).forEach((x) => R.excluir(db, t, x.id, login()));
-      }
-      R.excluir(db, tabela, reg.id, login(), reg.nome || reg.inquilino_nome || reg.descricao || null);
+      if (tabela === 'contratos') R.excluirContrato(db, reg.id, login());
+      else R.excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || null);
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
       if (cfg.depois) cfg.depois(db, reg);
     });
+    // contrato excluído: a pasta dele sai junto se estiver vazia (pasta com documentos fica guardada)
+    if (tabela === 'contratos') {
+      try { await S.apagarPastaVazia(await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), [pastaPaiContrato(r)], false), r.pasta || nomePastaContrato(r)); } catch { /* pasta nem existia */ }
+    }
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();
   },

@@ -54,7 +54,7 @@ export function conferirDocumento(tipo, v) {
 const DOCUMENTOS = ['cpf', 'cnpj', 'cpfcnpj', 'cep'];
 
 /** CEP que preenche o endereço (ViaCEP) e CNPJ que preenche a empresa (BrasilAPI): só os campos vazios. */
-const PREENCHE_CEP = (endereco, bairro, cidade) => ({ preencher: { fonte: 'cep', endereco, bairro, cidade } });
+const PREENCHE_CEP = (endereco, bairro, cidade, uf) => ({ preencher: { fonte: 'cep', endereco, bairro, cidade, uf } });
 const PREENCHE_CNPJ = (alvos) => ({ preencher: { fonte: 'cnpj', ...alvos } });
 
 /** Mostra o campo só quando outro campo tem um destes valores (caixa de seleção marcada = '1'). */
@@ -70,7 +70,8 @@ export const IMOVEL = [
   campo('complemento', 'Complemento', 'texto', { max: 25 }),
   campo('bairro', 'Bairro'),
   campo('cidade', 'Cidade (município)', 'texto', { max: LIMITES.municipio }),
-  campo('cep', 'CEP', 'cep', { ...PREENCHE_CEP('endereco', 'bairro', 'cidade'), ajuda: 'Digite o CEP para preencher rua, bairro e cidade' }),
+  campo('uf', 'Estado (UF)', 'texto', { max: 2, ajuda: 'Vem do CEP. Ex.: PR' }),
+  campo('cep', 'CEP', 'cep', { ...PREENCHE_CEP('endereco', 'bairro', 'cidade', 'uf'), ajuda: 'Digite o CEP para preencher rua, bairro, cidade e Estado' }),
   secao('Registros'),
   campo('matricula', 'Matrícula'),
   campo('sublote', 'Identificação do sublote', 'texto', { ajuda: 'Para imóveis que são sublotes internos. Ex.: Sublote 3' }),
@@ -214,6 +215,7 @@ export const CONTRATO = [
   campo('inquilino_cpf', 'CPF / CNPJ', 'cpfcnpj', { buscarPessoa: true, ...PREENCHE_CNPJ({ nome: 'inquilino_nome', endereco: 'inquilino_endereco' }) }),
   campo('inquilino_rg', 'RG / inscrição estadual'),
   ...qualificacao('inquilino_', quando('inquilino_tipo', 'Pessoa física'), false),
+  campo('usar_endereco_imovel', 'Usar o endereço do imóvel deste contrato', 'simnao', { virtual: true, soNovo: true, ajuda: 'Marcado: o endereço do inquilino fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)' }),
   campo('inquilino_endereco', 'Endereço (residência, comercial ou sede da empresa)', 'texto', { largo: true }),
   campo('responsavel_nome', 'Outro contato (se houver)'),
   campo('responsavel_telefone', 'Telefone do contato', 'tel'),
