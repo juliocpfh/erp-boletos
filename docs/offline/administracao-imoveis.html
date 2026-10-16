@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="4bde2c261cbd1307">
+<meta name="fontes" content="a208ce77c8068621">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -163,6 +163,7 @@ a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 /* Pontos a verificar, selos do contrato e boleto */
 .verificar, .alerta.amarelo { background: #fef08a; border-left: 5px solid #ca8a04; padding: 9px 12px; border-radius: 6px; margin-bottom: 10px; }
 tr.amarelo td { background: #fef9c3; }
+tr.doc-perdido td { background: #fee2e2; }
 .selos { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 14px; }
 .selos .etiqueta { font-size: 13px; padding: 3px 10px; }
 .descricao-boleto { background: #f8fafc; border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px; margin: 0; font-size: 14px; }
@@ -192,6 +193,9 @@ tr.cancelada td:last-child, tr.cancelada td:nth-last-child(2) { text-decoration:
 tr.linha-controle td { background: #faf8ff; }
 
 /* Mensagens do topo com botão de fechar */
+dialog.janela-erro { border: 2px solid var(--perigo); border-radius: 8px; max-width: 460px; padding: 18px 20px; }
+dialog.janela-erro::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.janela-erro p { margin: 0 0 14px; font-size: 16px; }
 .alerta.mensagem { position: relative; padding-right: 34px; }
 .alerta.mensagem .fechar { position: absolute; right: 6px; top: 4px; background: none; color: var(--suave); font-size: 18px; padding: 0 6px; line-height: 1.4; }
 
@@ -863,6 +867,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     calcularEncerramento: () => calcularEncerramento,
     calcularReajuste: () => calcularReajuste,
     campoArquivoDoc: () => campoArquivoDoc,
+    campoPerdidoDoc: () => campoPerdidoDoc,
     cancelarFaturas: () => cancelarFaturas,
     cancelarNumero: () => cancelarNumero,
     caucaoSugerida: () => caucaoSugerida,
@@ -885,6 +890,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     desfazerUltimaNumeracao: () => desfazerUltimaNumeracao,
     despesasDo: () => despesasDo,
     documentoEntrada: () => documentoEntrada,
+    documentoPerdido: () => documentoPerdido,
     emCarencia: () => emCarencia,
     encerramentoDo: () => encerramentoDo,
     encerrarContrato: () => encerrarContrato,
@@ -915,6 +921,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     marcarCartaEnviada: () => marcarCartaEnviada,
     marcarCondominioConferido: () => marcarCondominioConferido,
     marcarDocumento: () => marcarDocumento,
+    marcarDocumentoPerdido: () => marcarDocumentoPerdido,
     marcarEtapaFechamento: () => marcarEtapaFechamento,
     marcarIptuPago: () => marcarIptuPago,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
@@ -959,6 +966,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     todosAlertas: () => todosAlertas,
     totais: () => totais,
     totaisImoveis: () => totaisImoveis,
+    totaisIptu: () => totaisIptu,
     trocarFiador: () => trocarFiador,
     trocarGarantia: () => trocarGarantia,
     trocasGarantiaDo: () => trocasGarantiaDo,
@@ -1700,39 +1708,70 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     for (let n = 1; n <= valores.length; n += 1) if (competenciaDaParcela(p2, n, c) === comp) return [n, valores[n - 1]];
     return [null, 0];
   }
-  function inquilinoDaParcela(d2, p2, n) {
+  function inquilinosDaParcela(d2, p2, n, valor) {
+    const lista3 = [];
     for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
       const comp = competenciaDaParcela(p2, n, c);
-      if (comp && diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return { contrato: c, comp };
+      const dias = comp ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+      if (!dias || emCarencia(c, comp) && !c.carencia_cobrar_iptu) continue;
+      lista3.push({ contrato: c, comp, dias, diasMes: diasNoMes(comp), valor: aluguelProporcional(valor, dias, diasNoMes(comp)) });
     }
-    return null;
+    return lista3;
   }
   function parcelasIptu(d2, p2) {
     if (p2.pago_avista) {
+      const valor = p2.valor_avista || p2.valor_total;
       return [{
         n: 0,
         rotulo: "Cota única",
         comp: null,
-        valor: p2.valor_avista || p2.valor_total,
+        valor,
+        inquilinos: [],
+        valorInquilino: 0,
+        valorProprietario: valor,
         vencimento: p2.vencimento_primeira || null,
         proprietario: true,
         paga: p2.data_quitacao || null
       }];
     }
     return valoresIptu(p2).map((valor, i) => {
-      const quem = inquilinoDaParcela(d2, p2, i + 1);
+      const inquilinos = inquilinosDaParcela(d2, p2, i + 1, valor);
+      const valorInquilino = Math.min(valor, inquilinos.reduce((s, x) => s + x.valor, 0));
       return {
         n: i + 1,
         rotulo: `${i + 1}ª`,
-        comp: quem ? quem.comp : null,
+        comp: inquilinos.length ? inquilinos[0].comp : null,
         mesBoleto: mesBoletoDaParcela(p2, i + 1),
         valor,
-        inquilino: quem ? quem.contrato : null,
+        inquilinos,
+        inquilino: inquilinos.length ? inquilinos[0].contrato : null,
+        valorInquilino,
+        valorProprietario: valor - valorInquilino,
         vencimento: vencimentoParcela(p2, i + 1),
-        proprietario: !quem,
+        proprietario: valorInquilino < valor,
         paga: (p2.pagas || {})[i + 1] || null
       };
     });
+  }
+  function totaisIptu(d2, p2) {
+    const ps = parcelasIptu(d2, p2);
+    let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
+    if (p2.pago_avista) {
+      for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+        for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
+          const [n, v] = iptuNaCompetencia(p2, comp, c);
+          const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+          if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += aluguelProporcional(v, dias, diasNoMes(comp));
+        }
+      }
+    }
+    const custo = ps.reduce((s, x) => s + x.valor, 0);
+    return {
+      custo,
+      inquilino,
+      proprietario: custo - inquilino,
+      emAberto: ps.filter((x) => x.proprietario && !x.paga).reduce((s, x) => s + x.valorProprietario, 0)
+    };
   }
   function alertasIptu(d2, hoje2 = hojeIso()) {
     const lista3 = [];
@@ -1752,7 +1791,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           imovel: i.nome,
           inquilino: "",
           ancora: "iptu",
-          texto: `IPTU ${p2.ano} ${pc.rotulo} parcela de ${reais(pc.valor)} ${faltam < 0 ? `venceu em ${dataBr(venc)}` : `vence em ${dataBr(venc)}`}${pc.vencimento ? "" : " (vencimento estimado)"}. Imóvel sem inquilino pagando o IPTU: pagamento por conta do proprietário.`
+          texto: `IPTU ${p2.ano} ${pc.rotulo} ${pc.n ? "parcela" : ""} de ${reais(pc.valor)} ${faltam < 0 ? `venceu em ${dataBr(venc)}` : `vence em ${dataBr(venc)}`}${pc.vencimento ? "" : " (vencimento estimado)"}. ${pc.n === 0 ? "Pago à vista pelo proprietário." : pc.valorInquilino ? `Sua parte: ${reais(pc.valorProprietario)} (o inquilino paga ${reais(pc.valorInquilino)} no boleto, pelos dias em que ocupou).` : "Imóvel vazio ou sem cobrança de IPTU: a parcela é toda sua."}`.replace("  ", " ")
         });
       }
     }
@@ -2425,6 +2464,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ["doc_chaves_em", "Recibo de entrega das chaves", "assinado"]
   ];
   var campoArquivoDoc = (campo2) => campo2.replace(/_em$/, "_arquivo");
+  var campoPerdidoDoc = (campo2) => campo2.replace(/_em$/, "_perdido_em");
+  var documentoPerdido = (d2, c, campo2) => c[campoPerdidoDoc(campo2)] && !documentoEntrada(d2, c, campo2) ? c[campoPerdidoDoc(campo2)] : null;
   function documentoEntrada(d2, c, campo2) {
     const arq = campoArquivoDoc(campo2);
     if (c[campo2]) return { data: c[campo2], arquivo: c[arq] || null, contrato: c };
@@ -2434,7 +2475,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   }
   function alertaDocumentosEntrada(c, d2 = null) {
     if (c.ativo === false || c.data_saida) return null;
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d2, c, k)).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
+    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d2, c, k) && !documentoPerdido(d2, c, k)).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
     return falta.length ? { nivel: "aviso", tipo: "Documentos de entrada", texto: `falta ${falta.join(", ")}.`, ancora: "documentos" } : null;
   }
   function marcarDocumento(d2, contratoId, campo2, data, usuario, arquivo = null) {
@@ -2442,7 +2483,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (!doc) throw new Error("Documento desconhecido.");
     if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith("a") ? "a" : "o"} ${doc[1].toLocaleLowerCase("pt-BR")} ${doc[2]} antes de marcar.`);
     const c = buscar(d2, "contratos", contratoId);
-    atualizar(d2, "contratos", c.id, { [campo2]: data || null, [campoArquivoDoc(campo2)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data ? `${doc[2]} em ${dataBr(data)}` : "voltou a pendente"}`);
+    atualizar(d2, "contratos", c.id, { [campo2]: data || null, [campoArquivoDoc(campo2)]: data ? arquivo : null, ...data ? { [campoPerdidoDoc(campo2)]: null } : {} }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data ? `${doc[2]} em ${dataBr(data)}` : "voltou a pendente"}`);
+  }
+  function marcarDocumentoPerdido(d2, contratoId, campo2, data, usuario) {
+    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc) throw new Error("Documento desconhecido.");
+    const c = buscar(d2, "contratos", contratoId);
+    atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { [campoPerdidoDoc(campo2)]: data || null },
+      usuario,
+      `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data ? `perdido (registrado em ${dataBr(data)})` : "não está mais como perdido"}`
+    );
   }
   var aditivosDo = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
   function registrarAditivo(d2, contratoId, { data, assunto, arquivo }, usuario) {
@@ -2612,7 +2666,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const avulsas = d2.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
       let iptu = 0;
       for (const p2 of d2.iptus.filter((x) => x.imovel_id === i.id)) {
-        for (const pc of parcelasIptu(d2, p2)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valor;
+        for (const pc of parcelasIptu(d2, p2)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
       }
       const todasReformas = reformasDo(d2, i.id);
       const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
@@ -2855,7 +2909,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           data: pc.vencimento,
           tipo: "IPTU",
           imovel_id: p2.imovel_id,
-          texto: `${nomeImovel(p2.imovel_id)} · IPTU ${p2.ano} ${pc.rotulo} · ${reais(pc.valor)} · ${pc.proprietario ? "por conta do proprietário" : `no boleto de ${pc.inquilino.inquilino_nome}`}`,
+          texto: `${nomeImovel(p2.imovel_id)} · IPTU ${p2.ano} ${pc.rotulo} · ${reais(pc.valor)} · ${!pc.proprietario ? `no boleto de ${pc.inquilino.inquilino_nome}` : pc.valorInquilino ? `sua parte ${reais(pc.valorProprietario)}, inquilino ${reais(pc.valorInquilino)}` : "parte do proprietário"}`,
           situacao: !pc.proprietario ? "neutra" : pc.paga ? "ok" : pc.vencimento < hoje2 ? "perigo" : "aviso",
           estado: !pc.proprietario ? "inquilino paga" : pc.paga ? `pago em ${dataBr(pc.paga)}` : pc.vencimento < hoje2 ? "vencido" : "a pagar"
         });
@@ -5412,25 +5466,30 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function tabelaIptu(p2) {
     const ps = parcelasIptu(d(), p2);
-    const pagador = (pc) => pc.inquilino ? `<a href="#/contrato/${pc.inquilino.id}">${esc2(pc.inquilino.inquilino_nome)}</a> <span class="suave">(no boleto)</span>` : etiqueta("Proprietário", "aviso");
-    const situ = (pc) => {
-      if (!pc.proprietario) return "";
-      if (pc.paga) return `${etiqueta(`paga em ${dataBr2(pc.paga)}`, "ok")} ${opera() ? botao("iptuPago", "desfazer", { id: p2.id, n: pc.n, data: "" }, "link-botao", "Desfazer o pagamento desta parcela?") : ""}`;
-      return opera() ? `<form data-form="iptuPago" data-id="${p2.id}" data-n="${pc.n}" class="pagamento"><input type="date" name="data" value="${hojeIso()}"><button class="pequeno">Paga</button></form>` : etiqueta("em aberto", "perigo");
+    const parteInquilino = (pc) => !pc.inquilinos.length ? '<span class="suave">-</span>' : pc.inquilinos.map((x) => `<a href="#/contrato/${x.contrato.id}">${esc2(x.contrato.inquilino_nome)}</a> ${reais2(x.valor)}${x.dias < x.diasMes ? ` <span class="suave">(${x.dias}/${x.diasMes} dias)</span>` : ""}`).join("<br>");
+    const suaParte = (pc) => !pc.valorProprietario ? '<span class="suave">-</span>' : `<b>${reais2(pc.valorProprietario)}</b>${pc.n === 0 ? "" : ` <span class="suave">(${pc.valorInquilino ? "dias vazios" : "imóvel vazio ou sem IPTU no contrato"})</span>`}`;
+    const guia = (pc) => {
+      if (pc.paga) return `${etiqueta(`paga em ${dataBr2(pc.paga)}`, "ok")} ${opera() ? botao("iptuPago", "desfazer", { id: p2.id, n: pc.n, data: "" }, "link-botao", "Desfazer o pagamento desta guia?") : ""}`;
+      const aberta = pc.proprietario ? etiqueta("em aberto", "perigo") : "";
+      return opera() ? `<form data-form="iptuPago" data-id="${p2.id}" data-n="${pc.n}" class="pagamento">${aberta}<input type="date" name="data" value="${hojeIso()}"><button class="pequeno">Paga</button></form>` : aberta;
     };
-    return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vencimento na prefeitura</th><th>Boleto que vence em</th><th class="n">Valor</th><th>Quem arca</th><th>Pagamento pelo proprietário</th></tr>
+    return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vence na prefeitura</th><th>Boleto do inquilino</th><th class="n">Valor</th><th>Parte do inquilino</th><th>Sua parte</th><th>Guia na prefeitura</th></tr>
     ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr2(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr2(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr2(pc.comp)}</span>` : "-"}</td><td class="n">${reais2(pc.valor)}</td>
-      <td>${p2.pago_avista ? etiqueta("Proprietário (à vista)", "aviso") : pagador(pc)}</td><td>${situ(pc)}</td></tr>`).join("")}</table></div>`;
+      <td>${parteInquilino(pc)}</td><td>${suaParte(pc)}</td><td>${guia(pc)}</td></tr>`).join("")}</table></div>`;
+  }
+  function resumoIptu(p2) {
+    const t = totaisIptu(d(), p2);
+    return `<p>Inquilino(s) pagam <b>${reais2(t.inquilino)}</b> nos boletos · sua parte <b>${reais2(t.proprietario)}</b>${t.emAberto ? ` · ${etiqueta(`${reais2(t.emAberto)} em aberto`, "perigo")}` : ""}</p>`;
   }
   function caixaIptu(i) {
     const iptus = d().iptus.filter((p2) => p2.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
     const ano = (p2, atual2) => `<h3>${p2.ano} · total ${reais2(p2.valor_total)} em ${p2.num_parcelas} parcela(s)${p2.pago_avista ? ` · ${etiqueta(`quitado à vista${p2.valor_avista ? ` ${reais2(p2.valor_avista)}` : ""}${p2.data_quitacao ? ` em ${dataBr2(p2.data_quitacao)}` : " (falta data)"}`, "info")}` : ""}
       ${opera() ? `${link(`#/editar/iptus/${p2.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "iptus", id: p2.id }, "perigo pequeno", "Excluir o IPTU deste ano?")}` : ""}</h3>
-      ${p2.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc2(p2.cobranca_inquilino || COBRANCA_IPTU_QUITADO[0])}.</p>` : ""}${tabelaIptu(p2)}
+      ${resumoIptu(p2)}${p2.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc2(p2.cobranca_inquilino || COBRANCA_IPTU_QUITADO[0])}.</p>` : ""}${tabelaIptu(p2)}
       ${caixaArquivos("iptuano", idGuiasDoAno(i.id, p2.ano), `Guias do IPTU ${p2.ano}`, `guias-iptu-${p2.ano}`, atual2 ? "Anexe aqui a guia (carnê) deste ano. Ao lançar o IPTU do próximo ano, estas guias passam para o histórico." : "", true)}`;
     const [atual, ...anteriores] = iptus;
     return `<div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, "Lançar IPTU do ano") : ""}</div>
-    <p class="suave">Quando o imóvel está vazio (ou o IPTU não é cobrado do inquilino), a parcela fica por conta do proprietário: marque aqui quando pagar. As parcelas em aberto aparecem nos alertas 15 dias antes do vencimento.</p>
+    <p class="suave">Você paga todas as guias na prefeitura; o inquilino devolve a parte dele no boleto. No mês de entrada e no de saída, o inquilino paga os dias em que ocupou e você paga o resto. Imóvel vazio (ou contrato sem IPTU): a parcela é toda sua e aparece nos alertas 15 dias antes do vencimento, até ser marcada como paga.</p>
     ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? "" : caixaArquivos("iptu", i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, "guias-iptu", "", true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos("iptu", i.id, "Guias do IPTU", "guias-iptu", "Pode anexar a guia aqui; ao lançar o IPTU do ano ela vai para o histórico do ano anterior.", true)}`}
     ${atual ? `<details class="historico-iptu"><summary><b>Histórico do IPTU</b> <span class="suave">· anos anteriores e as guias de cada ano (${anteriores.length} ano(s))</span></summary>
       ${anteriores.map((p2) => ano(p2, false)).join("")}
@@ -5659,7 +5718,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function faixaDocumentosEntrada(c) {
     if (!contratoAtivo(c)) return "";
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d(), c, k));
+    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d(), c, k) && !documentoPerdido(d(), c, k));
     if (!falta.length) return "";
     const g = geradoresDocumentos(c, "botao pequeno");
     return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc2(falta.map(([, t]) => t.toLocaleLowerCase("pt-BR")).join(", "))}.
@@ -5672,14 +5731,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const doc = (k) => documentoEntrada(d(), c, k);
     const herdado = (k) => doc(k) && doc(k).contrato.id !== c.id;
     const abrir = (k) => doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc2(doc(k).arquivo)}">📎 ${esc2(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>';
-    const linhas2 = DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr><td><b>${esc2(nome)}</b></td>
-    <td>${doc(k) ? `${etiqueta(`${feito} em ${dataBr2(doc(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc2(doc(k).contrato.inquilino_nome)}</a></span>` : ""}` : etiqueta("pendente", "perigo")}</td>
-    <td class="nw">${gerar[k]}</td>
+    const perdido = (k) => documentoPerdido(d(), c, k);
+    const linhas2 = DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) ? ' class="doc-perdido"' : ""}><td><b>${esc2(nome)}</b></td>
+    <td>${perdido(k) ? etiqueta(`perdido (registrado em ${dataBr2(perdido(k))})`, "perigo") : doc(k) ? `${etiqueta(`${feito} em ${dataBr2(doc(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc2(doc(k).contrato.inquilino_nome)}</a></span>` : ""}` : etiqueta("pendente", "perigo")}</td>
+    <td class="nw">${doc(k) ? "" : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
       ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ""}` : !opera() ? "" : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${hoje2}" style="width:auto">
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-        <button class="secundario pequeno">Marcar ${feito}</button></form>`}</td></tr>`).join("");
+        <button class="secundario pequeno">Marcar ${feito}</button></form>`}
+      ${opera() && !doc(k) ? perdido(k) ? botao("desmarcarPerdido", 'Desfazer "perdido"', { contrato: c.id, campo: k }, "link-botao") : botao("documentoPerdido", "Documento perdido", { contrato: c.id, campo: k }, "perigo pequeno", `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.`) : ""}</td></tr>`).join("");
     return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, "Fazer vistoria de saída") : ""}</div>
     <div class="rolagem"><table>${linhas2}</table></div>
@@ -6324,7 +6385,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
       if (!c.inquilino_telefone) falta.push("telefone");
       if (!c.inquilino_email) falta.push("e-mail");
-      for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) if (!documentoEntrada(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo" });
+      for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) if (!documentoEntrada(d(), c, k) && !documentoPerdido(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo" });
       if (falta.length) out.push({ tipo: "Inquilino", nome: c.inquilino_nome, onde: (buscar2("imoveis", c.imovel_id) || {}).nome || "", falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
     }
     for (const i of d().imoveis) {
@@ -6666,31 +6727,46 @@ Salvar assim mesmo?`)) {
   }
   function telaIptu(ano) {
     const imoveis = ordenar(d().imoveis, "nome");
-    const doAno = (i, a) => d().iptus.find((p2) => p2.imovel_id === i.id && p2.ano === a);
-    const resumo = (p2) => p2 ? `${reais2(p2.valor_total)} · ${p2.pago_avista ? "à vista" : `${p2.num_parcelas}x${p2.valor_parcela ? ` de ${reais2(p2.valor_parcela)}` : ""}`}` : '<span class="suave">-</span>';
-    const proprietario = (p2) => {
-      if (!p2) return "-";
-      const ps = parcelasIptu(d(), p2).filter((x) => x.proprietario);
-      if (!ps.length) return '<span class="suave">inquilino paga todas</span>';
-      const abertas = ps.filter((x) => !x.paga);
-      return `${ps.length} parcela(s) ${abertas.length ? etiqueta(`${abertas.length} em aberto: ${reais2(abertas.reduce((s, x) => s + x.valor, 0))}`, "perigo") : etiqueta("todas pagas", "ok")}`;
+    const doAno = (i) => d().iptus.find((p2) => p2.imovel_id === i.id && p2.ano === ano);
+    const MESES3 = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    const meses = MESES3.map((_, k) => `${ano}-${String(k + 1).padStart(2, "0")}`);
+    const valor = (p2) => p2 ? `<b>${reais2(p2.valor_total)}</b>${p2.pago_avista && p2.valor_avista ? ` <span class="suave">(à vista ${reais2(p2.valor_avista)})</span>` : ""}` : '<span class="suave">-</span>';
+    const forma = (p2) => p2 ? p2.pago_avista ? "à vista" : `parcelado em ${p2.num_parcelas}x` : "-";
+    const primeira = (p2) => {
+      const m = p2 && !p2.pago_avista && (p2.primeiro_vencimento_boleto || p2.primeira_competencia && somarMeses(p2.primeira_competencia, 1));
+      return m ? compBr2(m) : "-";
     };
+    const celula = (pc) => {
+      if (!pc) return "";
+      if (!pc.proprietario) return '<span class="suave">inquilino</span>';
+      const sua = pc.n === 0 ? `à vista ${reais2(pc.valor)}` : `você ${reais2(pc.valorProprietario)}`;
+      return `${pc.valorInquilino ? `<span class="suave">inq. ${reais2(pc.valorInquilino)}</span><br>` : ""}${etiqueta(`${sua} ${pc.paga ? "paga" : "em aberto"}`, pc.paga ? "ok" : "perigo")}`;
+    };
+    const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
+    let somaSua = 0;
+    let somaAberto = 0;
     const linhas2 = imoveis.map((i) => {
-      const p2 = doAno(i, ano);
-      const ant = doAno(i, ano - 1);
-      const varia = p2 && ant && ant.valor_total ? ((p2.valor_total / ant.valor_total - 1) * 100).toFixed(2).replace(".", ",") : null;
+      const p2 = doAno(i);
+      const mapa = /* @__PURE__ */ new Map();
+      const t = p2 ? totaisIptu(d(), p2) : null;
+      if (p2) for (const pc of parcelasIptu(d(), p2)) mapa.set(mesDaParcela(pc, p2), pc);
+      if (t) {
+        somaSua += t.proprietario;
+        somaAberto += t.emAberto;
+      }
       const acao = !opera() ? "" : p2 ? link(`#/editar/iptus/${p2.id}?de=iptu`, "Editar") : link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, "botao pequeno");
-      return `<tr class="${p2 ? "" : "amarelo"}"><td><a href="#/imovel/${i.id}?ir=iptu">${esc2(i.nome)}</a></td><td class="n">${resumo(ant)}</td><td class="n"><b>${resumo(p2)}</b></td>
-      <td class="n">${varia !== null ? `${varia}%` : "-"}</td><td>${p2 ? `${p2.vencimento_primeira ? dataBr2(p2.vencimento_primeira) : "-"}<br><span class="suave">boletos a partir de ${compBr2(p2.primeiro_vencimento_boleto || p2.primeira_competencia && somarMeses(p2.primeira_competencia, 1))}</span>` : "-"}</td><td>${proprietario(p2)}</td><td class="n">${acao}</td></tr>`;
+      return `<tr class="${p2 ? "" : "amarelo"}"><td><a href="#/imovel/${i.id}?ir=iptu">${esc2(i.nome)}</a></td><td class="n nw">${valor(p2)}</td><td>${primeira(p2)}</td><td class="nw">${forma(p2)}</td>
+      ${meses.map((m) => `<td class="n nw">${celula(mapa.get(m))}</td>`).join("")}
+      <td class="n">${t ? reais2(t.inquilino) : "-"}</td><td class="n">${t ? `<b>${reais2(t.proprietario)}</b>` : "-"}</td><td class="n">${acao}</td></tr>`;
     }).join("");
-    const faltam = imoveis.filter((i) => !doAno(i, ano)).length;
-    const alertas = alertasIptu(d()).filter((a) => a.texto.includes(`IPTU ${ano}`));
+    const faltam = imoveis.filter((i) => !doAno(i)).length;
     return `<p class="suave"><a href="#/imoveis">← Imóveis</a></p>
     <div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, "botao secundario")} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, "botao secundario")}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : `<div class="alerta info">Todos os imóveis com IPTU de ${ano} lançado.</div>`}
-    ${alertas.map((a) => `<div class="alerta ${a.nivel}"><b>${esc2(a.imovel)}</b> ${esc2(a.texto)} <a href="#/imovel/${a.imovel_id}?ir=iptu">marcar como paga</a></div>`).join("")}
-    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">${ano - 1}</th><th class="n">${ano}</th><th class="n">Variação</th><th>1ª parcela: prefeitura / inquilino</th><th>Por conta do proprietário</th><th></th></tr>${linhas2}</table>
-    <p class="suave">As parcelas entram sozinhas nos boletos dos inquilinos que pagam IPTU, a partir do boleto que vence no mês informado, uma por mês, com o valor parcelado (mesmo quando o proprietário paga à vista com desconto). Se a prefeitura atrasar o carnê, é só editar o vencimento e o primeiro mês de cobrança. Nos meses em que o imóvel está vazio (ou o IPTU não é cobrado), a parcela fica por conta do proprietário: o controle e os alertas estão na página de cada imóvel.</p></div>`;
+    <div class="numeros"><div class="cartao"><div class="grande">${reais2(somaSua)}</div>sua parte no ano</div>
+      <div class="cartao"><div class="grande">${reais2(somaAberto)}</div>da sua parte em guias não pagas</div></div>
+    <div class="cartao rolagem"><table><tr><th>Imóvel</th><th class="n">Valor ${ano}: integral (desconto à vista)</th><th>1ª parcela do inquilino</th><th>Forma</th>${MESES3.map((m) => `<th class="n">${m}</th>`).join("")}<th class="n">Inquilino paga no ano</th><th class="n">Você paga no ano</th><th></th></tr>${linhas2}</table>
+    <p class="suave">Cada mês mostra o boleto em que a parcela entra. <b>inquilino</b>: a parcela vai toda no boleto dele, pelo valor parcelado (mesmo quando você paga à vista com desconto). <b>inq. / você</b>: mês de entrada ou de saída; o inquilino paga os dias em que ocupou e você o resto. <b>você … em aberto / paga</b>: imóvel vazio (ou contrato sem IPTU), a parcela é sua; marque o pagamento na página do imóvel. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
   }
   function calendarioDoPainel(mes, hoje2) {
     const eventos = eventosDoMes(d(), mes, hoje2);
@@ -6747,18 +6823,18 @@ Salvar assim mesmo?`)) {
       ${indices.map((x) => `<tr><td>${esc2(x.indice)}</td><td>${compBr2(x.mes_ref)}</td><td class="n">${pct2(x.percentual)}</td><td class="n">${opera() ? botao("excluir", "Excluir", { tabela: "indices_acumulados", id: x.id }, "perigo pequeno", "Excluir este índice?") : ""}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
     <div class="cartao rolagem"><div class="cabecalho"><h2>Reajustes de ${compBr2(de)} a ${compBr2(ate)}</h2>
       <div class="acoes">${link(`#/reajustes?de=${somarMeses(de, -3)}&ate=${somarMeses(ate, -3)}`, "← anteriores")} ${link(`#/reajustes?de=${somarMeses(de, 3)}&ate=${somarMeses(ate, 3)}`, "seguintes →")}</div></div>
-      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual</th><th class="n">Novo</th><th>Carta e correção</th></tr>
+      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual (bonificado)</th><th class="n">Novo (bonificado)</th><th>Carta e correção</th></tr>
       ${lista3.map((r) => {
       const k = r.calculo;
       const i = buscar2("imoveis", r.contrato.imovel_id);
       return `<tr><td><b>${compBr2(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr2(somarMeses(r.competencia, -1))}</span></td>
         <td><a href="#/contrato/${r.contrato.id}"><b>${esc2(i ? i.nome : "")}</b></a><br>${esc2(r.contrato.inquilino_nome)} · ${r.anos} ano(s)</td>
         <td>${esc2(k.indiceContrato || "não informado")}${k.escolhido ? `<br><span class="suave">usa ${esc2(k.escolhido.indice)} ${pct2(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(" e ")}`, "perigo")}` : ""}</td>
-        <td class="n">${reais2(k.atual)}${k.bonificacao ? `<br><span class="suave">${reais2(k.atualBonificado)}</span>` : ""}</td>
-        <td class="n">${k.novo !== null ? `<b>${reais2(k.novo)}</b>${k.bonificacao ? `<br><span class="suave">${reais2(k.novoBonificado)}</span>` : ""}` : "-"}</td>
+        <td class="n">${reais2(k.atual)}${k.bonificacao ? ` <span class="suave">(${reais2(k.atualBonificado)})</span>` : ""}</td>
+        <td class="n">${k.novo !== null ? `<b>${reais2(k.novo)}</b>${k.bonificacao ? ` <span class="suave">(${reais2(k.novoBonificado)})</span>` : ""}` : "-"}</td>
         <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`;
     }).join("") || '<tr><td colspan="6" class="suave">Nenhum reajuste no período.</td></tr>'}</table>
-      <p class="suave">Valores: cheio e, embaixo, com bonificação.</p></div>`;
+      <p class="suave">Valores: aluguel cheio e, entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>`;
   }
   function cartaReajuste(c, comp) {
     const i = buscar2("imoveis", c.imovel_id);
@@ -6771,13 +6847,12 @@ Salvar assim mesmo?`)) {
     if (k.percentual === null) {
       return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc2(k.faltando.join(" e ") || "o índice do contrato")} até ${compBr2(anterior)}. ${link("#/reajustes", "Informar em Reajustes")}</div>`;
     }
-    const varios = k.usados.length > 1;
     return `<div class="carta">
     ${d().logo ? `<p><img class="carta-logo" src="${esc2(d().logo)}" alt="Logo"></p>` : ""}
     <p class="carta-data">${esc2(i && i.cidade || "Curitiba")}, ${dataExtenso(hojeIso())}.</p>
     <p>Prezado(a) <b>${esc2(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc2(i ? `${i.nome} - ${enderecoCompleto(i)}` : "")}</b></p>
     <p>Com o aluguel de <b>${MESES2[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ""} ano${r && r.anos > 1 ? "s" : ""}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
-    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc2(k.indiceContrato)}</b> acumulado nos últimos 12 meses${varios ? `: ${k.usados.map((u) => `<b>${esc2(u.indice)} ${pct2(u.registro.percentual)}</b>`).join(" e ")}. Aplicaremos <b>${pct2(k.percentual)}</b>` : ` (até ${compBr2(k.escolhido.registro.mes_ref)}): <b>${pct2(k.percentual)}</b>`}.</p>
+    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc2(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc2(k.escolhido.indice)} ${pct2(k.percentual)}</b>.</p>
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr2(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais2(k.atual)}</td><td class="n"><b>${reais2(k.novo)}</b></td></tr>
       ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais2(k.atualBonificado)}</td><td class="n"><b>${reais2(k.novoBonificado)}</b></td></tr>` : ""}</table>
@@ -7965,6 +8040,14 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso("Alertas de volta ao padrão do sistema.");
       await mostrar();
     },
+    async documentoPerdido({ contrato, campo: campo2 }) {
+      await alterar((db) => marcarDocumentoPerdido(db, Number(contrato), campo2, hojeIso(), login()));
+      await mostrar();
+    },
+    async desmarcarPerdido({ contrato, campo: campo2 }) {
+      await alterar((db) => marcarDocumentoPerdido(db, Number(contrato), campo2, null, login()));
+      await mostrar();
+    },
     async desmarcarDocumento({ contrato, campo: campo2 }) {
       await alterar((db) => marcarDocumento(db, Number(contrato), campo2, null, login()));
       await mostrar();
@@ -8505,10 +8588,20 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   var mensagens = [];
   var proximaMensagem = 1;
   function aviso(texto2, tipo = "ok") {
+    if (tipo === "erro") return janelaErro(texto2);
     const m = { id: proximaMensagem++, texto: texto2, tipo };
     mensagens.push(m);
     desenharMensagens();
     if (tipo !== "erro") setTimeout(() => fecharMensagem(m.id), tipo === "aviso" ? 15e3 : 6e3);
+  }
+  function janelaErro(texto2) {
+    const dlg = document.createElement("dialog");
+    dlg.className = "janela-erro";
+    dlg.innerHTML = `<p>${esc(texto2)}</p><div class="acoes" style="justify-content:flex-end"><button type="button" autofocus>Entendi</button></div>`;
+    dlg.querySelector("button").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("close", () => dlg.remove());
+    document.body.appendChild(dlg);
+    dlg.showModal();
   }
   function fecharMensagem(id) {
     mensagens = mensagens.filter((x) => x.id !== id);

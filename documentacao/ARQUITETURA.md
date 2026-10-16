@@ -40,7 +40,7 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Pagamento, multa, juros, valor da NF | `regras.js` → `registrarPagamento`, `baixarEmLote`; `calculos.js` → `liquidar`, `multaEJuros`, `valorNotaFiscal` |
 | Numeração de NF | `regras.js` → `pendentesDeFatura`, `numerarFaturas`, `desfazerUltimaNumeracao`, `cancelarNumero`, `registrarNfExterna` |
 | Reserva | `regras.js` → `reservaParaCompetencia`, `realocarReserva`, `alertaReservaParada` |
-| IPTU | `regras.js` → `parcelasIptu`, `iptuNaCompetencia`, `competenciaDaParcela`, `alertasIptu` |
+| IPTU | `regras.js` → `parcelasIptu` (parte do inquilino pelos dias e do proprietário), `totaisIptu`, `iptuNaCompetencia`, `competenciaDaParcela`, `alertasIptu` |
 | Reajuste | `regras.js` → `mesDeAniversario`, `competenciaDoReajuste`, `reajusteNaCompetencia`, `calcularReajuste`, `aplicarReajuste` |
 | Ressarcimento de condomínio | `regras.js` → `competenciaDoAbatimento`, `aplicarRessarcimentos`, `condominioAConferir` |
 | Contas pagas por nós | `regras.js` → `contasPermitidas`, `lancarDespesas` |
@@ -48,11 +48,11 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas` (ordem por `estiloAlerta`), `salvarEstilosAlertas`, `eventosDoMes`; `alertas.js`; `telas.js` → `classeAlerta` |
 | Fechamento e resultados | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia` |
 | Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir` |
-| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa` |
+| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `documentoPerdido`, `marcarDocumentoPerdido`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa` |
 
 ## Fluxo típico: confirmar um pagamento
 1. Tela `#/cobrancas` (`telas.js` → `telaCobrancas`) desenha o form `data-form="pagamento"`.
-2. `app.js` captura o `submit` e chama `FORMULARIOS.pagamento(form)` em `telas.js`.
+2. `app.js` captura o `submit` e chama `FORMULARIOS.pagamento(form)` em `telas.js`; um erro lançado abre a janela "Entendi" (`aviso(…, 'erro')` → `janelaErro`).
 3. `FORMULARIOS.pagamento` valida e chama `alterar((db) => R.registrarPagamento(db, id, data, …))`.
 4. `alterar` (`app.js`): relê `imoveis-dados.json`; se a `revisao` do disco mudou, troca `E.d` pela versão do disco; clona; aplica a função.
 5. `registrarPagamento` usa `C.liquidar` e grava via `atualizar` → `registrar` adiciona a linha em `d.historico`.
