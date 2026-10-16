@@ -10,7 +10,7 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rodar = (titulo, cmd, args) => {
   process.stdout.write(`• ${titulo}… `);
   try {
-    const saida = execFileSync(cmd, args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const saida = execFileSync(cmd, args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
     console.log('ok');
     return saida;
   } catch (e) {

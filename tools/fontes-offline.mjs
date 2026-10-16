@@ -14,6 +14,10 @@ export function hashDasFontes() {
     path.join('docs', 'css', 'estilo.css'), path.join('docs', 'modelos', 'fatura-modelo.xlsx'), path.join('tools', 'gerar-offline.mjs'),
   ];
   const h = crypto.createHash('sha256');
-  for (const a of arquivos) h.update(a).update(fs.readFileSync(path.join(RAIZ, a)));
+  // igual no Windows e no Linux: caminho com "/" e texto sem o "\r" que o Git põe no Windows (CRLF)
+  for (const a of arquivos) {
+    const conteudo = fs.readFileSync(path.join(RAIZ, a));
+    h.update(a.split(path.sep).join('/')).update(a.endsWith('.xlsx') ? conteudo : conteudo.toString('utf8').replace(/\r\n/g, '\n'));
+  }
   return h.digest('hex').slice(0, 16);
 }
