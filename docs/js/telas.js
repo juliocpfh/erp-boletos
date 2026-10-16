@@ -444,6 +444,8 @@ export const TELAS = {
         ${n(abertas.filter((c) => c.vencimento < hoje).length, 'em aberto e vencidas', '#/inadimplencia')}
         ${n(pend.length, 'pagamentos aguardando nº de NF', '#/faturas')}
         ${n(incompletos.length, 'cadastros incompletos', '#/pendencias')}
+        ${(() => { const r = R.resumoSolicitacoes(d()); return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
+          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos</a>`; })()}
       </div>
       <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => e.titulo.split(' (')[0]).join('; '))}.` : 'todas as etapas feitas.'}
         ${link(`#/fechamento?mes=${mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
@@ -1066,11 +1068,17 @@ const CADASTROS = {
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`,
   },
   solicitacoes: {
-    titulo: (r, q) => `Solicitação do inquilino - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.SOLICITACAO,
-    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
-    padrao: () => ({ data: C.hojeIso() }),
-    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de] || `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes`),
+    titulo: (r) => (r ? 'Solicitação do inquilino' : 'Nova solicitação do inquilino'),
+    // inquilino escolhido na lista (ativos, em ordem de nome); vindo da tela Inquilinos, já vem marcado
+    campos: (r) => {
+      const ops = d().contratos.filter((c) => (r && c.id === r.contrato_id) || (c.ativo !== false && R.contratoAtivo(c, C.hojeIso())))
+        .sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
+        .map((c) => { const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null; return [String(c.id), `${c.inquilino_nome}${i ? ` · ${i.nome}` : ''}`]; });
+      return [{ nome: 'contrato_id', rotulo: 'Inquilino', tipo: 'opcao', obrig: true, opcoes: ops }, ...F.SOLICITACAO];
+    },
+    padrao: (q) => ({ data: C.hojeIso(), contrato_id: q.contrato || '' }),
+    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de]
+      || (r || (q && q.contrato) ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : '#/solicitacoes')),
     descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
     ajustar(dados) {
       if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
@@ -1901,7 +1909,7 @@ function telaSolicitacoes(q) {
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
     .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
   return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
-    <h1>Solicitações dos inquilinos</h1>
+    <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
       ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
     <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
@@ -1916,7 +1924,7 @@ function telaSolicitacoes(q) {
       <td class="n">${x.valor ? `${reais(x.valor)}${x.pago_por ? `<br><span class="suave">${esc(x.pago_por)}</span>` : ''}` : '-'}</td>
       <td class="n nw">${opera() ? link(`#/editar/solicitacoes/${x.id}?de=solicitacoes`, 'Editar') : ''}</td></tr>`;
   }).join('') || `<tr><td colspan="7" class="suave">Nenhuma solicitação${filtro ? ' nesta situação' : ''}.</td></tr>`}</table>
-    <p class="suave">Para registrar uma solicitação nova, use o botão "Registrar solicitação" ao lado do nome do inquilino, na tela Inquilinos.</p></div>`;
+</div>`;
 }
 
 /** Inquilinos atuais e anteriores, com o resumo da saída. */

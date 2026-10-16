@@ -77,7 +77,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .alerta.enfase-forte.cor-roxo { background: #ddd6fe; color: #4c1d95; }
 .alerta.enfase-forte.cor-cinza { background: #e5e7eb; color: #1f2937; }
 .alerta.enfase-discreta { border-left-width: 3px; background: #fff; color: var(--suave); font-size: 13px; }
-.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }
 .formulario { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px 18px; }
@@ -295,3 +295,4 @@ input.doc-invalido { border-color: var(--perigo); }
 .caixa-historico summary { cursor: pointer; }
 .caixa-historico[open] summary { margin-bottom: 10px; }
 .resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
+.resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
