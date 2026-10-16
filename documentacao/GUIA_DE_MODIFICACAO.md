@@ -9,7 +9,7 @@
      campo('valor', 'Valor investido', 'dinheiro', { obrig: true }),
    ];
    ```
-   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `cpf`, `cnpj`, `cpfcnpj`, `cep`. Mostrar/esconder campo: `quando('campo', 'valor')`.
+   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`.
 3. `docs/js/telas.js` → entrada em `CADASTROS` (modelo: `reformas`):
    ```js
    reformas: {
@@ -19,9 +19,9 @@
      voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}?ir=reformas`,
    },
    ```
-   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
+   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros` e nos comprovantes via `guardarComprovantes`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
 4. Links: novo `#/novo/<tabela>?...`; editar `#/editar/<tabela>/<id>`. A gravação genérica é `FORMULARIOS.cadastro`.
-5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato ou imóvel, inclua-a na exclusão em cascata de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
+5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato, inclua-a na cascata de `R.excluirContrato` (`regras.js`); se pertence a um imóvel, na de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
 
 ## Adicionar uma tela
 1. `telas.js` → função `telaX(rota)` que devolve HTML em texto; registre em `TELAS` com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).

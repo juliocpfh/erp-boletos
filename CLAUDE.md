@@ -15,7 +15,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 `node --check` NÃO detecta erros nestes módulos; use `tools/checar.mjs`.
 
 ## Leia por partes (economia de contexto)
-- `docs/js/telas.js` (~3.900 linhas) e `docs/js/regras.js` (~2.000): use `tools/mapa.mjs` e leia só o trecho (`Read` com offset/limit).
+- `docs/js/telas.js` (~4.100 linhas) e `docs/js/regras.js` (~2.100): use `tools/mapa.mjs` e leia só o trecho (`Read` com offset/limit).
 - Não leia `docs/offline/` (gerado, ~2 MB) nem `docs/vendor/` (bibliotecas minificadas).
 
 ## Regras que não podem quebrar

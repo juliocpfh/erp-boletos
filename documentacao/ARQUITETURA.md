@@ -47,8 +47,8 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Saída do inquilino | `regras.js` → `encerrarContrato`, `calcularEncerramento` |
 | Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas` (ordem por `estiloAlerta`), `salvarEstilosAlertas`, `eventosDoMes`; `alertas.js`; `telas.js` → `classeAlerta` |
 | Fechamento, resultados e impostos | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia`; impostos: `impostosDoMes` (`IMPOSTOS`, adicional do IRPJ, `excedenteLc224`, guia abaixo de R$ 10 em `transportado`), `faturamentoNf`, `vencimentoGuia`/`diaUtilAteh` (feriados nacionais), `salvarGuiaImposto`; `telas.js` → `telaImpostos`, `abasResultados` |
-| Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir` |
-| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `documentoPerdido`, `marcarDocumentoPerdido`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa` |
+| Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir`; comprovantes obrigatórios (caução, depósito, reserva, aplicação, complemento): `COMPROVANTES_CONTRATO`, `exigirComprovantes`, `guardarComprovantes`; fiadores no cadastro do contrato: `formularios.js` → `fiadoresNoCadastro`, `vagasFiador` |
+| Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `documentoPerdido`, `marcarDocumentoPerdido`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa`; marca-d'água: `contratos.js` → `marcaDagua`. Exclusão e contrato sem imóvel: `regras.js` → `excluirContrato`, `contratosSemImovelVencidos`, `dataApagarSemImovel` (`DIAS_SEM_IMOVEL`); `telas.js` → `limparSemImovel` (ao abrir o Painel) |
 
 ## Fluxo típico: confirmar um pagamento
 1. Tela `#/cobrancas` (`telas.js` → `telaCobrancas`) desenha o form `data-form="pagamento"`.
@@ -64,13 +64,13 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 |---|---|---|
 | Pasta local / OneDrive | `armazenamento.js` | O OneDrive só sincroniza a pasta; o código não fala com ele. Cópias em conflito são detectadas por nome (`copiasEmConflito`) |
 | GitHub Pages | — | Hospeda `docs/` (README). Não há backend |
-| ViaCEP | `telas.js` → `consultarCep` | `https://viacep.com.br/ws/<cep>/json/`; só preenche campos vazios |
+| ViaCEP | `telas.js` → `consultarCep` | `https://viacep.com.br/ws/<cep>/json/`; só preenche campos vazios, exceto o Estado (UF), que sempre segue o CEP; sem internet, `calculos.js` → `ufDoCep` |
 | BrasilAPI (CNPJ) | `telas.js` → `consultarCnpj` | `https://brasilapi.com.br/api/cnpj/v1/<cnpj>` |
 | Planilhas Excel | `fatura.js`, `telas.js` (`excelResultados`, `excelDoNumero`) | ExcelJS; modelo `docs/modelos/fatura-modelo.xlsx` ou o enviado pelo usuário |
 | PDF | `telas.js` → `pdfDaFatura`; impressão do navegador | html2canvas + jsPDF |
 | Word | `contratos.js` → `contratoDocx` | `.docx` montado à mão com JSZip |
 | Emissor fiscal (NFS-e da prefeitura) | — | Não há integração no código, e o usuário decidiu não integrar com a prefeitura por enquanto. A NF oficial é emitida fora do sistema |
-| Banco (boletos bancários) | `regras.js` → `dadosBoleto` | Só gera o texto/dados para copiar no banco; sem API bancária |
+| Banco (boletos bancários) | `regras.js` → `dadosBoleto` | Só gera o texto/dados para copiar no banco; sem API bancária. API do C6 em estudo (fora do código): exige uma "ponte" com certificado mTLS, pois o C6 não aceita chamadas do navegador |
 
 ## Pontos sensíveis (mexer só com teste)
 | Ponto | Por quê |
@@ -85,4 +85,4 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Reajuste (`mesDeAniversario`) | Regra de negócio definida pelo usuário (ver `documentacao/DECISOES.md`) |
 | `auth.js` e `backup-seguro.js` | Mudar parâmetros de cifragem/iterações invalida senhas e backups já gravados |
 | `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js`, `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs`. Usa caminhos com `/` e quebras de linha LF, para o mesmo hash no Windows (CRLF do Git) e no Linux |
-| Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `contrato-de-locacao-assinado-2026-10-15.pdf` via `salvarAssinado`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes |
+| Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `contrato-de-locacao-assinado-2026-10-15.pdf` via `salvarAssinado`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes. Para só listar arquivos use `pastaDoEscopo(escopo, id, false)`: abrir uma página não pode criar pasta vazia |
