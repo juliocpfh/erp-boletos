@@ -415,30 +415,60 @@ export function iptuNaCompetencia(p, comp, c = {}) {
   return [null, 0];
 }
 
-/** Inquilino que paga a parcela n no boleto (e em qual competência), ou null quando fica com o proprietário. */
-function inquilinoDaParcela(d, p, n) {
+/**
+ * Quanto da parcela n cada inquilino paga no boleto: proporcional aos dias ocupados no mês, como no boleto
+ * (mês de entrada ou saída parcial; carência sem IPTU = nada). O que sobra é a parte do proprietário.
+ */
+function inquilinosDaParcela(d, p, n, valor) {
+  const lista = [];
   for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
     const comp = competenciaDaParcela(p, n, c);
-    if (comp && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return { contrato: c, comp };
+    const dias = comp ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+    if (!dias || (emCarencia(c, comp) && !c.carencia_cobrar_iptu)) continue;
+    lista.push({ contrato: c, comp, dias, diasMes: C.diasNoMes(comp), valor: C.aluguelProporcional(valor, dias, C.diasNoMes(comp)) });
   }
-  return null;
+  return lista;
 }
 
 /**
- * Parcelas do IPTU na prefeitura, com quem arca com cada uma (inquilino no boleto ou proprietário, quando o
- * imóvel está vazio ou o IPTU não é cobrado) e se o proprietário já pagou.
+ * Parcelas do IPTU na prefeitura (o proprietário paga todas as guias). Em cada uma: a parte dos inquilinos (no boleto,
+ * proporcional aos dias) e a parte do proprietário (dias vazios, IPTU não cobrado, carência). paga = guia paga.
  * Quitado à vista: uma linha só (cota única, com o valor pago à vista).
  */
 export function parcelasIptu(d, p) {
   if (p.pago_avista) {
-    return [{ n: 0, rotulo: 'Cota única', comp: null, valor: p.valor_avista || p.valor_total,
+    const valor = p.valor_avista || p.valor_total;
+    return [{ n: 0, rotulo: 'Cota única', comp: null, valor, inquilinos: [], valorInquilino: 0, valorProprietario: valor,
       vencimento: p.vencimento_primeira || null, proprietario: true, paga: p.data_quitacao || null }];
   }
   return valoresIptu(p).map((valor, i) => {
-    const quem = inquilinoDaParcela(d, p, i + 1);
-    return { n: i + 1, rotulo: `${i + 1}ª`, comp: quem ? quem.comp : null, mesBoleto: mesBoletoDaParcela(p, i + 1), valor, inquilino: quem ? quem.contrato : null,
-      vencimento: vencimentoParcela(p, i + 1), proprietario: !quem, paga: (p.pagas || {})[i + 1] || null };
+    const inquilinos = inquilinosDaParcela(d, p, i + 1, valor);
+    const valorInquilino = Math.min(valor, inquilinos.reduce((s, x) => s + x.valor, 0));
+    return { n: i + 1, rotulo: `${i + 1}ª`, comp: inquilinos.length ? inquilinos[0].comp : null, mesBoleto: mesBoletoDaParcela(p, i + 1), valor,
+      inquilinos, inquilino: inquilinos.length ? inquilinos[0].contrato : null, valorInquilino, valorProprietario: valor - valorInquilino,
+      vencimento: vencimentoParcela(p, i + 1), proprietario: valorInquilino < valor, paga: (p.pagas || {})[i + 1] || null };
   });
+}
+
+/**
+ * Totais do IPTU no ano: quanto os inquilinos pagam nos boletos e quanto fica com o proprietário (e quanto dessa parte
+ * ainda está em guia não paga). À vista: o inquilino paga conforme "Inquilino que entrar" (1/12 ou parcelas) nos meses ocupados.
+ */
+export function totaisIptu(d, p) {
+  const ps = parcelasIptu(d, p);
+  let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
+  if (p.pago_avista) {
+    for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+      for (let k = 0, comp = `${p.ano - 1}-01`; k < 36; k += 1, comp = C.somarMeses(comp, 1)) {
+        const [n, v] = iptuNaCompetencia(p, comp, c);
+        const dias = n ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+        if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += C.aluguelProporcional(v, dias, C.diasNoMes(comp));
+      }
+    }
+  }
+  const custo = ps.reduce((s, x) => s + x.valor, 0);
+  return { custo, inquilino, proprietario: custo - inquilino,
+    emAberto: ps.filter((x) => x.proprietario && !x.paga).reduce((s, x) => s + x.valorProprietario, 0) };
 }
 
 /** Alertas de IPTU que o proprietário precisa pagar (imóvel vazio ou IPTU não cobrado do inquilino). */
@@ -454,7 +484,7 @@ export function alertasIptu(d, hoje = C.hojeIso()) {
       const faltam = C.diasEntre(hoje, venc);
       if (faltam > 15) continue;
       lista.push({ nivel: faltam < 0 ? 'perigo' : 'aviso', tipo: 'IPTU do proprietário', imovel_id: i.id, imovel: i.nome, inquilino: '', ancora: 'iptu',
-        texto: `IPTU ${p.ano} ${pc.rotulo} parcela de ${C.reais(pc.valor)} ${faltam < 0 ? `venceu em ${C.dataBr(venc)}` : `vence em ${C.dataBr(venc)}`}${pc.vencimento ? '' : ' (vencimento estimado)'}. Imóvel sem inquilino pagando o IPTU: pagamento por conta do proprietário.` });
+        texto: `IPTU ${p.ano} ${pc.rotulo} ${pc.n ? 'parcela' : ''} de ${C.reais(pc.valor)} ${faltam < 0 ? `venceu em ${C.dataBr(venc)}` : `vence em ${C.dataBr(venc)}`}${pc.vencimento ? '' : ' (vencimento estimado)'}. ${pc.n === 0 ? 'Pago à vista pelo proprietário.' : pc.valorInquilino ? `Sua parte: ${C.reais(pc.valorProprietario)} (o inquilino paga ${C.reais(pc.valorInquilino)} no boleto, pelos dias em que ocupou).` : 'Imóvel vazio ou sem cobrança de IPTU: a parcela é toda sua.'}`.replace('  ', ' ') });
     }
   }
   return lista;
@@ -1111,6 +1141,11 @@ export const DOCUMENTOS_ENTRADA = [
 
 /** Arquivo assinado de cada documento: doc_contrato_em → doc_contrato_arquivo. */
 export const campoArquivoDoc = (campo) => campo.replace(/_em$/, '_arquivo');
+/** Data em que o documento foi dado como perdido: doc_contrato_em → doc_contrato_perdido_em. */
+export const campoPerdidoDoc = (campo) => campo.replace(/_em$/, '_perdido_em');
+
+/** Data em que o documento foi registrado como perdido (null se não foi, ou se já existe assinado, próprio ou herdado). */
+export const documentoPerdido = (d, c, campo) => (c[campoPerdidoDoc(campo)] && !documentoEntrada(d, c, campo) ? c[campoPerdidoDoc(campo)] : null);
 
 /**
  * Situação de um documento de entrada. Quem "continua o contrato de" outro (ex.: troca de titular) herda o documento
@@ -1128,7 +1163,7 @@ export function documentoEntrada(d, c, campo) {
 /** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
 export function alertaDocumentosEntrada(c, d = null) {
   if (c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d, c, k) && !documentoPerdido(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
 }
 
@@ -1138,7 +1173,16 @@ export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = n
   if (!doc) throw new Error('Documento desconhecido.');
   if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
   const c = buscar(d, 'contratos', contratoId);
-  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null, ...(data ? { [campoPerdidoDoc(campo)]: null } : {}) }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+/** Registra que o documento foi perdido (fica em vermelho na lista, sem alerta geral) ou, sem data, desfaz o registro. */
+export function marcarDocumentoPerdido(d, contratoId, campo, data, usuario) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  atualizar(d, 'contratos', c.id, { [campoPerdidoDoc(campo)]: data || null }, usuario,
+    `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `perdido (registrado em ${C.dataBr(data)})` : 'não está mais como perdido'}`);
 }
 
 /** Termos aditivos do contrato (posteriores a ele), do mais recente ao mais antigo. */
@@ -1314,7 +1358,7 @@ export function resultadosFinanceiros(d, de, ate) {
     const avulsas = d.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
     let iptu = 0;
     for (const p of d.iptus.filter((x) => x.imovel_id === i.id)) {
-      for (const pc of parcelasIptu(d, p)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valor;
+      for (const pc of parcelasIptu(d, p)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
     }
     const todasReformas = reformasDo(d, i.id);
     const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
@@ -1543,7 +1587,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
     for (const pc of parcelasIptu(d, p)) {
       if (!no(pc.vencimento)) continue;
       ev.push({ data: pc.vencimento, tipo: 'IPTU', imovel_id: p.imovel_id,
-        texto: `${nomeImovel(p.imovel_id)} · IPTU ${p.ano} ${pc.rotulo} · ${C.reais(pc.valor)} · ${pc.proprietario ? 'por conta do proprietário' : `no boleto de ${pc.inquilino.inquilino_nome}`}`,
+        texto: `${nomeImovel(p.imovel_id)} · IPTU ${p.ano} ${pc.rotulo} · ${C.reais(pc.valor)} · ${!pc.proprietario ? `no boleto de ${pc.inquilino.inquilino_nome}` : pc.valorInquilino ? `sua parte ${C.reais(pc.valorProprietario)}, inquilino ${C.reais(pc.valorInquilino)}` : 'parte do proprietário'}`,
         situacao: !pc.proprietario ? 'neutra' : pc.paga ? 'ok' : pc.vencimento < hoje ? 'perigo' : 'aviso',
         estado: !pc.proprietario ? 'inquilino paga' : pc.paga ? `pago em ${C.dataBr(pc.paga)}` : pc.vencimento < hoje ? 'vencido' : 'a pagar' });
     }

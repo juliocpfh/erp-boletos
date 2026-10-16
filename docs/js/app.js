@@ -163,10 +163,22 @@ async function verificarMudancasExternas() {
 let mensagens = [];
 let proximaMensagem = 1;
 export function aviso(texto, tipo = 'ok') {
+  if (tipo === 'erro') return janelaErro(texto);
   const m = { id: proximaMensagem++, texto, tipo };
   mensagens.push(m);
   desenharMensagens();
   if (tipo !== 'erro') setTimeout(() => fecharMensagem(m.id), tipo === 'aviso' ? 15000 : 6000);
+}
+
+/** Erro: janela no meio da tela com botão "Entendi" (a tela não sobe sozinha, então um aviso no topo passaria despercebido). */
+function janelaErro(texto) {
+  const dlg = document.createElement('dialog');
+  dlg.className = 'janela-erro';
+  dlg.innerHTML = `<p>${esc(texto)}</p><div class="acoes" style="justify-content:flex-end"><button type="button" autofocus>Entendi</button></div>`;
+  dlg.querySelector('button').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.appendChild(dlg);
+  dlg.showModal();
 }
 
 function fecharMensagem(id) {

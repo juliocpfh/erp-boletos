@@ -442,9 +442,11 @@ test('IPTU: parcelas de imóvel vazio ficam com o proprietário, com alerta até
   const p = d.iptus[0];
   p.vencimento_primeira = '2026-02-15';
   const ps = R.parcelasIptu(d, p);
-  // Maria entra em 07/06: fevereiro a maio é do proprietário, junho em diante no boleto
-  assert.deepEqual(ps.map((x) => x.proprietario), [true, true, true, true, false, false, false, false, false, false]);
+  // Maria entra em 07/06: fevereiro a maio é do proprietário; junho dividido (24/30 dias dela); julho em diante no boleto
+  assert.deepEqual(ps.map((x) => x.proprietario), [true, true, true, true, true, false, false, false, false, false]);
   assert.equal(ps[4].inquilino.id, c.id);
+  assert.deepEqual([ps[4].valorInquilino, ps[4].valorProprietario], [8000, 2000]);
+  assert.deepEqual(R.totaisIptu(d, p), { custo: 100000, inquilino: 58000, proprietario: 42000, emAberto: 42000 });
   const alertas = R.alertasIptu(d, '2026-05-05');
   assert.equal(alertas.filter((a) => a.nivel === 'perigo').length, 3);
   assert.equal(alertas.filter((a) => a.nivel === 'aviso').length, 1);
@@ -526,6 +528,13 @@ test('documentos de entrada: alerta para todo inquilino ativo, até marcar os tr
   c.data_saida = '2026-09-30';
   assert.equal(R.alertaDocumentosEntrada(c), null, 'quem saiu não gera alerta');
   assert.throws(() => R.marcarDocumento(d, c.id, 'outro', '2026-09-05', 'julio'), /desconhecido/);
+  c.data_saida = null;
+  R.marcarDocumentoPerdido(d, c.id, 'doc_chaves_em', '2026-10-15', 'julio');
+  assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), '2026-10-15');
+  assert.equal(R.alertaDocumentosEntrada(c), null, 'documento perdido não gera alerta');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-10-16', 'julio', 'chaves.jpg');
+  assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), null, 'assinar limpa o "perdido"');
+  R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
 });
 
 test('contas pagas por nós abatem do resultado do imóvel', () => {
