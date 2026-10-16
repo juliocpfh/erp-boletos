@@ -802,6 +802,21 @@ export function enderecoCompleto(imovel) {
   return [imovel.endereco, imovel.complemento].filter(Boolean).join(', ');
 }
 
+/**
+ * Imóveis em ordem alfabética, mas os do mesmo endereço (só o complemento muda) ficam juntos:
+ * o grupo entra na posição do primeiro nome dele.
+ */
+export function imoveisPorEndereco(imoveis) {
+  const porNome = (a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+  const chave = (i) => String(i.endereco || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || `#${i.id}`;
+  const grupos = new Map();
+  for (const i of [...imoveis].sort(porNome)) {
+    if (!grupos.has(chave(i))) grupos.set(chave(i), []);
+    grupos.get(chave(i)).push(i);
+  }
+  return [...grupos.values()].flat();
+}
+
 function problemaDaFatura(d, base) {
   const partes = base.partes;
   if (!partes.length) return `Defina ${base.origem} quais empresas emitem a NF.`;
@@ -1411,7 +1426,14 @@ export function dadosBoleto(d, cb) {
 export const solicitacoesDo = (d, contratoId) => d.solicitacoes.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
 
-export const reformasDo = (d, imovelId) => d.reformas.filter((r) => r.imovel_id === imovelId)
+/** Quantas solicitações há em cada situação (sem situação conta como "Aberta"). */
+export function resumoSolicitacoes(d) {
+  const r = { Aberta: 0, 'Em andamento': 0, Concluída: 0, 'Não atendida': 0 };
+  for (const x of d.solicitacoes) { const s = x.situacao || 'Aberta'; r[s] = (r[s] || 0) + 1; }
+  return r;
+}
+
+export const reformasDo =(d, imovelId) => d.reformas.filter((r) => r.imovel_id === imovelId)
   .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
 
 /**
@@ -1821,6 +1843,16 @@ export function reajustesEntre(d, de, ate) {
       const r = reajusteNaCompetencia(d, c, comp);
       if (r) lista.push({ contrato: c, ...r, calculo: calcularReajuste(d, c, comp) });
     }
+  }
+  return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
+}
+
+/** Reajustes ainda não corrigidos até a competência "ate", inclusive os atrasados de antes de "de". */
+export function reajustesNaoCorrigidos(d, de, ate, hoje = C.hojeIso()) {
+  const lista = reajustesEntre(d, de, ate).filter((r) => !r.corrigido);
+  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id && contratoAtivo(x, hoje))) {
+    const r = reajustePendente(d, c, hoje);
+    if (r && r.competencia < de) lista.push({ contrato: c, ...r, calculo: calcularReajuste(d, c, r.competencia) });
   }
   return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
 }

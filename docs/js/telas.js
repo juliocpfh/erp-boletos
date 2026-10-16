@@ -132,6 +132,11 @@ async function salvarAssinado(escopo, contratoId, arquivo, texto) {
 const SEM_ACENTO = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão' ? '' : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
 const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.tipo));
+/** Para onde leva o clique no alerta: o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
+const linkAlerta = (a) => (a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
+  : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}`);
+/** Caixa de últimas alterações: começa recolhida e só abre quando o usuário clica nela. */
+const caixaHistorico = (titulo, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
 
 function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
@@ -446,17 +451,16 @@ export const TELAS = {
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
       <div class="cartao"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario('admin') ? link('#/alertas-config', 'Editar', 'botao secundario pequeno') : ''}</div>
-        ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> <a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
-      <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
-        ${tabelaHistorico(ultimos(() => true, 12))}
-        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString('pt-BR')}.</p></div>`;
+      ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
+        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString('pt-BR')}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
   },
 
   // ------------------------------------------------------------------------
   imoveis() {
     const hoje = C.hojeIso();
-    const linhas = ordenar(d().imoveis, 'nome').map((i) => {
+    const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const atual = atuais[0];
       return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a>${i.sublote ? `<br><span class="suave">${esc(i.sublote)}</span>` : ''}</td><td>${esc(R.enderecoCompleto(i))}</td>
@@ -531,6 +535,7 @@ export const TELAS = {
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
+  solicitacoes: (rota) => telaSolicitacoes(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
   dados: () => telaDados(),
@@ -671,7 +676,7 @@ function telaImovel(i) {
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos('anuncio', i.id, 'Fotos do último anúncio', 'anuncio')}
     ${caixaArquivos('imovel', i.id, 'Documentos do imóvel', 'documentos', 'Matrícula, cadastro do IPTU e outros documentos do imóvel.')}
-    <div class="cartao"><h2>Histórico do imóvel</h2>${tabelaHistorico(ultimos((h) => h.imovel_id === i.id))}</div>`;
+    ${caixaHistorico('Histórico do imóvel', tabelaHistorico(ultimos((h) => h.imovel_id === i.id)))}`;
 }
 
 // --------------------------------------------------------------------------
@@ -1003,7 +1008,7 @@ function telaContrato(c) {
     ${caixaDocumentos(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ', contrato social e cartão CNPJ da empresa, documentos do representante' : ''}${c.solidario_nome ? ', documentos do inquilino solidário' : ''} etc.`)}
     ${caixaSaida(c)}
-    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
+    ${caixaHistorico(`Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}`, tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80)))}`;
 }
 
 // --------------------------------------------------------------------------
@@ -1065,7 +1070,7 @@ const CADASTROS = {
     campos: () => F.SOLICITACAO,
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
     padrao: () => ({ data: C.hojeIso() }),
-    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes`,
+    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de] || `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes`),
     descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
     ajustar(dados) {
       if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
@@ -1880,6 +1885,40 @@ function caixaAvulsas() {
         <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'avulsas', id: a.id }, 'perigo pequeno', 'Excluir esta NF avulsa?')}` : ''}</td></tr>`).join('')}</table>` : ''}</div>`;
 }
 
+/** Situações da solicitação, com o símbolo do resumo (tela Inquilinos) e da lista de solicitações. */
+const SITUACOES_SOLICITACAO = [
+  { nome: 'Aberta', simbolo: '🟢', texto: 'abertas' },
+  { nome: 'Em andamento', simbolo: '➡️', texto: 'em andamento' },
+  { nome: 'Concluída', simbolo: '✅', texto: 'concluídas' },
+  { nome: 'Não atendida', simbolo: '❌', texto: 'não atendidas' },
+];
+
+/** Todas as solicitações dos inquilinos, com filtro pela situação. */
+function telaSolicitacoes(q) {
+  const resumo = R.resumoSolicitacoes(d());
+  const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
+  const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
+  const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
+    <h1>Solicitações dos inquilinos</h1>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
+      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
+    <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
+    ${lista.map((x) => {
+    const c = buscar('contratos', x.contrato_id);
+    const i = c && c.imovel_id ? buscar('imoveis', c.imovel_id) : null;
+    return `<tr><td class="nw">${dataBr(x.data)}</td>
+      <td>${c ? `<a href="#/contrato/${c.id}?ir=solicitacoes"><b>${esc(c.inquilino_nome)}</b></a>` : '-'}${i ? `<br><span class="suave">${esc(i.nome)}</span>` : ''}</td>
+      <td class="pre">${esc(x.descricao)}</td>
+      <td class="pre">${esc(x.providencia || '')}${x.responsavel ? `<br><span class="suave">${esc(x.responsavel)}</span>` : ''}</td>
+      <td class="nw">${simbolo(x.situacao || 'Aberta')} ${esc(x.situacao || 'Aberta')}${x.data_conclusao ? `<br><span class="suave">em ${dataBr(x.data_conclusao)}</span>` : ''}</td>
+      <td class="n">${x.valor ? `${reais(x.valor)}${x.pago_por ? `<br><span class="suave">${esc(x.pago_por)}</span>` : ''}` : '-'}</td>
+      <td class="n nw">${opera() ? link(`#/editar/solicitacoes/${x.id}?de=solicitacoes`, 'Editar') : ''}</td></tr>`;
+  }).join('') || `<tr><td colspan="7" class="suave">Nenhuma solicitação${filtro ? ' nesta situação' : ''}.</td></tr>`}</table>
+    <p class="suave">Para registrar uma solicitação nova, use o botão "Registrar solicitação" ao lado do nome do inquilino, na tela Inquilinos.</p></div>`;
+}
+
 /** Inquilinos atuais e anteriores, com o resumo da saída. */
 function telaInquilinos(q) {
   const hoje = C.hojeIso();
@@ -1894,10 +1933,13 @@ function telaInquilinos(q) {
   const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
+  const registrar = (c) => (opera() ? ` ${link(`#/novo/solicitacoes?contrato=${c.id}&de=inquilinos`, 'Registrar solicitação', 'botao secundario pequeno')}` : '');
+  const resumo = R.resumoSolicitacoes(d());
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo inquilino', 'botao') : ''}</div>
-    <form class="acoes" data-form="buscaInquilinos" style="margin-bottom:12px"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="max-width:340px"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
+      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}${registrar(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${x.c.vigencia_inicio ? `${dataBr(x.c.vigencia_inicio)} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr(x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
@@ -1997,7 +2039,9 @@ function telaReajustes(q) {
   const atual = C.competenciaDe(C.hojeIso());
   const de = q.de || C.somarMeses(atual, -2);
   const ate = q.ate || C.somarMeses(atual, 3);
-  const lista = R.reajustesEntre(d(), de, ate);
+  const todos = q.todos === '1';
+  const lista = todos ? R.reajustesEntre(d(), de, ate) : R.reajustesNaoCorrigidos(d(), de, ate);
+  const periodo = (x, y) => `#/reajustes?de=${x}&ate=${y}${todos ? '&todos=1' : ''}`;
   const indices = [...d().indices_acumulados].sort((a, b) => b.mes_ref.localeCompare(a.mes_ref) || a.indice.localeCompare(b.indice)).slice(0, 36);
   const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
   return `<h1>Reajustes do aluguel</h1>
@@ -2008,15 +2052,17 @@ function telaReajustes(q) {
         <input type="month" name="mes_ref" value="${atual}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>` : ''}
       <table style="margin-top:8px"><tr><th>Índice</th><th>Acumulado até</th><th class="n">12 meses</th><th></th></tr>
       ${indices.map((x) => `<tr><td>${esc(x.indice)}</td><td>${compBr(x.mes_ref)}</td><td class="n">${pct(x.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'indices_acumulados', id: x.id }, 'perigo pequeno', 'Excluir este índice?') : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><div class="cabecalho"><h2>Reajustes de ${compBr(de)} a ${compBr(ate)}</h2>
-      <div class="acoes">${link(`#/reajustes?de=${C.somarMeses(de, -3)}&ate=${C.somarMeses(ate, -3)}`, '← anteriores')} ${link(`#/reajustes?de=${C.somarMeses(de, 3)}&ate=${C.somarMeses(ate, 3)}`, 'seguintes →')}</div></div>
+    <div class="cartao rolagem"><div class="cabecalho"><h2>${todos ? 'Reajustes' : 'Reajustes ainda não corrigidos'} de ${compBr(de)} a ${compBr(ate)}</h2>
+      <div class="acoes">${link(periodo(C.somarMeses(de, -3), C.somarMeses(ate, -3)), '← anteriores')} ${link(periodo(C.somarMeses(de, 3), C.somarMeses(ate, 3)), 'seguintes →')}
+        ${link(`#/reajustes?de=${de}&ate=${ate}${todos ? '' : '&todos=1'}`, todos ? 'Mostrar só os não corrigidos' : 'Mostrar também os já corrigidos', 'botao secundario pequeno')}</div></div>
+      ${todos ? '' : '<p class="suave">Aparecem só os contratos que ainda não tiveram o aluguel corrigido (os atrasados aparecem mesmo antes do período).</p>'}
       <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual (bonificado)</th><th class="n">Novo (bonificado)</th><th>Carta e correção</th></tr>
-      ${lista.map((r) => { const k = r.calculo; const i = buscar('imoveis', r.contrato.imovel_id); return `<tr><td><b>${compBr(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr(C.somarMeses(r.competencia, -1))}</span></td>
+      ${lista.map((r) => { const k = r.calculo; const i = buscar('imoveis', r.contrato.imovel_id); return `<tr class="${String(r.contrato.id) === q.contrato ? 'amarelo' : ''}"><td><b>${compBr(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr(C.somarMeses(r.competencia, -1))}</span></td>
         <td><a href="#/contrato/${r.contrato.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(r.contrato.inquilino_nome)} · ${r.anos} ano(s)</td>
         <td>${esc(k.indiceContrato || 'não informado')}${k.escolhido ? `<br><span class="suave">usa ${esc(k.escolhido.indice)} ${pct(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo')}` : ''}</td>
         <td class="n">${reais(k.atual)}${k.bonificacao ? ` <span class="suave">(${reais(k.atualBonificado)})</span>` : ''}</td>
         <td class="n">${k.novo !== null ? `<b>${reais(k.novo)}</b>${k.bonificacao ? ` <span class="suave">(${reais(k.novoBonificado)})</span>` : ''}` : '-'}</td>
-        <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="suave">Nenhum reajuste no período.</td></tr>'}</table>
+        <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`; }).join('') || `<tr><td colspan="6" class="suave">${todos ? 'Nenhum reajuste no período.' : 'Nenhum reajuste a corrigir no período.'}</td></tr>`}</table>
       <p class="suave">Valores: aluguel cheio e, entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>`;
 }
 

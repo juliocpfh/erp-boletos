@@ -718,6 +718,36 @@ test('reajuste: correção feita pela regra antiga (mês seguinte) não vira rea
   assert.equal(R.reajustePendente(d, c, '2026-03-05'), null);
 });
 
+test('reajustes não corrigidos: some depois de corrigido e o atrasado aparece mesmo antes do período', () => {
+  const d = R.bancoVazio();
+  const i = R.inserir(d, 'imoveis', { nome: 'Casa', endereco: 'Rua A, 1' }, 'j');
+  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ana', data_entrada: '2025-03-10', vigencia_inicio: '2025-03-10', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
+  const b = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Bia', data_entrada: '2025-11-10', vigencia_inicio: '2025-11-10', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
+  // hoje 05/10/2026: Ana devia ter sido corrigida no aluguel de 03/2026 (fora do período 08/2026 a 01/2027); Bia corrige em 11/2026
+  const nomes = () => R.reajustesNaoCorrigidos(d, '2026-08', '2027-01', '2026-10-05').map((r) => `${r.contrato.inquilino_nome} ${r.competencia}`);
+  assert.deepEqual(nomes(), ['Ana 2026-03', 'Bia 2026-11']);
+  R.inserir(d, 'correcoes', { contrato_id: b.id, data_vigencia: '2026-11-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
+  assert.deepEqual(nomes(), ['Ana 2026-03']);
+  R.inserir(d, 'correcoes', { contrato_id: a.id, data_vigencia: '2026-03-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
+  assert.deepEqual(nomes(), []);
+});
+
+test('imóveis do mesmo endereço ficam juntos, mesmo fora da ordem alfabética', () => {
+  const lista = [
+    { id: 1, nome: 'Casa Azul', endereco: 'Rua B, 20' },
+    { id: 2, nome: 'Apto 101', endereco: 'Rua C, 30', complemento: 'Apto 101' },
+    { id: 3, nome: 'Zeta 202', endereco: 'Rua C,  30', complemento: 'Apto 202' },
+    { id: 4, nome: 'Bloco', endereco: 'Rua D, 40' },
+  ];
+  assert.deepEqual(R.imoveisPorEndereco(lista).map((i) => i.nome), ['Apto 101', 'Zeta 202', 'Bloco', 'Casa Azul']);
+});
+
+test('resumo das solicitações por situação (sem situação conta como aberta)', () => {
+  const d = R.bancoVazio();
+  for (const situacao of ['Aberta', undefined, 'Em andamento', 'Concluída', 'Concluída', 'Não atendida']) d.solicitacoes.push({ situacao });
+  assert.deepEqual(R.resumoSolicitacoes(d), { Aberta: 2, 'Em andamento': 1, Concluída: 2, 'Não atendida': 1 });
+});
+
 test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui termo aditivo"', () => {
   const { d, c } = base();
   assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento' }, 'julio'), /Anexe o arquivo/);
