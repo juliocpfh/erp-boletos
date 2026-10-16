@@ -179,13 +179,22 @@ export const FIADOR = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
-/** Dois fiadores direto no cadastro do inquilino (campos fiador1_nome, fiador2_nome...). */
+/** Fiadores direto no cadastro do contrato (campos fiador1_nome, fiador2_nome...). */
 export const CAMPOS_FIADOR = FIADOR.filter((c) => c.nome !== 'observacoes');
-const fiadoresNoCadastro = () => [1, 2].flatMap((n) => [
-  { secao: n === 1 ? 'Fiador' : '2º fiador (se houver)', fiador: n, ...GARANTIA_FIADOR },
-  ...CAMPOS_FIADOR.map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, fiador: n, ...GARANTIA_FIADOR,
-    ajuda: n === 1 && c.nome === 'nome' ? 'Pode cadastrar aqui ou depois, na página do inquilino' : c.ajuda })),
-]);
+/** Quantos blocos de fiador o cadastro mostra: os já cadastrados e mais um em branco (pelo menos dois). */
+export const vagasFiador = (existentes = []) => Math.max(2, existentes.length + 1);
+/** Os fiadores já cadastrados vêm preenchidos (para alterar ou excluir); os blocos em branco servem para incluir. */
+export const fiadoresNoCadastro = (existentes = []) => Array.from({ length: vagasFiador(existentes) }, (_, k) => k + 1).flatMap((n) => {
+  const atual = existentes[n - 1];
+  return [
+    { secao: atual ? `Fiador ${n}: ${atual.nome}` : n === 1 ? 'Fiador' : `Mais um fiador (se houver)`, fiador: n, ...GARANTIA_FIADOR },
+    ...(atual ? [campo(`fiador${n}_excluir`, 'Excluir este fiador', 'simnao', { virtual: true, fiador: n, ...GARANTIA_FIADOR,
+      ajuda: 'Cadastro errado ou desistiu. Se ele saiu do contrato, preencha o "Fim do vínculo": ele fica guardado em "Fiadores anteriores"' })] : []),
+    ...CAMPOS_FIADOR.map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, fiador: n, ...GARANTIA_FIADOR })),
+  ];
+});
+/** Comprovante obrigatório: PDF ou foto, guardado na pasta do inquilino. */
+const comprovante = (nome, rotulo, extra = {}) => campo(nome, rotulo, 'arquivo', { ajuda: 'Obrigatório ao registrar ou mudar o valor: PDF ou foto do comprovante', ...extra });
 
 const PJ = quando('inquilino_tipo', 'Pessoa jurídica (empresa)');
 const SOLIDARIO = quando('tem_solidario', '1');
@@ -231,13 +240,16 @@ export const CONTRATO = [
   campo('caucao_valor', 'Valor da caução', 'dinheiro', quando('garantia_tipo', 'Caução')),
   campo('caucao_data', 'Data em que a caução foi dada', 'data', quando('garantia_tipo', 'Caução')),
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Usado para sugerir o novo valor quando o aluguel for corrigido' }),
+  comprovante('comprovante_caucao', 'Comprovante do depósito da caução', quando('garantia_tipo', 'Caução')),
   campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   campo('deposito_data', 'Data do depósito', 'data', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   campo('deposito_uso', 'Quando e onde o depósito será usado', 'texto', { largo: true, ...quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito'), ajuda: 'Ex.: abatido nos dois últimos aluguéis do contrato' }),
+  comprovante('comprovante_deposito', 'Comprovante do depósito de garantia', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   ...fiadoresNoCadastro(),
   secao('Reserva dada na visita'),
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
+  comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'Obrigatório quando houver reserva: PDF ou foto do comprovante' }),
   campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
   secao('Objeto da locação (para o contrato)'),
   campo('finalidade', 'Finalidade', 'opcao', { padrao: 'Residencial', opcoes: ['Residencial', 'Não residencial'] }),
@@ -333,8 +345,8 @@ export const TROCA_FIADOR = [campo('data_troca', 'Data da troca', 'data', { obri
 
 export const TROCA_GARANTIA = [
   campo('data', 'Data da troca', 'data', { obrig: true }),
-  ...CONTRATO.filter((c) => ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'deposito_valor', 'deposito_data', 'deposito_uso'].includes(c.nome))
-    .map((c) => (c.nome === 'garantia_tipo' ? { ...c, rotulo: 'Nova garantia', ajuda: 'Os fiadores são cadastrados depois, na página do inquilino' } : c)),
+  ...CONTRATO.filter((c) => ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_uso', 'comprovante_deposito'].includes(c.nome))
+    .map((c) => (c.nome === 'garantia_tipo' ? { ...c, rotulo: 'Nova garantia', ajuda: 'Os fiadores são cadastrados depois, em "Editar" do contrato' } : c)),
   campo('observacoes', 'O que aconteceu com a garantia anterior', 'area', { ajuda: 'Ex.: caução devolvida em 10/10/2026 por PIX' }),
 ];
 
@@ -342,6 +354,7 @@ export const APLICACAO = [
   campo('data', 'Data da aplicação', 'data', { obrig: true }),
   campo('emitente_id', 'Empresa onde foi aplicado', 'opcao', { obrig: true, opcoes: [] }),
   campo('valor', 'Valor aplicado', 'dinheiro', { obrig: true }),
+  comprovante('comprovante', 'Comprovante da aplicação', { ajuda: 'Obrigatório: PDF ou foto do comprovante da aplicação na empresa' }),
   campo('observacoes', 'Observações (banco, aplicação)', 'area'),
 ];
 
@@ -349,6 +362,7 @@ export const CORRECAO_GARANTIA = [
   campo('data', 'Data', 'data', { obrig: true }),
   campo('valor_novo', 'Novo valor da caução', 'dinheiro', { obrig: true }),
   campo('complemento', 'Complemento pago pelo inquilino', 'dinheiro', { ajuda: 'Em branco: diferença entre o novo e o anterior' }),
+  comprovante('comprovante', 'Comprovante do depósito do complemento', { ajuda: 'Obrigatório quando houver complemento: PDF ou foto do comprovante' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -459,7 +473,7 @@ export function ler(campos, form, antigo = null) {
   const dados = {};
   const erros = {};
   for (const c of campos) {
-    if (!c.nome || c.virtual) continue;
+    if (!c.nome || c.virtual || c.tipo === 'arquivo') continue; // arquivo: gravado à parte (ajustarAsync)
     const bruto = String(fd.get(c.nome) ?? '').trim();
     if (c.tipo === 'simnao') {
       dados[c.nome] = fd.get(c.nome) === '1';
@@ -525,7 +539,11 @@ export function camposHtml(campos, valores = {}, erros = {}) {
       return `<div class="${erros[c.nome] ? 'com-erro' : ''}" ${se}><label class="check"><input type="checkbox" name="${c.nome}" value="1" ${marcado ? 'checked' : ''}> ${esc(c.rotulo)}</label>${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}</div>`;
     }
     const max = c.max ? `maxlength="${c.max}"` : '';
-    if (c.tipo === 'area') entrada = `<textarea id="${id}" name="${c.nome}" ${max}>${esc(v)}</textarea>`;
+    if (c.tipo === 'arquivo') {
+      // o nome do arquivo já guardado vem do registro; depois de um erro o navegador esquece o arquivo escolhido
+      const guardado = typeof v === 'string' && v ? `Já guardado: ${esc(v)}. Escolha outro só para trocar.` : '';
+      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${guardado ? `<div class="ajuda">${guardado}</div>` : ''}`;
+    } else if (c.tipo === 'area') entrada = `<textarea id="${id}" name="${c.nome}" ${max}>${esc(v)}</textarea>`;
     else if (c.tipo === 'opcao') {
       const ops = c.opcoes.map((o) => (Array.isArray(o) ? o : [o, o]));
       if (v !== '' && !ops.some(([k]) => String(k) === String(v))) ops.push([v, v]);
