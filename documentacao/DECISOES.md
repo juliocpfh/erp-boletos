@@ -7,7 +7,7 @@ Quando o motivo ou a alternativa não foi registrado, aparece NÃO CONFIRMADO. N
 |---|---|---|---|
 | 2026-10-09 | Trocar o programa local (Flask + SQLite) por site estático que grava numa pasta do computador | "sem instalação" e dados na pasta escolhida (ex.: OneDrive), segundo o commit | Flask + SQLite local (versão anterior) |
 | 2026-10-09 | Banco num único JSON (`imoveis-dados.json`) com backup diário e ZIP | Sugerido pelo Claude e aceito pelo usuário: sem servidor, funciona na pasta do OneDrive | Flask + SQLite (versão anterior); banco na nuvem (exigiria servidor/serviço externo) |
-| 2026-10-09 | Numeração contínua das NFs pela data em que o dinheiro entrou | Exigência do contador (usuário) | NÃO CONFIRMADO |
+| 2026-10-09 | Numeração contínua das NFs pela data em que o dinheiro entrou | Exigência do contador (usuário; confirmado em 2026-10-15) | Numerar pela data de vencimento (confirmado pelo usuário em 2026-10-15) |
 | 2026-10-09 | Juros ao dia truncados "como no banco" (`calculos.js` → `jurosAoDia`) | Seguir a regra do banco, que trunca os juros ao dia (commit e usuário) | Arredondar (daria centavos diferentes do banco) |
 | 2026-10-09 | Senhas com PBKDF2-SHA256 e sal (`auth.js`) | Comentário no código: a senha nunca é gravada | Não avaliadas (detalhe técnico) |
 | 2026-10-09 | Seguro obrigatório pertence ao imóvel, não ao inquilino | Seguro obrigatório por lei, ligado ao imóvel (usuário) | Seguro no inquilino (migrado ao abrir os dados) |
