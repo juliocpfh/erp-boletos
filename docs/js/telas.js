@@ -1643,7 +1643,8 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     const c = buscar('contratos', cb.contrato_id);
     return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: R.faturasDe(d(), 'cobranca', cb.id) };
   }).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
-  const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id));
+  const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id && !R.ehComplementoCaucao(x.cb)));
+  const caucoes = R.complementosCaucaoPendentes(d(), comp);
   const pend = R.pendentesDeFatura(d());
   // boleto de controle (inquilino sem NF) não entra nas somas
   const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
@@ -1661,6 +1662,9 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(proxima)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha). ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
+    ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido): boleto separado, sem tarifa e sem NF.
+      ${caucoes.map((x) => `<div class="acoes" style="margin-top:6px">${esc(x.contrato.inquilino_nome)}: caução de ${reais(x.atual)} para ${reais(x.necessaria)}
+        ${botao('gerarBoletoCaucao', `Gerar boleto de ${reais(x.complemento)}`, { contrato: x.contrato.id, comp }, 'pequeno', `Gerar o boleto do complemento da caução de ${reais(x.complemento)}?`)}</div>`).join('')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
@@ -2046,7 +2050,7 @@ function cartaReajuste(c, comp) {
       <tr><td>Caução necessária (${caucao.meses} × aluguel atualizado)</td><td class="n">${reais(caucao.nova)}</td></tr>
       <tr><td><b>Depósito adicional</b></td><td class="n"><b>${reais(caucao.nova - caucao.atual)}</b></td></tr></table>
     <p>O depósito adicional será cobrado em <b>boleto separado</b>, com vencimento em <b>${dataBr(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>` : ''}
-    <p>Seguimos a sua disposição para sanar qualquer dúvida.</p>
+    <p>Seguimos à sua disposição para sanar qualquer dúvida.</p>
     <p>Atenciosamente,<br><b>${esc(empresa.nome)}</b></p></div>`;
 }
 
@@ -3524,8 +3528,8 @@ export const ACOES = {
     await mostrar();
   },
 
-  async gerarBoletoCaucao({ contrato }) {
-    const cb = await alterar((db) => R.gerarBoletoCaucao(db, Number(contrato), login()));
+  async gerarBoletoCaucao({ contrato, comp }) {
+    const cb = await alterar((db) => R.gerarBoletoCaucao(db, Number(contrato), login(), comp || null));
     aviso(`Boleto do complemento da caução gerado: ${reais(cb.caucao_complemento)}, vence em ${dataBr(cb.vencimento)}.`, 'ok');
     await mostrar();
   },

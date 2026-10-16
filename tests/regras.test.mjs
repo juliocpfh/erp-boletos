@@ -793,3 +793,23 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   R.estornarPagamento(d, cb.id, 'julio');
   assert.equal(R.valorGarantia(d, c), 540000);
 });
+
+test('complemento da caução sai junto ao gerar os boletos do mês e não esconde o boleto do aluguel', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 3', endereco: 'Rua Teste, 20', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
+    data_entrada: '2025-03-01', vigencia_inicio: '2025-03-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
+    desconto_pontualidade_percentual: 10, taxa_boleto: 850, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3 }, 'julio');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-03-01', indice: 'IGP-M', percentual: 5, valor_anterior: 200000, valor_novo: 210000 }, 'julio');
+  // fevereiro ainda não tem o aluguel corrigido: só o boleto do aluguel
+  assert.deepEqual(R.gerarCobrancas(d, '2026-02', 'julio'), { geradas: 1, existentes: 0 });
+  assert.equal(R.complementosCaucaoPendentes(d, '2026-02').length, 0);
+  assert.equal(R.complementosCaucaoPendentes(d, '2026-03').length, 1);
+  // março: aluguel corrigido + complemento da caução
+  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 2, existentes: 0 });
+  const doMes = d.cobrancas.filter((x) => x.competencia === '2026-03');
+  assert.equal(doMes.filter(R.ehComplementoCaucao).length, 1);
+  assert.equal(doMes.find(R.ehComplementoCaucao).caucao_complemento, 27000);
+  assert.equal(R.complementosCaucaoPendentes(d, '2026-03').length, 0);
+  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 0, existentes: 1 });
+});
