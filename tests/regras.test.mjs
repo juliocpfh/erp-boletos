@@ -760,3 +760,36 @@ test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pe
   R.salvarEstilosAlertas(d, {}, 'julio');
   assert.deepEqual(d.estilos_alertas, {});
 });
+
+test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF, corrige a caução ao pagar', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 2', endereco: 'Rua Teste, 10', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
+    data_entrada: '2025-03-01', vigencia_inicio: '2025-03-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
+    desconto_pontualidade_percentual: 10, taxa_boleto: 850, multa_percentual: 10, juros_mensal_percentual: 1,
+    garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3 }, 'julio');
+  // aluguel R$ 2.000,00 → R$ 2.100,00 (5%); bonificado R$ 1.890,00; caução 3 × 1.890 = R$ 5.670,00
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-03-01', indice: 'IGP-M', percentual: 5, valor_anterior: 200000, valor_novo: 210000 }, 'julio');
+  const x = R.complementoCaucao(d, c);
+  assert.equal(x.necessaria, 567000);
+  assert.equal(x.complemento, 27000);
+  assert.match(R.alertasContrato(d, c, '2026-03-05').find((a) => a.tipo === 'Correção da caução').texto, /boleto do complemento de R\$ 270,00/);
+  const cb = R.gerarBoletoCaucao(d, c.id, 'julio');
+  assert.equal(cb.vencimento, '2026-04-10');
+  assert.equal(cb.taxa_boleto, 0);
+  assert.equal(R.totais(cb).a_pagar_pontual, 27000);
+  assert.match(R.dadosBoleto(d, cb).descricao, /COMPLEMENTO DA CAUÇÃO RS270,00/);
+  assert.throws(() => R.gerarBoletoCaucao(d, c.id, 'julio'), /já foi gerado/);
+  // o boleto do aluguel do mês continua sendo gerado normalmente
+  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 1, existentes: 0 });
+  assert.equal(R.boletoDoMes(d, c.id, '2026-03').aluguel, 210000);
+  // pago: sem NF e a caução passa a R$ 5.670,00
+  R.registrarPagamento(d, cb.id, '2026-04-08', null, 'julio');
+  assert.equal(cb.valor_nf, 0);
+  assert.ok(!R.pendentesDeFatura(d).some((p) => p.registro.id === cb.id));
+  assert.equal(R.valorGarantia(d, c), 567000);
+  assert.equal(R.complementoCaucao(d, c), null);
+  // desfazer o pagamento desfaz a correção da caução
+  R.estornarPagamento(d, cb.id, 'julio');
+  assert.equal(R.valorGarantia(d, c), 540000);
+});

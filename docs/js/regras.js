@@ -261,6 +261,49 @@ export function caucaoSugerida(d, c, dataRef = C.hojeIso()) {
   return c.caucao_meses * (aluguel - C.descontoPorPercentual(aluguel, percentualBonificacao(c)));
 }
 
+/** Boleto à parte só com o complemento da caução: sem tarifa, sem NF, não é o boleto do aluguel do mês. */
+export const ehComplementoCaucao = (cb) => cb.caucao_complemento > 0;
+/** Boleto do aluguel do contrato na competência (o do complemento da caução não conta). */
+export const boletoDoMes = (d, contratoId, comp) => d.cobrancas.find((x) => x.contrato_id === contratoId && x.competencia === comp && !ehComplementoCaucao(x)) || null;
+
+/**
+ * Caução depois de um reajuste ou novo valor do aluguel (correção posterior à última caução registrada): a necessária
+ * (aluguéis × aluguel corrigido com bonificação; null se o contrato não diz quantos aluguéis), a já depositada,
+ * o complemento a depositar e o boleto do complemento ainda não pago. Null quando não há correção pendente.
+ */
+export function complementoCaucao(d, c) {
+  if (!temCaucao(c) || !c.caucao_valor) return null;
+  const ultimaCaucao = correcoesCaucaoAtual(d, c).map((x) => x.data).pop() || c.caucao_data || '';
+  const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
+  if (!correcao) return null;
+  const atual = valorGarantia(d, c);
+  const necessaria = caucaoSugerida(d, c, correcao.data_vigencia);
+  const boleto = d.cobrancas.find((x) => x.contrato_id === c.id && ehComplementoCaucao(x) && !x.data_pagamento) || null;
+  return { correcao, competencia: correcao.data_vigencia.slice(0, 7), atual, necessaria,
+    complemento: necessaria === null ? null : necessaria - atual, boleto };
+}
+
+/** Gera o boleto do complemento da caução, com o vencimento do primeiro aluguel corrigido (sem tarifa e sem NF). */
+export function gerarBoletoCaucao(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const x = complementoCaucao(d, c);
+  if (!x) throw new Error('Não há correção do aluguel esperando a correção da caução.');
+  if (x.boleto) throw new Error('O boleto do complemento da caução já foi gerado.');
+  if (x.necessaria === null) throw new Error('Informe no contrato a quantos aluguéis a caução equivale.');
+  if (!(x.complemento > 0)) throw new Error('A caução depositada já cobre o valor necessário.');
+  const comp = x.competencia;
+  return inserir(d, 'cobrancas', {
+    contrato_id: c.id, competencia: comp,
+    vencimento: C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false),
+    dias_cobrados: C.diasNoMes(comp), dias_mes: C.diasNoMes(comp), aluguel_mensal: 0, aluguel: 0, desconto: 0,
+    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, outros: x.complemento, outros_descricao: 'Complemento da caução',
+    reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
+    caucao_complemento: x.complemento, caucao_anterior: x.atual, caucao_nova: x.necessaria, caucao_vigencia: x.correcao.data_vigencia,
+    multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0,
+    situacao: 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null, valor_nf: null,
+  }, usuario, `Boleto do complemento da caução gerado para ${c.inquilino_nome}: ${C.reais(x.complemento)} (caução de ${C.reais(x.atual)} para ${C.reais(x.necessaria)})`);
+}
+
 /** Onde a garantia foi aplicada (em qualquer empresa, sem divisão obrigatória) e quanto falta aplicar. */
 export function situacaoAplicacao(d, c) {
   const total = valorGarantia(d, c);
@@ -308,7 +351,7 @@ export function reservaParaCompetencia(d, contrato, comp, ignorar = null) {
  */
 export function realocarReserva(d, contrato, usuario) {
   if (!(contrato.reserva_valor > 0)) return 0;
-  const abertos = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento)
+  const abertos = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento && !ehComplementoCaucao(cb))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
   const livres = new Set(abertos.map((cb) => cb.id));
   let n = 0;
@@ -329,7 +372,7 @@ export function alertaReservaParada(d, contrato) {
   const alvo = competenciaReserva(contrato);
   if (!alvo) return null;
   const saldo = saldoReserva(d, contrato);
-  const doContrato = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id);
+  const doContrato = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !ehComplementoCaucao(cb));
   const presa = doContrato.find((cb) => cb.reserva_utilizada > 0 && cb.data_pagamento && cb.competencia > alvo);
   const alvoAberto = doContrato.find((cb) => cb.competencia === alvo && !cb.data_pagamento);
   if (presa && alvoAberto) {
@@ -559,7 +602,7 @@ export function gerarCobrancas(d, comp, usuario) {
   let existentes = 0;
   for (const contrato of [...d.contratos]) {
     if (contrato.ativo === false || !contrato.imovel_id) continue;
-    if (d.cobrancas.some((cb) => cb.contrato_id === contrato.id && cb.competencia === comp)) {
+    if (boletoDoMes(d, contrato.id, comp)) {
       existentes += 1;
       continue;
     }
@@ -584,7 +627,7 @@ const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'alugue
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   let n = 0;
-  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual;
+  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !ehComplementoCaucao(cb);
   const escolhidos = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb));
   // a reserva liga os meses do contrato: com reserva, todos os boletos em aberto dele são refeitos juntos
   const comReserva = new Set(escolhidos.map((cb) => cb.contrato_id).filter((id) => (buscar(d, 'contratos', id) || {}).reserva_valor > 0));
@@ -621,15 +664,28 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   if (dataPagou && dataPagou > dataContabil) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
   const r = C.liquidar(cb, pagouEmDia ? cb.vencimento : (dataPagou || dataContabil));
   const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
+  const caucao = ehComplementoCaucao(cb);
   atualizar(d, 'cobrancas', cb.id, {
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
-    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: r.valor_nf, pagou_em_dia: compensadoDepois,
+    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao ? 0 : r.valor_nf, pagou_em_dia: compensadoDepois,
     situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso',
   }, usuario, compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado');
+  // complemento da caução pago: a caução passa a ser o novo valor
+  if (caucao) {
+    const x = inserir(d, 'correcoes_garantia', { contrato_id: cb.contrato_id, data: cb.caucao_vigencia && cb.caucao_vigencia > dataContabil ? cb.caucao_vigencia : dataContabil,
+      valor_anterior: cb.caucao_anterior, valor_novo: cb.caucao_nova, complemento: cb.caucao_complemento, observacoes: `Boleto do complemento pago em ${C.dataBr(dataContabil)}` },
+    usuario, `Caução corrigida para ${C.reais(cb.caucao_nova)} (complemento pago)`);
+    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: x.id }, usuario, 'Correção da caução registrada');
+  }
   return r;
 }
 
 export function estornarPagamento(d, cobrancaId, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  if (cb && cb.caucao_correcao_id) {
+    if (buscar(d, 'correcoes_garantia', cb.caucao_correcao_id)) excluir(d, 'correcoes_garantia', cb.caucao_correcao_id, usuario, 'Correção da caução desfeita (pagamento do complemento desfeito)');
+    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: null }, usuario, 'Correção da caução desfeita');
+  }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
     juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto' }, usuario, 'Pagamento desfeito');
@@ -1073,13 +1129,14 @@ export function cadeiaDeContratos(d, c) {
 // Alertas
 // --------------------------------------------------------------------------
 function alertaCaucao(d, c) {
-  if (!temCaucao(c) || !c.caucao_valor) return null;
-  const ultimaCaucao = correcoesCaucaoAtual(d, c).map((x) => x.data).pop() || c.caucao_data || '';
-  const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
-  if (!correcao) return null;
-  const sug = caucaoSugerida(d, c, correcao.data_vigencia);
-  return { nivel: 'aviso', tipo: 'Correção da caução',
-    texto: `O aluguel foi corrigido em ${C.dataBr(correcao.data_vigencia)}. Corrija também a caução (atual ${C.reais(valorGarantia(d, c))}${sug ? `, sugerido ${C.reais(sug)}` : ''}).` };
+  const x = complementoCaucao(d, c);
+  if (!x) return null;
+  const inicio = `O aluguel foi corrigido em ${C.dataBr(x.correcao.data_vigencia)}.`;
+  const texto = x.boleto ? `${inicio} Boleto do complemento da caução (${C.reais(x.boleto.caucao_complemento)}) gerado, vence em ${C.dataBr(x.boleto.vencimento)}: ao confirmar o pagamento, a caução passa a ${C.reais(x.boleto.caucao_nova)}.`
+    : x.necessaria === null ? `${inicio} Corrija também a caução (atual ${C.reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.`
+      : x.complemento > 0 ? `${inicio} A caução deve passar a ${C.reais(x.necessaria)} (${c.caucao_meses} aluguéis com bonificação); já depositado ${C.reais(x.atual)}. Gere o boleto do complemento de ${C.reais(x.complemento)}.`
+        : `${inicio} A caução depositada (${C.reais(x.atual)}) já cobre o necessário (${C.reais(x.necessaria)}). Registre a correção da caução para tirar este aviso.`;
+  return { nivel: 'aviso', tipo: 'Correção da caução', ancora: 'garantia', texto };
 }
 
 function alertaAplicacao(d, c) {
@@ -1308,7 +1365,8 @@ export function dadosBoleto(d, cb) {
   const imovel = buscar(d, 'imoveis', c.imovel_id);
   const t = totais(cb);
   const linhas = [];
-  if (cb.carencia) linhas.push(`CARÊNCIA DO ALUGUEL ${C.compBr(cb.competencia)}`);
+  if (ehComplementoCaucao(cb)) linhas.push(`COMPLEMENTO DA CAUÇÃO ${rs(cb.caucao_complemento)}`, `CAUÇÃO DEPOSITADA ${rs(cb.caucao_anterior)} NOVA CAUÇÃO ${rs(cb.caucao_nova)}`);
+  else if (cb.carencia) linhas.push(`CARÊNCIA DO ALUGUEL ${C.compBr(cb.competencia)}`);
   else linhas.push(cb.dias_cobrados < cb.dias_mes ? `ALUGUEL ${cb.dias_cobrados}/${cb.dias_mes} DIAS ${rs(cb.aluguel)}` : `ALUGUEL ${rs(cb.aluguel)}`);
   if (cb.desconto) linhas.push(`COM BONF. ${rs(cb.aluguel - cb.desconto)}`);
   const extras = [];
@@ -1321,7 +1379,7 @@ export function dadosBoleto(d, cb) {
   if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
   if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
-  if (extras.length) linhas.push(extras.join(' '));
+  if (extras.length && !ehComplementoCaucao(cb)) linhas.push(extras.join(' '));
   const valor = t.a_pagar_sem_desconto;
   return {
     pagador: c.inquilino_nome, documento_pagador: c.inquilino_cpf || '',
@@ -1477,7 +1535,7 @@ export function alertaCondominio(c, hoje = C.hojeIso()) {
  * recebe só o ressarcimento (os outros valores digitados ficam). Devolve o boleto, ou null se ainda não foi gerado.
  */
 export function aplicarRessarcimentos(d, contrato, comp, usuario) {
-  const cb = d.cobrancas.find((x) => x.contrato_id === contrato.id && x.competencia === comp);
+  const cb = boletoDoMes(d, contrato.id, comp);
   if (!cb || cb.data_pagamento) return cb || null;
   const r = ressarcimentosNoBoleto(d, contrato.id, comp);
   atualizar(d, 'cobrancas', cb.id, { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && r.valor > 0 },
@@ -1505,7 +1563,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const proxima = mes;
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
   const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
-  const semBoleto = ativos.filter((c) => C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !d.cobrancas.some((x) => x.contrato_id === c.id && x.competencia === comp));
+  const semBoleto = ativos.filter((c) => C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, comp));
   const doMes = d.cobrancas.filter((x) => x.competencia === comp);
   const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== 'Carência');
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
@@ -1573,7 +1631,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
   for (const c of ativos) {
     for (const comp of [C.somarMeses(mes, -1), mes]) {
       if (C.diasOcupados(comp, c.data_entrada, c.data_saida) === 0) continue;
-      const cb = d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp);
+      const cb = boletoDoMes(d, c.id, comp);
       const venc = cb ? cb.vencimento : C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
       if (!no(venc)) continue;
       const pago = cb && cb.data_pagamento;
@@ -1581,6 +1639,15 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
         texto: `${c.inquilino_nome} · aluguel de ${C.compBr(comp)}${cb ? ` · ${C.reais(totais(cb).a_pagar_pontual)}` : ' · boleto ainda não gerado'}${geraNf(c) ? '' : ' · boleto de controle'}`,
         situacao: pago ? 'ok' : !cb ? 'neutra' : venc < hoje ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(cb.data_pagamento)}` : !cb ? 'previsto' : venc < hoje ? 'vencido' : 'em aberto' });
     }
+  }
+  // boletos do complemento da caução
+  for (const cb of d.cobrancas.filter((x) => ehComplementoCaucao(x) && no(x.vencimento))) {
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    if (!c) continue;
+    const pago = cb.data_pagamento;
+    ev.push({ data: cb.vencimento, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb.id,
+      texto: `${c.inquilino_nome} · complemento da caução · ${C.reais(cb.caucao_complemento)}`,
+      situacao: pago ? 'ok' : cb.vencimento < hoje ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(pago)}` : cb.vencimento < hoje ? 'vencido' : 'em aberto' });
   }
   // IPTU na prefeitura
   for (const p of d.iptus) {
@@ -1605,7 +1672,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       const r = reajusteNaCompetencia(d, c, comp);
       if (!r) continue;
       const anterior = C.somarMeses(comp, -1);
-      const cb = d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === anterior);
+      const cb = boletoDoMes(d, c.id, anterior);
       const venc = cb ? cb.vencimento : C.vencimentoDaCompetencia(anterior, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
       if (!no(venc)) continue;
       ev.push({ data: venc, tipo: 'Reajuste', imovel_id: c.imovel_id, contrato_id: c.id,
