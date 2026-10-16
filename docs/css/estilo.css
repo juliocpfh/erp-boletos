@@ -292,3 +292,6 @@ input.doc-invalido { border-color: var(--perigo); }
 .lista-baixa .check-mini { font-weight: 400; }
 .historico-iptu { margin-top: 14px; border-top: 1px solid var(--borda); padding-top: 8px; }
 .historico-iptu summary { cursor: pointer; }
+.caixa-historico summary { cursor: pointer; }
+.caixa-historico[open] summary { margin-bottom: 10px; }
+.resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
