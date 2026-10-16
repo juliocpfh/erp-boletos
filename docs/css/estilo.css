@@ -213,12 +213,13 @@ dialog.janela-erro p { margin: 0 0 14px; font-size: 16px; }
 @media (max-width: 700px) { .cal-dia { min-height: 48px; } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
 
 /* Carta de reajuste */
-.carta { background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
+.carta { position: relative; overflow: hidden; background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
+.carta > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
 .carta-logo { max-height: 90px; max-width: 260px; }
 .carta-data { text-align: right; }
 .carta-tabela { margin: 14px 0; }
 .carta-tabela td, .carta-tabela th { padding: 6px 10px; }
-@media print { .carta { border: 0; padding: 0; } }
+@media print { .carta { border: 0; padding: 0; position: static; overflow: visible; } }
 
 /* NF emitida fora do sistema */
 .nf-externa { display: inline-block; text-align: left; }
@@ -229,8 +230,10 @@ dialog.janela-erro p { margin: 0 0 14px; font-size: 16px; }
 /* Contrato de locação gerado pelo modelo: logo de fundo bem suave, logo pequena na capa e as empresas no rodapé */
 .contrato { position: relative; background: #fff; max-width: 820px; margin: 0 auto; padding: 48px 64px 90px; border: 1px solid var(--borda);
   font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.55; color: #111; overflow: hidden; }
-.contrato .ct-marca { position: absolute; top: 380px; left: 50%; width: 60%; transform: translateX(-50%); opacity: .07; pointer-events: none; z-index: 0; }
-.contrato > *:not(.ct-marca) { position: relative; z-index: 1; }
+/* marca-d'água em todas as páginas: na tela, um fundo que repete a logo a cada altura de folha A4; na impressão, a logo fixa (repete em cada página) */
+.ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .07; pointer-events: none; z-index: 0; }
+.ct-marca { display: none; opacity: .07; pointer-events: none; z-index: 0; }
+.contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
 .contrato .ct-capa { text-align: center; margin: 0 0 18px; }
 .contrato .ct-capa img { max-width: 150px; max-height: 70px; }
 .contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
@@ -251,7 +254,8 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 @media print {
   @page { size: A4; margin: 2.2cm 2.2cm 1.2cm 2.8cm; }
   .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
-  .contrato .ct-marca { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
+  .ct-marcas { display: none; }
+  .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
   /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
   .contrato .ct-pagina td { display: table-cell; }
   .contrato .ct-espaco-rodape { height: 1.5cm; }

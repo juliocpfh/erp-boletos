@@ -992,7 +992,7 @@ export function excluirRenovacao(d, renovacaoId, usuario) {
   excluir(d, 'renovacoes', r.id, usuario, `${r.tipo} excluído`);
 }
 
-const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'deposito_valor', 'deposito_data', 'deposito_uso'];
+const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_uso', 'comprovante_deposito'];
 
 /** Troca o tipo de garantia (ex.: caução → fiador) guardando a anterior no histórico do contrato. */
 export function trocarGarantia(d, contratoId, dados, usuario) {

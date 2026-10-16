@@ -26,3 +26,20 @@ test('ler: documento inválido barra; o que já estava salvo e não mudou passa'
   const antigo = { cpf: '123.456.789-00' };
   assert.deepEqual(F.ler(campos, fd('123.456.789-00'), antigo).erros, {}, 'dado antigo não barra a edição');
 });
+
+test('fiadores no cadastro do contrato: os já cadastrados vêm com "Excluir" e sobra um bloco em branco', () => {
+  const nomes = (lista) => lista.filter((c) => c.nome && c.nome.endsWith('_nome')).map((c) => c.nome);
+  assert.deepEqual(nomes(F.fiadoresNoCadastro([])), ['fiador1_nome', 'fiador2_nome']);
+  const dois = F.fiadoresNoCadastro([{ nome: 'A' }, { nome: 'B' }]);
+  assert.deepEqual(nomes(dois), ['fiador1_nome', 'fiador2_nome', 'fiador3_nome']);
+  assert.deepEqual(dois.filter((c) => c.nome && c.nome.endsWith('_excluir')).map((c) => c.nome), ['fiador1_excluir', 'fiador2_excluir']);
+});
+
+test('comprovante (arquivo) não entra na leitura do formulário: é gravado à parte', () => {
+  const fd = new FormData();
+  fd.set('valor', '1.000,00');
+  const { dados, erros } = F.ler(F.APLICACAO.filter((c) => ['valor', 'comprovante'].includes(c.nome)), fd);
+  assert.deepEqual(dados, { valor: 100000 });
+  assert.deepEqual(erros, {});
+  assert.match(F.camposHtml(F.APLICACAO.filter((c) => c.nome === 'comprovante'), { comprovante: 'comprovante-aplicacao.pdf' }), /type="file"[\s\S]*Já guardado: comprovante-aplicacao\.pdf/);
+});

@@ -313,6 +313,17 @@ function negritos(s) {
 const escH = (v) => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const runsHtml = (runs) => runs.map((r) => (r.b ? `<b>${escH(r.t)}</b>` : escH(r.t))).join('');
 
+/**
+ * Marca-d'água (logo bem suave) em todas as páginas. Na tela: um fundo que repete a logo a cada altura de folha A4.
+ * Na impressão / PDF: a imagem fica fixa no centro, e o navegador a repete em cada página impressa.
+ */
+export function marcaDagua(logo) {
+  if (!logo) return '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="210" height="297"><image href="${escH(logo)}" x="42" y="98" width="126" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
+  const fundo = `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `<div class="ct-marcas" style="background-image:url('${fundo}')"></div><img class="ct-marca" src="${escH(logo)}" alt="">`;
+}
+
 export function contratoHtml(blocos, { logo, rodape }) {
   const corpo = blocos.map((b) => {
     if (b.tipo === 'titulo') return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
@@ -332,7 +343,7 @@ export function contratoHtml(blocos, { logo, rodape }) {
     return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
   }).join('');
   return `<div class="contrato">
-    ${logo ? `<img class="ct-marca" src="${escH(logo)}" alt="">` : ''}
+    ${marcaDagua(logo)}
     <div class="ct-rodape">${rodape.map(escH).join('<br>')}</div>
     ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ''}
     <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;

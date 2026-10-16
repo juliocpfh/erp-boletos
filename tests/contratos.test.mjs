@@ -111,3 +111,11 @@ test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', 
   assert.deepEqual(ts.cabecalho, ['Item', 'Na entrada', 'Na saída', 'Observação']);
   assert.deepEqual(ts.destaques, [true, false]);
 });
+
+test('marca-d\'água: fundo repetido na tela e logo fixa para a impressão', () => {
+  assert.equal(K.marcaDagua(null), '');
+  const html = K.marcaDagua('data:image/png;base64,AAAA');
+  assert.match(html, /class="ct-marcas" style="background-image:url\('data:image\/svg\+xml;base64,/);
+  assert.match(html, /<img class="ct-marca" src="data:image\/png;base64,AAAA"/);
+  assert.match(K.contratoHtml([{ tipo: 'par', runs: [{ t: 'x' }] }], { logo: 'data:image/png;base64,AAAA', rodape: [] }), /ct-marcas/);
+});
