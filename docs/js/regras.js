@@ -1894,12 +1894,24 @@ export function inadimplencia(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 // Impostos: guia esperada por empresa, pelo faturamento das NFs (o contador faz o cálculo oficial)
 // --------------------------------------------------------------------------
-/** Alíquotas sobre o faturamento de NF: PIS/COFINS numa guia mensal; IRPJ e CSLL em guias trimestrais. */
+/**
+ * Lucro presumido de locação de imóveis próprios, sobre o faturamento de NF:
+ * - PIS/COFINS 3,65% (0,65% + 3%), guia mensal;
+ * - IRPJ 15% e CSLL 9% sobre o lucro presumido (32% do faturamento) = 4,80% e 2,88%, guias trimestrais;
+ * - adicional do IRPJ: 10% do lucro presumido que passar de R$ 60.000,00 no trimestre (Lei 9.249/95, art. 3º, § 1º);
+ * - LC 224/2025: presunção 10% maior (32% → 35,2%) na parte da receita do ano acima de R$ 5 milhões, controlada
+ *   por trimestre (R$ 1,25 milhão; a sobra passa para os trimestres seguintes; acerto no 4º). IRPJ desde 01/2026 e
+ *   CSLL desde 04/2026 (IN RFB 2.306/2026).
+ */
 export const IMPOSTOS = [
   { imposto: 'PIS/COFINS', aliquota: 3.65, mensal: true },
   { imposto: 'IRPJ', aliquota: 4.8, mensal: false },
   { imposto: 'CSLL', aliquota: 2.88, mensal: false },
 ];
+export const PRESUNCAO = 32;
+export const LIMITE_ADICIONAL_IRPJ = 6000000; // R$ 60.000,00 por trimestre
+export const LIMITE_LC224_TRIMESTRE = 125000000; // R$ 1.250.000,00 por trimestre (R$ 5 milhões no ano)
+export const INICIO_LC224 = { IRPJ: '2026-01', CSLL: '2026-04' };
 
 /** Trimestre de uma competência: 2026-05 → "2026-T2" (1º: jan-mar, 2º: abr-jun, 3º: jul-set, 4º: out-dez). */
 export const trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(comp.slice(5, 7)) / 3)}`;
@@ -1914,6 +1926,58 @@ export function faturamentoNf(d, emitenteId, comp) {
 
 const guiaDo = (d, emitenteId, imposto, periodo) => d.guias_impostos.find((g) => g.emitente_id === emitenteId && g.imposto === imposto && g.periodo === periodo) || null;
 
+/** Feriados nacionais em que os bancos não abrem (fixos e móveis pela Páscoa: Carnaval, Sexta-feira Santa, Corpus Christi). */
+function feriados(ano) {
+  // domingo de Páscoa (algoritmo de Meeus/Jones/Butcher)
+  const a = ano % 19; const b = Math.floor(ano / 100); const c = ano % 100;
+  const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
+  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  const pascoa = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map((x) => `${ano}-${x}`);
+  return new Set([...fixos, ...[-48, -47, -2, 60].map((n) => C.somarDias(pascoa, n))]);
+}
+const diaUtil = (iso) => { const dia = new Date(`${iso}T12:00:00`).getDay(); return dia !== 0 && dia !== 6 && !feriados(Number(iso.slice(0, 4))).has(iso); };
+/** Dia útil igual ou anterior à data (vencimento de tributo federal que cai em dia sem expediente bancário). */
+export function diaUtilAteh(iso) { let x = iso; while (!diaUtil(x)) x = C.somarDias(x, -1); return x; }
+/** Vencimento da guia: PIS/COFINS até o dia 25 do mês seguinte; IRPJ/CSLL até o último dia útil do mês seguinte ao trimestre. */
+export function vencimentoGuia(mensal, periodo) {
+  if (mensal) return diaUtilAteh(`${C.somarMeses(periodo, 1)}-25`);
+  const fim = `${periodo.slice(0, 4)}-${String(Number(periodo.slice(-1)) * 3).padStart(2, '0')}`;
+  const seguinte = C.somarMeses(fim, 1);
+  return diaUtilAteh(C.somarDias(`${C.somarMeses(seguinte, 1)}-01`, -1));
+}
+
+/**
+ * Parte da receita do trimestre acima do limite da LC 224/2025 (IN RFB 2.306/2026): R$ 1,25 milhão por trimestre,
+ * mais a sobra do limite dos trimestres anteriores do ano. No 4º trimestre, acerto anual: o total do ano fica
+ * igual à receita do ano acima de R$ 5 milhões (pode dar negativo: devolve o que foi acrescido a mais).
+ * Trimestres antes do início da regra (CSLL em 2026: só desde abril) ficam fora da conta, com o limite proporcional.
+ */
+function excedenteLc224(d, emitenteId, comp, inicio) {
+  const ano = comp.slice(0, 4);
+  const t = Number(trimestreDe(comp).slice(-1));
+  const receita = (q) => mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, '0')}`).filter((m) => m <= comp).reduce((v, m) => v + faturamentoNf(d, emitenteId, m).valor, 0);
+  let sobra = 0;
+  let considerado = 0;
+  let total = 0;
+  let atual = 0;
+  let contados = 0;
+  for (let q = 1; q <= t; q += 1) {
+    if (mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, '0')}`)[0] < inicio) continue;
+    contados += 1;
+    const r = receita(q);
+    const limite = LIMITE_LC224_TRIMESTRE + sobra;
+    const excedente = Math.max(0, r - limite);
+    sobra = Math.max(0, limite - r);
+    total += r;
+    if (q < t) considerado += excedente; else atual = excedente;
+  }
+  return t === 4 ? Math.max(0, total - contados * LIMITE_LC224_TRIMESTRE) - considerado : atual;
+}
+
 /**
  * Guias esperadas no mês para cada empresa: PIS/COFINS do mês e IRPJ/CSLL do trimestre, acumulando mês a mês
  * até o último mês do trimestre (aí é a guia completa). Valor do contador ao lado, quando informado.
@@ -1925,11 +1989,20 @@ export function impostosDoMes(d, comp) {
     const mes = faturamentoNf(d, e.id, comp);
     const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m) }));
     const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
+    // lucro presumido do trimestre: 32% do faturamento + 3,2% (10% de 32%) da parte acima do limite da LC 224
+    const presumido = (imposto) => {
+      const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d, e.id, comp, INICIO_LC224[imposto]) : 0;
+      return { base: Math.round((trimestre * PRESUNCAO) / 100) + Math.round((extra * PRESUNCAO) / 1000), lc224: extra };
+    };
     return { empresa: e, faturamento: mes, trimestre, porMes, fechado: meses.length === 3,
       guias: IMPOSTOS.map((x) => {
-        const base = x.mensal ? mes.valor : trimestre;
         const periodo = x.mensal ? comp : tri;
-        return { ...x, periodo, base, esperado: Math.round((base * x.aliquota) / 100), contador: guiaDo(d, e.id, x.imposto, periodo) };
+        const g = { ...x, periodo, vencimento: vencimentoGuia(x.mensal, periodo), contador: guiaDo(d, e.id, x.imposto, periodo), adicional: 0, lc224: 0 };
+        if (x.mensal) return { ...g, base: mes.valor, esperado: Math.round((mes.valor * x.aliquota) / 100) };
+        const p = presumido(x.imposto);
+        const adicional = x.imposto === 'IRPJ' ? Math.max(0, Math.round((p.base - LIMITE_ADICIONAL_IRPJ) / 10)) : 0;
+        const normal = Math.round((p.base * (x.imposto === 'IRPJ' ? 15 : 9)) / 100);
+        return { ...g, base: trimestre, presumido: p.base, lc224: p.lc224, adicional, esperado: normal + adicional };
       }) };
   });
 }

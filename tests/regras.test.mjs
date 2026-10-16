@@ -863,3 +863,52 @@ test('impostos: PIS/COFINS mensal e IRPJ/CSLL do trimestre acumulando mês a mê
   R.salvarGuiaImposto(d, e.id, 'IRPJ', '2026-T2', null, 'j');
   assert.equal(R.impostosDoMes(d, '2026-06')[0].guias[1].contador, null);
 });
+
+test('impostos: adicional do IRPJ acima de R$ 60.000,00 de lucro presumido no trimestre', () => {
+  const d = R.bancoVazio();
+  const e = R.inserir(d, 'emitentes', { nome: 'EMPRESA TESTE', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  R.inserir(d, 'faturas', { numero: 1, emissao: '2025-08-10', emitente_id: e.id, valor: 25000000, situacao: 'Emitida' }, 'j'); // R$ 250.000,00
+  const [, irpj, csll] = R.impostosDoMes(d, '2025-09')[0].guias;
+  assert.equal(irpj.presumido, 8000000); // 32% = R$ 80.000,00
+  assert.equal(irpj.adicional, 200000); // 10% de R$ 20.000,00
+  assert.equal(irpj.esperado, 1400000); // R$ 12.000,00 + R$ 2.000,00
+  assert.equal(csll.esperado, 720000); // 9% de R$ 80.000,00 (CSLL não tem adicional)
+  assert.equal(irpj.vencimento, '2025-10-31');
+});
+
+test('impostos: LC 224/2025 (35,2% acima de R$ 1,25 milhão no trimestre; sobra passa adiante; CSLL só desde abril de 2026)', () => {
+  const d = R.bancoVazio();
+  const e = R.inserir(d, 'emitentes', { nome: 'EMPRESA TESTE', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  const nf = (numero, emissao, valor) => R.inserir(d, 'faturas', { numero, emissao, emitente_id: e.id, valor, situacao: 'Emitida' }, 'j');
+  nf(1, '2026-02-10', 150000000); // 1º trimestre: R$ 1.500.000,00
+  let [, irpj, csll] = R.impostosDoMes(d, '2026-03')[0].guias;
+  assert.equal(irpj.presumido, 48800000); // R$ 1.250.000 × 32% + R$ 250.000 × 35,2% = R$ 488.000,00
+  assert.equal(csll.presumido, 48000000); // CSLL ainda sem o acréscimo no 1º trimestre de 2026
+  nf(2, '2026-05-10', 100000000); // 2º trimestre: R$ 1.000.000,00 (sobram R$ 250.000 do limite; o acréscimo do 1º não volta antes do 4º)
+  nf(3, '2026-08-10', 150000000); // 3º trimestre: R$ 1.500.000,00
+  [, irpj, csll] = R.impostosDoMes(d, '2026-06')[0].guias;
+  assert.equal(irpj.lc224, 0);
+  [, irpj, csll] = R.impostosDoMes(d, '2026-09')[0].guias;
+  assert.equal(irpj.lc224, 0); // limite do 3º trimestre: R$ 1.250.000 + sobra de R$ 250.000 do 2º = R$ 1.500.000
+  assert.equal(csll.lc224, 0);
+  nf(4, '2026-11-10', 50000000); // 4º trimestre: ano fecha em R$ 4.500.000, abaixo de R$ 5 milhões: devolve o acréscimo do 1º trimestre
+  [, irpj] = R.impostosDoMes(d, '2026-12')[0].guias;
+  assert.equal(irpj.lc224, -25000000);
+});
+
+test('impostos: vencimento em fim de semana ou feriado vem para o dia útil anterior', () => {
+  assert.equal(R.vencimentoGuia(true, '2026-10'), '2026-11-25');
+  assert.equal(R.vencimentoGuia(true, '2026-11'), '2026-12-24'); // 25/12 é Natal
+  assert.equal(R.vencimentoGuia(true, '2016-02'), '2016-03-24'); // 25/03/2016 foi Sexta-feira Santa
+  assert.equal(R.vencimentoGuia(false, '2026-T3'), '2026-10-30'); // 31/10/2026 é sábado
+  assert.equal(R.vencimentoGuia(false, '2026-T4'), '2027-01-29');
+});
+
+test('impostos: LC 224 na CSLL de 2026 conta só de abril em diante (acerto do 4º trimestre sem o 1º)', () => {
+  const d = R.bancoVazio();
+  const e = R.inserir(d, 'emitentes', { nome: 'EMPRESA TESTE', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  for (const [n, em] of [[1, '2026-02-10'], [2, '2026-05-10'], [3, '2026-08-10'], [4, '2026-11-10']]) R.inserir(d, 'faturas', { numero: n, emissao: em, emitente_id: e.id, valor: 150000000, situacao: 'Emitida' }, 'j');
+  const [, irpj, csll] = R.impostosDoMes(d, '2026-12')[0].guias;
+  assert.equal(irpj.lc224, 25000000); // ano R$ 6 milhões: R$ 1 milhão acima, R$ 250.000 em cada trimestre
+  assert.equal(csll.lc224, 25000000); // abril a dezembro: R$ 4,5 milhões no limite de R$ 3,75 milhões = R$ 750.000, R$ 250.000 por trimestre
+});

@@ -2250,7 +2250,12 @@ function telaImpostos(comp) {
     return `<tr><td><b>${esc(g.imposto)}</b><br><span class="suave">${g.mensal ? `guia mensal de ${compBr(comp)}` : `guia do ${nTri}º trimestre (${nomeMes(meses[0])} a ${nomeMes(meses[2])})`}</span></td>
       <td class="n">${reais(g.base)}${g.mensal ? '' : `<br><span class="suave">${meses.filter((m) => m <= comp).length} de 3 meses</span>`}</td>
       <td class="n">${pct(g.aliquota)}</td>
-      <td class="n"><b>${reais(g.esperado)}</b>${g.mensal ? '' : `<br>${etiqueta(meses[2] === comp ? 'guia completa' : 'parcial: acumula até ' + compBr(meses[2]), meses[2] === comp ? 'ok' : 'info')}`}</td>
+      <td class="n"><b>${reais(g.esperado)}</b>${g.mensal ? '' : `<br>${etiqueta(meses[2] === comp ? 'guia completa' : 'parcial: acumula até ' + compBr(meses[2]), meses[2] === comp ? 'ok' : 'info')}`}
+        ${g.adicional ? `<br><span class="suave">inclui adicional de ${reais(g.adicional)} (10% do lucro presumido acima de R$ 60.000,00)</span>` : ''}
+        ${g.lc224 ? `<br><span class="suave">LC 224: presunção de 35,2% sobre ${reais(Math.abs(g.lc224))} ${g.lc224 > 0 ? 'acima do limite' : '(acerto do ano: devolve)'}</span>` : ''}
+        <br><span class="suave">vence até ${dataBr(g.vencimento)}</span>
+        ${g.esperado > 0 && g.esperado < 1000 ? `<br>${etiqueta('abaixo de R$ 10: não se paga; soma na próxima guia', 'aviso')}` : ''}
+        ${!g.mensal && meses[2] === comp && g.esperado >= 200000 ? '<br><span class="suave">pode pagar em até 3 cotas (mín. R$ 1.000,00 cada; 2ª e 3ª com juros)</span>' : ''}</td>
       <td class="nw">${opera() ? `<form data-form="guiaImposto" class="acoes" data-emitente="${e.id}" data-imposto="${esc(g.imposto)}" data-periodo="${g.periodo}">
         <input name="valor" inputmode="decimal" data-dinheiro placeholder="valor do contador" value="${g.contador ? reais(g.contador.valor, false) : ''}" style="width:150px"><button class="secundario pequeno">Salvar</button></form>`
     : (g.contador ? reais(g.contador.valor) : '-')}</td>
@@ -2262,7 +2267,8 @@ function telaImpostos(comp) {
       <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Guia esperada, calculada pelo faturamento das NFs emitidas (data de emissão; NFs canceladas não entram). Atualiza sozinha a cada NF emitida.
-      PIS/COFINS (${pct(3.65)}): guia mensal. IRPJ (${pct(4.8)}) e CSLL (${pct(2.88)}): guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre.
+      PIS/COFINS (${pct(3.65)}): guia mensal, vence no dia 25 do mês seguinte. IRPJ (${pct(4.8)}) e CSLL (${pct(2.88)}): 15% e 9% sobre o lucro presumido (32% do faturamento), guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre; vence no último dia útil do mês seguinte ao trimestre.
+      IRPJ tem adicional de 10% sobre o lucro presumido acima de R$ 60.000,00 no trimestre (faturamento acima de R$ 187.500,00). Desde 2026 (LC 224/2025), a presunção é de 35,2% na parte do faturamento do ano acima de R$ 5 milhões, controlada por trimestre (R$ 1.250.000,00; IRPJ desde janeiro e CSLL desde abril de 2026). Vencimentos em fim de semana ou feriado nacional vêm para o dia útil anterior.
       O contador faz o cálculo oficial: informe o valor da guia dele ao lado para comparar.</p>
     ${lista.map((x) => `<div class="cartao rolagem"><div class="cabecalho"><h2>${esc(x.empresa.nome)}</h2>
         <span>Faturamento de NF em ${compBr(comp)}: <b>${reais(x.faturamento.valor)}</b> <span class="suave">(${x.faturamento.notas} NF(s))</span></span></div>
