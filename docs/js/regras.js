@@ -10,7 +10,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -1889,4 +1889,57 @@ export function inadimplencia(d, hoje = C.hojeIso()) {
       maiorAtraso: Math.max(0, ...atrasados.map((cb) => cb.dias_atraso)) };
   }).filter((x) => x.atrasados).sort((a, b) => b.atrasados - a.atrasados || b.mediaDias - a.mediaDias);
   return { devedores, historico, total: devedores.reduce((s, x) => s + x.total, 0), totalHoje: devedores.reduce((s, x) => s + x.totalHoje, 0) };
+}
+
+// --------------------------------------------------------------------------
+// Impostos: guia esperada por empresa, pelo faturamento das NFs (o contador faz o cálculo oficial)
+// --------------------------------------------------------------------------
+/** Alíquotas sobre o faturamento de NF: PIS/COFINS numa guia mensal; IRPJ e CSLL em guias trimestrais. */
+export const IMPOSTOS = [
+  { imposto: 'PIS/COFINS', aliquota: 3.65, mensal: true },
+  { imposto: 'IRPJ', aliquota: 4.8, mensal: false },
+  { imposto: 'CSLL', aliquota: 2.88, mensal: false },
+];
+
+/** Trimestre de uma competência: 2026-05 → "2026-T2" (1º: jan-mar, 2º: abr-jun, 3º: jul-set, 4º: out-dez). */
+export const trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(comp.slice(5, 7)) / 3)}`;
+/** Meses do trimestre de uma competência (ex.: 2026-05 → 2026-04, 2026-05, 2026-06). */
+export const mesesDoTrimestre = (comp) => { const t = Number(trimestreDe(comp).slice(-1)); return [0, 1, 2].map((k) => `${comp.slice(0, 4)}-${String((t - 1) * 3 + 1 + k).padStart(2, '0')}`); };
+
+/** Faturamento de NFs emitidas (não canceladas) de uma empresa num mês, pela data de emissão. */
+export function faturamentoNf(d, emitenteId, comp) {
+  const fs = d.faturas.filter((f) => f.emitente_id === emitenteId && f.situacao !== 'Cancelada' && String(f.emissao || '').slice(0, 7) === comp);
+  return { valor: fs.reduce((t, f) => t + f.valor, 0), notas: new Set(fs.map((f) => f.numero)).size };
+}
+
+const guiaDo = (d, emitenteId, imposto, periodo) => d.guias_impostos.find((g) => g.emitente_id === emitenteId && g.imposto === imposto && g.periodo === periodo) || null;
+
+/**
+ * Guias esperadas no mês para cada empresa: PIS/COFINS do mês e IRPJ/CSLL do trimestre, acumulando mês a mês
+ * até o último mês do trimestre (aí é a guia completa). Valor do contador ao lado, quando informado.
+ */
+export function impostosDoMes(d, comp) {
+  const meses = mesesDoTrimestre(comp).filter((m) => m <= comp);
+  const tri = trimestreDe(comp);
+  return d.emitentes.filter((e) => e.ativo || d.faturas.some((f) => f.emitente_id === e.id)).map((e) => {
+    const mes = faturamentoNf(d, e.id, comp);
+    const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m) }));
+    const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
+    return { empresa: e, faturamento: mes, trimestre, porMes, fechado: meses.length === 3,
+      guias: IMPOSTOS.map((x) => {
+        const base = x.mensal ? mes.valor : trimestre;
+        const periodo = x.mensal ? comp : tri;
+        return { ...x, periodo, base, esperado: Math.round((base * x.aliquota) / 100), contador: guiaDo(d, e.id, x.imposto, periodo) };
+      }) };
+  });
+}
+
+/** Grava (ou apaga, com valor vazio) o valor da guia calculado pelo contador. */
+export function salvarGuiaImposto(d, emitenteId, imposto, periodo, valor, usuario) {
+  const atual = guiaDo(d, emitenteId, imposto, periodo);
+  const e = buscar(d, 'emitentes', emitenteId);
+  const texto = `Guia ${imposto} ${periodo} · ${e ? e.nome : ''}`;
+  if (valor === null) { if (atual) excluir(d, 'guias_impostos', atual.id, usuario, `${texto}: valor do contador apagado`); return; }
+  if (atual) atualizar(d, 'guias_impostos', atual.id, { valor }, usuario, `${texto}: ${C.reais(valor)}`);
+  else inserir(d, 'guias_impostos', { emitente_id: emitenteId, imposto, periodo, valor }, usuario, `${texto}: ${C.reais(valor)}`);
 }

@@ -518,6 +518,7 @@ export const TELAS = {
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),
+  impostos: (rota) => telaImpostos(rota.q.mes || C.competenciaDe(C.hojeIso())),
   contas: (rota) => telaContas(rota),
   inadimplencia: () => telaInadimplencia(),
   reajustes: (rota) => telaReajustes(rota.q),
@@ -2230,6 +2231,49 @@ function telaContas(rota) {
       || '<tr><td colspan="6" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div></div>`;
 }
 
+/** Abas da página Resultados. */
+const abasResultados = (atual) => `<div class="abas">${[['resultados', '#/resultados', 'Resultados por imóvel'], ['impostos', '#/impostos', 'Impostos']]
+  .map(([k, h, t]) => `<a href="${h}" class="${k === atual ? 'ativo' : ''}">${t}</a>`).join('')}</div>`;
+
+/**
+ * Impostos: guia esperada por empresa no mês, pelo faturamento das NFs emitidas (PIS/COFINS mensal; IRPJ e CSLL
+ * trimestrais, acumulando mês a mês). O contador faz o cálculo oficial: o valor dele fica ao lado.
+ */
+function telaImpostos(comp) {
+  const lista = R.impostosDoMes(d(), comp);
+  const tri = R.trimestreDe(comp);
+  const nTri = Number(tri.slice(-1));
+  const meses = R.mesesDoTrimestre(comp);
+  const nomeMes = (m) => compBr(m);
+  const guiaLinha = (e, g) => {
+    const dif = g.contador ? g.contador.valor - g.esperado : null;
+    return `<tr><td><b>${esc(g.imposto)}</b><br><span class="suave">${g.mensal ? `guia mensal de ${compBr(comp)}` : `guia do ${nTri}º trimestre (${nomeMes(meses[0])} a ${nomeMes(meses[2])})`}</span></td>
+      <td class="n">${reais(g.base)}${g.mensal ? '' : `<br><span class="suave">${meses.filter((m) => m <= comp).length} de 3 meses</span>`}</td>
+      <td class="n">${pct(g.aliquota)}</td>
+      <td class="n"><b>${reais(g.esperado)}</b>${g.mensal ? '' : `<br>${etiqueta(meses[2] === comp ? 'guia completa' : 'parcial: acumula até ' + compBr(meses[2]), meses[2] === comp ? 'ok' : 'info')}`}</td>
+      <td class="nw">${opera() ? `<form data-form="guiaImposto" class="acoes" data-emitente="${e.id}" data-imposto="${esc(g.imposto)}" data-periodo="${g.periodo}">
+        <input name="valor" inputmode="decimal" data-dinheiro placeholder="valor do contador" value="${g.contador ? reais(g.contador.valor, false) : ''}" style="width:150px"><button class="secundario pequeno">Salvar</button></form>`
+    : (g.contador ? reais(g.contador.valor) : '-')}</td>
+      <td class="n">${dif === null ? '<span class="suave">-</span>' : dif === 0 ? etiqueta('igual', 'ok') : `<span class="${Math.abs(dif) > 100 ? 'texto-aviso' : 'suave'}">${dif > 0 ? '+' : '-'} ${reais(Math.abs(dif))}</span>`}</td></tr>`;
+  };
+  return `<h1>Resultados financeiros</h1>${abasResultados('impostos')}
+    <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
+      <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
+      <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
+      <a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
+    <p class="suave">Guia esperada, calculada pelo faturamento das NFs emitidas (data de emissão; NFs canceladas não entram). Atualiza sozinha a cada NF emitida.
+      PIS/COFINS (${pct(3.65)}): guia mensal. IRPJ (${pct(4.8)}) e CSLL (${pct(2.88)}): guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre.
+      O contador faz o cálculo oficial: informe o valor da guia dele ao lado para comparar.</p>
+    ${lista.map((x) => `<div class="cartao rolagem"><div class="cabecalho"><h2>${esc(x.empresa.nome)}</h2>
+        <span>Faturamento de NF em ${compBr(comp)}: <b>${reais(x.faturamento.valor)}</b> <span class="suave">(${x.faturamento.notas} NF(s))</span></span></div>
+      <p class="suave">${nTri}º trimestre até agora: ${x.porMes.map((m) => `${compBr(m.mes)} ${reais(m.valor)}`).join(' + ')} = <b>${reais(x.trimestre)}</b></p>
+      <table><tr><th>Imposto</th><th class="n">Base (faturamento)</th><th class="n">Alíquota</th><th class="n">Guia esperada</th><th>Valor do contador</th><th class="n">Diferença</th></tr>
+        ${x.guias.map((g) => guiaLinha(x.empresa, g)).join('')}
+        <tr class="total"><td colspan="3">Total esperado no mês${meses[2] === comp ? '' : ' (IRPJ e CSLL ainda parciais)'}</td><td class="n">${reais(x.guias.reduce((t, g) => t + g.esperado, 0))}</td>
+          <td>${x.guias.some((g) => g.contador) ? reais(x.guias.reduce((t, g) => t + (g.contador ? g.contador.valor : 0), 0)) : ''}</td><td></td></tr></table></div>`).join('')
+      || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
+}
+
 function telaResultados(q) {
   const hoje = C.hojeIso();
   const ate = q.ate || hoje;
@@ -2246,7 +2290,7 @@ function telaResultados(q) {
   const tot = (k) => lista.filter((x) => !x.controle).reduce((s, x) => s + x[k], 0);
   const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
-  return `<h1>Resultados financeiros</h1>
+  return `<h1>Resultados financeiros</h1>${abasResultados('resultados')}
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Contas pagas por nós</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
@@ -3097,6 +3141,19 @@ export const FORMULARIOS = {
     aviso('Índice salvo.');
     await mostrar();
   },
+  irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get('mes')}`),
+
+  /** Valor da guia calculado pelo contador (vazio apaga). */
+  async guiaImposto(form) {
+    const texto = String(new FormData(form).get('valor') || '').trim();
+    const valor = texto ? C.centavos(texto) : null;
+    if (valor !== null && !(valor >= 0)) throw new Error('Valor inválido.');
+    const { emitente, imposto, periodo } = form.dataset;
+    await alterar((db) => R.salvarGuiaImposto(db, Number(emitente), imposto, periodo, valor, login()));
+    aviso(valor === null ? 'Valor do contador apagado.' : 'Valor do contador salvo.');
+    await mostrar();
+  },
+
   filtroResultados(form) {
     const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
     ir(`#/resultados?${q}`);
