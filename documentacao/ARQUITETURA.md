@@ -27,7 +27,7 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 
 ## Modelo de dados
 - O banco é um objeto: `{ formato: 'imoveis-v1', revisao, seq, historico, listas, estilos_alertas, <tabela>: [ ... ] }` (`estilos_alertas`: aparência escolhida para cada tipo de alerta).
-- As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`, `aditivos`…). `bancoVazio()` cria uma lista para cada uma.
+- As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`, `aditivos`, `solicitacoes`, `guias_impostos`…). `bancoVazio()` cria uma lista para cada uma.
 - `id` de cada registro vem de `d.seq[tabela]` (em `inserir`).
 - Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
 - `normalizar(d)` em `regras.js` migra bancos antigos ao abrir (campos renomeados, tabelas novas).
@@ -41,12 +41,12 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Numeração de NF | `regras.js` → `pendentesDeFatura`, `numerarFaturas`, `desfazerUltimaNumeracao`, `cancelarNumero`, `registrarNfExterna` |
 | Reserva | `regras.js` → `reservaParaCompetencia`, `realocarReserva`, `alertaReservaParada` |
 | IPTU | `regras.js` → `parcelasIptu` (parte do inquilino pelos dias e do proprietário), `totaisIptu`, `iptuNaCompetencia`, `competenciaDaParcela`, `alertasIptu` |
-| Reajuste | `regras.js` → `mesDeAniversario`, `competenciaDoReajuste`, `reajusteNaCompetencia`, `calcularReajuste`, `aplicarReajuste` |
-| Ressarcimento de condomínio | `regras.js` → `competenciaDoAbatimento`, `aplicarRessarcimentos`, `condominioAConferir` |
-| Contas pagas por nós | `regras.js` → `contasPermitidas`, `lancarDespesas` |
+| Reajuste | `regras.js` → `mesDeAniversario`, `competenciaDoReajuste`, `reajusteNaCompetencia`, `calcularReajuste`, `aplicarReajuste`, `reajustesEntre`, `reajustesNaoCorrigidos` (tela Reajustes) |
+| Ressarcimento de condomínio; contas pagas por nós | `regras.js` → `competenciaDoAbatimento`, `aplicarRessarcimentos`, `condominioAConferir`; `contasPermitidas`, `lancarDespesas` |
+| Solicitações; ordem dos imóveis | `regras.js` → `solicitacoesDo`, `resumoSolicitacoes`; `telas.js` → `telaSolicitacoes`, `SITUACOES_SOLICITACAO`; `regras.js` → `imoveisPorEndereco` (mesmo endereço junto) |
 | Saída do inquilino | `regras.js` → `encerrarContrato`, `calcularEncerramento` |
 | Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas` (ordem por `estiloAlerta`), `salvarEstilosAlertas`, `eventosDoMes`; `alertas.js`; `telas.js` → `classeAlerta` |
-| Fechamento e resultados | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia` |
+| Fechamento, resultados e impostos | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia`; impostos: `impostosDoMes` (`IMPOSTOS`, adicional do IRPJ, `excedenteLc224`, guia abaixo de R$ 10 em `transportado`), `faturamentoNf`, `vencimentoGuia`/`diaUtilAteh` (feriados nacionais), `salvarGuiaImposto`; `telas.js` → `telaImpostos`, `abasResultados` |
 | Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir` |
 | Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado), `marcarDocumento`, `documentoPerdido`, `marcarDocumentoPerdido`, `registrarAditivo`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa` |
 

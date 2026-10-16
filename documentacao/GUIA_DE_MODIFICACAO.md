@@ -19,15 +19,15 @@
      voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}?ir=reformas`,
    },
    ```
-   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros), `conferir` (avisos com confirmação), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
+   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
 4. Links: novo `#/novo/<tabela>?...`; editar `#/editar/<tabela>/<id>`. A gravação genérica é `FORMULARIOS.cadastro`.
-5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato ou imóvel, inclua-a na exclusão em cascata de `ACOES.excluir`.
+5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato ou imóvel, inclua-a na exclusão em cascata de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
 
 ## Adicionar uma tela
 1. `telas.js` → função `telaX(rota)` que devolve HTML em texto; registre em `TELAS` com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`.
 3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES`. Formulários: `<form data-form="nome">` + função em `FORMULARIOS`.
-4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota).
+4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`).
 5. Telas de impressão: um tipo novo em `telaImprimir` (`#/imprimir/<tipo>`), que desenha sem o menu.
 
 ## Adicionar uma regra de negócio
