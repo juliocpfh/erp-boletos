@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="ab55120e343880ce">
+<meta name="fontes" content="f53ce66c586adbcb">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -85,7 +85,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .alerta.enfase-forte.cor-roxo { background: #ddd6fe; color: #4c1d95; }
 .alerta.enfase-forte.cor-cinza { background: #e5e7eb; color: #1f2937; }
 .alerta.enfase-discreta { border-left-width: 3px; background: #fff; color: var(--suave); font-size: 13px; }
-.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }
 .formulario { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px 18px; }
@@ -300,6 +300,19 @@ input.doc-invalido { border-color: var(--perigo); }
 .lista-baixa .check-mini { font-weight: 400; }
 .historico-iptu { margin-top: 14px; border-top: 1px solid var(--borda); padding-top: 8px; }
 .historico-iptu summary { cursor: pointer; }
+.caixa-historico summary { cursor: pointer; }
+.caixa-historico[open] summary { margin-bottom: 10px; }
+.resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
+.resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
+th.centro, td.centro { text-align: center; }
+.botao-icone { display: inline-flex; align-items: center; padding: 4px 10px; }
+.indices-compacta { margin-top: 8px; width: auto; }
+.indices-compacta th, .indices-compacta td { padding: 3px 14px 3px 0; }
+.link-botao.excluir-mini, .excluir-mini { color: var(--perigo); padding: 0 4px; font-weight: 700; }
+.abas { display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
+.abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
+.abas a.ativo { border-bottom-color: var(--info, #0891b2); font-weight: 700; }
+.texto-aviso { color: #b45309; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -835,9 +848,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ENFASES_ALERTA: () => ENFASES_ALERTA,
     ESTILOS_ALERTA_PADRAO: () => ESTILOS_ALERTA_PADRAO,
     GARANTIAS: () => GARANTIAS,
+    IMPOSTOS: () => IMPOSTOS,
+    INICIO_LC224: () => INICIO_LC224,
+    LIMITE_ADICIONAL_IRPJ: () => LIMITE_ADICIONAL_IRPJ,
+    LIMITE_LC224_TRIMESTRE: () => LIMITE_LC224_TRIMESTRE,
     LISTAS: () => LISTAS,
     MESES_DEPOIS_DE_ALUGAR: () => MESES_DEPOIS_DE_ALUGAR,
+    MINIMO_GUIA: () => MINIMO_GUIA,
     MODELO_AIRBNB: () => MODELO_AIRBNB,
+    PRESUNCAO: () => PRESUNCAO,
     SITUACOES: () => SITUACOES,
     TABELAS: () => TABELAS,
     TAXAS_DO_PROPRIETARIO: () => TAXAS_DO_PROPRIETARIO,
@@ -892,6 +911,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     desfazerNumeracao: () => desfazerNumeracao,
     desfazerUltimaNumeracao: () => desfazerUltimaNumeracao,
     despesasDo: () => despesasDo,
+    diaUtilAteh: () => diaUtilAteh,
     documentoEntrada: () => documentoEntrada,
     documentoPerdido: () => documentoPerdido,
     ehComplementoCaucao: () => ehComplementoCaucao,
@@ -905,14 +925,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     eventosDoMes: () => eventosDoMes,
     excluir: () => excluir,
     excluirRenovacao: () => excluirRenovacao,
+    faturamentoNf: () => faturamentoNf,
     faturasDe: () => faturasDe,
     fiadoresAnterioresDo: () => fiadoresAnterioresDo,
     fiadoresDo: () => fiadoresDo,
     geraNf: () => geraNf,
     gerarBoletoCaucao: () => gerarBoletoCaucao,
     gerarCobrancas: () => gerarCobrancas,
+    imoveisPorEndereco: () => imoveisPorEndereco,
     imovelDaFatura: () => imovelDaFatura,
     imovelSoControle: () => imovelSoControle,
+    impostosDoMes: () => impostosDoMes,
     inadimplencia: () => inadimplencia,
     incluirNaLista: () => incluirNaLista,
     indiceAcumulado: () => indiceAcumulado,
@@ -931,6 +954,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     marcarIptuPago: () => marcarIptuPago,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
     mesDeAniversario: () => mesDeAniversario,
+    mesesDoTrimestre: () => mesesDoTrimestre,
     modeloAirbnb: () => modeloAirbnb,
     montarCobranca: () => montarCobranca,
     normalizar: () => normalizar,
@@ -945,6 +969,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     reajusteNaCompetencia: () => reajusteNaCompetencia,
     reajustePendente: () => reajustePendente,
     reajustesEntre: () => reajustesEntre,
+    reajustesNaoCorrigidos: () => reajustesNaoCorrigidos,
     realocarReserva: () => realocarReserva,
     recalcularCobrancas: () => recalcularCobrancas,
     reformasDo: () => reformasDo,
@@ -958,8 +983,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     reservaParaCompetencia: () => reservaParaCompetencia,
     ressarcimentosDo: () => ressarcimentosDo,
     resultadosFinanceiros: () => resultadosFinanceiros,
+    resumoSolicitacoes: () => resumoSolicitacoes,
     saldoReserva: () => saldoReserva,
     salvarEstilosAlertas: () => salvarEstilosAlertas,
+    salvarGuiaImposto: () => salvarGuiaImposto,
     segurosDoImovel: () => segurosDoImovel,
     separarLeitura: () => separarLeitura,
     situacaoAplicacao: () => situacaoAplicacao,
@@ -972,6 +999,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     totais: () => totais,
     totaisImoveis: () => totaisImoveis,
     totaisIptu: () => totaisIptu,
+    trimestreDe: () => trimestreDe,
     trocarFiador: () => trocarFiador,
     trocarGarantia: () => trocarGarantia,
     trocasGarantiaDo: () => trocasGarantiaDo,
@@ -982,6 +1010,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ultimosValores: () => ultimosValores,
     usoDoItem: () => usoDoItem,
     valorGarantia: () => valorGarantia,
+    vencimentoGuia: () => vencimentoGuia,
     vincularInquilino: () => vincularInquilino,
     vistoriasDo: () => vistoriasDo
   });
@@ -1367,6 +1396,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     despesas: "Conta paga por nós",
     ressarcimentos: "Ressarcimento de condomínio",
     fechamentos: "Etapa do fechamento do mês",
+    guias_impostos: "Guia de imposto",
     arquivos: "Arquivo",
     banco: "Banco de dados",
     listas: "Lista de opções"
@@ -2165,6 +2195,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   function enderecoCompleto(imovel) {
     return [imovel.endereco, imovel.complemento].filter(Boolean).join(", ");
   }
+  function imoveisPorEndereco(imoveis) {
+    const porNome = (a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR");
+    const chave = (i) => String(i.endereco || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || `#${i.id}`;
+    const grupos = /* @__PURE__ */ new Map();
+    for (const i of [...imoveis].sort(porNome)) {
+      if (!grupos.has(chave(i))) grupos.set(chave(i), []);
+      grupos.get(chave(i)).push(i);
+    }
+    return [...grupos.values()].flat();
+  }
   function problemaDaFatura(d2, base) {
     const partes = base.partes;
     if (!partes.length) return `Defina ${base.origem} quais empresas emitem a NF.`;
@@ -2749,6 +2789,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     };
   }
   var solicitacoesDo = (d2, contratoId) => d2.solicitacoes.filter((x) => x.contrato_id === contratoId).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  function resumoSolicitacoes(d2) {
+    const r = { Aberta: 0, "Em andamento": 0, Concluída: 0, "Não atendida": 0 };
+    for (const x of d2.solicitacoes) {
+      const s = x.situacao || "Aberta";
+      r[s] = (r[s] || 0) + 1;
+    }
+    return r;
+  }
   var reformasDo = (d2, imovelId) => d2.reformas.filter((r) => r.imovel_id === imovelId).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
   function resultadosFinanceiros(d2, de, ate) {
     const meses = Math.max(1, mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
@@ -3180,6 +3228,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     }
     return lista3.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, "pt-BR"));
   }
+  function reajustesNaoCorrigidos(d2, de, ate, hoje2 = hojeIso()) {
+    const lista3 = reajustesEntre(d2, de, ate).filter((r) => !r.corrigido);
+    for (const c of d2.contratos.filter((x) => x.ativo !== false && x.imovel_id && contratoAtivo(x, hoje2))) {
+      const r = reajustePendente(d2, c, hoje2);
+      if (r && r.competencia < de) lista3.push({ contrato: c, ...r, calculo: calcularReajuste(d2, c, r.competencia) });
+    }
+    return lista3.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, "pt-BR"));
+  }
   var DIAS_VERMELHO = 5;
   function inadimplencia(d2, hoje2 = hojeIso()) {
     const porContrato = /* @__PURE__ */ new Map();
@@ -3211,6 +3267,138 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       };
     }).filter((x) => x.atrasados).sort((a, b) => b.atrasados - a.atrasados || b.mediaDias - a.mediaDias);
     return { devedores, historico, total: devedores.reduce((s, x) => s + x.total, 0), totalHoje: devedores.reduce((s, x) => s + x.totalHoje, 0) };
+  }
+  var IMPOSTOS = [
+    { imposto: "PIS/COFINS", aliquota: 3.65, mensal: true },
+    { imposto: "IRPJ", aliquota: 4.8, mensal: false },
+    { imposto: "CSLL", aliquota: 2.88, mensal: false }
+  ];
+  var PRESUNCAO = 32;
+  var LIMITE_ADICIONAL_IRPJ = 6e6;
+  var LIMITE_LC224_TRIMESTRE = 125e6;
+  var INICIO_LC224 = { IRPJ: "2026-01", CSLL: "2026-04" };
+  var trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(comp.slice(5, 7)) / 3)}`;
+  var mesesDoTrimestre = (comp) => {
+    const t = Number(trimestreDe(comp).slice(-1));
+    return [0, 1, 2].map((k) => `${comp.slice(0, 4)}-${String((t - 1) * 3 + 1 + k).padStart(2, "0")}`);
+  };
+  function faturamentoNf(d2, emitenteId, comp) {
+    const fs = d2.faturas.filter((f) => f.emitente_id === emitenteId && f.situacao !== "Cancelada" && String(f.emissao || "").slice(0, 7) === comp);
+    return { valor: fs.reduce((t, f) => t + f.valor, 0), notas: new Set(fs.map((f) => f.numero)).size };
+  }
+  var guiaDo = (d2, emitenteId, imposto, periodo) => d2.guias_impostos.find((g) => g.emitente_id === emitenteId && g.imposto === imposto && g.periodo === periodo) || null;
+  function feriados(ano) {
+    const a = ano % 19;
+    const b = Math.floor(ano / 100);
+    const c = ano % 100;
+    const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
+    const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - c % 4) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31);
+    const dia = (h + l - 7 * m + 114) % 31 + 1;
+    const pascoa = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    const fixos = ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"].map((x) => `${ano}-${x}`);
+    return /* @__PURE__ */ new Set([...fixos, ...[-48, -47, -2, 60].map((n) => somarDias(pascoa, n))]);
+  }
+  var diaUtil = (iso2) => {
+    const dia = (/* @__PURE__ */ new Date(`${iso2}T12:00:00`)).getDay();
+    return dia !== 0 && dia !== 6 && !feriados(Number(iso2.slice(0, 4))).has(iso2);
+  };
+  function diaUtilAteh(iso2) {
+    let x = iso2;
+    while (!diaUtil(x)) x = somarDias(x, -1);
+    return x;
+  }
+  function vencimentoGuia(mensal, periodo) {
+    if (mensal) return diaUtilAteh(`${somarMeses(periodo, 1)}-25`);
+    const fim = `${periodo.slice(0, 4)}-${String(Number(periodo.slice(-1)) * 3).padStart(2, "0")}`;
+    const seguinte = somarMeses(fim, 1);
+    return diaUtilAteh(somarDias(`${somarMeses(seguinte, 1)}-01`, -1));
+  }
+  function excedenteLc224(d2, emitenteId, comp, inicio) {
+    const ano = comp.slice(0, 4);
+    const t = Number(trimestreDe(comp).slice(-1));
+    const receita = (q) => mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, "0")}`).filter((m) => m <= comp).reduce((v, m) => v + faturamentoNf(d2, emitenteId, m).valor, 0);
+    let sobra = 0;
+    let considerado = 0;
+    let total = 0;
+    let atual = 0;
+    let contados = 0;
+    for (let q = 1; q <= t; q += 1) {
+      if (mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, "0")}`)[0] < inicio) continue;
+      contados += 1;
+      const r = receita(q);
+      const limite = LIMITE_LC224_TRIMESTRE + sobra;
+      const excedente = Math.max(0, r - limite);
+      sobra = Math.max(0, limite - r);
+      total += r;
+      if (q < t) considerado += excedente;
+      else atual = excedente;
+    }
+    return t === 4 ? Math.max(0, total - contados * LIMITE_LC224_TRIMESTRE) - considerado : atual;
+  }
+  var MINIMO_GUIA = 1e3;
+  function transportado(d2, e, x, comp) {
+    const primeira = d2.faturas.filter((f) => f.emitente_id === e.id && f.situacao !== "Cancelada" && f.emissao).map((f) => f.emissao.slice(0, 7)).sort()[0];
+    if (!primeira) return 0;
+    const passo = x.mensal ? 1 : 3;
+    const atual = x.mensal ? comp : mesesDoTrimestre(comp)[2];
+    let saldo = 0;
+    for (let m = x.mensal ? primeira : mesesDoTrimestre(primeira)[2]; m < atual; m = somarMeses(m, passo)) {
+      const total = saldo + guiasDoPeriodo(d2, e, m).find((g) => g.imposto === x.imposto).esperado;
+      saldo = total > 0 && total < MINIMO_GUIA ? total : 0;
+    }
+    return saldo;
+  }
+  function impostosDoMes(d2, comp) {
+    return d2.emitentes.filter((e) => e.ativo || d2.faturas.some((f) => f.emitente_id === e.id)).map((e) => {
+      const r = guiasDaEmpresa(d2, e, comp);
+      r.guias = r.guias.map((g) => {
+        const anterior = transportado(d2, e, g, comp);
+        const aPagar = g.esperado + anterior;
+        return { ...g, transportado: anterior, aPagar, abaixoDoMinimo: aPagar > 0 && aPagar < MINIMO_GUIA };
+      });
+      return r;
+    });
+  }
+  var guiasDoPeriodo = (d2, e, comp) => guiasDaEmpresa(d2, e, comp).guias;
+  function guiasDaEmpresa(d2, e, comp) {
+    const meses = mesesDoTrimestre(comp).filter((m) => m <= comp);
+    const tri = trimestreDe(comp);
+    const mes = faturamentoNf(d2, e.id, comp);
+    const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d2, e.id, m) }));
+    const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
+    const presumido = (imposto) => {
+      const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d2, e.id, comp, INICIO_LC224[imposto]) : 0;
+      return { base: Math.round(trimestre * PRESUNCAO / 100) + Math.round(extra * PRESUNCAO / 1e3), lc224: extra };
+    };
+    return {
+      empresa: e,
+      faturamento: mes,
+      trimestre,
+      porMes,
+      fechado: meses.length === 3,
+      guias: IMPOSTOS.map((x) => {
+        const periodo = x.mensal ? comp : tri;
+        const g = { ...x, periodo, vencimento: vencimentoGuia(x.mensal, periodo), contador: guiaDo(d2, e.id, x.imposto, periodo), adicional: 0, lc224: 0 };
+        if (x.mensal) return { ...g, base: mes.valor, esperado: Math.round(mes.valor * x.aliquota / 100) };
+        const p2 = presumido(x.imposto);
+        const adicional = x.imposto === "IRPJ" ? Math.max(0, Math.round((p2.base - LIMITE_ADICIONAL_IRPJ) / 10)) : 0;
+        const normal = Math.round(p2.base * (x.imposto === "IRPJ" ? 15 : 9) / 100);
+        return { ...g, base: trimestre, presumido: p2.base, lc224: p2.lc224, adicional, esperado: normal + adicional };
+      })
+    };
+  }
+  function salvarGuiaImposto(d2, emitenteId, imposto, periodo, valor, usuario) {
+    const atual = guiaDo(d2, emitenteId, imposto, periodo);
+    const e = buscar(d2, "emitentes", emitenteId);
+    const texto2 = `Guia ${imposto} ${periodo} · ${e ? e.nome : ""}`;
+    if (valor === null) {
+      if (atual) excluir(d2, "guias_impostos", atual.id, usuario, `${texto2}: valor do contador apagado`);
+      return;
+    }
+    if (atual) atualizar(d2, "guias_impostos", atual.id, { valor }, usuario, `${texto2}: ${reais(valor)}`);
+    else inserir(d2, "guias_impostos", { emitente_id: emitenteId, imposto, periodo, valor }, usuario, `${texto2}: ${reais(valor)}`);
   }
 
   // docs/js/armazenamento.js
@@ -3969,6 +4157,7 @@ ${JSON.stringify(cabecalho)}
   var SEGURO = [
     campo("seguradora", "Seguradora"),
     campo("apolice", "Nº da apólice"),
+    campo("telefone_assistencia", "Telefone da assistência", "texto", { ajuda: "Ex.: 0800 000 0000 (chaveiro, encanador, vidraceiro do seguro)" }),
     campo("data_contratacao", "Data de contratação", "data"),
     campo("vigencia_inicio", "Início da vigência", "data", { obrig: true }),
     campo("vigencia_fim", "Fim da vigência", "data", { obrig: true }),
@@ -5130,6 +5319,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return arquivos.length;
   }
+  var extensao = (nome) => {
+    const p2 = nome.lastIndexOf(".");
+    return p2 > 0 ? nome.slice(p2).toLowerCase() : "";
+  };
+  var semAcentoArquivo = (nome) => {
+    const ext = extensao(nome);
+    const base = (ext ? nome.slice(0, nome.lastIndexOf(".")) : nome).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return `${base || "arquivo"}${ext}`;
+  };
   async function salvarAssinado(escopo, contratoId, arquivo, texto2) {
     const ponto = arquivo.name.lastIndexOf(".");
     const ext = ponto > 0 ? arquivo.name.slice(ponto).toLowerCase() : "";
@@ -5139,6 +5337,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var SEM_ACENTO = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   var classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === "Padrão" ? "" : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
   var classeAlerta = (a) => classeEstilo(a.nivel, estiloAlerta(d(), a.tipo));
+  var linkAlerta = (a) => a.tipo === "Reajuste do aluguel" ? `#/reajustes?contrato=${a.contrato_id}` : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}`;
+  var caixaHistorico = (titulo2, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo2}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
   function caixaArquivos(escopo, id, titulo2, ancora, ajuda = "", dentro = false, enviar = true) {
     return `<div class="${dentro ? "arquivos-dentro" : "cartao"}" id="${ancora}">${dentro ? `<h3>${esc2(titulo2)}</h3>` : `<h2>${esc2(titulo2)}</h2>`}${ajuda ? `<p class="suave">${esc2(ajuda)}</p>` : ""}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
@@ -5158,7 +5358,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       }));
       return `<div class="fotos">${figs.join("")}</div>`;
     }
-    return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc2(a.nome)}">${esc2(a.nome)}</a></td>
+    const seguroDo = (nome) => escopo === "seguro" ? segurosDoImovel(d(), Number(id)).find((s) => s.arquivo_apolice === nome || (s.outros_arquivos || []).includes(nome)) : null;
+    const vigencia = (nome) => {
+      const s = seguroDo(nome);
+      return s ? ` <span class="suave">· ${s.arquivo_apolice === nome ? "apólice" : "outro arquivo"} · vigência ${dataBr2(s.vigencia_inicio)} a ${dataBr2(s.vigencia_fim)}</span>` : "";
+    };
+    return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc2(a.nome)}">${esc2(a.nome)}</a>${vigencia(a.nome)}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
     <td class="n">${botao("baixarArquivo", "Baixar", { escopo, id, nome: a.nome })} ${opera() ? botao("excluirArquivo", "Excluir", { escopo, id, nome: a.nome }, "perigo pequeno", "Excluir este arquivo?") : ""}</td></tr>`).join("")}</table>`;
   }
@@ -5441,6 +5646,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         ${n(abertas.filter((c) => c.vencimento < hoje2).length, "em aberto e vencidas", "#/inadimplencia")}
         ${n(pend.length, "pagamentos aguardando nº de NF", "#/faturas")}
         ${n(incompletos.length, "cadastros incompletos", "#/pendencias")}
+        ${(() => {
+        const r = resumoSolicitacoes(d());
+        return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
+          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join("")}</div>Solicitações de inquilinos</a>`;
+      })()}
       </div>
       <div class="alerta ${faltamEtapas.length ? "aviso" : "ok"}"><b>Fechamento de ${compBr2(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc2(faltamEtapas.map((e) => e.titulo.split(" (")[0]).join("; "))}.` : "todas as etapas feitas."}
         ${link(`#/fechamento?mes=${mesAtual}`, "Abrir o fechamento do mês", "botao pequeno")}</div>
@@ -5448,16 +5658,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc2(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
       ${calendarioDoPainel(rota.q.mes || competenciaDe(hoje2), hoje2)}
       <div class="cartao"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
-        ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc2(a.tipo)}</b> <a href="${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}">${esc2(a.imovel)}${a.inquilino ? ` · ${esc2(a.inquilino)}` : ""}</a>: ${esc2(a.texto)}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc2(a.tipo)}</b> <a href="${linkAlerta(a)}">${esc2(a.imovel)}${a.inquilino ? ` · ${esc2(a.inquilino)}` : ""}</a>: ${esc2(a.texto)}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
-      <div class="cartao"><div class="cabecalho"><h2>Últimas alterações</h2><a href="#/historico">Ver histórico completo</a></div>
-        ${tabelaHistorico(ultimos(() => true, 12))}
-        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString("pt-BR")}.</p></div>`;
+      ${caixaHistorico("Últimas alterações", `${tabelaHistorico(ultimos(() => true, 12))}
+        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString("pt-BR")}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
     },
     // ------------------------------------------------------------------------
     imoveis() {
       const hoje2 = hojeIso();
-      const linhas2 = ordenar(d().imoveis, "nome").map((i) => {
+      const linhas2 = imoveisPorEndereco(d().imoveis).map((i) => {
         const atuais = d().contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje2)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
         const atual = atuais[0];
         return `<tr><td><a href="#/imovel/${i.id}"><b>${esc2(i.nome)}</b></a>${i.sublote ? `<br><span class="suave">${esc2(i.sublote)}</span>` : ""}</td><td>${esc2(enderecoCompleto(i))}</td>
@@ -5498,6 +5707,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     },
     faturas: (rota) => telaFaturas(rota.q.mes || competenciaDe(hojeIso())),
     resultados: (rota) => telaResultados(rota.q),
+    impostos: (rota) => telaImpostos(rota.q.mes || competenciaDe(hojeIso())),
     contas: (rota) => telaContas(rota),
     inadimplencia: () => telaInadimplencia(),
     reajustes: (rota) => telaReajustes(rota.q),
@@ -5530,6 +5740,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     "modelo-contrato": (rota) => telaModelo(rota),
     empresas: () => telaEmpresas(),
     inquilinos: (rota) => telaInquilinos(rota.q),
+    solicitacoes: (rota) => telaSolicitacoes(rota.q),
     iptu: (rota) => telaIptu(Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear()),
     historico: (rota) => telaHistorico(rota.q),
     dados: () => telaDados(),
@@ -5663,7 +5874,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc2(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos("anuncio", i.id, "Fotos do último anúncio", "anuncio")}
     ${caixaArquivos("imovel", i.id, "Documentos do imóvel", "documentos", "Matrícula, cadastro do IPTU e outros documentos do imóvel.")}
-    <div class="cartao"><h2>Histórico do imóvel</h2>${tabelaHistorico(ultimos((h) => h.imovel_id === i.id))}</div>`;
+    ${caixaHistorico("Histórico do imóvel", tabelaHistorico(ultimos((h) => h.imovel_id === i.id)))}`;
   }
   function selosContrato(c) {
     const base = dataBaseCorrecao(c);
@@ -5818,10 +6029,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório do imóvel ${esc2(i.nome)}</h2>${opera() ? link(`#/novo/seguros?imovel=${i.id}`, "Cadastrar apólice") : ""}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc2(alerta.texto)}</div>` : ""}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
-      ${seguros.map((s) => `<tr><td>${esc2(s.seguradora || "-")}<br><span class="suave">${esc2(s.apolice || "")}</span></td><td>${dataBr2(s.data_contratacao)}</td><td>${dataBr2(s.vigencia_inicio)} a ${dataBr2(s.vigencia_fim)}</td><td class="n">${reais2(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr2(s.primeira_competencia)}</td>
+      ${seguros.map((s) => `<tr><td>${esc2(s.seguradora || "-")}<br><span class="suave">${esc2(s.apolice || "")}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc2(s.telefone_assistencia)}</b></span>` : ""}${s.arquivo_apolice ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${i.id}" data-nome="${esc2(s.arquivo_apolice)}">📎 apólice</a>` : `<br>${etiqueta("sem arquivo da apólice", "aviso")}`}</td><td>${dataBr2(s.data_contratacao)}</td><td>${dataBr2(s.vigencia_inicio)} a ${dataBr2(s.vigencia_fim)}</td><td class="n">${reais2(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr2(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "seguros", id: s.id }, "perigo pequeno", "Excluir esta apólice?")}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
     <p class="suave">As parcelas entram no boleto do inquilino que estiver no imóvel no mês de cada parcela (se o contrato dele inclui o seguro).</p>
-    ${caixaArquivos("seguro", i.id, "Apólices", "apolices", "Anexe aqui o PDF da apólice.", true)}</div>`;
+    ${caixaArquivos("seguro", i.id, "Apólices", "apolices", 'O arquivo da apólice é anexado ao cadastrar a apólice (botão "Cadastrar apólice"); aqui ficam todos, com a vigência ao lado.', true)}</div>`;
   }
   function geradoresDocumentos(c, cls = "botao secundario pequeno") {
     const entrada = vistoriasDo(d(), c.id).find((v) => v.tipo === "Entrada");
@@ -5971,7 +6182,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ${caixaDocumentos(c)}
     ${caixaArquivos("contrato", c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, "arquivos", `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ", contrato social e cartão CNPJ da empresa, documentos do representante" : ""}${c.solidario_nome ? ", documentos do inquilino solidário" : ""} etc.`)}
     ${caixaSaida(c)}
-    <div class="cartao"><h2>Histórico deste inquilino${historicoIds.size > 1 ? " e dos contratos ligados" : ""}</h2>${tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80))}</div>`;
+    ${caixaHistorico(`Histórico deste inquilino${historicoIds.size > 1 ? " e dos contratos ligados" : ""}`, tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80)))}`;
   }
   var comListas = (campos) => campos.map((c) => c.lista ? { ...c, opcoes: lista(d(), c.lista) } : c);
   var antesDoVinculo = null;
@@ -6025,11 +6236,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`
     },
     solicitacoes: {
-      titulo: (r, q) => `Solicitação do inquilino - ${buscar2("contratos", r ? r.contrato_id : q.contrato).inquilino_nome}`,
-      campos: () => SOLICITACAO,
-      fixos: (r, q) => r ? {} : { contrato_id: Number(q.contrato) },
-      padrao: () => ({ data: hojeIso() }),
-      voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes`,
+      titulo: (r) => r ? "Solicitação do inquilino" : "Nova solicitação do inquilino",
+      // inquilino escolhido na lista (ativos, em ordem de nome); vindo da tela Inquilinos, já vem marcado
+      campos: (r) => {
+        const ops = d().contratos.filter((c) => r && c.id === r.contrato_id || c.ativo !== false && contratoAtivo(c, hojeIso())).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, "pt-BR")).map((c) => {
+          const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
+          return [String(c.id), `${c.inquilino_nome}${i ? ` · ${i.nome}` : ""}`];
+        });
+        return [{ nome: "contrato_id", rotulo: "Inquilino", tipo: "opcao", obrig: true, opcoes: ops }, ...SOLICITACAO];
+      },
+      padrao: (q) => ({ data: hojeIso(), contrato_id: q.contrato || "" }),
+      voltar: (r, q) => ({ inquilinos: "#/inquilinos", solicitacoes: "#/solicitacoes" })[q && q.de] || (r || q && q.contrato ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : "#/solicitacoes"),
       descricao: (dados) => `Solicitação: ${String(dados.descricao || "").slice(0, 80)}`,
       ajustar(dados) {
         if (dados.situacao === "Concluída" && !dados.data_conclusao) dados.data_conclusao = hojeIso();
@@ -6185,9 +6402,35 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       titulo: (r, q) => `Seguro obrigatório - ${buscar2("imoveis", r ? r.imovel_id : q.imovel).nome}`,
       campos: () => SEGURO,
       fixos: (r, q) => r ? {} : { imovel_id: Number(q.imovel) },
+      // arquivo da apólice obrigatório (na edição, só se ainda não tiver); outros arquivos opcionais
+      extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
+      <div><label>Arquivo da apólice${r && r.arquivo_apolice ? "" : " *"}</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
+        <small class="suave">${r && r.arquivo_apolice ? `Já guardado: ${esc2(r.arquivo_apolice)}. Escolha outro só para trocar.` : "Obrigatório: PDF ou foto da apólice."}</small></div>
+      <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple>
+        <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
+      ajustar(dados, erros, r, form) {
+        const arq = form.querySelector("[name=arquivo_apolice]").files[0];
+        if (!arq && !(r && r.arquivo_apolice)) throw new Error("Anexe o arquivo da apólice para salvar o seguro obrigatório.");
+      },
+      async ajustarAsync(dados, erros, r, form, q) {
+        const imovelId = r ? r.imovel_id : Number(q.imovel);
+        const pasta = await pastaDoEscopo("seguro", imovelId);
+        const vig = `${dados.vigencia_inicio}-a-${dados.vigencia_fim}`;
+        const arq = form.querySelector("[name=arquivo_apolice]").files[0];
+        if (arq) dados.arquivo_apolice = await salvarArquivo(pasta, new File([arq], `apolice-${vig}${extensao(arq.name)}`));
+        const outros = [...form.querySelector("[name=outros_arquivos]").files];
+        if (outros.length) {
+          const nomes = [];
+          for (const a of outros) {
+            const nome = `seguro-${vig}-${semAcentoArquivo(a.name)}`;
+            nomes.push(await salvarArquivo(pasta, new File([a], nome)));
+          }
+          dados.outros_arquivos = [...r && r.outros_arquivos || [], ...nomes];
+        }
+      },
       recalcular: (salvo, db) => (cb) => (buscar(db, "contratos", cb.contrato_id) || {}).imovel_id === salvo.imovel_id,
       voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
-      descricao: () => "Seguro obrigatório"
+      descricao: (dados, r) => `Seguro obrigatório: ${[dados.seguradora, dados.apolice ? `apólice ${dados.apolice}` : ""].filter(Boolean).join(", ") || "apólice"}, vigência ${dataBr2(dados.vigencia_inicio)} a ${dataBr2(dados.vigencia_fim)}${dados.arquivo_apolice && dados.arquivo_apolice !== (r && r.arquivo_apolice) ? ` · arquivo ${dados.arquivo_apolice}` : ""}${dados.outros_arquivos && dados.outros_arquivos.length ? ` · ${dados.outros_arquivos.length - (r && r.outros_arquivos || []).length} outro(s) arquivo(s)` : ""}`
     },
     iptus: {
       titulo: (r, q) => `IPTU - ${buscar2("imoveis", r ? r.imovel_id : q.imovel).nome}`,
@@ -6602,7 +6845,7 @@ Salvar assim mesmo?`)) {
     const abertos = lista3.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== "Carência");
     if (!abertos.length) return "";
     const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
-    return `<details class="cartao baixa-lote" ${grupos.length ? "open" : ""}><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· separada por vencimento, para não misturar boletos</span></summary>
+    return `<details class="cartao baixa-lote"><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
     ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
       <div class="cabecalho"><div><b>Vencimento ${dataBr2(v)}</b> ${v < hoje2 ? etiqueta("vencido", "perigo") : ""} <span class="suave">${xs.length} em aberto · ${reais2(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
         <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
@@ -6624,7 +6867,8 @@ Salvar assim mesmo?`)) {
     const proxima = somarMeses(comp, 1);
     const reajustes = new Map(lista3.map((x) => [x.c.id, reajusteNaCompetencia(d(), x.c, proxima)]).filter(([, r]) => r && !r.corrigido));
     const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
-      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>`;
+      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>
+      ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
     return `<div class="cabecalho"><h1>Boletos de ${compBr2(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${somarMeses(comp, -1)}&ordem=${ordem}">← ${compBr2(somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -6639,11 +6883,11 @@ Salvar assim mesmo?`)) {
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
     ${opera() ? caixaBaixaLote(lista3, hoje2) : ""}
     ${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
-      <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <span class="suave">Ordenar por:</span> ${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : "vencimento") === k ? "botao pequeno" : "botao secundario pequeno")).join(" ")}</div>` : ""}
+      <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${comp}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${(ORDENS_BOLETO[ordem] ? ordem : "vencimento") === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista3.map(({ cb, c, i, t, fs }) => `<tr class="${geraNf(c) ? "" : "linha-controle"}">
-        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (imprimir o demonstrativo ou excluir)"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc2(i.nome)}</b></a><br>${esc2(c.inquilino_nome)}${geraNf(c) ? "" : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, "info")}` : ""}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais2(cb.reserva_utilizada)}`, "aviso")}` : ""}
@@ -6833,6 +7077,35 @@ Salvar assim mesmo?`)) {
       ${pend.map((a) => `<tr><td>${dataBr2(a.data_pagamento)}</td><td>${esc2(a.tomador_nome)}</td><td>${esc2(a.descricao || "")}</td><td class="n">${reais2(a.valor)}</td>
         <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "avulsas", id: a.id }, "perigo pequeno", "Excluir esta NF avulsa?")}` : ""}</td></tr>`).join("")}</table>` : ""}</div>`;
   }
+  var SITUACOES_SOLICITACAO = [
+    { nome: "Aberta", simbolo: "🟢", texto: "abertas" },
+    { nome: "Em andamento", simbolo: "➡️", texto: "em andamento" },
+    { nome: "Concluída", simbolo: "✅", texto: "concluídas" },
+    { nome: "Não atendida", simbolo: "❌", texto: "não atendidas" }
+  ];
+  function telaSolicitacoes(q) {
+    const resumo = resumoSolicitacoes(d());
+    const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
+    const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
+    const lista3 = d().solicitacoes.filter((x) => !filtro || (x.situacao || "Aberta") === filtro.nome).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
+    <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link("#/novo/solicitacoes?de=solicitacoes", "Abrir nova solicitação", "botao") : ""}</div>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/solicitacoes", `Todas (${d().solicitacoes.length})`, `botao ${filtro ? "secundario " : ""}pequeno`)}
+      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
+    <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
+    ${lista3.map((x) => {
+      const c = buscar2("contratos", x.contrato_id);
+      const i = c && c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
+      return `<tr><td class="nw">${dataBr2(x.data)}</td>
+      <td>${c ? `<a href="#/contrato/${c.id}?ir=solicitacoes"><b>${esc2(c.inquilino_nome)}</b></a>` : "-"}${i ? `<br><span class="suave">${esc2(i.nome)}</span>` : ""}</td>
+      <td class="pre">${esc2(x.descricao)}</td>
+      <td class="pre">${esc2(x.providencia || "")}${x.responsavel ? `<br><span class="suave">${esc2(x.responsavel)}</span>` : ""}</td>
+      <td class="nw">${simbolo(x.situacao || "Aberta")} ${esc2(x.situacao || "Aberta")}${x.data_conclusao ? `<br><span class="suave">em ${dataBr2(x.data_conclusao)}</span>` : ""}</td>
+      <td class="n">${x.valor ? `${reais2(x.valor)}${x.pago_por ? `<br><span class="suave">${esc2(x.pago_por)}</span>` : ""}` : "-"}</td>
+      <td class="n nw">${opera() ? link(`#/editar/solicitacoes/${x.id}?de=solicitacoes`, "Editar") : ""}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="suave">Nenhuma solicitação${filtro ? " nesta situação" : ""}.</td></tr>`}</table>
+</div>`;
+  }
   function telaInquilinos(q) {
     const hoje2 = hojeIso();
     const busca = String(q.busca || "").trim().toLocaleLowerCase("pt-BR");
@@ -6846,12 +7119,15 @@ Salvar assim mesmo?`)) {
     const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? "checked" : ""} ${opera() ? "" : "disabled"}>`;
     const imovel = (x) => x.i ? `<a href="#/imovel/${x.i.id}">${esc2(x.i.nome)}</a>` : etiqueta("Sem imóvel", "aviso");
     const situacao2 = (c) => c.data_saida && c.data_saida < hoje2 ? etiqueta("Saiu", "neutra") : c.ativo === false ? etiqueta("Inativo", "neutra") : "";
+    const registrar2 = (c) => opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc2(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : "";
+    const resumo = resumoSolicitacoes(d());
     return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link("#/novo/contratos", "Novo inquilino", "botao") : ""}</div>
-    <form class="acoes" data-form="buscaInquilinos" style="margin-bottom:12px"><input name="busca" value="${esc2(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="max-width:340px"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td><td class="nw">${dataBr2(x.c.data_entrada)}</td>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap"><input name="busca" value="${esc2(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
+      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ""}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr2(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.vigencia_inicio ? `${dataBr2(x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr2(x.c.vigencia_inicio)} a ${dataBr2(x.c.vigencia_fim)}`}</td><td class="n nw">${reais2(aluguelAtual(d(), x.c))}</td>
-        <td class="nw">${esc2(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais2(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
+        <td class="nw">${esc2(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais2(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
       ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao2(x.c)}</td><td class="nw">${dataBr2(x.c.data_entrada)}</td><td class="nw">${dataBr2(x.c.data_saida)}</td>
@@ -6943,8 +7219,15 @@ Salvar assim mesmo?`)) {
     const atual = competenciaDe(hojeIso());
     const de = q.de || somarMeses(atual, -2);
     const ate = q.ate || somarMeses(atual, 3);
-    const lista3 = reajustesEntre(d(), de, ate);
-    const indices = [...d().indices_acumulados].sort((a, b) => b.mes_ref.localeCompare(a.mes_ref) || a.indice.localeCompare(b.indice)).slice(0, 36);
+    const todos = q.todos === "1";
+    const lista3 = todos ? reajustesEntre(d(), de, ate) : reajustesNaoCorrigidos(d(), de, ate);
+    const periodo = (x, y) => `#/reajustes?de=${x}&ate=${y}${todos ? "&todos=1" : ""}`;
+    const colunas = [...new Set(d().indices_acumulados.map((x) => x.indice))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const meses = [...new Set(d().indices_acumulados.map((x) => x.mes_ref))].sort().reverse().slice(0, 12);
+    const celula = (mes, nome) => {
+      const x = d().indices_acumulados.find((y) => y.mes_ref === mes && y.indice === nome);
+      return x ? `${pct2(x.percentual)}${opera() ? ` ${botao("excluir", "×", { tabela: "indices_acumulados", id: x.id }, "link-botao excluir-mini", `Excluir ${x.indice} de ${compBr2(mes)}?`)}` : ""}` : '<span class="suave">-</span>';
+    };
     const nomesIndices = [...new Set(lista(d(), "indices").flatMap((n) => n.replace(/\(.*\)/, "").split("/").map((x) => x.trim())).filter(Boolean))];
     return `<h1>Reajustes do aluguel</h1>
     <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou. A carta vai junto com o boleto do mês anterior ao corrigido.</p>
@@ -6952,21 +7235,23 @@ Salvar assim mesmo?`)) {
       <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
       ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc2(n)}</option>`).join("")}</select>
         <input type="month" name="mes_ref" value="${atual}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>` : ""}
-      <table style="margin-top:8px"><tr><th>Índice</th><th>Acumulado até</th><th class="n">12 meses</th><th></th></tr>
-      ${indices.map((x) => `<tr><td>${esc2(x.indice)}</td><td>${compBr2(x.mes_ref)}</td><td class="n">${pct2(x.percentual)}</td><td class="n">${opera() ? botao("excluir", "Excluir", { tabela: "indices_acumulados", id: x.id }, "perigo pequeno", "Excluir este índice?") : ""}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><div class="cabecalho"><h2>Reajustes de ${compBr2(de)} a ${compBr2(ate)}</h2>
-      <div class="acoes">${link(`#/reajustes?de=${somarMeses(de, -3)}&ate=${somarMeses(ate, -3)}`, "← anteriores")} ${link(`#/reajustes?de=${somarMeses(de, 3)}&ate=${somarMeses(ate, 3)}`, "seguintes →")}</div></div>
+      ${meses.length ? `<table class="indices-compacta"><tr><th>Acumulado até</th>${colunas.map((n) => `<th class="n">${esc2(n)}</th>`).join("")}</tr>
+      ${meses.map((m) => `<tr><td>${compBr2(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join("")}</tr>`).join("")}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
+    <div class="cartao rolagem"><div class="cabecalho"><h2>${todos ? "Reajustes" : "Reajustes ainda não corrigidos"} de ${compBr2(de)} a ${compBr2(ate)}</h2>
+      <div class="acoes">${link(periodo(somarMeses(de, -3), somarMeses(ate, -3)), "← anteriores")} ${link(periodo(somarMeses(de, 3), somarMeses(ate, 3)), "seguintes →")}
+        ${link(`#/reajustes?de=${de}&ate=${ate}${todos ? "" : "&todos=1"}`, todos ? "Mostrar só os não corrigidos" : "Mostrar também os já corrigidos", "botao secundario pequeno")}</div></div>
+      ${todos ? "" : '<p class="suave">Aparecem só os contratos que ainda não tiveram o aluguel corrigido (os atrasados aparecem mesmo antes do período).</p>'}
       <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual (bonificado)</th><th class="n">Novo (bonificado)</th><th>Carta e correção</th></tr>
       ${lista3.map((r) => {
       const k = r.calculo;
       const i = buscar2("imoveis", r.contrato.imovel_id);
-      return `<tr><td><b>${compBr2(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr2(somarMeses(r.competencia, -1))}</span></td>
+      return `<tr class="${String(r.contrato.id) === q.contrato ? "amarelo" : ""}"><td><b>${compBr2(r.competencia)}</b><br><span class="suave">carta com o boleto de ${compBr2(somarMeses(r.competencia, -1))}</span></td>
         <td><a href="#/contrato/${r.contrato.id}"><b>${esc2(i ? i.nome : "")}</b></a><br>${esc2(r.contrato.inquilino_nome)} · ${r.anos} ano(s)</td>
         <td>${esc2(k.indiceContrato || "não informado")}${k.escolhido ? `<br><span class="suave">usa ${esc2(k.escolhido.indice)} ${pct2(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(" e ")}`, "perigo")}` : ""}</td>
         <td class="n">${reais2(k.atual)}${k.bonificacao ? ` <span class="suave">(${reais2(k.atualBonificado)})</span>` : ""}</td>
         <td class="n">${k.novo !== null ? `<b>${reais2(k.novo)}</b>${k.bonificacao ? ` <span class="suave">(${reais2(k.novoBonificado)})</span>` : ""}` : "-"}</td>
         <td class="nw">${botoesReajuste(r.contrato, r)}</td></tr>`;
-    }).join("") || '<tr><td colspan="6" class="suave">Nenhum reajuste no período.</td></tr>'}</table>
+    }).join("") || `<tr><td colspan="6" class="suave">${todos ? "Nenhum reajuste no período." : "Nenhum reajuste a corrigir no período."}</td></tr>`}</table>
       <p class="suave">Valores: aluguel cheio e, entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>`;
   }
   function cartaReajuste(c, comp) {
@@ -7068,6 +7353,46 @@ Salvar assim mesmo?`)) {
       ${lista3.map((x) => `<tr><td>${compBr2(x.competencia)}</td><td>${esc2(x.tipo)}</td><td class="n">${reais2(x.valor)}</td><td>${dataBr2(x.data_pagamento)}</td><td>${esc2(x.observacoes || "")}</td>
         <td class="n">${opera() ? botao("excluir", "Excluir", { tabela: "despesas", id: x.id }, "perigo pequeno", `Excluir ${x.tipo} de ${compBr2(x.competencia)} (${reais2(x.valor)})?`) : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div></div>`;
   }
+  var abasResultados = (atual) => `<div class="abas">${[["resultados", "#/resultados", "Resultados por imóvel"], ["impostos", "#/impostos", "Impostos"]].map(([k, h, t]) => `<a href="${h}" class="${k === atual ? "ativo" : ""}">${t}</a>`).join("")}</div>`;
+  function telaImpostos(comp) {
+    const lista3 = impostosDoMes(d(), comp);
+    const tri = trimestreDe(comp);
+    const nTri = Number(tri.slice(-1));
+    const meses = mesesDoTrimestre(comp);
+    const nomeMes = (m) => compBr2(m);
+    const guiaLinha = (e, g) => {
+      const dif = g.contador ? g.contador.valor - g.aPagar : null;
+      return `<tr><td><b>${esc2(g.imposto)}</b><br><span class="suave">${g.mensal ? `guia mensal de ${compBr2(comp)}` : `guia do ${nTri}º trimestre (${nomeMes(meses[0])} a ${nomeMes(meses[2])})`}</span></td>
+      <td class="n">${reais2(g.base)}${g.mensal ? "" : `<br><span class="suave">${meses.filter((m) => m <= comp).length} de 3 meses</span>`}</td>
+      <td class="n">${pct2(g.aliquota)}</td>
+      <td class="n"><b>${reais2(g.esperado)}</b>${g.mensal ? "" : `<br>${etiqueta(meses[2] === comp ? "guia completa" : "parcial: acumula até " + compBr2(meses[2]), meses[2] === comp ? "ok" : "info")}`}
+        ${g.adicional ? `<br><span class="suave">inclui adicional de ${reais2(g.adicional)} (10% do lucro presumido acima de R$ 60.000,00)</span>` : ""}
+        ${g.lc224 ? `<br><span class="suave">LC 224: presunção de 35,2% sobre ${reais2(Math.abs(g.lc224))} ${g.lc224 > 0 ? "acima do limite" : "(acerto do ano: devolve)"}</span>` : ""}
+        <br><span class="suave">vence até ${dataBr2(g.vencimento)}</span>
+        ${g.transportado ? `<br><span class="suave">+ ${reais2(g.transportado)} de guia(s) anterior(es) abaixo de R$ 10,00</span><br>a pagar: <b>${reais2(g.aPagar)}</b>` : ""}
+        ${g.abaixoDoMinimo ? `<br>${etiqueta("abaixo de R$ 10,00: não se paga; passa para a próxima guia", "aviso")}` : ""}
+        ${!g.mensal && meses[2] === comp && g.esperado >= 2e5 ? '<br><span class="suave">pode pagar em até 3 cotas (mín. R$ 1.000,00 cada; 2ª e 3ª com juros)</span>' : ""}</td>
+      <td class="nw">${opera() ? `<form data-form="guiaImposto" class="acoes" data-emitente="${e.id}" data-imposto="${esc2(g.imposto)}" data-periodo="${g.periodo}">
+        <input name="valor" inputmode="decimal" data-dinheiro placeholder="valor do contador" value="${g.contador ? reais2(g.contador.valor, false) : ""}" style="width:150px"><button class="secundario pequeno">Salvar</button></form>` : g.contador ? reais2(g.contador.valor) : "-"}</td>
+      <td class="n">${dif === null ? '<span class="suave">-</span>' : dif === 0 ? etiqueta("igual", "ok") : `<span class="${Math.abs(dif) > 100 ? "texto-aviso" : "suave"}">${dif > 0 ? "+" : "-"} ${reais2(Math.abs(dif))}</span>`}</td></tr>`;
+    };
+    return `<h1>Resultados financeiros</h1>${abasResultados("impostos")}
+    <div class="cabecalho"><h2>Impostos de ${compBr2(comp)}</h2>
+      <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${somarMeses(comp, -1)}">← ${compBr2(somarMeses(comp, -1))}</a>
+      <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
+      <a class="botao secundario" href="#/impostos?mes=${somarMeses(comp, 1)}">${compBr2(somarMeses(comp, 1))} →</a></div></div>
+    <p class="suave">Guia esperada, calculada pelo faturamento das NFs emitidas (data de emissão; NFs canceladas não entram). Atualiza sozinha a cada NF emitida.
+      PIS/COFINS (${pct2(3.65)}): guia mensal, vence no dia 25 do mês seguinte. IRPJ (${pct2(4.8)}) e CSLL (${pct2(2.88)}): 15% e 9% sobre o lucro presumido (32% do faturamento), guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre; vence no último dia útil do mês seguinte ao trimestre.
+      IRPJ tem adicional de 10% sobre o lucro presumido acima de R$ 60.000,00 no trimestre (faturamento acima de R$ 187.500,00). Desde 2026 (LC 224/2025), a presunção é de 35,2% na parte do faturamento do ano acima de R$ 5 milhões, controlada por trimestre (R$ 1.250.000,00; IRPJ desde janeiro e CSLL desde abril de 2026). Vencimentos em fim de semana ou feriado nacional vêm para o dia útil anterior. Guia abaixo de R$ 10,00 não se paga: o valor passa para a guia seguinte do mesmo imposto até somar R$ 10,00 (Lei 9.430/96, art. 68).
+      O contador faz o cálculo oficial: informe o valor da guia dele ao lado para comparar.</p>
+    ${lista3.map((x) => `<div class="cartao rolagem"><div class="cabecalho"><h2>${esc2(x.empresa.nome)}</h2>
+        <span>Faturamento de NF em ${compBr2(comp)}: <b>${reais2(x.faturamento.valor)}</b> <span class="suave">(${x.faturamento.notas} NF(s))</span></span></div>
+      <p class="suave">${nTri}º trimestre até agora: ${x.porMes.map((m) => `${compBr2(m.mes)} ${reais2(m.valor)}`).join(" + ")} = <b>${reais2(x.trimestre)}</b></p>
+      <table><tr><th>Imposto</th><th class="n">Base (faturamento)</th><th class="n">Alíquota</th><th class="n">Guia esperada</th><th>Valor do contador</th><th class="n">Diferença</th></tr>
+        ${x.guias.map((g) => guiaLinha(x.empresa, g)).join("")}
+        <tr class="total"><td colspan="3">Total a pagar no mês${meses[2] === comp ? "" : " (IRPJ e CSLL ainda parciais)"}</td><td class="n">${reais2(x.guias.reduce((t, g) => t + (g.abaixoDoMinimo ? 0 : g.aPagar), 0))}</td>
+          <td>${x.guias.some((g) => g.contador) ? reais2(x.guias.reduce((t, g) => t + (g.contador ? g.contador.valor : 0), 0)) : ""}</td><td></td></tr></table></div>`).join("") || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
+  }
   function telaResultados(q) {
     const hoje2 = hojeIso();
     const ate = q.ate || hoje2;
@@ -7083,7 +7408,7 @@ Salvar assim mesmo?`)) {
     const tot = (k) => lista3.filter((x) => !x.controle).reduce((s, x) => s + x[k], 0);
     const pctTxt = (v) => v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`;
     const maior = Math.max(0, ...lista3.map((x) => x.retornoAnual || 0));
-    return `<h1>Resultados financeiros</h1>
+    return `<h1>Resultados financeiros</h1>${abasResultados("resultados")}
     <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos} ${botao("excelResultados", "Exportar Excel", { de, ate }, "pequeno")}</form>
     <div class="cartao rolagem"><table><tr><th>#</th><th>Imóvel</th><th class="n">Valor do imóvel + reformas</th><th class="n">Aluguel recebido</th><th class="n">NFs avulsas</th><th class="n">IPTU pago pelo proprietário</th><th class="n">Contas pagas por nós</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th><th>Reformas no período</th></tr>
@@ -7901,6 +8226,17 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       aviso("Índice salvo.");
       await mostrar();
     },
+    irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get("mes")}`),
+    /** Valor da guia calculado pelo contador (vazio apaga). */
+    async guiaImposto(form) {
+      const texto2 = String(new FormData(form).get("valor") || "").trim();
+      const valor = texto2 ? centavos(texto2) : null;
+      if (valor !== null && !(valor >= 0)) throw new Error("Valor inválido.");
+      const { emitente, imposto, periodo } = form.dataset;
+      await alterar((db) => salvarGuiaImposto(db, Number(emitente), imposto, periodo, valor, login()));
+      aviso(valor === null ? "Valor do contador apagado." : "Valor do contador salvo.");
+      await mostrar();
+    },
     filtroResultados(form) {
       const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
       ir(`#/resultados?${q}`);
@@ -8402,6 +8738,28 @@ ${MODELO_COMODOS[comodo].join("\n")}
       if (!ids.length) throw new Error('Marque pelo menos um imóvel na lista (ou "selecionar todos").');
       ir(`#/imprimir/demonstrativos?comp=${comp}&ids=${ids.join(",")}`);
     },
+    /** Exclui os boletos marcados na lista. Pagos não saem: desfaça o pagamento antes (com NF, cancele a NF antes). */
+    async excluirBoletosSelecionados({ comp }) {
+      const ids = [...document.querySelectorAll("input[data-boleto]:checked")].map((x) => Number(x.dataset.boleto));
+      if (!ids.length) throw new Error('Marque pelo menos um boleto na lista (ou "selecionar todos").');
+      const nome = (cb) => {
+        const c = buscar2("contratos", cb.contrato_id);
+        return c ? c.inquilino_nome : `boleto ${cb.id}`;
+      };
+      const pagos = ids.map((id) => buscar2("cobrancas", id)).filter((cb) => cb && cb.data_pagamento);
+      if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(", ")}. Desmarque ou desfaça o pagamento antes.`);
+      if (!confirm(`Excluir ${ids.length} boleto(s) de ${compBr2(comp)}? Eles podem ser gerados de novo depois.`)) return;
+      await alterar((db) => {
+        for (const id of ids) {
+          const cb = buscar(db, "cobrancas", id);
+          const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
+          if (problema) throw new Error(`${nome(cb)}: ${problema}`);
+          excluir(db, "cobrancas", id, login(), `Boleto de ${compBr2(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
+        }
+      });
+      aviso(`${ids.length} boleto(s) excluído(s).`);
+      await mostrar();
+    },
     imprimirSelecionadas() {
       const ns = numerosSelecionados();
       ir(`#/imprimir/faturas?numeros=${ns.join(",")}`);
@@ -8880,11 +9238,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   var MENU = [
     ["#/", "Painel", "^$|^fechamento|^pendencias"],
     ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
-    ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria"],
+    ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes"],
     ["#/reajustes", "Reajustes", "reajustes"],
     ["#/cobrancas", "Boletos", "cobranca|inadimplencia"],
     ["#/faturas", "NF", "fatura"],
-    ["#/resultados", "Resultados", "^resultados|^contas"],
+    ["#/resultados", "Resultados", "^resultados|^contas|^impostos"],
     ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^backup|^empresas"]
   ];
   function layout(conteudo, rota) {
@@ -8968,6 +9326,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   });
   document.addEventListener("change", async (ev) => {
+    if (ev.target.matches("select[data-ordem-boletos]")) {
+      ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+      return;
+    }
     if (ev.target.matches("input[data-marcar-grupo]")) {
       ev.target.closest("form").querySelectorAll("input[name=ids]").forEach((x) => {
         x.checked = ev.target.checked;
