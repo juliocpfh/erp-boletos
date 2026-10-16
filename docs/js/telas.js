@@ -2043,10 +2043,10 @@ function cartaReajuste(c, comp) {
     <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>.${caucao ? '' : ' As demais condições do contrato permanecem as mesmas.'}</p>
     ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${caucao.meses} aluguéis</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
     <table class="carta-tabela"><tr><td>Caução já depositada</td><td class="n">${reais(caucao.atual)}</td></tr>
-      <tr><td>Caução necessária (${caucao.meses} × ${reais(caucao.aluguel)})</td><td class="n">${reais(caucao.nova)}</td></tr>
+      <tr><td>Caução necessária (${caucao.meses} × aluguel atualizado)</td><td class="n">${reais(caucao.nova)}</td></tr>
       <tr><td><b>Depósito adicional</b></td><td class="n"><b>${reais(caucao.nova - caucao.atual)}</b></td></tr></table>
     <p>O depósito adicional será cobrado em <b>boleto separado</b>, com vencimento em <b>${dataBr(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>` : ''}
-    <p>Ficamos à disposição para qualquer dúvida.</p>
+    <p>Seguimos a sua disposição para sanar qualquer dúvida.</p>
     <p>Atenciosamente,<br><b>${esc(empresa.nome)}</b></p></div>`;
 }
 
