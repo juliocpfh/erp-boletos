@@ -422,6 +422,10 @@ document.addEventListener('click', async (ev) => {
 });
 
 document.addEventListener('change', async (ev) => {
+  if (ev.target.matches('select[data-ordem-boletos]')) {
+    ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+    return;
+  }
   if (ev.target.matches('input[data-marcar-grupo]')) {
     ev.target.closest('form').querySelectorAll('input[name=ids]').forEach((x) => { x.checked = ev.target.checked; });
     return;

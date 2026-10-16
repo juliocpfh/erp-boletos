@@ -1679,7 +1679,7 @@ function caixaBaixaLote(lista, hoje) {
   const abertos = lista.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência');
   if (!abertos.length) return '';
   const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
-  return `<details class="cartao baixa-lote" ${grupos.length ? 'open' : ''}><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· separada por vencimento, para não misturar boletos</span></summary>
+  return `<details class="cartao baixa-lote"><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
     ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
       <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${v < hoje ? etiqueta('vencido', 'perigo') : ''} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
         <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
@@ -1705,7 +1705,8 @@ function telaCobrancas(comp, ordem = 'vencimento') {
   const reajustes = new Map(lista.map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, proxima)]).filter(([, r]) => r && !r.corrigido));
   // botões de impressão em cima e embaixo da lista
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
-      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>`;
+      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>
+      ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, -1)}&ordem=${ordem}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -1720,12 +1721,12 @@ function telaCobrancas(comp, ordem = 'vencimento') {
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
-      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <span class="suave">Ordenar por:</span> ${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
-    .map(([k, t]) => link(`#/cobrancas?comp=${comp}&ordem=${k}`, t, (ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'botao pequeno' : 'botao secundario pequeno')).join(' ')}</div>` : ''}
+      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${comp}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
+    .map(([k, t]) => `<option value="${k}" ${(ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
-        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar para imprimir o demonstrativo"></td>
+        <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (imprimir o demonstrativo ou excluir)"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
@@ -2088,7 +2089,13 @@ function telaReajustes(q) {
   const todos = q.todos === '1';
   const lista = todos ? R.reajustesEntre(d(), de, ate) : R.reajustesNaoCorrigidos(d(), de, ate);
   const periodo = (x, y) => `#/reajustes?de=${x}&ate=${y}${todos ? '&todos=1' : ''}`;
-  const indices = [...d().indices_acumulados].sort((a, b) => b.mes_ref.localeCompare(a.mes_ref) || a.indice.localeCompare(b.indice)).slice(0, 36);
+  // índices em grade compacta: uma linha por mês (12 mais recentes), uma coluna por índice
+  const colunas = [...new Set(d().indices_acumulados.map((x) => x.indice))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const meses = [...new Set(d().indices_acumulados.map((x) => x.mes_ref))].sort().reverse().slice(0, 12);
+  const celula = (mes, nome) => {
+    const x = d().indices_acumulados.find((y) => y.mes_ref === mes && y.indice === nome);
+    return x ? `${pct(x.percentual)}${opera() ? ` ${botao('excluir', '×', { tabela: 'indices_acumulados', id: x.id }, 'link-botao excluir-mini', `Excluir ${x.indice} de ${compBr(mes)}?`)}` : ''}` : '<span class="suave">-</span>';
+  };
   const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
   return `<h1>Reajustes do aluguel</h1>
     <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou. A carta vai junto com o boleto do mês anterior ao corrigido.</p>
@@ -2096,8 +2103,8 @@ function telaReajustes(q) {
       <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
       ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join('')}</select>
         <input type="month" name="mes_ref" value="${atual}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>` : ''}
-      <table style="margin-top:8px"><tr><th>Índice</th><th>Acumulado até</th><th class="n">12 meses</th><th></th></tr>
-      ${indices.map((x) => `<tr><td>${esc(x.indice)}</td><td>${compBr(x.mes_ref)}</td><td class="n">${pct(x.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'indices_acumulados', id: x.id }, 'perigo pequeno', 'Excluir este índice?') : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="suave">Nenhum índice informado.</td></tr>'}</table></div>
+      ${meses.length ? `<table class="indices-compacta"><tr><th>Acumulado até</th>${colunas.map((n) => `<th class="n">${esc(n)}</th>`).join('')}</tr>
+      ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
     <div class="cartao rolagem"><div class="cabecalho"><h2>${todos ? 'Reajustes' : 'Reajustes ainda não corrigidos'} de ${compBr(de)} a ${compBr(ate)}</h2>
       <div class="acoes">${link(periodo(C.somarMeses(de, -3), C.somarMeses(ate, -3)), '← anteriores')} ${link(periodo(C.somarMeses(de, 3), C.somarMeses(ate, 3)), 'seguintes →')}
         ${link(`#/reajustes?de=${de}&ate=${ate}${todos ? '' : '&todos=1'}`, todos ? 'Mostrar só os não corrigidos' : 'Mostrar também os já corrigidos', 'botao secundario pequeno')}</div></div>
@@ -3647,6 +3654,26 @@ export const ACOES = {
     const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((x) => x.dataset.boleto);
     if (!ids.length) throw new Error('Marque pelo menos um imóvel na lista (ou "selecionar todos").');
     ir(`#/imprimir/demonstrativos?comp=${comp}&ids=${ids.join(',')}`);
+  },
+
+  /** Exclui os boletos marcados na lista. Pagos não saem: desfaça o pagamento antes (com NF, cancele a NF antes). */
+  async excluirBoletosSelecionados({ comp }) {
+    const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((x) => Number(x.dataset.boleto));
+    if (!ids.length) throw new Error('Marque pelo menos um boleto na lista (ou "selecionar todos").');
+    const nome = (cb) => { const c = buscar('contratos', cb.contrato_id); return c ? c.inquilino_nome : `boleto ${cb.id}`; };
+    const pagos = ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && cb.data_pagamento);
+    if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);
+    if (!confirm(`Excluir ${ids.length} boleto(s) de ${compBr(comp)}? Eles podem ser gerados de novo depois.`)) return;
+    await alterar((db) => {
+      for (const id of ids) {
+        const cb = R.buscar(db, 'cobrancas', id);
+        const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
+        if (problema) throw new Error(`${nome(cb)}: ${problema}`);
+        R.excluir(db, 'cobrancas', id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
+      }
+    });
+    aviso(`${ids.length} boleto(s) excluído(s).`);
+    await mostrar();
   },
 
   imprimirSelecionadas() {
