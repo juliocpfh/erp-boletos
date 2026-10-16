@@ -912,3 +912,20 @@ test('impostos: LC 224 na CSLL de 2026 conta só de abril em diante (acerto do 4
   assert.equal(irpj.lc224, 25000000); // ano R$ 6 milhões: R$ 1 milhão acima, R$ 250.000 em cada trimestre
   assert.equal(csll.lc224, 25000000); // abril a dezembro: R$ 4,5 milhões no limite de R$ 3,75 milhões = R$ 750.000, R$ 250.000 por trimestre
 });
+
+test('impostos: guia abaixo de R$ 10,00 não se paga e passa para a seguinte do mesmo imposto até somar R$ 10,00', () => {
+  const d = R.bancoVazio();
+  const e = R.inserir(d, 'emitentes', { nome: 'EMPRESA TESTE', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  const nf = (numero, emissao, valor) => R.inserir(d, 'faturas', { numero, emissao, emitente_id: e.id, valor, situacao: 'Emitida' }, 'j');
+  nf(1, '2026-01-10', 20000); // R$ 200,00 → PIS/COFINS R$ 7,30
+  nf(2, '2026-02-10', 10000); // R$ 100,00 → R$ 3,65 + R$ 7,30 = R$ 10,95
+  nf(3, '2026-03-10', 10000); // R$ 3,65, sem nada de antes
+  const pis = (comp) => R.impostosDoMes(d, comp)[0].guias[0];
+  assert.deepEqual([pis('2026-01').aPagar, pis('2026-01').abaixoDoMinimo], [730, true]);
+  assert.deepEqual([pis('2026-02').transportado, pis('2026-02').aPagar, pis('2026-02').abaixoDoMinimo], [730, 1095, false]);
+  assert.deepEqual([pis('2026-03').transportado, pis('2026-03').aPagar, pis('2026-03').abaixoDoMinimo], [0, 365, true]);
+  assert.equal(pis('2026-04').transportado, 365); // abril sem NF: o saldo de março continua esperando
+  // CSLL do 1º trimestre: R$ 400 × 2,88% = R$ 11,52 (paga); IRPJ R$ 19,20 (paga)
+  const csll = R.impostosDoMes(d, '2026-03')[0].guias[2];
+  assert.deepEqual([csll.esperado, csll.abaixoDoMinimo], [1152, false]);
+});

@@ -1978,33 +1978,67 @@ function excedenteLc224(d, emitenteId, comp, inicio) {
   return t === 4 ? Math.max(0, total - contados * LIMITE_LC224_TRIMESTRE) - considerado : atual;
 }
 
+/** Valor mínimo de um DARF: abaixo dele não se paga e o valor passa para o período seguinte do mesmo imposto (Lei 9.430/96, art. 68). */
+export const MINIMO_GUIA = 1000;
+
+/**
+ * Valor que vem de períodos anteriores do mesmo imposto: guias abaixo de R$ 10,00 não pagas, somadas até o total
+ * chegar a R$ 10,00. Mensal: meses anteriores; trimestral: trimestres anteriores (guias completas).
+ */
+function transportado(d, e, x, comp) {
+  const primeira = d.faturas.filter((f) => f.emitente_id === e.id && f.situacao !== 'Cancelada' && f.emissao).map((f) => f.emissao.slice(0, 7)).sort()[0];
+  if (!primeira) return 0;
+  const passo = x.mensal ? 1 : 3;
+  const atual = x.mensal ? comp : mesesDoTrimestre(comp)[2];
+  let saldo = 0;
+  for (let m = x.mensal ? primeira : mesesDoTrimestre(primeira)[2]; m < atual; m = C.somarMeses(m, passo)) {
+    const total = saldo + guiasDoPeriodo(d, e, m).find((g) => g.imposto === x.imposto).esperado;
+    saldo = total > 0 && total < MINIMO_GUIA ? total : 0;
+  }
+  return saldo;
+}
+
 /**
  * Guias esperadas no mês para cada empresa: PIS/COFINS do mês e IRPJ/CSLL do trimestre, acumulando mês a mês
  * até o último mês do trimestre (aí é a guia completa). Valor do contador ao lado, quando informado.
+ * "aPagar" soma o que veio de guias abaixo de R$ 10,00; se ainda ficar abaixo, "abaixoDoMinimo" (passa adiante).
  */
 export function impostosDoMes(d, comp) {
+  return d.emitentes.filter((e) => e.ativo || d.faturas.some((f) => f.emitente_id === e.id)).map((e) => {
+    const r = guiasDaEmpresa(d, e, comp);
+    r.guias = r.guias.map((g) => {
+      const anterior = transportado(d, e, g, comp);
+      const aPagar = g.esperado + anterior;
+      return { ...g, transportado: anterior, aPagar, abaixoDoMinimo: aPagar > 0 && aPagar < MINIMO_GUIA };
+    });
+    return r;
+  });
+}
+
+const guiasDoPeriodo = (d, e, comp) => guiasDaEmpresa(d, e, comp).guias;
+
+/** Cálculo das guias de uma empresa no mês, sem o que vem de períodos anteriores. */
+function guiasDaEmpresa(d, e, comp) {
   const meses = mesesDoTrimestre(comp).filter((m) => m <= comp);
   const tri = trimestreDe(comp);
-  return d.emitentes.filter((e) => e.ativo || d.faturas.some((f) => f.emitente_id === e.id)).map((e) => {
-    const mes = faturamentoNf(d, e.id, comp);
-    const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m) }));
-    const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
-    // lucro presumido do trimestre: 32% do faturamento + 3,2% (10% de 32%) da parte acima do limite da LC 224
-    const presumido = (imposto) => {
-      const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d, e.id, comp, INICIO_LC224[imposto]) : 0;
-      return { base: Math.round((trimestre * PRESUNCAO) / 100) + Math.round((extra * PRESUNCAO) / 1000), lc224: extra };
-    };
-    return { empresa: e, faturamento: mes, trimestre, porMes, fechado: meses.length === 3,
-      guias: IMPOSTOS.map((x) => {
-        const periodo = x.mensal ? comp : tri;
-        const g = { ...x, periodo, vencimento: vencimentoGuia(x.mensal, periodo), contador: guiaDo(d, e.id, x.imposto, periodo), adicional: 0, lc224: 0 };
-        if (x.mensal) return { ...g, base: mes.valor, esperado: Math.round((mes.valor * x.aliquota) / 100) };
-        const p = presumido(x.imposto);
-        const adicional = x.imposto === 'IRPJ' ? Math.max(0, Math.round((p.base - LIMITE_ADICIONAL_IRPJ) / 10)) : 0;
-        const normal = Math.round((p.base * (x.imposto === 'IRPJ' ? 15 : 9)) / 100);
-        return { ...g, base: trimestre, presumido: p.base, lc224: p.lc224, adicional, esperado: normal + adicional };
-      }) };
-  });
+  const mes = faturamentoNf(d, e.id, comp);
+  const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m) }));
+  const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
+  // lucro presumido do trimestre: 32% do faturamento + 3,2% (10% de 32%) da parte acima do limite da LC 224
+  const presumido = (imposto) => {
+    const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d, e.id, comp, INICIO_LC224[imposto]) : 0;
+    return { base: Math.round((trimestre * PRESUNCAO) / 100) + Math.round((extra * PRESUNCAO) / 1000), lc224: extra };
+  };
+  return { empresa: e, faturamento: mes, trimestre, porMes, fechado: meses.length === 3,
+    guias: IMPOSTOS.map((x) => {
+      const periodo = x.mensal ? comp : tri;
+      const g = { ...x, periodo, vencimento: vencimentoGuia(x.mensal, periodo), contador: guiaDo(d, e.id, x.imposto, periodo), adicional: 0, lc224: 0 };
+      if (x.mensal) return { ...g, base: mes.valor, esperado: Math.round((mes.valor * x.aliquota) / 100) };
+      const p = presumido(x.imposto);
+      const adicional = x.imposto === 'IRPJ' ? Math.max(0, Math.round((p.base - LIMITE_ADICIONAL_IRPJ) / 10)) : 0;
+      const normal = Math.round((p.base * (x.imposto === 'IRPJ' ? 15 : 9)) / 100);
+      return { ...g, base: trimestre, presumido: p.base, lc224: p.lc224, adicional, esperado: normal + adicional };
+    }) };
 }
 
 /** Grava (ou apaga, com valor vazio) o valor da guia calculado pelo contador. */

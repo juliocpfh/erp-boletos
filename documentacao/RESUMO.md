@@ -6,7 +6,7 @@
 - Gera os boletos mensais (aluguel proporcional, bonificação, IPTU, seguro, tarifa, reserva, ressarcimentos).
 - Registra pagamentos (data contábil, multa e juros) e numera as NFs em sequência contínua, dividida entre as empresas.
 - Emite documentos: contrato por modelo, vistoria, recibo de chaves e carta de reajuste (tela/PDF e Word).
-- Mostra alertas, calendário, fechamento do mês, inadimplência e resultados financeiros por imóvel.
+- Mostra alertas, calendário, fechamento do mês, inadimplência, resultados financeiros por imóvel e a guia de impostos esperada por empresa.
 - Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor.
 
 ## Módulos (`docs/js/`)
@@ -40,7 +40,7 @@
 | Tarefa | Comando / passo |
 |---|---|
 | Rodar local | `cd docs && python3 -m http.server 8000` e abrir `http://localhost:8000/?teste` (pasta interna do navegador, sem escolher pasta) |
-| Conferir (sintaxe + testes) | `node tools/checar.mjs` (72 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
+| Conferir (sintaxe + testes) | `node tools/checar.mjs` (83 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
 | Achar código | `node tools/mapa.mjs <trecho>` (função → arquivo e linha) |
 | Versão sem internet | `node tools/checar.mjs --offline` (usa `tools/gerar-offline.mjs`) → `docs/offline/administracao-imoveis.html`; `tests/offline.test.mjs` falha se ela ficar desatualizada |
 | Publicar | Merge em `main`; o GitHub Pages serve a pasta `docs/` (segundo `README.md`). Configuração do Pages: NÃO CONFIRMADO no código |
@@ -50,12 +50,12 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 ## Estado atual
 | Pronto (no código) |
 |---|
-| Imóveis, inquilinos, fiadores, garantias (caução, depósito, fiador, seguro fiança), reserva, carência, IPTU por ano com guias (inquilino paga os dias ocupados, o resto é do proprietário), seguro |
-| Boletos mensais, baixa individual e em lote (por vencimento), recálculo pelo cadastro, boleto de controle (sem NF), boleto separado do complemento da caução (sem tarifa e sem NF, gerado junto com os do mês) |
+| Imóveis, inquilinos, fiadores, garantias (caução, depósito, fiador, seguro fiança), reserva, carência, IPTU por ano com guias (inquilino paga os dias ocupados, o resto é do proprietário), seguro (só salva com o arquivo da apólice; telefone da assistência), solicitações dos inquilinos (tela própria com resumo por situação) |
+| Boletos mensais, baixa individual e em lote (por vencimento), exclusão dos selecionados (não pagos), recálculo pelo cadastro, boleto de controle (sem NF), boleto separado do complemento da caução (sem tarifa e sem NF, gerado junto com os do mês) |
 | NFs: numeração contínua, divisão entre empresas, cancelar, voltar numeração, NF externa, avulsa (Airbnb), PDF e Excel |
 | Reajuste anual (13º mês a partir do mês de entrada), índices acumulados, carta (com o depósito adicional da caução); a caução acompanha o aluguel corrigido e é corrigida ao pagar o complemento |
 | Contrato por modelo, vistoria por modelo do imóvel com fotos, recibo de chaves; documentos de entrada marcados como assinados só com o arquivo anexado ou registrados como perdidos; termos aditivos; herança dos documentos na continuação de contrato |
-| Resultados por imóvel (com contas pagas por nós e ressarcimentos de condomínio), Excel |
+| Resultados por imóvel (com contas pagas por nós e ressarcimentos de condomínio), Excel; aba Impostos (PIS/COFINS mensal, IRPJ/CSLL trimestral com adicional e LC 224, vencimentos, valor do contador) |
 | Calendário (com atalho para o fechamento do mês), fechamento do mês, cadastros incompletos, inadimplência, histórico de alterações, alertas com cor/ênfase/prioridade editáveis |
 | Usuários e papéis, backup diário, ZIP, backup seguro cifrado, versão sem internet |
 
