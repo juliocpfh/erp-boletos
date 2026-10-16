@@ -50,11 +50,11 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 ## Estado atual
 | Pronto (no código) |
 |---|
-| Imóveis, inquilinos, fiadores, garantias (caução, depósito, fiador, seguro fiança), reserva, carência, IPTU por ano com guias, seguro |
+| Imóveis, inquilinos, fiadores, garantias (caução, depósito, fiador, seguro fiança), reserva, carência, IPTU por ano com guias (inquilino paga os dias ocupados, o resto é do proprietário), seguro |
 | Boletos mensais, baixa individual e em lote (por vencimento), recálculo pelo cadastro, boleto de controle (sem NF) |
 | NFs: numeração contínua, divisão entre empresas, cancelar, voltar numeração, NF externa, avulsa (Airbnb), PDF e Excel |
 | Reajuste anual (13º mês a partir do mês de entrada), índices acumulados, carta |
-| Contrato por modelo, vistoria por modelo do imóvel com fotos, recibo de chaves; documentos de entrada marcados como assinados só com o arquivo anexado; termos aditivos; herança dos documentos na continuação de contrato |
+| Contrato por modelo, vistoria por modelo do imóvel com fotos, recibo de chaves; documentos de entrada marcados como assinados só com o arquivo anexado ou registrados como perdidos; termos aditivos; herança dos documentos na continuação de contrato |
 | Resultados por imóvel (com contas pagas por nós e ressarcimentos de condomínio), Excel |
 | Calendário (com atalho para o fechamento do mês), fechamento do mês, cadastros incompletos, inadimplência, histórico de alterações, alertas com cor/ênfase/prioridade editáveis |
 | Usuários e papéis, backup diário, ZIP, backup seguro cifrado, versão sem internet |

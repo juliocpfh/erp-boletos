@@ -45,3 +45,5 @@ Quando o motivo ou a alternativa não foi registrado, aparece NÃO CONFIRMADO. N
 | 2026-10-15 | Documento de entrada pode ser registrado como perdido: linha em vermelho, sem alerta geral (`marcarDocumentoPerdido`) | Pedido do usuário | - |
 | 2026-10-15 | Carta de reajuste cita só o índice aplicado: "corrigido pelo X acumulado nos últimos 12 meses: X 4,5761%" | Pedido do usuário | Mostrar os dois índices e a escolha do maior (versão anterior) |
 | 2026-10-15 | Erros aparecem numa janela com botão "Entendi", não no topo da página | Pedido do usuário: a tela não sobe sozinha e o erro passava despercebido | Mensagem de erro no topo (versão anterior) |
+| 2026-10-15 | Botões de gerar contrato, fazer vistoria e gerar termo das chaves somem quando o documento já está assinado (`caixaDocumentos`) | Pedido do usuário | Botões sempre visíveis (versão anterior) |
+| 2026-10-15 | Página Reajustes: colunas "Atual (bonificado)" e "Novo (bonificado)", valor bonificado entre parênteses | Pedido do usuário: "cheio e bonificado" era confuso | Valor bonificado embaixo, com legenda "cheio e com bonificação" (versão anterior) |
