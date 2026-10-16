@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="a208ce77c8068621">
+<meta name="fontes" content="11fea88aaca8d23e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -862,6 +862,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     baixarEmLote: () => baixarEmLote,
     bancoVazio: () => bancoVazio,
     baseDaFatura: () => baseDaFatura,
+    boletoDoMes: () => boletoDoMes,
     buscar: () => buscar,
     cadeiaDeContratos: () => cadeiaDeContratos,
     calcularEncerramento: () => calcularEncerramento,
@@ -876,6 +877,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     competenciaDoAbatimento: () => competenciaDoAbatimento,
     competenciaDoReajuste: () => competenciaDoReajuste,
     competenciaReserva: () => competenciaReserva,
+    complementoCaucao: () => complementoCaucao,
     condicoesDoContrato: () => condicoesDoContrato,
     condominioAConferir: () => condominioAConferir,
     contasPermitidas: () => contasPermitidas,
@@ -891,6 +893,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     despesasDo: () => despesasDo,
     documentoEntrada: () => documentoEntrada,
     documentoPerdido: () => documentoPerdido,
+    ehComplementoCaucao: () => ehComplementoCaucao,
     emCarencia: () => emCarencia,
     encerramentoDo: () => encerramentoDo,
     encerrarContrato: () => encerrarContrato,
@@ -905,6 +908,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     fiadoresAnterioresDo: () => fiadoresAnterioresDo,
     fiadoresDo: () => fiadoresDo,
     geraNf: () => geraNf,
+    gerarBoletoCaucao: () => gerarBoletoCaucao,
     gerarCobrancas: () => gerarCobrancas,
     imovelDaFatura: () => imovelDaFatura,
     imovelSoControle: () => imovelSoControle,
@@ -1597,6 +1601,69 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const aluguel = aluguelAtual(d2, c, dataRef);
     return c.caucao_meses * (aluguel - descontoPorPercentual(aluguel, percentualBonificacao(c)));
   }
+  var ehComplementoCaucao = (cb) => cb.caucao_complemento > 0;
+  var boletoDoMes = (d2, contratoId, comp) => d2.cobrancas.find((x) => x.contrato_id === contratoId && x.competencia === comp && !ehComplementoCaucao(x)) || null;
+  function complementoCaucao(d2, c) {
+    if (!temCaucao(c) || !c.caucao_valor) return null;
+    const ultimaCaucao = correcoesCaucaoAtual(d2, c).map((x) => x.data).pop() || c.caucao_data || "";
+    const correcao = correcoesDo(d2, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
+    if (!correcao) return null;
+    const atual = valorGarantia(d2, c);
+    const necessaria = caucaoSugerida(d2, c, correcao.data_vigencia);
+    const boleto = d2.cobrancas.find((x) => x.contrato_id === c.id && ehComplementoCaucao(x) && !x.data_pagamento) || null;
+    return {
+      correcao,
+      competencia: correcao.data_vigencia.slice(0, 7),
+      atual,
+      necessaria,
+      complemento: necessaria === null ? null : necessaria - atual,
+      boleto
+    };
+  }
+  function gerarBoletoCaucao(d2, contratoId, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    const x = complementoCaucao(d2, c);
+    if (!x) throw new Error("Não há correção do aluguel esperando a correção da caução.");
+    if (x.boleto) throw new Error("O boleto do complemento da caução já foi gerado.");
+    if (x.necessaria === null) throw new Error("Informe no contrato a quantos aluguéis a caução equivale.");
+    if (!(x.complemento > 0)) throw new Error("A caução depositada já cobre o valor necessário.");
+    const comp = x.competencia;
+    return inserir(d2, "cobrancas", {
+      contrato_id: c.id,
+      competencia: comp,
+      vencimento: vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false),
+      dias_cobrados: diasNoMes(comp),
+      dias_mes: diasNoMes(comp),
+      aluguel_mensal: 0,
+      aluguel: 0,
+      desconto: 0,
+      iptu: 0,
+      iptu_parcela: "",
+      seguro: 0,
+      seguro_parcela: "",
+      taxa_boleto: 0,
+      outros: x.complemento,
+      outros_descricao: "Complemento da caução",
+      reserva_utilizada: 0,
+      carencia: false,
+      ressarcimento: 0,
+      ressarcimento_descricao: "",
+      ressarcimento_na_nf: false,
+      caucao_complemento: x.complemento,
+      caucao_anterior: x.atual,
+      caucao_nova: x.necessaria,
+      caucao_vigencia: x.correcao.data_vigencia,
+      multa_percentual: c.multa_percentual || 0,
+      juros_mensal_percentual: c.juros_mensal_percentual || 0,
+      situacao: "Em aberto",
+      data_pagamento: null,
+      valor_pago: null,
+      dias_atraso: null,
+      multa: null,
+      juros: null,
+      valor_nf: null
+    }, usuario, `Boleto do complemento da caução gerado para ${c.inquilino_nome}: ${reais(x.complemento)} (caução de ${reais(x.atual)} para ${reais(x.necessaria)})`);
+  }
   function situacaoAplicacao(d2, c) {
     const total = valorGarantia(d2, c);
     const aplicado = /* @__PURE__ */ new Map();
@@ -1627,7 +1694,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   }
   function realocarReserva(d2, contrato, usuario) {
     if (!(contrato.reserva_valor > 0)) return 0;
-    const abertos = d2.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento).sort((a, b) => a.competencia.localeCompare(b.competencia));
+    const abertos = d2.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento && !ehComplementoCaucao(cb)).sort((a, b) => a.competencia.localeCompare(b.competencia));
     const livres = new Set(abertos.map((cb) => cb.id));
     let n = 0;
     for (const cb of abertos) {
@@ -1645,7 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const alvo = competenciaReserva(contrato);
     if (!alvo) return null;
     const saldo = saldoReserva(d2, contrato);
-    const doContrato = d2.cobrancas.filter((cb) => cb.contrato_id === contrato.id);
+    const doContrato = d2.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !ehComplementoCaucao(cb));
     const presa = doContrato.find((cb) => cb.reserva_utilizada > 0 && cb.data_pagamento && cb.competencia > alvo);
     const alvoAberto = doContrato.find((cb) => cb.competencia === alvo && !cb.data_pagamento);
     if (presa && alvoAberto) {
@@ -1885,7 +1952,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     let existentes = 0;
     for (const contrato of [...d2.contratos]) {
       if (contrato.ativo === false || !contrato.imovel_id) continue;
-      if (d2.cobrancas.some((cb) => cb.contrato_id === contrato.id && cb.competencia === comp)) {
+      if (boletoDoMes(d2, contrato.id, comp)) {
         existentes += 1;
         continue;
       }
@@ -1920,7 +1987,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   ];
   function recalcularCobrancas(d2, filtro, usuario) {
     let n = 0;
-    const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual;
+    const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !ehComplementoCaucao(cb);
     const escolhidos = d2.cobrancas.filter((cb) => abertos(cb) && filtro(cb));
     const comReserva = new Set(escolhidos.map((cb) => cb.contrato_id).filter((id) => (buscar(d2, "contratos", id) || {}).reserva_valor > 0));
     const lista3 = d2.cobrancas.filter((cb) => abertos(cb) && (filtro(cb) || comReserva.has(cb.contrato_id))).sort((a, b) => a.competencia.localeCompare(b.competencia));
@@ -1945,6 +2012,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (dataPagou && dataPagou > dataContabil) throw new Error("O dia em que pagou não pode ser depois da data contábil.");
     const r = liquidar(cb, pagouEmDia ? cb.vencimento : dataPagou || dataContabil);
     const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
+    const caucao = ehComplementoCaucao(cb);
     atualizar(d2, "cobrancas", cb.id, {
       data_pagamento: dataContabil,
       data_pagou: pagouEmDia ? null : dataPagou || null,
@@ -1952,13 +2020,35 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       dias_atraso: r.dias_atraso,
       multa: r.multa,
       juros: r.juros,
-      valor_nf: r.valor_nf,
+      valor_nf: caucao ? 0 : r.valor_nf,
       pagou_em_dia: compensadoDepois,
       situacao: r.pontual ? "Paga em dia" : "Paga com atraso"
     }, usuario, compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${dataBr(dataContabil)})` : "Pagamento confirmado");
+    if (caucao) {
+      const x = inserir(
+        d2,
+        "correcoes_garantia",
+        {
+          contrato_id: cb.contrato_id,
+          data: cb.caucao_vigencia && cb.caucao_vigencia > dataContabil ? cb.caucao_vigencia : dataContabil,
+          valor_anterior: cb.caucao_anterior,
+          valor_novo: cb.caucao_nova,
+          complemento: cb.caucao_complemento,
+          observacoes: `Boleto do complemento pago em ${dataBr(dataContabil)}`
+        },
+        usuario,
+        `Caução corrigida para ${reais(cb.caucao_nova)} (complemento pago)`
+      );
+      atualizar(d2, "cobrancas", cb.id, { caucao_correcao_id: x.id }, usuario, "Correção da caução registrada");
+    }
     return r;
   }
   function estornarPagamento(d2, cobrancaId, usuario) {
+    const cb = buscar(d2, "cobrancas", cobrancaId);
+    if (cb && cb.caucao_correcao_id) {
+      if (buscar(d2, "correcoes_garantia", cb.caucao_correcao_id)) excluir(d2, "correcoes_garantia", cb.caucao_correcao_id, usuario, "Correção da caução desfeita (pagamento do complemento desfeito)");
+      atualizar(d2, "cobrancas", cb.id, { caucao_correcao_id: null }, usuario, "Correção da caução desfeita");
+    }
     cancelarFaturas(d2, "cobranca", cobrancaId, usuario);
     atualizar(d2, "cobrancas", cobrancaId, {
       data_pagamento: null,
@@ -2402,16 +2492,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return { antes, depois };
   }
   function alertaCaucao(d2, c) {
-    if (!temCaucao(c) || !c.caucao_valor) return null;
-    const ultimaCaucao = correcoesCaucaoAtual(d2, c).map((x) => x.data).pop() || c.caucao_data || "";
-    const correcao = correcoesDo(d2, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
-    if (!correcao) return null;
-    const sug = caucaoSugerida(d2, c, correcao.data_vigencia);
-    return {
-      nivel: "aviso",
-      tipo: "Correção da caução",
-      texto: `O aluguel foi corrigido em ${dataBr(correcao.data_vigencia)}. Corrija também a caução (atual ${reais(valorGarantia(d2, c))}${sug ? `, sugerido ${reais(sug)}` : ""}).`
-    };
+    const x = complementoCaucao(d2, c);
+    if (!x) return null;
+    const inicio = `O aluguel foi corrigido em ${dataBr(x.correcao.data_vigencia)}.`;
+    const texto2 = x.boleto ? `${inicio} Boleto do complemento da caução (${reais(x.boleto.caucao_complemento)}) gerado, vence em ${dataBr(x.boleto.vencimento)}: ao confirmar o pagamento, a caução passa a ${reais(x.boleto.caucao_nova)}.` : x.necessaria === null ? `${inicio} Corrija também a caução (atual ${reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.` : x.complemento > 0 ? `${inicio} A caução deve passar a ${reais(x.necessaria)} (${c.caucao_meses} aluguéis com bonificação); já depositado ${reais(x.atual)}. Gere o boleto do complemento de ${reais(x.complemento)}.` : `${inicio} A caução depositada (${reais(x.atual)}) já cobre o necessário (${reais(x.necessaria)}). Registre a correção da caução para tirar este aviso.`;
+    return { nivel: "aviso", tipo: "Correção da caução", ancora: "garantia", texto: texto2 };
   }
   function alertaAplicacao(d2, c) {
     const s = situacaoAplicacao(d2, c);
@@ -2626,7 +2711,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const imovel = buscar(d2, "imoveis", c.imovel_id);
     const t = totais(cb);
     const linhas2 = [];
-    if (cb.carencia) linhas2.push(`CARÊNCIA DO ALUGUEL ${compBr(cb.competencia)}`);
+    if (ehComplementoCaucao(cb)) linhas2.push(`COMPLEMENTO DA CAUÇÃO ${rs(cb.caucao_complemento)}`, `CAUÇÃO DEPOSITADA ${rs(cb.caucao_anterior)} NOVA CAUÇÃO ${rs(cb.caucao_nova)}`);
+    else if (cb.carencia) linhas2.push(`CARÊNCIA DO ALUGUEL ${compBr(cb.competencia)}`);
     else linhas2.push(cb.dias_cobrados < cb.dias_mes ? `ALUGUEL ${cb.dias_cobrados}/${cb.dias_mes} DIAS ${rs(cb.aluguel)}` : `ALUGUEL ${rs(cb.aluguel)}`);
     if (cb.desconto) linhas2.push(`COM BONF. ${rs(cb.aluguel - cb.desconto)}`);
     const extras = [];
@@ -2639,7 +2725,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? "RESSARCIMENTO" : "COBRANÇA ADICIONAL")).toLocaleUpperCase("pt-BR")} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
     if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
     if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
-    if (extras.length) linhas2.push(extras.join(" "));
+    if (extras.length && !ehComplementoCaucao(cb)) linhas2.push(extras.join(" "));
     const valor = t.a_pagar_sem_desconto;
     return {
       pagador: c.inquilino_nome,
@@ -2775,7 +2861,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     } : null;
   }
   function aplicarRessarcimentos(d2, contrato, comp, usuario) {
-    const cb = d2.cobrancas.find((x) => x.contrato_id === contrato.id && x.competencia === comp);
+    const cb = boletoDoMes(d2, contrato.id, comp);
     if (!cb || cb.data_pagamento) return cb || null;
     const r = ressarcimentosNoBoleto(d2, contrato.id, comp);
     atualizar(
@@ -2799,7 +2885,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const proxima = mes;
     const marcado = (chave) => d2.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
     const ativos = d2.contratos.filter((c) => c.ativo !== false && c.imovel_id);
-    const semBoleto = ativos.filter((c) => diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !d2.cobrancas.some((x) => x.contrato_id === c.id && x.competencia === comp));
+    const semBoleto = ativos.filter((c) => diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d2, c.id, comp));
     const doMes = d2.cobrancas.filter((x) => x.competencia === comp);
     const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== "Carência");
     const vencidos = emAberto.filter((x) => x.vencimento < hoje2);
@@ -2886,7 +2972,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     for (const c of ativos) {
       for (const comp of [somarMeses(mes, -1), mes]) {
         if (diasOcupados(comp, c.data_entrada, c.data_saida) === 0) continue;
-        const cb = d2.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp);
+        const cb = boletoDoMes(d2, c.id, comp);
         const venc = cb ? cb.vencimento : vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
         if (!no(venc)) continue;
         const pago = cb && cb.data_pagamento;
@@ -2901,6 +2987,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           estado: pago ? `pago em ${dataBr(cb.data_pagamento)}` : !cb ? "previsto" : venc < hoje2 ? "vencido" : "em aberto"
         });
       }
+    }
+    for (const cb of d2.cobrancas.filter((x) => ehComplementoCaucao(x) && no(x.vencimento))) {
+      const c = buscar(d2, "contratos", cb.contrato_id);
+      if (!c) continue;
+      const pago = cb.data_pagamento;
+      ev.push({
+        data: cb.vencimento,
+        tipo: "Boleto",
+        imovel_id: c.imovel_id,
+        contrato_id: c.id,
+        cobranca_id: cb.id,
+        texto: `${c.inquilino_nome} · complemento da caução · ${reais(cb.caucao_complemento)}`,
+        situacao: pago ? "ok" : cb.vencimento < hoje2 ? "perigo" : "aviso",
+        estado: pago ? `pago em ${dataBr(pago)}` : cb.vencimento < hoje2 ? "vencido" : "em aberto"
+      });
     }
     for (const p2 of d2.iptus) {
       for (const pc of parcelasIptu(d2, p2)) {
@@ -2932,7 +3033,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         const r = reajusteNaCompetencia(d2, c, comp);
         if (!r) continue;
         const anterior = somarMeses(comp, -1);
-        const cb = d2.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === anterior);
+        const cb = boletoDoMes(d2, c.id, anterior);
         const venc = cb ? cb.vencimento : vencimentoDaCompetencia(anterior, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
         if (!no(venc)) continue;
         ev.push({
@@ -5592,6 +5693,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const anteriores = fiadoresAnterioresDo(d(), c.id);
     let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc2(c.garantia_tipo || "não informada")}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, "Trocar tipo de garantia") : ""}</div>`;
     if (temCaucao(c)) {
+      const comp = complementoCaucao(d(), c);
+      if (comp && comp.necessaria !== null && (comp.boleto || comp.complemento > 0)) {
+        html += `<div class="alerta aviso"><b>Complemento da caução.</b> Aluguel corrigido em ${dataBr2(comp.correcao.data_vigencia)}: a caução deve passar a <b>${reais2(comp.necessaria)}</b> (${c.caucao_meses} aluguéis com bonificação).
+        Já depositado ${reais2(comp.atual)}; falta depositar <b>${reais2(comp.complemento)}</b>.
+        ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr2(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.` : opera() ? `<div class="acoes" style="margin-top:6px">${botao("gerarBoletoCaucao", `Gerar boleto do complemento (${reais2(comp.complemento)})`, { contrato: c.id }, "pequeno", `Gerar um boleto separado de ${reais2(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ""}</div>`;
+      }
       html += `<div class="grade">${item("Caução dada", `${reais2(c.caucao_valor)} em ${dataBr2(c.caucao_data)}`)}
       ${item("Caução atual", `<span class="maior">${reais2(valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item("Equivale a", `${c.caucao_meses} aluguéis (sugerido hoje: ${reais2(sug)})`) : ""}</div>
@@ -5678,7 +5785,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ${aConferir ? `<div class="alerta info">Condomínio de ${compBr2(aConferir)} ainda não conferido. ${opera() ? botao("condominioConferido", `Conferido: sem taxa do proprietário em ${compBr2(aConferir)}`, { id: c.id, mes: aConferir }, "secundario pequeno") : ""}</div>` : inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr2(c.condominio_conferido_ate) : "-"}.</p>` : ""}
     ${lista3.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto de</th><th></th></tr>
       ${lista3.map((x) => {
-      const cb = d().cobrancas.find((b) => b.contrato_id === c.id && b.competencia === x.competencia_abatimento);
+      const cb = boletoDoMes(d(), c.id, x.competencia_abatimento);
       return `<tr><td>${compBr2(x.competencia_condominio)}</td><td>${esc2(x.descricao)}</td><td class="n">${reais2(x.valor)}</td><td>${dataBr2(x.data_pagamento)}</td>
         <td>${compBr2(x.competencia_abatimento)} ${cb ? cb.data_pagamento ? etiqueta("abatido", "ok") : etiqueta("no boleto em aberto", "info") : etiqueta("entra quando o boleto for gerado", "neutra")}</td>
         <td class="n nw">${opera() && !(cb && cb.data_pagamento) ? `${link(`#/editar/ressarcimentos/${x.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "ressarcimentos", id: x.id }, "perigo pequeno", "Excluir este ressarcimento?")}` : ""}</td></tr>`;
@@ -5734,7 +5841,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const perdido = (k) => documentoPerdido(d(), c, k);
     const linhas2 = DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) ? ' class="doc-perdido"' : ""}><td><b>${esc2(nome)}</b></td>
     <td>${perdido(k) ? etiqueta(`perdido (registrado em ${dataBr2(perdido(k))})`, "perigo") : doc(k) ? `${etiqueta(`${feito} em ${dataBr2(doc(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc2(doc(k).contrato.inquilino_nome)}</a></span>` : ""}` : etiqueta("pendente", "perigo")}</td>
-    <td class="nw">${doc(k) ? "" : gerar[k]}</td>
+    <td class="nw">${doc(k) || perdido(k) ? "" : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
       ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ""}` : !opera() ? "" : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${hoje2}" style="width:auto">
@@ -5847,7 +5954,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     <div class="cartao"><h2>Boletos</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${cobs.map((x) => {
       const fs = faturasDe(d(), "cobranca", x.id);
-      return `<tr><td><a href="#/cobranca/${x.id}">${compBr2(x.competencia)}</a>${x.carencia ? ` ${etiqueta("carência", "aviso")}` : ""}</td><td>${dataBr2(x.vencimento)}</td><td class="n">${reais2(totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}${x.pagou_em_dia ? ` ${etiqueta("pagou em dia", "ok")}` : ""}</td><td>${dataBr2(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais2(x.valor_nf) : "-"}</td><td>${fs.length ? `Nº ${numeroFatura(fs[0].numero)}` : c.gerar_nf === false ? etiqueta("controle", "controle") : "-"}</td></tr>`;
+      return `<tr><td><a href="#/cobranca/${x.id}">${compBr2(x.competencia)}</a>${x.carencia ? ` ${etiqueta("carência", "aviso")}` : ""}${ehComplementoCaucao(x) ? ` ${etiqueta("complemento da caução", "info")}` : ""}</td><td>${dataBr2(x.vencimento)}</td><td class="n">${reais2(totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}${x.pagou_em_dia ? ` ${etiqueta("pagou em dia", "ok")}` : ""}</td><td>${dataBr2(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais2(x.valor_nf) : "-"}</td><td>${fs.length ? `Nº ${numeroFatura(fs[0].numero)}` : c.gerar_nf === false ? etiqueta("controle", "controle") : "-"}</td></tr>`;
     }).join("") || '<tr><td colspan="8" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div></div>
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, "Registrar protocolo") : ""}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
@@ -5889,7 +5996,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         if (dados.valor !== null && dados.valor <= 0) erros.valor = "Informe o valor";
         if (dados.descricao === "Outra" && !dados.detalhe) erros.detalhe = "Diga qual é a taxa";
         if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = competenciaDoAbatimento(c, dados.data_pagamento);
-        const cb = d().cobrancas.find((x) => x.contrato_id === c.id && x.competencia === dados.competencia_abatimento);
+        const cb = boletoDoMes(d(), c.id, dados.competencia_abatimento);
         if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
           erros.competencia_abatimento = `O boleto de ${compBr2(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
         }
@@ -6529,7 +6636,8 @@ Salvar assim mesmo?`)) {
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, "info")}` : ""}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais2(cb.reserva_utilizada)}`, "aviso")}` : ""}
           ${cb.carencia ? `<br>${etiqueta("carência", "aviso")}` : ""}
-          ${reajustes.has(c.id) ? `<br>${etiqueta(`reajuste no aluguel de ${compBr2(proxima)}`, "aviso")} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${proxima}`, reajustes.get(c.id).carta ? "Carta (enviada ✓)" : "Gerar carta", "botao pequeno")}` : ""}</td>
+          ${ehComplementoCaucao(cb) ? `<br>${etiqueta("complemento da caução · sem NF", "info")}` : ""}
+          ${reajustes.has(c.id) && !ehComplementoCaucao(cb) ? `<br>${etiqueta(`reajuste no aluguel de ${compBr2(proxima)}`, "aviso")} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${proxima}`, reajustes.get(c.id).carta ? "Carta (enviada ✓)" : "Gerar carta", "botao pequeno")}` : ""}</td>
         <td>${dataBr2(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje2 ? `<br>${etiqueta("vencida", "perigo")}` : ""}
           ${!cb.data_pagamento ? `<br>${botao("copiar", "Copiar texto do boleto", { texto: dadosBoleto(d(), cb).descricao })}` : ""}</td>
         <td class="n">${reais2(t.a_pagar_pontual)}</td>
@@ -6537,7 +6645,7 @@ Salvar assim mesmo?`)) {
         <td>${cb.data_pagamento ? `${situacao(cb.situacao)}${cb.pagou_em_dia ? ` ${etiqueta("pagou em dia", "ok")}` : ""}<br><span class="suave">entrou em ${dataBr2(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ""}<br>recebido ${reais2(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao("estornar", "Desfazer", { id: cb.id }, "secundario pequeno", "Desfazer este pagamento?")}` : ""}` : cb.situacao === "Carência" ? situacao("Carência") : opera() ? formPagamento(cb, true) : situacao(cb.situacao)}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais2(cb.valor_nf) : "-"}</td>
-        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${numeroFatura(fs[0].numero)}`) : !geraNf(c) ? etiqueta("sem NF", "controle") : cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : "-"}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr2(comp)}.</td></tr>`}
+        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${numeroFatura(fs[0].numero)}`) : !geraNf(c) || ehComplementoCaucao(cb) ? etiqueta("sem NF", "controle") : cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : "-"}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr2(comp)}.</td></tr>`}
       ${lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais2(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais2(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ""}
     </table></div>
     ${lista3.length ? `<div class="acoes">${impressao}</div>` : ""}`;
@@ -6547,6 +6655,19 @@ Salvar assim mesmo?`)) {
     const i = buscar2("imoveis", c.imovel_id);
     const t = totais(cb);
     const linha = (txt, v) => `<tr><td>${txt}</td><td class="n">${v}</td></tr>`;
+    if (ehComplementoCaucao(cb)) {
+      return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: complemento da caução</h2><div class="suave">Aluguel corrigido a partir de ${compBr2(cb.competencia)}</div></div>
+      <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr2(cb.vencimento)}</b></div></div></div>
+    <div class="endereco">📍 ${esc2(i.nome)} · ${esc2(endereco(i))}</div>
+    <p><b>Inquilino:</b> ${esc2(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc2(c.inquilino_cpf)}` : ""}${c.inquilino_telefone ? ` · ${esc2(c.inquilino_telefone)}` : ""}</p>
+    <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
+      ${linha("Caução já depositada", reais2(cb.caucao_anterior))}
+      ${linha(`Nova caução${c.caucao_meses ? ` (${c.caucao_meses} aluguéis)` : ""}`, reais2(cb.caucao_nova))}
+      <tr class="total"><td>Depósito adicional a pagar até ${dataBr2(cb.vencimento)}</td><td class="n maior">${reais2(t.a_pagar_pontual)}</td></tr>
+      <tr><td colspan="2" class="suave">Após o vencimento: + multa de ${pct2(cb.multa_percentual)} + juros de ${pct2(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
+    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr2(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso: multa ${reais2(cb.multa)}; juros ${reais2(cb.juros)}` : ""} · recebido ${reais2(cb.valor_pago)}</p>` : ""}
+    ${cb.observacoes ? `<p class="pre">${esc2(cb.observacoes)}</p>` : ""}</div>`;
+    }
     return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto de aluguel</h2><div class="suave">Competência ${compBr2(cb.competencia)}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr2(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc2(i.nome)} · ${esc2(endereco(i))}</div>
@@ -6568,7 +6689,7 @@ Salvar assim mesmo?`)) {
     ${cb.observacoes ? `<p class="pre">${esc2(cb.observacoes)}</p>` : ""}</div>`;
   }
   function caixaAjuste(cb) {
-    if (!opera() || cb.data_pagamento) return "";
+    if (!opera() || cb.data_pagamento || ehComplementoCaucao(cb)) return "";
     const tipo = cb.outros < 0 ? "ressarcimento" : "adicional";
     return `<div class="cartao"><h2>Ajuste deste mês</h2>
     <p class="suave">Para corrigir o valor do boleto: cobrar algo a mais ou devolver/descontar um valor (reforma, acerto do mês anterior etc.). Fica registrado no histórico do inquilino.</p>
@@ -6598,22 +6719,22 @@ Salvar assim mesmo?`)) {
     const validas = fs.filter((f) => f.situacao === "Emitida");
     const sim = cb.data_pagamento ? null : liquidar(cb, hojeIso());
     return `<div class="nao-imprimir"><p class="suave"><a href="#/cobrancas?comp=${cb.competencia}">← Boletos de ${compBr2(cb.competencia)}</a> · <a href="#/contrato/${c.id}">${esc2(c.inquilino_nome)}</a></p>
-    <div class="cabecalho"><h1>Boleto ${compBr2(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
+    <div class="cabecalho"><h1>Boleto ${ehComplementoCaucao(cb) ? "do complemento da caução" : compBr2(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>
-      ${opera() && !cb.data_pagamento ? `${link(`#/editar/cobrancas/${cb.id}`, "Alterar valores", "botao secundario")} ${botao("excluir", "Excluir", { tabela: "cobrancas", id: cb.id }, "perigo", "Excluir este boleto?")}` : ""}</div></div>
+      ${opera() && !cb.data_pagamento ? `${ehComplementoCaucao(cb) ? "" : link(`#/editar/cobrancas/${cb.id}`, "Alterar valores", "botao secundario")} ${botao("excluir", "Excluir", { tabela: "cobrancas", id: cb.id }, "perigo", "Excluir este boleto?")}` : ""}</div></div>
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao("recalcularBoleto", "Voltar a calcular pelo cadastro", { id: cb.id }, "secundario pequeno", "Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).") : ""}</div>` : ""}</div>
     ${geraNf(c) ? "" : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
     ${demonstrativo(cb)}
     <div class="nao-imprimir">${caixaAjuste(cb)}${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
       ${cb.data_pagamento ? `<div class="grade">${item("Pago em", dataBr2(cb.data_pagamento))}${item("Situação", `${esc2(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ""}`)}
         ${item(`Multa (${pct2(cb.multa_percentual)})`, reais2(cb.multa))}${item(`Juros (${pct2(cb.juros_mensal_percentual)} ao mês)`, reais2(cb.juros))}
-        ${item("Valor recebido", reais2(cb.valor_pago))}${item("Valor da nota fiscal", `<span class="maior">${reais2(cb.valor_nf)}</span>`)}</div>
-        <p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais2(cb.aluguel)} + multa ${reais2(cb.multa)} + juros ${reais2(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais2(cb.aluguel)} - desconto ${reais2(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>
-        ${opera() ? botao("estornar", "Desfazer pagamento", { id: cb.id }, "perigo pequeno", validas.length ? "Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado." : "Desfazer o pagamento?") : ""}` : `<p>Se for pago hoje (${dataBr2(hojeIso())}): <b>${reais2(sim.valor_devido)}</b>${sim.pontual ? "" : ` (${sim.dias_atraso} dias de atraso: multa ${pct2(cb.multa_percentual)} = ${reais2(sim.multa)}; juros ${pct2(cb.juros_mensal_percentual)} a.m. = ${reais2(sim.juros)})`} · nota fiscal ${reais2(sim.valor_nf)}</p>
+        ${item("Valor recebido", reais2(cb.valor_pago))}${ehComplementoCaucao(cb) ? "" : item("Valor da nota fiscal", `<span class="maior">${reais2(cb.valor_nf)}</span>`)}</div>
+        ${ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais2(cb.aluguel)} + multa ${reais2(cb.multa)} + juros ${reais2(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais2(cb.aluguel)} - desconto ${reais2(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>`}
+        ${opera() ? botao("estornar", "Desfazer pagamento", { id: cb.id }, "perigo pequeno", validas.length ? "Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado." : "Desfazer o pagamento?") : ""}` : `<p>Se for pago hoje (${dataBr2(hojeIso())}): <b>${reais2(sim.valor_devido)}</b>${sim.pontual ? "" : ` (${sim.dias_atraso} dias de atraso: multa ${pct2(cb.multa_percentual)} = ${reais2(sim.multa)}; juros ${pct2(cb.juros_mensal_percentual)} a.m. = ${reais2(sim.juros)})`}${ehComplementoCaucao(cb) ? " · sem NF (complemento da caução)" : ` · nota fiscal ${reais2(sim.valor_nf)}`}</p>
         ${opera() && cb.situacao !== "Carência" ? formPagamento(cb, false) : ""}`}</div>
     <div class="cartao"><h2>NFs</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
-      ${fs.map((f) => `<tr><td>${numeroFatura(f.numero)}</td><td>${esc2(buscar2("emitentes", f.emitente_id).nome)}</td><td>${dataBr2(f.emissao)}</td><td>${dataBr2(f.periodo_inicio)} a ${dataBr2(f.periodo_fim)}</td><td class="n">${pct2(f.percentual)}</td><td class="n">${reais2(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === "Emitida" ? "ok" : "perigo")}</td></tr>`).join("") || `<tr><td colspan="7" class="suave">${!geraNf(c) ? "Este inquilino não emite NF (só controle do pagamento)." : cb.data_pagamento ? "Aguardando numeração (tela NF)." : "Confirme o pagamento para gerar a NF."}</td></tr>`}</table>
-      ${cb.data_pagamento && !validas.length && geraNf(c) && opera() ? `<p>${formNfExterna("cobranca", cb.id, cb.data_pagamento)}</p>` : ""}
+      ${fs.map((f) => `<tr><td>${numeroFatura(f.numero)}</td><td>${esc2(buscar2("emitentes", f.emitente_id).nome)}</td><td>${dataBr2(f.emissao)}</td><td>${dataBr2(f.periodo_inicio)} a ${dataBr2(f.periodo_fim)}</td><td class="n">${pct2(f.percentual)}</td><td class="n">${reais2(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === "Emitida" ? "ok" : "perigo")}</td></tr>`).join("") || `<tr><td colspan="7" class="suave">${!geraNf(c) ? "Este inquilino não emite NF (só controle do pagamento)." : ehComplementoCaucao(cb) ? "Complemento da caução: não gera NF." : cb.data_pagamento ? "Aguardando numeração (tela NF)." : "Confirme o pagamento para gerar a NF."}</td></tr>`}</table>
+      ${cb.data_pagamento && !validas.length && geraNf(c) && !ehComplementoCaucao(cb) && opera() ? `<p>${formNfExterna("cobranca", cb.id, cb.data_pagamento)}</p>` : ""}
       ${validas.length ? `<p class="acoes">${link(`#/imprimir/faturas?numero=${validas[0].numero}`, "Ver / imprimir NF", "botao")} ${botao("excel", "Baixar Excel", { numero: validas[0].numero })}</p>` : ""}</div></div>`;
   }
   function origemTexto(f) {
@@ -6847,6 +6968,8 @@ Salvar assim mesmo?`)) {
     if (k.percentual === null) {
       return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc2(k.faltando.join(" e ") || "o índice do contrato")} até ${compBr2(anterior)}. ${link("#/reajustes", "Informar em Reajustes")}</div>`;
     }
+    let caucao = temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: valorGarantia(d(), c) } : null;
+    if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
     return `<div class="carta">
     ${d().logo ? `<p><img class="carta-logo" src="${esc2(d().logo)}" alt="Logo"></p>` : ""}
     <p class="carta-data">${esc2(i && i.cidade || "Curitiba")}, ${dataExtenso(hojeIso())}.</p>
@@ -6856,8 +6979,13 @@ Salvar assim mesmo?`)) {
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr2(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais2(k.atual)}</td><td class="n"><b>${reais2(k.novo)}</b></td></tr>
       ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais2(k.atualBonificado)}</td><td class="n"><b>${reais2(k.novoBonificado)}</b></td></tr>` : ""}</table>
-    <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr2(comp)}</b>, com vencimento em <b>${dataBr2(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>
-    <p>Ficamos à disposição para qualquer dúvida.</p>
+    <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr2(comp)}</b>, com vencimento em <b>${dataBr2(vencNovo)}</b>.${caucao ? "" : " As demais condições do contrato permanecem as mesmas."}</p>
+    ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${caucao.meses} aluguéis</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
+    <table class="carta-tabela"><tr><td>Caução já depositada</td><td class="n">${reais2(caucao.atual)}</td></tr>
+      <tr><td>Caução necessária (${caucao.meses} × aluguel atualizado)</td><td class="n">${reais2(caucao.nova)}</td></tr>
+      <tr><td><b>Depósito adicional</b></td><td class="n"><b>${reais2(caucao.nova - caucao.atual)}</b></td></tr></table>
+    <p>O depósito adicional será cobrado em <b>boleto separado</b>, com vencimento em <b>${dataBr2(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>` : ""}
+    <p>Seguimos a sua disposição para sanar qualquer dúvida.</p>
     <p>Atenciosamente,<br><b>${esc2(empresa.nome)}</b></p></div>`;
   }
   function telaInadimplencia() {
@@ -7711,7 +7839,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         cb && data < somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr2(data)}) é bem antes do vencimento (${dataBr2(cb.vencimento)}).` : ""
       ].filter(Boolean));
       const r = await alterar((db) => registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia, dataPagou }));
-      aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? " (sem multa e juros)" : ""}. Data da NF: ${dataBr2(data)}. Valor da nota: ${reais2(r.valor_nf)}.` : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais2(r.multa)} e juros ${reais2(r.juros)}. Valor da nota: ${reais2(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr2(data)}.`, r.pontual ? "ok" : "aviso");
+      const pago = buscar2("cobrancas", form.dataset.id);
+      if (pago && ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? "" : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais2(pago.caucao_nova)}. Sem NF.`, "ok");
+      else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? " (sem multa e juros)" : ""}. Data da NF: ${dataBr2(data)}. Valor da nota: ${reais2(r.valor_nf)}.` : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais2(r.multa)} e juros ${reais2(r.juros)}. Valor da nota: ${reais2(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr2(data)}.`, r.pontual ? "ok" : "aviso");
       await mostrar();
     },
     async ajuste(form) {
@@ -7865,7 +7995,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     aditivos: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
     despesas: {},
     ressarcimentos: {
-      checar: (db, r) => (db.cobrancas.find((cb) => cb.contrato_id === r.contrato_id && cb.competencia === r.competencia_abatimento) || {}).data_pagamento ? "Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes." : null,
+      checar: (db, r) => (boletoDoMes(db, r.contrato_id, r.competencia_abatimento) || {}).data_pagamento ? "Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes." : null,
       depois: (db, r) => aplicarRessarcimentos(db, buscar(db, "contratos", r.contrato_id), r.competencia_abatimento, login()),
       voltar: (r) => `#/contrato/${r.contrato_id}?ir=ressarcimentos`
     }
@@ -8231,6 +8361,11 @@ ${MODELO_COMODOS[comodo].join("\n")}
         return recalcularCobrancas(db, (cb) => cb.contrato_id === Number(contrato), login());
       });
       aviso(`Correção registrada a partir do aluguel de ${compBr2(comp)}.${n ? ` ${n} boleto(s) em aberto recalculado(s).` : ""}`);
+      await mostrar();
+    },
+    async gerarBoletoCaucao({ contrato }) {
+      const cb = await alterar((db) => gerarBoletoCaucao(db, Number(contrato), login()));
+      aviso(`Boleto do complemento da caução gerado: ${reais2(cb.caucao_complemento)}, vence em ${dataBr2(cb.vencimento)}.`, "ok");
       await mostrar();
     },
     async cartaEnviada({ contrato, comp, enviada }) {
