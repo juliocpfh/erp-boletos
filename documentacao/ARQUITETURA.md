@@ -36,7 +36,7 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Assunto | Arquivo → função |
 |---|---|
 | Gravar com histórico | `regras.js` → `inserir`, `atualizar`, `excluir`, `registrar` |
-| Boleto do mês | `regras.js` → `montarCobranca`, `gerarCobrancas`, `recalcularCobrancas`; `calculos.js` → `calcularCobranca`, `totaisCobranca` |
+| Boleto do mês | `regras.js` → `montarCobranca`, `gerarCobrancas`, `recalcularCobrancas`, `boletoDoMes` (só o do aluguel); `calculos.js` → `calcularCobranca`, `totaisCobranca`. Complemento da caução (boleto à parte, campo `caucao_complemento`): `complementoCaucao`, `complementosCaucaoPendentes`, `gerarBoletoCaucao`, `ehComplementoCaucao`; ao pagar, `registrarPagamento` grava a correção da caução |
 | Pagamento, multa, juros, valor da NF | `regras.js` → `registrarPagamento`, `baixarEmLote`; `calculos.js` → `liquidar`, `multaEJuros`, `valorNotaFiscal` |
 | Numeração de NF | `regras.js` → `pendentesDeFatura`, `numerarFaturas`, `desfazerUltimaNumeracao`, `cancelarNumero`, `registrarNfExterna` |
 | Reserva | `regras.js` → `reservaParaCompetencia`, `realocarReserva`, `alertaReservaParada` |

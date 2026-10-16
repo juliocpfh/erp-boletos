@@ -283,15 +283,24 @@ export function complementoCaucao(d, c) {
     complemento: necessaria === null ? null : necessaria - atual, boleto };
 }
 
-/** Gera o boleto do complemento da caução, com o vencimento do primeiro aluguel corrigido (sem tarifa e sem NF). */
-export function gerarBoletoCaucao(d, contratoId, usuario) {
+/** Contratos ativos com complemento da caução a cobrar até a competência ``comp`` e sem boleto gerado: [{ contrato, ...complementoCaucao }]. */
+export function complementosCaucaoPendentes(d, comp) {
+  return d.contratos.filter((c) => c.ativo !== false && c.imovel_id && contratoAtivo(c, `${comp}-01`)).map((c) => ({ contrato: c, ...complementoCaucao(d, c) }))
+    .filter((x) => x.correcao && !x.boleto && x.complemento > 0 && x.competencia <= comp);
+}
+
+/**
+ * Gera o boleto do complemento da caução, com o vencimento do primeiro aluguel corrigido (sem tarifa e sem NF).
+ * ``comp``: competência em que está sendo gerado (ao gerar os boletos de um mês depois do aluguel corrigido, vai com o desse mês).
+ */
+export function gerarBoletoCaucao(d, contratoId, usuario, comp = null) {
   const c = buscar(d, 'contratos', contratoId);
   const x = complementoCaucao(d, c);
   if (!x) throw new Error('Não há correção do aluguel esperando a correção da caução.');
   if (x.boleto) throw new Error('O boleto do complemento da caução já foi gerado.');
   if (x.necessaria === null) throw new Error('Informe no contrato a quantos aluguéis a caução equivale.');
   if (!(x.complemento > 0)) throw new Error('A caução depositada já cobre o valor necessário.');
-  const comp = x.competencia;
+  comp = comp && comp > x.competencia ? comp : x.competencia;
   return inserir(d, 'cobrancas', {
     contrato_id: c.id, competencia: comp,
     vencimento: C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false),
@@ -613,6 +622,11 @@ export function gerarCobrancas(d, comp, usuario) {
       // gerou um mês anterior a boletos que já existiam: a reserva vai para o mês certo
       realocarReserva(d, contrato, usuario);
     }
+  }
+  // complemento da caução depois de reajuste ou novo valor: boleto separado, gerado junto com os do mês
+  for (const x of complementosCaucaoPendentes(d, comp)) {
+    gerarBoletoCaucao(d, x.contrato.id, usuario, comp);
+    geradas += 1;
   }
   return { geradas, existentes };
 }
