@@ -293,6 +293,7 @@ export const CORRECAO = [
 export const SEGURO = [
   campo('seguradora', 'Seguradora'),
   campo('apolice', 'Nº da apólice'),
+  campo('telefone_assistencia', 'Telefone da assistência', 'texto', { ajuda: 'Ex.: 0800 000 0000 (chaveiro, encanador, vidraceiro do seguro)' }),
   campo('data_contratacao', 'Data de contratação', 'data'),
   campo('vigencia_inicio', 'Início da vigência', 'data', { obrig: true }),
   campo('vigencia_fim', 'Fim da vigência', 'data', { obrig: true }),

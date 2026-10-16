@@ -120,6 +120,14 @@ async function guardarGuiasSoltas(imovelId, anoNovo) {
   return arquivos.length;
 }
 
+/** Extensão do arquivo em minúsculas (".pdf") e nome sem acento para gravar na pasta (ex.: "Apólice Nº 1.PDF" → "apolice-n-1.pdf"). */
+const extensao = (nome) => { const p = nome.lastIndexOf('.'); return p > 0 ? nome.slice(p).toLowerCase() : ''; };
+const semAcentoArquivo = (nome) => {
+  const ext = extensao(nome);
+  const base = (ext ? nome.slice(0, nome.lastIndexOf('.')) : nome).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${base || 'arquivo'}${ext}`;
+};
+
 /** Guarda o arquivo assinado na pasta do inquilino com nome padrão, sem acento (ex.: contrato-de-locacao-assinado-2026-10-15.pdf). */
 async function salvarAssinado(escopo, contratoId, arquivo, texto) {
   const ponto = arquivo.name.lastIndexOf('.');
@@ -158,7 +166,10 @@ async function listaArquivos(escopo, id) {
     }));
     return `<div class="fotos">${figs.join('')}</div>`;
   }
-  return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a></td>
+  // apólices do seguro: a vigência da apólice aparece ao lado do arquivo
+  const seguroDo = (nome) => (escopo === 'seguro' ? R.segurosDoImovel(d(), Number(id)).find((s) => s.arquivo_apolice === nome || (s.outros_arquivos || []).includes(nome)) : null);
+  const vigencia = (nome) => { const s = seguroDo(nome); return s ? ` <span class="suave">· ${s.arquivo_apolice === nome ? 'apólice' : 'outro arquivo'} · vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}${s.telefone_assistencia && s.arquivo_apolice === nome ? ` · 📞 assistência ${esc(s.telefone_assistencia)}` : ''}</span>` : ''; };
+  return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${vigencia(a.nome)}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
     <td class="n">${botao('baixarArquivo', 'Baixar', { escopo, id, nome: a.nome })} ${opera() ? botao('excluirArquivo', 'Excluir', { escopo, id, nome: a.nome }, 'perigo pequeno', 'Excluir este arquivo?') : ''}</td></tr>`).join('')}</table>`;
 }
@@ -854,10 +865,10 @@ function caixaSeguros(i) {
   return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório do imóvel ${esc(i.nome)}</h2>${opera() ? link(`#/novo/seguros?imovel=${i.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
-      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span></td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
+      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${i.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
     <p class="suave">As parcelas entram no boleto do inquilino que estiver no imóvel no mês de cada parcela (se o contrato dele inclui o seguro).</p>
-    ${caixaArquivos('seguro', i.id, 'Apólices', 'apolices', 'Anexe aqui o PDF da apólice.', true)}</div>`;
+    ${caixaArquivos('seguro', i.id, 'Apólices', 'apolices', 'O arquivo da apólice é anexado ao cadastrar a apólice (botão "Cadastrar apólice"); aqui ficam todos, com a vigência ao lado.', true)}</div>`;
 }
 
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
@@ -1229,9 +1240,36 @@ const CADASTROS = {
     titulo: (r, q) => `Seguro obrigatório - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
     campos: () => F.SEGURO,
     fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
+    // arquivo da apólice obrigatório (na edição, só se ainda não tiver); outros arquivos opcionais
+    extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
+      <div><label>Arquivo da apólice${r && r.arquivo_apolice ? '' : ' *'}</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
+        <small class="suave">${r && r.arquivo_apolice ? `Já guardado: ${esc(r.arquivo_apolice)}. Escolha outro só para trocar.` : 'Obrigatório: PDF ou foto da apólice.'}</small></div>
+      <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple>
+        <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
+    ajustar(dados, erros, r, form) {
+      const arq = form.querySelector('[name=arquivo_apolice]').files[0];
+      if (!arq && !(r && r.arquivo_apolice)) throw new Error('Anexe o arquivo da apólice para salvar o seguro obrigatório.');
+    },
+    async ajustarAsync(dados, erros, r, form, q) {
+      const imovelId = r ? r.imovel_id : Number(q.imovel);
+      const pasta = await pastaDoEscopo('seguro', imovelId);
+      const vig = `${dados.vigencia_inicio}-a-${dados.vigencia_fim}`;
+      const arq = form.querySelector('[name=arquivo_apolice]').files[0];
+      if (arq) dados.arquivo_apolice = await S.salvarArquivo(pasta, new File([arq], `apolice-${vig}${extensao(arq.name)}`));
+      const outros = [...form.querySelector('[name=outros_arquivos]').files];
+      if (outros.length) {
+        const nomes = [];
+        for (const a of outros) {
+          const nome = `seguro-${vig}-${semAcentoArquivo(a.name)}`;
+          nomes.push(await S.salvarArquivo(pasta, new File([a], nome)));
+        }
+        dados.outros_arquivos = [...((r && r.outros_arquivos) || []), ...nomes];
+      }
+    },
     recalcular: (salvo, db) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === salvo.imovel_id,
     voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
-    descricao: () => 'Seguro obrigatório',
+    descricao: (dados, r) => `Seguro obrigatório: ${[dados.seguradora, dados.apolice ? `apólice ${dados.apolice}` : ''].filter(Boolean).join(', ') || 'apólice'}, vigência ${dataBr(dados.vigencia_inicio)} a ${dataBr(dados.vigencia_fim)}`
+      + `${dados.arquivo_apolice && dados.arquivo_apolice !== (r && r.arquivo_apolice) ? ` · arquivo ${dados.arquivo_apolice}` : ''}${dados.outros_arquivos && dados.outros_arquivos.length ? ` · ${dados.outros_arquivos.length - ((r && r.outros_arquivos) || []).length} outro(s) arquivo(s)` : ''}`,
   },
   iptus: {
     titulo: (r, q) => `IPTU - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
@@ -1941,15 +1979,15 @@ function telaInquilinos(q) {
   const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
-  const registrar = (c) => (opera() ? ` ${link(`#/novo/solicitacoes?contrato=${c.id}&de=inquilinos`, 'Registrar solicitação', 'botao secundario pequeno')}` : '');
+  const registrar = (c) => (opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : '');
   const resumo = R.resumoSolicitacoes(d());
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo inquilino', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}${registrar(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ''}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${x.c.vigencia_inicio ? `${dataBr(x.c.vigencia_inicio)} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr(x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
-        <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
+        <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
       ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>

@@ -296,3 +296,5 @@ input.doc-invalido { border-color: var(--perigo); }
 .caixa-historico[open] summary { margin-bottom: 10px; }
 .resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
 .resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
+th.centro, td.centro { text-align: center; }
+.botao-icone { display: inline-flex; align-items: center; padding: 4px 10px; }
