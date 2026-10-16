@@ -263,3 +263,27 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
   await gravarBanco(pasta, novos);
   return novos;
 }
+
+/** A pasta (e as subpastas) não tem nenhum arquivo? */
+async function semArquivos(dir) {
+  for await (const [, h] of dir.entries()) {
+    if (h.kind === 'file' || !(await semArquivos(h))) return false;
+  }
+  return true;
+}
+
+/** Apaga a subpasta "nome" se ela não tiver nenhum arquivo dentro. Devolve true se apagou (ou se nem existia). */
+export async function apagarPastaVazia(pai, nome) {
+  let dir;
+  try { dir = await pai.getDirectoryHandle(limparNome(nome)); } catch { return true; }
+  if (!(await semArquivos(dir))) return false;
+  await pai.removeEntry(limparNome(nome), { recursive: true });
+  return true;
+}
+
+/** Nomes das subpastas de uma pasta. */
+export async function subpastas(dir) {
+  const nomes = [];
+  for await (const [nome, h] of dir.entries()) if (h.kind === 'directory') nomes.push(nome);
+  return nomes;
+}

@@ -119,3 +119,11 @@ test('alertas de correção, seguro e reserva', () => {
   assert.match(A.alertaReserva(50000, 50000, '2026-11', '2026-10-05').texto, /500,00.*11\/2026/);
   assert.equal(A.alertaReserva(50000, 0, '2026-11', '2026-10-05'), null);
 });
+
+test('Estado (UF) pelo CEP', () => {
+  assert.equal(C.ufDoCep('82210-050'), 'PR');
+  assert.equal(C.ufDoCep('01310-100'), 'SP');
+  assert.equal(C.ufDoCep('88010-000'), 'SC');
+  assert.equal(C.ufDoCep('70040-010'), 'DF');
+  assert.equal(C.ufDoCep('8221'), '');
+});

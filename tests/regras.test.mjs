@@ -929,3 +929,20 @@ test('impostos: guia abaixo de R$ 10,00 não se paga e passa para a seguinte do 
   const csll = R.impostosDoMes(d, '2026-03')[0].guias[2];
   assert.deepEqual([csll.esperado, csll.abaixoDoMinimo], [1152, false]);
 });
+
+test('contrato sem imóvel é apagado depois de 7 dias (sem boleto); normalizar dá o Estado pelo CEP', () => {
+  const d = R.bancoVazio();
+  const i = R.inserir(d, 'imoveis', { nome: 'Casa', cep: '82210-050' }, 'teste');
+  const sem = R.inserir(d, 'contratos', { inquilino_nome: 'Pessoa Teste', imovel_id: null, sem_imovel_desde: '2026-10-01' }, 'teste');
+  R.inserir(d, 'fiadores', { nome: 'Fiador Teste', contrato_id: sem.id }, 'teste');
+  const com = R.inserir(d, 'contratos', { inquilino_nome: 'Com Imóvel', imovel_id: i.id }, 'teste');
+  assert.equal(R.dataApagarSemImovel(sem), '2026-10-08');
+  assert.equal(R.dataApagarSemImovel(com), null);
+  assert.deepEqual(R.contratosSemImovelVencidos(d, '2026-10-07').map((c) => c.id), []);
+  assert.deepEqual(R.contratosSemImovelVencidos(d, '2026-10-08').map((c) => c.id), [sem.id]);
+  R.excluirContrato(d, sem.id, 'teste');
+  assert.equal(d.contratos.length, 1);
+  assert.equal(d.fiadores.length, 0);
+  R.normalizar(d);
+  assert.equal(d.imoveis[0].uf, 'PR');
+});
