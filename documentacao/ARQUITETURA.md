@@ -84,5 +84,5 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Reserva (`reservaParaCompetencia`, `realocarReserva`) | Já teve dois bugs corrigidos; há testes específicos em `tests/regras.test.mjs` |
 | Reajuste (`mesDeAniversario`) | Regra de negócio definida pelo usuário (ver `documentacao/DECISOES.md`) |
 | `auth.js` e `backup-seguro.js` | Mudar parâmetros de cifragem/iterações invalida senhas e backups já gravados |
-| `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js`, `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs` |
+| `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js`, `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs`. Usa caminhos com `/` e quebras de linha LF, para o mesmo hash no Windows (CRLF do Git) e no Linux |
 | Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `contrato-de-locacao-assinado-2026-10-15.pdf` via `salvarAssinado`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes |

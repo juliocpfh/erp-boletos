@@ -1,7 +1,7 @@
 // Gera docs/offline/administracao-imoveis.html: o programa inteiro num único arquivo (código, estilo,
 // componentes e modelo da NF), que abre com dois cliques no Chrome ou no Edge, sem internet e sem o GitHub.
 // Uso: node tools/gerar-offline.mjs   (precisa do esbuild, baixado pelo npx na primeira vez)
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,8 +13,13 @@ const ler = (arq) => fs.readFileSync(arq, 'utf8');
 /** Texto seguro dentro de <script>: não pode fechar a tag nem abrir comentário HTML. */
 const seguro = (js) => js.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
 
-const programa = execFileSync('npx', ['-y', 'esbuild@0.24.0', docs('js', 'app.js'), '--bundle', '--format=iife', '--charset=utf8', '--log-level=warning'],
-  { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+// Caminho relativo e cwd na raiz: com o caminho absoluto (cheio de espaços) o npx do Windows falhava
+const argsEsbuild = ['-y', 'esbuild@0.24.0', path.join('docs', 'js', 'app.js'), '--bundle', '--format=iife', '--charset=utf8', '--log-level=warning'];
+const opcoes = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, cwd: RAIZ };
+// No Windows o npx é um .cmd: precisa do shell
+const programa = process.platform === 'win32'
+  ? execSync(['npx', ...argsEsbuild].join(' '), opcoes)
+  : execFileSync('npx', argsEsbuild, opcoes);
 const componentes = ['jszip.min.js', 'exceljs.min.js', 'html2canvas.min.js', 'jspdf.umd.min.js'].map((n) => `<script>${seguro(ler(docs('vendor', n)))}</script>`).join('\n');
 const modelo = fs.readFileSync(docs('modelos', 'fatura-modelo.xlsx')).toString('base64');
 const hoje = new Date().toISOString().slice(0, 10);
