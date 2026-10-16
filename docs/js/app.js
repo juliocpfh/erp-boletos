@@ -324,7 +324,7 @@ function atualizarFaixa() {
 const MENU = [
   ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
   ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'],
-  ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', '^resultados|^contas'],
+  ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', '^resultados|^contas|^impostos'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^backup|^empresas'],
 ];
 
@@ -422,6 +422,10 @@ document.addEventListener('click', async (ev) => {
 });
 
 document.addEventListener('change', async (ev) => {
+  if (ev.target.matches('select[data-ordem-boletos]')) {
+    ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+    return;
+  }
   if (ev.target.matches('input[data-marcar-grupo]')) {
     ev.target.closest('form').querySelectorAll('input[name=ids]').forEach((x) => { x.checked = ev.target.checked; });
     return;

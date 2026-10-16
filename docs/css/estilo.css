@@ -298,3 +298,10 @@ input.doc-invalido { border-color: var(--perigo); }
 .resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
 th.centro, td.centro { text-align: center; }
 .botao-icone { display: inline-flex; align-items: center; padding: 4px 10px; }
+.indices-compacta { margin-top: 8px; width: auto; }
+.indices-compacta th, .indices-compacta td { padding: 3px 14px 3px 0; }
+.link-botao.excluir-mini, .excluir-mini { color: var(--perigo); padding: 0 4px; font-weight: 700; }
+.abas { display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
+.abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
+.abas a.ativo { border-bottom-color: var(--info, #0891b2); font-weight: 700; }
+.texto-aviso { color: #b45309; font-weight: 700; }

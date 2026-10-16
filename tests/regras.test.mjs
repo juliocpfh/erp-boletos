@@ -843,3 +843,23 @@ test('complemento da caução sai junto ao gerar os boletos do mês e não escon
   assert.equal(R.complementosCaucaoPendentes(d, '2026-03').length, 0);
   assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 0, existentes: 1 });
 });
+
+test('impostos: PIS/COFINS mensal e IRPJ/CSLL do trimestre acumulando mês a mês; valor do contador ao lado', () => {
+  const d = R.bancoVazio();
+  const e = R.inserir(d, 'emitentes', { nome: 'EMPRESA TESTE', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  const nf = (numero, emissao, valor, situacao = 'Emitida') => R.inserir(d, 'faturas', { numero, emissao, emitente_id: e.id, valor, situacao }, 'j');
+  nf(1, '2026-04-10', 1000000); // abril R$ 10.000,00
+  nf(2, '2026-05-10', 2000000); // maio R$ 20.000,00
+  nf(3, '2026-05-20', 500000, 'Cancelada'); // cancelada não entra
+  nf(4, '2026-06-10', 1000000); // junho R$ 10.000,00
+  nf(5, '2026-07-10', 1000000); // julho: 3º trimestre
+  const g = (comp) => Object.fromEntries(R.impostosDoMes(d, comp)[0].guias.map((x) => [x.imposto, [x.periodo, x.base, x.esperado]]));
+  assert.deepEqual(g('2026-04'), { 'PIS/COFINS': ['2026-04', 1000000, 36500], IRPJ: ['2026-T2', 1000000, 48000], CSLL: ['2026-T2', 1000000, 28800] });
+  assert.deepEqual(g('2026-05'), { 'PIS/COFINS': ['2026-05', 2000000, 73000], IRPJ: ['2026-T2', 3000000, 144000], CSLL: ['2026-T2', 3000000, 86400] });
+  assert.deepEqual(g('2026-06'), { 'PIS/COFINS': ['2026-06', 1000000, 36500], IRPJ: ['2026-T2', 4000000, 192000], CSLL: ['2026-T2', 4000000, 115200] });
+  assert.deepEqual(g('2026-07').IRPJ, ['2026-T3', 1000000, 48000]);
+  R.salvarGuiaImposto(d, e.id, 'IRPJ', '2026-T2', 191950, 'j');
+  assert.equal(R.impostosDoMes(d, '2026-06')[0].guias[1].contador.valor, 191950);
+  R.salvarGuiaImposto(d, e.id, 'IRPJ', '2026-T2', null, 'j');
+  assert.equal(R.impostosDoMes(d, '2026-06')[0].guias[1].contador, null);
+});
