@@ -168,7 +168,7 @@ async function listaArquivos(escopo, id) {
   }
   // apólices do seguro: a vigência da apólice aparece ao lado do arquivo
   const seguroDo = (nome) => (escopo === 'seguro' ? R.segurosDoImovel(d(), Number(id)).find((s) => s.arquivo_apolice === nome || (s.outros_arquivos || []).includes(nome)) : null);
-  const vigencia = (nome) => { const s = seguroDo(nome); return s ? ` <span class="suave">· ${s.arquivo_apolice === nome ? 'apólice' : 'outro arquivo'} · vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}${s.telefone_assistencia && s.arquivo_apolice === nome ? ` · 📞 assistência ${esc(s.telefone_assistencia)}` : ''}</span>` : ''; };
+  const vigencia = (nome) => { const s = seguroDo(nome); return s ? ` <span class="suave">· ${s.arquivo_apolice === nome ? 'apólice' : 'outro arquivo'} · vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</span>` : ''; };
   return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${vigencia(a.nome)}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
     <td class="n">${botao('baixarArquivo', 'Baixar', { escopo, id, nome: a.nome })} ${opera() ? botao('excluirArquivo', 'Excluir', { escopo, id, nome: a.nome }, 'perigo pequeno', 'Excluir este arquivo?') : ''}</td></tr>`).join('')}</table>`;
