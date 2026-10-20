@@ -181,6 +181,29 @@ function janelaErro(texto) {
   dlg.showModal();
 }
 
+/**
+ * Janela de pergunta no meio da tela. ``html`` já vem escapado por quem chama; ``forte`` = borda e botão vermelhos (mais chamativa).
+ * Devolve os campos marcados/preenchidos da janela ({ nome: [valores] }) ao confirmar, ou null ao cancelar.
+ */
+export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', forte = false }) {
+  return new Promise((resolver) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = `janela-erro janela-pergunta${forte ? ' forte' : ''}`;
+    dlg.innerHTML = `<form method="dialog">${titulo ? `<h3>${esc(titulo)}</h3>` : ''}<div class="corpo">${html}</div>
+      <div class="acoes" style="justify-content:flex-end"><button type="button" class="secundario" data-nao>${esc(nao)}</button><button value="sim" class="${forte ? 'perigo' : ''}">${esc(sim)}</button></div></form>`;
+    let resposta = null;
+    dlg.querySelector('[data-nao]').addEventListener('click', () => dlg.close());
+    dlg.querySelector('form').addEventListener('submit', () => {
+      const fd = new FormData(dlg.querySelector('form'));
+      resposta = {};
+      for (const [k, v] of fd.entries()) (resposta[k] = resposta[k] || []).push(v);
+    });
+    dlg.addEventListener('close', () => { dlg.remove(); resolver(resposta); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+  });
+}
+
 function fecharMensagem(id) {
   mensagens = mensagens.filter((x) => x.id !== id);
   const el = document.querySelector(`#mensagens [data-msg="${id}"]`);
@@ -447,6 +470,16 @@ document.addEventListener('change', async (ev) => {
   if (ev.target.matches('input[data-arquivo-doc]')) {
     const nome = ev.target.closest('label').querySelector('[data-nome-escolhido]');
     nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
+    return;
+  }
+  if (ev.target.matches('input[data-acao-arquivo]')) {
+    if (!ev.target.files.length) return;
+    try {
+      await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
+    } catch (e) {
+      console.error(e);
+      aviso(e.message, 'erro');
+    }
     return;
   }
   const el = ev.target.closest('input[data-upload]');

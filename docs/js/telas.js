@@ -1,6 +1,6 @@
 // Telas do sistema (HTML), formulários e ações dos botões.
 import {
-  E, alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, criarBanco, entrar, escolherPasta, excelJs, ir, jsZip, login, mostrar,
+  E, alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, criarBanco, entrar, escolherPasta, excelJs, ir, janela, jsZip, login, mostrar,
   naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, renovarUsuario, sair,
 } from './app.js';
 import * as B from './backup-seguro.js';
@@ -39,12 +39,19 @@ function multaJurosTexto(cb) {
 
 const textoValor = (v) => (v === null || v === undefined || v === '' ? '(vazio)' : typeof v === 'object' ? JSON.stringify(v) : v);
 
-function tabelaHistorico(lista) {
+/**
+ * Tabela do histórico. ``desfazer`` (só na página Histórico, para o administrador): { pode: Set "índice:campo", indice: Map registro → índice }
+ * mostra a caixinha e o botão ↶ nos campos que podem voltar agora (sempre o mais recente de cada campo).
+ */
+function tabelaHistorico(lista, desfazer = null) {
   const linhas = lista.map((h) => {
     let det = '';
     if (h.acao === 'Alteração' && h.detalhes) {
+      const i = desfazer ? desfazer.indice.get(h) : -1;
+      const volta = (k) => (desfazer && desfazer.pode.has(`${i}:${k}`) ? ` <label class="check-mini" title="Marcar para desfazer junto com outros"><input type="checkbox" data-desfazer value="${i}:${esc(k)}"></label>
+        ${botao('desfazerAlteracao', '↶ Desfazer', { itens: `${i}:${k}` }, 'secundario pequeno', `Voltar "${k}" de "${textoValor(h.detalhes[k].para)}" para "${textoValor(h.detalhes[k].de)}"?`)}` : '');
       det = Object.entries(h.detalhes).map(([k, m]) => (m && typeof m === 'object'
-        ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}</div>`
+        ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}${volta(k)}</div>`
         : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`)).join('');
     } else if (h.detalhes) {
       det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('')}</details>`;
@@ -541,11 +548,17 @@ export const TELAS = {
 
   // ------------------------------------------------------------------------
   imoveis() {
+    // contas do imóvel numa linha fina embaixo do endereço (só o que estiver preenchido)
+    const linhaContas = (i) => {
+      const l = [['💧 Sanepar', i.sanepar_matricula], ['⚡ Copel', i.copel_uc], ['🔥 Gás', i.gas_relogio], ['🏢', i.administradora_nome]]
+        .filter(([, v]) => v).map(([t, v]) => `${t} <b>${esc(v)}</b>`);
+      return l.length ? `<br><span class="contas">${l.join(' · ')}</span>` : '';
+    };
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const atual = atuais[0];
-      return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a>${i.sublote ? `<br><span class="suave">${esc(i.sublote)}</span>` : ''}</td><td>${esc(R.enderecoCompleto(i))}</td>
+      return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td><td>${esc(R.enderecoCompleto(i))}${linhaContas(i)}</td>
         <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
         <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td></tr>`;
     }).join('');
@@ -790,6 +803,32 @@ function valorBonificado(c) {
   return aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c));
 }
 
+/**
+ * Valores do contrato inicial (aluguel cheio e bonificado): mudar depois de salvo pede duas confirmações.
+ * O aluguel em vigor muda por "Registrar correção" ou "Renovação / novo valor". Devolve true para seguir.
+ */
+async function confirmarValoresIniciais(dados, r) {
+  if (!r) return true;
+  // o bonificado é comparado sobre o mesmo aluguel que o formulário mostra (o atual), para não acusar diferença de centavo
+  const base = R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
+  const antes = r.bonificacao === false ? null : valorBonificado(r);
+  const depois = dados.bonificacao === false ? null : base - C.descontoPorPercentual(base, dados.desconto_pontualidade_percentual || 0);
+  const mudou = [];
+  if (dados.aluguel_inicial !== r.aluguel_inicial) mudou.push(`Aluguel inicial (valor cheio): ${reais(r.aluguel_inicial)} → ${reais(dados.aluguel_inicial)}`);
+  if (antes !== depois) mudou.push(`Aluguel com bonificação: ${antes === null ? 'sem bonificação' : reais(antes)} → ${depois === null ? 'sem bonificação' : reais(depois)}`);
+  if (!mudou.length) return true;
+  const lista = `<ul>${mudou.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  const passo1 = await janela({ titulo: 'Valores do contrato inicial',
+    html: `<p>O aluguel cheio e o aluguel com bonificação deste cadastro são os valores do <b>contrato inicial</b>${r.vigencia_inicio ? `, assinado a partir de ${dataBr(r.vigencia_inicio)}` : ''}.</p>
+      <p>Para mudar o aluguel em vigor (reajuste ou novo valor negociado), use <b>Registrar correção</b> ou <b>Registrar renovação / novo valor</b> na página do contrato.</p>${lista}`,
+    sim: 'Quero corrigir o contrato inicial', nao: 'Cancelar' });
+  if (!passo1) return false;
+  const passo2 = await janela({ titulo: '⚠ Confirme a mudança do contrato inicial', forte: true,
+    html: `<p><b>Isto muda o histórico do contrato.</b> Os boletos em aberto deste contrato podem ser recalculados com os valores novos.</p>${lista}<p>Confirma?</p>`,
+    sim: 'Confirmo a mudança', nao: 'Cancelar' });
+  return !!passo2;
+}
+
 /** Selo e aviso do boleto de controle (inquilino que não emite NF e não conta nos resultados). */
 const seloControle = () => etiqueta('Boleto de controle · sem NF · fora dos resultados', 'controle');
 const AVISO_CONTROLE = 'não emite NF. O pagamento é acompanhado (em dia ou atrasado), mas não gera NF e não conta nas somas dos boletos nem nos resultados financeiros.';
@@ -813,17 +852,17 @@ function caixaGarantia(c) {
         ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
     : opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}</div>`;
     }
-    html += `<div class="grade">${item('Caução dada', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}`)}
+    html += `<div class="grade">${item('Caução dada', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao, { tabela: 'contratos', id: c.id, campo: 'comprovante_caucao', tipo: 'caucao', data: c.caucao_data })}`)}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>
       <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
-      ${correcoes.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${esc(x.observacoes || '')}${x.comprovante ? ` ${linkComprovante(c.id, x.comprovante)}` : ''}</td>
+      ${correcoes.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${esc(x.observacoes || '')}${x.comprovante || x.complemento > 0 ? ` ${linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data })}` : ''}</td>
         <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes_garantia', id: x.id }, 'perigo pequeno', 'Excluir esta correção da caução?') : ''}</td></tr>`).join('')
       || '<tr><td colspan="5" class="suave">Nenhuma correção registrada.</td></tr>'}</table>
       ${opera() ? `<p>${link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução')}</p>` : ''}`;
   }
   if (R.temDeposito(c)) {
-    html += `<div class="grade">${item('Depósito de garantia', `${reais(c.deposito_valor)} em ${dataBr(c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito)}`)}
+    html += `<div class="grade">${item('Depósito de garantia', `${reais(c.deposito_valor)} em ${dataBr(c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito, { tabela: 'contratos', id: c.id, campo: 'comprovante_deposito', tipo: 'deposito-garantia', data: c.deposito_data })}`)}
       ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>`;
   }
   if (R.temFiador(c) || fiadores.length) {
@@ -848,7 +887,7 @@ function caixaGarantia(c) {
       <table><tr><th>Empresa</th><th class="n">Aplicado</th></tr>
       ${sit.linhas.map((l) => `<tr><td>${esc(l.emitente.nome)}</td><td class="n">${reais(l.aplicado)}</td></tr>`).join('') || '<tr><td colspan="2" class="suave">Nada aplicado ainda.</td></tr>'}
       <tr class="total"><td>Total aplicado de ${reais(sit.total)}</td><td class="n">${reais(sit.soma)} ${sit.ok ? etiqueta('100% aplicado', 'ok') : ''}</td></tr></table>
-      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Empresa</th><th class="n">Valor</th><th>Comprovante</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc((buscar('emitentes', a.emitente_id) || {}).nome || '-')}</td><td class="n">${reais(a.valor)}</td><td>${linkComprovante(c.id, a.comprovante)}</td><td>${esc(a.observacoes || '')}</td>
+      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Empresa</th><th class="n">Valor</th><th>Comprovante</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc((buscar('emitentes', a.emitente_id) || {}).nome || '-')}</td><td class="n">${reais(a.valor)}</td><td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })}</td><td>${esc(a.observacoes || '')}</td>
         <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aplicacoes', id: a.id }, 'perigo pequeno', 'Excluir esta aplicação?') : ''}</td></tr>`).join('')}</table>` : ''}
       ${opera() ? `<p>${link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação')}</p>` : ''}
       <p class="suave">Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final).</p>`;
@@ -952,10 +991,49 @@ function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
   };
 }
 
+/** Marca única da situação do boleto: paga em dia, paga com atraso, vencida, em aberto ou carência. */
+function situacaoBoleto(cb, hoje = C.hojeIso()) {
+  if (!cb.data_pagamento && cb.situacao !== 'Carência' && cb.vencimento < hoje) return etiqueta('Vencida', 'perigo');
+  return cb.pagou_em_dia ? `<span title="Pagou até o vencimento; o banco compensou depois">${situacao(cb.situacao)}</span>` : situacao(cb.situacao);
+}
+
+/** Boletos na página do inquilino: os 12 mais recentes numa tabela compacta; os anteriores ficam recolhidos. */
+const BOLETOS_INQUILINO = 12;
+function caixaBoletosInquilino(c, cobs, hoje) {
+  const linha = (x) => {
+    const fs = R.faturasDe(d(), 'cobranca', x.id);
+    const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : '';
+    return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('caução', 'info')}` : ''}</td>
+      <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td>
+      <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}</td>
+      <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
+  };
+  const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
+  const recentes = cobs.slice(0, BOLETOS_INQUILINO);
+  const antigos = cobs.slice(BOLETOS_INQUILINO);
+  return `<div class="cartao"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
+    <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join('') || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
+    ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join('')}</table></div></details>` : ''}</div>`;
+}
+
+/** Cabeçalho do inquilino: botões para abrir na hora os documentos já anexados (entrada, assinatura faltante e aditivos). */
+function atalhosDocumentos(c) {
+  const abrir = (escopo, id, nome, texto) => `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(texto)}</a>`;
+  const curto = { doc_contrato_em: 'Contrato', doc_vistoria_em: 'Vistoria de entrada', doc_chaves_em: 'Termo das chaves' };
+  const botoes = R.DOCUMENTOS_ENTRADA.map(([k]) => {
+    const doc = R.documentoEntrada(d(), c, k);
+    if (doc && doc.arquivo) return abrir('assinados', doc.contrato.id, doc.arquivo, curto[k]);
+    const p = R.documentoParcial(d(), c, k);
+    return p ? abrir('assinados', c.id, p.arquivo, `${curto[k]} (falta assinatura)`) : '';
+  }).filter(Boolean);
+  for (const a of [...R.aditivosDo(d(), c.id)].reverse()) botoes.push(abrir('aditivos', a.contrato_id, a.arquivo, `Aditivo ${dataBr(a.data)}`));
+  return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(' ')}</div>` : '';
+}
+
 /** Topo da página do inquilino: o que falta dos documentos de entrada, com os botões para gerar. */
 function faixaDocumentosEntrada(c) {
   if (!R.contratoAtivo(c)) return '';
-  const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => !R.documentoEntrada(d(), c, k) && !R.documentoPerdido(d(), c, k));
+  const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => R.documentoFalta(d(), c, k));
   if (!falta.length) return '';
   const g = geradoresDocumentos(c, 'botao pequeno');
   return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase('pt-BR')).join(', '))}.
@@ -969,18 +1047,40 @@ function caixaDocumentos(c) {
   const doc = (k) => R.documentoEntrada(d(), c, k);
   const herdado = (k) => doc(k) && doc(k).contrato.id !== c.id;
   const abrir = (k) => (doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc(doc(k).arquivo)}">📎 ${esc(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>');
+  // troca de titular: os documentos de entrada vêm do contrato original (não se gera novo, não fica pendente)
+  const original = R.contratoHerdado(d(), c);
   const perdido = (k) => R.documentoPerdido(d(), c, k);
-  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) ? ' class="doc-perdido"' : ''}><td><b>${esc(nome)}</b></td>
-    <td>${perdido(k) ? etiqueta(`perdido (registrado em ${dataBr(perdido(k))})`, 'perigo') : doc(k) ? `${etiqueta(`${feito} em ${dataBr(doc(k).data)}`, 'ok')}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc(doc(k).contrato.inquilino_nome)}</a></span>` : ''}` : etiqueta('pendente', 'perigo')}</td>
-    <td class="nw">${doc(k) || perdido(k) ? '' : gerar[k]}</td>
+  const aguardaPerda = (k) => perdido(k) && c[R.campoPerdidoPendente(k)];
+  const parcial = (k) => R.documentoParcial(d(), c, k);
+  const adm = podeUsuario('admin');
+  const analise = (k, tipo) => (adm ? ` ${botao('analisarDocumento', tipo === 'perdido' ? 'Confirmar perda' : 'Conferido', { contrato: c.id, campo: k, tipo, aceitar: 1 }, 'pequeno')}
+    ${botao('analisarDocumento', 'Recusar', { contrato: c.id, campo: k, tipo, aceitar: 0 }, 'perigo pequeno', tipo === 'perdido' ? 'Recusar a perda? O documento volta a pendente.' : 'Recusar este anexo com assinatura faltante? O documento volta a pendente (o arquivo continua na pasta).')}` : '');
+  const situacaoDoc = (k, feito) => {
+    if (aguardaPerda(k)) return `${etiqueta(`perdido? aguardando o administrador (${c[R.campoPerdidoPendente(k)]}, ${dataBr(perdido(k))})`, 'aviso')}${analise(k, 'perdido')}`;
+    if (perdido(k)) return etiqueta(`perdido (registrado em ${dataBr(perdido(k))})`, 'perigo');
+    if (parcial(k)) {
+      const p = parcial(k);
+      return `${etiqueta(`falta assinatura: ${p.falta.join(', ')}`, 'aviso')}<br><span class="suave">anexado em ${dataBr(p.data)} por ${esc(p.por || '-')}:</span>
+        <a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(p.arquivo)}">📎 ${esc(p.arquivo)}</a>
+        ${p.pendente ? `<br>${etiqueta('aguardando análise do administrador', 'info')}${analise(k, 'parcial')}` : ''}`;
+    }
+    if (doc(k)) return `${etiqueta(`${feito} em ${dataBr(doc(k).data)}`, 'ok')}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc(doc(k).contrato.inquilino_nome)}</a></span>` : ''}`;
+    if (original) return `${etiqueta(`herdado de ${original.inquilino_nome}`, 'info')}<br><span class="suave">ainda não marcado no contrato anterior: marque lá, em <a href="#/contrato/${original.id}?ir=documentos">${esc(original.inquilino_nome)}</a></span>`;
+    return etiqueta('pendente', 'perigo');
+  };
+  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) && !aguardaPerda(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ''}><td><b>${esc(nome)}</b></td>
+    <td>${situacaoDoc(k, feito)}</td>
+    <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
       ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ''}`
-    : !opera() ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+    : !opera() || perdido(k) || original ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${hoje}" style="width:auto">
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-        <button class="secundario pequeno">Marcar ${feito}</button></form>`}
-      ${opera() && !doc(k) ? (perdido(k) ? botao('desmarcarPerdido', 'Desfazer "perdido"', { contrato: c.id, campo: k }, 'link-botao')
-        : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.`)) : ''}</td></tr>`).join('');
+        <button class="secundario pequeno">Marcar ${feito}</button>
+        ${parcial(k) ? '' : botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno')}</form>`}
+      ${opera() && !doc(k) && !original ? (perdido(k) ? botao('desmarcarPerdido', 'Desfazer "perdido"', { contrato: c.id, campo: k }, 'link-botao')
+        : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente (o arquivo continua na pasta).')
+        : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</td></tr>`).join('');
   return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
     <div class="rolagem"><table>${linhas}</table></div>
@@ -989,7 +1089,7 @@ function caixaDocumentos(c) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'vistorias', id: v.id }, 'perigo pequeno', `Excluir a vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')} de ${dataBr(v.data)}?`) : ''}</td></tr>`).join('')}</table>` : ''}
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
     : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
-    <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar".</p>
+    <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar". Se ainda falta a assinatura de alguém, anexe o arquivo e clique em "Falta assinatura": fica um alerta até chegar o arquivo completo.</p>
     <details><summary>Todos os arquivos assinados guardados</summary>${caixaArquivos('assinados', c.id, 'Documentos assinados', 'assinados', '', true, false)}
       ${R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => caixaArquivos('assinados', x.id, `Histórico: contrato anterior de ${x.inquilino_nome}`, `assinados-${x.id}`, '', true, false)).join('')}</details>
     ${caixaAditivos(c)}</div>`;
@@ -1000,8 +1100,10 @@ function caixaAditivos(c) {
   const lista = R.aditivosDo(d(), c.id);
   const abrir = (a) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`;
   const anteriores = R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, R.aditivosDo(d(), x.id)]).filter(([, l]) => l.length);
+  const ant = R.contratoHerdado(d(), c);
   return `<h3 id="aditivos">Termos aditivos</h3>
-    ${c.possui_aditivos && !lista.length ? '<div class="alerta aviso">O contrato está marcado com "Possui termo aditivo" (mudou o vencimento ou a garantia), mas nenhum termo foi registrado aqui. Registre-o com o arquivo assinado.</div>' : ''}
+    ${ant && !lista.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). Registre-o com o arquivo assinado.</div>` : ''}
+    ${c.possui_aditivos && !lista.length && !ant ? '<div class="alerta aviso">O contrato está marcado com "Possui termo aditivo" (mudou o vencimento ou a garantia), mas nenhum termo foi registrado aqui. Registre-o com o arquivo assinado.</div>' : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td>
       <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo continua guardado na pasta.`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
@@ -1040,6 +1142,7 @@ function telaContrato(c) {
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
+    ${atalhosDocumentos(c)}
     ${faixaDocumentosEntrada(c)}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
@@ -1061,7 +1164,7 @@ function telaContrato(c) {
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)} · ${linkComprovante(c.id, c.comprovante_reserva)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)} · ${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
         <p class="suave">${(() => { const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0); return usos.length ? `Abatida em: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : 'Ainda não abatida em nenhum boleto.'; })()}
           ${opera() ? botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno') : ''}</p>` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
@@ -1081,14 +1184,13 @@ function telaContrato(c) {
       ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td>
         <td class="n">${opera() ? botao('excluirRenovacao', 'Excluir', { id: r.id }, 'perigo pequeno', `Excluir este registro${r.novo_valor ? ' e o novo valor negociado' : ''}? A data de término do contrato não volta sozinha: confira em "Editar".`) : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
-    <div class="cartao"><h2>Boletos</h2><div class="rolagem"><table><tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th>Pago em</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
-      ${cobs.map((x) => { const fs = R.faturasDe(d(), 'cobranca', x.id); return `<tr><td><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('complemento da caução', 'info')}` : ''}</td><td>${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td><td>${situacao(x.situacao)}${x.pagou_em_dia ? ` ${etiqueta('pagou em dia', 'ok')}` : ''}</td><td>${dataBr(x.data_pagamento)}</td><td>${multaJurosTexto(x)}</td><td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td>${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`; }).join('') || '<tr><td colspan="8" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div></div>
+    ${caixaBoletosInquilino(c, cobs, hoje)}
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}
     ${caixaDocumentos(c)}
-    ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', `Ficha cadastral, documentos iniciais, contrato, termos aditivos, vistoria de entrada e saída, notificações, documento de identificação${pj ? ', contrato social e cartão CNPJ da empresa, documentos do representante' : ''}${c.solidario_nome ? ', documentos do inquilino solidário' : ''} etc.`)}
+    ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', 'Fichas cadastrais, Documentos de Identificação, Consulta Serasa, Contra Vistorias')}
     ${caixaSaida(c)}
     ${caixaHistorico(`Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}`, tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80)))}`;
 }
@@ -1100,7 +1202,8 @@ function telaContrato(c) {
 const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lista(d(), c.lista) } : c));
 
 // --------------------------------------------------------------------------
-// Comprovantes obrigatórios (caução, depósito, reserva, aplicação e complemento da caução): PDF ou foto na pasta do inquilino
+// Comprovantes (caução, depósito, reserva, aplicação e complemento da caução): PDF ou foto na pasta do inquilino.
+// O valor pode ser salvo sem o comprovante: fica um alerta para buscar no banco e anexar depois.
 // --------------------------------------------------------------------------
 const COMPROVANTES_CONTRATO = [
   { campo: 'comprovante_caucao', valor: 'caucao_valor', data: 'caucao_data', nome: 'caucao', texto: 'do depósito da caução', vale: (x) => x.garantia_tipo === 'Caução' },
@@ -1111,26 +1214,32 @@ const COMPROVANTE_APLICACAO = [{ campo: 'comprovante', valor: 'valor', data: 'da
 const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
 const arquivoEscolhido = (form, campo) => { const el = form.querySelector(`[name="${campo}"]`); return (el && el.files && el.files[0]) || null; };
 
-/** Exige o comprovante quando o valor entra ou muda; o que já tinha arquivo e não mudou de valor passa. */
-function exigirComprovantes(lista, dados, erros, r, form) {
+/** Valor mudou e nenhum arquivo novo foi escolhido: o comprovante antigo não vale mais (volta o alerta para anexar). */
+function conferirComprovantes(lista, dados, r, form) {
   for (const k of lista) {
-    if (!k.vale(dados) || !(dados[k.valor] > 0)) continue;
-    const jaTem = r && r[k.campo] && r[k.valor] === dados[k.valor];
-    if (!arquivoEscolhido(form, k.campo) && !jaTem) erros[k.campo] = `Anexe o comprovante ${k.texto} (PDF ou foto)`;
+    if (r && r[k.campo] && r[k.valor] !== dados[k.valor] && !arquivoEscolhido(form, k.campo)) dados[k.campo] = null;
   }
 }
 
-/** Grava na pasta os comprovantes escolhidos e guarda o nome do arquivo no registro (ex.: comprovante-caucao-2026-10-05.pdf). */
+/** Nome do arquivo do comprovante (ex.: comprovante-caucao-2026-10-05.pdf). */
+const nomeComprovante = (tipo, data, arq) => `comprovante-${tipo}-${data || C.hojeIso()}${extensao(arq.name)}`;
+
+/** Grava na pasta os comprovantes escolhidos e guarda o nome do arquivo no registro. */
 async function guardarComprovantes(lista, dados, form, pasta) {
   for (const k of lista) {
     const arq = arquivoEscolhido(form, k.campo);
     if (!arq || !k.vale(dados) || !(dados[k.valor] > 0)) continue;
-    dados[k.campo] = await S.salvarArquivo(await pasta(), new File([arq], `comprovante-${k.nome}-${dados[k.data] || C.hojeIso()}${extensao(arq.name)}`));
+    dados[k.campo] = await S.salvarArquivo(await pasta(), new File([arq], nomeComprovante(k.nome, dados[k.data], arq)));
   }
 }
 
-/** Link para abrir o comprovante guardado na pasta do inquilino. */
-const linkComprovante = (contratoId, nome) => (nome ? `<a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}">📎 comprovante</a>` : etiqueta('sem comprovante', 'aviso'));
+/**
+ * Link para abrir o comprovante guardado na pasta do inquilino. Sem comprovante: etiqueta e, com ``anexo``
+ * ({ tabela, id, campo, tipo, data }), o botão para anexar depois.
+ */
+const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}">📎 comprovante</a>`
+  : `${etiqueta('sem comprovante: buscar no banco', 'aviso')}${anexo && opera() ? ` <label class="botao secundario pequeno enviar" title="Comprovante (PDF ou foto)">Anexar comprovante<input type="file" accept="application/pdf,image/*"
+    data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>` : ''}`);
 
 let antesDoVinculo = null;
 let fiadoresMudancas = { novos: [], alterados: [], excluidos: [] };
@@ -1291,7 +1400,7 @@ const CADASTROS = {
         if (!f.nome) erros[`fiador${n}_nome`] = 'Informe o nome do fiador';
         else fiadoresMudancas.novos.push(f);
       }
-      exigirComprovantes(COMPROVANTES_CONTRATO, dados, erros, r, form);
+      conferirComprovantes(COMPROVANTES_CONTRATO, dados, r, form);
       avisoAditivo = '';
       if (r && (dados.dia_vencimento !== r.dia_vencimento || (r.garantia_tipo && dados.garantia_tipo !== r.garantia_tipo))) {
         dados.possui_aditivos = true;
@@ -1308,6 +1417,7 @@ const CADASTROS = {
         else erros.inquilino_endereco = 'Escolha o imóvel para usar o endereço dele';
       }
     },
+    confirmar: confirmarValoresIniciais,
     // contrato já salvo: grava na pasta atual (se o nome mudar, a pasta inteira é renomeada depois); contrato novo: na pasta que ele vai ter
     async ajustarAsync(dados, erros, r, form) {
       const pasta = r ? () => pastaDoEscopo('contrato', r.id)
@@ -1486,7 +1596,7 @@ const CADASTROS = {
     aviso: (r, q) => { const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato)); return `Garantia ${reais(s.total)}: aplicado ${reais(s.soma)}${s.linhas.length ? ` (${s.linhas.map((l) => `${l.emitente.nome} ${reais(l.aplicado)}`).join('; ')})` : ''}, falta ${reais(Math.max(s.falta, 0))}. Pode aplicar tudo numa empresa só.`; },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
     descricao: (dados) => `Garantia aplicada: ${reais(dados.valor)}${dados.comprovante ? ` · comprovante ${dados.comprovante}` : ''}`,
-    ajustar: (dados, erros, r, form) => exigirComprovantes(COMPROVANTE_APLICACAO, dados, erros, r, form),
+    ajustar: (dados, erros, r, form) => conferirComprovantes(COMPROVANTE_APLICACAO, dados, r, form),
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_APLICACAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
   },
   correcoes_garantia: {
@@ -1505,7 +1615,7 @@ const CADASTROS = {
       const anterior = R.valorGarantia(d(), buscar('contratos', q.contrato));
       dados.valor_anterior = anterior;
       if (dados.complemento === null) dados.complemento = dados.valor_novo - anterior;
-      exigirComprovantes(COMPROVANTE_COMPLEMENTO, dados, erros, r, form);
+      conferirComprovantes(COMPROVANTE_COMPLEMENTO, dados, r, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
   },
@@ -1523,7 +1633,6 @@ const CADASTROS = {
     ajustar(dados, erros, r, form) {
       if (dados.garantia_tipo === 'Caução' && !(dados.caucao_valor > 0)) erros.caucao_valor = 'Informe o valor da caução';
       if (R.temDeposito(dados) && !(dados.deposito_valor > 0)) erros.deposito_valor = 'Informe o valor do depósito';
-      exigirComprovantes(COMPROVANTES_CONTRATO.slice(0, 2), dados, erros, null, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTES_CONTRATO.slice(0, 2), dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
     salvar: (db, dados, q) => R.trocarGarantia(db, Number(q.contrato), dados, login()),
@@ -1703,7 +1812,10 @@ function cadastrosIncompletos() {
     const falta = K.pendenciasDoContrato(d(), c).filter((t) => !t.endsWith('(em Empresas)'));
     if (!c.inquilino_telefone) falta.push('telefone');
     if (!c.inquilino_email) falta.push('e-mail');
-    for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) if (!R.documentoEntrada(d(), c, k) && !R.documentoPerdido(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
+    for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) {
+      if (R.documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
+      else if (R.documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (falta assinatura)`, nivel: 'aviso' });
+    }
     if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
   }
   for (const i of d().imoveis) {
@@ -1870,7 +1982,7 @@ function telaCobrancas(comp, ordem = 'vencimento') {
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${comp}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => `<option value="${k}" ${(ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas">
-      <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Pagamento</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
+      <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
         <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (imprimir o demonstrativo ou excluir)"></td>
         <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
@@ -1879,15 +1991,15 @@ function telaCobrancas(comp, ordem = 'vencimento') {
           ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
           ${R.ehComplementoCaucao(cb) ? `<br>${etiqueta('complemento da caução · sem NF', 'info')}` : ''}
           ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(`reajuste no aluguel de ${compBr(proxima)}`, 'aviso')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${proxima}`, reajustes.get(c.id).carta ? 'Carta (enviada ✓)' : 'Gerar carta', 'botao pequeno')}` : ''}</td>
-        <td>${dataBr(cb.vencimento)}${!cb.data_pagamento && cb.vencimento < hoje ? `<br>${etiqueta('vencida', 'perigo')}` : ''}
+        <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.</td>
-        <td>${cb.data_pagamento ? `${situacao(cb.situacao)}${cb.pagou_em_dia ? ` ${etiqueta('pagou em dia', 'ok')}` : ''}<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ''}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao('estornar', 'Desfazer', { id: cb.id }, 'secundario pequeno', 'Desfazer este pagamento?')}` : ''}`
-          : cb.situacao === 'Carência' ? situacao('Carência') : (opera() ? formPagamento(cb, true) : situacao(cb.situacao))}</td>
+        <td>${cb.data_pagamento || cb.situacao === 'Carência' ? situacaoBoleto(cb, hoje) : `${situacaoBoleto(cb, hoje)}${opera() ? `<br>${formPagamento(cb, true)}` : ''}`}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
-        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}</td></tr>`).join('')
+        <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}
+          ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ''}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'secundario pequeno', 'Desfazer este pagamento?')}` : ''}` : ''}</td></tr>`).join('')
       || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr(comp)}.</td></tr>`}
       ${lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ''}
     </table></div>
@@ -1929,7 +2041,7 @@ function demonstrativo(cb) {
       ${cb.ressarcimento ? linha(`(-) Ressarcimento de taxa do condomínio (${esc(cb.ressarcimento_descricao || '')})`, `- ${reais(cb.ressarcimento)}`) : ''}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
-    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou em dia; compensado depois)' : ''}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ''}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
+    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou até o vencimento; compensado depois)' : ''}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ''}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
 }
 
@@ -2885,6 +2997,20 @@ function telaEmpresas() {
       ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
 }
 
+/** Desfaz as alterações escolhidas no Histórico (só administrador) e recalcula os boletos em aberto ligados a elas. */
+async function desfazerItens(itens) {
+  if (!podeUsuario('admin')) throw new Error('Só o administrador desfaz alterações.');
+  let recalculados = 0;
+  await alterar((db) => {
+    for (const { tabela, id } of R.desfazerAlteracoes(db, itens, login())) {
+      const cfg = CADASTROS[tabela];
+      if (cfg && cfg.recalcular) recalculados += R.recalcularCobrancas(db, cfg.recalcular(R.buscar(db, tabela, id), db), login());
+    }
+  });
+  aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : 'Desfeito.');
+  await mostrar();
+}
+
 function telaHistorico(q) {
   let lista = d().historico;
   if (q.usuario) lista = lista.filter((h) => h.usuario === q.usuario);
@@ -2896,17 +3022,20 @@ function telaHistorico(q) {
     lista = lista.filter((h) => `${h.descricao || ''} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase('pt-BR').includes(t));
   }
   const usuarios = [...new Set(d().historico.map((h) => h.usuario))].sort();
-  // Começa recolhido; fica aberto só quando há filtro aplicado (senão o resultado sumiria ao filtrar).
   const filtrando = Object.values(q).some(Boolean);
+  // administrador: desfaz alterações de cadastro, sempre da mais recente para a mais antiga de cada campo
+  const desfazer = podeUsuario('admin') ? { pode: R.alteracoesDesfaziveis(d()), indice: new Map(d().historico.map((h, i) => [h, i])) } : null;
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
-    <details class="cartao" ${filtrando ? 'open' : ''}><summary><b>Histórico</b> <span class="suave">· ${lista.length} registro(s)${filtrando ? ' com o filtro aplicado' : ''}</span></summary>
+    <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista.length} registro(s)${filtrando ? ' com o filtro aplicado' : ''}</span></summary>
     <form class="formulario" data-form="filtroHistorico" style="margin-top:12px">
       <div><label>Usuário</label><select name="usuario"><option value=""></option>${usuarios.map((u) => `<option ${q.usuario === u ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></div>
       <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(R.TABELAS).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div><label>De</label><input type="date" name="de" value="${esc(q.de || '')}"></div><div><label>Até</label><input type="date" name="ate" value="${esc(q.ate || '')}"></div>
       <div><label>Contém o texto</label><input name="texto" value="${esc(q.texto || '')}"></div>
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
-    ${tabelaHistorico(lista.slice(-500).reverse())}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
+    ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta o campo ao valor anterior. Cada campo volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
+      <p>${botao('desfazerMarcados', '↶ Desfazer os marcados', {}, 'secundario pequeno')}</p>` : ''}
+    ${tabelaHistorico(lista.slice(-500).reverse(), desfazer)}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
 }
 
 async function telaDados() {
@@ -3187,6 +3316,7 @@ export const FORMULARIOS = {
     // documentos já salvos (CPF/CNPJ) e que não mudaram não são barrados; "valores" traz também os que aparecem no formulário (ex.: fiadores no contrato)
     const { dados, erros } = F.ler(campos, form, registro && cfg.valores ? cfg.valores(registro) : registro);
     if (cfg.ajustar && !Object.keys(erros).length) cfg.ajustar(dados, erros, registro, form, rota.q);
+    if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new Error('Nada foi salvo.');
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
     confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
@@ -3621,13 +3751,67 @@ export const ACOES = {
   },
 
   async documentoPerdido({ contrato, campo }) {
-    await alterar((db) => R.marcarDocumentoPerdido(db, Number(contrato), campo, C.hojeIso(), login()));
+    await alterar((db) => R.marcarDocumentoPerdido(db, Number(contrato), campo, C.hojeIso(), login(), podeUsuario('admin')));
+    await mostrar();
+  },
+
+  /** Anexo com assinatura faltante: a janela só oferece os nomes ligados ao contrato. */
+  async documentoParcial({ contrato, campo }, el) {
+    const form = el.closest('form');
+    const data = form.querySelector('[name=data]').value;
+    const arquivo = form.querySelector('[name=arquivo]').files[0];
+    const doc = R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+    if (!data) throw new Error('Informe a data.');
+    if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
+    const partes = R.partesDoContrato(d(), buscar('contratos', contrato));
+    const r = await janela({ titulo: `De quem falta a assinatura? (${doc[1]})`,
+      html: `<p class="suave">Só aparecem as pessoas e empresas cadastradas neste contrato. Marque todas que faltam.</p>
+        ${partes.map((p) => `<label class="check"><input type="checkbox" name="falta" value="${esc(R.textoParte(p))}"> <b>${esc(p.nome)}</b> <span class="suave">(${esc(p.papel)})</span></label>`).join('')}`,
+      sim: 'Anexar com assinatura faltante' });
+    if (!r) return;
+    if (!r.falta || !r.falta.length) throw new Error('Marque de quem falta a assinatura. Nada foi salvo.');
+    const nome = await salvarAssinado('assinados', Number(contrato), arquivo, `${doc[1]} falta assinatura ${data}`);
+    await alterar((db) => R.anexarDocumentoParcial(db, Number(contrato), campo, { data, arquivo: nome, falta: r.falta }, login(), podeUsuario('admin')));
+    aviso(podeUsuario('admin') ? 'Anexado. Fica o alerta até chegar o arquivo com todas as assinaturas.' : 'Anexado. O administrador vai analisar; fica o alerta até chegar o arquivo com todas as assinaturas.');
+    await mostrar();
+  },
+
+  async desfazerParcial({ contrato, campo }) {
+    await alterar((db) => R.anexarDocumentoParcial(db, Number(contrato), campo, null, login(), podeUsuario('admin')));
+    await mostrar();
+  },
+
+  /** Administrador confirma ou recusa a perda ou o anexo com assinatura faltante registrados por outro usuário. */
+  async analisarDocumento({ contrato, campo, tipo, aceitar }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador analisa.');
+    await alterar((db) => R.analisarDocumento(db, Number(contrato), campo, tipo, aceitar === '1', login()));
     await mostrar();
   },
 
   async desmarcarPerdido({ contrato, campo }) {
     await alterar((db) => R.marcarDocumentoPerdido(db, Number(contrato), campo, null, login()));
     await mostrar();
+  },
+
+  /** Comprovante de depósito que faltava: grava na pasta do inquilino e liga ao registro (some o alerta). */
+  async anexarComprovante({ contrato, tabela, id, campo, tipo, data }, el) {
+    const arq = el.files[0];
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(contrato)), new File([arq], nomeComprovante(tipo, data, arq)));
+    await alterar((db) => R.anexarComprovante(db, tabela, Number(id), campo, nome, login()));
+    aviso('Comprovante anexado.');
+    await mostrar();
+  },
+
+  /** Histórico (administrador): desfaz uma alteração ou as marcadas, recalculando os boletos em aberto quando for o caso. */
+  async desfazerAlteracao({ itens }) {
+    await desfazerItens(String(itens).split(','));
+  },
+
+  async desfazerMarcados() {
+    const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].map((x) => x.value);
+    if (!itens.length) throw new Error('Marque as alterações que quer desfazer.');
+    if (!confirm(`Desfazer ${itens.length} alteração(ões) marcada(s)? Cada campo volta ao valor anterior.`)) return;
+    await desfazerItens(itens);
   },
 
   async desmarcarDocumento({ contrato, campo }) {

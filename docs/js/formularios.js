@@ -194,8 +194,9 @@ export const fiadoresNoCadastro = (existentes = []) => Array.from({ length: vaga
     ...CAMPOS_FIADOR.map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, fiador: n, ...GARANTIA_FIADOR })),
   ];
 });
-/** Comprovante obrigatório: PDF ou foto, guardado na pasta do inquilino. */
-const comprovante = (nome, rotulo, extra = {}) => campo(nome, rotulo, 'arquivo', { ajuda: 'Obrigatório ao registrar ou mudar o valor: PDF ou foto do comprovante', ...extra });
+/** Comprovante: PDF ou foto, guardado na pasta do inquilino. Sem ele, o valor é salvo e fica um alerta para anexar depois. */
+const SEM_COMPROVANTE = 'Ainda não tem? Salve assim mesmo: fica um alerta para buscar no banco e anexar depois';
+const comprovante = (nome, rotulo, extra = {}) => campo(nome, rotulo, 'arquivo', { ajuda: `PDF ou foto do comprovante. ${SEM_COMPROVANTE}`, ...extra });
 
 const PJ = quando('inquilino_tipo', 'Pessoa jurídica (empresa)');
 const SOLIDARIO = quando('tem_solidario', '1');
@@ -251,7 +252,7 @@ export const CONTRATO = [
   secao('Reserva dada na visita'),
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
-  comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'Obrigatório quando houver reserva: PDF ou foto do comprovante' }),
+  comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: `PDF ou foto do comprovante da reserva. ${SEM_COMPROVANTE}` }),
   campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
   secao('Objeto da locação (para o contrato)'),
   campo('finalidade', 'Finalidade', 'opcao', { padrao: 'Residencial', opcoes: ['Residencial', 'Não residencial'] }),
@@ -356,7 +357,7 @@ export const APLICACAO = [
   campo('data', 'Data da aplicação', 'data', { obrig: true }),
   campo('emitente_id', 'Empresa onde foi aplicado', 'opcao', { obrig: true, opcoes: [] }),
   campo('valor', 'Valor aplicado', 'dinheiro', { obrig: true }),
-  comprovante('comprovante', 'Comprovante da aplicação', { ajuda: 'Obrigatório: PDF ou foto do comprovante da aplicação na empresa' }),
+  comprovante('comprovante', 'Comprovante da aplicação', { ajuda: `PDF ou foto do comprovante da aplicação na empresa. ${SEM_COMPROVANTE}` }),
   campo('observacoes', 'Observações (banco, aplicação)', 'area'),
 ];
 
@@ -364,7 +365,7 @@ export const CORRECAO_GARANTIA = [
   campo('data', 'Data', 'data', { obrig: true }),
   campo('valor_novo', 'Novo valor da caução', 'dinheiro', { obrig: true }),
   campo('complemento', 'Complemento pago pelo inquilino', 'dinheiro', { ajuda: 'Em branco: diferença entre o novo e o anterior' }),
-  comprovante('comprovante', 'Comprovante do depósito do complemento', { ajuda: 'Obrigatório quando houver complemento: PDF ou foto do comprovante' }),
+  comprovante('comprovante', 'Comprovante do depósito do complemento', { ajuda: `PDF ou foto do comprovante do complemento. ${SEM_COMPROVANTE}` }),
   campo('observacoes', 'Observações', 'area'),
 ];
 

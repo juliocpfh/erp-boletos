@@ -201,6 +201,68 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
   return mudancas;
 }
 
+// --------------------------------------------------------------------------
+// Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
+// Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
+// --------------------------------------------------------------------------
+const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos']);
+const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
+const textoComparar = (x) => (x === undefined || x === null ? '' : typeof x === 'object' ? JSON.stringify(x) : String(x));
+
+/**
+ * Campos que podem ser desfeitos agora: Set de "índice no histórico:campo". Para cada campo de cada registro só vale a
+ * alteração mais recente ainda não desfeita, e só se o valor atual ainda é o que ela gravou. Desfeita a última,
+ * a anterior passa a poder ser desfeita (até voltar ao valor original).
+ */
+export function alteracoesDesfaziveis(d) {
+  const desfeitos = new Set();
+  d.historico.forEach((h) => { if (h.desfaz !== undefined && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`); });
+  const topo = new Map();
+  d.historico.forEach((h, i) => {
+    if (h.acao !== 'Alteração' || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== undefined) return;
+    for (const [k, m] of Object.entries(h.detalhes)) {
+      if (m && typeof m === 'object' && 'de' in m && !desfeitos.has(`${i}:${k}`)) topo.set(`${h.tabela}:${h.registro_id}:${k}`, i);
+    }
+  });
+  const out = new Set();
+  for (const [chave, i] of topo) {
+    const h = d.historico[i];
+    const k = chave.split(':').slice(2).join(':');
+    if (SEM_DESFAZER.has(h.tabela) || CAMPOS_SEM_DESFAZER.has(k) || !Array.isArray(d[h.tabela])) continue;
+    const r = buscar(d, h.tabela, h.registro_id);
+    if (r && textoComparar(r[k]) === textoComparar(h.detalhes[k].para)) out.add(`${i}:${k}`);
+  }
+  return out;
+}
+
+/**
+ * Desfaz as alterações escolhidas (["índice:campo", ...]): o campo volta ao valor de antes daquela alteração.
+ * Cada volta fica no histórico como "Desfeito pelo administrador". Devolve [{ tabela, id }] dos registros mudados.
+ */
+export function desfazerAlteracoes(d, itens, usuario) {
+  const porIndice = new Map();
+  for (const x of itens) {
+    const p = String(x).indexOf(':');
+    const i = Number(String(x).slice(0, p));
+    porIndice.set(i, [...(porIndice.get(i) || []), String(x).slice(p + 1)]);
+  }
+  const mudados = [];
+  for (const i of [...porIndice.keys()].sort((a, b) => b - a)) {
+    const pode = alteracoesDesfaziveis(d);
+    const campos = porIndice.get(i).filter((k) => pode.has(`${i}:${k}`));
+    if (!campos.length) throw new Error('Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).');
+    const h = d.historico[i];
+    const r = buscar(d, h.tabela, h.registro_id);
+    const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
+    for (const k of campos) r[k] = h.detalhes[k].de ?? null;
+    registrar(d, usuario, 'Alteração', h.tabela, r.id, `Desfeito pelo administrador (alteração de ${h.usuario} em ${new Date(h.quando).toLocaleString('pt-BR')})${h.descricao ? `: ${h.descricao}` : ''}`,
+      det, vinculos(d, h.tabela, r));
+    d.historico[d.historico.length - 1].desfaz = i;
+    mudados.push({ tabela: h.tabela, id: r.id });
+  }
+  return mudados;
+}
+
 export function excluir(d, tabela, id, usuario, descricao) {
   const i = d[tabela].findIndex((r) => r.id === Number(id));
   if (i < 0) return;
@@ -1202,6 +1264,38 @@ function alertaAplicacao(d, c) {
     texto: `Garantia de ${C.reais(s.total)} não foi aplicada integralmente: ${s.soma ? `aplicado ${C.reais(s.soma)} (${s.linhas.map((l) => `${l.emitente.nome.split(/\s+/)[0]} ${C.reais(l.aplicado)}`).join(', ')}), ` : ''}falta aplicar ${C.reais(s.falta)}.` };
 }
 
+/**
+ * Depósitos registrados sem o comprovante (caução, depósito de garantia, reserva, complemento da caução e aplicação):
+ * [{ texto, valor, data, tabela, id, campo, tipo }]. ``tipo`` dá o nome do arquivo (comprovante-caucao-AAAA-MM-DD.pdf).
+ */
+export function comprovantesPendentes(d, c) {
+  const out = [];
+  const falta = (cond, texto, valor, data, tabela, id, campo, tipo) => { if (cond && valor > 0) out.push({ texto, valor, data, tabela, id, campo, tipo }); };
+  falta(c.garantia_tipo === 'Caução' && !c.comprovante_caucao, 'caução', c.caucao_valor, c.caucao_data, 'contratos', c.id, 'comprovante_caucao', 'caucao');
+  falta(temDeposito(c) && !c.comprovante_deposito, 'depósito de garantia', c.deposito_valor, c.deposito_data, 'contratos', c.id, 'comprovante_deposito', 'deposito-garantia');
+  falta(!c.comprovante_reserva, 'reserva', c.reserva_valor, c.reserva_data, 'contratos', c.id, 'comprovante_reserva', 'reserva');
+  for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
+  for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
+  return out;
+}
+
+/** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
+export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'] };
+  if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
+  if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
+  const r = buscar(d, tabela, id);
+  if (!r) throw new Error(`${TABELAS[tabela]} não encontrado.`);
+  atualizar(d, tabela, r.id, { [campo]: arquivo }, usuario, `Comprovante anexado: ${arquivo}`);
+}
+
+function alertaComprovantes(d, c) {
+  const l = comprovantesPendentes(d, c);
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Comprovante a buscar no banco', ancora: 'garantia',
+    texto: `Anexe o comprovante: ${l.map((x) => `${x.texto} de ${C.reais(x.valor)}${x.data ? ` (${C.dataBr(x.data)})` : ''}`).join('; ')}.` };
+}
+
 /** Fiador com fim de vínculo próximo (ou já terminado) e nenhum outro fiador para o contrato. */
 function alertaFiador(d, c, hoje) {
   if (!temFiador(c)) return null;
@@ -1238,7 +1332,11 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     alertaFiador(d, contrato, hoje),
     alertaAplicacao(d, contrato),
+    alertaComprovantes(d, contrato),
     alertaDocumentosEntrada(contrato, d),
+    alertaAssinaturaFaltante(d, contrato),
+    alertaPerdaAConfirmar(d, contrato),
+    alertaAditivoHerdeiro(d, contrato),
     alertaCondominio(contrato, hoje),
   ].filter(Boolean);
 }
@@ -1256,9 +1354,134 @@ export const DOCUMENTOS_ENTRADA = [
 export const campoArquivoDoc = (campo) => campo.replace(/_em$/, '_arquivo');
 /** Data em que o documento foi dado como perdido: doc_contrato_em → doc_contrato_perdido_em. */
 export const campoPerdidoDoc = (campo) => campo.replace(/_em$/, '_perdido_em');
+/** Perda registrada por quem não é administrador: login de quem registrou, até o administrador confirmar ou recusar. */
+export const campoPerdidoPendente = (campo) => campo.replace(/_em$/, '_perdido_pendente');
+/** Arquivo anexado com assinatura faltante: { data, arquivo, falta: [nomes], por, pendente } (pendente = aguarda o administrador). */
+export const campoParcialDoc = (campo) => campo.replace(/_em$/, '_parcial');
 
 /** Data em que o documento foi registrado como perdido (null se não foi, ou se já existe assinado, próprio ou herdado). */
 export const documentoPerdido = (d, c, campo) => (c[campoPerdidoDoc(campo)] && !documentoEntrada(d, c, campo) ? c[campoPerdidoDoc(campo)] : null);
+/** Anexo com assinatura faltante (null se não há, ou se o documento já está assinado). */
+export const documentoParcial = (d, c, campo) => (c[campoParcialDoc(campo)] && !documentoEntrada(d, c, campo) ? c[campoParcialDoc(campo)] : null);
+/** Documento que ainda falta: nem assinado, nem perdido, nem anexado com assinatura faltante. */
+/**
+ * Quem "continua o contrato de" outro (troca de titular) não gera contrato, vistoria nem termo das chaves novos:
+ * herda os do contrato original. Devolve o contrato anterior imediato, ou null.
+ */
+export const contratoHerdado = (d, c) => (d && c.contrato_anterior_id ? buscar(d, 'contratos', c.contrato_anterior_id) || null : null);
+/** Documento que ainda falta: nem assinado, nem perdido, nem anexado com assinatura faltante, nem herdado do contrato original. */
+export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !documentoEntrada(d, c, campo) && !documentoPerdido(d, c, campo) && !documentoParcial(d, c, campo);
+
+/** Troca de titular: o termo aditivo que coloca o novo titular no contrato é obrigatório (alerta até registrar um aditivo neste contrato). */
+export function alertaAditivoHerdeiro(d, c) {
+  const ant = contratoHerdado(d, c);
+  if (!ant || c.ativo === false || c.data_saida || aditivosDo(d, c.id).length) return null;
+  return { nivel: 'perigo', tipo: 'Aditivo da troca de titular', ancora: 'aditivos',
+    texto: `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
+}
+
+/**
+ * Quem assina o contrato (nomes já cadastrados): locadoras, inquilino, representante da empresa, solidário e fiadores atuais.
+ * [{ nome, papel }]. Só estes nomes podem ser apontados como assinatura faltante.
+ */
+export function partesDoContrato(d, c) {
+  const partes = d.participacoes.filter((p) => p.imovel_id === c.imovel_id).map((p) => buscar(d, 'emitentes', p.emitente_id)).filter(Boolean);
+  const locadoras = partes.length ? partes : d.emitentes.filter((e) => e.ativo);
+  return [
+    ...locadoras.map((e) => ({ nome: e.razao_social || e.nome, papel: 'locadora' })),
+    { nome: c.inquilino_nome, papel: 'inquilino' },
+    ...(c.inquilino_tipo === 'Pessoa jurídica (empresa)' && c.representante_nome ? [{ nome: c.representante_nome, papel: 'representante da empresa' }] : []),
+    ...(c.solidario_nome ? [{ nome: c.solidario_nome, papel: 'inquilino solidário' }] : []),
+    ...(temFiador(c) ? fiadoresDo(d, c.id) : []).map((f) => ({ nome: f.nome, papel: 'fiador' })),
+  ].filter((p) => p.nome);
+}
+/** Texto gravado para cada parte: "Pedro Souza (fiador)". */
+export const textoParte = (p) => `${p.nome} (${p.papel})`;
+
+/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
+export function alertaDocumentosEntrada(c, d = null) {
+  if (c.ativo === false || c.data_saida) return null;
+  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
+}
+
+/** Documento anexado com assinatura faltante: alerta até alguém anexar o arquivo com todas as assinaturas. */
+function alertaAssinaturaFaltante(d, c) {
+  if (c.ativo === false || c.data_saida) return null;
+  const l = DOCUMENTOS_ENTRADA.map(([k, t]) => [t, documentoParcial(d, c, k)]).filter(([, p]) => p);
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Assinatura faltante', ancora: 'documentos',
+    texto: `${l.map(([t, p]) => `${t.toLocaleLowerCase('pt-BR')} anexado sem a assinatura de ${p.falta.join(', ')}${p.pendente ? ' (aguardando análise do administrador)' : ''}`).join('; ')}. Anexe o arquivo com todas as assinaturas.` };
+}
+
+/** Perda registrada por quem não é administrador: aguarda o administrador confirmar ou recusar. */
+function alertaPerdaAConfirmar(d, c) {
+  const l = DOCUMENTOS_ENTRADA.filter(([k]) => documentoPerdido(d, c, k) && c[campoPerdidoPendente(k)]);
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Documento perdido a confirmar', ancora: 'documentos',
+    texto: `${l.map(([k, t]) => `${t.toLocaleLowerCase('pt-BR')} registrado como perdido por ${c[campoPerdidoPendente(k)]} em ${C.dataBr(c[campoPerdidoDoc(k)])}`).join('; ')}. O administrador confirma ou recusa.` };
+}
+
+/** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
+export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
+  const c = buscar(d, 'contratos', contratoId);
+  // assinado de verdade: saem o registro de perdido e o de assinatura faltante
+  const limpa = data ? { [campoPerdidoDoc(campo)]: null, [campoPerdidoPendente(campo)]: null, [campoParcialDoc(campo)]: null } : {};
+  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null, ...limpa }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+/**
+ * Anexa o documento com assinatura faltante. ``falta`` = textos de partesDoContrato (outro nome é recusado).
+ * Quem não é administrador fica aguardando a análise do administrador. Sem dados: desfaz o registro.
+ */
+export function anexarDocumentoParcial(d, contratoId, campo, dados, usuario, administrador) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  const nome = doc[1].toLocaleLowerCase('pt-BR');
+  if (!dados) {
+    atualizar(d, 'contratos', c.id, { [campoParcialDoc(campo)]: null }, usuario, `${c.inquilino_nome}: ${nome} sem o registro de assinatura faltante`);
+    return;
+  }
+  if (!dados.data) throw new Error('Informe a data.');
+  if (!dados.arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${nome}.`);
+  const validos = partesDoContrato(d, c).map(textoParte);
+  const falta = [...new Set(dados.falta || [])];
+  if (!falta.length) throw new Error('Escolha de quem falta a assinatura.');
+  const errado = falta.find((x) => !validos.includes(x));
+  if (errado) throw new Error(`"${errado}" não está ligado a este contrato.`);
+  atualizar(d, 'contratos', c.id, { [campoParcialDoc(campo)]: { data: dados.data, arquivo: dados.arquivo, falta, por: usuario, pendente: !administrador } }, usuario,
+    `${c.inquilino_nome}: ${nome} anexado sem a assinatura de ${falta.join(', ')}`);
+}
+
+/** Registra que o documento foi perdido ou, sem data, desfaz o registro. Quem não é administrador fica aguardando a análise. */
+export function marcarDocumentoPerdido(d, contratoId, campo, data, usuario, administrador = true) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  atualizar(d, 'contratos', c.id, { [campoPerdidoDoc(campo)]: data || null, [campoPerdidoPendente(campo)]: data && !administrador ? usuario : null }, usuario,
+    `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `perdido (registrado em ${C.dataBr(data)}${administrador ? '' : ', aguardando o administrador'})` : 'não está mais como perdido'}`);
+}
+
+/** Análise do administrador: ``tipo`` 'perdido' ou 'parcial'; aceitar confirma, recusar desfaz o registro (o arquivo fica na pasta). */
+export function analisarDocumento(d, contratoId, campo, tipo, aceitar, usuario) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  const nome = doc[1].toLocaleLowerCase('pt-BR');
+  if (tipo === 'perdido') {
+    atualizar(d, 'contratos', c.id, aceitar ? { [campoPerdidoPendente(campo)]: null } : { [campoPerdidoDoc(campo)]: null, [campoPerdidoPendente(campo)]: null }, usuario,
+      `${c.inquilino_nome}: perda d${doc[2].endsWith('a') ? 'a' : 'o'} ${nome} ${aceitar ? 'confirmada' : 'recusada'} pelo administrador`);
+  } else {
+    const p = c[campoParcialDoc(campo)];
+    if (!p) return;
+    atualizar(d, 'contratos', c.id, { [campoParcialDoc(campo)]: aceitar ? { ...p, pendente: false } : null }, usuario,
+      `${c.inquilino_nome}: ${nome} com assinatura faltante ${aceitar ? 'conferido' : 'recusado'} pelo administrador`);
+  }
+}
 
 /**
  * Situação de um documento de entrada. Quem "continua o contrato de" outro (ex.: troca de titular) herda o documento
@@ -1271,31 +1494,6 @@ export function documentoEntrada(d, c, campo) {
   if (!d) return null;
   const x = [...cadeiaDeContratos(d, c).antes].reverse().find((a) => a[campo]);
   return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
-}
-
-/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
-export function alertaDocumentosEntrada(c, d = null) {
-  if (c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => !documentoEntrada(d, c, k) && !documentoPerdido(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
-  return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
-}
-
-/** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
-export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null) {
-  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
-  if (!doc) throw new Error('Documento desconhecido.');
-  if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
-  const c = buscar(d, 'contratos', contratoId);
-  atualizar(d, 'contratos', c.id, { [campo]: data || null, [campoArquivoDoc(campo)]: data ? arquivo : null, ...(data ? { [campoPerdidoDoc(campo)]: null } : {}) }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `${doc[2]} em ${C.dataBr(data)}` : 'voltou a pendente'}`);
-}
-
-/** Registra que o documento foi perdido (fica em vermelho na lista, sem alerta geral) ou, sem data, desfaz o registro. */
-export function marcarDocumentoPerdido(d, contratoId, campo, data, usuario) {
-  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
-  if (!doc) throw new Error('Documento desconhecido.');
-  const c = buscar(d, 'contratos', contratoId);
-  atualizar(d, 'contratos', c.id, { [campoPerdidoDoc(campo)]: data || null }, usuario,
-    `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')} ${data ? `perdido (registrado em ${C.dataBr(data)})` : 'não está mais como perdido'}`);
 }
 
 /** Termos aditivos do contrato (posteriores a ele), do mais recente ao mais antigo. */
@@ -1383,7 +1581,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
-  'Titularidade', 'A verificar'];
+  'Titularidade', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
