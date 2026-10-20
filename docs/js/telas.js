@@ -2659,7 +2659,7 @@ function contratoMontado(q) {
   const modelos = K.modelosDe(d());
   const modelo = modelos.find((m) => m.id === Number(q.modelo)) || modelos[0];
   const testemunhas = [[q.t1, q.c1], [q.t2, q.c2]].map(([nome, cpf]) => ({ nome: nome || '', cpf: cpf || '' }));
-  const dados = K.dadosDoContrato(d(), c, { data: q.data || C.hojeIso(), testemunhas });
+  const dados = K.dadosDoContrato(d(), c, { data: q.data || c.vigencia_inicio || C.hojeIso(), testemunhas });
   return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
 }
 
@@ -2864,7 +2864,7 @@ function telaGerarContrato(rota) {
     <form class="cartao formulario" data-form="gerarContrato">
       <input type="hidden" name="contrato" value="${c.id}">
       <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>
-      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc(rota.q.data || C.hojeIso())}"></div>
+      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc(rota.q.data || c.vigencia_inicio || C.hojeIso())}"></div>
       <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
       <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
       <div class="check"><button>Ver contrato</button></div></form>

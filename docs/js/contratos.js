@@ -96,13 +96,13 @@ const nacionalidade = (p) => {
 
 /**
  * Qualificação de uma pessoa física: "NOME, brasileiro, solteiro, gerente de marketing, portador do RG nº X e CPF nº Y,
- * nascido na data de 25 de outubro de 1978, residente e domiciliado à Rua Z".
+ * nascido em 25 de outubro de 1978, residente e domiciliado à Rua Z".
  */
 export function qualificarPessoa(p) {
   const partes = [String(p.nome || '').toLocaleUpperCase('pt-BR'), nacionalidade(p), estadoCivil(p), p.profissao];
   const docs = [p.rg && `RG nº ${p.rg}`, p.cpf && `CPF nº ${p.cpf}`].filter(Boolean).join(' e ');
   if (docs) partes.push(`${gen(p, 'portador', 'portadora')} do ${docs}`);
-  if (p.nascimento) partes.push(`${gen(p, 'nascido', 'nascida')} na data de ${dataPorExtenso(p.nascimento)}`);
+  if (p.nascimento) partes.push(`${gen(p, 'nascido', 'nascida')} em ${dataPorExtenso(p.nascimento)}`);
   if (p.endereco) partes.push(`${gen(p, 'residente e domiciliado', 'residente e domiciliada')} à ${p.endereco}`);
   return partes.filter(Boolean).join(', ');
 }
@@ -370,7 +370,20 @@ const estiloRodape = (rodape) => `<style>@media print { @page {
     margin-bottom: calc(2cm - 15pt); border-bottom: 1px solid #999; padding-bottom: 2pt; ${FONTE_RODAPE} } } }</style>`;
 
 export function contratoHtml(blocos, { logo, rodape }) {
-  const corpo = blocos.map((b) => {
+  // o fecho ("E por assim estarem justos...", local e data) fica junto das assinaturas, na mesma página, quando couber
+  const iAss = blocos.findIndex((b) => b.tipo === 'assinaturas');
+  const iFecho = iAss > 1 && blocos[iAss - 1].tipo === 'direita' && blocos[iAss - 2].tipo === 'paragrafo' ? iAss - 2 : -1;
+  const corpo = blocos.map((b, i) => (i === iFecho ? '<div class="ct-fecho">' : '') + blocoHtml(b) + (i === iAss && iFecho >= 0 ? '</div>' : '')).join('');
+  return `<div class="contrato">
+    ${estiloRodape(rodape)}
+    ${marcaDagua(logo)}
+    <div class="ct-rodape">${rodape.map(escH).join('<br>')}</div>
+    ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ''}
+    <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;
+}
+
+function blocoHtml(b) {
+  {
     if (b.tipo === 'titulo') return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
     if (b.tipo === 'secao') return `<h2 class="ct-secao">${runsHtml(b.runs)}</h2>`;
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
@@ -386,13 +399,7 @@ export function contratoHtml(blocos, { logo, rodape }) {
       return `<div class="ct-assinaturas">${gruposAssinatura(b.pessoas).map((g) => `<div class="ct-grupo-assina${g.length === 1 ? ' um' : ''}">${g.map(assinaHtml).join('')}</div>`).join('')}</div>`;
     }
     return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
-  }).join('');
-  return `<div class="contrato">
-    ${estiloRodape(rodape)}
-    ${marcaDagua(logo)}
-    <div class="ct-rodape">${rodape.map(escH).join('<br>')}</div>
-    ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ''}
-    <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -437,10 +444,10 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + `${borda ? '' : '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'}`
     + `${cab ? '<w:shd w:val="clear" w:color="auto" w:fill="E5E7EB"/>' : destaque ? '<w:shd w:val="clear" w:color="auto" w:fill="FEF3C7"/>' : ''}</w:tcPr>${conteudo}</w:tc>`;
   const parCel = (t, { b = false, centro = false, rPr = '' } = {}) => `<w:p><w:pPr><w:spacing w:before="20" w:after="20" w:line="260" w:lineRule="auto"/>${centro ? '<w:jc w:val="center"/>' : ''}</w:pPr>${runX({ t, b }, rPr)}</w:p>`;
-  if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="240"/><w:jc w:val="center"/></w:pPr>${imagemX(1, 'rIdLogo', 4, 4 * prop)}</w:p>`);
+  if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${imagemX(1, 'rIdLogo', 4, 4 * prop)}</w:p>`);
   for (const b of blocos) {
-    if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }));
-    else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }));
+    if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
+    else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'direita') corpo.push(parX(b.runs, { alinhar: 'right', antes: 240, depois: 480 }));
     else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
@@ -449,7 +456,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
       const assina = (p) => {
         const linhas = [{ t: p.nome, b: true }, ...[p.doc, p.extra, p.papel].filter(Boolean).map((t) => ({ t, b: false }))];
         return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="560" w:after="0"/><w:jc w:val="center"/></w:pPr>${runX({ t: '__________________________________', b: false })}</w:p>`
-          + `<w:p><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after="120"/><w:jc w:val="center"/></w:pPr>${linhas.map((l, i) => (i ? '<w:r><w:br/></w:r>' : '') + runX(l, '<w:sz w:val="20"/>')).join('')}</w:p>`;
+          + `<w:p><w:pPr><w:keepLines/><w:spacing w:after="600"/><w:jc w:val="center"/></w:pPr>${linhas.map((l, i) => (i ? '<w:r><w:br/></w:r>' : '') + runX(l, '<w:sz w:val="20"/>')).join('')}</w:p>`;
       };
       const linhasTab = [];
       for (const g of gruposAssinatura(b.pessoas)) {

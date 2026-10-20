@@ -244,7 +244,7 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .05; pointer-events: none; z-index: 0; }
 .ct-marca { display: none; opacity: .05; pointer-events: none; z-index: 0; image-rendering: auto; }
 .contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
-.contrato .ct-capa { text-align: center; margin: 0 0 18px; }
+.contrato .ct-capa { text-align: center; margin: -.6cm 0 calc(18px - .6cm); }
 .contrato .ct-capa img { max-width: 150px; max-height: 70px; }
 .contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
 .contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
@@ -258,7 +258,9 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-espaco-rodape { height: 0; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
 .ct-assinaturas { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
-.ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 18px; }
+.ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 64px; break-inside: avoid; page-break-inside: avoid; }
+.ct-fecho { break-inside: avoid; page-break-inside: avoid; }
+.contrato .ct-titulo, .contrato .ct-secao, .contrato .ct-subsecao { break-after: avoid; page-break-after: avoid; }
 .ct-grupo-assina.um { grid-template-columns: minmax(0, 50%); justify-content: center; }
 .ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
 .ct-assina .ct-linha { border-top: 1px solid #111; margin: 34px 0 6px; }
