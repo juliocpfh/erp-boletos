@@ -770,7 +770,7 @@ test('documentos de entrada: quem continua o contrato de outro herda os document
   const h = R.documentoEntrada(d, novo, 'doc_contrato_em');
   assert.equal(h.contrato.id, c.id);
   assert.equal(h.arquivo, 'contrato.pdf');
-  assert.match(R.alertaDocumentosEntrada(novo, d).texto, /^falta recibo de entrega das chaves\.$/, 'só falta o que o anterior também não tinha');
+  assert.equal(R.alertaDocumentosEntrada(novo, d), null, 'herdeiro nunca fica com documento pendente (marca-se no contrato original)');
   R.marcarDocumento(d, c.id, 'doc_chaves_em', '2025-01-11', 'julio', 'chaves.pdf');
   assert.equal(R.documentoEntrada(d, novo, 'doc_chaves_em').arquivo, 'chaves.pdf', 'o recibo das chaves também é herdado');
   assert.equal(R.alertaDocumentosEntrada(novo, d), null);
@@ -945,4 +945,81 @@ test('contrato sem imóvel é apagado depois de 7 dias (sem boleto); normalizar 
   assert.equal(d.fiadores.length, 0);
   R.normalizar(d);
   assert.equal(d.imoveis[0].uf, 'PR');
+});
+
+test('assinatura faltante: só nomes do contrato, alerta até anexar o arquivo completo; operador aguarda o administrador', () => {
+  const { d, c } = base();
+  const partes = R.partesDoContrato(d, c).map(R.textoParte);
+  assert.deepEqual(partes, ['ANK ADMINISTRADORA DE BENS LTDA (locadora)', 'JCK ADMINISTRADORA DE BENS LTDA (locadora)', 'Maria Exemplo (inquilino)']);
+  assert.throws(() => R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'x.pdf', falta: ['Fulano (fiador)'] }, 'ana', false), /não está ligado/);
+  assert.throws(() => R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'x.pdf', falta: [] }, 'ana', false), /Escolha de quem/);
+  R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'contrato-falta.pdf', falta: ['JCK ADMINISTRADORA DE BENS LTDA (locadora)'] }, 'ana', false);
+  assert.doesNotMatch(R.alertaDocumentosEntrada(c, d).texto, /contrato de locação/, 'sai da lista de faltantes');
+  const a = R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Assinatura faltante');
+  assert.match(a.texto, /contrato de locação anexado sem a assinatura de JCK ADMINISTRADORA DE BENS LTDA \(locadora\) \(aguardando análise do administrador\)/);
+  R.analisarDocumento(d, c.id, 'doc_contrato_em', 'parcial', true, 'julio');
+  assert.equal(c.doc_contrato_parcial.pendente, false);
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-10-21', 'ana', 'contrato-assinado.pdf');
+  assert.equal(c.doc_contrato_parcial, null, 'o arquivo completo tira o registro');
+  assert.equal(R.alertasContrato(d, c, '2026-10-21').find((x) => x.tipo === 'Assinatura faltante'), undefined);
+});
+
+test('documento perdido por operador aguarda o administrador; do administrador vale direto', () => {
+  const { d, c } = base();
+  R.marcarDocumentoPerdido(d, c.id, 'doc_vistoria_em', '2026-10-20', 'ana', false);
+  assert.equal(c.doc_vistoria_perdido_pendente, 'ana');
+  assert.match(R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Documento perdido a confirmar').texto, /vistoria de entrada registrado como perdido por ana em 20\/10\/2026/);
+  R.analisarDocumento(d, c.id, 'doc_vistoria_em', 'perdido', false, 'julio');
+  assert.equal(R.documentoPerdido(d, c, 'doc_vistoria_em'), null, 'recusar volta a pendente');
+  R.marcarDocumentoPerdido(d, c.id, 'doc_vistoria_em', '2026-10-20', 'julio', true);
+  assert.equal(c.doc_vistoria_perdido_pendente, null);
+  assert.equal(R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Documento perdido a confirmar'), undefined);
+});
+
+test('comprovante de depósito ausente: alerta até anexar', () => {
+  const { d, c } = base();
+  const a = R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Comprovante a buscar no banco');
+  assert.match(a.texto, /reserva de R\$ 500,00/);
+  R.anexarComprovante(d, 'contratos', c.id, 'comprovante_reserva', 'comprovante-reserva.pdf', 'julio');
+  assert.equal(R.comprovantesPendentes(d, c).length, 0);
+  assert.throws(() => R.anexarComprovante(d, 'contratos', c.id, 'inquilino_nome', 'x.pdf', 'julio'), /desconhecido/);
+});
+
+test('desfazer pelo histórico: sempre a alteração mais recente de cada campo, até o valor original', () => {
+  const { d, c } = base();
+  R.atualizar(d, 'contratos', c.id, { inquilino_nome: 'Maria Exemplo Silva', inquilino_profissao: 'Engenheira' }, 'ana', 'manhã');
+  const manha = d.historico.length - 1;
+  R.atualizar(d, 'contratos', c.id, { inquilino_profissao: 'Arquiteta' }, 'ana', 'tarde');
+  const tarde = d.historico.length - 1;
+  let pode = R.alteracoesDesfaziveis(d);
+  assert.ok(pode.has(`${tarde}:inquilino_profissao`));
+  assert.ok(!pode.has(`${manha}:inquilino_profissao`), 'a da manhã só depois de desfazer a da tarde');
+  assert.ok(pode.has(`${manha}:inquilino_nome`), 'o nome tem a própria fila');
+  assert.throws(() => R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`], 'julio'), /não pode mais ser desfeita/);
+  R.desfazerAlteracoes(d, [`${tarde}:inquilino_profissao`], 'julio');
+  assert.equal(c.inquilino_profissao, 'Engenheira');
+  pode = R.alteracoesDesfaziveis(d);
+  assert.ok(pode.has(`${manha}:inquilino_profissao`));
+  assert.ok(!pode.has(`${tarde}:inquilino_profissao`));
+  R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`, `${manha}:inquilino_nome`], 'julio');
+  assert.equal(c.inquilino_profissao, null, 'voltou ao original (vazio)');
+  assert.equal(c.inquilino_nome, 'Maria Exemplo');
+  assert.match(d.historico.at(-1).descricao, /^Desfeito pelo administrador \(alteração de ana/);
+  assert.equal(R.alteracoesDesfaziveis(d).size, 0);
+  // boletos ficam de fora
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  R.atualizar(d, 'cobrancas', d.cobrancas[0].id, { observacoes: 'x' }, 'ana', 'obs');
+  assert.equal(R.alteracoesDesfaziveis(d).size, 0);
+});
+
+test('troca de titular: documentos de entrada herdados (nunca pendentes) e aditivo obrigatório', () => {
+  const { d, c } = base();
+  R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-06-07', 'julio', 'contrato.pdf');
+  const h = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'Ana Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-11-01', ativo: true }, 'julio');
+  assert.equal(R.alertaDocumentosEntrada(h, d), null, 'nada fica pendente no herdeiro');
+  assert.equal(R.documentoEntrada(d, h, 'doc_contrato_em').contrato.id, c.id);
+  const a = R.alertasContrato(d, h, '2026-11-01').find((x) => x.tipo === 'Aditivo da troca de titular');
+  assert.match(a.texto, /continua o de Maria Exemplo: registre o termo aditivo assinado que coloca Ana Herdeira como titular/);
+  R.registrarAditivo(d, h.id, { data: '2026-11-01', assunto: 'Troca de titular', arquivo: 'aditivo.pdf' }, 'julio');
+  assert.equal(R.alertasContrato(d, h, '2026-11-01').find((x) => x.tipo === 'Aditivo da troca de titular'), undefined);
 });
