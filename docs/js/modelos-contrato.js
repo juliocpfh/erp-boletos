@@ -33,7 +33,7 @@ O aluguel mensal e demais encargos previstos neste contrato vencem todo dia {dia
 
 **#i. DA FORMA DE PAGAMENTO**
 
-O pagamento dos aluguéis será feito mediante boleto bancário[se tarifa_boleto], sujeito à tarifa de cobrança de {tarifa_boleto}[fim], que será enviado ao LOCATÁRIO por e-mail.
+O pagamento dos aluguéis será feito mediante boleto bancário, que será enviado ao LOCATÁRIO por e-mail.
 
 Os signatários que contratam nas qualidades indicadas neste contrato têm entre si ajustada a presente locação, mediante as seguintes cláusulas e condições, celebrada conforme a Lei nº 8.245/91, na qual as partes contratadas se obrigam mutuamente:`;
 

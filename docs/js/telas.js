@@ -1447,6 +1447,8 @@ const CADASTROS = {
       dados.sem_imovel_desde = imovelFinal ? null : (r && !r.imovel_id && r.sem_imovel_desde) || C.hojeIso();
       // "Usar o endereço do imóvel": o endereço do inquilino fica igual ao do imóvel
       const imovelEndereco = buscar('imoveis', imovelFinal || q.vincular);
+      // caução: data prevista = data do contrato; valor = aluguéis × aluguel com bonificação (se não foi digitado)
+      if (dados.garantia_tipo === 'Caução') R.completarCaucao(dados);
       for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
         if (r || new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome)) continue;
         if (imovelEndereco) dados[campoEnd] = enderecoInquilino(imovelEndereco);
@@ -2942,9 +2944,9 @@ async function logoPng() {
   g.drawImage(img, 0, 0);
   const png = async () => new Uint8Array(await (await new Promise((ok) => canvas.toBlob(ok, 'image/png'))).arrayBuffer());
   const bytes = await png();
-  // marca-d'água: a mesma logo quase transparente (7%), para ficar suave em qualquer leitor de Word
+  // marca-d'água: a mesma logo quase transparente (5%), para ficar suave em qualquer leitor de Word
   g.clearRect(0, 0, canvas.width, canvas.height);
-  g.globalAlpha = 0.07;
+  g.globalAlpha = 0.05;
   g.drawImage(img, 0, 0);
   return { bytes, marca: await png(), largura: canvas.width, altura: canvas.height };
 }
@@ -3018,7 +3020,8 @@ function telaEmpresas() {
     || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
     <div class="cartao"><h2>Logo da empresa</h2>
-      <p class="suave">Aparece no topo de todas as páginas do sistema.</p>
+      <p class="suave">Aparece no topo de todas as páginas do sistema e como marca-d'água nos contratos, vistorias e cartas. Envie em boa resolução (PNG ou SVG, de preferência com 1.000 pixels de largura ou mais).</p>
+      ${d().logo && larguraLogo(d().logo) && larguraLogo(d().logo) < 800 ? `<div class="alerta aviso">A logo atual está em baixa resolução (${larguraLogo(d().logo)} pixels de largura): a marca-d'água sai serrilhada. Envie a logo de novo em "Trocar logo".</div>` : ''}
       ${d().logo ? `<p><img class="logo-previa" src="${esc(d().logo)}" alt="Logo atual"></p>` : '<p class="suave">Nenhuma logo enviada.</p>'}
       ${podeUsuario('admin') ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? 'Trocar logo' : 'Enviar logo'}</button>
         ${d().logo ? botao('removerLogo', 'Remover logo', {}, 'perigo pequeno', 'Remover a logo?') : ''}</form>` : ''}</div>
@@ -3111,7 +3114,18 @@ async function telaDados() {
 // --------------------------------------------------------------------------
 // Envio de formulários
 // --------------------------------------------------------------------------
-/** Reduz a imagem da logo (até 400×120) e devolve como data URL PNG, guardada no próprio banco de dados. */
+/**
+ * Logo em boa resolução (até 1400×700, PNG em data URL guardada no próprio banco): a mesma imagem vira a marca-d'água
+ * de 14 cm dos contratos, então precisa ser nítida. SVG é desenhado já no tamanho máximo.
+ */
+const LOGO_MAX = { largura: 1400, altura: 700 };
+/** Largura em pixels da logo guardada (lida do cabeçalho do PNG); 0 se não der para saber. */
+function larguraLogo(dataUrl) {
+  try {
+    const b = atob(String(dataUrl).split(',')[1].slice(0, 40));
+    return b.slice(1, 4) === 'PNG' ? ((b.charCodeAt(16) << 24) | (b.charCodeAt(17) << 16) | (b.charCodeAt(18) << 8) | b.charCodeAt(19)) : 0;
+  } catch { return 0; }
+}
 async function reduzirImagem(arquivo) {
   if (!podeUsuario('admin')) throw new Error('Só administradores podem alterar a logo.');
   const url = URL.createObjectURL(arquivo);
@@ -3122,13 +3136,17 @@ async function reduzirImagem(arquivo) {
       i.onerror = () => falha(new Error('Não consegui abrir a imagem. Use PNG, JPG, SVG ou WEBP.'));
       i.src = url;
     });
+    const svg = /svg/i.test(arquivo.type);
     const largura = img.naturalWidth || 400;
     const altura = img.naturalHeight || 120;
-    const escala = Math.min(1, 400 / largura, 120 / altura);
+    const escala = Math.min(svg ? Infinity : 1, LOGO_MAX.largura / largura, LOGO_MAX.altura / altura);
     const cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.round(largura * escala));
     cv.height = Math.max(1, Math.round(altura * escala));
-    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    const g = cv.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, cv.width, cv.height);
     return cv.toDataURL('image/png');
   } finally {
     URL.revokeObjectURL(url);

@@ -121,3 +121,22 @@ test('marca-d\'água: fundo repetido na tela e logo fixa para a impressão', () 
   assert.match(html, /<img class="ct-marca" src="data:image\/png;base64,AAAA"/);
   assert.match(K.contratoHtml([{ tipo: 'par', runs: [{ t: 'x' }] }], { logo: 'data:image/png;base64,AAAA', rodape: [] }), /ct-marcas/);
 });
+
+test('caução pelas condições do contrato (sem valor gravado nem data) e sem tarifa de cobrança', () => {
+  const { d, c } = base({ caucao_valor: null, taxa_boleto: 350 });
+  const t = texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === 'Residencial').texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
+  assert.match(t, /o valor de R\$ 9\.450,00 \(nove mil quatrocentos e cinquenta reais\), equivalente a 3 \(três\) meses de aluguel/, '3 × R$ 3.150,00 bonificado');
+  assert.doesNotMatch(t, /tarifa de cobrança/);
+  const x = R.completarCaucao({ garantia_tipo: 'Caução', caucao_meses: 3, aluguel_inicial: 200000, desconto_pontualidade_percentual: 10, vigencia_inicio: '2026-11-01' });
+  assert.equal(x.caucao_valor, 540000);
+  assert.equal(x.caucao_data, '2026-11-01', 'data prevista = data do contrato');
+  assert.ok(K.pendenciasDoContrato(d, { ...c, caucao_valor: null, caucao_meses: null }).includes('caução: valor ou quantos aluguéis'));
+});
+
+test('assinaturas em conjuntos: locatários, fiadores, locadora, testemunhas', () => {
+  const g = K.gruposAssinatura([{ papel: 'LOCADORA' }, { papel: 'LOCATÁRIO' }, { papel: 'LOCATÁRIO SOLIDÁRIO' }, { papel: 'FIADOR 1' }, { papel: 'FIADOR 2' }, { papel: 'TESTEMUNHA 1' }]);
+  assert.deepEqual(g.map((x) => x.map((p) => p.papel)), [['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO'], ['FIADOR 1', 'FIADOR 2'], ['LOCADORA'], ['TESTEMUNHA 1']]);
+  const html = K.contratoHtml([{ tipo: 'assinaturas', pessoas: [{ nome: 'A', papel: 'LOCADORA' }, { nome: 'B', papel: 'LOCATÁRIO' }] }], { logo: null, rodape: ['ANK – CNPJ 1'] });
+  assert.match(html, /ct-grupo-assina um/, 'conjunto de uma pessoa fica centralizado');
+  assert.match(html, /counter\(page\) " de " counter\(pages\)/, 'contagem de páginas no rodapé da impressão');
+});

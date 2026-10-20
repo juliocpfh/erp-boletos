@@ -74,7 +74,22 @@ export function normalizar(d) {
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
   // contrato sem imóvel passou a ter prazo para ser vinculado: os que já existiam contam a partir de hoje
   for (const c of d.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = C.hojeIso();
+  // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
+  for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
   return d;
+}
+
+/**
+ * Ordem da caução: 1º as condições do contrato (valor e data prevista = data do contrato), 2º a assinatura,
+ * 3º o comprovante. Sem data: a do início do contrato; sem valor: aluguéis × aluguel inicial com bonificação.
+ */
+export function completarCaucao(c) {
+  if (!c.caucao_data) c.caucao_data = c.vigencia_inicio || c.data_entrada || null;
+  if (!(c.caucao_valor > 0) && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
+    const a = c.aluguel_inicial;
+    c.caucao_valor = c.caucao_meses * (a - C.descontoPorPercentual(a, percentualBonificacao(c)));
+  }
+  return c;
 }
 
 /**
@@ -1272,8 +1287,10 @@ function alertaAplicacao(d, c) {
 export function comprovantesPendentes(d, c) {
   const out = [];
   const falta = (cond, texto, valor, data, tabela, id, campo, tipo) => { if (cond && valor > 0) out.push({ texto, valor, data, tabela, id, campo, tipo }); };
-  falta(c.garantia_tipo === 'Caução' && !c.comprovante_caucao, 'caução', c.caucao_valor, c.caucao_data, 'contratos', c.id, 'comprovante_caucao', 'caucao');
-  falta(temDeposito(c) && !c.comprovante_deposito, 'depósito de garantia', c.deposito_valor, c.deposito_data, 'contratos', c.id, 'comprovante_deposito', 'deposito-garantia');
+  // caução e depósito: o comprovante vem depois da assinatura do contrato (antes disso não há o que cobrar)
+  const assinado = !!documentoEntrada(d, c, 'doc_contrato_em');
+  falta(assinado && c.garantia_tipo === 'Caução' && !c.comprovante_caucao, 'caução', c.caucao_valor, c.caucao_data, 'contratos', c.id, 'comprovante_caucao', 'caucao');
+  falta(assinado && temDeposito(c) && !c.comprovante_deposito, 'depósito de garantia', c.deposito_valor, c.deposito_data, 'contratos', c.id, 'comprovante_deposito', 'deposito-garantia');
   falta(!c.comprovante_reserva, 'reserva', c.reserva_valor, c.reserva_data, 'contratos', c.id, 'comprovante_reserva', 'reserva');
   for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
