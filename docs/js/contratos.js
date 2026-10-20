@@ -181,7 +181,9 @@ export function dadosDoContrato(d, c, extra = {}) {
   const inclusos = ENCARGOS.filter(([k]) => c[k] === 'Incluso no aluguel').map(([, t]) => t);
   const endereco = [imovel.endereco, imovel.complemento].filter(Boolean).join(', ');
   const situado = [endereco, imovel.bairro, imovel.cidade ? `${imovel.cidade}/${imovel.uf || 'PR'}` : ''].filter(Boolean).join(', ');
-  const caucaoMeses = c.caucao_meses || (c.caucao_valor && aluguel ? Math.round(c.caucao_valor / bonificado) : 0);
+  // caução pelas condições do contrato: sem valor gravado, aluguéis × aluguel com bonificação (não depende do depósito)
+  const caucaoValor = c.caucao_valor > 0 ? c.caucao_valor : (c.caucao_meses > 0 ? c.caucao_meses * bonificado : 0);
+  const caucaoMeses = c.caucao_meses || (caucaoValor && bonificado ? Math.round(caucaoValor / bonificado) : 0);
   const campos = {
     locadoras: locadoras.map((e) => qualificarEmpresa(e.razao_social || e.nome, e.cnpj, e.endereco_sede || e.endereco, pessoaDe(e, 'representante_'), e.representante_cargo)).join('; e '),
     locatarios: locatarios.join('; e '),
@@ -204,10 +206,10 @@ export function dadosDoContrato(d, c, extra = {}) {
     indice: textoIndice(c.indice_correcao),
     multa: percentualComExtenso(c.multa_percentual ?? 2),
     juros: percentualComExtenso(c.juros_mensal_percentual ?? 1),
-    tarifa_boleto: c.taxa_boleto ? valorComExtenso(c.taxa_boleto) : '',
+    tarifa_boleto: '', // a tarifa de cobrança não sai no contrato (pedido do usuário)
     encargos_inquilino: lista([...inquilinoPaga, 'telefone', 'dedetização', 'limpeza de calhas']),
     encargos_inclusos: lista(inclusos),
-    caucao_valor: valorComExtenso(c.caucao_valor || 0),
+    caucao_valor: valorComExtenso(caucaoValor),
     caucao_meses: numeroComExtenso(caucaoMeses || 0),
     deposito_valor: valorComExtenso(c.deposito_valor || 0),
     deposito_uso: c.deposito_uso || '',
@@ -219,7 +221,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     seguro_fianca: c.garantia_tipo === 'Seguro fiança', sem_garantia: !c.garantia_tipo || c.garantia_tipo === 'Sem garantia',
     solidario: !!c.solidario_nome, pj, residencial: c.finalidade !== 'Não residencial', nao_residencial: c.finalidade === 'Não residencial',
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
-    tem_incluso: inclusos.length > 0, tarifa_boleto: !!c.taxa_boleto, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
+    tem_incluso: inclusos.length > 0, tarifa_boleto: false, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
     indeterminado: c.prazo_tipo === 'Indeterminado', testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
   };
@@ -251,6 +253,7 @@ export function pendenciasDoContrato(d, c) {
   } else pessoa('inquilino_', 'inquilino');
   pessoa('solidario_', 'solidário', !!c.solidario_nome);
   if (!c.descricao_objeto) falta.push('descrição do imóvel no contrato');
+  if (c.garantia_tipo === 'Caução' && !(c.caucao_valor > 0) && !(c.caucao_meses > 0)) falta.push('caução: valor ou quantos aluguéis');
   if (!c.vigencia_inicio || (c.prazo_tipo !== 'Indeterminado' && !c.vigencia_fim)) falta.push('datas do contrato');
   if (!c.indice_correcao) falta.push('índice de correção');
   if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)) falta.push('fiador');
@@ -329,10 +332,42 @@ const runsHtml = (runs) => runs.map((r) => (r.b ? `<b>${escH(r.t)}</b>` : escH(r
  */
 export function marcaDagua(logo) {
   if (!logo) return '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="210" height="297"><image href="${escH(logo)}" x="42" y="98" width="126" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
+  // tamanho grande (10 px por mm): o navegador desenha o fundo nessa resolução, sem serrilhar ao ampliar
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="2970" viewBox="0 0 210 297"><image href="${escH(logo)}" x="42" y="98" width="126" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
   const fundo = `data:image/svg+xml;base64,${btoa(svg)}`;
   return `<div class="ct-marcas" style="background-image:url('${fundo}')"></div><img class="ct-marca" src="${escH(logo)}" alt="">`;
 }
+
+/**
+ * Assinaturas em conjuntos, cada um em suas linhas: locatário com o solidário, fiadores, locadora e por último as testemunhas.
+ * Conjunto de uma pessoa só fica centralizado. Devolve [[pessoas], ...] sem os conjuntos vazios.
+ */
+export function gruposAssinatura(pessoas) {
+  const ordem = [/^LOCAT/, /^FIADOR/, /^LOCADORA/, /^TESTEMUNHA/];
+  const grupos = ordem.map(() => []);
+  const outros = [];
+  for (const p of pessoas) {
+    const i = ordem.findIndex((r) => r.test(p.papel || ''));
+    (i >= 0 ? grupos[i] : outros).push(p);
+  }
+  return [...grupos, outros].filter((g) => g.length);
+}
+
+const assinaHtml = (p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escH(p.nome)}</b>${p.doc ? `<br>${escH(p.doc)}` : ''}${p.extra ? `<br>${escH(p.extra)}` : ''}<br>${escH(p.papel)}</div>`;
+
+/**
+ * Rodapé da impressão, em todas as folhas (caixas da margem da página): "Página X de Y" no canto direito, acima da linha;
+ * a linha atravessa a página a 14pt do topo da margem (borda de cima das caixas da esquerda e do centro; borda de baixo
+ * da caixa da direita, encolhida até a linha); as empresas centralizadas embaixo da linha. A margem de baixo é de 2cm.
+ */
+const textoCss = (t) => `"${String(t).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ')}"`;
+const FONTE_RODAPE = 'font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #666;';
+const estiloRodape = (rodape) => `<style>@media print { @page {
+  @bottom-left { content: ""; width: 20%; margin-top: 14pt; border-top: 1px solid #999; }
+  @bottom-center { content: ${rodape.map(textoCss).join(' "\\A" ')}; width: 60%; white-space: pre; text-align: center; vertical-align: top;
+    margin-top: 14pt; border-top: 1px solid #999; padding-top: 3pt; ${FONTE_RODAPE} }
+  @bottom-right { content: "Página " counter(page) " de " counter(pages); width: 20%; text-align: right; vertical-align: bottom;
+    margin-bottom: calc(2cm - 15pt); border-bottom: 1px solid #999; padding-bottom: 2pt; ${FONTE_RODAPE} } } }</style>`;
 
 export function contratoHtml(blocos, { logo, rodape }) {
   const corpo = blocos.map((b) => {
@@ -348,11 +383,12 @@ export function contratoHtml(blocos, { logo, rodape }) {
       return `<div class="ct-fotos ${b.grande ? 'ct-fotos-grande' : ''}">${b.fotos.map((f) => `<figure><img src="${escH(f.src)}" alt="${escH(f.legenda)}"><figcaption>${escH(f.legenda)}</figcaption></figure>`).join('')}</div>`;
     }
     if (b.tipo === 'assinaturas') {
-      return `<div class="ct-assinaturas">${b.pessoas.map((p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escH(p.nome)}</b>${p.doc ? `<br>${escH(p.doc)}` : ''}${p.extra ? `<br>${escH(p.extra)}` : ''}<br>${escH(p.papel)}</div>`).join('')}</div>`;
+      return `<div class="ct-assinaturas">${gruposAssinatura(b.pessoas).map((g) => `<div class="ct-grupo-assina${g.length === 1 ? ' um' : ''}">${g.map(assinaHtml).join('')}</div>`).join('')}</div>`;
     }
     return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
   }).join('');
   return `<div class="contrato">
+    ${estiloRodape(rodape)}
     ${marcaDagua(logo)}
     <div class="ct-rodape">${rodape.map(escH).join('<br>')}</div>
     ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ''}
@@ -409,11 +445,18 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
     else if (b.tipo === 'assinaturas') {
-      for (const p of b.pessoas) {
-        corpo.push(parX([{ t: '_____________________________________________', b: false }], { alinhar: 'center', antes: 600, depois: 0 }));
+      // um conjunto por linha da tabela (dois lado a lado; um só, centralizado), tudo preso na mesma página
+      const assina = (p) => {
         const linhas = [{ t: p.nome, b: true }, ...[p.doc, p.extra, p.papel].filter(Boolean).map((t) => ({ t, b: false }))];
-        corpo.push(`<w:p><w:pPr><w:keepLines/><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${linhas.map((l, i) => (i ? '<w:r><w:br/></w:r>' : '') + runX(l)).join('')}</w:p>`);
+        return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="560" w:after="0"/><w:jc w:val="center"/></w:pPr>${runX({ t: '__________________________________', b: false })}</w:p>`
+          + `<w:p><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after="120"/><w:jc w:val="center"/></w:pPr>${linhas.map((l, i) => (i ? '<w:r><w:br/></w:r>' : '') + runX(l, '<w:sz w:val="20"/>')).join('')}</w:p>`;
+      };
+      const linhasTab = [];
+      for (const g of gruposAssinatura(b.pessoas)) {
+        if (g.length === 1) linhasTab.push(`<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9000" w:type="dxa"/><w:gridSpan w:val="2"/><w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders></w:tcPr>${assina(g[0])}</w:tc></w:tr>`);
+        else for (let i = 0; i < g.length; i += 2) linhasTab.push(`<w:tr><w:trPr><w:cantSplit/></w:trPr>${[g[i], g[i + 1]].map((p) => celula(p ? assina(p) : '<w:p/>', 4500, { borda: false })).join('')}</w:tr>`);
       }
+      corpo.push(`<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>${linhasTab.join('')}</w:tbl>`);
     } else if (b.tipo === 'tabela') {
       const total = 9000;
       const larguras = b.cabecalho.length === 4 ? [2900, 1500, 1500, 3100] : [3200, 1800, 4000];
@@ -443,7 +486,11 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1701" w:left="1701" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>';
   const documento = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${corpo.join('')}${sect}</w:body></w:document>`;
   const cabecalho = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}><w:p>${logo ? imagemX(2, 'rIdMarca', 14, 14 * prop, { ancora: true }) : ''}</w:p></w:hdr>`;
-  const rodapeX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}>${rodape.map((linha, i) => `<w:p><w:pPr>${i === 0 ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>' : ''}<w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${escX(linha)}</w:t></w:r></w:p>`).join('')}</w:ftr>`;
+  const cinza = '<w:rPr><w:color w:val="666666"/><w:sz w:val="16"/></w:rPr>';
+  const campoX = (instr) => `<w:r>${cinza}<w:fldChar w:fldCharType="begin"/></w:r><w:r>${cinza}<w:instrText xml:space="preserve"> ${instr} </w:instrText></w:r><w:r>${cinza}<w:fldChar w:fldCharType="separate"/></w:r><w:r>${cinza}<w:t>1</w:t></w:r><w:r>${cinza}<w:fldChar w:fldCharType="end"/></w:r>`;
+  // "Página X de Y" à direita, acima da linha; as empresas centralizadas embaixo da linha
+  const paginas = `<w:p><w:pPr><w:spacing w:after="40"/><w:jc w:val="right"/></w:pPr><w:r>${cinza}<w:t xml:space="preserve">Página </w:t></w:r>${campoX('PAGE')}<w:r>${cinza}<w:t xml:space="preserve"> de </w:t></w:r>${campoX('NUMPAGES')}</w:p>`;
+  const rodapeX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}>${paginas}${rodape.map((linha, i) => `<w:p><w:pPr>${i === 0 ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>' : ''}<w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr><w:r>${cinza}<w:t xml:space="preserve">${escX(linha)}</w:t></w:r></w:p>`).join('')}</w:ftr>`;
   const estilos = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
     + '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault>'
     + '<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'

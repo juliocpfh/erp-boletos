@@ -241,8 +241,8 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato { position: relative; background: #fff; max-width: 820px; margin: 0 auto; padding: 48px 64px 90px; border: 1px solid var(--borda);
   font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.55; color: #111; overflow: hidden; }
 /* marca-d'água em todas as páginas: na tela, um fundo que repete a logo a cada altura de folha A4; na impressão, a logo fixa (repete em cada página) */
-.ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .07; pointer-events: none; z-index: 0; }
-.ct-marca { display: none; opacity: .07; pointer-events: none; z-index: 0; }
+.ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .05; pointer-events: none; z-index: 0; }
+.ct-marca { display: none; opacity: .05; pointer-events: none; z-index: 0; image-rendering: auto; }
 .contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
 .contrato .ct-capa { text-align: center; margin: 0 0 18px; }
 .contrato .ct-capa img { max-width: 150px; max-height: 70px; }
@@ -256,20 +256,23 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-pagina, .contrato .ct-pagina td { border: 0; padding: 0; width: 100%; border-collapse: collapse; background: none; }
 .contrato .ct-pagina td { display: block; }
 .contrato .ct-espaco-rodape { height: 0; }
-.ct-assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 42px 40px; margin-top: 30px; }
+/* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
+.ct-assinaturas { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
+.ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 18px; }
+.ct-grupo-assina.um { grid-template-columns: minmax(0, 50%); justify-content: center; }
 .ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
-.ct-assina .ct-linha { border-top: 1px solid #111; margin: 40px 0 6px; }
+.ct-assina .ct-linha { border-top: 1px solid #111; margin: 34px 0 6px; }
 textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
-@media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-assinaturas { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
+@media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-grupo-assina, .ct-grupo-assina.um { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
 @media print {
-  @page { size: A4; margin: 2.2cm 2.2cm 1.2cm 2.8cm; }
+  @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
   .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
   /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
   .contrato .ct-pagina td { display: table-cell; }
-  .contrato .ct-espaco-rodape { height: 1.5cm; }
-  .contrato .ct-rodape { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; }
+  .contrato .ct-espaco-rodape { height: 0; }
+  .contrato .ct-rodape { display: none; }
 }
 .destaque-contas { font-weight: 700; }
 

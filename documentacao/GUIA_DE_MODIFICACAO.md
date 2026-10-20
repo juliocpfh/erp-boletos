@@ -19,7 +19,7 @@
      voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}?ir=reformas`,
    },
    ```
-   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros` e nos comprovantes via `guardarComprovantes`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
+   Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros` e nos comprovantes via `guardarComprovantes`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `confirmar` (async, janela própria antes de gravar; ex.: valores do contrato inicial), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
 4. Links: novo `#/novo/<tabela>?...`; editar `#/editar/<tabela>/<id>`. A gravação genérica é `FORMULARIOS.cadastro`.
 5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Se a tabela pertence a um contrato, inclua-a na cascata de `R.excluirContrato` (`regras.js`); se pertence a um imóvel, na de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
 

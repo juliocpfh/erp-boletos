@@ -268,7 +268,7 @@ export const CONTRATO = [
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'] }),
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel com bonificação (parte "Valores e boleto")' }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel com bonificação); pode ajustar se o depósito foi outro valor' }),
-  campo('caucao_data', 'Data em que a caução foi dada', 'data', quando('garantia_tipo', 'Caução')),
+  campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. O comprovante é anexado depois da assinatura' }),
   comprovante('comprovante_caucao', 'Comprovante do depósito da caução', quando('garantia_tipo', 'Caução')),
   campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   campo('deposito_data', 'Data do depósito', 'data', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
