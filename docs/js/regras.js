@@ -2,6 +2,7 @@
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
+import { locadorasDoContrato } from './contratos.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
@@ -1385,8 +1386,7 @@ export function alertaAditivoHerdeiro(d, c) {
  * [{ nome, papel }]. Só estes nomes podem ser apontados como assinatura faltante.
  */
 export function partesDoContrato(d, c) {
-  const partes = d.participacoes.filter((p) => p.imovel_id === c.imovel_id).map((p) => buscar(d, 'emitentes', p.emitente_id)).filter(Boolean);
-  const locadoras = partes.length ? partes : d.emitentes.filter((e) => e.ativo);
+  const locadoras = locadorasDoContrato(d, c);
   return [
     ...locadoras.map((e) => ({ nome: e.razao_social || e.nome, papel: 'locadora' })),
     { nome: c.inquilino_nome, papel: 'inquilino' },

@@ -332,24 +332,58 @@ function ligarContinuacaoDeContrato(raiz) {
   });
 }
 
-/** Novo contrato: "Usar o endereço do imóvel" copia o endereço do imóvel escolhido para o endereço do inquilino. */
+/** Caixas "Usar o endereço do imóvel" do novo contrato: [caixa, campo de endereço que recebe] (inquilino e solidário). */
+const ENDERECO_DO_IMOVEL = [['usar_endereco_imovel', 'inquilino_endereco'], ['solidario_usar_endereco_imovel', 'solidario_endereco']];
+
+/** Novo contrato: "Usar o endereço do imóvel" copia o endereço do imóvel escolhido para o endereço do inquilino (ou do solidário). */
 function ligarEnderecoDoImovel(raiz) {
-  const caixa = raiz.querySelector('form[data-form=cadastro] input[name=usar_endereco_imovel]');
-  if (!caixa) return;
-  const form = caixa.form;
-  const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
-  const imovelId = () => (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular;
-  const aplicar = () => {
-    const i = imovelId() && buscar('imoveis', imovelId());
-    const campo = form.querySelector('[name=inquilino_endereco]');
-    if (!caixa.checked) return mensagemAuto(caixa, '');
-    if (!i) return mensagemAuto(caixa, 'Escolha primeiro o imóvel deste contrato.');
-    campo.value = enderecoInquilino(i);
-    mensagemAuto(caixa, '');
+  for (const [nomeCaixa, nomeCampo] of ENDERECO_DO_IMOVEL) {
+    const caixa = raiz.querySelector(`form[data-form=cadastro] input[name=${nomeCaixa}]`);
+    if (!caixa) continue;
+    const form = caixa.form;
+    const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
+    const imovelId = () => (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular;
+    const aplicar = () => {
+      const i = imovelId() && buscar('imoveis', imovelId());
+      const campo = form.querySelector(`[name=${nomeCampo}]`);
+      if (!caixa.checked) return mensagemAuto(caixa, '');
+      if (!i) return mensagemAuto(caixa, 'Escolha primeiro o imóvel deste contrato.');
+      campo.value = enderecoInquilino(i);
+      mensagemAuto(caixa, '');
+    };
+    caixa.addEventListener('change', aplicar);
+    const sel = form.querySelector('[name=imovel_id]');
+    if (sel) sel.addEventListener('change', aplicar);
+  }
+}
+
+/**
+ * Caução calculada: aluguéis × aluguel com bonificação (sem bonificação: o aluguel cheio). No novo contrato acompanha
+ * sempre; na edição só preenche se estiver vazia (a caução já dada não muda sozinha).
+ */
+function ligarCaucao(raiz) {
+  const form = raiz.querySelector('form[data-form=cadastro]');
+  const valor = form && form.querySelector('[name=caucao_valor]');
+  const meses = form && form.querySelector('[name=caucao_meses]');
+  if (!valor || !meses || !form.querySelector('[name=aluguel_inicial]')) return;
+  const novo = /^#\/novo\/contratos/.test(location.hash);
+  const cent = (t) => { try { return String(t || '').trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
+  const calcular = () => {
+    if (!novo && valor.value.trim() !== '') return;
+    const n = Number(meses.value);
+    const bonif = form.querySelector('[name=bonificacao]');
+    const base = bonif && bonif.checked ? cent((form.querySelector('[name=aluguel_bonificado]') || {}).value) : cent(form.querySelector('[name=aluguel_inicial]').value);
+    if (!(n > 0) || !Number.isFinite(base)) return;
+    valor.value = F.dinheiroTexto(n * base);
+    mensagemAuto(valor, `${n} × ${reais(base)} (aluguel ${bonif && bonif.checked ? 'com bonificação' : 'cheio'})`);
   };
-  caixa.addEventListener('change', aplicar);
-  const sel = form.querySelector('[name=imovel_id]');
-  if (sel) sel.addEventListener('change', aplicar);
+  meses.addEventListener('input', calcular);
+  for (const n of ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual']) {
+    const el = form.querySelector(`[name=${n}]`);
+    // depois do cálculo do bonificado (que também escuta "input")
+    if (el) el.addEventListener('input', () => setTimeout(calcular, 0));
+  }
+  ['bonificacao', 'garantia_tipo'].forEach((n) => { const el = form.querySelector(`[name=${n}]`); if (el) el.addEventListener('change', calcular); });
 }
 
 /** Endereço do imóvel por extenso, para o cadastro do inquilino (ex.: "Rua X, 117, Ap 02, Bairro, Curitiba/PR, CEP 82210-050"). */
@@ -358,6 +392,7 @@ const enderecoInquilino = (i) => [R.enderecoCompleto(i), i.bairro, i.cidade ? `$
 function ligarCamposAutomaticos(raiz) {
   ligarContinuacaoDeContrato(raiz);
   ligarEnderecoDoImovel(raiz);
+  ligarCaucao(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
     el.addEventListener('input', () => {
       const novo = F.mascarar(el.dataset.mascara, el.value);
@@ -1412,9 +1447,10 @@ const CADASTROS = {
       dados.sem_imovel_desde = imovelFinal ? null : (r && !r.imovel_id && r.sem_imovel_desde) || C.hojeIso();
       // "Usar o endereço do imóvel": o endereço do inquilino fica igual ao do imóvel
       const imovelEndereco = buscar('imoveis', imovelFinal || q.vincular);
-      if (!r && new FormData(form).get('usar_endereco_imovel') === '1') {
-        if (imovelEndereco) dados.inquilino_endereco = enderecoInquilino(imovelEndereco);
-        else erros.inquilino_endereco = 'Escolha o imóvel para usar o endereço dele';
+      for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
+        if (r || new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome)) continue;
+        if (imovelEndereco) dados[campoEnd] = enderecoInquilino(imovelEndereco);
+        else erros[campoEnd] = 'Escolha o imóvel para usar o endereço dele';
       }
     },
     confirmar: confirmarValoresIniciais,
@@ -2382,8 +2418,7 @@ function cartaReajuste(c, comp) {
   const i = buscar('imoveis', c.imovel_id);
   const r = R.reajusteNaCompetencia(d(), c, comp);
   const k = R.calcularReajuste(d(), c, comp);
-  const parte = i && R.participacoesDo(d(), i.id)[0];
-  const empresa = (parte && buscar('emitentes', parte.emitente_id)) || d().emitentes.find((e) => e.ativo) || { nome: '' };
+  const empresa = K.locadorasDoContrato(d(), c)[0] || { nome: '' };
   const anterior = C.somarMeses(comp, -1);
   const vencNovo = C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
   if (k.percentual === null) {

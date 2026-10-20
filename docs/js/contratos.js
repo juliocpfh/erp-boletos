@@ -148,14 +148,26 @@ export function textoIndice(nome) {
 }
 
 /**
+ * Empresa locadora dos documentos do inquilino (contrato, vistoria, recibo das chaves, carta): por enquanto só a ANK,
+ * mesmo quando o imóvel é dividido com a JCK (pedido do usuário, 2026-10-20; numa versão futura voltam as duas).
+ * Sem ANK cadastrada: as empresas do imóvel (ou as ativas), como antes.
+ */
+export const LOCADORA_UNICA = /\bANK\b/i;
+export function locadorasDoContrato(d, c) {
+  const ank = d.emitentes.filter((e) => e.ativo !== false && LOCADORA_UNICA.test(`${e.nome || ''} ${e.razao_social || ''}`));
+  if (ank.length) return ank.slice(0, 1);
+  const partes = d.participacoes.filter((p) => p.imovel_id === c.imovel_id).map((p) => d.emitentes.find((e) => e.id === p.emitente_id)).filter(Boolean);
+  return partes.length ? partes : d.emitentes.filter((e) => e.ativo);
+}
+
+/**
  * Monta tudo que o modelo usa: campos de texto ({campo}), condições ([se x]) e quantidades (singular/plural).
  * ``extra``: data da assinatura e testemunhas informadas na hora de gerar.
  */
 export function dadosDoContrato(d, c, extra = {}) {
   const R = { buscar: (t, id) => d[t].find((x) => x.id === Number(id)) };
   const imovel = R.buscar('imoveis', c.imovel_id) || {};
-  const partes = d.participacoes.filter((p) => p.imovel_id === imovel.id).map((p) => R.buscar('emitentes', p.emitente_id)).filter(Boolean);
-  const locadoras = partes.length ? partes : d.emitentes.filter((e) => e.ativo);
+  const locadoras = locadorasDoContrato(d, c);
   const pj = c.inquilino_tipo === 'Pessoa jurídica (empresa)';
   const locatarios = [];
   if (pj) locatarios.push(qualificarEmpresa(c.inquilino_nome, c.inquilino_cpf, c.inquilino_endereco, pessoaDe(c, 'representante_'), c.representante_cargo));
@@ -222,7 +234,7 @@ export function dadosDoContrato(d, c, extra = {}) {
   ];
   // o solidário assina como "LOCATÁRIO SOLIDÁRIO"; no texto o locatário continua no singular
   return { campos, condicoes, quantidades: { locatarios: 1, locadoras: locadoras.length, fiadores: fiadores.length },
-    assinaturas, locadoras, rodape: d.emitentes.filter((e) => e.ativo).map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')} – CNPJ ${e.cnpj || ''}`) };
+    assinaturas, locadoras, rodape: locadoras.map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')} – CNPJ ${e.cnpj || ''}`) };
 }
 
 /** Campos que ficaram em branco no cadastro e o contrato usa (para avisar antes de imprimir). */
@@ -242,9 +254,7 @@ export function pendenciasDoContrato(d, c) {
   if (!c.vigencia_inicio || (c.prazo_tipo !== 'Indeterminado' && !c.vigencia_fim)) falta.push('datas do contrato');
   if (!c.indice_correcao) falta.push('índice de correção');
   if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)) falta.push('fiador');
-  const imovel = d.imoveis.find((i) => i.id === c.imovel_id);
-  const emp = d.participacoes.filter((p) => imovel && p.imovel_id === imovel.id).map((p) => d.emitentes.find((e) => e.id === p.emitente_id)).filter(Boolean);
-  for (const e of (emp.length ? emp : d.emitentes.filter((x) => x.ativo))) {
+  for (const e of locadorasDoContrato(d, c)) {
     if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
     if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
   }
