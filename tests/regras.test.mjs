@@ -950,13 +950,13 @@ test('contrato sem imóvel é apagado depois de 7 dias (sem boleto); normalizar 
 test('assinatura faltante: só nomes do contrato, alerta até anexar o arquivo completo; operador aguarda o administrador', () => {
   const { d, c } = base();
   const partes = R.partesDoContrato(d, c).map(R.textoParte);
-  assert.deepEqual(partes, ['ANK ADMINISTRADORA DE BENS LTDA (locadora)', 'JCK ADMINISTRADORA DE BENS LTDA (locadora)', 'Maria Exemplo (inquilino)']);
+  assert.deepEqual(partes, ['ANK ADMINISTRADORA DE BENS LTDA (locadora)', 'Maria Exemplo (inquilino)'], 'só a ANK assina como locadora');
   assert.throws(() => R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'x.pdf', falta: ['Fulano (fiador)'] }, 'ana', false), /não está ligado/);
   assert.throws(() => R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'x.pdf', falta: [] }, 'ana', false), /Escolha de quem/);
-  R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'contrato-falta.pdf', falta: ['JCK ADMINISTRADORA DE BENS LTDA (locadora)'] }, 'ana', false);
+  R.anexarDocumentoParcial(d, c.id, 'doc_contrato_em', { data: '2026-10-20', arquivo: 'contrato-falta.pdf', falta: ['ANK ADMINISTRADORA DE BENS LTDA (locadora)'] }, 'ana', false);
   assert.doesNotMatch(R.alertaDocumentosEntrada(c, d).texto, /contrato de locação/, 'sai da lista de faltantes');
   const a = R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Assinatura faltante');
-  assert.match(a.texto, /contrato de locação anexado sem a assinatura de JCK ADMINISTRADORA DE BENS LTDA \(locadora\) \(aguardando análise do administrador\)/);
+  assert.match(a.texto, /contrato de locação anexado sem a assinatura de ANK ADMINISTRADORA DE BENS LTDA \(locadora\) \(aguardando análise do administrador\)/);
   R.analisarDocumento(d, c.id, 'doc_contrato_em', 'parcial', true, 'julio');
   assert.equal(c.doc_contrato_parcial.pendente, false);
   R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-10-21', 'ana', 'contrato-assinado.pdf');

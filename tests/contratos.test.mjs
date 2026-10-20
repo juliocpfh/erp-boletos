@@ -34,19 +34,20 @@ test('linguagem do modelo: campos, condições, plural, cláusulas numeradas e r
   assert.equal(texto(K.montarContrato(t, dados)), 'T\nCLÁUSULA 1ª – X sim outro nb.\nCLÁUSULA 2ª – as LOCADORAS e o FIADOR.\nVer 2ª (segunda).');
 });
 
-test('contrato residencial com as duas empresas como locadoras e caução', () => {
+test('contrato residencial: só a ANK como locadora (mesmo com o imóvel dividido com a JCK) e caução', () => {
   const { d, c } = base();
   const modelo = K.modelosDe(d).find((m) => m.nome === 'Residencial');
   const dados = K.dadosDoContrato(d, c, { data: '2026-09-01', testemunhas: [{ nome: 'Ana', cpf: '5' }] });
   const t = texto(K.montarContrato(modelo.texto, dados));
-  assert.match(t, /LOCADORAS: ANK ADMINISTRADORA DE BENS LTDA.*; e JCK ADMINISTRADORA DE BENS LTDA/);
+  assert.match(t, /LOCADORA: ANK ADMINISTRADORA DE BENS LTDA/);
+  assert.doesNotMatch(t, /JCK/, 'a JCK não aparece no contrato nem nas assinaturas');
   assert.match(t, /com término em 05 de março de 2029/);
   assert.match(t, /R\$ 3\.150,00 \(três mil cento e cinquenta reais\)/);
   assert.match(t, /GARANTIA DO CONTRATO – CAUÇÃO/);
   assert.match(t, /Na inobservância da cláusula \d+ª \(/, 'a caução cita a cláusula de vistoria pelo número');
   assert.doesNotMatch(t, /FIADOR:|\[[a-z_]+\?\]|\{|\[se /, 'sem fiador, sem campos desconhecidos e sem marcações sobrando');
-  assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO, TESTEMUNHA 1\]/);
-  assert.deepEqual(dados.rodape, ['ANK ADMINISTRADORA DE BENS LTDA – CNPJ 58.492.818/0001-59', 'JCK ADMINISTRADORA DE BENS LTDA – CNPJ 58.522.768/0001-05']);
+  assert.match(t, /\[LOCADORA, LOCATÁRIO, TESTEMUNHA 1\]/);
+  assert.deepEqual(dados.rodape, ['ANK ADMINISTRADORA DE BENS LTDA – CNPJ 58.492.818/0001-59']);
 });
 
 test('contrato não residencial com fiadores no plural', () => {
@@ -75,13 +76,14 @@ test('vistoria: cabeçalho, chaves, roteiro sem preencher fica de fora, assinatu
     descritivo: '## Sala\n- Piso e rodapé: bom estado\n- Paredes e teto: \nMobília em bom estado:\n- Sofá 2 lugares', condicoes: 'Imóvel entregue limpo.', prazo_dias: 3 };
   const t = texto(K.vistoriaBlocos(d, c, v, { agua: '123', energia: '456' }).blocos);
   assert.match(t, /^VISTORIA DE ENTRADA/);
-  assert.match(t, /LOCADORAS: ANK .*; JCK /);
+  assert.match(t, /LOCADORA: ANK ADMINISTRADORA/);
+  assert.doesNotMatch(t, /JCK/);
   assert.match(t, /• 01 Controle remoto/);
   assert.match(t, /Água: 123/);
   assert.match(t, /SALA\n• Piso e rodapé: bom estado\nMobília em bom estado:\n• Sofá 2 lugares/);
   assert.doesNotMatch(t, /Paredes e teto/);
   assert.match(t, /3 \(três\) dias/);
-  assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO, FIADOR\]/);
+  assert.match(t, /\[LOCADORA, LOCATÁRIO, FIADOR\]/);
 });
 
 test('recibo de entrega das chaves', () => {
@@ -90,7 +92,7 @@ test('recibo de entrega das chaves', () => {
   assert.match(t, /^RECIBO DE ENTREGA DAS CHAVES/);
   assert.match(t, /• 01 Chave tetra/);
   assert.match(t, /Data do recebimento: _____/);
-  assert.match(t, /\[LOCADORA, LOCADORA, LOCATÁRIO\]$/);
+  assert.match(t, /\[LOCADORA, LOCATÁRIO\]$/);
 });
 
 test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', () => {
