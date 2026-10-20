@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="09f1fa008e77c8ae">
+<meta name="fontes" content="8085a51121fcc3ae">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -252,7 +252,7 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .05; pointer-events: none; z-index: 0; }
 .ct-marca { display: none; opacity: .05; pointer-events: none; z-index: 0; image-rendering: auto; }
 .contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
-.contrato .ct-capa { text-align: center; margin: 0 0 -2cm; line-height: 0; }
+.contrato .ct-capa { text-align: center; margin: 0 0 .3cm; line-height: 0; }
 .contrato .ct-capa img { width: 6cm; height: 6cm; object-fit: contain; }
 .contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
 .contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
@@ -276,6 +276,8 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 @media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-grupo-assina, .ct-grupo-assina.um { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
 @media print {
   @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
+  /* 1ª página: margem de cima menor (dentro da área que a impressora imprime) para a logo de 6 cm subir sem cortar */
+  @page :first { margin-top: .8cm; }
   .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
