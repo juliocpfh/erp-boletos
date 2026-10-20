@@ -463,6 +463,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
         if (g.length === 1) linhasTab.push(`<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="9000" w:type="dxa"/><w:gridSpan w:val="2"/><w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders></w:tcPr>${assina(g[0])}</w:tc></w:tr>`);
         else for (let i = 0; i < g.length; i += 2) linhasTab.push(`<w:tr><w:trPr><w:cantSplit/></w:trPr>${[g[i], g[i + 1]].map((p) => celula(p ? assina(p) : '<w:p/>', 4500, { borda: false })).join('')}</w:tr>`);
       }
+      corpo.push('<w:p><w:pPr><w:keepNext/><w:spacing w:after="0"/></w:pPr></w:p>'); // uma linha a mais antes das 1ªs assinaturas (assinatura gov.br)
       corpo.push(`<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>${linhasTab.join('')}</w:tbl>`);
     } else if (b.tipo === 'tabela') {
       const total = 9000;
