@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="b7a55e2f12cde1b5">
+<meta name="fontes" content="f807a4f321816ca6">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -252,7 +252,7 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .05; pointer-events: none; z-index: 0; }
 .ct-marca { display: none; opacity: .05; pointer-events: none; z-index: 0; image-rendering: auto; }
 .contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
-.contrato .ct-capa { text-align: center; margin: 0 0 18px; }
+.contrato .ct-capa { text-align: center; margin: -.6cm 0 calc(18px - .6cm); }
 .contrato .ct-capa img { max-width: 150px; max-height: 70px; }
 .contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
 .contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
@@ -266,7 +266,9 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-espaco-rodape { height: 0; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
 .ct-assinaturas { margin-top: 24px; break-inside: avoid; page-break-inside: avoid; }
-.ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 18px; }
+.ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 64px; break-inside: avoid; page-break-inside: avoid; }
+.ct-fecho { break-inside: avoid; page-break-inside: avoid; }
+.contrato .ct-titulo, .contrato .ct-secao, .contrato .ct-subsecao { break-after: avoid; page-break-after: avoid; }
 .ct-grupo-assina.um { grid-template-columns: minmax(0, 50%); justify-content: center; }
 .ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
 .ct-assina .ct-linha { border-top: 1px solid #111; margin: 34px 0 6px; }
@@ -1752,7 +1754,7 @@ ${FINAIS(`
     const partes = [String(p2.nome || "").toLocaleUpperCase("pt-BR"), nacionalidade(p2), estadoCivil(p2), p2.profissao];
     const docs = [p2.rg && `RG nº ${p2.rg}`, p2.cpf && `CPF nº ${p2.cpf}`].filter(Boolean).join(" e ");
     if (docs) partes.push(`${gen(p2, "portador", "portadora")} do ${docs}`);
-    if (p2.nascimento) partes.push(`${gen(p2, "nascido", "nascida")} na data de ${dataPorExtenso(p2.nascimento)}`);
+    if (p2.nascimento) partes.push(`${gen(p2, "nascido", "nascida")} em ${dataPorExtenso(p2.nascimento)}`);
     if (p2.endereco) partes.push(`${gen(p2, "residente e domiciliado", "residente e domiciliada")} à ${p2.endereco}`);
     return partes.filter(Boolean).join(", ");
   }
@@ -2004,7 +2006,18 @@ ${FINAIS(`
   @bottom-right { content: "Página " counter(page) " de " counter(pages); width: 20%; text-align: right; vertical-align: bottom;
     margin-bottom: calc(2cm - 15pt); border-bottom: 1px solid #999; padding-bottom: 2pt; ${FONTE_RODAPE} } } }</style>`;
   function contratoHtml(blocos, { logo, rodape }) {
-    const corpo = blocos.map((b) => {
+    const iAss = blocos.findIndex((b) => b.tipo === "assinaturas");
+    const iFecho = iAss > 1 && blocos[iAss - 1].tipo === "direita" && blocos[iAss - 2].tipo === "paragrafo" ? iAss - 2 : -1;
+    const corpo = blocos.map((b, i) => (i === iFecho ? '<div class="ct-fecho">' : "") + blocoHtml(b) + (i === iAss && iFecho >= 0 ? "</div>" : "")).join("");
+    return `<div class="contrato">
+    ${estiloRodape(rodape)}
+    ${marcaDagua(logo)}
+    <div class="ct-rodape">${rodape.map(escH).join("<br>")}</div>
+    ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ""}
+    <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;
+  }
+  function blocoHtml(b) {
+    {
       if (b.tipo === "titulo") return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
       if (b.tipo === "secao") return `<h2 class="ct-secao">${runsHtml(b.runs)}</h2>`;
       if (b.tipo === "direita") return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
@@ -2020,13 +2033,7 @@ ${FINAIS(`
         return `<div class="ct-assinaturas">${gruposAssinatura(b.pessoas).map((g) => `<div class="ct-grupo-assina${g.length === 1 ? " um" : ""}">${g.map(assinaHtml).join("")}</div>`).join("")}</div>`;
       }
       return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
-    }).join("");
-    return `<div class="contrato">
-    ${estiloRodape(rodape)}
-    ${marcaDagua(logo)}
-    <div class="ct-rodape">${rodape.map(escH).join("<br>")}</div>
-    ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ""}
-    <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;
+    }
   }
   var escX = (v) => String(v ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
   var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
@@ -2052,17 +2059,17 @@ ${FINAIS(`
     };
     const celula = (conteudo, largura, { cab = false, destaque = false, borda = true } = {}) => `<w:tc><w:tcPr><w:tcW w:w="${largura}" w:type="dxa"/>${borda ? "" : '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'}${cab ? '<w:shd w:val="clear" w:color="auto" w:fill="E5E7EB"/>' : destaque ? '<w:shd w:val="clear" w:color="auto" w:fill="FEF3C7"/>' : ""}</w:tcPr>${conteudo}</w:tc>`;
     const parCel = (t, { b = false, centro = false, rPr = "" } = {}) => `<w:p><w:pPr><w:spacing w:before="20" w:after="20" w:line="260" w:lineRule="auto"/>${centro ? '<w:jc w:val="center"/>' : ""}</w:pPr>${runX({ t, b }, rPr)}</w:p>`;
-    if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="240"/><w:jc w:val="center"/></w:pPr>${imagemX(1, "rIdLogo", 4, 4 * prop)}</w:p>`);
+    if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${imagemX(1, "rIdLogo", 4, 4 * prop)}</w:p>`);
     for (const b of blocos) {
-      if (b.tipo === "titulo") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }));
-      else if (b.tipo === "secao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }));
+      if (b.tipo === "titulo") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
+      else if (b.tipo === "secao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
       else if (b.tipo === "direita") corpo.push(parX(b.runs, { alinhar: "right", antes: 240, depois: 480 }));
       else if (b.tipo === "subsecao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "left", antes: 200, depois: 60 }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
       else if (b.tipo === "item") corpo.push(parX(b.runs, { alinhar: "left", depois: 40 }));
       else if (b.tipo === "assinaturas") {
         const assina = (p2) => {
           const linhas2 = [{ t: p2.nome, b: true }, ...[p2.doc, p2.extra, p2.papel].filter(Boolean).map((t) => ({ t, b: false }))];
-          return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="560" w:after="0"/><w:jc w:val="center"/></w:pPr>${runX({ t: "__________________________________", b: false })}</w:p><w:p><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after="120"/><w:jc w:val="center"/></w:pPr>${linhas2.map((l, i) => (i ? "<w:r><w:br/></w:r>" : "") + runX(l, '<w:sz w:val="20"/>')).join("")}</w:p>`;
+          return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="560" w:after="0"/><w:jc w:val="center"/></w:pPr>${runX({ t: "__________________________________", b: false })}</w:p><w:p><w:pPr><w:keepLines/><w:spacing w:after="600"/><w:jc w:val="center"/></w:pPr>${linhas2.map((l, i) => (i ? "<w:r><w:br/></w:r>" : "") + runX(l, '<w:sz w:val="20"/>')).join("")}</w:p>`;
         };
         const linhasTab = [];
         for (const g of gruposAssinatura(b.pessoas)) {
@@ -5247,9 +5254,9 @@ ${JSON.stringify(cabecalho)}
     comprovante("comprovante_deposito", "Comprovante do depósito de garantia", quando("garantia_tipo", "Depósito garantia", "Fiador + depósito")),
     ...fiadoresNoCadastro(),
     secao("Datas e prazo"),
-    campo("data_entrada", "Data de entrada", "data", { obrig: true }),
+    campo("data_entrada", "Data entrega de chaves", "data", { obrig: true }),
     campo("data_saida", "Data de saída", "data", { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
-    campo("vigencia_inicio", "Início do contrato", "data", { obrig: true }),
+    campo("vigencia_inicio", "Assinatura do contrato", "data", { obrig: true, ajuda: "É também a data que sai no contrato ao gerá-lo e o início do prazo" }),
     campo("prazo_tipo", "Prazo", "opcao", { obrig: true, padrao: "Determinado", opcoes: ["Determinado", "Indeterminado"] }),
     campo("prazo_meses", "Prazo do contrato (meses)", "inteiro", { ...quando("prazo_tipo", "Determinado"), ajuda: "Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia)" }),
     campo("renovacao_automatica", "Renovação automática", "simnao"),
@@ -8119,7 +8126,7 @@ Salvar assim mesmo?`)) {
     const modelos = modelosDe(d());
     const modelo = modelos.find((m) => m.id === Number(q.modelo)) || modelos[0];
     const testemunhas = [[q.t1, q.c1], [q.t2, q.c2]].map(([nome, cpf]) => ({ nome: nome || "", cpf: cpf || "" }));
-    const dados = dadosDoContrato(d(), c, { data: q.data || hojeIso(), testemunhas });
+    const dados = dadosDoContrato(d(), c, { data: q.data || c.vigencia_inicio || hojeIso(), testemunhas });
     return { c, modelo, dados, blocos: montarContrato(modelo.texto, dados) };
   }
   async function documentoMontado(tipo, q) {
@@ -8327,7 +8334,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <form class="cartao formulario" data-form="gerarContrato">
       <input type="hidden" name="contrato" value="${c.id}">
       <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? "selected" : ""}>${esc2(m.nome)}</option>`).join("")}</select></div>
-      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc2(rota.q.data || hojeIso())}"></div>
+      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc2(rota.q.data || c.vigencia_inicio || hojeIso())}"></div>
       <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc2(t.t1 || "")}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc2(t.c1 || "")}"></div>
       <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc2(t.t2 || "")}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc2(t.c2 || "")}"></div>
       <div class="check"><button>Ver contrato</button></div></form>
