@@ -41,7 +41,7 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Numeração de NF | `regras.js` → `pendentesDeFatura`, `numerarFaturas`, `desfazerUltimaNumeracao`, `cancelarNumero`, `registrarNfExterna` |
 | Reserva | `regras.js` → `reservaParaCompetencia`, `realocarReserva`, `alertaReservaParada` |
 | IPTU | `regras.js` → `parcelasIptu` (parte do inquilino pelos dias e do proprietário), `totaisIptu`, `iptuNaCompetencia`, `competenciaDaParcela`, `alertasIptu` |
-| Reajuste | `regras.js` → `mesDeAniversario`, `competenciaDoReajuste`, `reajusteNaCompetencia`, `calcularReajuste`, `aplicarReajuste`, `reajustesEntre`, `reajustesNaoCorrigidos` (tela Reajustes) |
+| Reajuste | `regras.js` → `mesDeAniversario`, `competenciaDoReajuste`, `reajusteNaCompetencia`, `calcularReajuste`, `aplicarReajuste`, `reajustesEntre`, `reajustesNaoCorrigidos` (tela Reajustes); aluguel inicial corrigido: `correcoesRecalculadas`, `recalcularCorrecoes`. Troca de garantia / fiador: `regras.js` → `trocarGarantia` (com os fiadores que entram, saem ou são corrigidos), `cancelarTrocaGarantia`; `formularios.js` → `trocaGarantia` |
 | Ressarcimento de condomínio; contas pagas por nós | `regras.js` → `competenciaDoAbatimento`, `aplicarRessarcimentos`, `condominioAConferir`; `contasPermitidas`, `lancarDespesas` |
 | Solicitações; ordem dos imóveis | `regras.js` → `solicitacoesDo`, `resumoSolicitacoes`; `telas.js` → `telaSolicitacoes`, `SITUACOES_SOLICITACAO`; `regras.js` → `imoveisPorEndereco` (mesmo endereço junto) |
 | Saída do inquilino | `regras.js` → `encerrarContrato`, `calcularEncerramento` |
