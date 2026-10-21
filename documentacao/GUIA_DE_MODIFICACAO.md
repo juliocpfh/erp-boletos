@@ -9,7 +9,7 @@
      campo('valor', 'Valor investido', 'dinheiro', { obrig: true }),
    ];
    ```
-   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`.
+   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`; seção que começa recolhida: `{ secao, recolher: 'texto do botão' }`; caixa de uma linha que cresce: `area` com `linha: true`.
 3. `docs/js/telas.js` → entrada em `CADASTROS` (modelo: `reformas`):
    ```js
    reformas: {
@@ -47,7 +47,7 @@
 |---|---|
 | Tela com tabela | Função em `regras.js` que devolve linhas + tela em `telas.js` (`resultadosFinanceiros` + `telaResultados`) |
 | Excel | `ACOES.excelResultados` (ExcelJS via `excelJs()` de `app.js`, download com `baixar()`) |
-| PDF/impressão | Tipo novo em `telaImprimir` + CSS de `@media print` em `docs/css/estilo.css` |
+| PDF/impressão | Tipo novo em `telaImprimir` + CSS de `@media print` em `docs/css/estilo.css`; botão "Baixar PDF": `ACOES.baixarPdfTela` (seletor + nome de `nomeArquivoDoc`) |
 | Documento Word | Blocos de `contratos.js` + `contratoDocx` (ex.: `documentoMontado` em `telas.js`) |
 
 ## Checklist antes de alterar
