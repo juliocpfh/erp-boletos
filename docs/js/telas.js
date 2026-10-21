@@ -832,6 +832,16 @@ function selosContrato(c) {
     ${R.contratoAtivo(c) ? '' : etiqueta('Encerrado', 'perigo')}</div>`;
 }
 
+/**
+ * Aluguel sobre o qual vale o % de bonificação ao salvar o cadastro: o atual; se o inicial foi corrigido,
+ * o atual refeito com as correções em cadeia a partir do inicial novo.
+ */
+function baseBonificacao(r, inicial) {
+  if (!r) return inicial;
+  if (inicial !== r.aluguel_inicial) return R.aluguelComInicial(d(), r, inicial);
+  return R.aluguelAtual(d(), r);
+}
+
 /** Aluguel atual com a bonificação de pontualidade (o que o inquilino paga em dia, sem IPTU e seguro). */
 function valorBonificado(c) {
   const aluguel = R.aluguelAtual(d(), c);
@@ -845,12 +855,18 @@ function valorBonificado(c) {
 async function confirmarValoresIniciais(dados, r) {
   if (!r) return true;
   // o bonificado é comparado sobre o mesmo aluguel que o formulário mostra (o atual), para não acusar diferença de centavo
-  const base = R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
+  const base = baseBonificacao(r, dados.aluguel_inicial);
   const antes = r.bonificacao === false ? null : valorBonificado(r);
   const depois = dados.bonificacao === false ? null : base - C.descontoPorPercentual(base, dados.desconto_pontualidade_percentual || 0);
   const mudou = [];
   if (dados.aluguel_inicial !== r.aluguel_inicial) mudou.push(`Aluguel inicial (valor cheio): ${reais(r.aluguel_inicial)} → ${reais(dados.aluguel_inicial)}`);
   if (antes !== depois) mudou.push(`Aluguel com bonificação: ${antes === null ? 'sem bonificação' : reais(antes)} → ${depois === null ? 'sem bonificação' : reais(depois)}`);
+  // reajustes já lançados são refeitos em cadeia a partir do inicial corrigido
+  if (dados.aluguel_inicial !== r.aluguel_inicial) {
+    for (const m of R.correcoesRecalculadas(d(), r, dados.aluguel_inicial)) {
+      mudou.push(`${m.x.indice === 'Negociado' ? 'Novo valor negociado' : 'Reajuste'} de ${dataBr(m.x.data_vigencia)}: ${reais(m.x.valor_novo)} → ${reais(m.valor_novo)}${m.x.indice === 'Negociado' ? ' (valor combinado mantido)' : ` (${pct(m.percentual)} sobre ${reais(m.valor_anterior)})`}`);
+    }
+  }
   if (!mudou.length) return true;
   const lista = `<ul>${mudou.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
   const passo1 = await janela({ titulo: 'Valores do contrato inicial',
@@ -1211,6 +1227,9 @@ function telaContrato(c) {
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
       ${(() => { const r = R.reajustePendente(d(), c); if (!r) { const p = R.mesDeAniversario(c); return p ? `<p class="suave">Reajuste no 13º mês (o mês de entrada conta como o 1º): aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
     return `<div class="alerta aviso"><b>Reajuste do aluguel de ${compBr(r.competencia)}</b> (${r.anos} ano(s)) ${botoesReajuste(c, r)}</div>`; })()}
+      ${(() => { const m = R.correcoesRecalculadas(d(), c, c.aluguel_inicial); return m.length ? `<div class="alerta aviso"><b>As correções abaixo não batem com o aluguel inicial de ${reais(c.aluguel_inicial)}</b> (ex.: o inicial foi corrigido depois).
+        Refeitas em cadeia: ${m.map((x) => `${dataBr(x.x.data_vigencia)} ${reais(x.x.valor_novo)} → <b>${reais(x.valor_novo)}</b>`).join('; ')}. O novo valor negociado fica como combinado.
+        ${opera() ? `<div class="acoes" style="margin-top:6px">${botao('recalcularCorrecoes', 'Refazer as correções a partir do aluguel inicial', { id: c.id }, 'pequeno', 'Refazer as correções a partir do aluguel inicial? Os boletos em aberto são recalculados.')}</div>` : ''}</div>` : ''; })()}
       <table><tr><th>Vale a partir de</th><th>Previsto no contrato</th><th>Índice usado</th><th class="n">%</th><th class="n">Valor anterior</th><th class="n">Novo valor</th><th></th></tr>
       <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="4" class="suave">Valor inicial do contrato</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
       ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${esc(x.indice_contrato || '-')}</td><td>${x.indice === 'Negociado' ? etiqueta('Negociado', 'aviso') : `${esc(x.indice || '-')}${x.data_indice ? ` <span class="suave">(${compBr(x.data_indice)})</span>` : ''}`}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
@@ -1389,7 +1408,7 @@ const CADASTROS = {
     // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
     base: (r) => (r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form, q = {}) {
-      const base = r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : dados.aluguel_inicial;
+      const base = baseBonificacao(r, dados.aluguel_inicial);
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
       if (dados.bonificacao && bonificadoTexto) {
         // o aluguel bonificado digitado manda: o % é calculado sem arredondar, para o desconto bater no centavo
@@ -1466,8 +1485,11 @@ const CADASTROS = {
     salvar(db, dados, q, r) {
       let c;
       if (r) {
+        const inicialMudou = dados.aluguel_inicial !== r.aluguel_inicial;
         R.atualizar(db, 'contratos', r.id, dados, login(), dados.inquilino_nome);
         c = R.buscar(db, 'contratos', r.id);
+        // aluguel inicial corrigido: os reajustes já lançados são refeitos a partir dele (o aluguel atual e a caução sugerida acompanham)
+        if (inicialMudou) R.recalcularCorrecoes(db, c.id, login());
       } else c = R.inserir(db, 'contratos', { ...dados, docs_entrada: true }, login(), dados.inquilino_nome);
       const { novos, alterados, excluidos } = fiadoresMudancas;
       for (const f of excluidos) R.excluir(db, 'fiadores', f.id, login());
@@ -4006,6 +4028,16 @@ export const ACOES = {
       R.recalcularCobrancas(db, (cb) => cb.id === Number(id), login());
     });
     aviso('Boleto recalculado pelo cadastro.');
+    await mostrar();
+  },
+
+  async recalcularCorrecoes({ id }) {
+    let n = 0;
+    await alterar((db) => {
+      n = R.recalcularCorrecoes(db, Number(id), login());
+      R.recalcularCobrancas(db, (cb) => cb.contrato_id === Number(id), login());
+    });
+    aviso(`${n} correção(ões) refeita(s) a partir do aluguel inicial.`);
     await mostrar();
   },
 
