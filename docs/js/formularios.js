@@ -5,6 +5,8 @@ export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 
 const campo = (nome, rotulo, tipo = 'texto', extra = {}) => ({ nome, rotulo, tipo, ...extra });
 const secao = (titulo) => ({ secao: titulo });
+/** Começa uma nova linha no formulário. */
+const QUEBRA = { quebra: true };
 
 // --------------------------------------------------------------------------
 // CPF, CNPJ, CEP e telefone: máscara ao digitar e conferência dos dígitos ao salvar
@@ -133,7 +135,7 @@ export const RESSARCIMENTO = [
 ];
 
 /** Contas do imóvel e quem paga cada uma, conforme o contrato. */
-export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_condominio', 'Condomínio'], ['conta_internet', 'Internet / TV']];
+export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_internet', 'Internet / TV'], ['conta_condominio', 'Condomínio']];
 export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
 /** Relógios lidos na entrada e na saída do inquilino. */
 export const LEITURAS = [['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás']];
@@ -158,7 +160,7 @@ export const VINCULO = [
 export const GENEROS = ['Masculino', 'Feminino', 'Neutro – o(a)'];
 export const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'Separado(a)', 'União estável'];
 const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
-  campo(`${prefixo}genero`, 'Sexo (para a concordância no contrato)', 'opcao', { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
+  campo(`${prefixo}genero`, 'Sexo', 'opcao', { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
   campo(`${prefixo}nacionalidade`, 'Nacionalidade', 'texto', { padrao: 'brasileira', ...extra }),
   campo(`${prefixo}estado_civil`, 'Estado civil', 'opcao', { opcoes: ESTADOS_CIVIS, ...extra }),
   campo(`${prefixo}profissao`, 'Profissão', 'texto', extra),
@@ -232,7 +234,9 @@ export const CONTRATO = [
   campo('representante_cpf', 'CPF do representante', 'cpf', PJ),
   campo('representante_rg', 'RG do representante', 'texto', PJ),
   campo('representante_cargo', 'Cargo', 'texto', PJ),
-  ...qualificacao('representante_', PJ),
+  ...qualificacao('representante_', PJ, false),
+  campo('representante_usar_endereco_imovel', 'Usar o endereço do imóvel deste contrato', 'simnao', { virtual: true, autoMsg: true, ...PJ, ajuda: 'Marcado: o endereço do representante fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)' }),
+  campo('representante_endereco', 'Endereço (residência ou comercial)', 'texto', { largo: true, ...PJ }),
   campo('representante_telefone', 'Telefone do representante', 'tel', PJ),
   campo('representante_email', 'E-mail do representante', 'email', PJ),
   { secao: 'Inquilino solidário', recolher: EXPANDIR_PARTE },
@@ -257,31 +261,31 @@ export const CONTRATO = [
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
-  campo('contas_adicionais', 'Contas ou cobranças adicionais previstas no contrato', 'area', { linha: true, largo: true, ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
+  campo('contas_adicionais', 'Contas ou cobranças adicionais', 'area', { linha: true, ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Valores e boleto'),
-  campo('aluguel_inicial', 'Aluguel inicial (valor cheio, histórico)', 'dinheiro', { obrig: true }),
+  campo('aluguel_inicial', 'Aluguel', 'dinheiro', { obrig: true, ajuda: 'Valor cheio do contrato (histórico)' }),
   campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true }),
+  campo('aluguel_bonificado', 'Aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Digite o valor que o inquilino paga em dia: o % é calculado' }),
+  campo('desconto_pontualidade_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Ou digite o % e o aluguel bonificado é calculado' }),
   campo('cobranca_mes_seguinte', 'O aluguel do mês vence no mês seguinte', 'simnao', { padrao: true, ajuda: 'Marcado: aluguel de julho vence em agosto' }),
-  campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true }),
-  campo('aluguel_bonificado', 'Aluguel com bonificação (R$)', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Digite o valor que o inquilino paga em dia: o % é calculado' }),
-  campo('desconto_pontualidade_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Ou digite o % e o aluguel com bonificação é calculado' }),
+  campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true, colado: true }),
+  QUEBRA,
   campo('taxa_boleto', 'Tarifa de emissão do boleto (R$)', 'dinheiro', { ajuda: 'Entra no boleto e na descrição do boleto' }),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'] }),
-  campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel com bonificação (parte "Valores e boleto")' }),
-  campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel com bonificação); pode ajustar se o depósito foi outro valor' }),
-  campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. O comprovante é anexado depois da assinatura' }),
-  comprovante('comprovante_caucao', 'Comprovante do depósito da caução', quando('garantia_tipo', 'Caução')),
+  campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto")' }),
+  campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor' }),
+  campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino' }),
   campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   campo('deposito_data', 'Data do depósito', 'data', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   campo('deposito_uso', 'Quando e onde o depósito será usado', 'texto', { largo: true, ...quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito'), ajuda: 'Ex.: abatido nos dois últimos aluguéis do contrato' }),
   comprovante('comprovante_deposito', 'Comprovante do depósito de garantia', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
   ...fiadoresNoCadastro(),
   secao('Datas e prazo'),
-  campo('vigencia_inicio', 'Data de assinatura do contrato', 'data', { obrig: true, ajuda: 'É também a data que sai no contrato ao gerá-lo e o início do prazo' }),
-  campo('data_entrada', 'Data de vigência inicial', 'data', { obrig: true, ajuda: 'A data que consta no contrato como início da vigência' }),
+  campo('vigencia_inicio', 'Data do contrato', 'data', { obrig: true }),
+  campo('data_entrada', 'Data de vigência inicial', 'data', { obrig: true }),
   campo('prazo_tipo', 'Prazo', 'opcao', { obrig: true, padrao: 'Determinado', opcoes: ['Determinado', 'Indeterminado'] }),
   campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ...quando('prazo_tipo', 'Determinado'), ajuda: 'Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia)' }),
   campo('renovacao_automatica', 'Renovação automática', 'simnao'),
@@ -289,7 +293,7 @@ export const CONTRATO = [
   secao('Correção anual'),
   campo('indice_correcao', 'Índice de correção previsto no contrato', 'opcao', { lista: 'indices', ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
-  { secao: 'Carência de aluguel', recolher: 'Expanda para informar a carência' },
+  { secao: 'Carência de aluguel', recolher: 'Expanda para cadastrar carência' },
   campo('carencia_meses', 'Meses de carência', 'inteiro', { ajuda: 'Nestes meses o aluguel não é cobrado. Em branco: sem carência' }),
   campo('carencia_inicio', 'Carência a partir do aluguel de', 'mes', { ajuda: 'Em branco: mês de entrada' }),
   campo('carencia_cobrar_iptu', 'Na carência, cobrar o IPTU', 'simnao'),
@@ -563,6 +567,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
   const partes = campos.map((c, k) => {
     const se = c.mostrarSe ? `data-mostrar-se="${esc([c.mostrarSe.campo, ...c.mostrarSe.valores].join('|'))}"` : '';
     const g = grupoDe[k];
+    if (c.quebra) return '<div class="quebra"></div>';
     if (c.secao) {
       if (!c.recolher) return `<h3 ${se}>${esc(c.secao)}</h3>`;
       const texto = doGrupo(g).some(preenchido) ? 'Expanda para ver ou alterar' : c.recolher;
@@ -579,7 +584,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     let entrada;
     if (c.tipo === 'simnao') {
       const marcado = v === true || v === '1' || v === 1;
-      return `<div class="${erros[c.nome] ? 'com-erro' : ''} ${recolhido}"${grupo} ${se}><label class="check"><input type="checkbox" name="${c.nome}" value="1" ${marcado ? 'checked' : ''}> ${esc(c.rotulo)}</label>${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}</div>`;
+      return `<div class="${erros[c.nome] ? 'com-erro' : ''} ${recolhido} ${c.colado ? 'colado' : ''}"${grupo} ${se}><label class="check"><input type="checkbox" name="${c.nome}" value="1" ${marcado ? 'checked' : ''}> ${esc(c.rotulo)}</label>${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}</div>`;
     }
     const max = c.max ? `maxlength="${c.max}"` : '';
     if (c.tipo === 'arquivo') {
@@ -605,5 +610,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ''}
       ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ''}${c.preencher || c.buscarPessoa || c.autoMsg || ['imovel_id', 'contrato_anterior_id'].includes(c.nome) ? '<div class="ajuda-auto" data-auto-msg></div>' : ''}</div>`;
   });
+  // "colado": a caixa de marcar fica na mesma célula do campo anterior (uma embaixo da outra)
+  for (let k = partes.length - 1; k > 0; k -= 1) if (campos[k].colado) { partes[k - 1] = `${partes[k - 1].replace(/<\/div>\s*$/, '')}${partes[k]}</div>`; partes[k] = ''; }
   return `<div class="formulario${compacto ? ' compacto' : ''}">${partes.join('')}</div>`;
 }

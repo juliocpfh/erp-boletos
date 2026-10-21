@@ -332,8 +332,8 @@ function ligarContinuacaoDeContrato(raiz) {
   });
 }
 
-/** Caixas "Usar o endereço do imóvel" do novo contrato: [caixa, campo de endereço que recebe] (inquilino e solidário). */
-const ENDERECO_DO_IMOVEL = [['usar_endereco_imovel', 'inquilino_endereco'], ['solidario_usar_endereco_imovel', 'solidario_endereco']];
+/** Caixas "Usar o endereço do imóvel" do contrato: [caixa, campo de endereço que recebe] (inquilino, representante e solidário). */
+const ENDERECO_DO_IMOVEL = [['usar_endereco_imovel', 'inquilino_endereco'], ['representante_usar_endereco_imovel', 'representante_endereco'], ['solidario_usar_endereco_imovel', 'solidario_endereco']];
 
 /** Novo contrato: "Usar o endereço do imóvel" copia o endereço do imóvel escolhido para o endereço do inquilino (ou do solidário). */
 function ligarEnderecoDoImovel(raiz) {
@@ -929,7 +929,16 @@ function caixaGarantia(c) {
         ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
     : opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}</div>`;
     }
-    html += `<div class="grade">${item('Caução dada', `${reais(c.caucao_valor)} em ${dataBr(c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao, { tabela: 'contratos', id: c.id, campo: 'comprovante_caucao', tipo: 'caucao', data: c.caucao_data })}`)}
+    // a data efetivamente paga e o comprovante são lançados aqui (no cadastro do contrato fica só a data prevista)
+    if (!c.comprovante_caucao && c.caucao_valor > 0) {
+      html += `<div class="alerta aviso"><b>Incluir caução e anexar comprovante.</b> Caução de ${reais(c.caucao_valor)} prevista para ${dataBr(c.caucao_data)}.
+        ${opera() ? `<form data-form="caucaoPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
+          <label style="margin:0">Paga em</label><input type="date" name="data" value="${esc(c.caucao_pago_em || c.caucao_data || C.hojeIso())}" style="width:auto">
+          <label class="botao secundario pequeno enviar" title="Comprovante do depósito (PDF ou foto)"><span data-nome-escolhido>Anexar comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+          <button class="pequeno">Registrar caução</button></form>` : ''}</div>`;
+    }
+    html += `<div class="grade">${item('Caução', `${reais(c.caucao_valor)} · prevista para ${dataBr(c.caucao_data)}`)}
+      ${c.comprovante_caucao ? item('Paga em', `${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}`) : ''}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>
       <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
@@ -1235,7 +1244,7 @@ function telaContrato(c) {
       ${c.solidario_nome ? `<h3>Inquilino solidário</h3><p><b>${esc(c.solidario_nome)}</b> · ${pessoa('solidario')}</p><p class="suave">O boleto sai no nome do inquilino principal.</p>` : ''}</div>
     <div class="cartao"><h2>Contrato e valores</h2><div class="grade">
       ${item('Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
-      ${item('Contrato', `${dataBr(c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${c.prazo_meses ? ` (${c.prazo_meses} meses)` : ''}`}`)}
+      ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${c.prazo_meses ? ` (${c.prazo_meses} meses)` : ''}`}`)}
       ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
       ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
       ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', reais(c.taxa_boleto))}
@@ -1250,6 +1259,7 @@ function telaContrato(c) {
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
+    ${caixaBoletosInquilino(c, cobs, hoje)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${opera() ? link(`#/novo/correcoes?contrato=${c.id}`, 'Registrar correção') : ''}</div>
       ${(() => { const r = R.reajustePendente(d(), c); if (!r) { const p = R.mesDeAniversario(c); return p ? `<p class="suave">Reajuste no 13º mês (o mês de entrada conta como o 1º): aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
     return `<div class="alerta aviso"><b>Reajuste do aluguel de ${compBr(r.competencia)}</b> (${r.anos} ano(s)) ${botoesReajuste(c, r)}</div>`; })()}
@@ -1265,12 +1275,11 @@ function telaContrato(c) {
       ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td>
         <td class="n">${opera() ? botao('excluirRenovacao', 'Excluir', { id: r.id }, 'perigo pequeno', `Excluir este registro${r.novo_valor ? ' e o novo valor negociado' : ''}? A data de término do contrato não volta sozinha: confira em "Editar".`) : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
-    ${caixaBoletosInquilino(c, cobs, hoje)}
+    ${caixaDocumentos(c)}
     <div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
       <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
       ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}
-    ${caixaDocumentos(c)}
     ${caixaArquivos('contrato', c.id, `Arquivos do inquilino · 📁 ${c.pasta || nomePastaContrato(c)}`, 'arquivos', 'Fichas cadastrais, Documentos de Identificação, Consulta Serasa, Contra Vistorias')}
     ${caixaSaida(c)}
     ${caixaHistorico(`Histórico deste inquilino${historicoIds.size > 1 ? ' e dos contratos ligados' : ''}`, tabelaHistorico(ultimos((h) => historicoIds.has(h.contrato_id), 80)))}`;
@@ -1426,7 +1435,7 @@ const CADASTROS = {
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
-      inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
+      inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.data_entrada || r.vigencia_inicio, r.vigencia_fim) || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
@@ -1451,7 +1460,8 @@ const CADASTROS = {
       if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = 'A saída não pode ser antes da entrada';
       if (dados.prazo_tipo === 'Determinado') {
         if (!(dados.prazo_meses > 0)) erros.prazo_meses = 'Informe o prazo em meses, ou marque prazo indeterminado';
-        else if (dados.vigencia_inicio) dados.vigencia_fim = C.fimDoPrazo(dados.vigencia_inicio, dados.prazo_meses);
+        // o prazo conta da data de vigência inicial (sem ela, da data do contrato)
+        else if (dados.data_entrada || dados.vigencia_inicio) dados.vigencia_fim = C.fimDoPrazo(dados.data_entrada || dados.vigencia_inicio, dados.prazo_meses);
       }
       if (dados.carencia_meses < 0) erros.carencia_meses = 'Valor inválido';
       if (dados.inquilino_tipo === 'Pessoa jurídica (empresa)' && !dados.representante_nome) erros.representante_nome = 'Empresa precisa do representante (pessoa física)';
@@ -1496,7 +1506,7 @@ const CADASTROS = {
       // caução: data prevista = data do contrato; valor = aluguéis × aluguel com bonificação (se não foi digitado)
       if (dados.garantia_tipo === 'Caução') R.completarCaucao(dados);
       for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
-        if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome)) continue;
+        if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome) || (caixa.startsWith('representante') && dados.inquilino_tipo !== 'Pessoa jurídica (empresa)')) continue;
         if (imovelEndereco) dados[campoEnd] = enderecoInquilino(imovelEndereco);
         else erros[campoEnd] = 'Escolha o imóvel para usar o endereço dele';
       }
@@ -2359,7 +2369,7 @@ function telaInquilinos(q) {
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ''}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
-        <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${x.c.vigencia_inicio ? `${dataBr(x.c.vigencia_inicio)} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr(x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
+        <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
@@ -3315,6 +3325,18 @@ export const FORMULARIOS = {
     if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
     const nome = await salvarAssinado('assinados', Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
     await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
+    await mostrar();
+  },
+
+  /** Caução paga: data do depósito e comprovante (obrigatório), gravado na pasta do inquilino. */
+  async caucaoPaga(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const arq = form.querySelector('[name=arquivo]').files[0];
+    if (!f.data) throw new Error('Informe a data em que a caução foi paga.');
+    if (!arq) throw new Error('Anexe o comprovante do depósito da caução.');
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante('caucao', f.data, arq)));
+    await alterar((db) => R.registrarCaucaoPaga(db, Number(f.contrato), f.data, nome, login()));
+    aviso('Caução registrada.');
     await mostrar();
   },
 

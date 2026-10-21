@@ -1102,3 +1102,12 @@ test('troca para garantia sem fiador: os fiadores atuais saem', () => {
   assert.equal(a.data_saida, '2026-10-09');
   assert.equal(d.fiadores.length, 1);
 });
+
+test('caução paga: exige data e comprovante; guarda a data efetiva e o arquivo', () => {
+  const { d, c } = base();
+  assert.throws(() => R.registrarCaucaoPaga(d, c.id, '2026-02-03', null, 'julio'), /Anexe o comprovante/);
+  assert.throws(() => R.registrarCaucaoPaga(d, c.id, '', 'x.pdf', 'julio'), /data/);
+  R.registrarCaucaoPaga(d, c.id, '2026-02-03', 'comprovante-caucao-2026-02-03.pdf', 'julio');
+  assert.equal(c.caucao_pago_em, '2026-02-03');
+  assert.equal(c.comprovante_caucao, 'comprovante-caucao-2026-02-03.pdf');
+});
