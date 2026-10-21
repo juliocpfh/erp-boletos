@@ -184,13 +184,9 @@ ${PARTES}
 
 As partes acima, já qualificadas no Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, resolvem, de comum acordo e a pedido do LOCATÁRIO, celebrar o presente Termo Aditivo, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
 
-**CLÁUSULA #** – O aluguel mensal e os demais encargos da locação passam a vencer todo dia {dia_vencimento_novo} de cada mês, e não mais no dia {dia_vencimento_anterior}, a partir do vencimento de {primeiro_vencimento}.
+**CLÁUSULA #** – O aluguel mensal e os demais encargos da locação passam a vencer todo dia {dia_vencimento_novo} de cada mês, e não mais no dia {dia_vencimento_anterior}, a partir do vencimento de {primeiro_vencimento}, referente ao mês de {mes_referencia}.
 
-[se diferenca_cobrar]**CLÁUSULA #** – Em razão da alteração, o LOCATÁRIO pagará, junto com o vencimento de {primeiro_vencimento}, o valor proporcional de {valor_diferenca}, referente a {dias_diferenca} dias de locação.[fim]
-
-[se diferenca_abater]**CLÁUSULA #** – Em razão da alteração, será abatido do vencimento de {primeiro_vencimento} o valor proporcional de {valor_diferenca}, referente a {dias_diferenca} dias de locação.[fim]
-
-[se diferenca_sem]**CLÁUSULA #** – A alteração não gera cobrança nem desconto de valor proporcional no mês da troca.[fim]
+**CLÁUSULA #** – Muda apenas o dia do vencimento: cada pagamento continua se referindo ao [se mes_seguinte]mês anterior ao do vencimento[senão]próprio mês do vencimento[fim], sem cobrança ou desconto de dias por causa da alteração.
 
 **CLÁUSULA #** – Esta alteração não modifica o valor do aluguel, a data-base e o índice de reajuste, nem o prazo da locação.[se bonificacao] A bonificação por pontualidade passa a valer para o pagamento feito até o novo dia do vencimento.[fim]
 

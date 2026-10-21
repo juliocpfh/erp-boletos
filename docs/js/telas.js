@@ -3150,14 +3150,12 @@ function telaAditivo(rota) {
   const hoje = C.hojeIso();
   const modelos = K.modelosDe(d(), 'aditivo');
   const diaAtual = a ? a.dia_anterior : (c.dia_vencimento || 10);
-  const aluguel = R.aluguelAtual(d(), c);
   const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
-  const dif = a ? a.diferenca : 'Sem cobrança';
   const falta = K.pendenciasDoContrato(d(), c);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca do dia do vencimento` : 'Gerar termo aditivo: troca do dia do vencimento'}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
-    <div class="alerta info">Hoje o vencimento é no <b>dia ${diaAtual}</b> e o aluguel atual é <b>${reais(aluguel)}</b>.
+    <div class="alerta info">Hoje o vencimento é no <b>dia ${diaAtual}</b>. Muda só o dia: o boleto continua se referindo ao mês ${c.cobranca_mes_seguinte !== false ? 'anterior' : 'do vencimento'}, sem cobrança proporcional.
       Este termo não muda o cadastro: depois de assinado, mude o dia do vencimento em "Editar" no inquilino.</div>
     <form class="cartao" data-form="aditivoVencimento">
       <input type="hidden" name="id" value="${a ? a.id : ''}"><input type="hidden" name="contrato" value="${c.id}">
@@ -3165,14 +3163,12 @@ function telaAditivo(rota) {
         <div><label>Data do termo aditivo</label><input type="date" name="data" value="${esc(a ? a.data : hoje)}" required></div>
         <div><label>Novo dia do vencimento</label><input type="number" name="dia_novo" min="1" max="31" value="${esc(a ? a.dia_novo : '')}" required></div>
         <div><label>Mês do 1º vencimento no novo dia</label><input type="month" name="mes" value="${esc(a ? a.primeiro_vencimento.slice(0, 7) : C.somarMeses(C.competenciaDe(hoje), 1))}" required></div>
-        <div><label>Dias de diferença no mês da troca</label><select name="diferenca">${['Sem cobrança', 'Proporcional'].map((x) => `<option ${x === dif ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
-        <div><label>Valor proporcional (R$) <span class="suave">vazio = calcula</span></label><input name="valor_diferenca" value="${a && a.diferenca === 'Proporcional' ? esc(C.reais(a.valor_diferenca, false)) : ''}" placeholder="aluguel ÷ 30 × dias"></div>
         ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
         <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
         <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
       </div>
-      <p class="suave">Proporcional: ex. aluguel de R$ 2.000,00 passando do dia 10 para o dia 20 = 10 dias × R$ 2.000,00 ÷ 30 = R$ 666,67, cobrados junto com o 1º vencimento no novo dia
-        (se o novo dia for antes do atual, o valor é abatido). Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
+      <p class="suave">Ex.: do dia 10 para o dia 20 a partir de novembro/2026: o aluguel de outubro vence em 20/11/2026, com o valor normal.
+        Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
       ${a ? `<p><label>Texto deste termo <span class="suave">(muda só este termo; o padrão fica em ${link('#/modelos-contrato', 'Modelos de contrato', '')})</span></label>
         <textarea name="texto" class="texto-modelo" spellcheck="true">${esc(a.texto)}</textarea></p>` : ''}
       <div class="acoes"><button>${a ? 'Salvar e ver o termo' : 'Gerar o termo'}</button><a class="botao secundario" href="#/contrato/${c.id}?ir=aditivos">Cancelar</a></div></form>
@@ -3187,8 +3183,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
     <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
       <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto
       area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
-    <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {dias_diferenca} {valor_diferenca}</code>
-      e as condições <code>diferenca_sem diferenca_cobrar diferenca_abater</code>.</li>
+    <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
+      e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>
@@ -3645,8 +3641,7 @@ export const FORMULARIOS = {
     try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo').find((m) => String(m.id) === f.modelo);
     if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
-    const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes, diferenca: f.diferenca,
-      valor_diferenca: String(f.valor_diferenca || '').trim() ? C.centavos(f.valor_diferenca) : '',
+    const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes,
       testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() })),
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
