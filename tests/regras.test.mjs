@@ -1147,14 +1147,12 @@ test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"
   const dia = c.dia_vencimento;
   assert.throws(() => R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: String(dia || 10), mes: '2026-12', texto: 'x' }, 'julio'), /já é no dia/);
   assert.throws(() => R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '40', mes: '2026-12', texto: 'x' }, 'julio'), /de 1 a 31/);
-  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '31', mes: '2027-02', diferenca: 'Proporcional', valor_diferenca: 5000, texto: 'texto' }, 'julio');
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '31', mes: '2027-02', texto: 'texto' }, 'julio');
   assert.equal(a.primeiro_vencimento, '2027-02-28', 'dia que não existe no mês vira o último dia');
-  assert.equal(a.valor_diferenca, 5000, 'valor digitado prevalece sobre o cálculo');
   assert.equal(R.aditivosDo(d, c.id).length, 0);
   assert.equal(R.aditivosAguardando(d, c.id).length, 1);
   assert.equal(c.possui_aditivos, undefined);
-  R.salvarAditivoVencimento(d, c.id, { data: '2026-11-06', dia_novo: '15', mes: '2026-12', diferenca: 'Sem cobrança', texto: 'texto novo' }, 'julio', a.id);
-  assert.equal(a.valor_diferenca, 0);
+  R.salvarAditivoVencimento(d, c.id, { data: '2026-11-06', dia_novo: '15', mes: '2026-12', texto: 'texto novo' }, 'julio', a.id);
   assert.equal(a.texto, 'texto novo');
   assert.match(a.assunto, /dia 15, a partir de 15\/12\/2026/);
   assert.throws(() => R.assinarAditivo(d, a.id, { data: '2026-11-10' }, 'julio'), /Anexe/);
