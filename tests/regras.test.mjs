@@ -1023,3 +1023,18 @@ test('troca de titular: documentos de entrada herdados (nunca pendentes) e aditi
   R.registrarAditivo(d, h.id, { data: '2026-11-01', assunto: 'Troca de titular', arquivo: 'aditivo.pdf' }, 'julio');
   assert.equal(R.alertasContrato(d, h, '2026-11-01').find((x) => x.tipo === 'Aditivo da troca de titular'), undefined);
 });
+
+test('cancelar a troca de garantia: o contrato volta à garantia anterior e só a última troca pode ser cancelada', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', aluguel_inicial: 200000, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_meses: 3, caucao_data: '2025-09-01' }, 'j');
+  const t1 = R.trocarGarantia(d, c.id, { data: '2026-01-10', garantia_tipo: 'Fiador' }, 'j');
+  const t2 = R.trocarGarantia(d, c.id, { data: '2026-02-10', garantia_tipo: 'Depósito garantia', deposito_valor: 100000 }, 'j');
+  assert.throws(() => R.cancelarTrocaGarantia(d, t1.id, 'j'), /mais recente/);
+  R.cancelarTrocaGarantia(d, t2.id, 'j');
+  assert.equal(c.garantia_tipo, 'Fiador');
+  R.cancelarTrocaGarantia(d, t1.id, 'j');
+  assert.equal(c.garantia_tipo, 'Caução');
+  assert.equal(c.caucao_valor, 540000);
+  assert.equal(c.caucao_data, '2025-09-01');
+  assert.equal(d.trocas_garantia.length, 0);
+});

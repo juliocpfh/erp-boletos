@@ -913,8 +913,9 @@ function caixaGarantia(c) {
       ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td></tr>`).join('')}</table>`;
   }
   if (trocas.length) {
-    html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th></tr>
-      ${trocas.map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td></tr>`).join('')}</table>`;
+    html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th><th></th></tr>
+      ${trocas.map((t, i) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
+        <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo pequeno', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
   }
   if (sit.total || aplic.length) {
     html += `<h3>Onde o valor foi aplicado</h3>
@@ -4005,6 +4006,12 @@ export const ACOES = {
       R.recalcularCobrancas(db, (cb) => cb.id === Number(id), login());
     });
     aviso('Boleto recalculado pelo cadastro.');
+    await mostrar();
+  },
+
+  async cancelarTrocaGarantia({ id }) {
+    await alterar((db) => R.cancelarTrocaGarantia(db, Number(id), login()));
+    aviso('Troca de garantia cancelada: o contrato voltou para a garantia anterior.');
     await mostrar();
   },
 
