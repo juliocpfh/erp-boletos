@@ -1089,6 +1089,21 @@ export function trocarGarantia(d, contratoId, dados, usuario) {
   return r;
 }
 
+/**
+ * Cancela a última troca de garantia (lançada por engano): o contrato volta à garantia anterior, guardada na troca,
+ * e o registro da troca sai. Só a mais recente pode ser cancelada (as anteriores dependem dela).
+ */
+export function cancelarTrocaGarantia(d, trocaId, usuario) {
+  const t = buscar(d, 'trocas_garantia', trocaId);
+  if (!t) throw new Error('Registro não encontrado.');
+  if (trocasGarantiaDo(d, t.contrato_id)[0].id !== t.id) throw new Error('Só a troca de garantia mais recente pode ser cancelada.');
+  const texto = `Troca de garantia cancelada: volta para ${t.tipo_anterior || 'não informada'}`;
+  const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, (t.anterior || {})[k] ?? null]));
+  if (!t.anterior) anterior.garantia_tipo = t.tipo_anterior || null;
+  atualizar(d, 'contratos', t.contrato_id, anterior, usuario, texto);
+  excluir(d, 'trocas_garantia', t.id, usuario, texto);
+}
+
 /** Substitui um fiador: o antigo fica guardado com data de saída e o novo entra no lugar. */
 export function trocarFiador(d, fiadorId, dados, usuario) {
   const antigo = buscar(d, 'fiadores', fiadorId);
