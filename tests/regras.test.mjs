@@ -154,7 +154,7 @@ test('bonificação desligada, renovação com novo valor, caução e saída', (
   const i = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Venezuela', endereco: 'Rua Venezuela, 526' }, 'julio');
   const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ruy', data_entrada: '2024-09-01', vigencia_inicio: '2024-09-01',
     data_base_correcao: '2024-10-01', prazo_tipo: 'Determinado', vigencia_fim: '2027-09-01', aluguel_inicial: 492800,
-    bonificacao: false, desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_valor: 1344000,
+    bonificacao: false, desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_valor: 1344000, comprovante_caucao: 'c.pdf',
     caucao_data: '2024-09-01', caucao_meses: 3, dia_vencimento: 1 }, 'julio');
   R.gerarCobrancas(d, '2026-08', 'julio');
   assert.equal(d.cobrancas[0].desconto, 0);
@@ -817,7 +817,7 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
     data_entrada: '2025-03-01', vigencia_inicio: '2025-03-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
     desconto_pontualidade_percentual: 10, taxa_boleto: 850, multa_percentual: 10, juros_mensal_percentual: 1,
-    garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3 }, 'julio');
+    garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
   // aluguel R$ 2.000,00 → R$ 2.100,00 (5%); bonificado R$ 1.890,00; caução 3 × 1.890 = R$ 5.670,00
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-03-01', indice: 'IGP-M', percentual: 5, valor_anterior: 200000, valor_novo: 210000 }, 'julio');
   const x = R.complementoCaucao(d, c);
@@ -849,7 +849,7 @@ test('complemento da caução sai junto ao gerar os boletos do mês e não escon
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 3', endereco: 'Rua Teste, 20', cidade: 'Curitiba' }, 'julio');
   const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
     data_entrada: '2025-03-01', vigencia_inicio: '2025-03-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
-    desconto_pontualidade_percentual: 10, taxa_boleto: 850, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3 }, 'julio');
+    desconto_pontualidade_percentual: 10, taxa_boleto: 850, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-03-01', indice: 'IGP-M', percentual: 5, valor_anterior: 200000, valor_novo: 210000 }, 'julio');
   // fevereiro ainda não tem o aluguel corrigido: só o boleto do aluguel
   assert.deepEqual(R.gerarCobrancas(d, '2026-02', 'julio'), { geradas: 1, existentes: 0 });
@@ -1105,9 +1105,20 @@ test('troca para garantia sem fiador: os fiadores atuais saem', () => {
 
 test('caução paga: exige data e comprovante; guarda a data efetiva e o arquivo', () => {
   const { d, c } = base();
-  assert.throws(() => R.registrarCaucaoPaga(d, c.id, '2026-02-03', null, 'julio'), /Anexe o comprovante/);
-  assert.throws(() => R.registrarCaucaoPaga(d, c.id, '', 'x.pdf', 'julio'), /data/);
-  R.registrarCaucaoPaga(d, c.id, '2026-02-03', 'comprovante-caucao-2026-02-03.pdf', 'julio');
+  assert.throws(() => R.registrarGarantiaPaga(d, c.id, 'caucao', '2026-02-03', null, 'julio'), /Anexe o comprovante/);
+  assert.throws(() => R.registrarGarantiaPaga(d, c.id, 'caucao', '', 'x.pdf', 'julio'), /data/);
+  R.registrarGarantiaPaga(d, c.id, 'caucao', '2026-02-03', 'comprovante-caucao-2026-02-03.pdf', 'julio');
   assert.equal(c.caucao_pago_em, '2026-02-03');
   assert.equal(c.comprovante_caucao, 'comprovante-caucao-2026-02-03.pdf');
+});
+
+test('garantia só conta depois de depositada com comprovante (caução atual, aplicação, complemento)', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', aluguel_inicial: 200000, garantia_tipo: 'Depósito garantia', deposito_valor: 400000, deposito_data: '2026-01-01' }, 'j');
+  assert.equal(R.garantiaDepositada(c), false);
+  assert.equal(R.situacaoAplicacao(d, c).total, 0, 'sem comprovante: nada a aplicar');
+  R.registrarGarantiaPaga(d, c.id, 'deposito', '2026-01-03', 'comprovante-deposito-garantia-2026-01-03.pdf', 'j');
+  assert.equal(c.deposito_pago_em, '2026-01-03');
+  assert.equal(R.garantiaDepositada(c), true);
+  assert.equal(R.situacaoAplicacao(d, c).total, 400000);
 });

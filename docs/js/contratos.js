@@ -371,10 +371,8 @@ const estiloRodape = (rodape) => `<style>@media print { @page {
     margin-bottom: calc(2cm - 15pt); border-bottom: 1px solid #999; padding-bottom: 2pt; ${FONTE_RODAPE} } } }</style>`;
 
 export function contratoHtml(blocos, { logo, rodape }) {
-  // o fecho ("E por assim estarem justos...", local e data) fica junto das assinaturas, na mesma página, quando couber
-  const iAss = blocos.findIndex((b) => b.tipo === 'assinaturas');
-  const iFecho = iAss > 1 && blocos[iAss - 1].tipo === 'direita' && blocos[iAss - 2].tipo === 'paragrafo' ? iAss - 2 : -1;
-  const corpo = blocos.map((b, i) => (i === iFecho ? '<div class="ct-fecho">' : '') + blocoHtml(b) + (i === iAss && iFecho >= 0 ? '</div>' : '')).join('');
+  // o fecho ("E por assim estarem justos...", local e data) segue o texto; as assinaturas podem ir para a folha seguinte
+  const corpo = blocos.map(blocoHtml).join('');
   return `<div class="contrato">
     ${estiloRodape(rodape)}
     ${marcaDagua(logo)}

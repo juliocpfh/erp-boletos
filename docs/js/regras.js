@@ -364,6 +364,9 @@ export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.cont
   .sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
 
 /** Valor atual da garantia em dinheiro (caução corrigida ou depósito). */
+/** Caução ou depósito já depositado, com o comprovante anexado: só então conta (caução atual, aplicação, complemento). */
+export const garantiaDepositada = (c) => (temCaucao(c) ? !!c.comprovante_caucao : temDeposito(c) ? !!c.comprovante_deposito : false);
+
 export function valorGarantia(d, c) {
   if (temCaucao(c)) {
     const cs = correcoesCaucaoAtual(d, c);
@@ -391,7 +394,7 @@ export const boletoDoMes = (d, contratoId, comp) => d.cobrancas.find((x) => x.co
  * o complemento a depositar e o boleto do complemento ainda não pago. Null quando não há correção pendente.
  */
 export function complementoCaucao(d, c) {
-  if (!temCaucao(c) || !c.caucao_valor) return null;
+  if (!temCaucao(c) || !c.caucao_valor || !garantiaDepositada(c)) return null;
   const ultimaCaucao = correcoesCaucaoAtual(d, c).map((x) => x.data).pop() || c.caucao_data || '';
   const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
   if (!correcao) return null;
@@ -434,7 +437,7 @@ export function gerarBoletoCaucao(d, contratoId, usuario, comp = null) {
 
 /** Onde a garantia foi aplicada (em qualquer empresa, sem divisão obrigatória) e quanto falta aplicar. */
 export function situacaoAplicacao(d, c) {
-  const total = valorGarantia(d, c);
+  const total = garantiaDepositada(c) ? valorGarantia(d, c) : 0;
   const aplicado = new Map();
   for (const a of aplicacoesDo(d, c.id)) aplicado.set(a.emitente_id, (aplicado.get(a.emitente_id) || 0) + a.valor);
   const linhas = [...aplicado].map(([id, valor]) => ({ emitente: d.emitentes.find((e) => e.id === id) || { id, nome: 'Empresa excluída' }, aplicado: valor }));
@@ -1111,7 +1114,7 @@ export function excluirRenovacao(d, renovacaoId, usuario) {
   excluir(d, 'renovacoes', r.id, usuario, `${r.tipo} excluído`);
 }
 
-const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_pago_em', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_uso', 'comprovante_deposito'];
+const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_pago_em', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_pago_em', 'deposito_uso', 'comprovante_deposito'];
 
 /**
  * Troca de garantia (ex.: caução → fiador, ou troca de fiador: fiador → fiador), guardando a anterior no histórico do contrato.
@@ -1386,19 +1389,26 @@ export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
   atualizar(d, tabela, r.id, { [campo]: arquivo }, usuario, `Comprovante anexado: ${arquivo}`);
 }
 
-/** Caução paga: a data efetiva do depósito e o comprovante (os dois obrigatórios). */
-export function registrarCaucaoPaga(d, contratoId, data, arquivo, usuario) {
+/** Caução e depósito de garantia: campos da data efetivamente paga e do comprovante. */
+export const GARANTIAS_DEPOSITADAS = {
+  caucao: { nome: 'caução', pago: 'caucao_pago_em', comprovante: 'comprovante_caucao', arquivo: 'caucao' },
+  deposito: { nome: 'depósito de garantia', pago: 'deposito_pago_em', comprovante: 'comprovante_deposito', arquivo: 'deposito-garantia' },
+};
+
+/** Caução ou depósito de garantia pago: a data efetiva do depósito e o comprovante (os dois obrigatórios). */
+export function registrarGarantiaPaga(d, contratoId, qual, data, arquivo, usuario) {
   const c = buscar(d, 'contratos', contratoId);
-  if (!c) throw new Error('Contrato não encontrado.');
-  if (!data) throw new Error('Informe a data em que a caução foi paga.');
-  if (!arquivo) throw new Error('Anexe o comprovante do depósito da caução.');
-  atualizar(d, 'contratos', c.id, { caucao_pago_em: data, comprovante_caucao: arquivo }, usuario, `${c.inquilino_nome}: caução paga em ${C.dataBr(data)}`);
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
+  if (!data) throw new Error(`Informe a data em que ${g.nome} foi paga.`);
+  if (!arquivo) throw new Error(`Anexe o comprovante: ${g.nome}.`);
+  atualizar(d, 'contratos', c.id, { [g.pago]: data, [g.comprovante]: arquivo }, usuario, `${c.inquilino_nome}: ${g.nome} paga em ${C.dataBr(data)}`);
 }
 
 function alertaComprovantes(d, c) {
   const l = comprovantesPendentes(d, c);
   if (!l.length) return null;
-  return { nivel: 'aviso', tipo: l.some((x) => x.campo === 'comprovante_caucao') ? 'Incluir caução e anexar comprovante' : 'Comprovante a buscar no banco', ancora: 'garantia',
+  return { nivel: 'aviso', tipo: l.some((x) => x.campo === 'comprovante_caucao') ? 'Incluir caução e anexar comprovante' : l.some((x) => x.campo === 'comprovante_deposito') ? 'Incluir depósito e anexar comprovante' : 'Comprovante a buscar no banco', ancora: 'garantia',
     texto: `Anexe o comprovante: ${l.map((x) => `${x.texto} de ${C.reais(x.valor)}${x.data ? ` (${C.dataBr(x.data)})` : ''}`).join('; ')}.` };
 }
 

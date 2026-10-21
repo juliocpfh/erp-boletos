@@ -396,7 +396,47 @@ function crescer(t) {
   t.style.height = `${t.scrollHeight + 2}px`;
 }
 
+/**
+ * Rascunho da vistoria (neste navegador): o que já foi marcado fica guardado a cada mudança e volta ao reabrir a vistoria,
+ * por exemplo depois de editar o modelo do imóvel. Os itens são guardados pelo cômodo e nome (o modelo pode mudar). Some ao salvar.
+ */
+const lerRascunho = (chave) => { try { return JSON.parse(localStorage.getItem(chave) || 'null'); } catch { return null; } };
+function guardarRascunhoVistoria() {
+  const form = document.querySelector('form[data-rascunho]');
+  if (!form) return;
+  const f = Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string'));
+  const itens = {};
+  for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) if (f[`is_${n}`] || f[`io_${n}`]) itens[`${f[`ic_${n}`]}|${f[`ii_${n}`]}`] = [f[`is_${n}`] || '', f[`io_${n}`] || ''];
+  const campos = Object.fromEntries(['data', 'link_fotos', 'prazo_dias', 'chaves', 'descritivo', 'condicoes'].filter((k) => k in f).map((k) => [k, f[k]]));
+  try { localStorage.setItem(form.dataset.rascunho, JSON.stringify({ campos, itens })); } catch { /* navegador sem espaço: segue sem rascunho */ }
+}
+export function apagarRascunhoVistoria(chave) { try { localStorage.removeItem(chave); } catch { /* nada */ } }
+function ligarRascunhoVistoria(raiz) {
+  const form = raiz.querySelector('form[data-rascunho]');
+  if (!form) return;
+  const r = lerRascunho(form.dataset.rascunho);
+  if (r) {
+    for (const [k, v] of Object.entries(r.campos || {})) { const el = form.querySelector(`[name="${k}"]`); if (el) el.value = v; }
+    // situação e observação de cada item: o rascunho manda (inclusive o que foi apagado)
+    for (const sel of form.querySelectorAll('select[name^="is_"]')) {
+      const n = sel.name.slice(3);
+      const chave = `${form.querySelector(`[name="ic_${n}"]`).value}|${form.querySelector(`[name="ii_${n}"]`).value}`;
+      const [s, o] = r.itens[chave] || ['', ''];
+      sel.value = s;
+      form.querySelector(`[name="io_${n}"]`).value = o;
+    }
+    const nota = document.createElement('div');
+    nota.className = 'alerta info';
+    nota.innerHTML = 'O preenchimento que você tinha começado foi recuperado. Ele fica guardado até salvar a vistoria. <button type="button" class="link-botao">Descartar e começar de novo</button>';
+    nota.querySelector('button').addEventListener('click', () => { apagarRascunhoVistoria(form.dataset.rascunho); location.reload(); });
+    form.prepend(nota);
+  }
+  form.addEventListener('input', guardarRascunhoVistoria);
+  form.addEventListener('change', guardarRascunhoVistoria);
+}
+
 function ligarCamposAutomaticos(raiz) {
+  ligarRascunhoVistoria(raiz);
   ligarContinuacaoDeContrato(raiz);
   ligarEnderecoDoImovel(raiz);
   ligarCaucao(raiz);
@@ -921,7 +961,15 @@ function caixaGarantia(c) {
   const trocas = R.trocasGarantiaDo(d(), c.id);
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
   let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
-  if (R.temCaucao(c)) {
+  // caução e depósito: antes do depósito com comprovante, só o alerta para registrar (data paga e comprovante)
+  const registrar = (qual, nome, valor, prevista, pagoEm) => `<div class="alerta aviso"><b>Incluir ${nome} e anexar comprovante.</b> ${nome.charAt(0).toLocaleUpperCase('pt-BR')}${nome.slice(1)} de ${reais(valor)} prevista para ${dataBr(prevista)}.
+    ${opera() ? `<form data-form="garantiaPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
+      <label style="margin:0">Paga em</label><input type="date" name="data" value="${esc(pagoEm || prevista || C.hojeIso())}" style="width:auto">
+      <label class="botao secundario pequeno enviar" title="Comprovante do depósito (PDF ou foto)"><span data-nome-escolhido>Anexar comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <button class="pequeno">Registrar ${nome}</button></form>` : ''}</div>`;
+  if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
+    html += c.caucao_valor > 0 ? registrar('caucao', 'caução', c.caucao_valor, c.caucao_data, c.caucao_pago_em) : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
+  } else if (R.temCaucao(c)) {
     const comp = R.complementoCaucao(d(), c);
     if (comp && comp.necessaria !== null && (comp.boleto || comp.complemento > 0)) {
       html += `<div class="alerta aviso"><b>Complemento da caução.</b> Aluguel corrigido em ${dataBr(comp.correcao.data_vigencia)}: a caução deve passar a <b>${reais(comp.necessaria)}</b> (${c.caucao_meses} aluguéis com bonificação).
@@ -929,16 +977,7 @@ function caixaGarantia(c) {
         ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
     : opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}</div>`;
     }
-    // a data efetivamente paga e o comprovante são lançados aqui (no cadastro do contrato fica só a data prevista)
-    if (!c.comprovante_caucao && c.caucao_valor > 0) {
-      html += `<div class="alerta aviso"><b>Incluir caução e anexar comprovante.</b> Caução de ${reais(c.caucao_valor)} prevista para ${dataBr(c.caucao_data)}.
-        ${opera() ? `<form data-form="caucaoPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
-          <label style="margin:0">Paga em</label><input type="date" name="data" value="${esc(c.caucao_pago_em || c.caucao_data || C.hojeIso())}" style="width:auto">
-          <label class="botao secundario pequeno enviar" title="Comprovante do depósito (PDF ou foto)"><span data-nome-escolhido>Anexar comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-          <button class="pequeno">Registrar caução</button></form>` : ''}</div>`;
-    }
-    html += `<div class="grade">${item('Caução', `${reais(c.caucao_valor)} · prevista para ${dataBr(c.caucao_data)}`)}
-      ${c.comprovante_caucao ? item('Paga em', `${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}`) : ''}
+    html += `<div class="grade">${item('Caução', `${reais(c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}`)}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>
       <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
@@ -947,8 +986,10 @@ function caixaGarantia(c) {
       || '<tr><td colspan="5" class="suave">Nenhuma correção registrada.</td></tr>'}</table>
       ${opera() ? `<p>${link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução')}</p>` : ''}`;
   }
-  if (R.temDeposito(c)) {
-    html += `<div class="grade">${item('Depósito de garantia', `${reais(c.deposito_valor)} em ${dataBr(c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito, { tabela: 'contratos', id: c.id, campo: 'comprovante_deposito', tipo: 'deposito-garantia', data: c.deposito_data })}`)}
+  if (R.temDeposito(c) && !R.garantiaDepositada(c)) {
+    html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_valor, c.deposito_data, c.deposito_pago_em) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
+  } else if (R.temDeposito(c)) {
+    html += `<div class="grade">${item('Depósito de garantia', `${reais(c.deposito_valor)} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito)}`)}
       ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>`;
   }
   if (R.temFiador(c) || fiadores.length) {
@@ -969,7 +1010,7 @@ function caixaGarantia(c) {
       ${trocas.map((t, i) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
         <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo pequeno', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
   }
-  if (sit.total || aplic.length) {
+  if (R.garantiaDepositada(c) && (sit.total || aplic.length)) {
     html += `<h3>Onde o valor foi aplicado</h3>
       ${sit.total && !sit.ok ? `<div class="alerta aviso">Valor integral ainda não aplicado: falta aplicar <b>${reais(sit.falta)}</b> de ${reais(sit.total)}.</div>` : ''}
       <table><tr><th>Empresa</th><th class="n">Aplicado</th></tr>
@@ -1505,6 +1546,7 @@ const CADASTROS = {
       const imovelEndereco = buscar('imoveis', imovelFinal || q.vincular);
       // caução: data prevista = data do contrato; valor = aluguéis × aluguel com bonificação (se não foi digitado)
       if (dados.garantia_tipo === 'Caução') R.completarCaucao(dados);
+      if (R.temDeposito(dados) && !dados.deposito_data) dados.deposito_data = dados.vigencia_inicio || null;
       for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
         if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome) || (caixa.startsWith('representante') && dados.inquilino_tipo !== 'Pessoa jurídica (empresa)')) continue;
         if (imovelEndereco) dados[campoEnd] = enderecoInquilino(imovelEndereco);
@@ -2809,20 +2851,23 @@ function telaVistoria(rota) {
   const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
   const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
   const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
-  const grade = gradeVistoria(i, v, base, tipo === 'Saída' ? entrada : null);
+  // editar o modelo do imóvel no meio da vistoria: ao salvar, volta para cá (o que já foi marcado fica no rascunho)
+  const aqui = v ? `#/vistoria/${v.id}` : `#/vistoria/novo?contrato=${c.id}&tipo=${tipo === 'Saída' ? 'Sa%C3%ADda' : 'Entrada'}`;
+  const linkModelo = (texto) => (opera() && i.id ? link(`#/modelo-vistoria/${i.id}?voltar=${encodeURIComponent(aqui)}`, texto) : '');
+  const grade = gradeVistoria(i, v, base, tipo === 'Saída' ? entrada : null, linkModelo);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
     ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
     ${tipo === 'Saída' && !grade ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
-    ${grade ? '' : `<div class="alerta info">Este imóvel ainda não tem <b>modelo de vistoria</b>. ${opera() && i.id ? link(`#/modelo-vistoria/${i.id}`, 'Montar o modelo do imóvel') : ''} Montado uma vez, a vistoria vira só marcar a situação de cada item.</div>`}
-    <form class="cartao" data-form="vistoria">
+    ${grade ? '' : `<div class="alerta info">Este imóvel ainda não tem <b>modelo de vistoria</b>. ${linkModelo('Montar o modelo do imóvel')} Montado uma vez, a vistoria vira só marcar a situação de cada item.</div>`}
+    <form class="cartao" data-form="vistoria" data-rascunho="vistoria-${c.id}-${tipo === 'Saída' ? 'saida' : 'entrada'}-${v ? v.id : 'nova'}">
       <input type="hidden" name="id" value="${v ? v.id : ''}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data)}" required></div>
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
         ${tipo === 'Entrada' ? `<div><label>Dias para o inquilino contestar</label><input type="number" name="prazo_dias" min="1" value="${esc(v ? v.prazo_dias || 3 : 3)}"></div>` : ''}
       </div>
-      <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
+      <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'que serão entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
         <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
       ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
       ${grade}
@@ -2839,7 +2884,7 @@ function telaVistoria(rota) {
 }
 
 /** Grade da vistoria pelo modelo do imóvel: situação de cada item, com observação. Vazio se o imóvel não tem modelo. */
-function gradeVistoria(i, v, base, entrada) {
+function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
   const chave = (x) => `${x.comodo}|${x.item}`;
   const anteriores = new Map(((v && v.itens) || (entrada ? [] : base.itens) || []).map((x) => [chave(x), x]));
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [chave(x), x.situacao]));
@@ -2854,10 +2899,12 @@ function gradeVistoria(i, v, base, entrada) {
   let k = 0;
   const opcoes = (sel) => `<option value=""></option>${K.SITUACOES_VISTORIA.map((o) => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('')}`;
   return `<h2>Situação por cômodo</h2>
-    <p class="suave">Marque a situação de cada item. "Tudo bom" marca o cômodo inteiro; depois mude só o que diverge e anote a observação e o nº da foto. Item sem situação não sai no documento.
-      ${entrada ? 'Na saída, o que ficar pior que na entrada sai destacado.' : ''} ${opera() && i.id ? link(`#/modelo-vistoria/${i.id}`, 'Editar o modelo do imóvel') : ''}</p>
+    <p class="suave">Marque a situação de cada item. Os botões do cômodo preenchem os itens ainda sem situação; depois mude só o que diverge e anote a observação e o nº da foto.
+      "Apagar tudo" limpa o cômodo. Item sem situação não sai no documento. O que você marcar fica guardado mesmo se sair para editar o modelo.
+      ${entrada ? 'Na saída, o que ficar pior que na entrada sai destacado.' : ''} ${linkModelo('Editar o modelo do imóvel')}</p>
     ${comodos.map((g, ci) => `<div class="vistoria-comodo"><div class="cabecalho"><h3>${esc(g.comodo)}</h3><div class="acoes">
-      ${botao('vistoriaTudo', 'Tudo bom', { comodo: ci, valor: 'Bom' })}${entrada ? botao('vistoriaTudo', 'Igual à entrada', { comodo: ci, valor: 'entrada' }) : ''}</div></div>
+      ${ESTADOS_COMODO.map(([valor, texto]) => botao('vistoriaTudo', texto, { comodo: ci, valor })).join('')}${entrada ? botao('vistoriaTudo', 'Igual à entrada', { comodo: ci, valor: 'entrada' }) : ''}
+      ${botao('vistoriaApagar', 'Apagar tudo', { comodo: ci }, 'perigo pequeno')}</div></div>
       <div class="rolagem"><table class="grade-vistoria"><tr><th>Item</th>${entrada ? '<th>Na entrada</th>' : ''}<th>Situação</th><th>Observação / nº da foto</th></tr>
       ${g.itens.map((item) => {
     const n = k++;
@@ -2866,9 +2913,12 @@ function gradeVistoria(i, v, base, entrada) {
     return `<tr><td>${esc(item)}<input type="hidden" name="ic_${n}" value="${esc(g.comodo)}"><input type="hidden" name="ii_${n}" value="${esc(item)}"></td>
       ${entrada ? `<td class="suave">${esc(ent || '—')}</td>` : ''}
       <td><select name="is_${n}" data-comodo="${ci}" data-entrada="${esc(ent)}" class="${K.piorou(ent, a.situacao) ? 'piorou' : ''}">${opcoes(a.situacao)}</select></td>
-      <td><input name="io_${n}" value="${esc(a.obs || '')}"></td></tr>`;
+      <td><input name="io_${n}" data-comodo="${ci}" value="${esc(a.obs || '')}"></td></tr>`;
   }).join('')}</table></div></div>`).join('')}`;
 }
+
+/** Botões do cômodo na vistoria: [situação, texto do botão]. */
+const ESTADOS_COMODO = [['Novo', 'Estado de novo'], ['Ótimo', 'Ótimo estado'], ['Bom', 'Bom estado'], ['Marcas de uso', 'Marcas de uso']];
 
 /** Itens gerais de cada cômodo no modelo de vistoria. Linha terminada em ":" é só um lembrete (não vira item). */
 const GERAIS = ['Teto', 'Paredes', 'Piso', 'Janelas', 'Portas', 'Elétrica'];
@@ -2891,10 +2941,12 @@ function telaModeloVistoria(rota) {
   if (!i) return '<h1>Imóvel não encontrado</h1>';
   const outros = ordenar(d().imoveis.filter((x) => x.id !== i.id && x.modelo_vistoria), 'nome');
   const resumo = K.lerModeloVistoria(i.modelo_vistoria);
-  return `<p class="suave"><a href="#/imovel/${i.id}">← ${esc(i.nome)}</a></p>
+  // aberto pela vistoria: salvar e cancelar voltam para ela
+  const voltar = /^#\/vistoria\//.test(rota.q.voltar || '') ? rota.q.voltar : `#/imovel/${i.id}`;
+  return `<p class="suave"><a href="${esc(voltar)}">← ${voltar.startsWith('#/vistoria/') ? 'Voltar para a vistoria' : esc(i.nome)}</a></p>
     <h1>Modelo de vistoria · ${esc(i.nome)}</h1>
     <div class="alerta info">Monte uma vez os cômodos deste imóvel e o que verificar em cada um. Na vistoria, você só marca a situação de cada item (novo, ótimo, bom, marcas de uso, avaria…).</div>
-    <form class="cartao" data-form="modeloVistoria"><input type="hidden" name="imovel" value="${i.id}">
+    <form class="cartao" data-form="modeloVistoria"><input type="hidden" name="imovel" value="${i.id}"><input type="hidden" name="voltar" value="${esc(voltar)}">
       <p class="suave">Uma linha por item. <code>## Nome do cômodo</code> abre um cômodo (ex.: <code>## Quarto fundos</code>). Para móveis e eletrodomésticos, um por linha com a descrição
         (ex.: <code>Móvel: sofá 2 lugares cinza</code>, <code>Eletrodoméstico: geladeira Electrolux</code>). Linhas terminadas em ":" são só lembretes e não viram item.</p>
       <div class="acoes" style="margin:8px 0">Inserir cômodo: ${Object.keys(MODELO_COMODOS).map((x) => `<button type="button" class="secundario pequeno" data-acao="inserirComodoModelo" data-comodo="${esc(x)}">${esc(x)}</button>`).join('')}</div>
@@ -2902,7 +2954,7 @@ function telaModeloVistoria(rota) {
         <button type="button" class="secundario pequeno" data-acao="copiarModeloVistoria">Copiar</button></div>` : ''}
       <textarea name="modelo" class="texto-modelo">${esc(i.modelo_vistoria || '')}</textarea>
       <p class="suave">${resumo.length ? `Salvo: ${resumo.length} cômodo(s), ${resumo.reduce((t, x) => t + x.itens.length, 0)} itens.` : 'Ainda sem modelo.'}</p>
-      <div class="acoes"><button>Salvar modelo</button><a class="botao secundario" href="#/imovel/${i.id}">Cancelar</a></div></form>`;
+      <div class="acoes"><button>Salvar modelo</button><a class="botao secundario" href="${esc(voltar)}">Cancelar</a></div></form>`;
 }
 
 /** Foto reduzida (até 1600 px, JPEG) para guardar na pasta e pôr no documento. */
@@ -2950,7 +3002,7 @@ function telaGerarContrato(rota) {
     <form class="cartao formulario" data-form="gerarContrato">
       <input type="hidden" name="contrato" value="${c.id}">
       <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>
-      <div><label>Data da assinatura</label><input type="date" name="data" value="${esc(rota.q.data || c.vigencia_inicio || C.hojeIso())}"></div>
+      <div><label>Data do contrato</label><input type="date" name="data" value="${esc(rota.q.data || c.vigencia_inicio || C.hojeIso())}"></div>
       <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
       <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
       <div class="check"><button>Ver contrato</button></div></form>
@@ -3286,7 +3338,7 @@ export const FORMULARIOS = {
     const i = buscar('imoveis', f.imovel);
     await alterar((db) => R.atualizar(db, 'imoveis', i.id, { modelo_vistoria: String(f.modelo || '').trim() }, login(), `${i.nome}: modelo de vistoria`));
     aviso('Modelo de vistoria salvo.');
-    ir(`#/imovel/${i.id}`);
+    ir(/^#\/vistoria\//.test(f.voltar || '') ? f.voltar : `#/imovel/${i.id}`);
   },
 
   async baixaLote(form) {
@@ -3328,15 +3380,16 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  /** Caução paga: data do depósito e comprovante (obrigatório), gravado na pasta do inquilino. */
-  async caucaoPaga(form) {
+  /** Caução ou depósito de garantia pago: data do depósito e comprovante (obrigatório), gravado na pasta do inquilino. */
+  async garantiaPaga(form) {
     const f = Object.fromEntries(new FormData(form));
     const arq = form.querySelector('[name=arquivo]').files[0];
-    if (!f.data) throw new Error('Informe a data em que a caução foi paga.');
-    if (!arq) throw new Error('Anexe o comprovante do depósito da caução.');
-    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante('caucao', f.data, arq)));
-    await alterar((db) => R.registrarCaucaoPaga(db, Number(f.contrato), f.data, nome, login()));
-    aviso('Caução registrada.');
+    const g = R.GARANTIAS_DEPOSITADAS[f.qual];
+    if (!f.data) throw new Error(`Informe a data em que ${g.nome} foi paga.`);
+    if (!arq) throw new Error(`Anexe o comprovante: ${g.nome}.`);
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante(g.arquivo, f.data, arq)));
+    await alterar((db) => R.registrarGarantiaPaga(db, Number(f.contrato), f.qual, f.data, nome, login()));
+    aviso(`Registrado: ${g.nome} paga em ${dataBr(f.data)}.`);
     await mostrar();
   },
 
@@ -3386,6 +3439,7 @@ export const FORMULARIOS = {
       if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim() }, login(), 'Chaves e controles do imóvel');
       if (dados.link_fotos && f.tipo === 'Entrada' && !c.vistoria_link) R.atualizar(db, 'contratos', c.id, { vistoria_link: dados.link_fotos }, login(), `${c.inquilino_nome}: link das fotos da vistoria`);
     });
+    apagarRascunhoVistoria(form.dataset.rascunho);
     aviso('Vistoria salva.');
     ir(`#/imprimir/vistoria?id=${id}`);
   },
@@ -3842,6 +3896,13 @@ export const ACOES = {
       if (el.value) return;
       el.value = valor === 'entrada' ? el.dataset.entrada || '' : valor;
     });
+    guardarRascunhoVistoria();
+  },
+
+  /** Vistoria: limpa a situação e a observação de todos os itens do cômodo. */
+  vistoriaApagar({ comodo }) {
+    document.querySelectorAll(`[data-comodo="${comodo}"]`).forEach((el) => { el.value = ''; el.classList.remove('piorou'); });
+    guardarRascunhoVistoria();
   },
 
   inserirComodoModelo({ comodo }) {
