@@ -27,12 +27,31 @@ test('ler: documento inválido barra; o que já estava salvo e não mudou passa'
   assert.deepEqual(F.ler(campos, fd('123.456.789-00'), antigo).erros, {}, 'dado antigo não barra a edição');
 });
 
-test('fiadores no cadastro do contrato: os já cadastrados vêm com "Excluir" e sobra um bloco em branco', () => {
+test('fiadores no cadastro do contrato: sem "Excluir" (é na página do inquilino); sobra um bloco em branco, recolhido', () => {
   const nomes = (lista) => lista.filter((c) => c.nome && c.nome.endsWith('_nome')).map((c) => c.nome);
+  const recolhidos = (lista) => lista.filter((c) => c.secao && c.recolher).map((c) => c.fiador);
   assert.deepEqual(nomes(F.fiadoresNoCadastro([])), ['fiador1_nome', 'fiador2_nome']);
+  assert.deepEqual(recolhidos(F.fiadoresNoCadastro([])), [2], 'o primeiro fiador fica aberto; "mais um fiador" começa recolhido');
   const dois = F.fiadoresNoCadastro([{ nome: 'A' }, { nome: 'B' }]);
   assert.deepEqual(nomes(dois), ['fiador1_nome', 'fiador2_nome', 'fiador3_nome']);
-  assert.deepEqual(dois.filter((c) => c.nome && c.nome.endsWith('_excluir')).map((c) => c.nome), ['fiador1_excluir', 'fiador2_excluir']);
+  assert.deepEqual(recolhidos(dois), [3]);
+  assert.equal(dois.some((c) => c.nome && c.nome.endsWith('_excluir')), false);
+});
+
+test('partes recolhidas: começam fechadas com o botão de expandir; com erro, abertas', () => {
+  const campos = [{ secao: 'Inquilino solidário', recolher: F.EXPANDIR_PARTE }, { nome: 'solidario_nome', rotulo: 'Nome', tipo: 'texto' }, { secao: 'Outra' }, { nome: 'x', rotulo: 'X', tipo: 'texto' }];
+  const html = F.camposHtml(campos);
+  assert.match(html, /data-expandir="g0"[^>]*>Expanda para cadastrar parte</);
+  assert.match(html, /class="[^"]*recolhido"\s*data-grupo="g0"/);
+  assert.doesNotMatch(html, /recolhido"\s*data-grupo="g2"|data-grupo="g2"/, 'seção comum não recolhe');
+  assert.match(F.camposHtml(campos, { solidario_nome: 'Maria' }), />Expanda para ver ou alterar</);
+  assert.doesNotMatch(F.camposHtml(campos, {}, { solidario_nome: 'erro' }), /recolhido/);
+});
+
+test('rótulo do documento do inquilino: CPF e RG na pessoa física, CNPJ e inscrição estadual na empresa', () => {
+  const campos = F.CONTRATO.filter((c) => ['inquilino_cpf', 'inquilino_rg'].includes(c.nome));
+  assert.match(F.camposHtml(campos, { inquilino_tipo: 'Pessoa física' }), />CPF<[\s\S]*>RG</);
+  assert.match(F.camposHtml(campos, { inquilino_tipo: 'Pessoa jurídica (empresa)' }), />CNPJ<[\s\S]*>Inscrição estadual</);
 });
 
 test('comprovante (arquivo) não entra na leitura do formulário: é gravado à parte', () => {

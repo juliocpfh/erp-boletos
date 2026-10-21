@@ -76,6 +76,8 @@ export function normalizar(d) {
   for (const c of d.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = C.hojeIso();
   // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
   for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
+  // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
+  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id);
   return d;
 }
 
@@ -346,7 +348,11 @@ export const temDeposito = (c) => ['Depósito garantia', 'Fiador + depósito'].i
 export const temFiador = (c) => ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo);
 /** Fiadores atuais do contrato: sem fim de vínculo, ou com o fim ainda por vir (os substituídos ficam guardados). */
 export const fiadoresDo = (d, contratoId, hoje = C.hojeIso()) => d.fiadores.filter((f) => f.contrato_id === contratoId && (!f.data_saida || f.data_saida >= hoje));
-export const fiadoresAnterioresDo = (d, contratoId, hoje = C.hojeIso()) => d.fiadores.filter((f) => f.contrato_id === contratoId && f.data_saida && f.data_saida < hoje)
+/** Fiadores do contrato assinado (atuais ou anteriores): todos menos os que entraram numa troca de garantia. */
+export const fiadoresDoContrato = (d, contratoId) => d.fiadores
+  .filter((f) => f.contrato_id === contratoId && !d.trocas_garantia.some((t) => (t.fiadores_novos || []).includes(f.id)))
+  .sort((a, b) => a.id - b.id);
+export const fiadoresAnterioresDo =(d, contratoId, hoje = C.hojeIso()) => d.fiadores.filter((f) => f.contrato_id === contratoId && f.data_saida && f.data_saida < hoje)
   .sort((a, b) => b.data_saida.localeCompare(a.data_saida));
 export const trocasGarantiaDo = (d, contratoId) => d.trocas_garantia.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id);
@@ -1126,7 +1132,6 @@ export function trocarGarantia(d, contratoId, dados, usuario, fiadores = {}) {
   const r = inserir(d, 'trocas_garantia', { contrato_id: c.id, data: dados.data, tipo_anterior: c.garantia_tipo || '', tipo_novo: dados.garantia_tipo,
     valor_anterior: valorGarantia(d, c), anterior, observacoes: dados.observacoes || '', fiadores_saida: [], fiadores_novos: [], fiadores_alterados: [] }, usuario, texto);
   const novo = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, dados[k] ?? null]));
-  novo.possui_aditivos = true; // troca de garantia exige termo aditivo
   atualizar(d, 'contratos', c.id, novo, usuario, texto);
   for (const f of saem) {
     r.fiadores_saida.push({ id: f.id, data_saida: f.data_saida ?? null });
@@ -1599,8 +1604,16 @@ export function registrarAditivo(d, contratoId, { data, assunto, arquivo }, usua
   if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
   const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo }, usuario,
     `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}`);
-  if (!c.possui_aditivos) atualizar(d, 'contratos', c.id, { possui_aditivos: true }, usuario, `${c.inquilino_nome}: possui termo aditivo`);
+  marcarAditivos(d, c.id, usuario);
   return a;
+}
+
+/** "Possui termo aditivo" só vale com algum termo registrado (com o arquivo assinado): acerta a marca depois de incluir ou excluir. */
+export function marcarAditivos(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) return;
+  const tem = aditivosDo(d, c.id).length > 0;
+  if (!!c.possui_aditivos !== tem) atualizar(d, 'contratos', c.id, { possui_aditivos: tem }, usuario, `${c.inquilino_nome}: ${tem ? 'possui' : 'não possui mais'} termo aditivo`);
 }
 
 const porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;

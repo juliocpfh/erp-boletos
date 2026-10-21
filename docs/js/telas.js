@@ -389,6 +389,13 @@ function ligarCaucao(raiz) {
 /** Endereço do imóvel por extenso, para o cadastro do inquilino (ex.: "Rua X, 117, Ap 02, Bairro, Curitiba/PR, CEP 82210-050"). */
 const enderecoInquilino = (i) => [R.enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}${i.uf ? `/${i.uf}` : ''}` : '', i.cep ? `CEP ${i.cep}` : ''].filter(Boolean).join(', ');
 
+/** Caixa de texto de uma linha: a altura acompanha o texto (escondida, não mede: fica para quando aparecer). */
+function crescer(t) {
+  if (!t.offsetParent) return;
+  t.style.height = 'auto';
+  t.style.height = `${t.scrollHeight + 2}px`;
+}
+
 function ligarCamposAutomaticos(raiz) {
   ligarContinuacaoDeContrato(raiz);
   ligarEnderecoDoImovel(raiz);
@@ -441,6 +448,26 @@ export const TELAS = {
     const nomes = new Set(regras.map((el) => el.dataset.mostrarSe.split('|')[0]));
     for (const n of nomes) raiz.querySelectorAll(`[name="${n}"]`).forEach((el) => el.addEventListener('change', aplicar));
     aplicar();
+    // partes recolhidas (fiador a mais, solidário, carência): o botão expande e recolhe
+    for (const b of raiz.querySelectorAll('[data-expandir]')) {
+      b.addEventListener('click', () => {
+        const abrir = b.dataset.aberto !== '1';
+        b.closest('form').querySelectorAll(`[data-grupo="${b.dataset.expandir}"]`).forEach((el) => el.classList.toggle('recolhido', !abrir));
+        b.dataset.aberto = abrir ? '1' : '';
+        b.textContent = abrir ? 'Recolher' : b.dataset.texto;
+        if (abrir) b.closest('form').querySelectorAll(`[data-grupo="${b.dataset.expandir}"] textarea.cresce`).forEach(crescer);
+      });
+    }
+    // rótulos que mudam com outro campo (CPF ou CNPJ, RG ou inscrição estadual, conforme o tipo de inquilino)
+    for (const lb of raiz.querySelectorAll('label[data-rotulo-se]')) {
+      const [campoNome, valor, alt, normal] = lb.dataset.rotuloSe.split('|');
+      const sel = lb.closest('form').querySelector(`[name="${campoNome}"]`);
+      if (!sel) continue;
+      const trocar = () => { lb.firstChild.textContent = (sel.value === valor ? alt : normal) + (lb.textContent.endsWith(' *') ? ' *' : ''); };
+      sel.addEventListener('change', trocar);
+    }
+    // caixa de texto de uma linha que cresce com o texto digitado
+    for (const t of raiz.querySelectorAll('textarea.cresce')) { t.addEventListener('input', () => crescer(t)); crescer(t); }
     const bonif = raiz.querySelector('input[name=bonificacao]');
     if (bonif) {
       const mostrarBonif = () => raiz.querySelectorAll('[data-vinculo="desconto"]').forEach((el) => { el.closest('div').hidden = !bonif.checked; });
@@ -822,7 +849,7 @@ function selosContrato(c) {
   return `<div class="selos">${prazo}
     ${c.inquilino_tipo === 'Pessoa jurídica (empresa)' ? etiqueta('Empresa (PJ)', 'info') : ''}
     ${c.solidario_nome ? etiqueta(`Solidário: ${c.solidario_nome}`, 'neutra') : ''}
-    ${c.possui_aditivos ? etiqueta('Possui termo aditivo', 'aviso') : ''}
+    ${R.aditivosDo(d(), c.id).length ? etiqueta('Possui termo aditivo', 'aviso') : ''}
     ${(() => { const n = R.solicitacoesDo(d(), c.id).filter((x) => ['Aberta', 'Em andamento'].includes(x.situacao || 'Aberta')).length; return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, 'perigo')}</a>` : ''; })()}
     ${c.gerar_nf === false ? seloControle() : ''}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ''}`, 'aviso') : ''}
@@ -916,15 +943,17 @@ function caixaGarantia(c) {
       ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>`;
   }
   if (R.temFiador(c) || fiadores.length) {
-    html += `<h3>Fiadores</h3><table><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th>Vínculo</th></tr>
+    html += `<h3>Fiadores</h3><table><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th>Vínculo</th><th></th></tr>
       ${fiadores.map((f) => `<tr><td><b>${esc(f.nome)}</b>${f.endereco ? `<br><span class="suave">${esc(f.endereco)}</span>` : ''}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td>
         <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
-        <td class="nw">${f.data_entrada ? dataBr(f.data_entrada) : 'início do contrato'} a ${f.data_saida ? dataBr(f.data_saida) : 'fim do contrato'}</td></tr>`).join('')
-      || `<tr><td colspan="4">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>`;
+        <td class="nw">${f.data_entrada ? dataBr(f.data_entrada) : 'início do contrato'} a ${f.data_saida ? dataBr(f.data_saida) : 'fim do contrato'}</td>
+        <td class="n">${opera() ? botao('excluirFiador', 'Excluir', { id: f.id }, 'perigo pequeno') : ''}</td></tr>`).join('')
+      || `<tr><td colspan="5">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>`;
   }
   if (anteriores.length) {
-    html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th></tr>
-      ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td></tr>`).join('')}</table>`;
+    html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th><th></th></tr>
+      ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td>
+        <td class="n">${opera() ? botao('excluirFiador', 'Excluir', { id: f.id }, 'perigo pequeno') : ''}</td></tr>`).join('')}</table>`;
   }
   if (trocas.length) {
     html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th><th></th></tr>
@@ -977,11 +1006,11 @@ function caixaLeituras(lista, botaoNovo, comInquilino) {
 function caixaIncluso(c) {
   const sit = (v) => (!v ? '<span class="suave">não informado</span>'
     : v === 'Incluso no aluguel' ? etiqueta(v, 'ok') : v === 'Por conta do inquilino' ? etiqueta(v, 'info') : etiqueta(v, 'neutra'));
-  return `<div class="cartao"><h2>O que está incluso no contrato</h2><div class="grade">
+  return `<div class="cartao"><h2>O que está incluso no contrato</h2><div class="grade compacta">
     ${item('IPTU', sit(c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])))}
     ${item('Seguro obrigatório', sit(c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])))}
     ${F.CONTAS.map(([k, t]) => item(t, sit(c[k]))).join('')}</div>
-    ${c.contas_adicionais ? `<h3>Contas adicionais</h3><p class="pre">${esc(c.contas_adicionais)}</p>` : ''}</div>`;
+    ${c.contas_adicionais ? `<p class="pre" style="margin:8px 0 0"><span class="suave">Contas adicionais:</span> ${esc(c.contas_adicionais)}</p>` : ''}</div>`;
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
@@ -1153,7 +1182,6 @@ function caixaAditivos(c) {
   const ant = R.contratoHerdado(d(), c);
   return `<h3 id="aditivos">Termos aditivos</h3>
     ${ant && !lista.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). Registre-o com o arquivo assinado.</div>` : ''}
-    ${c.possui_aditivos && !lista.length && !ant ? '<div class="alerta aviso">O contrato está marcado com "Possui termo aditivo" (mudou o vencimento ou a garantia), mas nenhum termo foi registrado aqui. Registre-o com o arquivo assinado.</div>' : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td>
       <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo continua guardado na pasta.`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
@@ -1295,7 +1323,7 @@ const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>` : ''}`);
 
 let antesDoVinculo = null;
-let fiadoresMudancas = { novos: [], alterados: [], excluidos: [] };
+let fiadoresMudancas = { novos: [], alterados: [] };
 /** Fiadores que entram, saem ou são corrigidos na troca de garantia (preenchido em ajustar, usado em salvar). */
 let fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
 let avisoAditivo = '';
@@ -1383,8 +1411,8 @@ const CADASTROS = {
       const hoje = C.hojeIso();
       const vago = (i) => !d().contratos.some((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && (!r || c.id !== r.id));
       const imoveis = ordenar(d().imoveis, 'nome').map((i) => [String(i.id), `${i.nome}${!r && vago(i) ? ' · vago' : ''}`]);
-      // fiadores: os já cadastrados vêm preenchidos (alterar ou excluir) e mais um bloco em branco (incluir)
-      const fiadores = r ? R.fiadoresDo(d(), r.id) : [];
+      // fiadores do contrato (não os da troca de garantia) vêm preenchidos para alterar, e mais um bloco em branco (incluir)
+      const fiadores = r ? R.fiadoresDoContrato(d(), r.id) : [];
       // contrato novo: escolhe o imóvel aqui mesmo (pelo "Vincular inquilino" do imóvel, o vínculo vem depois)
       const imovelNoNovo = (c) => c.nome === 'imovel_id' && !q.vincular;
       return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
@@ -1395,11 +1423,12 @@ const CADASTROS = {
     // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
     padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
-    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
+    compacto: true,
+    valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
-      ...Object.fromEntries(R.fiadoresDo(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
+      ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
     aviso: (r, q) => (!r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
       : r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : ''),
@@ -1426,24 +1455,22 @@ const CADASTROS = {
       }
       if (dados.carencia_meses < 0) erros.carencia_meses = 'Valor inválido';
       if (dados.inquilino_tipo === 'Pessoa jurídica (empresa)' && !dados.representante_nome) erros.representante_nome = 'Empresa precisa do representante (pessoa física)';
-      // solidário só vale com a caixa marcada
-      if (new FormData(form).get('tem_solidario') !== '1') for (const k of ['solidario_nome', 'solidario_cpf', 'solidario_rg', 'solidario_telefone', 'solidario_email']) dados[k] = null;
-      else if (!dados.solidario_nome) erros.solidario_nome = 'Informe o nome do inquilino solidário';
+      // sem o nome, não há solidário: o resto da parte dele fica em branco
+      if (!dados.solidario_nome) for (const k of Object.keys(dados)) if (k.startsWith('solidario_')) dados[k] = null;
       // só "por conta do inquilino" entra no boleto
       dados.cobrar_iptu = dados.conta_iptu === R.SITUACOES[0];
       dados.cobrar_seguro = dados.conta_seguro === R.SITUACOES[0];
-      // fiadores no próprio cadastro: os já cadastrados podem ser alterados ou excluídos; os blocos em branco incluem novos
-      const existentes = r ? R.fiadoresDo(d(), r.id) : [];
-      const fd = new FormData(form);
-      fiadoresMudancas = { novos: [], alterados: [], excluidos: [] };
+      // fiadores do contrato no próprio cadastro: os já cadastrados podem ser alterados; os blocos em branco incluem novos
+      // (excluir é na página do inquilino; quem entra depois é pela troca de garantia)
+      const existentes = r ? R.fiadoresDoContrato(d(), r.id) : [];
+      fiadoresMudancas = { novos: [], alterados: [] };
       for (let n = 1; n <= F.vagasFiador(existentes); n += 1) {
         const f = Object.fromEntries(F.CAMPOS_FIADOR.map((c) => [c.nome, dados[`fiador${n}_${c.nome}`] ?? null]));
         F.CAMPOS_FIADOR.forEach((c) => delete dados[`fiador${n}_${c.nome}`]);
         const atual = existentes[n - 1];
         if (atual) {
-          if (fd.get(`fiador${n}_excluir`) === '1') { fiadoresMudancas.excluidos.push(atual); continue; }
           if (!R.temFiador(dados)) continue; // a garantia deixou de ter fiador: o cadastro dele fica como está
-          if (!f.nome) erros[`fiador${n}_nome`] = 'Informe o nome do fiador (ou marque "Excluir este fiador")';
+          if (!f.nome) erros[`fiador${n}_nome`] = 'Informe o nome do fiador (para excluir, use "Excluir" no fiador, na página do inquilino)';
           else if (f.data_entrada && f.data_saida && f.data_saida < f.data_entrada) erros[`fiador${n}_data_saida`] = 'O fim do vínculo não pode ser antes do início';
           else if (F.CAMPOS_FIADOR.some((c) => String(atual[c.nome] ?? '') !== String(f[c.nome] ?? ''))) fiadoresMudancas.alterados.push({ id: atual.id, ...f });
           continue;
@@ -1456,9 +1483,9 @@ const CADASTROS = {
       }
       conferirComprovantes(COMPROVANTES_CONTRATO, dados, r, form);
       avisoAditivo = '';
+      // "Possui termo aditivo" só aparece quando um termo assinado é anexado
       if (r && (dados.dia_vencimento !== r.dia_vencimento || (r.garantia_tipo && dados.garantia_tipo !== r.garantia_tipo))) {
-        dados.possui_aditivos = true;
-        avisoAditivo = `Você mudou ${dados.dia_vencimento !== r.dia_vencimento ? 'o dia do vencimento' : 'a garantia'}: registre o termo aditivo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino). O contrato ficou marcado com "Possui termo aditivo".`;
+        avisoAditivo = `Você mudou ${dados.dia_vencimento !== r.dia_vencimento ? 'o dia do vencimento' : 'a garantia'}: registre o termo aditivo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino), anexando o arquivo.`;
       }
       dados.pasta = nomePastaContrato({ ...r, ...dados });
       // sem imóvel: conta o prazo de 7 dias para vincular (depois o contrato é apagado sozinho)
@@ -1469,7 +1496,7 @@ const CADASTROS = {
       // caução: data prevista = data do contrato; valor = aluguéis × aluguel com bonificação (se não foi digitado)
       if (dados.garantia_tipo === 'Caução') R.completarCaucao(dados);
       for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
-        if (r || new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome)) continue;
+        if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome)) continue;
         if (imovelEndereco) dados[campoEnd] = enderecoInquilino(imovelEndereco);
         else erros[campoEnd] = 'Escolha o imóvel para usar o endereço dele';
       }
@@ -1490,11 +1517,10 @@ const CADASTROS = {
         // aluguel inicial corrigido: os reajustes já lançados são refeitos a partir dele (o aluguel atual e a caução sugerida acompanham)
         if (inicialMudou) R.recalcularCorrecoes(db, c.id, login());
       } else c = R.inserir(db, 'contratos', { ...dados, docs_entrada: true }, login(), dados.inquilino_nome);
-      const { novos, alterados, excluidos } = fiadoresMudancas;
-      for (const f of excluidos) R.excluir(db, 'fiadores', f.id, login());
+      const { novos, alterados } = fiadoresMudancas;
       for (const { id, ...f } of alterados) R.atualizar(db, 'fiadores', id, f, login(), `Fiador ${f.nome}`);
       for (const f of novos) R.inserir(db, 'fiadores', { ...f, contrato_id: c.id }, login(), `Fiador ${f.nome}`);
-      fiadoresMudancas = { novos: [], alterados: [], excluidos: [] };
+      fiadoresMudancas = { novos: [], alterados: [] };
       return c;
     },
     recalcular: (salvo) => (cb) => cb.contrato_id === salvo.id,
@@ -1989,7 +2015,7 @@ function telaFormulario(tabela, registro, q, estado) {
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
-      ${F.camposHtml(campos, valores, estado ? estado.erros : {})}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
+      ${F.camposHtml(campos, valores, estado ? estado.erros : {}, { compacto: !!cfg.compacto })}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${cfg.voltar(registro, q)}">Voltar</a></p></form>`;
 }
 
@@ -3655,7 +3681,8 @@ const TABELAS_EXCLUSAO = {
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
-  aditivos: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
+  aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
+  fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   despesas: {},
   ressarcimentos: {
     checar: (db, r) => ((R.boletoDoMes(db, r.contrato_id, r.competencia_abatimento) || {}).data_pagamento
@@ -4066,6 +4093,20 @@ export const ACOES = {
     });
     aviso(`${n} correção(ões) refeita(s) a partir do aluguel inicial.`);
     await mostrar();
+  },
+
+  /** Fiador: excluir o cadastro (fiador contratual lançado errado; pode ser incluído de novo em "Editar contrato") ou trocar a garantia. */
+  async excluirFiador({ id }) {
+    const f = buscar('fiadores', id);
+    if (!f) throw new Error('Fiador não encontrado.');
+    const r = await janela({ titulo: `Fiador ${f.nome}`,
+      html: `<p>Deseja excluir fiador contratual ou trocar garantia/fiador?</p>
+        <p><label class="check" style="padding-top:0"><input type="radio" name="escolha" value="excluir"> Excluir fiador contratual (cadastro errado). Pode ser incluído de novo em "Editar contrato"</label></p>
+        <p><label class="check" style="padding-top:0"><input type="radio" name="escolha" value="trocar" checked> Trocar garantia/fiador (fica guardado no histórico, com termo aditivo)</label></p>`,
+      sim: 'Continuar', nao: 'Cancelar' });
+    if (!r) return;
+    if ((r.escolha || [])[0] === 'trocar') return ir(`#/novo/trocas_garantia?contrato=${f.contrato_id}`);
+    await ACOES.excluir({ tabela: 'fiadores', id: f.id });
   },
 
   async cancelarTrocaGarantia({ id }) {
