@@ -437,6 +437,7 @@ function ligarRascunhoVistoria(raiz) {
 
 function ligarCamposAutomaticos(raiz) {
   ligarRascunhoVistoria(raiz);
+  for (const el of raiz.querySelectorAll('input[data-calculado]')) el.addEventListener('input', () => el.classList.toggle('valor-calculado', el.value.trim() === el.dataset.calculado));
   ligarContinuacaoDeContrato(raiz);
   ligarEnderecoDoImovel(raiz);
   ligarCaucao(raiz);
@@ -1377,6 +1378,8 @@ let fiadoresMudancas = { novos: [], alterados: [] };
 /** Fiadores que entram, saem ou são corrigidos na troca de garantia (preenchido em ajustar, usado em salvar). */
 let fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
 let avisoAditivo = '';
+/** Pagamento com valor diferente do previsto, esperando o valor da NF na página do boleto (nada é salvo antes). */
+let pagamentoDivergente = null;
 let guardarModeloAirbnb = false;
 const CADASTROS = {
   imoveis: {
@@ -2089,6 +2092,23 @@ function formPagamento(cb, compacto) {
     <p class="suave">A data contábil é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
 }
 
+/** Valor recebido diferente do previsto: descritivo do cálculo, justificativa e o valor da NF (vem o calculado, em vermelho, e precisa ser alterado). */
+function formNfDivergente(cb, p) {
+  const r = R.previstoNoPagamento(cb, p.data, p);
+  const dif = p.valor - r.valor_devido;
+  const ress = cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : '';
+  const conta = r.pontual ? `aluguel ${reais(cb.aluguel)} − desconto ${reais(cb.desconto)}${ress}` : `aluguel ${reais(cb.aluguel)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}${ress} (${r.dias_atraso} dia(s) de atraso, sem desconto)`;
+  return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> Confira o cálculo e informe o valor da NF (cálculo manual). Nada foi salvo ainda.</div>
+    <div class="grade">${item('Data contábil (data da NF)', dataBr(p.data))}${item('Pagou em', dataBr(p.pagouEmDia ? cb.vencimento : p.dataPagou || p.data))}
+      ${item('Previsto', reais(r.valor_devido))}${item('Recebido', `<b>${reais(p.valor)}</b>`)}${item('Diferença', `<b>${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b>`)}</div>
+    <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa e ajuste do mês não entram.</p>
+    <form data-form="pagamentoNf" data-id="${cb.id}" class="formulario">
+      <div class="largo"><label>Justificativa da divergência</label><textarea name="justificativa" rows="2">${esc(p.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
+      <div><label>Valor da NF</label><input name="valor_nf" inputmode="decimal" data-dinheiro value="${F.dinheiroTexto(r.valor_nf)}" data-calculado="${F.dinheiroTexto(r.valor_nf)}" class="valor-calculado">
+        <div class="ajuda">Veio o valor calculado: altere para o valor do cálculo manual</div></div>
+      <div class="acoes" style="align-self:end"><button>Confirmar pagamento</button>${botao('cancelarPagamentoDivergente', 'Cancelar', {}, 'secundario')}</div></form>`;
+}
+
 const nomeI = (x) => (x.i ? x.i.nome : '');
 /** Ordenações da lista de boletos (o padrão é a data de vencimento). */
 const ORDENS_BOLETO = {
@@ -2251,14 +2271,15 @@ function telaCobranca(cb) {
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
     ${R.geraNf(c) ? '' : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
     ${demonstrativo(cb)}
-    <div class="nao-imprimir">${caixaAjuste(cb)}${caixaBoleto(cb)}<div class="cartao"><h2>Pagamento</h2>
-      ${cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
+    <div class="nao-imprimir">${caixaAjuste(cb)}<div class="cartao" id="pagamento"><h2>Pagamento</h2>
+      ${!cb.data_pagamento && pagamentoDivergente && pagamentoDivergente.id === cb.id ? formNfDivergente(cb, pagamentoDivergente) : cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
         ${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}
-        ${item('Valor recebido', reais(cb.valor_pago))}${R.ehComplementoCaucao(cb) ? '' : item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>`)}</div>
-        ${R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>`}
+        ${item('Valor recebido', reais(cb.valor_pago))}${R.ehComplementoCaucao(cb) ? '' : item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta('digitado à mão', 'aviso')}` : ''}`)}</div>
+        ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa e ajuste do mês não entram.</p>`}
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${R.ehComplementoCaucao(cb) ? ' · sem NF (complemento da caução)' : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
         ${opera() && cb.situacao !== 'Carência' ? formPagamento(cb, false) : ''}`}</div>
+    ${caixaBoleto(cb)}
     <div class="cartao"><h2>NFs</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${R.numeroFatura(f.numero)}</td><td>${esc(buscar('emitentes', f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === 'Emitida' ? 'ok' : 'perigo')}</td></tr>`).join('')
       || `<tr><td colspan="7" class="suave">${!R.geraNf(c) ? 'Este inquilino não emite NF (só controle do pagamento).' : R.ehComplementoCaucao(cb) ? 'Complemento da caução: não gera NF.' : cb.data_pagamento ? 'Aguardando numeração (tela NF).' : 'Confirme o pagamento para gerar a NF.'}</td></tr>`}</table>
@@ -3573,11 +3594,43 @@ export const FORMULARIOS = {
       data > C.hojeIso() ? `A data do pagamento (${dataBr(data)}) está no futuro.` : '',
       cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
     ].filter(Boolean));
+    // valor recebido diferente do previsto: justificativa e, na página do boleto, o valor da NF digitado à mão
+    const previsto = cb && R.previstoNoPagamento(cb, data, { pagouEmDia, dataPagou });
+    if (cb && valor !== null && valor !== previsto.valor_devido && !R.ehComplementoCaucao(cb) && R.geraNf(buscar('contratos', cb.contrato_id))) {
+      if (dataPagou && dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+      const dif = valor - previsto.valor_devido;
+      const resp = await janela({ titulo: 'Valor diferente do previsto',
+        html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
+          Diferença: <b class="${dif < 0 ? 'negativo' : ''}">${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b></p>
+          <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
+          <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
+        sim: 'Continuar', nao: 'Cancelar' });
+      const justificativa = resp && String((resp.justificativa || [])[0] || '').trim();
+      if (!resp) return;
+      if (!justificativa) throw new Error('Informe a justificativa da divergência. Nada foi salvo.');
+      pagamentoDivergente = { id: cb.id, data, valor, pagouEmDia, dataPagou, justificativa };
+      ir(`#/cobranca/${cb.id}?ir=pagamento`);
+      return;
+    }
     const r = await alterar((db) => R.registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia, dataPagou }));
     const pago = buscar('cobrancas', form.dataset.id);
     if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
     else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
       : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+    await mostrar();
+  },
+
+  /** Pagamento com valor diferente do previsto: a NF sai com o valor digitado (diferente do calculado) e a justificativa fica no histórico. */
+  async pagamentoNf(form) {
+    const p = pagamentoDivergente;
+    if (!p || String(p.id) !== form.dataset.id) throw new Error('Confirme o pagamento de novo.');
+    const f = new FormData(form);
+    const texto = String(f.get('valor_nf') || '').trim();
+    const valorNf = texto ? C.centavos(texto) : null;
+    const justificativa = String(f.get('justificativa') || '').trim();
+    const r = await alterar((db) => R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa }));
+    pagamentoDivergente = null;
+    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
     await mostrar();
   },
 
@@ -4190,6 +4243,12 @@ export const ACOES = {
     if (!r) return;
     if ((r.escolha || [])[0] === 'trocar') return ir(`#/novo/trocas_garantia?contrato=${f.contrato_id}`);
     await ACOES.excluir({ tabela: 'fiadores', id: f.id });
+  },
+
+  cancelarPagamentoDivergente() {
+    pagamentoDivergente = null;
+    aviso('Pagamento não confirmado. Nada foi salvo.');
+    return mostrar();
   },
 
   async cancelarTrocaGarantia({ id }) {

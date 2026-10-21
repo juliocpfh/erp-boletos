@@ -1122,3 +1122,22 @@ test('garantia só conta depois de depositada com comprovante (caução atual, a
   assert.equal(R.garantiaDepositada(c), true);
   assert.equal(R.situacaoAplicacao(d, c).total, 400000);
 });
+
+test('pagamento com valor diferente do previsto: NF digitada (diferente da calculada) e justificativa no histórico', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const cb = d.cobrancas[0];
+  const previsto = R.previstoNoPagamento(cb, cb.vencimento);
+  const recebido = previsto.valor_devido - 5000;
+  assert.throws(() => R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: previsto.valor_nf, justificativa: 'Pagou sem o IPTU' }), /Altere o valor da NF/);
+  assert.throws(() => R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: 100000, justificativa: ' ' }), /justificativa/);
+  assert.equal(cb.data_pagamento, null, 'nada salvo enquanto não confere');
+  R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: 100000, justificativa: 'Pagou sem o IPTU' });
+  assert.equal(cb.valor_nf, 100000);
+  assert.equal(cb.valor_pago, recebido);
+  assert.equal(cb.nf_manual, true);
+  assert.match(d.historico.at(-1).descricao, /Justificativa: Pagou sem o IPTU/);
+  R.estornarPagamento(d, cb.id, 'julio');
+  assert.equal(cb.nf_manual, false);
+  assert.equal(cb.divergencia, null);
+});
