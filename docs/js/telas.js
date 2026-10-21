@@ -407,7 +407,7 @@ function guardarRascunhoVistoria() {
   const f = Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string'));
   const itens = {};
   for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) if (f[`is_${n}`] || f[`io_${n}`]) itens[`${f[`ic_${n}`]}|${f[`ii_${n}`]}`] = [f[`is_${n}`] || '', f[`io_${n}`] || ''];
-  const campos = Object.fromEntries(['data', 'link_fotos', 'prazo_dias', 'chaves', 'descritivo', 'condicoes'].filter((k) => k in f).map((k) => [k, f[k]]));
+  const campos = Object.fromEntries(['data', 'link_fotos', 'texto_abertura', 'chaves', 'descritivo', 'condicoes', 'texto_final'].filter((k) => k in f).map((k) => [k, f[k]]));
   try { localStorage.setItem(form.dataset.rascunho, JSON.stringify({ campos, itens })); } catch { /* navegador sem espaço: segue sem rascunho */ }
 }
 export function apagarRascunhoVistoria(chave) { try { localStorage.removeItem(chave); } catch { /* nada */ } }
@@ -2792,7 +2792,7 @@ async function telaImprimir(rota) {
     const falta = K.pendenciasDoContrato(d(), m.c);
     const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
     return `<div class="impressao">
-      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${tipo === 'vistoria' ? botao('documentoPdf', 'Baixar PDF', {}, 'secundario') : ''}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
@@ -2833,6 +2833,52 @@ function contratoMontado(q) {
   return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
 }
 
+/**
+ * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas, sempre entre um bloco e outro
+ * (parágrafo, linha de tabela, foto, assinatura), com o rodapé das empresas e "Página X de Y" embaixo.
+ */
+async function pdfDoDocumento(el, rodape = []) {
+  const { html2canvas, jsPDF } = await bibliotecasPdf();
+  const caixa = el.getBoundingClientRect();
+  const topo = caixa.top;
+  // o link das fotos continua clicável no PDF (área do link na folha certa)
+  const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
+  const cortes = [...el.querySelectorAll('.ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina')]
+    .map((x) => x.getBoundingClientRect().bottom - topo).sort((a, b) => a - b);
+  const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', onclone: (doc) => {
+    doc.querySelectorAll('.ct-rodape').forEach((x) => x.remove());
+    doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
+  } });
+  const escala = canvas.width / el.offsetWidth;
+  const pxMm = el.offsetWidth / 210;
+  const [margemTopo, margemPe] = [12, 24];
+  const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
+  const total = el.offsetHeight;
+  const fatias = [];
+  for (let ini = 0; ini < total - 1;) {
+    let fim = ini + alturaFolha;
+    if (fim >= total) fim = total;
+    else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
+    fatias.push([ini, fim]);
+    ini = fim;
+  }
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  fatias.forEach(([ini, fim], n) => {
+    if (n) pdf.addPage();
+    const pedaco = document.createElement('canvas');
+    pedaco.width = canvas.width;
+    pedaco.height = Math.round((fim - ini) * escala);
+    pedaco.getContext('2d').drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
+    pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', 0, margemTopo, 210, (fim - ini) / pxMm);
+    for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(l.x / pxMm, margemTopo + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
+    pdf.setFontSize(8).setTextColor(102);
+    pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: 'right' });
+    pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
+    rodape.forEach((linha, k) => pdf.text(linha, 105, 297 - margemPe + 12 + k * 3.5, { align: 'center' }));
+  });
+  return pdf.output('blob');
+}
+
 /** Contrato, vistoria ou recibo das chaves, prontos para a tela, o PDF e o Word. */
 async function documentoMontado(tipo, q) {
   if (tipo === 'contrato') {
@@ -2848,7 +2894,9 @@ async function documentoMontado(tipo, q) {
     const entrada = v.tipo === 'Saída' ? R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada') : null;
     const fotos = await fotosDaVistoria(v);
     const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
-    return { c, v, semSituacao, ...K.vistoriaBlocos(d(), c, v, leitura, fotos, entrada ? entrada.itens || [] : null), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
+    const i = buscar('imoveis', c.imovel_id);
+    const arquivo = `Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')} ${i ? i.nome : 'sem imóvel'} - ${c.inquilino_nome} - ${String(c.data_entrada || v.data || '').slice(0, 4)}`;
+    return { c, v, semSituacao, arquivo, ...K.vistoriaBlocos(d(), c, v, leitura, fotos, entrada ? entrada.itens || [] : null), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
@@ -2897,6 +2945,9 @@ function telaVistoria(rota) {
   const aqui = v ? `#/vistoria/${v.id}` : `#/vistoria/novo?contrato=${c.id}&tipo=${tipo === 'Saída' ? 'Sa%C3%ADda' : 'Entrada'}`;
   const linkModelo = (texto) => (opera() && i.id ? link(`#/modelo-vistoria/${i.id}?voltar=${encodeURIComponent(aqui)}`, texto) : '');
   const grade = gradeVistoria(i, v, base, tipo === 'Saída' ? entrada : null, linkModelo);
+  // textos padrão que podem ser trocados: vêm desta vistoria, da anterior do imóvel ou do padrão
+  const abertura = (v ? v.texto_abertura : base.texto_abertura) || (v && !v.link_fotos ? K.VISTORIA_ABERTURA_SEM_LINK : K.VISTORIA_ABERTURA);
+  const textoFinal = (v ? v.texto_final : base.texto_final) || K.vistoriaFinal((v && v.prazo_dias) || 3);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
     ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
@@ -2907,8 +2958,8 @@ function telaVistoria(rota) {
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data)}" required></div>
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
-        ${tipo === 'Entrada' ? `<div><label>Dias para o inquilino contestar</label><input type="number" name="prazo_dias" min="1" value="${esc(v ? v.prazo_dias || 3 : 3)}"></div>` : ''}
       </div>
+      <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>
       <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'que serão entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
         <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
       ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
@@ -2922,6 +2973,7 @@ function telaVistoria(rota) {
         <span class="acoes" style="margin:8px 0">Inserir roteiro: ${Object.keys(ROTEIROS).map((k) => `<button type="button" class="secundario pequeno" data-acao="inserirRoteiro" data-comodo="${esc(k)}">${esc(k)}</button>`).join('')}</span>
         <textarea name="descritivo" class="texto-modelo">${valor('descritivo')}</textarea></p>
       <p><label>Condições gerais</label><textarea name="condicoes" rows="6">${valor('condicoes', K.VISTORIA_CONDICOES)}</textarea></p>
+      ${tipo === 'Entrada' ? `<p><label>Texto final <span class="suave">(prazo para o inquilino contestar e devolução do imóvel)</span></label><textarea name="texto_final" rows="4">${esc(textoFinal)}</textarea></p>` : ''}
       <div class="acoes"><button>Salvar e ver o documento</button><a class="botao secundario" href="#/contrato/${c.id}?ir=documentos">Cancelar</a></div></form>`;
 }
 
@@ -3453,7 +3505,12 @@ export const FORMULARIOS = {
     if (!f.data) throw new Error('Informe a data da vistoria.');
     const c = buscar('contratos', f.contrato);
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
-      chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '' };
+      chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '',
+      texto_abertura: String(f.texto_abertura || '').trim(), texto_final: f.tipo === 'Entrada' ? String(f.texto_final || '').trim() : '' };
+    // texto igual ao padrão fica em branco: vale o padrão (a abertura muda sozinha com ou sem o link das fotos)
+    const semEspacos = (x) => String(x).replace(/\s+/g, ' ').trim();
+    if ([K.VISTORIA_ABERTURA, K.VISTORIA_ABERTURA_SEM_LINK].map(semEspacos).includes(semEspacos(dados.texto_abertura))) dados.texto_abertura = '';
+    if (semEspacos(dados.texto_final) === semEspacos(K.vistoriaFinal(3))) dados.texto_final = '';
     dados.itens = [];
     for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
     const tirados = dados.itens.filter((x) => x.situacao === K.NAO_SE_APLICA);
@@ -3470,7 +3527,6 @@ export const FORMULARIOS = {
         dados.fotos[k] = nome;
       }
     }
-    if (f.tipo === 'Entrada') dados.prazo_dias = Number(f.prazo_dias) || 3;
     if (f.tipo === 'Saída') {
       const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
       dados.comparar_com = entrada ? entrada.data : null;
@@ -3915,7 +3971,17 @@ export const ACOES = {
     const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
     const i = buscar('imoveis', m.c.imovel_id);
     const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.rodape, titulo: `${m.nome} - ${m.c.inquilino_nome}` });
-    baixar(blob, `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+    baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}`}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
+  },
+
+  /** PDF do documento que está na tela (vistoria), com o rodapé e "Página X de Y" em todas as folhas. */
+  async documentoPdf() {
+    const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
+    const m = await documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    const el = document.querySelector('.impressao .contrato');
+    if (!m || !el) throw new Error('Documento não encontrado.');
+    const blob = await pdfDoDocumento(el, m.rodape);
+    baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
   },
 
   async escolherPastaSegura() {

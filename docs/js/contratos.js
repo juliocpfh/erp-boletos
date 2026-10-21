@@ -549,6 +549,11 @@ export const modelosDe = (d) => (d.modelos_contrato && d.modelos_contrato.length
 // Vistoria e recibo de entrega das chaves (mesmo papel timbrado do contrato)
 // --------------------------------------------------------------------------
 export const VISTORIA_INTRO = 'O presente relatório acusará as condições do imóvel; a ausência de qualquer observação indicará que está funcionando sem avarias.';
+/** Textos padrão da vistoria; cada vistoria pode trocar (abertura e, na entrada, o texto final). */
+export const VISTORIA_ABERTURA = `${VISTORIA_INTRO} Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail:`;
+export const VISTORIA_ABERTURA_SEM_LINK = `${VISTORIA_INTRO} Para mais detalhes, verifique as fotos em anexo.`;
+export const vistoriaFinal = (dias = 3) => `O LOCATÁRIO tem ${numeroComExtenso(dias)} dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.
+O imóvel deve ser devolvido nas mesmas condições descritas neste documento.`;
 export const VISTORIA_CONDICOES = `Imóvel entregue limpo.
 Parte elétrica e hidráulica em perfeito funcionamento, exceto os pontos descritos acima.
 Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os pontos descritos acima e/ou registrados nas fotos da vistoria.`;
@@ -641,7 +646,7 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
   const saida = v.tipo === 'Saída';
   const blocos = [{ tipo: 'titulo', runs: negritos(`VISTORIA DE ${saida ? 'SAÍDA' : 'ENTRADA'}`) }, ...cabecalhoDoc(d, c, dados)];
   blocos.push(it(`**DATA DA VISTORIA:** ${dataPorExtenso(v.data)}`));
-  blocos.push(p(`${VISTORIA_INTRO} ${v.link_fotos ? 'Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail:' : 'Para mais detalhes, verifique as fotos em anexo.'}`));
+  blocos.push(p(String(v.texto_abertura || '').trim() || (v.link_fotos ? VISTORIA_ABERTURA : VISTORIA_ABERTURA_SEM_LINK)));
   if (v.link_fotos) blocos.push({ tipo: 'link', url: /^https?:\/\//i.test(v.link_fotos) ? v.link_fotos : `https://${v.link_fotos}` });
   if (fotos.fachada) blocos.push({ tipo: 'fotos', grande: true, fotos: [{ ...fotos.fachada, legenda: 'Fachada do imóvel' }] });
   if (saida && v.comparar_com) blocos.push(p(`Esta vistoria de saída compara o imóvel com a vistoria de entrada de ${dataPorExtenso(v.comparar_com)}. Os itens marcados como **DIFERENÇA** são de responsabilidade do LOCATÁRIO, conforme o contrato.`));
@@ -670,10 +675,7 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
     blocos.push(it('Os itens destacados pioraram em relação à vistoria de entrada.'));
   }
   blocos.push({ tipo: 'secao', runs: negritos('CONDIÇÕES GERAIS') }, ...linhasDe(v.condicoes).map(it));
-  if (!saida) {
-    blocos.push(it(`O LOCATÁRIO tem ${numeroComExtenso(v.prazo_dias || 3)} dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.`));
-    blocos.push(it('O imóvel deve ser devolvido nas mesmas condições descritas neste documento.'));
-  }
+  if (!saida) blocos.push(...linhasDe(String(v.texto_final || '').trim() || vistoriaFinal(v.prazo_dias || 3)).map(it));
   blocos.push({ tipo: 'direita', runs: negritos(`${dados.campos.cidade}, ${dados.campos.data_assinatura}.`) });
   blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => !a.papel.startsWith('TESTEMUNHA')) });
   return { blocos, rodape: dados.rodape };

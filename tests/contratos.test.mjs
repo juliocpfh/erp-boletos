@@ -163,3 +163,15 @@ test('modelo de vistoria: tira só os itens que não se aplicam, no cômodo cert
   assert.equal(K.tirarDoModelo(modelo, [{ comodo: 'Sala', item: 'Lareira' }]), '## Sala\nPiso\nMóvel:\n## Cozinha\n- Lareira\nPia');
   assert.ok(!K.SITUACOES_VISTORIA.includes('Ótimo'));
 });
+
+test('vistoria: textos de abertura e final podem ser trocados; em branco, vale o padrão', () => {
+  const { d, c } = base();
+  const v = { tipo: 'Entrada', data: '2026-09-04', condicoes: '', itens: [] };
+  let t = texto(K.vistoriaBlocos(d, c, v).blocos);
+  assert.match(t, /verifique as fotos em anexo\./, 'sem link: o padrão sem link');
+  assert.match(t, /O LOCATÁRIO tem 3 \(três\) dias[^\n]*\nO imóvel deve ser devolvido/);
+  t = texto(K.vistoriaBlocos(d, c, { ...v, texto_abertura: 'Relatório do imóvel.', texto_final: 'Prazo de 5 dias para contestar.\nDevolver igual.' }).blocos);
+  assert.match(t, /Relatório do imóvel\./);
+  assert.match(t, /Prazo de 5 dias para contestar\.\nDevolver igual\./);
+  assert.doesNotMatch(t, /3 \(três\) dias|presente relatório/);
+});
