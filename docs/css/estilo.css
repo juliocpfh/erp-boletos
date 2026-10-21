@@ -272,7 +272,6 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
 .ct-assinaturas { margin-top: calc(24px + 1.55em); /* uma linha a mais antes das 1ªs assinaturas: cabe a assinatura gov.br */ break-inside: avoid; page-break-inside: avoid; }
 .ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-bottom: 64px; break-inside: avoid; page-break-inside: avoid; }
-.ct-fecho { break-inside: avoid; page-break-inside: avoid; }
 .contrato .ct-titulo, .contrato .ct-secao, .contrato .ct-subsecao { break-after: avoid; page-break-after: avoid; }
 .ct-grupo-assina.um { grid-template-columns: minmax(0, 50%); justify-content: center; }
 .ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
