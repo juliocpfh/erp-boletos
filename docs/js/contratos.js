@@ -196,8 +196,9 @@ export function dadosDoContrato(d, c, extra = {}) {
     endereco_imovel: situado,
     finalidade: c.finalidade === 'Não residencial' ? `não residencial${c.atividade ? `, para a atividade de ${c.atividade}` : ''}` : 'residencial',
     atividade: c.atividade || '',
-    prazo_meses: numeroComExtenso(c.prazo_meses || C.mesesDoPrazo(c.vigencia_inicio, c.vigencia_fim) || 0),
-    data_inicio: dataPorExtenso(c.vigencia_inicio),
+    prazo_meses: numeroComExtenso(c.prazo_meses || C.mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0),
+    // o prazo conta da data de vigência inicial (a data do contrato fica para o local e data das assinaturas)
+    data_inicio: dataPorExtenso(c.data_entrada || c.vigencia_inicio),
     data_fim: dataPorExtenso(c.vigencia_fim),
     aluguel_bonificado: valorComExtenso(bonificado),
     aluguel_cheio: valorComExtenso(aluguel),

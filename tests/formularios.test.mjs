@@ -62,3 +62,18 @@ test('comprovante (arquivo) não entra na leitura do formulário: é gravado à 
   assert.deepEqual(erros, {});
   assert.match(F.camposHtml(F.APLICACAO.filter((c) => c.nome === 'comprovante'), { comprovante: 'comprovante-aplicacao.pdf' }), /type="file"[\s\S]*Já guardado: comprovante-aplicacao\.pdf/);
 });
+
+test('valores do contrato: aluguel, vencimento, bonificado e %, as duas caixas juntas; tarifa, multa e juros na linha de baixo', () => {
+  const ini = F.CONTRATO.findIndex((c) => c.secao === 'Valores e boleto');
+  const fim = F.CONTRATO.findIndex((c, k) => k > ini && c.secao);
+  const ordem = F.CONTRATO.slice(ini + 1, fim).map((c) => c.nome || (c.quebra ? '|' : ''));
+  assert.deepEqual(ordem, ['aluguel_inicial', 'dia_vencimento', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'cobranca_mes_seguinte', 'bonificacao', '|', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual']);
+  const html = F.camposHtml(F.CONTRATO.slice(ini + 1, fim), {});
+  assert.match(html, /name="cobranca_mes_seguinte"[^]*?<div class="[^"]*colado[^"]*"[^>]*><label class="check"><input type="checkbox" name="bonificacao"[^]*?<\/div><\/div><div class="quebra">/, 'bonificação dentro da mesma célula');
+});
+
+test('contrato: sem comprovante da caução no cadastro (vai na página do inquilino)', () => {
+  assert.equal(F.CONTRATO.some((c) => c.nome === 'comprovante_caucao'), false);
+  assert.ok(F.CONTRATO.some((c) => c.nome === 'representante_usar_endereco_imovel'));
+  assert.deepEqual(F.CONTAS.map(([, t]) => t), ['Água', 'Energia', 'Gás', 'Internet / TV', 'Condomínio']);
+});

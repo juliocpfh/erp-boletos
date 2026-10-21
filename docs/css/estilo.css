@@ -85,6 +85,8 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .formulario h3 { grid-column: 1 / -1; border-bottom: 1px solid var(--borda); padding-bottom: 4px; margin-top: 18px; }
 .formulario h3 .link-botao { font-weight: 400; margin-left: 8px; }
 .formulario .recolhido { display: none !important; }
+.formulario .quebra { grid-column: 1 / -1; height: 0; margin-top: -8px; }
+.formulario .colado .check { padding-top: 6px; }
 textarea.cresce { min-height: 0; overflow: hidden; resize: none; }
 /* contrato: formulário mais junto */
 .formulario.compacto { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 14px; }
