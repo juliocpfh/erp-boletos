@@ -1107,16 +1107,40 @@ export function excluirRenovacao(d, renovacaoId, usuario) {
 
 const CAMPOS_GARANTIA = ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_uso', 'comprovante_deposito'];
 
-/** Troca o tipo de garantia (ex.: caução → fiador) guardando a anterior no histórico do contrato. */
-export function trocarGarantia(d, contratoId, dados, usuario) {
+/**
+ * Troca de garantia (ex.: caução → fiador, ou troca de fiador: fiador → fiador), guardando a anterior no histórico do contrato.
+ * fiadores: { novos: [dados], saem: [ids], alterados: [{ id, ...dados }] }. Os que saem ficam em "Fiadores anteriores"
+ * (fim do vínculo = véspera da troca); os novos começam na data da troca. Sem fiador na nova garantia, os atuais saem todos.
+ * A troca guarda o que mudou nos fiadores para poder ser cancelada.
+ */
+export function trocarGarantia(d, contratoId, dados, usuario, fiadores = {}) {
   const c = buscar(d, 'contratos', contratoId);
   const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, c[k] ?? null]));
-  const texto = `Garantia: ${c.garantia_tipo || 'não informada'} → ${dados.garantia_tipo}`;
+  const atuais = fiadoresDo(d, c.id, dados.data);
+  const comFiador = temFiador(dados);
+  const saem = comFiador ? atuais.filter((f) => (fiadores.saem || []).includes(f.id)) : atuais;
+  const alterados = comFiador ? (fiadores.alterados || []).filter((a) => atuais.some((f) => f.id === a.id) && !saem.some((f) => f.id === a.id)) : [];
+  const novos = comFiador ? (fiadores.novos || []) : [];
+  const nomes = [...saem.map((f) => `sai ${f.nome}`), ...novos.map((f) => `entra ${f.nome}`)];
+  const texto = `Garantia: ${c.garantia_tipo || 'não informada'} → ${dados.garantia_tipo}${nomes.length ? ` (${nomes.join(', ')})` : ''}`;
   const r = inserir(d, 'trocas_garantia', { contrato_id: c.id, data: dados.data, tipo_anterior: c.garantia_tipo || '', tipo_novo: dados.garantia_tipo,
-    valor_anterior: valorGarantia(d, c), anterior, observacoes: dados.observacoes || '' }, usuario, texto);
+    valor_anterior: valorGarantia(d, c), anterior, observacoes: dados.observacoes || '', fiadores_saida: [], fiadores_novos: [], fiadores_alterados: [] }, usuario, texto);
   const novo = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, dados[k] ?? null]));
   novo.possui_aditivos = true; // troca de garantia exige termo aditivo
   atualizar(d, 'contratos', c.id, novo, usuario, texto);
+  for (const f of saem) {
+    r.fiadores_saida.push({ id: f.id, data_saida: f.data_saida ?? null });
+    atualizar(d, 'fiadores', f.id, { data_saida: C.somarDias(dados.data, -1) }, usuario, `Fiador ${f.nome} sai na troca de garantia`);
+  }
+  for (const { id, ...a } of alterados) {
+    const f = buscar(d, 'fiadores', id);
+    r.fiadores_alterados.push({ id, antes: Object.fromEntries(Object.keys(a).map((k) => [k, f[k] ?? null])) });
+    atualizar(d, 'fiadores', id, a, usuario, `Fiador ${a.nome || f.nome}`);
+  }
+  for (const f of novos) {
+    const x = inserir(d, 'fiadores', { ...f, contrato_id: c.id, data_entrada: dados.data }, usuario, `Fiador ${f.nome} entra na troca de garantia`);
+    r.fiadores_novos.push(x.id);
+  }
   return r;
 }
 
@@ -1132,6 +1156,10 @@ export function cancelarTrocaGarantia(d, trocaId, usuario) {
   const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, (t.anterior || {})[k] ?? null]));
   if (!t.anterior) anterior.garantia_tipo = t.tipo_anterior || null;
   atualizar(d, 'contratos', t.contrato_id, anterior, usuario, texto);
+  // fiadores: os que entraram saem do cadastro, os que saíram voltam e os alterados voltam ao que eram
+  for (const id of t.fiadores_novos || []) if (d.fiadores.some((f) => f.id === id)) excluir(d, 'fiadores', id, usuario, texto);
+  for (const s of t.fiadores_saida || []) if (d.fiadores.some((f) => f.id === s.id)) atualizar(d, 'fiadores', s.id, { data_saida: s.data_saida }, usuario, texto);
+  for (const a of t.fiadores_alterados || []) if (d.fiadores.some((f) => f.id === a.id)) atualizar(d, 'fiadores', a.id, a.antes, usuario, texto);
   excluir(d, 'trocas_garantia', t.id, usuario, texto);
 }
 
