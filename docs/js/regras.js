@@ -792,20 +792,36 @@ export const totais = (cb) => C.totaisCobranca(cb, cb.reserva_utilizada || 0);
  * ``dataPagou``: dia em que o inquilino pagou, quando atrasou (multa e juros até esse dia). Em branco: a data contábil.
  * Atraso de verdade: o banco já cobra multa e juros no próprio boleto, e a NF sai com esse valor a mais.
  */
-export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuario, { pagouEmDia = false, dataPagou = null } = {}) {
+/** O que o boleto deveria receber nesta confirmação (com desconto em dia; com multa e juros até o dia em que pagou). */
+export const previstoNoPagamento = (cb, dataContabil, { pagouEmDia = false, dataPagou = null } = {}) => C.liquidar(cb, pagouEmDia ? cb.vencimento : (dataPagou || dataContabil));
+
+/**
+ * Valor recebido diferente do previsto (caso excepcional): a NF não sai pelo cálculo. ``valorNf`` é digitado à mão
+ * e precisa ser diferente do calculado; ``justificativa`` é obrigatória e fica só no sistema (histórico do boleto).
+ */
+export function conferirDivergencia(cb, r, valorPago, valorNf, justificativa) {
+  if (!String(justificativa || '').trim()) throw new Error('Informe a justificativa da divergência.');
+  if (!(valorNf > 0)) throw new Error('Informe o valor da NF.');
+  if (valorNf === r.valor_nf) throw new Error(`Altere o valor da NF: ele está igual ao calculado (${C.reais(r.valor_nf)}). Faça o cálculo à mão com o valor recebido de ${C.reais(valorPago)}.`);
+}
+
+export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuario, { pagouEmDia = false, dataPagou = null, valorNf = null, justificativa = '' } = {}) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (faturasDe(d, 'cobranca', cb.id).length) {
     throw new Error('Este boleto já tem NF emitida. Desfaça o pagamento antes de alterar.');
   }
   if (dataPagou && dataPagou > dataContabil) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
-  const r = C.liquidar(cb, pagouEmDia ? cb.vencimento : (dataPagou || dataContabil));
+  const r = previstoNoPagamento(cb, dataContabil, { pagouEmDia, dataPagou });
   const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
   const caucao = ehComplementoCaucao(cb);
+  const manual = valorNf !== null && !caucao;
+  if (manual) conferirDivergencia(cb, r, valorPago, valorNf, justificativa);
   atualizar(d, 'cobrancas', cb.id, {
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
-    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao ? 0 : r.valor_nf, pagou_em_dia: compensadoDepois,
-    situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso',
-  }, usuario, compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado');
+    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
+    situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
+  }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}${manual
+    ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}`);
   // complemento da caução pago: a caução passa a ser o novo valor
   if (caucao) {
     const x = inserir(d, 'correcoes_garantia', { contrato_id: cb.contrato_id, data: cb.caucao_vigencia && cb.caucao_vigencia > dataContabil ? cb.caucao_vigencia : dataContabil,
@@ -824,7 +840,7 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
-    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto' }, usuario, 'Pagamento desfeito');
+    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null }, usuario, 'Pagamento desfeito');
 }
 
 // --------------------------------------------------------------------------
