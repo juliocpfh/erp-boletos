@@ -83,6 +83,17 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .formulario { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px 18px; }
 .formulario .largo { grid-column: 1 / -1; }
 .formulario h3 { grid-column: 1 / -1; border-bottom: 1px solid var(--borda); padding-bottom: 4px; margin-top: 18px; }
+.formulario h3 .link-botao { font-weight: 400; margin-left: 8px; }
+.formulario .recolhido { display: none !important; }
+textarea.cresce { min-height: 0; overflow: hidden; resize: none; }
+/* contrato: formulário mais junto */
+.formulario.compacto { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 14px; }
+.formulario.compacto h3 { margin: 10px 0 0; font-size: 15px; }
+.formulario.compacto .ajuda { font-size: 11px; }
+.formulario.compacto .check { padding-top: 18px; }
+.formulario.compacto input:not([type=checkbox]):not([type=radio]), .formulario.compacto select, .formulario.compacto textarea { padding: 5px 8px; }
+.formulario.compacto textarea:not(.cresce) { min-height: 56px; }
+.grade.compacta { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
 label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 3px; }
 input:not([type=checkbox]):not([type=radio]), select, textarea {
   width: 100%; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 6px; font: inherit; background: #fff; }

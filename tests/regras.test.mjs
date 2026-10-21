@@ -756,6 +756,26 @@ test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui
   R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento', arquivo: 'b.pdf' }, 'julio');
   assert.equal(c.possui_aditivos, true);
   assert.deepEqual(R.aditivosDo(d, c.id).map((a) => a.arquivo), ['b.pdf', 'a.pdf']);
+  // excluídos os termos, a marca sai junto
+  for (const a of R.aditivosDo(d, c.id)) { R.excluir(d, 'aditivos', a.id, 'julio'); R.marcarAditivos(d, c.id, 'julio'); }
+  assert.equal(c.possui_aditivos, false);
+});
+
+test('"possui termo aditivo" só com termo registrado: troca de garantia não marca e dados antigos se ajustam', () => {
+  const { d, c } = base();
+  R.trocarGarantia(d, c.id, { data: '2026-09-01', garantia_tipo: 'Sem garantia' }, 'julio');
+  assert.notEqual(c.possui_aditivos, true);
+  c.possui_aditivos = true; // marcado sem termo (versão anterior)
+  R.normalizar(d);
+  assert.equal(c.possui_aditivos, false);
+});
+
+test('fiadores do contrato (para editar o contrato): sem os que entraram na troca de garantia', () => {
+  const { d, c } = base();
+  R.atualizar(d, 'contratos', c.id, { garantia_tipo: 'Fiador' }, 'julio');
+  const f1 = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador Original' }, 'julio');
+  R.trocarGarantia(d, c.id, { data: '2026-09-01', garantia_tipo: 'Fiador' }, 'julio', { novos: [{ nome: 'Fiador Novo' }], saem: [f1.id] });
+  assert.deepEqual(R.fiadoresDoContrato(d, c.id).map((f) => f.nome), ['Fiador Original']);
 });
 
 test('documentos de entrada: quem continua o contrato de outro herda os documentos assinados e vê os aditivos anteriores', () => {
