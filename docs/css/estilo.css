@@ -267,8 +267,9 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-subsecao { font-size: 15px; margin: 16px 0 4px; }
 .contrato .ct-item { margin: 0 0 3px; }
 .contrato .ct-rodape { position: absolute; bottom: 24px; left: 64px; right: 64px; border-top: 1px solid #999; padding-top: 5px; text-align: center; font-size: 11px; color: #666; }
-.contrato .ct-pagina, .contrato .ct-pagina td { border: 0; padding: 0; width: 100%; border-collapse: collapse; background: none; }
-.contrato .ct-pagina td { display: block; }
+/* moldura da página (só as células dela, não as das tabelas do documento) */
+.contrato .ct-pagina, .contrato .ct-pagina > * > tr > td { border: 0; padding: 0; width: 100%; border-collapse: collapse; background: none; }
+.contrato .ct-pagina > * > tr > td { display: block; }
 .contrato .ct-espaco-rodape { height: 0; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
 .ct-assinaturas { margin-top: calc(24px + 1.55em); /* uma linha a mais antes das 1ªs assinaturas: cabe a assinatura gov.br */ break-inside: avoid; page-break-inside: avoid; }
@@ -287,7 +288,7 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
   /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
-  .contrato .ct-pagina td { display: table-cell; }
+  .contrato .ct-pagina > * > tr > td { display: table-cell; }
   .contrato .ct-espaco-rodape { height: 0; }
   .contrato .ct-rodape { display: none; }
 }
@@ -305,7 +306,8 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 .contrato .ct-tabela th:nth-child(3):not(:last-child) { width: 17%; }
 .contrato .ct-subsecao { break-after: avoid; }
 .contrato .ct-tabela th, .contrato .ct-tabela td { border: 1px solid #bbb; padding: 3px 6px; text-align: left; }
-.contrato .ct-tabela th { background: #e5e7eb; }
+.contrato .ct-tabela th { background: #e5e7eb; color: #111; font-size: 13px; text-transform: none; letter-spacing: 0; }
+.contrato .ct-link a { color: #0563c1; word-break: break-all; }
 .contrato .ct-tabela tr.ct-destaque td { background: #fef3c7; font-weight: 600; }
 .contrato .ct-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0 14px; break-inside: avoid; }
 .contrato .ct-fotos.ct-fotos-grande { grid-template-columns: 1fr; justify-items: center; }
