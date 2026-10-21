@@ -542,8 +542,35 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
 
-/** Modelos do banco; na primeira vez, os padrões (Residencial e Não residencial). */
-export const modelosDe = (d) => (d.modelos_contrato && d.modelos_contrato.length ? d.modelos_contrato : MODELOS_PADRAO.map((m, i) => ({ id: -(i + 1), ...m })));
+/** Tipo do modelo: "contrato" (sem tipo gravado) ou "aditivo". */
+export const tipoDoModelo = (m) => m.tipo || 'contrato';
+/** Modelos do banco de um tipo; enquanto não houver nenhum gravado desse tipo, os padrões (id negativo = posição em MODELOS_PADRAO). */
+export function modelosDe(d, tipo = 'contrato') {
+  const salvos = (d.modelos_contrato || []).filter((m) => tipoDoModelo(m) === tipo);
+  return salvos.length ? salvos : MODELOS_PADRAO.map((m, i) => ({ id: -(i + 1), ...m })).filter((m) => tipoDoModelo(m) === tipo);
+}
+
+/**
+ * Termo aditivo de troca do dia do vencimento: os dados do contrato (partes, imóvel, assinaturas na data do aditivo)
+ * e os da troca. ``a``: registro da tabela aditivos (dia_anterior, dia_novo, primeiro_vencimento, diferenca, valor_diferenca).
+ */
+export function dadosDoAditivo(d, c, a) {
+  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
+  const proporcional = a.diferenca === 'Proporcional' && a.valor_diferenca > 0;
+  Object.assign(dados.campos, {
+    numero_aditivo: `${a.numero || 1}º`,
+    data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
+    dia_vencimento_anterior: numeroComExtenso(a.dia_anterior),
+    dia_vencimento_novo: numeroComExtenso(a.dia_novo),
+    primeiro_vencimento: dataPorExtenso(a.primeiro_vencimento),
+    dias_diferenca: numeroComExtenso(Math.abs(a.dia_novo - a.dia_anterior)),
+    valor_diferenca: valorComExtenso(a.valor_diferenca || 0),
+  });
+  Object.assign(dados.condicoes, {
+    diferenca_sem: !proporcional, diferenca_cobrar: proporcional && a.dia_novo > a.dia_anterior, diferenca_abater: proporcional && a.dia_novo < a.dia_anterior,
+  });
+  return dados;
+}
 
 // --------------------------------------------------------------------------
 // Vistoria e recibo de entrega das chaves (mesmo papel timbrado do contrato)

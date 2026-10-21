@@ -175,6 +175,36 @@ E por assim estarem justos e contratados, e após terem os contratantes lido e e
 
 const CONDOMINIO = `[se nao_residencial]**CLÁUSULA #** – O LOCATÁRIO se obriga a cumprir as determinações do condomínio a que o imóvel pertence e seu regimento interno, principalmente no que se refere à manutenção da ordem e respeito ao condomínio, suas coisas e condôminos, ao silêncio após os horários determinados, à utilização de áreas comuns e privativas, aos horários de mudança e ao tratamento com os funcionários do condomínio, respondendo pelas despesas e danos causados por si e por outros sob sua responsabilidade.[fim]`;
 
+/** Termo aditivo de troca do dia do vencimento, a pedido do inquilino (modelo C): campos e condições em dadosDoAditivo (contratos.js). */
+const ADITIVO_VENCIMENTO = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
+
+## ALTERAÇÃO DO DIA DO VENCIMENTO
+
+${PARTES}
+
+As partes acima, já qualificadas no Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, resolvem, de comum acordo e a pedido do LOCATÁRIO, celebrar o presente Termo Aditivo, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+
+**CLÁUSULA #** – O aluguel mensal e os demais encargos da locação passam a vencer todo dia {dia_vencimento_novo} de cada mês, e não mais no dia {dia_vencimento_anterior}, a partir do vencimento de {primeiro_vencimento}.
+
+[se diferenca_cobrar]**CLÁUSULA #** – Em razão da alteração, o LOCATÁRIO pagará, junto com o vencimento de {primeiro_vencimento}, o valor proporcional de {valor_diferenca}, referente a {dias_diferenca} dias de locação.[fim]
+
+[se diferenca_abater]**CLÁUSULA #** – Em razão da alteração, será abatido do vencimento de {primeiro_vencimento} o valor proporcional de {valor_diferenca}, referente a {dias_diferenca} dias de locação.[fim]
+
+[se diferenca_sem]**CLÁUSULA #** – A alteração não gera cobrança nem desconto de valor proporcional no mês da troca.[fim]
+
+**CLÁUSULA #** – Esta alteração não modifica o valor do aluguel, a data-base e o índice de reajuste, nem o prazo da locação.[se bonificacao] A bonificação por pontualidade passa a valer para o pagamento feito até o novo dia do vencimento.[fim]
+
+[se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} estar de acordo com esta alteração e {f:mantém|mantêm} a fiança prestada no contrato de locação, nas mesmas condições.[fim]
+
+**CLÁUSULA #** – Permanecem em vigor todas as demais cláusulas e condições do contrato de locação não alteradas por este Termo Aditivo, que passa a fazer parte integrante dele.
+
+E por estarem de acordo, as partes assinam este Termo Aditivo em duas vias de igual teor e forma[se testemunhas], na presença das testemunhas abaixo[fim].
+
+> {cidade}, {data_assinatura}.
+
+[assinaturas]`;
+
+/** ``tipo``: "aditivo" para os termos aditivos (sem tipo: contrato). */
 export const MODELOS_PADRAO = [
   {
     nome: 'Residencial',
@@ -223,5 +253,10 @@ ${GARANTIA}
 ${FINAIS(`
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] ficam cientes de que a administradora do imóvel é associada ao SERASA e ao SCPC e incluirá no cadastro de inadimplentes todo atraso de pagamento de aluguéis e encargos vencidos.
 `)}`,
+  },
+  {
+    nome: 'Aditivo de vencimento (a pedido do inquilino)',
+    tipo: 'aditivo',
+    texto: ADITIVO_VENCIMENTO,
   },
 ];
