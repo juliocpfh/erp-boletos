@@ -731,6 +731,7 @@ export const TELAS = {
   calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
+  aditivo: (rota) => telaAditivo(rota),
   'modelos-contrato': () => telaModelos(),
   vistoria: (rota) => telaVistoria(rota),
   'modelo-vistoria': (rota) => telaModeloVistoria(rota),
@@ -1252,10 +1253,19 @@ function caixaAditivos(c) {
   const abrir = (a) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`;
   const anteriores = R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, R.aditivosDo(d(), x.id)]).filter(([, l]) => l.length);
   const ant = R.contratoHerdado(d(), c);
-  return `<h3 id="aditivos">Termos aditivos</h3>
+  const aguardando = R.aditivosAguardando(d(), c.id);
+  const ver = (a) => (a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver / PDF') : '');
+  return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, 'Gerar aditivo de vencimento') : ''}</div>
     ${ant && !lista.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). Registre-o com o arquivo assinado.</div>` : ''}
+    ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
+      <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
+      <td class="n nw">${ver(a)} ${opera() ? `${link(`#/aditivo/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ''}
+      ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
+        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">
+        <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td>
-      <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo continua guardado na pasta.`) : ''}</td></tr>`).join('')}</table></div>`
+      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo continua guardado na pasta.`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}
@@ -2789,14 +2799,15 @@ async function telaImprimir(rota) {
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${carta}</div>`;
   }
-  if (['contrato', 'vistoria', 'chaves'].includes(tipo)) {
+  if (['contrato', 'vistoria', 'chaves', 'aditivo'].includes(tipo)) {
     const m = await documentoMontado(tipo, rota.q);
     if (!m) return '<p>Registro não encontrado.</p>';
     const falta = K.pendenciasDoContrato(d(), m.c);
-    const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
+    const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === 'aditivo' ? 'aditivos' : 'documentos'}`;
     return `<div class="impressao">
       <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoPdf', 'Baixar PDF', {}, 'secundario')}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
+        ${tipo === 'aditivo' && opera() && !m.a.arquivo ? link(`#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
       ${tipo === 'vistoria' && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ''}
@@ -2909,6 +2920,14 @@ async function documentoMontado(tipo, q) {
     const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
     const arquivo = nomeArquivoDoc(`Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')}`, c, String(c.data_entrada || v.data || '').slice(0, 4));
     return { c, v, semSituacao, arquivo, ...K.vistoriaBlocos(d(), c, v, leitura, fotos, entrada ? entrada.itens || [] : null), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
+  }
+  if (tipo === 'aditivo') {
+    const a = buscar('aditivos', q.id);
+    const c = a && buscar('contratos', a.contrato_id);
+    if (!c || !a.texto) return null;
+    const dados = K.dadosDoAditivo(d(), c, a);
+    return { c, a, blocos: K.montarContrato(a.texto, dados), rodape: dados.rodape, nome: 'Termo aditivo',
+      arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} vencimento`, c, String(a.data || '').slice(0, 4)) };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
@@ -3119,6 +3138,47 @@ function telaGerarContrato(rota) {
         Os textos ficam em ${link('#/modelos-contrato', 'Modelos de contrato', '')}.</p></div>`;
 }
 
+/** Termo aditivo de troca do dia do vencimento: gerar (escolhendo o modelo) ou alterar o que ainda não foi assinado (com o texto). */
+function telaAditivo(rota) {
+  const id = rota.partes[1];
+  const a = id === 'novo' ? null : buscar('aditivos', id);
+  if (id !== 'novo' && !a) return '<h1>Termo aditivo não encontrado</h1>';
+  const c = buscar('contratos', a ? a.contrato_id : rota.q.contrato);
+  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
+  if (!opera()) return '<h1>Sem permissão para gerar termos aditivos</h1>';
+  const hoje = C.hojeIso();
+  const modelos = K.modelosDe(d(), 'aditivo');
+  const diaAtual = a ? a.dia_anterior : (c.dia_vencimento || 10);
+  const aluguel = R.aluguelAtual(d(), c);
+  const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
+  const dif = a ? a.diferenca : 'Sem cobrança';
+  const falta = K.pendenciasDoContrato(d(), c);
+  return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca do dia do vencimento` : 'Gerar termo aditivo: troca do dia do vencimento'}</h1>
+    ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
+    <div class="alerta info">Hoje o vencimento é no <b>dia ${diaAtual}</b> e o aluguel atual é <b>${reais(aluguel)}</b>.
+      Este termo não muda o cadastro: depois de assinado, mude o dia do vencimento em "Editar" no inquilino.</div>
+    <form class="cartao" data-form="aditivoVencimento">
+      <input type="hidden" name="id" value="${a ? a.id : ''}"><input type="hidden" name="contrato" value="${c.id}">
+      <div class="formulario">
+        <div><label>Data do termo aditivo</label><input type="date" name="data" value="${esc(a ? a.data : hoje)}" required></div>
+        <div><label>Novo dia do vencimento</label><input type="number" name="dia_novo" min="1" max="31" value="${esc(a ? a.dia_novo : '')}" required></div>
+        <div><label>Mês do 1º vencimento no novo dia</label><input type="month" name="mes" value="${esc(a ? a.primeiro_vencimento.slice(0, 7) : C.somarMeses(C.competenciaDe(hoje), 1))}" required></div>
+        <div><label>Dias de diferença no mês da troca</label><select name="diferenca">${['Sem cobrança', 'Proporcional'].map((x) => `<option ${x === dif ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+        <div><label>Valor proporcional (R$) <span class="suave">vazio = calcula</span></label><input name="valor_diferenca" value="${a && a.diferenca === 'Proporcional' ? esc(C.reais(a.valor_diferenca, false)) : ''}" placeholder="aluguel ÷ 30 × dias"></div>
+        ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
+        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
+        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+      </div>
+      <p class="suave">Proporcional: ex. aluguel de R$ 2.000,00 passando do dia 10 para o dia 20 = 10 dias × R$ 2.000,00 ÷ 30 = R$ 666,67, cobrados junto com o 1º vencimento no novo dia
+        (se o novo dia for antes do atual, o valor é abatido). Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
+      ${a ? `<p><label>Texto deste termo <span class="suave">(muda só este termo; o padrão fica em ${link('#/modelos-contrato', 'Modelos de contrato', '')})</span></label>
+        <textarea name="texto" class="texto-modelo" spellcheck="true">${esc(a.texto)}</textarea></p>` : ''}
+      <div class="acoes"><button>${a ? 'Salvar e ver o termo' : 'Gerar o termo'}</button><a class="botao secundario" href="#/contrato/${c.id}?ir=aditivos">Cancelar</a></div></form>
+    ${a ? AJUDA_MODELO : ''}`;
+}
+
 const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um modelo</b></summary>
   <ul>
     <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
@@ -3127,6 +3187,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
     <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
       <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto
       area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
+    <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {dias_diferenca} {valor_diferenca}</code>
+      e as condições <code>diferenca_sem diferenca_cobrar diferenca_abater</code>.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>
@@ -3134,42 +3196,52 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;
 
+const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)' };
+
 function telaModelos() {
-  const salvos = d().modelos_contrato.length > 0;
-  const modelos = K.modelosDe(d());
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
-    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? link('#/modelo-contrato/novo', 'Novo modelo', 'botao') : ''}</div>
-    <div class="cartao"><table><tr><th>Modelo</th><th></th></tr>
-    ${modelos.map((m) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
+  const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
-      ${podeUsuario('admin') && salvos ? botao('excluirModelo', 'Excluir', { id: m.id }, 'perigo pequeno', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`).join('')}</table>
-    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>. Edite à vontade: os modelos ficam guardados no banco de dados${salvos ? '' : ' (por enquanto, os padrões do sistema)'}.</p></div>
+      ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', 'Excluir', { id: m.id }, 'perigo pequeno', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? `<div class="acoes">${link('#/modelo-contrato/novo', 'Novo modelo de contrato', 'botao')} ${link('#/modelo-contrato/novo?tipo=aditivo', 'Novo modelo de aditivo', 'botao secundario')}</div>` : ''}</div>
+    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao"><h2>${titulo}</h2><table><tr><th>Modelo</th><th></th></tr>
+      ${K.modelosDe(d(), tipo).map((m) => linha(m, tipo)).join('')}</table></div>`).join('')}
+    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar aditivo de vencimento</b> (em "Termos aditivos").
+      Edite à vontade: os modelos ficam guardados no banco de dados.</p>
     ${AJUDA_MODELO}`;
 }
 
 function telaModelo(rota) {
   const id = rota.partes[1];
-  const m = id === 'novo' ? { id: '', nome: '', texto: '' } : K.modelosDe(d()).find((x) => String(x.id) === id);
+  const m = id === 'novo' ? { id: '', nome: '', texto: '', tipo: rota.q.tipo === 'aditivo' ? 'aditivo' : 'contrato' }
+    : Object.keys(TIPOS_MODELO).flatMap((t) => K.modelosDe(d(), t)).find((x) => String(x.id) === id);
   if (!m) return '<h1>Modelo não encontrado</h1>';
+  const aditivo = K.tipoDoModelo(m) === 'aditivo';
   return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
-    <h1>${m.id === '' ? 'Novo modelo de contrato' : `Modelo: ${esc(m.nome)}`}</h1>
+    <h1>${m.id === '' ? `Novo modelo de ${aditivo ? 'termo aditivo' : 'contrato'}` : `Modelo: ${esc(m.nome)}`}</h1>
     <form class="cartao" data-form="modeloContrato">
-      <input type="hidden" name="id" value="${esc(m.id)}">
+      <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${aditivo ? 'aditivo' : 'contrato'}">
       <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>
       <p><label>Texto</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
       <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-contrato">Cancelar</a></div></form>
     ${AJUDA_MODELO}`;
 }
 
-/** Na primeira alteração, os modelos padrão passam a ficar no banco (e podem ser editados). Devolve o id real. */
-function modelosNoBanco(db, id) {
-  if (!db.modelos_contrato.length) {
-    for (const p of MODELOS_PADRAO) R.inserir(db, 'modelos_contrato', { nome: p.nome, texto: p.texto, padrao: p.nome }, login(), `Modelo de contrato "${p.nome}" (padrão)`);
+/**
+ * Na primeira alteração de um tipo (contrato ou aditivo), os modelos padrão desse tipo passam a ficar no banco (e podem ser editados).
+ * Devolve o id real.
+ */
+function modelosNoBanco(db, id, tipo = 'contrato') {
+  const p = id < 0 ? MODELOS_PADRAO[-id - 1] : null;
+  const t = p ? K.tipoDoModelo(p) : tipo;
+  if (!db.modelos_contrato.some((m) => K.tipoDoModelo(m) === t)) {
+    for (const x of MODELOS_PADRAO.filter((y) => K.tipoDoModelo(y) === t)) {
+      R.inserir(db, 'modelos_contrato', { nome: x.nome, texto: x.texto, padrao: x.nome, ...(x.tipo ? { tipo: x.tipo } : {}) }, login(), `Modelo "${x.nome}" (padrão)`);
+    }
   }
-  if (id < 0) {
-    const p = MODELOS_PADRAO[-id - 1];
-    const m = p && db.modelos_contrato.find((x) => x.padrao === p.nome);
+  if (p) {
+    const m = db.modelos_contrato.find((x) => x.padrao === p.nome);
     return m ? m.id : null;
   }
   return id;
@@ -3568,16 +3640,45 @@ export const FORMULARIOS = {
     ir(`#/imprimir/contrato?${q}`);
   },
 
+  async aditivoVencimento(form) {
+    const f = Object.fromEntries(new FormData(form));
+    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const modelo = f.id ? null : K.modelosDe(d(), 'aditivo').find((m) => String(m.id) === f.modelo);
+    if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
+    const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes, diferenca: f.diferenca,
+      valor_diferenca: String(f.valor_diferenca || '').trim() ? C.centavos(f.valor_diferenca) : '',
+      testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() })),
+      ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
+    let a;
+    await alterar((db) => { a = R.salvarAditivoVencimento(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null); });
+    aviso(f.id ? 'Termo aditivo salvo.' : 'Termo aditivo gerado: imprima ou baixe o PDF para assinar.');
+    ir(`#/imprimir/aditivo?id=${a.id}`);
+  },
+
+  async assinarAditivo(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const arquivo = form.querySelector('[name=arquivo]').files[0];
+    const a = buscar('aditivos', f.id);
+    if (!f.data) throw new Error('Informe a data da assinatura.');
+    if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+    const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
+    await alterar((db) => R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
+    aviso('Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).');
+    await mostrar();
+  },
+
   async modeloContrato(form) {
     const f = new FormData(form);
     const nome = String(f.get('nome') || '').trim();
     const texto = String(f.get('texto') || '');
     if (!nome || !texto.trim()) throw new Error('Preencha o nome e o texto do modelo.');
     const id = Number(f.get('id') || 0);
+    const tipo = f.get('tipo') === 'aditivo' ? 'aditivo' : 'contrato';
     await alterar((db) => {
-      const real = id ? modelosNoBanco(db, id) : null;
+      // o modelo novo não esconde os padrões do mesmo tipo: eles vão para o banco antes
+      const real = modelosNoBanco(db, id, tipo);
       if (real) R.atualizar(db, 'modelos_contrato', real, { nome, texto }, login(), `Modelo de contrato "${nome}"`);
-      else R.inserir(db, 'modelos_contrato', { nome, texto }, login(), `Modelo de contrato "${nome}"`);
+      else R.inserir(db, 'modelos_contrato', { nome, texto, ...(tipo === 'aditivo' ? { tipo } : {}) }, login(), `Modelo de contrato "${nome}"`);
     });
     aviso('Modelo salvo.');
     ir('#/modelos-contrato');
@@ -4211,7 +4312,7 @@ export const ACOES = {
     let novo;
     await alterar((db) => {
       const m = R.buscar(db, 'modelos_contrato', modelosNoBanco(db, Number(id)));
-      novo = R.inserir(db, 'modelos_contrato', { nome: `Cópia de ${m.nome}`, texto: m.texto }, login(), `Modelo de contrato "Cópia de ${m.nome}"`);
+      novo = R.inserir(db, 'modelos_contrato', { nome: `Cópia de ${m.nome}`, texto: m.texto, ...(m.tipo ? { tipo: m.tipo } : {}) }, login(), `Modelo de contrato "Cópia de ${m.nome}"`);
     });
     ir(`#/modelo-contrato/${novo.id}`);
   },

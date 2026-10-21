@@ -77,7 +77,8 @@ export function normalizar(d) {
   // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
   for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
   // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
-  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id);
+  // (o termo gerado e ainda não assinado, sem arquivo, não conta)
+  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
   return d;
 }
 
@@ -1627,9 +1628,59 @@ export function documentoEntrada(d, c, campo) {
   return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
 }
 
-/** Termos aditivos do contrato (posteriores a ele), do mais recente ao mais antigo. */
-export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId)
-  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+const porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+/** Termos aditivos assinados do contrato (posteriores a ele, com o arquivo anexado), do mais recente ao mais antigo. */
+export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
+/** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo). */
+export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo).sort(porDataAditivo);
+
+/** Diferença de dias na troca do vencimento: aluguel ÷ 30 × dias (centavos). Ex.: R$ 2.000,00, dia 10 → 20: R$ 666,67. */
+export const diferencaProporcional = (aluguel, diaAnterior, diaNovo) => C.arred((aluguel * Math.abs(diaNovo - diaAnterior)) / 30);
+
+/**
+ * Gera (ou altera) o termo aditivo de troca do dia do vencimento, ainda sem assinatura. ``f``: data, dia_novo,
+ * mes (AAAA-MM do 1º vencimento no dia novo), diferenca ("Sem cobrança" ou "Proporcional"), valor_diferenca (centavos;
+ * vazio = calcula pelo aluguel atual), testemunhas, modelo_id e texto (o texto do modelo, que pode ser ajustado só neste termo).
+ * Não muda o vencimento do contrato: isso continua no cadastro.
+ */
+export function salvarAditivoVencimento(d, contratoId, f, usuario, id = null) {
+  const c = buscar(d, 'contratos', contratoId);
+  const atual = id ? buscar(d, 'aditivos', id) : null;
+  if (atual && atual.arquivo) throw new Error('Este termo aditivo já foi assinado e não pode mais ser alterado.');
+  if (!f.data) throw new Error('Informe a data do termo aditivo.');
+  const diaNovo = Number(f.dia_novo);
+  if (!Number.isInteger(diaNovo) || diaNovo < 1 || diaNovo > 31) throw new Error('Informe o novo dia do vencimento (de 1 a 31).');
+  const diaAnterior = atual ? atual.dia_anterior : (c.dia_vencimento || 10);
+  if (diaNovo === diaAnterior) throw new Error(`O vencimento já é no dia ${diaAnterior}.`);
+  if (!/^\d{4}-\d{2}$/.test(f.mes || '')) throw new Error('Informe o mês do primeiro vencimento no novo dia.');
+  const primeiro = `${f.mes}-${String(Math.min(diaNovo, C.diasNoMes(f.mes))).padStart(2, '0')}`;
+  const diferenca = f.diferenca === 'Proporcional' ? 'Proporcional' : 'Sem cobrança';
+  const valor = diferenca === 'Proporcional'
+    ? (f.valor_diferenca !== undefined && f.valor_diferenca !== null && f.valor_diferenca !== '' ? Number(f.valor_diferenca) : diferencaProporcional(aluguelAtual(d, c, primeiro), diaAnterior, diaNovo))
+    : 0;
+  if (!String(f.texto || '').trim()) throw new Error('O texto do termo aditivo está vazio.');
+  const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: 'Vencimento', data: f.data, dia_anterior: diaAnterior, dia_novo: diaNovo,
+    primeiro_vencimento: primeiro, diferenca, valor_diferenca: valor, testemunhas: (f.testemunhas || []).filter((t) => t && t.nome),
+    modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null), texto: String(f.texto),
+    assunto: `Troca do dia do vencimento: dia ${diaAnterior} → dia ${diaNovo}, a partir de ${C.dataBr(primeiro)}`, arquivo: null };
+  if (atual) {
+    atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
+    return atual;
+  }
+  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de vencimento gerado (aguardando assinatura)`);
+}
+
+/** Anexa o arquivo assinado ao termo gerado pelo sistema: passa a contar como termo aditivo registrado. */
+export function assinarAditivo(d, id, { data, arquivo }, usuario) {
+  const a = buscar(d, 'aditivos', id);
+  const c = buscar(d, 'contratos', a.contrato_id);
+  if (!data) throw new Error('Informe a data da assinatura.');
+  if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+  atualizar(d, 'aditivos', a.id, { arquivo, assinado_em: data }, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} assinado em ${C.dataBr(data)}`);
+  marcarAditivos(d, c.id, usuario);
+  return a;
+}
 
 /** Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo". */
 export function registrarAditivo(d, contratoId, { data, assunto, arquivo }, usuario) {
