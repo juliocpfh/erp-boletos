@@ -920,8 +920,7 @@ function caixaGarantia(c) {
       ${fiadores.map((f) => `<tr><td><b>${esc(f.nome)}</b>${f.endereco ? `<br><span class="suave">${esc(f.endereco)}</span>` : ''}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td>
         <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
         <td class="nw">${f.data_entrada ? dataBr(f.data_entrada) : 'início do contrato'} a ${f.data_saida ? dataBr(f.data_saida) : 'fim do contrato'}</td></tr>`).join('')
-      || `<tr><td colspan="4">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>
-      ${opera() ? `<p>${link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Incluir, trocar ou tirar fiador')} <span class="suave">(fica registrado em "Trocas de garantia" e pode ser cancelado)</span></p>` : ''}`;
+      || `<tr><td colspan="4">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>`;
   }
   if (anteriores.length) {
     html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th></tr>
