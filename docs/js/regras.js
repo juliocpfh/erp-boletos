@@ -316,12 +316,6 @@ export function correcoesRecalculadas(d, c, inicial) {
   return mudam;
 }
 
-/** Aluguel numa data se o inicial fosse outro (com as correções refeitas em cadeia). */
-export function aluguelComInicial(d, c, inicial, dataRef = C.hojeIso()) {
-  const novas = new Map(correcoesRecalculadas(d, c, inicial).map((m) => [m.x.id, m.valor_novo]));
-  return C.aluguelVigente(inicial, correcoesDo(d, c.id).map((x) => ({ ...x, valor_novo: novas.has(x.id) ? novas.get(x.id) : x.valor_novo })), dataRef);
-}
-
 /** Refaz as correções do contrato a partir do aluguel inicial gravado (depois de corrigir o inicial no cadastro). */
 export function recalcularCorrecoes(d, contratoId, usuario) {
   const c = buscar(d, 'contratos', contratoId);
