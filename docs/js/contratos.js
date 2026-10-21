@@ -552,23 +552,22 @@ export function modelosDe(d, tipo = 'contrato') {
 
 /**
  * Termo aditivo de troca do dia do vencimento: os dados do contrato (partes, imóvel, assinaturas na data do aditivo)
- * e os da troca. ``a``: registro da tabela aditivos (dia_anterior, dia_novo, primeiro_vencimento, diferenca, valor_diferenca).
+ * e os da troca. ``a``: registro da tabela aditivos (dia_anterior, dia_novo, primeiro_vencimento). Só muda o dia: sem valor proporcional.
+ * Mês de referência: o mês de uso que vence no 1º vencimento novo (o anterior, quando a cobrança é no mês seguinte).
  */
 export function dadosDoAditivo(d, c, a) {
   const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
-  const proporcional = a.diferenca === 'Proporcional' && a.valor_diferenca > 0;
+  const mesSeguinte = c.cobranca_mes_seguinte !== false;
+  const ref = mesSeguinte ? C.somarMeses(a.primeiro_vencimento.slice(0, 7), -1) : a.primeiro_vencimento.slice(0, 7);
   Object.assign(dados.campos, {
     numero_aditivo: `${a.numero || 1}º`,
     data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
     dia_vencimento_anterior: numeroComExtenso(a.dia_anterior),
     dia_vencimento_novo: numeroComExtenso(a.dia_novo),
     primeiro_vencimento: dataPorExtenso(a.primeiro_vencimento),
-    dias_diferenca: numeroComExtenso(Math.abs(a.dia_novo - a.dia_anterior)),
-    valor_diferenca: valorComExtenso(a.valor_diferenca || 0),
+    mes_referencia: `${MESES[Number(ref.slice(5, 7)) - 1]} de ${ref.slice(0, 4)}`,
   });
-  Object.assign(dados.condicoes, {
-    diferenca_sem: !proporcional, diferenca_cobrar: proporcional && a.dia_novo > a.dia_anterior, diferenca_abater: proporcional && a.dia_novo < a.dia_anterior,
-  });
+  dados.condicoes.mes_seguinte = mesSeguinte;
   return dados;
 }
 

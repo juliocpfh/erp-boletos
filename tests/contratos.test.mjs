@@ -176,26 +176,28 @@ test('vistoria: textos de abertura e final podem ser trocados; em branco, vale o
   assert.doesNotMatch(t, /3 \(três\) dias|presente relatório/);
 });
 
-test('termo aditivo de vencimento (modelo C): troca do dia, diferença proporcional, fiador concorda e assinaturas', () => {
+test('termo aditivo de vencimento (modelo C): só muda o dia, referência no mês anterior, fiador concorda e assinaturas', () => {
   const { d, c } = base({ garantia_tipo: 'Fiador' });
   R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Ana Lima', cpf: '529.982.247-25', genero: 'Feminino' }, 'j');
   const modelo = K.modelosDe(d, 'aditivo')[0];
   assert.equal(K.modelosDe(d).some((m) => m.tipo === 'aditivo'), false, 'o aditivo não aparece entre os modelos de contrato');
-  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '20', mes: '2026-12', diferenca: 'Proporcional', texto: modelo.texto,
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '20', mes: '2026-12', texto: modelo.texto,
     testemunhas: [{ nome: 'Teste Um', cpf: '529.982.247-25' }, { nome: '', cpf: '' }] }, 'j');
-  assert.equal(a.valor_diferenca, 116667, 'R$ 3.500,00 ÷ 30 × 10 dias');
   const t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, c, a)));
   assert.match(t, /1º TERMO ADITIVO AO CONTRATO DE LOCAÇÃO/);
   assert.match(t, /a pedido do LOCATÁRIO/);
-  assert.match(t, /vencer todo dia 20 \(vinte\) de cada mês, e não mais no dia 10 \(dez\), a partir do vencimento de 20 de dezembro de 2026/);
-  assert.match(t, /o LOCATÁRIO pagará.*R\$ 1\.166,67 .*10 \(dez\) dias/);
+  assert.match(t, /vencer todo dia 20 \(vinte\) de cada mês, e não mais no dia 10 \(dez\), a partir do vencimento de 20 de dezembro de 2026, referente ao mês de novembro de 2026/);
+  assert.match(t, /continua se referindo ao mês anterior ao do vencimento, sem cobrança ou desconto de dias/);
+  assert.doesNotMatch(t, /R\$/, 'sem valor proporcional');
   assert.match(t, /O FIADOR declara estar de acordo/);
   assert.match(t, /\[LOCADORA, LOCATÁRIO, FIADOR, TESTEMUNHA 1\]/);
   assert.doesNotMatch(t, /\[\w+\?\]/, 'nenhum campo desconhecido');
-  // sem cobrança e dia anterior ao atual
-  const b = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '5', mes: '2027-01', diferenca: 'Sem cobrança', texto: modelo.texto }, 'j');
+  // cobrança no próprio mês do vencimento
+  R.atualizar(d, 'contratos', c.id, { cobranca_mes_seguinte: false }, 'j');
+  const b = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '5', mes: '2027-01', texto: modelo.texto }, 'j');
   const tb = texto(K.montarContrato(b.texto, K.dadosDoAditivo(d, c, b)));
   assert.match(tb, /^2º TERMO/);
-  assert.match(tb, /não gera cobrança nem desconto/);
+  assert.match(tb, /referente ao mês de janeiro de 2027/);
+  assert.match(tb, /próprio mês do vencimento/);
   assert.doesNotMatch(tb, /TESTEMUNHA/);
 });
