@@ -435,8 +435,29 @@ function ligarRascunhoVistoria(raiz) {
   form.addEventListener('change', guardarRascunhoVistoria);
 }
 
+/** Vistoria: item marcado "Não se aplica" sai da tabela (fica uma linha para desfazer); ao salvar, sai também do modelo do imóvel. */
+function ligarNaoSeAplica(raiz) {
+  for (const sel of raiz.querySelectorAll('.grade-vistoria select[name^="is_"]')) {
+    const tr = sel.closest('tr');
+    const aplicar = () => {
+      const fora = sel.value === K.NAO_SE_APLICA;
+      tr.hidden = fora;
+      const aviso = tr.nextElementSibling && tr.nextElementSibling.classList.contains('nao-aplica') ? tr.nextElementSibling : null;
+      if (fora && !aviso) {
+        const nome = tr.querySelector('input[name^="ii_"]').value;
+        tr.insertAdjacentHTML('afterend', `<tr class="nao-aplica"><td colspan="${tr.children.length}" class="suave">${esc(nome)}: não se aplica (sai da vistoria e do modelo ao salvar) <button type="button" class="link-botao">Desfazer</button></td></tr>`);
+        tr.nextElementSibling.querySelector('button').addEventListener('click', () => { sel.value = ''; sel.dispatchEvent(new Event('change', { bubbles: true })); });
+      }
+      if (!fora && aviso) aviso.remove();
+    };
+    sel.addEventListener('change', aplicar);
+    aplicar();
+  }
+}
+
 function ligarCamposAutomaticos(raiz) {
   ligarRascunhoVistoria(raiz);
+  ligarNaoSeAplica(raiz);
   for (const el of raiz.querySelectorAll('input[data-calculado]')) el.addEventListener('input', () => el.classList.toggle('valor-calculado', el.value.trim() === el.dataset.calculado));
   ligarContinuacaoDeContrato(raiz);
   ligarEnderecoDoImovel(raiz);
@@ -2897,7 +2918,7 @@ function telaVistoria(rota) {
       <div class="formulario">${K.FOTOS_VISTORIA.map(([k, t]) => `<div><label>${esc(t)}${v && v.fotos && v.fotos[k] ? ' <span class="etiqueta ok">já tem ✓</span>' : ''}</label><input type="file" name="foto_${k}" accept="image/*"></div>`).join('')}</div>
       <p><label>${grade ? 'Outras observações (opcional)' : 'Descritivo do imóvel'}</label>
         <span class="suave">Uma linha por item. <code>## SALA</code> abre um cômodo; <code>- item: estado</code> vira marcador. Item do roteiro que ficar sem preencher (termina em ":") não sai no documento.
-        Use sempre as mesmas palavras para o estado: <b>novo · ótimo estado · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
+        Use sempre as mesmas palavras para o estado: <b>novo · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
         <span class="acoes" style="margin:8px 0">Inserir roteiro: ${Object.keys(ROTEIROS).map((k) => `<button type="button" class="secundario pequeno" data-acao="inserirRoteiro" data-comodo="${esc(k)}">${esc(k)}</button>`).join('')}</span>
         <textarea name="descritivo" class="texto-modelo">${valor('descritivo')}</textarea></p>
       <p><label>Condições gerais</label><textarea name="condicoes" rows="6">${valor('condicoes', K.VISTORIA_CONDICOES)}</textarea></p>
@@ -2907,7 +2928,7 @@ function telaVistoria(rota) {
 /** Grade da vistoria pelo modelo do imóvel: situação de cada item, com observação. Vazio se o imóvel não tem modelo. */
 function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
   const chave = (x) => `${x.comodo}|${x.item}`;
-  const anteriores = new Map(((v && v.itens) || (entrada ? [] : base.itens) || []).map((x) => [chave(x), x]));
+  const anteriores = new Map(((v && v.itens) || (entrada ? [] : base.itens) || []).filter((x) => x.situacao !== K.NAO_SE_APLICA).map((x) => [chave(x), x]));
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [chave(x), x.situacao]));
   const comodos = K.lerModeloVistoria(i.modelo_vistoria);
   // itens já marcados que saíram do modelo continuam aparecendo
@@ -2918,10 +2939,10 @@ function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
   }
   if (!comodos.length) return '';
   let k = 0;
-  const opcoes = (sel) => `<option value=""></option>${K.SITUACOES_VISTORIA.map((o) => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('')}`;
+  const opcoes = (sel) => `<option value=""></option>${[...K.SITUACOES_VISTORIA, ...(sel && !K.SITUACOES_VISTORIA.includes(sel) ? [sel] : [])].map((o) => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('')}`;
   return `<h2>Situação por cômodo</h2>
     <p class="suave">Marque a situação de cada item. Os botões do cômodo preenchem os itens ainda sem situação; depois mude só o que diverge e anote a observação e o nº da foto.
-      "Apagar tudo" limpa o cômodo. Item sem situação não sai no documento. O que você marcar fica guardado mesmo se sair para editar o modelo.
+      "Apagar tudo" limpa o cômodo. "Não se aplica" tira o item da tabela e, ao salvar, também do modelo do imóvel. Item sem situação não sai no documento. O que você marcar fica guardado mesmo se sair para editar o modelo.
       ${entrada ? 'Na saída, o que ficar pior que na entrada sai destacado.' : ''} ${linkModelo('Editar o modelo do imóvel')}</p>
     ${comodos.map((g, ci) => `<div class="vistoria-comodo"><div class="cabecalho"><h3>${esc(g.comodo)}</h3><div class="acoes">
       ${ESTADOS_COMODO.map(([valor, texto]) => botao('vistoriaTudo', texto, { comodo: ci, valor })).join('')}${entrada ? botao('vistoriaTudo', 'Igual à entrada', { comodo: ci, valor: 'entrada' }) : ''}
@@ -2939,7 +2960,7 @@ function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
 }
 
 /** Botões do cômodo na vistoria: [situação, texto do botão]. */
-const ESTADOS_COMODO = [['Novo', 'Estado de novo'], ['Ótimo', 'Ótimo estado'], ['Bom', 'Bom estado'], ['Marcas de uso', 'Marcas de uso']];
+const ESTADOS_COMODO = [['Novo', 'Estado de novo'], ['Bom', 'Bom estado'], ['Marcas de uso', 'Marcas de uso']];
 
 /** Itens gerais de cada cômodo no modelo de vistoria. Linha terminada em ":" é só um lembrete (não vira item). */
 const GERAIS = ['Teto', 'Paredes', 'Piso', 'Janelas', 'Portas', 'Elétrica'];
@@ -2966,7 +2987,7 @@ function telaModeloVistoria(rota) {
   const voltar = /^#\/vistoria\//.test(rota.q.voltar || '') ? rota.q.voltar : `#/imovel/${i.id}`;
   return `<p class="suave"><a href="${esc(voltar)}">← ${voltar.startsWith('#/vistoria/') ? 'Voltar para a vistoria' : esc(i.nome)}</a></p>
     <h1>Modelo de vistoria · ${esc(i.nome)}</h1>
-    <div class="alerta info">Monte uma vez os cômodos deste imóvel e o que verificar em cada um. Na vistoria, você só marca a situação de cada item (novo, ótimo, bom, marcas de uso, avaria…).</div>
+    <div class="alerta info">Monte uma vez os cômodos deste imóvel e o que verificar em cada um. Na vistoria, você só marca a situação de cada item (novo, bom, marcas de uso, avaria, não se aplica…).</div>
     <form class="cartao" data-form="modeloVistoria"><input type="hidden" name="imovel" value="${i.id}"><input type="hidden" name="voltar" value="${esc(voltar)}">
       <p class="suave">Uma linha por item. <code>## Nome do cômodo</code> abre um cômodo (ex.: <code>## Quarto fundos</code>). Para móveis e eletrodomésticos, um por linha com a descrição
         (ex.: <code>Móvel: sofá 2 lugares cinza</code>, <code>Eletrodoméstico: geladeira Electrolux</code>). Linhas terminadas em ":" são só lembretes e não viram item.</p>
@@ -3435,6 +3456,8 @@ export const FORMULARIOS = {
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '' };
     dados.itens = [];
     for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
+    const tirados = dados.itens.filter((x) => x.situacao === K.NAO_SE_APLICA);
+    dados.itens = dados.itens.filter((x) => x.situacao !== K.NAO_SE_APLICA);
     // fotos: reduzidas e guardadas na pasta do inquilino (mesmo nome = substitui a anterior)
     const anterior = Number(f.id) ? buscar('vistorias', f.id) : null;
     dados.fotos = { ...((anterior && anterior.fotos) || {}) };
@@ -3457,6 +3480,11 @@ export const FORMULARIOS = {
       const desc = `${c.inquilino_nome}: vistoria de ${f.tipo.toLocaleLowerCase('pt-BR')}`;
       if (id) R.atualizar(db, 'vistorias', id, dados, login(), desc);
       else id = R.inserir(db, 'vistorias', dados, login(), desc).id;
+      const im = c.imovel_id && R.buscar(db, 'imoveis', c.imovel_id);
+      if (im && tirados.length) {
+        const modelo = K.tirarDoModelo(im.modelo_vistoria, tirados);
+        if (modelo !== (im.modelo_vistoria || '')) R.atualizar(db, 'imoveis', im.id, { modelo_vistoria: modelo }, login(), `Modelo de vistoria: tirado o que não se aplica (${tirados.map((x) => `${x.comodo} – ${x.item}`).join(', ')})`);
+      }
       if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim() }, login(), 'Chaves e controles do imóvel');
       if (dados.link_fotos && f.tipo === 'Entrada' && !c.vistoria_link) R.atualizar(db, 'contratos', c.id, { vistoria_link: dados.link_fotos }, login(), `${c.inquilino_nome}: link das fotos da vistoria`);
     });
@@ -3954,7 +3982,7 @@ export const ACOES = {
 
   /** Vistoria: limpa a situação e a observação de todos os itens do cômodo. */
   vistoriaApagar({ comodo }) {
-    document.querySelectorAll(`[data-comodo="${comodo}"]`).forEach((el) => { el.value = ''; el.classList.remove('piorou'); });
+    document.querySelectorAll(`[data-comodo="${comodo}"]`).forEach((el) => { el.value = ''; el.classList.remove('piorou'); el.dispatchEvent(new Event('change', { bubbles: true })); });
     guardarRascunhoVistoria();
   },
 

@@ -16,7 +16,7 @@ function base(extra = {}) {
     descricao_objeto: 'a casa nº 3', ...extra }, 'j');
   return { d, c };
 }
-const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
+const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.url ? `[link ${b.url}]` : b.linhas ? '[tabela]' : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
 
 test('valores, números e datas por extenso', () => {
   assert.equal(K.valorComExtenso(350000), 'R$ 3.500,00 (três mil e quinhentos reais)');
@@ -139,4 +139,27 @@ test('assinaturas em conjuntos: locatários, fiadores, locadora, testemunhas', (
   const html = K.contratoHtml([{ tipo: 'assinaturas', pessoas: [{ nome: 'A', papel: 'LOCADORA' }, { nome: 'B', papel: 'LOCATÁRIO' }] }], { logo: null, rodape: ['ANK – CNPJ 1'] });
   assert.match(html, /ct-grupo-assina um/, 'conjunto de uma pessoa fica centralizado');
   assert.match(html, /counter\(page\) " de " counter\(pages\)/, 'contagem de páginas no rodapé da impressão');
+});
+
+test('vistoria: cada parte numa linha, link das fotos em linha própria (hiperlink no Word) e "Não se aplica" fora', async () => {
+  const { d, c } = base({ solidario_nome: 'Ana Solidária', solidario_cpf: '529.982.247-25' });
+  const v = { tipo: 'Entrada', data: '2026-09-04', link_fotos: 'onedrive.live.com/fotos', condicoes: '',
+    itens: [{ comodo: 'Sala', item: 'Piso', situacao: 'Bom', obs: '' }, { comodo: 'Sala', item: 'Lareira', situacao: 'Não se aplica', obs: '' }] };
+  const blocos = K.vistoriaBlocos(d, c, v).blocos;
+  const t = texto(blocos);
+  assert.match(t, /\nLOCATÁRIO: PEDRO SOUZA, CPF 444\nLOCATÁRIO SOLIDÁRIO: ANA SOLIDÁRIA, CPF 529\.982\.247-25\n/);
+  assert.match(t, /compartilhado por e-mail:\n\[link https:\/\/onedrive\.live\.com\/fotos\]/);
+  assert.deepEqual(blocos.find((b) => b.tipo === 'tabela').linhas, [['Piso', 'Bom', '']]);
+  assert.match(K.contratoHtml(blocos, { rodape: [] }), /<a href="https:\/\/onedrive\.live\.com\/fotos"/);
+  const arquivos = {};
+  const JSZip = class { file(n, c) { arquivos[n] = c; } async generateAsync() { return null; } };
+  await K.contratoDocx(JSZip, blocos, { logo: null, rodape: [], titulo: 'v' });
+  assert.match(arquivos['word/document.xml'], /<w:hyperlink r:id="rIdLink1"/);
+  assert.match(arquivos['word/_rels/document.xml.rels'], /Id="rIdLink1"[^>]*Target="https:\/\/onedrive\.live\.com\/fotos" TargetMode="External"/);
+});
+
+test('modelo de vistoria: tira só os itens que não se aplicam, no cômodo certo', () => {
+  const modelo = '## Sala\nPiso\nLareira\nMóvel:\n## Cozinha\n- Lareira\nPia';
+  assert.equal(K.tirarDoModelo(modelo, [{ comodo: 'Sala', item: 'Lareira' }]), '## Sala\nPiso\nMóvel:\n## Cozinha\n- Lareira\nPia');
+  assert.ok(!K.SITUACOES_VISTORIA.includes('Ótimo'));
 });

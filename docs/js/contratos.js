@@ -388,6 +388,7 @@ function blocoHtml(b) {
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
     if (b.tipo === 'subsecao') return `<h3 class="ct-subsecao">${runsHtml(b.runs)}</h3>`;
     if (b.tipo === 'item') return `<p class="ct-item">${runsHtml(b.runs)}</p>`;
+    if (b.tipo === 'link') return `<p class="ct-item ct-link"><a href="${escH(b.url)}" target="_blank" rel="noopener noreferrer">${escH(b.url)}</a></p>`;
     if (b.tipo === 'tabela') {
       return `<table class="ct-tabela"><tr>${b.cabecalho.map((h) => `<th>${escH(h)}</th>`).join('')}</tr>${b.linhas.map((l, i) => `<tr class="${b.destaques && b.destaques[i] ? 'ct-destaque' : ''}">${l.map((x) => `<td>${escH(x)}</td>`).join('')}</tr>`).join('')}</table>`;
     }
@@ -433,6 +434,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
   const prop = logo ? logo.altura / logo.largura : 0;
   const corpo = [];
   const midias = []; // fotos (JPEG) do documento
+  const links = []; // hiperlinks (endereços)
   let idDesenho = 10;
   const foto = (f, larguraCm) => {
     midias.push(f.bytes);
@@ -450,6 +452,10 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     else if (b.tipo === 'direita') corpo.push(parX(b.runs, { alinhar: 'right', antes: 240, depois: 480 }));
     else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
+    else if (b.tipo === 'link') {
+      links.push(b.url);
+      corpo.push(`<w:p><w:pPr><w:spacing w:after="120"/></w:pPr><w:hyperlink r:id="rIdLink${links.length}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escX(b.url)}</w:t></w:r></w:hyperlink></w:p>`);
+    }
     else if (b.tipo === 'assinaturas') {
       // um conjunto por linha da tabela (dois lado a lado; um só, centralizado), tudo preso na mesma página
       const assina = (p) => {
@@ -520,7 +526,8 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + '<Relationship Id="rIdCab" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'
     + '<Relationship Id="rIdRod" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
     + `${logo ? `<Relationship Id="rIdLogo" Type="${img}" Target="media/logo.png"/>` : ''}`
-    + `${midias.map((m, i) => `<Relationship Id="rIdFoto${i + 1}" Type="${img}" Target="media/foto${i + 1}.jpeg"/>`).join('')}</Relationships>`);
+    + `${midias.map((m, i) => `<Relationship Id="rIdFoto${i + 1}" Type="${img}" Target="media/foto${i + 1}.jpeg"/>`).join('')}`
+    + `${links.map((u, i) => `<Relationship Id="rIdLink${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escX(u)}" TargetMode="External"/>`).join('')}</Relationships>`);
   zip.file('word/_rels/header1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + `${logo ? `<Relationship Id="rIdMarca" Type="${img}" Target="media/marca.png"/>` : ''}</Relationships>`);
   zip.file('word/document.xml', documento);
@@ -555,10 +562,12 @@ function cabecalhoDoc(d, c, dados) {
   const imovel = d.imoveis.find((i) => i.id === c.imovel_id) || {};
   const pj = c.inquilino_tipo === 'Pessoa jurídica (empresa)';
   const descr = c.descricao_objeto ? `${c.descricao_objeto.charAt(0).toLocaleUpperCase('pt-BR')}${c.descricao_objeto.slice(1)}, no endereço ` : '';
+  // cada parte do contrato numa linha
   return [
     it(`**IMÓVEL:** ${descr}${dados.campos.endereco_imovel || imovel.nome || ''}`),
-    it(`**${dados.locadoras.length > 1 ? 'LOCADORAS' : 'LOCADORA'}:** ${dados.locadoras.map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}`).join('; ')}`),
-    it(`**LOCATÁRIO:** ${dados.campos.inquilino_nome}${c.inquilino_cpf ? `, ${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : ''}${c.solidario_nome ? `; **LOCATÁRIO SOLIDÁRIO:** ${c.solidario_nome.toLocaleUpperCase('pt-BR')}${c.solidario_cpf ? `, CPF ${c.solidario_cpf}` : ''}` : ''}`),
+    ...dados.locadoras.map((e) => it(`**LOCADORA:** ${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}`)),
+    it(`**LOCATÁRIO:** ${dados.campos.inquilino_nome}${c.inquilino_cpf ? `, ${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : ''}`),
+    ...(c.solidario_nome ? [it(`**LOCATÁRIO SOLIDÁRIO:** ${c.solidario_nome.toLocaleUpperCase('pt-BR')}${c.solidario_cpf ? `, CPF ${c.solidario_cpf}` : ''}`)] : []),
   ];
 }
 
@@ -576,7 +585,9 @@ export function descritivoBlocos(texto) {
  * Vistoria de entrada ou de saída. ``v``: registro da tabela vistorias; ``leitura``: leitura dos relógios do dia (ou null).
  * Assinam as locadoras, o locatário, o solidário e os fiadores.
  */
-export const SITUACOES_VISTORIA = ['Novo', 'Ótimo', 'Bom', 'Marcas de uso', 'Avaria', 'Não funciona', 'Não se aplica'];
+export const SITUACOES_VISTORIA = ['Novo', 'Bom', 'Marcas de uso', 'Avaria', 'Não funciona', 'Não se aplica'];
+/** Item marcado "Não se aplica": sai da vistoria e do modelo do imóvel. */
+export const NAO_SE_APLICA = 'Não se aplica';
 const GRAU = { Novo: 0, 'Ótimo': 1, Bom: 2, 'Marcas de uso': 3, Avaria: 4, 'Não funciona': 5 };
 /** Na saída, o item piorou em relação à entrada? */
 export const piorou = (entrada, saida) => GRAU[saida] !== undefined && GRAU[entrada] !== undefined && GRAU[saida] > GRAU[entrada];
@@ -596,11 +607,23 @@ export function lerModeloVistoria(texto) {
   return comodos.filter((x) => x.itens.length);
 }
 
+/** Modelo de vistoria sem os itens indicados ([{ comodo, item }]); cômodos, lembretes e o resto do texto ficam como estão. */
+export function tirarDoModelo(texto, tirar) {
+  const fora = new Set(tirar.map((x) => `${x.comodo}|${x.item}`));
+  let comodo = 'Geral';
+  return String(texto || '').replace(/\r\n/g, '\n').split('\n').filter((l) => {
+    const s = l.trim();
+    if (s.startsWith('## ')) { comodo = s.slice(3).trim(); return true; }
+    if (!s || /:$/.test(s)) return true;
+    return !fora.has(`${comodo}|${s.replace(/^[-•*]\s+/, '')}`);
+  }).join('\n');
+}
+
 /** Itens marcados na vistoria agrupados por cômodo, na ordem em que aparecem. */
 function itensPorComodo(itens) {
   const grupos = [];
   for (const x of itens || []) {
-    if (!x.situacao && !x.obs) continue;
+    if ((!x.situacao && !x.obs) || x.situacao === NAO_SE_APLICA) continue;
     let g = grupos.find((y) => y.comodo === x.comodo);
     if (!g) grupos.push((g = { comodo: x.comodo, itens: [] }));
     g.itens.push(x);
@@ -618,7 +641,8 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
   const saida = v.tipo === 'Saída';
   const blocos = [{ tipo: 'titulo', runs: negritos(`VISTORIA DE ${saida ? 'SAÍDA' : 'ENTRADA'}`) }, ...cabecalhoDoc(d, c, dados)];
   blocos.push(it(`**DATA DA VISTORIA:** ${dataPorExtenso(v.data)}`));
-  blocos.push(p(`${VISTORIA_INTRO} ${v.link_fotos ? `Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail: ${v.link_fotos}` : 'Para mais detalhes, verifique as fotos em anexo.'}`));
+  blocos.push(p(`${VISTORIA_INTRO} ${v.link_fotos ? 'Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail:' : 'Para mais detalhes, verifique as fotos em anexo.'}`));
+  if (v.link_fotos) blocos.push({ tipo: 'link', url: /^https?:\/\//i.test(v.link_fotos) ? v.link_fotos : `https://${v.link_fotos}` });
   if (fotos.fachada) blocos.push({ tipo: 'fotos', grande: true, fotos: [{ ...fotos.fachada, legenda: 'Fachada do imóvel' }] });
   if (saida && v.comparar_com) blocos.push(p(`Esta vistoria de saída compara o imóvel com a vistoria de entrada de ${dataPorExtenso(v.comparar_com)}. Os itens marcados como **DIFERENÇA** são de responsabilidade do LOCATÁRIO, conforme o contrato.`));
   const chaves = linhasDe(v.chaves);
