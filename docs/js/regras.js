@@ -296,6 +296,43 @@ export function aluguelAtual(d, contrato, dataRef = C.hojeIso()) {
   return C.aluguelVigente(contrato.aluguel_inicial, correcoesDo(d, contrato.id), dataRef);
 }
 
+/**
+ * Correções refeitas em cadeia a partir de um aluguel inicial (ex.: o inicial foi lançado errado e corrigido no cadastro).
+ * Reajuste por índice: o mesmo % sobre o novo valor anterior. Novo valor negociado: o valor combinado fica; só o
+ * valor anterior e o % mudam. Devolve só as que mudam: [{ x, valor_anterior, valor_novo, percentual }].
+ */
+export function correcoesRecalculadas(d, c, inicial) {
+  let anterior = inicial;
+  const mudam = [];
+  for (const x of correcoesDo(d, c.id)) {
+    // valor anterior já certo: a correção fica como está (sem refazer o % e mexer em centavos)
+    if (anterior === x.valor_anterior) { anterior = x.valor_novo; continue; }
+    const porIndice = x.indice !== 'Negociado' && x.percentual !== null && x.percentual !== undefined;
+    const valorNovo = porIndice ? C.aplicarCorrecao(anterior, x.percentual) : x.valor_novo;
+    const percentual = porIndice ? x.percentual : (anterior ? C.percentualPorDesconto(anterior, x.valor_novo - anterior) : 0);
+    mudam.push({ x, valor_anterior: anterior, valor_novo: valorNovo, percentual });
+    anterior = valorNovo;
+  }
+  return mudam;
+}
+
+/** Aluguel numa data se o inicial fosse outro (com as correções refeitas em cadeia). */
+export function aluguelComInicial(d, c, inicial, dataRef = C.hojeIso()) {
+  const novas = new Map(correcoesRecalculadas(d, c, inicial).map((m) => [m.x.id, m.valor_novo]));
+  return C.aluguelVigente(inicial, correcoesDo(d, c.id).map((x) => ({ ...x, valor_novo: novas.has(x.id) ? novas.get(x.id) : x.valor_novo })), dataRef);
+}
+
+/** Refaz as correções do contrato a partir do aluguel inicial gravado (depois de corrigir o inicial no cadastro). */
+export function recalcularCorrecoes(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const mudam = correcoesRecalculadas(d, c, c.aluguel_inicial);
+  for (const m of mudam) {
+    atualizar(d, 'correcoes', m.x.id, { valor_anterior: m.valor_anterior, valor_novo: m.valor_novo, percentual: m.percentual }, usuario,
+      `Correção de ${C.dataBr(m.x.data_vigencia)} refeita com o aluguel inicial corrigido: ${C.reais(m.x.valor_novo)} → ${C.reais(m.valor_novo)}`);
+  }
+  return mudam.length;
+}
+
 export function contratoAtivo(contrato, dataRef = C.hojeIso()) {
   return contrato.ativo !== false && (!contrato.data_saida || contrato.data_saida >= dataRef);
 }

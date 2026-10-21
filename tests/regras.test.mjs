@@ -1038,3 +1038,21 @@ test('cancelar a troca de garantia: o contrato volta à garantia anterior e só 
   assert.equal(c.caucao_data, '2025-09-01');
   assert.equal(d.trocas_garantia.length, 0);
 });
+
+test('aluguel inicial corrigido no cadastro: reajustes refeitos em cadeia, negociado mantido, caução sugerida acompanha', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', aluguel_inicial: 100000, desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_meses: 3,
+    caucao_valor: 270000, caucao_data: '2024-01-01', vigencia_inicio: '2024-01-01', data_entrada: '2024-01-01' }, 'j');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2025-01-01', indice: 'IPCA', percentual: 10, valor_anterior: 100000, valor_novo: 110000 }, 'j');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-01-01', indice: 'Negociado', percentual: 0, valor_anterior: 110000, valor_novo: 250000 }, 'j');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-06-01', indice: 'IPCA', percentual: 4, valor_anterior: 250000, valor_novo: 260000 }, 'j');
+  assert.equal(R.aluguelComInicial(d, c, 200000, '2025-06-01'), 220000);
+  R.atualizar(d, 'contratos', c.id, { aluguel_inicial: 200000 }, 'j');
+  assert.equal(R.recalcularCorrecoes(d, c.id, 'j'), 2);
+  const [a, b, x] = R.correcoesDo(d, c.id);
+  assert.deepEqual([a.valor_anterior, a.valor_novo], [200000, 220000]);
+  assert.deepEqual([b.valor_anterior, b.valor_novo], [220000, 250000]); // negociado: valor combinado mantido
+  assert.deepEqual([x.valor_anterior, x.valor_novo], [250000, 260000]);
+  assert.equal(R.caucaoSugerida(d, c, '2025-06-01'), 3 * (220000 - 22000));
+  assert.equal(R.recalcularCorrecoes(d, c.id, 'j'), 0);
+});
