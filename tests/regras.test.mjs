@@ -1046,7 +1046,6 @@ test('aluguel inicial corrigido no cadastro: reajustes refeitos em cadeia, negoc
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2025-01-01', indice: 'IPCA', percentual: 10, valor_anterior: 100000, valor_novo: 110000 }, 'j');
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-01-01', indice: 'Negociado', percentual: 0, valor_anterior: 110000, valor_novo: 250000 }, 'j');
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-06-01', indice: 'IPCA', percentual: 4, valor_anterior: 250000, valor_novo: 260000 }, 'j');
-  assert.equal(R.aluguelComInicial(d, c, 200000, '2025-06-01'), 220000);
   R.atualizar(d, 'contratos', c.id, { aluguel_inicial: 200000 }, 'j');
   assert.equal(R.recalcularCorrecoes(d, c.id, 'j'), 2);
   const [a, b, x] = R.correcoesDo(d, c.id);

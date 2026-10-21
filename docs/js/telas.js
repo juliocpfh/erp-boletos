@@ -832,15 +832,8 @@ function selosContrato(c) {
     ${R.contratoAtivo(c) ? '' : etiqueta('Encerrado', 'perigo')}</div>`;
 }
 
-/**
- * Aluguel sobre o qual vale o % de bonificação ao salvar o cadastro: o atual; se o inicial foi corrigido,
- * o atual refeito com as correções em cadeia a partir do inicial novo.
- */
-function baseBonificacao(r, inicial) {
-  if (!r) return inicial;
-  if (inicial !== r.aluguel_inicial) return R.aluguelComInicial(d(), r, inicial);
-  return R.aluguelAtual(d(), r);
-}
+/** Aluguel inicial (histórico, do contrato) com a bonificação: é o que o cadastro mostra e de onde sai o %. */
+const inicialBonificado = (c, inicial = c.aluguel_inicial, pctB = R.percentualBonificacao(c)) => inicial - C.descontoPorPercentual(inicial, pctB);
 
 /** Aluguel atual com a bonificação de pontualidade (o que o inquilino paga em dia, sem IPTU e seguro). */
 function valorBonificado(c) {
@@ -854,10 +847,9 @@ function valorBonificado(c) {
  */
 async function confirmarValoresIniciais(dados, r) {
   if (!r) return true;
-  // o bonificado é comparado sobre o mesmo aluguel que o formulário mostra (o atual), para não acusar diferença de centavo
-  const base = baseBonificacao(r, dados.aluguel_inicial);
-  const antes = r.bonificacao === false ? null : valorBonificado(r);
-  const depois = dados.bonificacao === false ? null : base - C.descontoPorPercentual(base, dados.desconto_pontualidade_percentual || 0);
+  // o bonificado do cadastro é sempre o do aluguel inicial (histórico), não o do aluguel atual já corrigido
+  const antes = r.bonificacao === false ? null : inicialBonificado(r);
+  const depois = dados.bonificacao === false ? null : inicialBonificado(r, dados.aluguel_inicial, dados.desconto_pontualidade_percentual || 0);
   const mudou = [];
   if (dados.aluguel_inicial !== r.aluguel_inicial) mudou.push(`Aluguel inicial (valor cheio): ${reais(r.aluguel_inicial)} → ${reais(dados.aluguel_inicial)}`);
   if (antes !== depois) mudou.push(`Aluguel com bonificação: ${antes === null ? 'sem bonificação' : reais(antes)} → ${depois === null ? 'sem bonificação' : reais(depois)}`);
@@ -1398,17 +1390,16 @@ const CADASTROS = {
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, tem_solidario: !!r.solidario_nome, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
-      aluguel_bonificado: r.bonificacao === false ? null : valorBonificado(r),
+      aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
       ...Object.fromEntries(R.fiadoresDo(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
     aviso: (r, q) => (!r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
       : r ? 'Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).' : ''),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
-    // o % vale sobre o aluguel atual; se ainda não houve correção, o atual é o próprio aluguel cheio digitado
-    base: (r) => (r && R.aluguelAtual(d(), r) !== r.aluguel_inicial ? R.aluguelAtual(d(), r) : null),
     ajustar(dados, erros, r, form, q = {}) {
-      const base = baseBonificacao(r, dados.aluguel_inicial);
+      // o aluguel com bonificação digitado é o do aluguel inicial (histórico): o % sai sobre ele e vale também para o aluguel corrigido
+      const base = dados.aluguel_inicial;
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
       if (dados.bonificacao && bonificadoTexto) {
         // o aluguel bonificado digitado manda: o % é calculado sem arredondar, para o desconto bater no centavo
