@@ -2287,7 +2287,7 @@ function telaCobranca(cb) {
   const sim = cb.data_pagamento ? null : C.liquidar(cb, C.hojeIso());
   return `<div class="nao-imprimir"><p class="suave"><a href="#/cobrancas?comp=${cb.competencia}">← Boletos de ${compBr(cb.competencia)}</a> · <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></p>
     <div class="cabecalho"><h1>Boleto ${R.ehComplementoCaucao(cb) ? 'do complemento da caução' : compBr(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
-      <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>
+      <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>${botao('baixarPdfTela', 'Baixar PDF', { seletor: '.demonstrativo', nome: nomeArquivoDoc(R.ehComplementoCaucao(cb) ? 'Demonstrativo complemento caução' : 'Demonstrativo boleto', c, cb.competencia) }, 'secundario')}
       ${opera() && !cb.data_pagamento ? `${R.ehComplementoCaucao(cb) ? '' : link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir este boleto?')}` : ''}</div></div>
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
     ${R.geraNf(c) ? '' : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
@@ -2777,14 +2777,17 @@ function telaResultados(q) {
 
 async function telaImprimir(rota) {
   const tipo = rota.partes[1];
-  const voltar = '<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button><button class="secundario" data-acao="voltar">Voltar</button></div>';
+  // "Baixar PDF" da página: o que está em ``seletor``, com o nome do arquivo
+  const voltar = (pdf = null) => `<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${pdf ? botao('baixarPdfTela', 'Baixar PDF', pdf, 'secundario') : ''}<button class="secundario" data-acao="voltar">Voltar</button></div>`;
   if (tipo === 'carta') {
     const c = buscar('contratos', rota.q.contrato);
     if (!c) return '<p>Inquilino não encontrado.</p>';
     const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
-    return `<div class="impressao">${voltar}
+    const carta = cartaReajuste(c, rota.q.comp);
+    // sem o índice, não há carta (só o aviso): sem botão de PDF
+    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, rota.q.comp || '') } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
-      ${cartaReajuste(c, rota.q.comp)}</div>`;
+      ${carta}</div>`;
   }
   if (['contrato', 'vistoria', 'chaves'].includes(tipo)) {
     const m = await documentoMontado(tipo, rota.q);
@@ -2792,7 +2795,7 @@ async function telaImprimir(rota) {
     const falta = K.pendenciasDoContrato(d(), m.c);
     const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=documentos`;
     return `<div class="impressao">
-      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${tipo === 'vistoria' ? botao('documentoPdf', 'Baixar PDF', {}, 'secundario') : ''}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoPdf', 'Baixar PDF', {}, 'secundario')}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
@@ -2805,13 +2808,15 @@ async function telaImprimir(rota) {
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
     const lista = d().cobrancas.filter((x) => x.competencia === rota.q.comp && (!ids || ids.has(x.id)))
       .sort((a, b) => nomeImovel(a).localeCompare(nomeImovel(b), 'pt-BR'));
-    return `<div class="impressao">${voltar}${lista.map(demonstrativo).join('') || '<p>Nenhum boleto.</p>'}</div>`;
+    const um = lista.length === 1 && buscar('contratos', lista[0].contrato_id);
+    const nome = um ? nomeArquivoDoc('Demonstrativo boleto', um, lista[0].competencia) : S.limparNome(`Demonstrativos boletos ${rota.q.comp || ''}`);
+    return `<div class="impressao">${voltar(lista.length ? { seletor: '.lista-demonstrativos', nome } : null)}<div class="lista-demonstrativos">${lista.map(demonstrativo).join('') || '<p>Nenhum boleto.</p>'}</div></div>`;
   }
   let fs = d().faturas.filter((f) => f.situacao === 'Emitida');
   const numeros = rota.q.numeros ? new Set(rota.q.numeros.split(',').map(Number)) : null;
   fs = numeros ? fs.filter((f) => numeros.has(f.numero)) : rota.q.numero ? fs.filter((f) => f.numero === Number(rota.q.numero)) : fs.filter((f) => f.emissao.slice(0, 7) === rota.q.mes);
   fs.sort((a, b) => a.numero - b.numero || a.id - b.id);
-  return `<div class="impressao">${voltar}${rota.q.numero && fs.length ? `<p class="nao-imprimir">${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
+  return `<div class="impressao">${voltar()}${rota.q.numero && fs.length ? `<p class="nao-imprimir acoes">${fs.map((f) => botao('pdf', `Baixar PDF${fs.length > 1 ? ` (${esc(buscar('emitentes', f.emitente_id).nome)})` : ''}`, { id: f.id }, 'secundario pequeno')).join('')}${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
     ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma NF.</p>'}</div>`;
 }
 
@@ -2837,25 +2842,27 @@ function contratoMontado(q) {
  * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas, sempre entre um bloco e outro
  * (parágrafo, linha de tabela, foto, assinatura), com o rodapé das empresas e "Página X de Y" embaixo.
  */
-async function pdfDoDocumento(el, rodape = []) {
+async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
   const caixa = el.getBoundingClientRect();
   const topo = caixa.top;
   // o link das fotos continua clicável no PDF (área do link na folha certa)
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
-  const cortes = [...el.querySelectorAll('.ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina')]
+  const cortes = [...el.querySelectorAll('.ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina, .demonstrativo, tr, p, li, h2, h3')]
     .map((x) => x.getBoundingClientRect().bottom - topo).sort((a, b) => a - b);
   const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', onclone: (doc) => {
     doc.querySelectorAll('.ct-rodape').forEach((x) => x.remove());
     doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
   } });
   const escala = canvas.width / el.offsetWidth;
-  const pxMm = el.offsetWidth / 210;
+  const largura = 210 - 2 * margemLado;
+  const pxMm = el.offsetWidth / largura;
   const [margemTopo, margemPe] = [12, 24];
   const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
   const total = el.offsetHeight;
   const fatias = [];
   for (let ini = 0; ini < total - 1;) {
+    if (fatias.length && !cortes.some((y) => y > ini + 2)) break; // depois do último bloco só há espaço em branco
     let fim = ini + alturaFolha;
     if (fim >= total) fim = total;
     else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
@@ -2869,8 +2876,8 @@ async function pdfDoDocumento(el, rodape = []) {
     pedaco.width = canvas.width;
     pedaco.height = Math.round((fim - ini) * escala);
     pedaco.getContext('2d').drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
-    pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', 0, margemTopo, 210, (fim - ini) / pxMm);
-    for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(l.x / pxMm, margemTopo + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
+    pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', margemLado, margemTopo, largura, (fim - ini) / pxMm);
+    for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, margemTopo + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
     pdf.setFontSize(8).setTextColor(102);
     pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: 'right' });
     pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
@@ -2879,11 +2886,17 @@ async function pdfDoDocumento(el, rodape = []) {
   return pdf.output('blob');
 }
 
+/** Nome dos arquivos baixados: "Documento Imóvel - Inquilino - ano de entrada" (ex.: "Contrato locação Loja 1 - Maria - 2026"). */
+function nomeArquivoDoc(documento, c, fim = String(c.data_entrada || c.vigencia_inicio || '').slice(0, 4)) {
+  const i = buscar('imoveis', c.imovel_id);
+  return S.limparNome(`${documento} ${i ? i.nome : 'sem imóvel'} - ${c.inquilino_nome}${fim ? ` - ${fim}` : ''}`);
+}
+
 /** Contrato, vistoria ou recibo das chaves, prontos para a tela, o PDF e o Word. */
 async function documentoMontado(tipo, q) {
   if (tipo === 'contrato') {
     const m = contratoMontado(q);
-    return m && { ...m, rodape: m.dados.rodape, nome: 'Contrato' };
+    return m && { ...m, rodape: m.dados.rodape, nome: 'Contrato', arquivo: nomeArquivoDoc('Contrato locação', m.c) };
   }
   if (tipo === 'vistoria') {
     const v = buscar('vistorias', q.id);
@@ -2894,14 +2907,13 @@ async function documentoMontado(tipo, q) {
     const entrada = v.tipo === 'Saída' ? R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada') : null;
     const fotos = await fotosDaVistoria(v);
     const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
-    const i = buscar('imoveis', c.imovel_id);
-    const arquivo = `Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')} ${i ? i.nome : 'sem imóvel'} - ${c.inquilino_nome} - ${String(c.data_entrada || v.data || '').slice(0, 4)}`;
+    const arquivo = nomeArquivoDoc(`Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')}`, c, String(c.data_entrada || v.data || '').slice(0, 4));
     return { c, v, semSituacao, arquivo, ...K.vistoriaBlocos(d(), c, v, leitura, fotos, entrada ? entrada.itens || [] : null), nome: `Vistoria de ${v.tipo.toLocaleLowerCase('pt-BR')}` };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
   const chaves = chavesDoContrato(c);
-  return { c, temChaves: !!chaves.trim(), ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves' };
+  return { c, temChaves: !!chaves.trim(), ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves', arquivo: nomeArquivoDoc('Recibo entrega chaves', c) };
 }
 
 /** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
@@ -3974,7 +3986,15 @@ export const ACOES = {
     baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}`}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
   },
 
-  /** PDF do documento que está na tela (vistoria), com o rodapé e "Página X de Y" em todas as folhas. */
+  /** PDF de um trecho da página (carta de reajuste, demonstrativo do boleto), com margens e "Página X de Y". */
+  async baixarPdfTela({ seletor, nome }) {
+    const el = document.querySelector(seletor);
+    if (!el) throw new Error('Documento não encontrado.');
+    aviso('Gerando o PDF…', 'info');
+    baixar(await pdfDoDocumento(el, [], { margemLado: 15 }), `${nome || 'Documento'}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
+  },
+
+  /** PDF do documento que está na tela (contrato, vistoria, recibo das chaves), com o rodapé e "Página X de Y" em todas as folhas. */
   async documentoPdf() {
     const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
     const m = await documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
