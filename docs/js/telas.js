@@ -878,6 +878,13 @@ const AVISO_CONTROLE = 'não emite NF. O pagamento é acompanhado (em dia ou atr
 
 const caixaVerificar = (texto) => (texto ? `<div class="verificar"><b>A verificar:</b> ${esc(texto).replace(/\n/g, '<br>')}</div>` : '');
 
+/** Quem entrou e quem saiu como fiador numa troca de garantia ("entra X; sai Y"). */
+function mudancaFiadores(t) {
+  const nome = (id) => (buscar('fiadores', id) || {}).nome || 'fiador excluído';
+  const partes = [...(t.fiadores_novos || []).map((id) => `entra ${nome(id)}`), ...(t.fiadores_saida || []).map((s) => `sai ${nome(s.id)}`)];
+  return partes.length ? `<br><span class="suave">${esc(partes.join('; '))}</span>` : '';
+}
+
 function caixaGarantia(c) {
   const fiadores = R.fiadoresDo(d(), c.id);
   const correcoes = R.correcoesGarantiaDo(d(), c.id);
@@ -886,7 +893,7 @@ function caixaGarantia(c) {
   const sug = R.caucaoSugerida(d(), c);
   const trocas = R.trocasGarantiaDo(d(), c.id);
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
-  let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar tipo de garantia') : ''}</div>`;
+  let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
   if (R.temCaucao(c)) {
     const comp = R.complementoCaucao(d(), c);
     if (comp && comp.necessaria !== null && (comp.boleto || comp.complemento > 0)) {
@@ -914,7 +921,7 @@ function caixaGarantia(c) {
         <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
         <td class="nw">${f.data_entrada ? dataBr(f.data_entrada) : 'início do contrato'} a ${f.data_saida ? dataBr(f.data_saida) : 'fim do contrato'}</td></tr>`).join('')
       || `<tr><td colspan="4">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>
-      ${opera() ? `<p class="suave">Para cadastrar, alterar ou excluir fiador: ${link(`#/editar/contratos/${c.id}`, 'Editar contrato')} (parte "Garantia").</p>` : ''}`;
+      ${opera() ? `<p>${link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Incluir, trocar ou tirar fiador')} <span class="suave">(fica registrado em "Trocas de garantia" e pode ser cancelado)</span></p>` : ''}`;
   }
   if (anteriores.length) {
     html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th></tr>
@@ -922,7 +929,7 @@ function caixaGarantia(c) {
   }
   if (trocas.length) {
     html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th><th></th></tr>
-      ${trocas.map((t, i) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
+      ${trocas.map((t, i) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
         <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo pequeno', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
   }
   if (sit.total || aplic.length) {
@@ -1290,6 +1297,8 @@ const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#"
 
 let antesDoVinculo = null;
 let fiadoresMudancas = { novos: [], alterados: [], excluidos: [] };
+/** Fiadores que entram, saem ou são corrigidos na troca de garantia (preenchido em ajustar, usado em salvar). */
+let fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
 let avisoAditivo = '';
 let guardarModeloAirbnb = false;
 const CADASTROS = {
@@ -1672,22 +1681,50 @@ const CADASTROS = {
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
   },
   trocas_garantia: {
-    titulo: (r, q) => `Trocar tipo de garantia - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => F.TROCA_GARANTIA,
-    padrao: (q) => ({ data: C.hojeIso(), caucao_meses: buscar('contratos', q.contrato).caucao_meses || null }),
+    titulo: (r, q) => `Trocar garantia ou fiador - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    campos: (r, q) => comListas(F.trocaGarantia(R.fiadoresDo(d(), Number(q.contrato)))),
+    padrao: (q) => {
+      const c = buscar('contratos', q.contrato);
+      // fiadores atuais preenchidos (tf1_, tf2_...); com fiador hoje, a nova garantia já vem igual (troca de fiador)
+      const atuais = Object.fromEntries(R.fiadoresDo(d(), c.id).flatMap((f, k) => F.CAMPOS_FIADOR_TROCA.map((x) => [`tf${k + 1}_${x.nome}`, f[x.nome] ?? null])));
+      return { data: C.hojeIso(), caucao_meses: c.caucao_meses || null, ...(R.temFiador(c) ? { garantia_tipo: c.garantia_tipo, deposito_valor: c.deposito_valor ?? null,
+        deposito_data: c.deposito_data ?? null, deposito_uso: c.deposito_uso ?? null } : {}), ...atuais };
+    },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); const v = R.valorGarantia(d(), c); return `Garantia atual: ${c.garantia_tipo || 'não informada'}${v ? ` de ${reais(v)}` : ''}. Ela fica guardada no histórico do contrato. A troca exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
-    destino: (salvo, q) => {
-      if (!R.temFiador({ garantia_tipo: salvo.tipo_novo }) || R.fiadoresDo(d(), Number(q.contrato)).length) return `#/contrato/${q.contrato}`;
-      aviso('Agora cadastre o fiador na parte "Garantia" deste cadastro.', 'aviso');
-      return `#/editar/contratos/${q.contrato}`;
-    },
-    ajustar(dados, erros, r, form) {
+    destino: (salvo, q) => `#/contrato/${q.contrato}`,
+    ajustar(dados, erros, r, form, q) {
       if (dados.garantia_tipo === 'Caução' && !(dados.caucao_valor > 0)) erros.caucao_valor = 'Informe o valor da caução';
       if (R.temDeposito(dados) && !(dados.deposito_valor > 0)) erros.deposito_valor = 'Informe o valor do depósito';
+      // fiadores: os atuais (tfN_) podem ser corrigidos ou sair; os blocos em branco (tnN_) incluem os novos
+      const atuais = R.fiadoresDo(d(), Number(q.contrato));
+      const fd = new FormData(form);
+      const pega = (p) => { const f = Object.fromEntries(F.CAMPOS_FIADOR_TROCA.map((c) => [c.nome, dados[`${p}_${c.nome}`] ?? null])); F.CAMPOS_FIADOR_TROCA.forEach((c) => delete dados[`${p}_${c.nome}`]); return f; };
+      fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
+      const comFiador = R.temFiador(dados);
+      atuais.forEach((atual, k) => {
+        const f = pega(`tf${k + 1}`);
+        delete dados[`tf${k + 1}_sai`];
+        if (!comFiador) return;
+        if (fd.get(`tf${k + 1}_sai`) === '1') { fiadoresDaTroca.saem.push(atual.id); return; }
+        if (!f.nome) erros[`tf${k + 1}_nome`] = 'Informe o nome do fiador (ou marque que ele sai nesta troca)';
+        else if (F.CAMPOS_FIADOR_TROCA.some((c) => String(atual[c.nome] ?? '') !== String(f[c.nome] ?? ''))) fiadoresDaTroca.alterados.push({ id: atual.id, ...f });
+      });
+      for (let n = 1; n <= F.NOVOS_FIADORES_TROCA; n += 1) {
+        const f = pega(`tn${n}`);
+        // a nacionalidade já vem preenchida ("brasileira"): sozinha não conta como fiador digitado
+        if (!comFiador || !Object.entries(f).some(([k, v]) => v && k !== 'nacionalidade')) continue;
+        if (!f.nome) erros[`tn${n}_nome`] = 'Informe o nome do fiador novo';
+        else fiadoresDaTroca.novos.push(f);
+      }
+      if (comFiador && atuais.length - fiadoresDaTroca.saem.length + fiadoresDaTroca.novos.length < 1) erros.garantia_tipo = 'Com fiador, fica pelo menos um: preencha o fiador novo ou desmarque quem sai';
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTES_CONTRATO.slice(0, 2), dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
-    salvar: (db, dados, q) => R.trocarGarantia(db, Number(q.contrato), dados, login()),
+    salvar: (db, dados, q) => {
+      const t = R.trocarGarantia(db, Number(q.contrato), dados, login(), fiadoresDaTroca);
+      fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
+      return t;
+    },
   },
   vinculos: {
     titulo: (r, q) => `Vincular inquilino - ${buscar('imoveis', q.imovel).nome}`,

@@ -1055,3 +1055,30 @@ test('aluguel inicial corrigido no cadastro: reajustes refeitos em cadeia, negoc
   assert.equal(R.caucaoSugerida(d, c, '2025-06-01'), 3 * (220000 - 22000));
   assert.equal(R.recalcularCorrecoes(d, c.id, 'j'), 0);
 });
+
+test('troca de fiador pela troca de garantia: um sai, outro entra, um é corrigido; cancelar desfaz tudo', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', garantia_tipo: 'Fiador' }, 'j');
+  const a = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador A' }, 'j');
+  const b = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador B', telefone: '1' }, 'j');
+  const t = R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Fiador' }, 'j',
+    { saem: [a.id], alterados: [{ id: b.id, nome: 'Fiador B', telefone: '2' }], novos: [{ nome: 'Fiador C' }] });
+  assert.equal(a.data_saida, '2026-10-09');
+  assert.equal(b.telefone, '2');
+  const novo = d.fiadores.find((f) => f.nome === 'Fiador C');
+  assert.equal(novo.data_entrada, '2026-10-10');
+  assert.deepEqual(R.fiadoresDo(d, c.id, '2026-10-10').map((f) => f.nome).sort(), ['Fiador B', 'Fiador C']);
+  R.cancelarTrocaGarantia(d, t.id, 'j');
+  assert.equal(a.data_saida, null);
+  assert.equal(b.telefone, '1');
+  assert.ok(!d.fiadores.some((f) => f.nome === 'Fiador C'));
+});
+
+test('troca para garantia sem fiador: os fiadores atuais saem', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', garantia_tipo: 'Fiador' }, 'j');
+  const a = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador A' }, 'j');
+  R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Caução', caucao_valor: 100000 }, 'j', { novos: [{ nome: 'Ignorado' }] });
+  assert.equal(a.data_saida, '2026-10-09');
+  assert.equal(d.fiadores.length, 1);
+});

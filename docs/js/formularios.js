@@ -348,11 +348,28 @@ export const TITULARIDADE = [
 
 export const TROCA_FIADOR = [campo('data_troca', 'Data da troca', 'data', { obrig: true, ajuda: 'É o início do vínculo do novo fiador' }), ...FIADOR.filter((c) => c.nome !== 'data_entrada')];
 
-export const TROCA_GARANTIA = [
+/** Campos do fiador na troca de garantia (o início do vínculo é a data da troca; o fim, quando ele sair). */
+export const CAMPOS_FIADOR_TROCA = CAMPOS_FIADOR.filter((c) => !['data_entrada', 'data_saida'].includes(c.nome));
+/** Quantos blocos de fiador novo a troca mostra. */
+export const NOVOS_FIADORES_TROCA = 2;
+/**
+ * Troca de garantia, inclusive troca de fiador (Fiador → Fiador): os fiadores atuais vêm preenchidos (para corrigir ou
+ * marcar que saem) e há blocos em branco para os novos (campos tfN_ para os atuais e tnN_ para os novos).
+ */
+export const trocaGarantia = (atuais = []) => [
   campo('data', 'Data da troca', 'data', { obrig: true }),
   ...CONTRATO.filter((c) => ['garantia_tipo', 'caucao_valor', 'caucao_data', 'caucao_meses', 'comprovante_caucao', 'deposito_valor', 'deposito_data', 'deposito_uso', 'comprovante_deposito'].includes(c.nome))
-    .map((c) => (c.nome === 'garantia_tipo' ? { ...c, rotulo: 'Nova garantia', ajuda: 'Os fiadores são cadastrados depois, em "Editar" do contrato' } : c)),
-  campo('observacoes', 'O que aconteceu com a garantia anterior', 'area', { ajuda: 'Ex.: caução devolvida em 10/10/2026 por PIX' }),
+    .map((c) => (c.nome === 'garantia_tipo' ? { ...c, rotulo: 'Nova garantia', ajuda: 'Para trocar, incluir ou tirar fiador, escolha "Fiador" (ou "Fiador + depósito") e preencha os fiadores abaixo' } : c)),
+  ...atuais.flatMap((f, k) => [
+    { secao: `Fiador atual: ${f.nome}`, ...GARANTIA_FIADOR },
+    campo(`tf${k + 1}_sai`, 'Este fiador sai nesta troca', 'simnao', { virtual: true, ...GARANTIA_FIADOR, ajuda: 'Fica guardado em "Fiadores anteriores", com o fim do vínculo na véspera da troca' }),
+    ...CAMPOS_FIADOR_TROCA.map((c) => ({ ...c, nome: `tf${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
+  ]),
+  ...Array.from({ length: NOVOS_FIADORES_TROCA }, (_, k) => [
+    { secao: k ? 'Mais um fiador novo (se houver)' : 'Fiador novo (se entrar alguém)', ...GARANTIA_FIADOR },
+    ...CAMPOS_FIADOR_TROCA.map((c) => ({ ...c, nome: `tn${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
+  ]).flat(),
+  campo('observacoes', 'O que aconteceu com a garantia anterior', 'area', { ajuda: 'Ex.: caução devolvida em 10/10/2026 por PIX; fiador substituído a pedido do inquilino' }),
 ];
 
 export const APLICACAO = [
