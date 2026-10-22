@@ -1001,7 +1001,7 @@ test('comprovante de depósito ausente: alerta até anexar', () => {
   const a = R.alertasContrato(d, c, '2026-10-20').find((x) => x.tipo === 'Comprovante a buscar no banco');
   assert.match(a.texto, /reserva de R\$ 500,00/);
   R.anexarComprovante(d, 'contratos', c.id, 'comprovante_reserva', 'comprovante-reserva.pdf', 'julio');
-  assert.equal(R.comprovantesPendentes(d, c).length, 0);
+  assert.equal(R.comprovantesPendentes(d, c).filter((x) => x.tabela === 'depositos_garantia').length, 0);
   assert.throws(() => R.anexarComprovante(d, 'contratos', c.id, 'inquilino_nome', 'x.pdf', 'julio'), /desconhecido/);
 });
 
@@ -1190,7 +1190,6 @@ test('caução em depósitos de valores diferentes, cada um com comprovante: som
   let s = R.garantiaADepositar(d, c, 'caucao', '2026-10-01');
   assert.equal(s.corrigida, 360000, '2 aluguéis × R$ 1.800,00 (R$ 2.000,00 com 10% de bonificação)');
   assert.equal(s.falta, 360000);
-  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 200000 }, 'julio'), /Anexe/);
   R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 200000, arquivo: 'a.pdf' }, 'julio');
   s = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-15', valor: 100000, arquivo: 'b.pdf' }, 'julio');
   assert.equal(s.depositado, 300000);
@@ -1257,4 +1256,20 @@ test('remover o comprovante do depósito da caução: só sem correções; em de
   R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio');
   assert.equal(R.garantiaDepositada(c), false);
   assert.deepEqual(R.depositosGarantiaDo(d, c, 'caucao').map((x) => x.comprovante), ['b.pdf']);
+});
+
+test('depósito da caução sem comprovante: registra com data e valor, conta na soma e fica o aviso até anexar', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07', doc_contrato_em: '2026-06-01' });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-10', valor: 100000 }, 'julio');
+  const ultimo = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-20', valor: 200000, arquivo: 'b.pdf' }, 'julio');
+  assert.equal(ultimo.falta, 0);
+  assert.equal(R.garantiaDepositada(c), true, 'registrada mesmo com um comprovante faltando');
+  const pend = R.comprovantesPendentes(d, c).filter((x) => x.tabela === 'depositos_garantia');
+  assert.deepEqual(pend.map((x) => [x.texto, x.valor, x.tabela]), [['depósito da caução', 100000, 'depositos_garantia']]);
+  R.anexarComprovante(d, 'depositos_garantia', pend[0].id, 'comprovante', 'a.pdf', 'julio');
+  assert.equal(R.comprovantesPendentes(d, c).filter((x) => x.tabela === 'depositos_garantia').length, 0);
+  // troca de garantia: a marca de "registrada em depósitos" não passa para a nova
+  R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Caução', caucao_valor: 360000, caucao_data: '2026-10-10' }, 'julio');
+  assert.equal(R.garantiaDepositada(c), false);
 });
