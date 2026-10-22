@@ -1182,3 +1182,34 @@ test('reserva já abatida em aluguel antigo (fora do sistema): sai dos boletos e
   assert.equal(cb.reserva_utilizada, 50000, 'volta para o mês marcado');
   assert.equal(c.reserva_abatida_comp, null);
 });
+
+test('caução em depósitos de valores diferentes, cada um com comprovante: soma até o necessário (com as correções do aluguel)', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_meses: 2, caucao_data: '2026-06-07' });
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-08-07', indice: 'Negociado', valor_anterior: 135000, valor_novo: 200000, percentual: 0 }, 'julio');
+  let s = R.garantiaADepositar(d, c, 'caucao', '2026-10-01');
+  assert.equal(s.corrigida, 360000, '2 aluguéis × R$ 1.800,00 (R$ 2.000,00 com 10% de bonificação)');
+  assert.equal(s.falta, 360000);
+  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 200000 }, 'julio'), /Anexe/);
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 200000, arquivo: 'a.pdf' }, 'julio');
+  s = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-15', valor: 100000, arquivo: 'b.pdf' }, 'julio');
+  assert.equal(s.depositado, 300000);
+  assert.equal(s.falta, 60000, 'ainda falta o complemento das correções');
+  assert.equal(R.garantiaDepositada(c), false);
+  assert.match(R.comprovantesPendentes(d, { ...c, doc_contrato_em: '2026-06-01' }).find((x) => x.campo === 'comprovante_caucao').texto, /falta depositar/);
+  const ultimo = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-10-01', valor: 60000, arquivo: 'c.pdf' }, 'julio');
+  assert.equal(ultimo.falta, 0);
+  assert.equal(R.garantiaDepositada(c), true);
+  assert.equal(c.caucao_pago_em, '2026-10-01');
+  assert.equal(c.comprovante_caucao, 'c.pdf');
+  assert.equal(R.valorGarantia(d, c), 360000, 'caução atual = soma dos depósitos');
+  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-10-02', valor: 1, arquivo: 'd.pdf' }, 'julio'), /já está registrada/);
+  // excluir um depósito: volta a faltar
+  R.excluir(d, 'depositos_garantia', ultimo.deposito.id, 'julio');
+  R.acertarGarantiaDepositada(d, c.id, 'caucao', 'julio');
+  assert.equal(R.garantiaDepositada(c), false);
+  assert.equal(R.garantiaADepositar(d, c, 'caucao').falta, 60000);
+  // nova troca de garantia: os depósitos anteriores são da garantia antiga
+  R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Caução', caucao_valor: 360000, caucao_meses: 2, caucao_data: '2026-10-10' }, 'julio');
+  assert.equal(R.garantiaADepositar(d, c, 'caucao').depositado, 0);
+});
