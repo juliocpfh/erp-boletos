@@ -1025,19 +1025,22 @@ function caixaGarantia(c) {
     return `<div class="alerta aviso"><b>Incluir ${nome} e anexar comprovante.</b> ${Nome} de ${reais(s.combinado)} prevista para ${dataBr(prevista)}.
     ${s.corrigida ? `<br>Com o aluguel corrigido, a ${nome} deve ser de <b>${reais(s.corrigida)}</b> (${c.caucao_meses} aluguéis com bonificação): complemento de ${reais(s.corrigida - s.combinado)} pelas correções.` : ''}
     ${s.depositos.length ? `<table class="compacta" style="margin-top:6px"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th><th></th></tr>${s.depositos.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td>
-      <td>${linkComprovante(c.id, x.comprovante)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : ''}
+      <td>${linkComprovante(c.id, x.comprovante, { tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data })}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : ''}
     <br>A depositar: <b>${reais(s.necessaria)}</b> · já depositado: <b>${reais(s.depositado)}</b> · falta: <b>${reais(s.falta)}</b>
     ${opera() ? `<form data-form="garantiaPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
       <label style="margin:0">Depositado em</label><input type="date" name="data" value="${esc(C.hojeIso())}" style="width:auto">
       <label style="margin:0">Valor R$</label><input name="valor" value="${esc(C.reais(s.falta, false))}" style="width:120px">
-      <label class="botao secundario pequeno enviar" title="Comprovante deste depósito (PDF ou foto)"><span data-nome-escolhido>Anexar comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <label class="botao secundario pequeno enviar" title="Comprovante deste depósito (PDF ou foto); pode anexar depois"><span data-nome-escolhido>Anexar comprovante (opcional)</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
       <button class="pequeno">Registrar depósito</button></form>
-      <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes: registre cada depósito com o seu comprovante. Quando a soma chegar ao valor a depositar, a ${nome} fica registrada.</p>` : ''}</div>`;
+      <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes, com a data e o valor de cada uma. Sem o comprovante, o depósito é registrado e fica o aviso "sem comprovante" até anexar. Quando a soma chegar ao valor a depositar, a ${nome} fica registrada.</p>` : ''}</div>`;
   };
   const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
-    ? ` ${botao('removerComprovanteGarantia', 'Remover comprovante', { contrato: c.id, qual }, 'perigo pequeno', `Remover o comprovante do depósito? ${c[`${qual}_por_depositos`] ? 'O último depósito sai da lista (com o arquivo) e' : 'O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
-  /** Depósitos que formaram a garantia (quando paga em parcelas). */
-  const parcelas = (qual) => { const l = R.depositosGarantiaDo(d(), c, qual); return l.length > 1 ? `<p class="suave">Depositada em ${l.length} vezes: ${l.map((x) => `${dataBr(x.data)} ${reais(x.valor)} ${linkComprovante(c.id, x.comprovante)}`).join('; ')}.</p>` : ''; };
+    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo pequeno', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
+  const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
+  /** Comprovante da garantia; registrada em depósitos, cada um fica na tabela abaixo (com "Anexar comprovante" no que faltar). */
+  const comprovanteDa = (qual, campo) => (c[`${qual}_por_depositos`] ? '<span class="suave">comprovantes nos depósitos abaixo</span>' : linkComprovante(c.id, c[campo]));
+  const parcelas = (qual) => { const l = c[`${qual}_por_depositos`] ? R.depositosGarantiaDo(d(), c, qual) : []; return l.length ? `<table class="compacta"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th></tr>
+    ${l.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td><td>${linkComprovante(c.id, x.comprovante, anexoDeposito(qual, x))}</td></tr>`).join('')}</table>` : ''; };
   if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
     html += c.caucao_valor > 0 ? registrar('caucao', 'caução', c.caucao_data) : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
   } else if (R.temCaucao(c)) {
@@ -1048,7 +1051,7 @@ function caixaGarantia(c) {
         ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
     : opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}</div>`;
     }
-    html += `<div class="grade">${item('Caução', `${reais(R.somaDepositos(d(), c, 'caucao') || c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}${remover('caucao')}`)}
+    html += `<div class="grade">${item('Caução', `${reais(R.somaDepositos(d(), c, 'caucao') || c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}`)}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>${parcelas('caucao')}
       <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
@@ -1060,7 +1063,7 @@ function caixaGarantia(c) {
   if (R.temDeposito(c) && !R.garantiaDepositada(c)) {
     html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
   } else if (R.temDeposito(c)) {
-    html += `<div class="grade">${item('Depósito de garantia', `${reais(R.valorGarantia(d(), c))} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito)}${remover('deposito')}`)}
+    html += `<div class="grade">${item('Depósito de garantia', `${reais(R.valorGarantia(d(), c))} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}`)}
       ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>${parcelas('deposito')}`;
   }
   if (R.temFiador(c) || fiadores.length) {
@@ -3642,15 +3645,14 @@ export const FORMULARIOS = {
     const arq = form.querySelector('[name=arquivo]').files[0];
     const g = R.GARANTIAS_DEPOSITADAS[f.qual];
     const valor = C.centavos(f.valor);
-    // confere antes de gravar o arquivo na pasta (as mesmas mensagens de R.registrarDepositoGarantia)
+    // confere antes de gravar o arquivo na pasta (as mesmas mensagens de R.registrarDepositoGarantia); o comprovante pode vir depois
     if (!f.data) throw new Error('Informe a data do depósito.');
     if (!(valor > 0)) throw new Error('Informe o valor depositado.');
-    if (!arq) throw new Error('Anexe o comprovante deste depósito.');
-    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante(g.arquivo, f.data, arq)));
+    const nome = arq ? await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante(g.arquivo, f.data, arq))) : null;
     let s;
     await alterar((db) => { s = R.registrarDepositoGarantia(db, Number(f.contrato), f.qual, { data: f.data, valor, arquivo: nome }, login()); });
-    aviso(s.falta > 0 ? `Depósito de ${reais(valor)} registrado. Já depositado ${reais(s.depositado)}; falta ${reais(s.falta)}.`
-      : `Depósito de ${reais(valor)} registrado: ${g.nome} completa (${reais(s.depositado)}).`);
+    aviso(`${s.falta > 0 ? `Depósito de ${reais(valor)} registrado. Já depositado ${reais(s.depositado)}; falta ${reais(s.falta)}.`
+      : `Depósito de ${reais(valor)} registrado: ${g.nome} completa (${reais(s.depositado)}).`}${nome ? '' : ' Sem comprovante: fica o aviso até anexar.'}`);
     await mostrar();
   },
 
