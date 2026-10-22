@@ -1164,3 +1164,21 @@ test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"
   R.normalizar(d);
   assert.equal(c.possui_aditivos, true);
 });
+
+test('reserva já abatida em aluguel antigo (fora do sistema): sai dos boletos em aberto; excluir o registro devolve', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  const cb = d.cobrancas[0];
+  assert.equal(cb.reserva_utilizada, 50000);
+  assert.throws(() => R.marcarReservaAbatida(d, c.id, { competencia: '2024-03', valor: 60000 }, 'julio'), /não pode passar de R\$ 500,00/);
+  assert.throws(() => R.marcarReservaAbatida(d, c.id, { competencia: '', valor: 50000 }, 'julio'), /mês/);
+  assert.equal(R.marcarReservaAbatida(d, c.id, { competencia: '2024-03', valor: 50000 }, 'julio'), 1);
+  assert.equal(cb.reserva_utilizada, 0, 'saiu do boleto em aberto');
+  assert.equal(R.saldoReserva(d, c), 0);
+  assert.equal(R.alertaReservaParada(d, c), null);
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  assert.equal(d.cobrancas[1].reserva_utilizada, 0, 'boleto novo também não usa');
+  assert.equal(R.desmarcarReservaAbatida(d, c.id, 'julio'), 1);
+  assert.equal(cb.reserva_utilizada, 50000, 'volta para o mês marcado');
+  assert.equal(c.reserva_abatida_comp, null);
+});

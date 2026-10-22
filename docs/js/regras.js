@@ -454,11 +454,40 @@ export function competenciaReserva(contrato) {
 /** ``ignorar``: id de um boleto, ou função (boleto) => true para os boletos que não contam (os que estão sendo recalculados). */
 const ignorados = (ignorar) => (typeof ignorar === 'function' ? ignorar : (cb) => cb.id === ignorar);
 
+/** Saldo da reserva: o valor menos o já usado nos boletos e o marcado como abatido fora do sistema (contratos antigos). */
 export function saldoReserva(d, contrato, ignorarCobranca = null) {
   const fora = ignorados(ignorarCobranca);
   const usado = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !fora(cb))
     .reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
-  return Math.max((contrato.reserva_valor || 0) - usado, 0);
+  return Math.max((contrato.reserva_valor || 0) - usado - (contrato.reserva_abatida_valor || 0), 0);
+}
+
+/** Reserva já usada em boletos pagos (não muda com o recálculo). */
+const reservaUsadaPaga = (d, c) => d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.data_pagamento).reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
+/** Quanto ainda pode ser marcado como abatido fora do sistema: a reserva menos o já usado em boletos pagos. */
+export const reservaParaMarcarAbatida = (d, c) => Math.max((c.reserva_valor || 0) - reservaUsadaPaga(d, c), 0);
+
+/**
+ * Contrato antigo: a reserva já foi abatida em aluguéis de antes do sistema. Marca o mês (AAAA-MM) e o valor;
+ * a reserva sai dos boletos em aberto e não é mais usada. Ex.: reserva de R$ 500,00 abatida em 03/2024.
+ */
+export function marcarReservaAbatida(d, contratoId, { competencia, valor }, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!(c.reserva_valor > 0)) throw new Error('Este contrato não tem reserva.');
+  if (!/^\d{4}-\d{2}$/.test(competencia || '')) throw new Error('Informe o mês em que a reserva foi abatida.');
+  const max = reservaParaMarcarAbatida(d, c);
+  if (!(valor > 0)) throw new Error('Informe o valor abatido.');
+  if (valor > max) throw new Error(`O valor abatido não pode passar de ${C.reais(max)} (reserva${max < c.reserva_valor ? ' menos o já usado em boletos pagos' : ''}).`);
+  atualizar(d, 'contratos', c.id, { reserva_abatida_comp: competencia, reserva_abatida_valor: valor }, usuario,
+    `${c.inquilino_nome}: reserva marcada como abatida em ${C.compBr(competencia)} (${C.reais(valor)})`);
+  return realocarReserva(d, c, usuario);
+}
+
+/** Exclui o registro de reserva abatida fora do sistema: ela volta a abater os boletos em aberto. */
+export function desmarcarReservaAbatida(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  atualizar(d, 'contratos', c.id, { reserva_abatida_comp: null, reserva_abatida_valor: null }, usuario, `${c.inquilino_nome}: registro de reserva abatida excluído`);
+  return realocarReserva(d, c, usuario);
 }
 
 /**
@@ -504,6 +533,7 @@ export function alertaReservaParada(d, contrato) {
   const alvo = competenciaReserva(contrato);
   if (!alvo) return null;
   const saldo = saldoReserva(d, contrato);
+  if (contrato.reserva_abatida_valor > 0 && !(saldo > 0)) return null; // já abatida fora do sistema
   const doContrato = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !ehComplementoCaucao(cb));
   const presa = doContrato.find((cb) => cb.reserva_utilizada > 0 && cb.data_pagamento && cb.competencia > alvo);
   const alvoAberto = doContrato.find((cb) => cb.competencia === alvo && !cb.data_pagamento);
@@ -516,7 +546,7 @@ export function alertaReservaParada(d, contrato) {
   const motivo = doAlvo && doAlvo.data_pagamento ? `o boleto de ${C.compBr(alvo)} já foi pago sem ela`
     : !doAlvo && doContrato.some((cb) => cb.competencia > alvo) ? `o boleto de ${C.compBr(alvo)} não está no sistema` : '';
   return motivo ? { nivel: 'aviso', tipo: 'Reserva do imóvel', ancora: 'reserva',
-    texto: `Reserva de ${C.reais(saldo)} marcada para o aluguel de ${C.compBr(alvo)} não foi usada: ${motivo}. Em "Editar", escolha em "Usar a reserva no aluguel de" o mês do boleto em aberto que deve receber o desconto.` } : null;
+    texto: `Reserva de ${C.reais(saldo)} marcada para o aluguel de ${C.compBr(alvo)} não foi usada: ${motivo}. Em "Editar", escolha em "Usar a reserva no aluguel de" o mês do boleto em aberto que deve receber o desconto; se ela já foi abatida em aluguéis antigos, use "Marcar como já abatida" na página do inquilino.` } : null;
 }
 
 function parcelasDoMes(lista, comp, rotulo) {

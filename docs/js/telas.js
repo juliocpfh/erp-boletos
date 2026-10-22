@@ -1325,8 +1325,7 @@ function telaContrato(c) {
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
       ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)} · ${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
-        <p class="suave">${(() => { const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0); return usos.length ? `Abatida em: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : 'Ainda não abatida em nenhum boleto.'; })()}
-          ${opera() ? botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno') : ''}</p>` : ''}
+        ${caixaReservaAbatida(c)}` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaIncluso(c)}
     ${caixaRessarcimentos(c)}
@@ -1365,6 +1364,27 @@ function telaContrato(c) {
 const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lista(d(), c.lista) } : c));
 
 // --------------------------------------------------------------------------
+/**
+ * Uso da reserva: nos boletos do sistema e/ou marcada como já abatida em aluguéis antigos (fora do sistema).
+ * Marcada: mostra o mês e o valor, com "Excluir registro" no lugar de "Reaplicar a reserva".
+ */
+function caixaReservaAbatida(c) {
+  const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
+  const nosBoletos = usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '';
+  if (c.reserva_abatida_valor > 0) {
+    return `<div class="alerta ok"><b>Reserva já abatida</b> em ${compBr(c.reserva_abatida_comp)}: ${reais(c.reserva_abatida_valor)} (aluguel antigo, fora dos boletos do sistema).
+      ${nosBoletos ? `<br>${nosBoletos}` : ''}
+      ${opera() ? `<div class="acoes" style="margin-top:6px">${botao('desmarcarReservaAbatida', 'Excluir registro', { id: c.id }, 'perigo pequeno', 'Excluir o registro de reserva já abatida? A reserva volta a abater os boletos em aberto.')}</div>` : ''}</div>`;
+  }
+  const max = R.reservaParaMarcarAbatida(d(), c);
+  return `${usos.length ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
+    ${opera() ? `<div class="acoes">${botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno')}</div>
+      ${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
+        <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
+        <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" required>
+        <button class="secundario pequeno">Marcar como já abatida</button></form>` : ''}` : ''}`;
+}
+
 // Comprovantes (caução, depósito, reserva, aplicação e complemento da caução): PDF ou foto na pasta do inquilino.
 // O valor pode ser salvo sem o comprovante: fica um alerta para buscar no banco e anexar depois.
 // --------------------------------------------------------------------------
@@ -3636,6 +3656,13 @@ export const FORMULARIOS = {
     ir(`#/imprimir/contrato?${q}`);
   },
 
+  async reservaAbatida(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const n = await alterar((db) => R.marcarReservaAbatida(db, Number(f.contrato), { competencia: f.competencia, valor: C.centavos(f.valor) }, login()));
+    aviso(`Reserva marcada como já abatida${n ? `; saiu de ${n} boleto(s) em aberto` : ''}.`);
+    await mostrar();
+  },
+
   async aditivoVencimento(form) {
     const f = Object.fromEntries(new FormData(form));
     try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
@@ -4191,6 +4218,12 @@ export const ACOES = {
 
   async etapaFechamento({ mes, etapa, feito }) {
     await alterar((db) => R.marcarEtapaFechamento(db, mes, etapa, feito === '1', login()));
+    await mostrar();
+  },
+
+  async desmarcarReservaAbatida({ id }) {
+    const n = await alterar((db) => R.desmarcarReservaAbatida(db, Number(id), login()));
+    aviso(`Registro excluído: a reserva volta a abater os boletos em aberto${n ? ` (${n} boleto(s) ajustado(s))` : ''}.`);
     await mostrar();
   },
 
