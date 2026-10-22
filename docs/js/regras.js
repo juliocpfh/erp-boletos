@@ -1533,6 +1533,25 @@ export function acertarGarantiaDepositada(d, contratoId, qual, usuario) {
   atualizar(d, 'contratos', c.id, novo, usuario, `${c.inquilino_nome}: depósitos de ${g.nome} conferidos (${C.reais(s.depositado)})`);
 }
 
+/** Pode remover o comprovante do depósito? Na caução, só sem correções registradas (elas partem do valor depositado). */
+export const podeRemoverComprovanteGarantia = (d, c, qual) => !!c[GARANTIAS_DEPOSITADAS[qual].comprovante] && (qual !== 'caucao' || !correcoesCaucaoAtual(d, c).length);
+
+/**
+ * Remove o comprovante do depósito (anexado errado): a garantia volta a "Incluir … e anexar comprovante".
+ * Paga em depósitos: sai o último depósito (os outros continuam na lista, e podem ser excluídos lá).
+ */
+export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
+  if (!c[g.comprovante]) throw new Error('Não há comprovante para remover.');
+  if (!podeRemoverComprovanteGarantia(d, c, qual)) throw new Error('Exclua antes as correções da caução.');
+  const ultimo = c[`${qual}_por_depositos`] ? depositosGarantiaDo(d, c, qual).pop() : null;
+  if (ultimo) excluir(d, 'depositos_garantia', ultimo.id, usuario, `${c.inquilino_nome}: depósito de ${C.reais(ultimo.valor)} de ${C.dataBr(ultimo.data)} removido`);
+  atualizar(d, 'contratos', c.id, { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null }, usuario,
+    `${c.inquilino_nome}: comprovante de ${g.nome} removido (volta a depositar)`);
+}
+
 /** Caução ou depósito de garantia pago: a data efetiva do depósito e o comprovante (os dois obrigatórios). */
 export function registrarGarantiaPaga(d, contratoId, qual, data, arquivo, usuario) {
   const c = buscar(d, 'contratos', contratoId);
