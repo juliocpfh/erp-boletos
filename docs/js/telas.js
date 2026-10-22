@@ -1082,10 +1082,10 @@ function caixaGarantia(c) {
   if (R.garantiaDepositada(c) && (sit.total || aplic.length)) {
     html += `<h3>Onde o valor foi aplicado</h3>
       ${sit.total && !sit.ok ? `<div class="alerta aviso">Valor integral ainda não aplicado: falta aplicar <b>${reais(sit.falta)}</b> de ${reais(sit.total)}.</div>` : ''}
-      <table><tr><th>Empresa</th><th class="n">Aplicado</th></tr>
-      ${sit.linhas.map((l) => `<tr><td>${esc(l.emitente.nome)}</td><td class="n">${reais(l.aplicado)}</td></tr>`).join('') || '<tr><td colspan="2" class="suave">Nada aplicado ainda.</td></tr>'}
+      <table><tr><th>Depositado em</th><th class="n">Aplicado</th></tr>
+      ${sit.linhas.map((l) => `<tr><td>${esc(l.emitente.nome)}${l.emitente.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(l.aplicado)}</td></tr>`).join('') || '<tr><td colspan="2" class="suave">Nada aplicado ainda.</td></tr>'}
       <tr class="total"><td>Total aplicado de ${reais(sit.total)}</td><td class="n">${reais(sit.soma)} ${sit.ok ? etiqueta('100% aplicado', 'ok') : ''}</td></tr></table>
-      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Empresa</th><th class="n">Valor</th><th>Comprovante</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc((buscar('emitentes', a.emitente_id) || {}).nome || '-')}</td><td class="n">${reais(a.valor)}</td><td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })}</td><td>${esc(a.observacoes || '')}</td>
+      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Depositado em</th><th class="n">Valor</th><th>Comprovante</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc(R.recebedorDaAplicacao(d(), a).nome)}</td><td class="n">${reais(a.valor)}</td><td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })}</td><td>${esc(a.observacoes || '')}</td>
         <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aplicacoes', id: a.id }, 'perigo pequeno', 'Excluir esta aplicação?') : ''}</td></tr>`).join('')}</table>` : ''}
       ${opera() ? `<p>${link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação')}</p>` : ''}
       <p class="suave">Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final).</p>`;
@@ -1106,6 +1106,7 @@ function caixaSaida(c) {
     ${item('Garantia a devolver', reais(e.garantia_valor))}${item('Correção (poupança)', `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}
     ${item('Débitos descontados', reais(e.debitos))}${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
     ${item('Vistoria de saída', esc(e.vistoria_saida || '-'))}</div>
+    ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
     ${podeUsuario('admin') ? botao('excluir', 'Desfazer registro da saída', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo de saída? A data de saída do contrato continua preenchida.') : ''}</div>`;
 }
@@ -1825,16 +1826,26 @@ const CADASTROS = {
   },
   aplicacoes: {
     titulo: (r, q) => `Aplicação da garantia - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.APLICACAO.map((c) => (c.nome === 'emitente_id' ? { ...c, opcoes: d().emitentes.filter((e) => e.ativo).map((e) => [String(e.id), e.nome]) } : c)),
+    campos: () => F.APLICACAO.map((c) => (c.nome === 'emitente_id' ? { ...c, opcoes: [...d().emitentes.filter((e) => e.ativo).map((e) => [String(e.id), e.nome]), ['-1', 'Outra pessoa (depositado na conta de…)']] }
+      : c.nome === 'recebedor' ? { ...c, sugestoes: R.recebedoresUsados(d()) } : c)),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    valores: (r) => (r && r.recebedor ? { ...r, emitente_id: -1 } : r),
     padrao: (q) => {
       const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato));
       return { data: C.hojeIso(), valor: s.falta > 0 ? s.falta : null };
     },
-    aviso: (r, q) => { const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato)); return `Garantia ${reais(s.total)}: aplicado ${reais(s.soma)}${s.linhas.length ? ` (${s.linhas.map((l) => `${l.emitente.nome} ${reais(l.aplicado)}`).join('; ')})` : ''}, falta ${reais(Math.max(s.falta, 0))}. Pode aplicar tudo numa empresa só.`; },
+    aviso: (r, q) => { const s = R.situacaoAplicacao(d(), buscar('contratos', q.contrato)); return `Garantia ${reais(s.total)}: aplicado ${reais(s.soma)}${s.linhas.length ? ` (${s.linhas.map((l) => `${l.emitente.nome} ${reais(l.aplicado)}`).join('; ')})` : ''}, falta ${reais(Math.max(s.falta, 0))}. Pode aplicar tudo num lugar só. Na saída, a devolução sai de onde foi depositado.`; },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
     descricao: (dados) => `Garantia aplicada: ${reais(dados.valor)}${dados.comprovante ? ` · comprovante ${dados.comprovante}` : ''}`,
-    ajustar: (dados, erros, r, form) => conferirComprovantes(COMPROVANTE_APLICACAO, dados, r, form),
+    ajustar(dados, erros, r, form) {
+      // outra pessoa: guarda o nome (sem empresa); empresa: sem nome de pessoa
+      if (dados.emitente_id === -1) {
+        dados.recebedor = String(dados.recebedor || '').trim();
+        if (!dados.recebedor) erros.recebedor = 'Informe o nome de quem recebeu o depósito';
+        dados.emitente_id = null;
+      } else dados.recebedor = '';
+      return conferirComprovantes(COMPROVANTE_APLICACAO, dados, r, form);
+    },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_APLICACAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
   },
   correcoes_garantia: {
