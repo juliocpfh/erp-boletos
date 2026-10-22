@@ -94,6 +94,40 @@ const SUB_ADITIVOS = 'Termos aditivos';
 const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos'].includes(escopo);
 const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
+/** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Termos aditivos". */
+function chavePasta(escopo, id) {
+  if (escopoDoContrato(escopo)) {
+    const c = buscar('contratos', id);
+    return c ? [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === 'assinados' ? SUB_ASSINADOS : escopo === 'aditivos' ? SUB_ADITIVOS : ''].join('/') : null;
+  }
+  const i = buscar('imoveis', imovelDoEscopo(escopo, id));
+  return i ? [i.pasta || i.nome, escopo].join('/') : null;
+}
+/** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
+const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
+/** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
+async function apagarAnexos(lista, motivo) {
+  const apagados = [];
+  for (const a of lista) {
+    try { await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome); apagados.push(a); } catch { /* já não estava na pasta */ }
+  }
+  if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
+  return apagados.length;
+}
+/**
+ * Faz uma alteração que exclui ou desfaz lançamentos e apaga da pasta os anexos que eram deles e ficaram sem uso.
+ * Ex.: excluir um termo aditivo apaga o PDF assinado dele.
+ */
+async function alterarApagandoAnexos(fn) {
+  const antes = R.arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
+  const r = await alterar(fn);
+  const emUso = anexosEmUso();
+  const soltos = antes.filter((a) => a.pasta && !emUso.has(`${a.pasta}|${a.nome}`))
+    .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n);
+  await apagarAnexos(soltos, 'Arquivo apagado junto com o lançamento');
+  return r;
+}
+
 /** Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página). */
 async function pastaDoEscopo(escopo, id, criar = true) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
@@ -991,7 +1025,7 @@ function caixaGarantia(c) {
     return `<div class="alerta aviso"><b>Incluir ${nome} e anexar comprovante.</b> ${Nome} de ${reais(s.combinado)} prevista para ${dataBr(prevista)}.
     ${s.corrigida ? `<br>Com o aluguel corrigido, a ${nome} deve ser de <b>${reais(s.corrigida)}</b> (${c.caucao_meses} aluguéis com bonificação): complemento de ${reais(s.corrigida - s.combinado)} pelas correções.` : ''}
     ${s.depositos.length ? `<table class="compacta" style="margin-top:6px"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th><th></th></tr>${s.depositos.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td>
-      <td>${linkComprovante(c.id, x.comprovante)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O arquivo continua na pasta.`) : ''}</td></tr>`).join('')}</table>` : ''}
+      <td>${linkComprovante(c.id, x.comprovante)}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : ''}
     <br>A depositar: <b>${reais(s.necessaria)}</b> · já depositado: <b>${reais(s.depositado)}</b> · falta: <b>${reais(s.falta)}</b>
     ${opera() ? `<form data-form="garantiaPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
       <label style="margin:0">Depositado em</label><input type="date" name="data" value="${esc(C.hojeIso())}" style="width:auto">
@@ -1218,7 +1252,7 @@ function caixaDocumentos(c) {
   const parcial = (k) => R.documentoParcial(d(), c, k);
   const adm = podeUsuario('admin');
   const analise = (k, tipo) => (adm ? ` ${botao('analisarDocumento', tipo === 'perdido' ? 'Confirmar perda' : 'Conferido', { contrato: c.id, campo: k, tipo, aceitar: 1 }, 'pequeno')}
-    ${botao('analisarDocumento', 'Recusar', { contrato: c.id, campo: k, tipo, aceitar: 0 }, 'perigo pequeno', tipo === 'perdido' ? 'Recusar a perda? O documento volta a pendente.' : 'Recusar este anexo com assinatura faltante? O documento volta a pendente (o arquivo continua na pasta).')}` : '');
+    ${botao('analisarDocumento', 'Recusar', { contrato: c.id, campo: k, tipo, aceitar: 0 }, 'perigo pequeno', tipo === 'perdido' ? 'Recusar a perda? O documento volta a pendente.' : 'Recusar este anexo com assinatura faltante? O documento volta a pendente e o arquivo é apagado.')}` : '');
   const situacaoDoc = (k, feito) => {
     if (aguardaPerda(k)) return `${etiqueta(`perdido? aguardando o administrador (${c[R.campoPerdidoPendente(k)]}, ${dataBr(perdido(k))})`, 'aviso')}${analise(k, 'perdido')}`;
     if (perdido(k)) return etiqueta(`perdido (registrado em ${dataBr(perdido(k))})`, 'perigo');
@@ -1236,14 +1270,14 @@ function caixaDocumentos(c) {
     <td>${situacaoDoc(k, feito)}</td>
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
-      ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo continua guardado na pasta.`) : ''}`
+      ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ''}`
     : !opera() || perdido(k) || original ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${hoje}" style="width:auto">
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="secundario pequeno">Marcar ${feito}</button>
         ${parcial(k) ? '' : botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno')}</form>`}
       ${opera() && !doc(k) && !original ? (perdido(k) ? botao('desmarcarPerdido', 'Desfazer "perdido"', { contrato: c.id, campo: k }, 'link-botao')
-        : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente (o arquivo continua na pasta).')
+        : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.')
         : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</td></tr>`).join('');
   return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
@@ -1277,7 +1311,7 @@ function caixaAditivos(c) {
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo continua guardado na pasta.`) : ''}</td></tr>`).join('')}</table></div>`
+      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo assinado também é apagado.`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}
@@ -3448,6 +3482,9 @@ async function telaDados() {
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ''}
+    ${podeUsuario('admin') ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
+      Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
+      ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento')}</div>` : ''}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK).'}</p>
@@ -4304,14 +4341,14 @@ export const ACOES = {
   },
 
   async desfazerParcial({ contrato, campo }) {
-    await alterar((db) => R.anexarDocumentoParcial(db, Number(contrato), campo, null, login(), podeUsuario('admin')));
+    await alterarApagandoAnexos((db) => R.anexarDocumentoParcial(db, Number(contrato), campo, null, login(), podeUsuario('admin')));
     await mostrar();
   },
 
   /** Administrador confirma ou recusa a perda ou o anexo com assinatura faltante registrados por outro usuário. */
   async analisarDocumento({ contrato, campo, tipo, aceitar }) {
     if (!podeUsuario('admin')) throw new Error('Só o administrador analisa.');
-    await alterar((db) => R.analisarDocumento(db, Number(contrato), campo, tipo, aceitar === '1', login()));
+    await alterarApagandoAnexos((db) => R.analisarDocumento(db, Number(contrato), campo, tipo, aceitar === '1', login()));
     await mostrar();
   },
 
@@ -4342,7 +4379,7 @@ export const ACOES = {
   },
 
   async desmarcarDocumento({ contrato, campo }) {
-    await alterar((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
+    await alterarApagandoAnexos((db) => R.marcarDocumento(db, Number(contrato), campo, null, login()));
     await mostrar();
   },
 
@@ -4388,7 +4425,8 @@ export const ACOES = {
     if (cfg.admin && !podeUsuario('admin')) throw new Error('Só administradores podem excluir.');
     const r = buscar(tabela, id);
     const destino = cfg.voltar ? cfg.voltar(r) : null;
-    await alterar((db) => {
+    // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato e imóvel guardam a pasta.
+    await (['contratos', 'imoveis'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
@@ -4406,6 +4444,44 @@ export const ACOES = {
     }
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();
+  },
+
+  /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
+  async limparAnexosSoltos() {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador apaga arquivos sem lançamento.');
+    const emUso = anexosEmUso();
+    const vistas = new Set();
+    const soltos = [];
+    for (const c of d().contratos) {
+      for (const escopo of ['contrato', 'assinados', 'aditivos']) {
+        const pasta = chavePasta(escopo, c.id);
+        if (vistas.has(pasta)) continue;
+        vistas.add(pasta);
+        let dir;
+        try { dir = await pastaDoEscopo(escopo, c.id, false); } catch { continue; }
+        for (const a of await S.listar(dir)) {
+          // na pasta do inquilino ficam também as fichas e documentos anexados à mão: só os gravados pelo sistema
+          if (escopo === 'contrato' && !/^(comprovante-|vistoria-(entrada|saida)-)/i.test(a.nome)) continue;
+          if (!emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo, id: c.id, nome: a.nome, quem: c.inquilino_nome });
+        }
+      }
+    }
+    for (const i of d().imoveis) {
+      let dir;
+      try { dir = await pastaDoEscopo('seguro', i.id, false); } catch { continue; }
+      const pasta = chavePasta('seguro', i.id);
+      // apólices: só os arquivos que já foram de uma apólice (os anexados à mão na caixa ficam)
+      for (const a of await S.listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: 'seguro', id: i.id, nome: a.nome, quem: i.nome });
+    }
+    if (!soltos.length) { aviso('Nenhum arquivo sobrando: todos os anexos têm lançamento.', 'info'); return; }
+    const ok = await janela({ titulo: `${soltos.length} arquivo(s) sem lançamento`, forte: true,
+      html: `<p>Estes arquivos ficaram na pasta depois que o lançamento foi excluído. Serão <b>apagados de vez</b>:</p>
+        <ul style="max-height:300px;overflow:auto">${soltos.map((a) => `<li>${esc(a.quem)}: ${esc(a.nome)}</li>`).join('')}</ul>`,
+      sim: `Apagar ${soltos.length} arquivo(s)`, nao: 'Cancelar' });
+    if (!ok) return;
+    const n = await apagarAnexos(soltos, 'Arquivo sem lançamento apagado na limpeza');
+    aviso(`${n} arquivo(s) apagado(s).`);
+    await mostrar();
   },
 
   async removerLogo() {

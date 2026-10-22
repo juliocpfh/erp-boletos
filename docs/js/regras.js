@@ -1720,6 +1720,28 @@ export function documentoEntrada(d, c, campo) {
   return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
 }
 
+/**
+ * Arquivos anexados que algum lançamento usa: [{ escopo, id, nome }] (escopo e id da pasta, como nas caixas de arquivos:
+ * "contrato", "assinados" e "aditivos" pelo contrato; "seguro" pelo imóvel). O que sair desta lista ao excluir ou desfazer
+ * um lançamento é apagado da pasta.
+ */
+export function arquivosReferenciados(d) {
+  const out = [];
+  const usa = (escopo, id, nome) => { if (nome && id) out.push({ escopo, id, nome }); };
+  for (const c of d.contratos) {
+    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva']) usa('contrato', c.id, c[k]);
+    for (const [campo] of DOCUMENTOS_ENTRADA) {
+      usa('assinados', c.id, c[campoArquivoDoc(campo)]);
+      usa('assinados', c.id, (c[campoParcialDoc(campo)] || {}).arquivo);
+    }
+  }
+  for (const t of ['depositos_garantia', 'correcoes_garantia', 'aplicacoes']) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
+  for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
+  for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
+  for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.imovel_id, nome);
+  return out;
+}
+
 const porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
 /** Termos aditivos assinados do contrato (posteriores a ele, com o arquivo anexado), do mais recente ao mais antigo. */
 export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
