@@ -381,7 +381,8 @@ export const trocaGarantia = (atuais = []) => [
 
 export const APLICACAO = [
   campo('data', 'Data da aplicação', 'data', { obrig: true }),
-  campo('emitente_id', 'Empresa onde foi aplicado', 'opcao', { obrig: true, opcoes: [] }),
+  campo('emitente_id', 'Depositado em', 'opcao', { obrig: true, opcoes: [], ajuda: 'Empresa, ou "Outra pessoa" quando foi depositado na conta de uma pessoa (ex.: dono do imóvel)' }),
+  campo('recebedor', 'Nome de quem recebeu', 'texto', { mostrarSe: { campo: 'emitente_id', valores: ['-1'] }, sugestoes: [], ajuda: 'Escreva uma vez: nas próximas aplicações o nome aparece para escolher' }),
   campo('valor', 'Valor aplicado', 'dinheiro', { obrig: true }),
   comprovante('comprovante', 'Comprovante da aplicação', { ajuda: `PDF ou foto do comprovante da aplicação na empresa. ${SEM_COMPROVANTE}` }),
   campo('observacoes', 'Observações (banco, aplicação)', 'area'),
@@ -602,7 +603,10 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ['pct', 'inteiro'].includes(c.tipo) ? 'inputmode="decimal"'
         : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : '';
-      entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${max} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;
+      // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)
+      const lista = c.sugestoes ? `list="${id}_sugestoes" autocomplete="off"` : '';
+      entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${lista} ${max} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;
+      if (c.sugestoes) entrada += `<datalist id="${id}_sugestoes">${c.sugestoes.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
     }
     return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''} ${recolhido}"${grupo} ${se}>
       <label for="${id}"${rotuloSe}>${esc(rotulo)}${c.obrig ? ' *' : ''}</label>${entrada}

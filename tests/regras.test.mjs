@@ -1226,3 +1226,16 @@ test('arquivos anexados que os lançamentos usam (para apagar o anexo junto com 
   R.excluir(d, 'aditivos', d.aditivos[0].id, 'julio');
   assert.equal(lista().includes('aditivos:aditivo.pdf'), false, 'excluído o aditivo, o arquivo fica sem uso');
 });
+
+test('aplicação da garantia na conta de outra pessoa: soma no aplicado e a devolução sai de onde foi depositada, na proporção', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 540000, comprovante_caucao: 'c.pdf' });
+  const ank = d.emitentes[0];
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: ank.id, data: '2023-05-10', valor: 300000 }, 'julio');
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: null, recebedor: 'Maria Silva (PF)', data: '2023-05-10', valor: 240000 }, 'julio');
+  const s = R.situacaoAplicacao(d, c);
+  assert.equal(s.ok, true);
+  assert.deepEqual(s.linhas.map((l) => [l.emitente.nome, l.aplicado, !!l.emitente.pessoa]), [[ank.nome, 300000, false], ['Maria Silva (PF)', 240000, true]]);
+  assert.deepEqual(R.recebedoresUsados(d), ['Maria Silva (PF)']);
+  assert.deepEqual(R.devolucaoPorRecebedor(d, c, 594000).map((x) => [x.nome, x.valor]), [[ank.nome, 330000], ['Maria Silva (PF)', 264000]]);
+});

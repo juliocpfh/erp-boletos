@@ -464,11 +464,24 @@ export function gerarBoletoCaucao(d, contratoId, usuario, comp = null) {
 }
 
 /** Onde a garantia foi aplicada (em qualquer empresa, sem divisão obrigatória) e quanto falta aplicar. */
+/** Onde a aplicação foi depositada: a empresa ou outra pessoa (ex.: conta do dono do imóvel). { id, nome, pessoa }. */
+export function recebedorDaAplicacao(d, a) {
+  if (a.recebedor) return { id: null, nome: a.recebedor, pessoa: true };
+  return d.emitentes.find((e) => e.id === a.emitente_id) || { id: a.emitente_id, nome: 'Empresa excluída' };
+}
+/** Nomes de outras pessoas já usados nas aplicações (para escolher de novo sem digitar). */
+export const recebedoresUsados = (d) => [...new Set(d.aplicacoes.map((a) => a.recebedor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
 export function situacaoAplicacao(d, c) {
   const total = garantiaDepositada(c) ? valorGarantia(d, c) : 0;
   const aplicado = new Map();
-  for (const a of aplicacoesDo(d, c.id)) aplicado.set(a.emitente_id, (aplicado.get(a.emitente_id) || 0) + a.valor);
-  const linhas = [...aplicado].map(([id, valor]) => ({ emitente: d.emitentes.find((e) => e.id === id) || { id, nome: 'Empresa excluída' }, aplicado: valor }));
+  for (const a of aplicacoesDo(d, c.id)) {
+    const chave = a.recebedor ? `p:${a.recebedor}` : `e:${a.emitente_id}`;
+    const x = aplicado.get(chave) || { emitente: recebedorDaAplicacao(d, a), aplicado: 0 };
+    x.aplicado += a.valor;
+    aplicado.set(chave, x);
+  }
+  const linhas = [...aplicado.values()];
   const soma = linhas.reduce((s, l) => s + l.aplicado, 0);
   return { total, linhas, soma, falta: total - soma, ok: total > 0 && soma >= total };
 }
@@ -1391,6 +1404,22 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
 }
 
 export const encerramentoDo = (d, contratoId) => d.encerramentos.find((e) => e.contrato_id === contratoId) || null;
+
+/**
+ * Na saída, a garantia é devolvida pela conta em que foi depositada: o valor corrigido dividido na proporção do que foi
+ * aplicado em cada lugar. Ex.: R$ 3.000,00 na ANK e R$ 2.400,00 com Maria; corrigida R$ 5.940,00 → ANK R$ 3.300,00 e
+ * Maria R$ 2.640,00. [{ nome, pessoa, valor }]; vazio sem aplicações.
+ */
+export function devolucaoPorRecebedor(d, c, corrigida) {
+  const { linhas, soma } = situacaoAplicacao(d, c);
+  if (!soma || !(corrigida > 0)) return [];
+  let resto = corrigida;
+  return linhas.map((l, n) => {
+    const valor = n === linhas.length - 1 ? resto : C.arred((corrigida * l.aplicado) / soma);
+    resto -= valor;
+    return { nome: l.emitente.nome, pessoa: !!l.emitente.pessoa, valor };
+  });
+}
 
 /** Contratos ligados (ex.: alteração de titular): anteriores e seguintes, em ordem. */
 export function cadeiaDeContratos(d, c) {
