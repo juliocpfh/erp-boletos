@@ -1213,3 +1213,16 @@ test('caução em depósitos de valores diferentes, cada um com comprovante: som
   R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Caução', caucao_valor: 360000, caucao_meses: 2, caucao_data: '2026-10-10' }, 'julio');
   assert.equal(R.garantiaADepositar(d, c, 'caucao').depositado, 0);
 });
+
+test('arquivos anexados que os lançamentos usam (para apagar o anexo junto com o lançamento)', () => {
+  const { d, c, loja } = base();
+  Object.assign(c, { comprovante_reserva: 'comprovante-reserva.pdf', doc_contrato_arquivo: 'contrato.pdf', doc_vistoria_parcial: { arquivo: 'vistoria-parcial.pdf' } });
+  R.registrarAditivo(d, c.id, { data: '2026-10-01', assunto: 'Troca do vencimento', arquivo: 'aditivo.pdf' }, 'julio');
+  R.inserir(d, 'vistorias', { contrato_id: c.id, tipo: 'Entrada', data: '2026-06-07', fotos: { fachada: 'vistoria-entrada-2026-06-07-fachada.jpg' } }, 'julio');
+  R.inserir(d, 'seguros', { imovel_id: loja.id, arquivo_apolice: 'apolice-1.pdf', outros_arquivos: ['seguro-1-a.pdf'] }, 'julio');
+  const lista = () => R.arquivosReferenciados(d).map((a) => `${a.escopo}:${a.nome}`).sort();
+  assert.deepEqual(lista(), ['aditivos:aditivo.pdf', 'assinados:contrato.pdf', 'assinados:vistoria-parcial.pdf', 'contrato:comprovante-reserva.pdf',
+    'contrato:vistoria-entrada-2026-06-07-fachada.jpg', 'seguro:apolice-1.pdf', 'seguro:seguro-1-a.pdf']);
+  R.excluir(d, 'aditivos', d.aditivos[0].id, 'julio');
+  assert.equal(lista().includes('aditivos:aditivo.pdf'), false, 'excluído o aditivo, o arquivo fica sem uso');
+});
