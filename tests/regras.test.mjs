@@ -1239,3 +1239,22 @@ test('aplicação da garantia na conta de outra pessoa: soma no aplicado e a dev
   assert.deepEqual(R.recebedoresUsados(d), ['Maria Silva (PF)']);
   assert.deepEqual(R.devolucaoPorRecebedor(d, c, 594000).map((x) => [x.nome, x.valor]), [[ank.nome, 330000], ['Maria Silva (PF)', 264000]]);
 });
+
+test('remover o comprovante do depósito da caução: só sem correções; em depósitos, sai o último', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07', caucao_pago_em: '2026-06-07', comprovante_caucao: 'a.pdf' });
+  const cg = R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2026-08-01', valor_novo: 320000, complemento: 20000 }, 'julio');
+  assert.equal(R.podeRemoverComprovanteGarantia(d, c, 'caucao'), false);
+  assert.throws(() => R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio'), /correções/);
+  R.excluir(d, 'correcoes_garantia', cg.id, 'julio');
+  R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio');
+  assert.equal(R.garantiaDepositada(c), false);
+  assert.equal(c.caucao_pago_em, null);
+  // paga em depósitos
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-07', valor: 200000, arquivo: 'b.pdf' }, 'julio');
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-20', valor: 100000, arquivo: 'c.pdf' }, 'julio');
+  assert.equal(R.garantiaDepositada(c), true);
+  R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio');
+  assert.equal(R.garantiaDepositada(c), false);
+  assert.deepEqual(R.depositosGarantiaDo(d, c, 'caucao').map((x) => x.comprovante), ['b.pdf']);
+});

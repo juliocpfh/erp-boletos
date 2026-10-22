@@ -1034,6 +1034,8 @@ function caixaGarantia(c) {
       <button class="pequeno">Registrar depósito</button></form>
       <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes: registre cada depósito com o seu comprovante. Quando a soma chegar ao valor a depositar, a ${nome} fica registrada.</p>` : ''}</div>`;
   };
+  const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
+    ? ` ${botao('removerComprovanteGarantia', 'Remover comprovante', { contrato: c.id, qual }, 'perigo pequeno', `Remover o comprovante do depósito? ${c[`${qual}_por_depositos`] ? 'O último depósito sai da lista (com o arquivo) e' : 'O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
   /** Depósitos que formaram a garantia (quando paga em parcelas). */
   const parcelas = (qual) => { const l = R.depositosGarantiaDo(d(), c, qual); return l.length > 1 ? `<p class="suave">Depositada em ${l.length} vezes: ${l.map((x) => `${dataBr(x.data)} ${reais(x.valor)} ${linkComprovante(c.id, x.comprovante)}`).join('; ')}.</p>` : ''; };
   if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
@@ -1046,7 +1048,7 @@ function caixaGarantia(c) {
         ${comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
     : opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}</div>`;
     }
-    html += `<div class="grade">${item('Caução', `${reais(R.somaDepositos(d(), c, 'caucao') || c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}`)}
+    html += `<div class="grade">${item('Caução', `${reais(R.somaDepositos(d(), c, 'caucao') || c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${linkComprovante(c.id, c.comprovante_caucao)}${remover('caucao')}`)}
       ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
       ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>${parcelas('caucao')}
       <h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
@@ -1058,7 +1060,7 @@ function caixaGarantia(c) {
   if (R.temDeposito(c) && !R.garantiaDepositada(c)) {
     html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
   } else if (R.temDeposito(c)) {
-    html += `<div class="grade">${item('Depósito de garantia', `${reais(R.valorGarantia(d(), c))} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito)}`)}
+    html += `<div class="grade">${item('Depósito de garantia', `${reais(R.valorGarantia(d(), c))} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${linkComprovante(c.id, c.comprovante_deposito)}${remover('deposito')}`)}
       ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>${parcelas('deposito')}`;
   }
   if (R.temFiador(c) || fiadores.length) {
@@ -4387,6 +4389,12 @@ export const ACOES = {
     if (!itens.length) throw new Error('Marque as alterações que quer desfazer.');
     if (!confirm(`Desfazer ${itens.length} alteração(ões) marcada(s)? Cada campo volta ao valor anterior.`)) return;
     await desfazerItens(itens);
+  },
+
+  async removerComprovanteGarantia({ contrato, qual }) {
+    await alterarApagandoAnexos((db) => R.removerComprovanteGarantia(db, Number(contrato), qual, login()));
+    aviso('Comprovante removido: anexe o certo em "Incluir … e anexar comprovante".');
+    await mostrar();
   },
 
   async desmarcarDocumento({ contrato, campo }) {
