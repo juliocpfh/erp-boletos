@@ -5,7 +5,7 @@
 - Cadastra imóveis (com Estado/UF pelo CEP), contratos (o contrato liga o inquilino ao imóvel), fiadores, garantias, IPTU, seguro e leituras de relógios.
 - Gera os boletos mensais (aluguel proporcional, bonificação, IPTU, seguro, tarifa, reserva, ressarcimentos).
 - Registra pagamentos (data contábil, multa e juros; valor recebido diferente do previsto pede justificativa e NF digitada à mão) e numera as NFs em sequência contínua, dividida entre as empresas.
-- Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste e demonstrativo do boleto (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
+- Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste, demonstrativo do boleto e termo aditivo de troca do vencimento (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
 - Mostra alertas, calendário, fechamento do mês, inadimplência, resultados financeiros por imóvel e a guia de impostos esperada por empresa.
 - Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor.
 
@@ -19,7 +19,7 @@
 | `formularios.js` | Definição dos campos de cada cadastro, desenho do formulário, leitura/validação, máscaras CPF/CNPJ/CEP |
 | `armazenamento.js` | Pasta via File System Access API: ler/gravar banco, backup diário, anexos, ZIP |
 | `contratos.js` | Linguagem de modelos de contrato, extenso, vistoria/recibo, geração de HTML e `.docx` |
-| `modelos-contrato.js` | Textos padrão dos contratos (residencial e não residencial) |
+| `modelos-contrato.js` | Textos padrão dos contratos (residencial e não residencial) e do aditivo de vencimento (`tipo: 'aditivo'`) |
 | `fatura.js` | Desenho da NF (HTML) e preenchimento do Excel a partir do modelo |
 | `alertas.js` | Alertas de correção, seguro, reserva e vigência |
 | `auth.js` | Senhas PBKDF2-SHA256 e papéis (admin, operador, consulta) |
@@ -40,7 +40,7 @@
 | Tarefa | Comando / passo |
 |---|---|
 | Rodar local | `cd docs && python3 -m http.server 8000` e abrir `http://localhost:8000/?teste` (pasta interna do navegador, sem escolher pasta) |
-| Conferir (sintaxe + testes) | `node tools/checar.mjs` (111 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
+| Conferir (sintaxe + testes) | `node tools/checar.mjs` (130 testes na última execução); testes sozinhos: `node --test tests/*.mjs` |
 | Achar código | `node tools/mapa.mjs <trecho>` (função → arquivo e linha) |
 | Versão sem internet | `node tools/checar.mjs --offline` (usa `tools/gerar-offline.mjs`) → `docs/offline/administracao-imoveis.html`; `tests/offline.test.mjs` falha se ela ficar desatualizada |
 | Publicar | Merge em `main`; o GitHub Pages serve a pasta `docs/` (segundo `README.md`). Configuração do Pages: NÃO CONFIRMADO no código |
@@ -50,14 +50,14 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 ## Estado atual
 | Pronto (no código) |
 |---|
-| Imóveis, contratos ("Novo contrato"; sem imóvel por 7 dias e sem boleto, é apagado sozinho), fiadores (incluídos, trocados ou tirados pela troca de garantia, que pode ser cancelada), garantias (caução calculada por aluguéis × bonificado; caução e depósito com data prevista no cadastro e data paga + comprovante na página do inquilino, só contam depois disso; fiador, seguro fiança) e reserva com comprovante (também na aplicação da garantia e no complemento da caução; sem ele, alerta para buscar no banco), carência, IPTU por ano com guias (inquilino paga os dias ocupados, o resto é do proprietário), seguro (só salva com o arquivo da apólice; telefone da assistência), solicitações dos inquilinos (tela própria com resumo por situação) |
+| Imóveis, contratos ("Novo contrato"; sem imóvel por 7 dias e sem boleto, é apagado sozinho), fiadores (incluídos, trocados ou tirados pela troca de garantia, que pode ser cancelada), garantias (caução calculada por aluguéis × bonificado; caução e depósito registrados em depósitos de valores diferentes, comprovante opcional com alerta até anexar, completos ao somar o valor do contrato; reajustes viram complemento; aplicação na empresa ou na conta de outra pessoa, e a devolução sai de onde foi depositado; fiador, seguro fiança) e reserva com comprovante (marcável como já abatida em aluguel antigo), carência, IPTU por ano com guias (inquilino paga os dias ocupados, o resto é do proprietário), seguro (só salva com o arquivo da apólice; telefone da assistência), solicitações dos inquilinos (tela própria com resumo por situação) |
 | Boletos mensais, baixa individual e em lote (por vencimento), exclusão dos selecionados (não pagos), recálculo pelo cadastro, boleto de controle (sem NF), boleto separado do complemento da caução (sem tarifa e sem NF, gerado junto com os do mês) |
 | NFs: numeração contínua, divisão entre empresas, cancelar, voltar numeração, NF externa, avulsa (Airbnb), PDF e Excel |
 | Reajuste anual (13º mês a partir do mês de entrada), índices acumulados, carta (com o depósito adicional da caução); a caução acompanha o aluguel corrigido e é corrigida ao pagar o complemento; corrigir o aluguel inicial refaz os reajustes em cadeia |
-| Contrato por modelo (prazo conta da data de vigência inicial), vistoria por modelo do imóvel com fotos (botões de estado por cômodo, "Não se aplica" tira o item do modelo, rascunho guardado até salvar, textos de abertura e final editáveis), recibo de chaves, carta de reajuste (logo de fundo em todas as páginas, na tela e na impressão); documentos de entrada marcados como assinados só com o arquivo anexado, anexados com assinatura faltante ou registrados como perdidos (de operador, aguardam o administrador); termos aditivos ("Possui termo aditivo" só com termo anexado); herança dos documentos na continuação de contrato (com aditivo obrigatório); assinaturas em conjuntos e "Página X de Y" |
+| Contrato por modelo (prazo conta da data de vigência inicial), vistoria por modelo do imóvel com fotos (botões de estado por cômodo, "Não se aplica" tira o item do modelo, rascunho guardado até salvar, textos de abertura e final editáveis), recibo de chaves, carta de reajuste (logo de fundo em todas as páginas, na tela e na impressão); documentos de entrada marcados como assinados só com o arquivo anexado, anexados com assinatura faltante ou registrados como perdidos (de operador, aguardam o administrador); termos aditivos ("Possui termo aditivo" só com termo anexado; aditivo de vencimento gerado por modelo editável, aguardando assinatura); troca de titular ("Continua o contrato de": data da troca, fim do vínculo do anterior, condições/aluguel/reserva/garantia travados e trazidos do anterior, garantia cuidada no contrato anterior, aditivo obrigatório); assinaturas em conjuntos e "Página X de Y" |
 | Resultados por imóvel (com contas pagas por nós e ressarcimentos de condomínio), Excel; aba Impostos (PIS/COFINS mensal, IRPJ/CSLL trimestral com adicional e LC 224, vencimentos, valor do contador) |
 | Painel (imóveis, contratos ativos, boletos em dia/vencidos, pagamentos aguardando NF, aviso com mais alertas, solicitações), calendário (com atalho para o fechamento do mês), fechamento do mês, cadastros incompletos, inadimplência, histórico de alterações (administrador desfaz alterações de cadastro), alertas com cor/ênfase/prioridade editáveis |
-| Usuários e papéis, backup diário, ZIP, backup seguro cifrado, versão sem internet |
+| Usuários e papéis, backup diário, ZIP, backup seguro cifrado, versão sem internet; excluir lançamento apaga o arquivo anexado e "Procurar arquivos sem lançamento" limpa os que sobraram |
 
 | Em andamento |
 |---|
