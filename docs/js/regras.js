@@ -1360,10 +1360,11 @@ export const dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) 
  * Condições do contrato anterior, para quem continua o contrato dele (ex.: troca de titular): prazo, índice, vencimento,
  * bonificação, multa e juros, contas, garantia e finalidade. O aluguel é o atual do anterior.
  */
-export function condicoesDoContrato(d, anterior) {
+export function condicoesDoContrato(d, anterior, data = null) {
   const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
   const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
-  out.aluguel_inicial = aluguelAtual(d, anterior);
+  // aluguel cheio vigente na véspera da troca (sem data: o de hoje)
+  out.aluguel_inicial = aluguelAtual(d, anterior, data ? C.somarDias(data, -1) : C.hojeIso());
   // aluguel com bonificação sobre o aluguel atual (o % do contrato continua)
   if (anterior.bonificacao !== false && percentualBonificacao(anterior) > 0) out.aluguel_bonificado = out.aluguel_inicial - C.descontoPorPercentual(out.aluguel_inicial, percentualBonificacao(anterior));
   // reserva dada na visita: é do contrato (o que o anterior já usou é descontado ao salvar)
