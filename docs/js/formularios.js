@@ -569,12 +569,13 @@ export function arquivoGuardado(campo, nome, acao = 'excluirAnexoDoCampo', dados
 
 /** HTML dos campos de um formulário. */
 export function camposHtml(campos, valores = {}, erros = {}, { compacto = false } = {}) {
-  // seções com "recolher" começam fechadas, com um botão para expandir (abrem sozinhas se algum campo delas tem erro)
+  // seções com "recolher" começam fechadas, com um botão para expandir; abrem sozinhas se algum campo delas está preenchido
+  // (ex.: editar um contrato com inquilino solidário ou carência) ou tem erro
   let atual = null;
   const grupoDe = campos.map((c, k) => { if (c.secao) atual = c.recolher ? `g${k}` : null; return atual; });
   const preenchido = (c) => { const v = valores[c.nome]; return ![undefined, null, '', false, 0, '0'].includes(v) && String(v) !== String(c.padrao ?? ''); };
   const doGrupo = (g) => campos.filter((c, k) => c.nome && grupoDe[k] === g);
-  const aberto = Object.fromEntries([...new Set(grupoDe.filter(Boolean))].map((g) => [g, doGrupo(g).some((c) => erros[c.nome])]));
+  const aberto = Object.fromEntries([...new Set(grupoDe.filter(Boolean))].map((g) => [g, doGrupo(g).some((c) => erros[c.nome] || preenchido(c))]));
   const partes = campos.map((c, k) => {
     const se = c.mostrarSe ? `data-mostrar-se="${esc([c.mostrarSe.campo, ...c.mostrarSe.valores].join('|'))}"` : '';
     const g = grupoDe[k];

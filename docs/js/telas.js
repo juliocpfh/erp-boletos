@@ -360,16 +360,40 @@ function procurarPessoa(el) {
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
 }
 
-/** Inquilino novo que continua o contrato de outro (troca de titular): as condições do contrato anterior entram no formulário. */
+/** Troca de titular escolhida no novo contrato: { anteriorId, data, arquivo } (o termo aditivo é gravado depois de salvar). */
+let continuacao = null;
+
+/**
+ * Inquilino novo que continua o contrato de outro (troca de titular): confirma numa janela a data da alteração (novo início
+ * do contrato e da vigência) e, se já tiver, o termo aditivo assinado da troca; as condições do contrato anterior entram
+ * no formulário. Sem o termo, o contrato é salvo e fica o alerta "Aditivo da troca de titular" até anexar.
+ */
 function ligarContinuacaoDeContrato(raiz) {
   const sel = raiz.querySelector('form[data-form=cadastro] select[name=contrato_anterior_id]');
   if (!sel || !/^#\/novo\/contratos/.test(location.hash)) return;
-  sel.addEventListener('change', () => {
+  if (continuacao && String(continuacao.anteriorId) !== sel.value) continuacao = null;
+  sel.addEventListener('change', async () => {
     const anterior = sel.value && buscar('contratos', sel.value);
+    continuacao = null;
     if (!anterior) return mensagemAuto(sel, '');
+    const r = await janela({ titulo: `Continuar o contrato de ${anterior.inquilino_nome}`, sim: 'Continuar o contrato',
+      html: `<p>O novo inquilino assume o contrato de <b>${esc(anterior.inquilino_nome)}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
+        <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${C.hojeIso()}" required></p>
+        <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
+        <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>` });
+    if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
+    const data = (r.data || [])[0] || C.hojeIso();
+    const arq = (r.arquivo || [])[0];
+    continuacao = { anteriorId: anterior.id, data, arquivo: arq && arq.size ? arq : null };
     const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
     const feitos = preencherVazios(sel.form, F.paraFormulario(campos, R.condicoesDoContrato(d(), anterior)), F.paraFormulario(campos, null));
-    mensagemAuto(sel, feitos.length ? `Continuação do contrato de ${esc(anterior.inquilino_nome)}: ${esc(feitos.join(', '))} vieram do contrato anterior. Confira os valores.` : '');
+    // a data da alteração é o novo início do contrato e da vigência (mesmo se já havia outra data no formulário)
+    for (const nome of ['vigencia_inicio', 'data_entrada']) {
+      const el = sel.form.querySelector(`[name=${nome}]`);
+      if (el) { el.value = data; el.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
+    mensagemAuto(sel, `Continuação do contrato de ${esc(anterior.inquilino_nome)} a partir de ${dataBr(data)}${feitos.length ? `: ${esc(feitos.join(', '))} vieram do contrato anterior` : ''}. Confira os valores.
+      ${continuacao.arquivo ? `Termo aditivo: ${esc(continuacao.arquivo.name)} (anexado ao salvar).` : 'Sem termo aditivo: fica o alerta para anexar.'}`);
   });
 }
 
@@ -1708,6 +1732,16 @@ const CADASTROS = {
     async depois(salvo, antigo) {
       if (avisoAditivo) aviso(avisoAditivo, 'aviso');
       avisoAditivo = '';
+      // troca de titular com o termo aditivo já assinado: vai para "Termos aditivos" do novo contrato
+      const cont = continuacao;
+      continuacao = null;
+      if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
+        const anterior = buscar('contratos', cont.anteriorId);
+        const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
+        const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
+        await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome }, login()));
+        aviso('Termo aditivo da troca de titular registrado.');
+      }
       if (!antigo || !antigo.pasta) return;
       const paiAntigo = pastaPaiContrato(antigo);
       const paiNovo = pastaPaiContrato(salvo);

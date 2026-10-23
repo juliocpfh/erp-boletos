@@ -38,13 +38,15 @@ test('fiadores no cadastro do contrato: sem "Excluir" (é na página do inquilin
   assert.equal(dois.some((c) => c.nome && c.nome.endsWith('_excluir')), false);
 });
 
-test('partes recolhidas: começam fechadas com o botão de expandir; com erro, abertas', () => {
+test('partes recolhidas: começam fechadas com o botão de expandir; preenchidas ou com erro, abertas', () => {
   const campos = [{ secao: 'Inquilino solidário', recolher: F.EXPANDIR_PARTE }, { nome: 'solidario_nome', rotulo: 'Nome', tipo: 'texto' }, { secao: 'Outra' }, { nome: 'x', rotulo: 'X', tipo: 'texto' }];
   const html = F.camposHtml(campos);
   assert.match(html, /data-expandir="g0"[^>]*>Expanda para cadastrar parte</);
   assert.match(html, /class="[^"]*recolhido"\s*data-grupo="g0"/);
   assert.doesNotMatch(html, /recolhido"\s*data-grupo="g2"|data-grupo="g2"/, 'seção comum não recolhe');
-  assert.match(F.camposHtml(campos, { solidario_nome: 'Maria' }), />Expanda para ver ou alterar</);
+  const preenchida = F.camposHtml(campos, { solidario_nome: 'Maria' });
+  assert.doesNotMatch(preenchida, /recolhido/, 'editar contrato com solidário: a parte já vem aberta');
+  assert.match(preenchida, /data-aberto="1"[^>]*>Recolher</);
   assert.doesNotMatch(F.camposHtml(campos, {}, { solidario_nome: 'erro' }), /recolhido/);
 });
 
