@@ -316,10 +316,9 @@ async function listaArquivos(escopo, id) {
   let dir;
   try { dir = await pastaDoEscopo(escopo, id, false); } catch { dir = null; } // pasta ainda não existe: nada anexado
   const todos = dir ? await S.listar(dir) : [];
-  // coluna Matrícula da lista de imóveis: só os arquivos da matrícula, cada um com o "×" para excluir
+  // matrícula na lista de imóveis (embaixo do endereço): 📎1, 📎2… com o nome no "title" e o "×" para excluir
   if (escopo === 'matricula') {
-    return todos.filter((a) => ehMatricula(a.nome)).map((a) => `<div class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎 ${esc(a.nome.replace(/\.[^.]+$/, '').replace(/^matr[ií]cula[\s_-]*/i, '') || 'matrícula')}</a>
-      ${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo da matrícula "${a.nome}"?`) : ''}</div>`).join('');
+    return todos.filter((a) => ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo da matrícula "${a.nome}"?`) : ''}</span>`).join(' ');
   }
   const itens = todos;
   if (!itens.length) return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
@@ -909,24 +908,26 @@ export const TELAS = {
         .filter(([, v]) => v).map(([t, v]) => `${t} <b>${esc(v)}</b>`);
       return l.length ? `<br><span class="contas">${l.join(' · ')}</span>` : '';
     };
+    // matrícula em outra linha fina: número, arquivos (📎1 ×, 📎2 ×…) e "+ anexar"
+    const linhaMatricula = (i) => `<br><span class="contas matricula">📄 Matrícula${i.matricula ? ` nº <b>${esc(i.matricula)}</b>` : ''}
+      <span data-arquivos="matricula:${i.id}"></span>
+      ${opera() ? `<label class="link-botao enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">+ anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</span>`;
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const atual = atuais[0];
-      return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td><td>${esc(R.enderecoCompleto(i))}${linhaContas(i)}</td>
+      return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td><td>${esc(R.enderecoCompleto(i))}${linhaContas(i)}${linhaMatricula(i)}</td>
         <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
-        <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td>
-        <td class="matricula">${i.matricula ? `<span class="suave">nº ${esc(i.matricula)}</span>` : ''}<div data-arquivos="matricula:${i.id}"></div>
-          ${opera() ? `<label class="link-botao enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">+ anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</td></tr>`;
+        <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
-      <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual (bonificado)</th><th>Matrícula</th></tr>
-      ${linhas || '<tr><td colspan="5" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
+      <div class="cartao"><table class="lista-imoveis"><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel (bonif.)</th></tr>
+      ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
       ${linhas ? (() => {
     const t = R.totaisImoveis(d(), hoje);
-    return `<tr class="total"><td colspan="3">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td><td></td></tr>
+    return `<tr class="total"><td colspan="3">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
       <tr class="total"><td colspan="3">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
-        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td><td></td></tr>`;
+        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td></tr>`;
   })() : ''}</table>
       <p class="suave">Valores bonificados (o que o inquilino paga em dia); no total esperado, o valor cheio vem antes e o bonificado entre parênteses. O total com 100% locado soma os aluguéis atuais bonificados e o último aluguel bonificado de cada imóvel vago; entre parênteses, quanto falta para chegar nele. Boletos de controle não entram.</p></div>`;
   },
