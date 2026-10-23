@@ -145,6 +145,36 @@ async function trazerHeranca(id) {
   return r;
 }
 
+/** Muda (ou copia) arquivos da pasta do contrato anterior para a do novo titular. */
+async function arquivosParaHerdeiro(anteriorId, novoId, nomes, mover = true) {
+  if (!nomes.length) return;
+  let de;
+  try { de = await pastaDoEscopo('contrato', anteriorId, false); } catch { return; } // pasta do anterior não existe
+  const para = await pastaDoEscopo('contrato', Number(novoId));
+  for (const nome of [...new Set(nomes)]) {
+    try {
+      await S.escreverTexto(para, nome, await S.abrirArquivo(de, nome));
+      if (mover) await de.removeEntry(nome);
+    } catch { /* arquivo já não estava na pasta do anterior */ }
+  }
+}
+
+/** Herança já feita com a garantia ou a reserva ainda no contrato anterior: completa (R.completarHeranca) e avisa. */
+async function completarHeranca(id) {
+  let r = null;
+  await alterar((db) => {
+    const a = R.contratoHerdado(db, R.buscar(db, 'contratos', Number(id)));
+    if (a && !a.pasta) R.atualizar(db, 'contratos', a.id, { pasta: nomePastaContrato(a) }, login(), 'Pasta de arquivos');
+    r = R.completarHeranca(db, Number(id), login());
+  });
+  if (!r) return null;
+  await arquivosParaHerdeiro(r.anterior.id, id, r.arquivos, true);
+  await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
+  const c = buscar('contratos', id);
+  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.reserva && `reserva de ${reais(c.reserva_valor)}`].filter(Boolean).join(' e ')} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
+  return r;
+}
+
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
 async function trazerHerancasPendentes() {
@@ -152,22 +182,10 @@ async function trazerHerancasPendentes() {
   herancasFeitas = true;
   const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
-  // heranças já feitas antes da reserva passar ao novo titular
-  const semReserva = d().contratos.filter((c) => R.reservaAHerdar(d(), c));
-  for (const c of semReserva) {
-    let copiar = [];
-    await alterar((db) => {
-      const n = R.buscar(db, 'contratos', c.id);
-      copiar = R.herdarReserva(db, n, R.contratoHerdado(db, n), login());
-      R.recalcularCobrancas(db, (cb) => cb.contrato_id === n.id, login());
-    });
-    const a = R.contratoHerdado(d(), c);
-    for (const nome of copiar) {
-      try { await S.escreverTexto(await pastaDoEscopo('contrato', c.id), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', a.id, false), nome)); } catch { /* sem o arquivo */ }
-    }
-    aviso(`${c.inquilino_nome}: reserva de ${reais(a.reserva_valor)} trazida do contrato de ${a.inquilino_nome}.`, 'info');
-  }
-  if (pendentes.length || semReserva.length) await mostrar();
+  // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações) ou a reserva do anterior
+  const incompletas = d().contratos.filter((c) => R.herancaIncompleta(d(), c));
+  for (const c of incompletas) await completarHeranca(c.id);
+  if (pendentes.length || incompletas.length) await mostrar();
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
