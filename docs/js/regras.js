@@ -1537,6 +1537,8 @@ export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
   const r = buscar(d, tabela, id);
   if (!r) throw new Error(`${TABELAS[tabela]} não encontrado.`);
   atualizar(d, tabela, r.id, { [campo]: arquivo }, usuario, `Comprovante anexado: ${arquivo}`);
+  const contratoId = tabela === 'contratos' ? r.id : r.contrato_id;
+  if (['comprovante_caucao', 'comprovante_deposito'].includes(campo) || tabela === 'depositos_garantia') sincronizarGarantiaHerdeiro(d, contratoId, usuario);
 }
 
 /** Caução e depósito de garantia: campos da data efetivamente paga e do comprovante. */
@@ -1563,6 +1565,7 @@ export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, ar
     ...(complementar ? { complementar: true } : {}) }, usuario,
     `${c.inquilino_nome}: ${g.nome}, depósito ${complementar ? 'para completar ' : ''}de ${C.reais(valor)} em ${C.dataBr(data)}${arquivo ? '' : ' (sem comprovante)'}`);
   if (!complementar) completarPorDepositos(d, c, qual, usuario);
+  sincronizarGarantiaHerdeiro(d, c.id, usuario);
   return { deposito: x, ...garantiaADepositar(d, c, qual), completou: !complementar && garantiaDepositada(c) };
 }
 
@@ -1913,6 +1916,31 @@ export function restaurarGarantiaHerdada(d, contratoId, usuario) {
   return { registros: x.registros.length + x.desmarcar.length, duplicados: x.duplicados.length, campos: Object.keys(x.campos), arquivos: [...new Set(arquivos)] };
 }
 
+/**
+ * Garantia herdada cuidada no contrato do titular anterior: o que for anexado lá (comprovante do depósito da caução ou do
+ * depósito de garantia, data do depósito) aparece no novo titular. O arquivo fica na pasta do anterior
+ * (``comprovante_caucao_contrato`` / ``comprovante_deposito_contrato`` = id do anterior). Devolve o herdeiro atualizado ou null.
+ */
+export function sincronizarGarantiaHerdeiro(d, anteriorId, usuario) {
+  const a = buscar(d, 'contratos', anteriorId);
+  const n = a && a.garantia_transferida_para && buscar(d, 'contratos', a.garantia_transferida_para);
+  if (!n) return null;
+  const mud = {};
+  for (const [qual, g] of Object.entries(GARANTIAS_DEPOSITADAS)) {
+    // comprovante do anterior: o do contrato ou o do último depósito com comprovante
+    const dep = depositosGarantiaDo(d, a, qual).filter((x) => x.comprovante && !x.complementar).pop();
+    const nome = a[g.comprovante] || (dep && dep.comprovante);
+    if (!nome) continue;
+    mud[g.comprovante] = nome;
+    mud[`${g.comprovante}_contrato`] = a.id;
+    mud[g.pago] = a[g.pago] || (dep && dep.data) || n[g.pago] || null;
+    mud[`${qual}_por_depositos`] = null;
+  }
+  if (!Object.keys(mud).length) return null;
+  atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
+  return n;
+}
+
 /** Herança feita antes da reserva passar ao novo titular: falta trazer a reserva. */
 export const reservaAHerdar = (d, c) => { const a = c.heranca_transferida && contratoHerdado(d, c); return !!(a && a.reserva_valor > 0 && c.reserva_usada_anterior === undefined); };
 
@@ -2059,7 +2087,7 @@ export function arquivosReferenciados(d) {
   const out = [];
   const usa = (escopo, id, nome) => { if (nome && id) out.push({ escopo, id, nome }); };
   for (const c of d.contratos) {
-    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva']) usa('contrato', c.id, c[k]);
+    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
     for (const [campo] of DOCUMENTOS_ENTRADA) {
       usa('assinados', c.id, c[campoArquivoDoc(campo)]);
       usa('assinados', c.id, (c[campoParcialDoc(campo)] || {}).arquivo);
