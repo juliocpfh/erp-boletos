@@ -3035,7 +3035,7 @@ function telaContas(rota) {
         ${permitidas.tipos.length ? '<button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button>' : ''}</div>
       <div class="rolagem"><table><tr><th>Conta</th><th>Valor pago</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
-      <p class="suave">Preencha só as contas pagas. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
+      <p class="suave">Preencha só as contas pagas. Verificou e não há conta no mês? Informe 0,00 e escreva na observação (ex.: "verificado, sem conta em aberto"): fica registrado e conta como lançado no fechamento. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
       ${permitidas.tipos.length ? '<div class="acoes"><button>Lançar</button></div>' : ''}</form>
     <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th></th></tr>
       ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td>
@@ -3879,7 +3879,7 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const linhas = R.TIPOS_DESPESA.map((t, n) => {
       const texto = String(f[`valor_${n}`] || '').trim();
-      return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : 0, data_pagamento: f[`data_${n}`], observacoes: String(f[`obs_${n}`] || '').trim() };
+      return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], observacoes: String(f[`obs_${n}`] || '').trim() };
     });
     if (!f.competencia) throw new Error('Informe o mês da conta.');
     let n = 0;

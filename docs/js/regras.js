@@ -2437,17 +2437,23 @@ export function contasPermitidas(d, imovelId, comp) {
   return { tipos, motivo: tipos.length ? 'incluso' : 'inquilino' };
 }
 
-/** Lança várias contas do mesmo imóvel de uma vez. ``linhas``: [{ tipo, valor (centavos), data_pagamento, observacoes }]. */
+/**
+ * Lança várias contas do mesmo imóvel de uma vez. ``linhas``: [{ tipo, valor (centavos; null = em branco), data_pagamento, observacoes }].
+ * R$ 0,00 com observação fica registrado: o imóvel foi verificado e não tem conta nossa no mês (conta para o fechamento).
+ */
 export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
   const i = buscar(d, 'imoveis', imovelId);
   if (!i) throw new Error('Imóvel não encontrado.');
-  const novas = linhas.filter((l) => l.valor > 0);
-  if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta.');
+  const obs = (l) => String(l.observacoes || '').trim();
+  const semValor = linhas.filter((l) => l.valor === null && obs(l)).map((l) => l.tipo);
+  if (semValor.length) throw new Error(`${semValor.join(', ')}: informe o valor (0,00 se foi verificado e não há conta).`);
+  const novas = linhas.filter((l) => l.valor > 0 || (l.valor === 0 && obs(l)));
+  if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
   const { tipos } = contasPermitidas(d, i.id, competencia);
   const fora = novas.filter((l) => !tipos.includes(l.tipo)).map((l) => l.tipo);
   if (fora.length) throw new Error(`Em ${C.compBr(competencia)} o inquilino paga ${fora.join(', ')}, conforme o contrato. Só entram contas que são nossas.`);
   return novas.map((l) => inserir(d, 'despesas', { imovel_id: i.id, competencia, tipo: l.tipo, valor: l.valor, data_pagamento: l.data_pagamento || C.hojeIso(),
-    observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} paga por nós (${C.reais(l.valor)})`));
+    observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} ${l.valor ? `paga por nós (${C.reais(l.valor)})` : `verificada, sem conta (R$ 0,00: ${obs(l)})`}`));
 }
 
 // --------------------------------------------------------------------------

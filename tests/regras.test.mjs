@@ -580,6 +580,12 @@ test('fechamento: uma conta lançada (do mês ou paga no mês) já tira o imóve
   assert.equal(contas().feito, true, 'conta de setembro paga em outubro conta para outubro');
   assert.match(contas().detalhe, /1 imóvel\(is\) com conta lançada/);
   d.despesas.length = 0;
+  assert.throws(() => R.lancarDespesas(d, sala.id, '2026-10', [{ tipo: 'Água', valor: 0 }], 'julio'), /pelo menos uma/, '0,00 sem observação não registra');
+  assert.throws(() => R.lancarDespesas(d, sala.id, '2026-10', [{ tipo: 'Água', valor: null, observacoes: 'verificado' }], 'julio'), /informe o valor/);
+  R.lancarDespesas(d, sala.id, '2026-10', [{ tipo: 'Água', valor: 0, observacoes: 'verificado, sem conta em aberto', data_pagamento: '2026-10-20' }], 'julio');
+  assert.equal(d.despesas[0].valor, 0);
+  assert.equal(contas().feito, true, 'R$ 0,00 com observação conta como lançado');
+  d.despesas.length = 0;
   R.lancarDespesas(d, sala.id, '2026-10', [{ tipo: 'Luz', valor: 12000, data_pagamento: '2026-11-03' }], 'julio');
   assert.equal(contas().feito, true, 'só a luz, sem as outras contas');
   assert.equal(loja.id > 0, true);
