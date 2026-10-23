@@ -1444,3 +1444,26 @@ test('garantia herdada desfeita por engano volta pelo histórico; não se pode m
   assert.equal(R.depositosGarantiaDo(d, novo, 'caucao').some((x) => x.id === herdado.id), true);
   assert.equal(R.garantiaHerdadaDesfeita(d, novo), null);
 });
+
+test('garantia herdada cuidada no contrato anterior: comprovante anexado lá aparece no novo titular (arquivo na pasta do anterior)', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', data_saida: '2026-09-30' });
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, data_saida: null, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01' }, 'julio');
+  c.garantia_transferida_para = novo.id;
+  assert.equal(R.garantiaDepositada(novo), false);
+  R.anexarComprovante(d, 'contratos', c.id, 'comprovante_caucao', 'cau.pdf', 'julio');
+  assert.equal(novo.comprovante_caucao, 'cau.pdf');
+  assert.equal(novo.comprovante_caucao_contrato, c.id, 'o arquivo fica na pasta do anterior');
+  assert.equal(R.garantiaDepositada(novo), true);
+  assert.ok(R.arquivosReferenciados(d).some((x) => x.escopo === 'contrato' && x.id === c.id && x.nome === 'cau.pdf'));
+  // ou registrando o depósito com o comprovante no anterior
+  const { d: d2, c: a2 } = base();
+  Object.assign(a2, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01' });
+  const n2 = R.inserir(d2, 'contratos', { inquilino_nome: 'H2', contrato_anterior_id: a2.id, garantia_tipo: 'Caução', caucao_valor: 300000, data_entrada: '2026-10-01' }, 'julio');
+  a2.garantia_transferida_para = n2.id;
+  R.registrarDepositoGarantia(d2, a2.id, 'caucao', { data: '2025-02-03', valor: 300000, arquivo: 'dep.pdf' }, 'julio');
+  assert.equal(n2.comprovante_caucao, 'dep.pdf');
+  assert.equal(n2.caucao_pago_em, '2025-02-03');
+  assert.equal(R.garantiaDepositada(n2), true);
+});

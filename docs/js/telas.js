@@ -175,30 +175,6 @@ async function completarHeranca(id) {
   return r;
 }
 
-/**
- * Restaura a garantia herdada que foi desfeita (R.restaurarGarantiaHerdada) e confere os comprovantes: o que não está
- * na pasta do novo titular vem da pasta do anterior; o que não está em nenhuma é avisado (recuperar da lixeira do OneDrive).
- */
-async function restaurarGarantia(id) {
-  let r = null;
-  await alterar((db) => { r = R.restaurarGarantiaHerdada(db, Number(id), login()); });
-  if (!r) return null;
-  const c = buscar('contratos', id);
-  const a = R.contratoHerdado(d(), c);
-  const faltando = [];
-  for (const nome of r.arquivos) {
-    let ok = false;
-    try { await S.abrirArquivo(await pastaDoEscopo('contrato', c.id, false), nome); ok = true; } catch { /* não está na pasta do novo */ }
-    if (!ok && a) {
-      try { await S.escreverTexto(await pastaDoEscopo('contrato', c.id), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', a.id, false), nome)); ok = true; } catch { /* nem na do anterior */ }
-    }
-    if (!ok) faltando.push(nome);
-  }
-  aviso(`${c.inquilino_nome}: garantia herdada de ${a ? a.inquilino_nome : 'contrato anterior'} restaurada (${[r.registros && `${r.registros} registro(s)`, r.campos.length && 'comprovante e data do depósito', r.duplicados && `${r.duplicados} depósito(s) repetido(s) retirado(s)`].filter(Boolean).join(', ')}).${faltando.length
-    ? ` Arquivo(s) que não estão mais na pasta: ${faltando.join(', ')}. Recupere da lixeira do OneDrive (ou do backup) para a pasta de ${c.inquilino_nome}.` : ''}`, faltando.length ? 'aviso' : 'info');
-  return r;
-}
-
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
 async function trazerHerancasPendentes() {
@@ -209,10 +185,7 @@ async function trazerHerancasPendentes() {
   // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações) ou a reserva do anterior
   const incompletas = d().contratos.filter((c) => R.herancaIncompleta(d(), c));
   for (const c of incompletas) await completarHeranca(c.id);
-  // garantia herdada que foi desfeita depois (ex.: "Desfazer último depósito"): volta pelo histórico
-  const desfeitas = d().contratos.filter((c) => R.garantiaHerdadaDesfeita(d(), c));
-  for (const c of desfeitas) await restaurarGarantia(c.id);
-  if (pendentes.length || incompletas.length || desfeitas.length) await mostrar();
+  if (pendentes.length || incompletas.length) await mostrar();
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
@@ -1233,11 +1206,13 @@ function caixaGarantia(c) {
   const trocas = R.trocasGarantiaDo(d(), c.id);
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
   const herdeiro = c.garantia_transferida_para && buscar('contratos', c.garantia_transferida_para);
+  const anteriorDaGarantia = R.garantiaHerdada(d(), c) ? R.contratoHerdado(d(), c) : null;
+  let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() && !herdeiro ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
+  // troca de titular: a garantia é cuidada aqui, no contrato anterior, e aparece no novo titular
   if (herdeiro) {
-    return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>
-      <p>Passou para <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a> na troca de titular (${dataBr(herdeiro.data_entrada)}), com os depósitos, comprovantes, correções e aplicações.</p></div>`;
+    html += `<div class="alerta info">Esta garantia também vale para <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a> (troca de titular em ${dataBr(herdeiro.data_entrada)}).
+      O comprovante e o depósito anexados aqui aparecem lá. ${opera() ? botao('sincronizarGarantia', `Atualizar em ${esc(herdeiro.inquilino_nome)}`, { id: c.id }, 'mini') : ''}</div>`;
   }
-  let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
   /** Título de uma parte com o botão na mesma linha (ex.: "Correções da caução · Corrigir caução"). */
   const subtitulo = (titulo, acao = '', dica = '') => `<div class="sub-garantia"><h3${dica ? ` title="${esc(dica)}"` : ''}>${titulo}</h3>${acao}</div>`;
   const excluir = (tabela, id, pergunta) => (opera() ? botao('excluir', '✕', { tabela, id }, 'perigo mini', pergunta) : '');
@@ -1260,15 +1235,28 @@ function caixaGarantia(c) {
     ${formDeposito(qual, s.falta)}</div>`;
   };
   const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
-    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo mini', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
-  const comprovanteDa = (qual, campo) => (c[`${qual}_por_depositos`] ? '' : ` · ${linkComprovante(c.id, c[campo])}`);
+    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] && R.depositosGarantiaDo(d(), c, qual).some((x) => !x.complementar) ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo mini', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
+  const irParaAnterior = anteriorDaGarantia && opera() ? ` ${link(`#/contrato/${anteriorDaGarantia.id}?ir=garantia`, `Anexar na garantia de ${esc(anteriorDaGarantia.inquilino_nome)}`, 'botao secundario mini')}` : '';
+  const comprovanteDa = (qual, campo) => {
+    // contrato anterior da troca de titular: comprovante anexado aqui (vale para o novo titular), mesmo se os depósitos passaram para lá
+    if (herdeiro && !R.depositosGarantiaDo(d(), c, qual).some((x) => x.comprovante)) {
+      return ` · ${linkComprovante(c.id, c[campo] || null, { tabela: 'contratos', id: c.id, campo, tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: c[`${qual}_pago_em`] || c[`${qual}_data`] || '' })}`;
+    }
+    if (c[`${qual}_por_depositos`]) return '';
+    return ` · ${c[campo] ? linkComprovante(c[`${campo}_contrato`] || c.id, c[campo]) : `${etiqueta('sem comprovante', 'aviso')}${irParaAnterior}`}`;
+  };
   const parcelas = (qual) => tabelaDepositos(qual, R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
   // correções da caução: aparecem também enquanto a caução não foi depositada inteira
   const correcoesHtml = () => `${subtitulo('Correções da caução', opera() ? link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução') : '')}
     ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th><th></th></tr>
       ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data }) : ''} ${esc(x.observacoes || '')}</td>
         <td class="n">${excluir('correcoes_garantia', x.id, 'Excluir esta correção da caução?')}</td></tr>`).join('')}</table>` : ''}`;
-  if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
+  if (anteriorDaGarantia && (R.temCaucao(c) || R.temDeposito(c)) && !R.garantiaDepositada(c)) {
+    // herdada e ainda sem comprovante: o depósito e o comprovante são anexados no contrato anterior
+    const qual = R.temCaucao(c) ? 'caucao' : 'deposito';
+    html += `<div class="alerta aviso"><b>${qual === 'caucao' ? 'Caução' : 'Depósito de garantia'} herdada de ${esc(anteriorDaGarantia.inquilino_nome)}:</b> ${reais(qual === 'caucao' ? c.caucao_valor : c.deposito_valor)} · sem comprovante.
+      Anexe o comprovante do depósito na garantia do contrato anterior: aparece aqui sozinho.${irParaAnterior}</div>${qual === 'caucao' ? correcoesHtml() : ''}`;
+  } else if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
     html += c.caucao_valor > 0 ? `${registrar('caucao', 'caução', c.caucao_data)}${correcoesHtml()}` : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
   } else if (R.temCaucao(c)) {
     const comp = R.complementoCaucao(d(), c);
@@ -1285,7 +1273,7 @@ function caixaGarantia(c) {
       · atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ''}</p>
       ${parcelas('caucao')}${correcoesHtml()}`;
   }
-  if (R.temDeposito(c) && !R.garantiaDepositada(c)) {
+  if (R.temDeposito(c) && !R.garantiaDepositada(c) && !anteriorDaGarantia) {
     html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
   } else if (R.temDeposito(c)) {
     html += `<p class="linha-garantia">Depósito de garantia <b>${reais(R.valorGarantia(d(), c))}</b>, pago em ${dataBr(c.deposito_pago_em || c.deposito_data)}${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}
@@ -4681,6 +4669,14 @@ export const ACOES = {
     delete fotos[campo];
     await alterarApagandoAnexos((db) => R.atualizar(db, 'vistorias', v.id, { fotos }, login(), `Foto da vistoria excluída: ${v.fotos[campo]}`));
     arquivoApagadoNoFormulario(el, v.fotos[campo]);
+  },
+
+  /** Contrato anterior (troca de titular): leva o comprovante e a data do depósito da garantia para o novo titular. */
+  async sincronizarGarantia({ id }) {
+    let n = null;
+    await alterar((db) => { n = R.sincronizarGarantiaHerdeiro(db, Number(id), login()); });
+    aviso(n ? `Garantia atualizada em ${n.inquilino_nome}.` : 'Anexe primeiro aqui o comprovante do depósito (ou registre o depósito com o comprovante).', n ? 'ok' : 'aviso');
+    await mostrar();
   },
 
   async removerComprovanteGarantia({ contrato, qual }) {
