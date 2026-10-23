@@ -2525,7 +2525,10 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
   const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, proxima)).filter((r) => r && !r.corrigido && !r.carta);
   const nfs = pendentesDeFatura(d).length;
-  const contas = d.imoveis.filter((i) => contasPermitidas(d, i.id, mes).tipos.length && !d.despesas.some((x) => x.imovel_id === i.id && x.competencia === mes));
+  // basta uma conta lançada no imóvel (do mês, ou paga no mês): nem todo imóvel tem todas as contas
+  const lancou = (i) => d.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || '').slice(0, 7) === mes));
+  const comConta = d.imoveis.filter((i) => contasPermitidas(d, i.id, mes).tipos.length);
+  const contas = comConta.filter((i) => !lancou(i));
   const etapas = [
     { chave: 'boletos', titulo: `Gerar os boletos de ${C.compBr(comp)} (vencem em ${C.compBr(mes)})`, pendentes: semBoleto.length,
       detalhe: semBoleto.length ? `sem boleto: ${semBoleto.map((c) => c.inquilino_nome).join(', ')}` : `${doMes.length} boleto(s) gerado(s)`, link: `#/cobrancas?comp=${comp}` },
@@ -2540,7 +2543,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
         detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : 'nada a conferir', link: conferir.length === 1 ? `#/contrato/${conferir[0].id}?ir=ressarcimentos` : '#/inquilinos' };
     })(),
     { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length, manual: true,
-      detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
+      detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
   ];
   for (const e of etapas) {
     e.marcado = marcado(e.chave);
