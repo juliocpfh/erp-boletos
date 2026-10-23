@@ -897,7 +897,7 @@ export const TELAS = {
   imoveis() {
     // contas do imóvel numa linha fina embaixo do endereço (só o que estiver preenchido)
     const linhaContas = (i) => {
-      const l = [['💧 Sanepar', i.sanepar_matricula], ['⚡ Copel', i.copel_uc], ['🔥 Gás', i.gas_relogio], ['🏢', i.administradora_nome]]
+      const l = [['💧 Sanepar', i.sanepar_matricula], ['⚡ Copel', i.copel_uc], ['🔥 Gás', i.gas_relogio], ['📶 Internet', i.internet], ['🏢', i.administradora_nome]]
         .filter(([, v]) => v).map(([t, v]) => `${t} <b>${esc(v)}</b>`);
       return l.length ? `<br><span class="contas">${l.join(' · ')}</span>` : '';
     };
