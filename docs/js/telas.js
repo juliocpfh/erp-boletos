@@ -1572,7 +1572,7 @@ function telaContrato(c) {
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}</div>`;
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
-      ${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao') : ''}
+      ${opera() ? botao('editarContrato', 'Editar', { id: c.id }, 'botao') : ''}
       ${link(`#/contrato/${c.id}?ir=documentos`, 'Contrato, Vistoria, Termos e Aditivos', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
@@ -4979,6 +4979,14 @@ export const ACOES = {
     const cb = await alterar((db) => R.gerarBoletoCaucao(db, Number(contrato), login(), comp || null));
     aviso(`Boleto do complemento da caução gerado: ${reais(cb.caucao_complemento)}, vence em ${dataBr(cb.vencimento)}.`, 'ok');
     await mostrar();
+  },
+
+  /** Editar do inquilino: avisa que é só o cadastro do contrato; correções, reajustes e lançamentos são na própria tela. */
+  async editarContrato({ id }) {
+    const ok = await janela({ titulo: 'Editar os dados do contrato', sim: 'Editar o contrato', nao: 'Voltar',
+      html: `<p>Aqui você altera só os <b>dados do contrato</b>: inquilino, documentos, prazo, valores combinados, garantia e condições.</p>
+        <p><b>Não use para</b> correções do aluguel, reajustes, boletos, pagamentos, depósitos da garantia e demais lançamentos: faça isso pelos botões da própria tela do inquilino.</p>` });
+    if (ok) ir(`#/editar/contratos/${id}`);
   },
 
   async cartaEnviada({ contrato, comp, enviada }) {
