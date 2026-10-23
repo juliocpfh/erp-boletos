@@ -528,13 +528,13 @@ export function saldoReserva(d, contrato, ignorarCobranca = null) {
   const fora = ignorados(ignorarCobranca);
   const usado = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !fora(cb))
     .reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
-  return Math.max((contrato.reserva_valor || 0) - usado - (contrato.reserva_abatida_valor || 0), 0);
+  return Math.max((contrato.reserva_valor || 0) - usado - (contrato.reserva_abatida_valor || 0) - (contrato.reserva_usada_anterior || 0), 0);
 }
 
 /** Reserva já usada em boletos pagos (não muda com o recálculo). */
 const reservaUsadaPaga = (d, c) => d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.data_pagamento).reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
 /** Quanto ainda pode ser marcado como abatido fora do sistema: a reserva menos o já usado em boletos pagos. */
-export const reservaParaMarcarAbatida = (d, c) => Math.max((c.reserva_valor || 0) - reservaUsadaPaga(d, c), 0);
+export const reservaParaMarcarAbatida = (d, c) => Math.max((c.reserva_valor || 0) - reservaUsadaPaga(d, c) - (c.reserva_usada_anterior || 0), 0);
 
 /**
  * Contrato antigo: a reserva já foi abatida em aluguéis de antes do sistema. Marca o mês (AAAA-MM) e o valor;
@@ -1364,6 +1364,10 @@ export function condicoesDoContrato(d, anterior) {
   const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
   const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
   out.aluguel_inicial = aluguelAtual(d, anterior);
+  // aluguel com bonificação sobre o aluguel atual (o % do contrato continua)
+  if (anterior.bonificacao !== false && percentualBonificacao(anterior) > 0) out.aluguel_bonificado = out.aluguel_inicial - C.descontoPorPercentual(out.aluguel_inicial, percentualBonificacao(anterior));
+  // reserva dada na visita: é do contrato (o que o anterior já usou é descontado ao salvar)
+  for (const k of ['reserva_valor', 'reserva_data', 'reserva_competencia']) if (anterior[k]) out[k] = anterior[k];
   // o reajuste continua no aniversário do contrato original
   out.data_base_correcao = dataBaseCorrecao(anterior);
   return out;
@@ -1756,11 +1760,31 @@ export function transferirHeranca(d, novoId, usuario) {
       out.boletosMovidos += 1;
     }
   }
+  out.arquivosReserva = herdarReserva(d, n, a, usuario);
   recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
   desativarSeSaiu(d, a, usuario);
   out.arquivos = [...new Set(out.arquivos)];
   return out;
 }
+
+/**
+ * Reserva dada na visita na troca de titular: é do contrato. O novo titular recebe o valor, a data e o mês de uso; o que
+ * o anterior já usou (nos boletos que ficaram com ele, ou abatido fora do sistema) não volta a abater. Ex.: reserva de
+ * R$ 500,00 já usada no 1º aluguel do anterior → saldo R$ 0,00 no novo. Devolve o comprovante a copiar ([nome] ou []).
+ */
+export function herdarReserva(d, n, a, usuario) {
+  if (!(a.reserva_valor > 0) || n.reserva_usada_anterior !== undefined) return [];
+  const usada = d.cobrancas.filter((cb) => cb.contrato_id === a.id).reduce((t, cb) => t + (cb.reserva_utilizada || 0), 0) + (a.reserva_abatida_valor || 0);
+  const res = { reserva_valor: a.reserva_valor, reserva_data: a.reserva_data || null, reserva_competencia: a.reserva_competencia || null,
+    reserva_usada_anterior: Math.min(usada, a.reserva_valor), reserva_abatida_comp: null, reserva_abatida_valor: null };
+  const copiar = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
+  if (copiar.length) res.comprovante_reserva = a.comprovante_reserva;
+  atualizar(d, 'contratos', n.id, res, usuario, `${n.inquilino_nome}: reserva de ${C.reais(a.reserva_valor)} do contrato (já usada ${C.reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
+  return copiar;
+}
+
+/** Herança feita antes da reserva passar ao novo titular: falta trazer a reserva. */
+export const reservaAHerdar = (d, c) => { const a = c.heranca_transferida && contratoHerdado(d, c); return !!(a && a.reserva_valor > 0 && c.reserva_usada_anterior === undefined); };
 
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
   const a = buscar(d, 'contratos', anteriorId);

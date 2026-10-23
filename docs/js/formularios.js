@@ -278,7 +278,7 @@ export const CONTRATO = [
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto")' }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor' }),
   campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino' }),
-  campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito')),
+  campo('deposito_valor', 'Valor do depósito de garantia', 'dinheiro', { ...quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito'), autoMsg: true }),
   campo('deposito_data', 'Data prevista do depósito', 'data', { ...quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito'), ajuda: 'Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino' }),
   campo('deposito_uso', 'Quando e onde o depósito será usado', 'texto', { largo: true, ...quando('garantia_tipo', 'Depósito garantia', 'Fiador + depósito'), ajuda: 'Ex.: abatido nos dois últimos aluguéis do contrato' }),
   ...fiadoresNoCadastro(),

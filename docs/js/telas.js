@@ -135,8 +135,11 @@ async function trazerHeranca(id) {
       }
     } catch { /* pasta do anterior não existe */ }
   }
+  for (const nome of r.arquivosReserva || []) {
+    try { await S.escreverTexto(await pastaDoEscopo('contrato', Number(id)), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', r.anterior.id, false), nome)); } catch { /* sem o arquivo */ }
+  }
   const c = buscar('contratos', id);
-  const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, r.garantia && `a garantia (${c.garantia_tipo})`,
+  const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`,
     r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
   aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}`, 'info');
   return r;
@@ -149,7 +152,22 @@ async function trazerHerancasPendentes() {
   herancasFeitas = true;
   const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
-  if (pendentes.length) await mostrar();
+  // heranças já feitas antes da reserva passar ao novo titular
+  const semReserva = d().contratos.filter((c) => R.reservaAHerdar(d(), c));
+  for (const c of semReserva) {
+    let copiar = [];
+    await alterar((db) => {
+      const n = R.buscar(db, 'contratos', c.id);
+      copiar = R.herdarReserva(db, n, R.contratoHerdado(db, n), login());
+      R.recalcularCobrancas(db, (cb) => cb.contrato_id === n.id, login());
+    });
+    const a = R.contratoHerdado(d(), c);
+    for (const nome of copiar) {
+      try { await S.escreverTexto(await pastaDoEscopo('contrato', c.id), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', a.id, false), nome)); } catch { /* sem o arquivo */ }
+    }
+    aviso(`${c.inquilino_nome}: reserva de ${reais(a.reserva_valor)} trazida do contrato de ${a.inquilino_nome}.`, 'info');
+  }
+  if (pendentes.length || semReserva.length) await mostrar();
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
@@ -430,6 +448,7 @@ function ligarContinuacaoDeContrato(raiz) {
     continuacao = { anteriorId: anterior.id, data, arquivo: arq && arq.size ? arq : null };
     const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
     const feitos = preencherVazios(sel.form, F.paraFormulario(campos, R.condicoesDoContrato(d(), anterior)), F.paraFormulario(campos, null));
+    if (anterior.garantia_tipo && anterior.garantia_tipo !== 'Sem garantia') travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
     // a data da alteração é o novo início do contrato e da vigência (mesmo se já havia outra data no formulário)
     for (const nome of ['vigencia_inicio', 'data_entrada']) {
       const el = sel.form.querySelector(`[name=${nome}]`);
@@ -438,6 +457,46 @@ function ligarContinuacaoDeContrato(raiz) {
     mensagemAuto(sel, `Continuação do contrato de ${esc(anterior.inquilino_nome)} a partir de ${dataBr(data)}${feitos.length ? `: ${esc(feitos.join(', '))} vieram do contrato anterior` : ''}. Confira os valores.
       ${continuacao.arquivo ? `Termo aditivo: ${esc(continuacao.arquivo.name)} (anexado ao salvar).` : 'Sem termo aditivo: fica o alerta para anexar.'}`);
   });
+}
+
+/** Campos da garantia que vêm do contrato anterior na troca de titular (não se digita uma garantia nova). */
+const CAMPOS_GARANTIA_HERDADA = ['garantia_tipo', 'caucao_meses', 'caucao_valor', 'caucao_data', 'deposito_valor', 'deposito_data'];
+
+/**
+ * Troca de titular: a garantia é a do contrato (não se digita uma caução nova). Os campos ficam travados com a caução
+ * atual (o último valor corrigido) e um aviso; mudar a caução é em "Corrigir caução" na página do inquilino.
+ * ``origem``: contrato de onde vem a garantia (o anterior no novo contrato; o próprio herdeiro na edição).
+ */
+function travarGarantiaHerdada(form, origem, nomeAnterior) {
+  const valores = { garantia_tipo: origem.garantia_tipo || '', caucao_meses: origem.caucao_meses || '', caucao_data: origem.caucao_data || '',
+    deposito_data: origem.deposito_data || '' };
+  const atual = R.valorGarantia(d(), origem);
+  if (R.temCaucao(origem)) valores.caucao_valor = F.dinheiroTexto(atual);
+  if (R.temDeposito(origem)) valores.deposito_valor = F.dinheiroTexto(atual);
+  for (const nome of CAMPOS_GARANTIA_HERDADA) {
+    const el = form.querySelector(`[name=${nome}]`);
+    if (!el) continue;
+    if (nome in valores) el.value = valores[nome];
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.readOnly = true;
+    el.classList.add('travado');
+    el.tabIndex = -1;
+  }
+  // o aviso vai no campo do valor (que tem a linha de mensagem automática)
+  const alvo = form.querySelector(`[name=${R.temDeposito(origem) && !R.temCaucao(origem) ? 'deposito_valor' : 'caucao_valor'}]`);
+  if (alvo) {
+    mensagemAuto(alvo, `<b>Garantia herdada de ${esc(nomeAnterior)}</b>${atual ? `: ${R.temCaucao(origem) ? 'caução' : 'depósito'} atual de ${reais(atual)} (último valor corrigido)` : ''}.
+      Não se registra uma garantia nova na troca de titular: se precisar mudar o valor, use <b>"Corrigir caução"</b> na página do inquilino depois de salvar.`);
+  }
+}
+
+/** Editar o contrato de quem continuou o de outro: a garantia fica travada (é a do contrato). */
+function ligarGarantiaHerdada(raiz) {
+  const form = raiz.querySelector('form[data-form=cadastro]');
+  const [, id] = location.hash.match(/^#\/editar\/contratos\/(\d+)/) || [];
+  const c = form && id && buscar('contratos', id);
+  const ant = c && R.contratoHerdado(d(), c);
+  if (ant) travarGarantiaHerdada(form, c, ant.inquilino_nome);
 }
 
 /** Caixas "Usar o endereço do imóvel" do contrato: [caixa, campo de endereço que recebe] (inquilino, representante e solidário). */
@@ -477,7 +536,7 @@ function ligarCaucao(raiz) {
   const novo = /^#\/novo\/contratos/.test(location.hash);
   const cent = (t) => { try { return String(t || '').trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
   const calcular = () => {
-    if (!novo && valor.value.trim() !== '') return;
+    if (valor.readOnly || (!novo && valor.value.trim() !== '')) return;
     const n = Number(meses.value);
     const bonif = form.querySelector('[name=bonificacao]');
     const base = bonif && bonif.checked ? cent((form.querySelector('[name=aluguel_bonificado]') || {}).value) : cent(form.querySelector('[name=aluguel_inicial]').value);
@@ -568,6 +627,7 @@ function ligarCamposAutomaticos(raiz) {
   ligarNaoSeAplica(raiz);
   for (const el of raiz.querySelectorAll('input[data-calculado]')) el.addEventListener('input', () => el.classList.toggle('valor-calculado', el.value.trim() === el.dataset.calculado));
   ligarContinuacaoDeContrato(raiz);
+  ligarGarantiaHerdada(raiz);
   ligarEnderecoDoImovel(raiz);
   ligarCaucao(raiz);
   for (const el of raiz.querySelectorAll('input[data-mascara]')) {
@@ -1517,14 +1577,16 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
  */
 function caixaReservaAbatida(c) {
   const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
-  const nosBoletos = usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '';
+  const ant = c.reserva_usada_anterior > 0 && R.contratoHerdado(d(), c);
+  const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
+    ant ? `Já usada no contrato de ${esc(ant.inquilino_nome)}: ${reais(c.reserva_usada_anterior)}.` : ''].filter(Boolean).join(' ');
   if (c.reserva_abatida_valor > 0) {
     return `<div class="alerta ok"><b>Reserva já abatida</b> em ${compBr(c.reserva_abatida_comp)}: ${reais(c.reserva_abatida_valor)} (aluguel antigo, fora dos boletos do sistema).
       ${nosBoletos ? `<br>${nosBoletos}` : ''}
       ${opera() ? `<div class="acoes" style="margin-top:6px">${botao('desmarcarReservaAbatida', 'Excluir registro', { id: c.id }, 'perigo pequeno', 'Excluir o registro de reserva já abatida? A reserva volta a abater os boletos em aberto.')}</div>` : ''}</div>`;
   }
   const max = R.reservaParaMarcarAbatida(d(), c);
-  return `${usos.length ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
+  return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
     ${opera() ? `<div class="acoes">${botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno')}</div>
       ${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
         <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
@@ -1688,6 +1750,8 @@ const CADASTROS = {
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.vincular ? `#/novo/vinculos?imovel=${q.vincular}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     ajustar(dados, erros, r, form, q = {}) {
+      // troca de titular: a garantia é a do contrato (travada no formulário; muda só por "Corrigir caução")
+      if (r && R.contratoHerdado(d(), r)) for (const k of CAMPOS_GARANTIA_HERDADA) dados[k] = r[k] ?? null;
       // o aluguel com bonificação digitado é o do aluguel inicial (histórico): o % sai sobre ele e vale também para o aluguel corrigido
       const base = dados.aluguel_inicial;
       const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
