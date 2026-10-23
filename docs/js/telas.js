@@ -72,7 +72,9 @@ const ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n).rever
 export const SUB_DOCS = 'Documentos do imóvel';
 export const SUB_ANUNCIO = 'Anúncio';
 /** Subpastas do imóvel para cada caixa de arquivos. */
-const SUBPASTAS = { imovel: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', seguro: 'Seguro (apólices)', reformas: 'Reformas' };
+/** Arquivo da matrícula: fica nos documentos do imóvel, com o nome começando por "Matricula". */
+const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
+const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', seguro: 'Seguro (apólices)', reformas: 'Reformas' };
 export const PASTA_SEM_IMOVEL = 'Sem imóvel';
 
 /** Pasta-mãe dos arquivos do inquilino: a do imóvel, ou "Sem imóvel". */
@@ -313,7 +315,13 @@ async function listaArquivos(escopo, id) {
   urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
   let dir;
   try { dir = await pastaDoEscopo(escopo, id, false); } catch { dir = null; } // pasta ainda não existe: nada anexado
-  const itens = dir ? await S.listar(dir) : [];
+  const todos = dir ? await S.listar(dir) : [];
+  // coluna Matrícula da lista de imóveis: só os arquivos da matrícula, cada um com o "×" para excluir
+  if (escopo === 'matricula') {
+    return todos.filter((a) => ehMatricula(a.nome)).map((a) => `<div class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎 ${esc(a.nome.replace(/\.[^.]+$/, '').replace(/^matr[ií]cula[\s_-]*/i, '') || 'matrícula')}</a>
+      ${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo da matrícula "${a.nome}"?`) : ''}</div>`).join('');
+  }
+  const itens = todos;
   if (!itens.length) return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
   if (escopo === 'anuncio') {
     const figs = await Promise.all(itens.map(async (a) => {
@@ -328,7 +336,7 @@ async function listaArquivos(escopo, id) {
   const vigencia = (nome) => { const s = seguroDo(nome); return s ? ` <span class="suave">· ${s.arquivo_apolice === nome ? 'apólice' : 'outro arquivo'} · vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</span>` : ''; };
   return `<table>${itens.map((a) => `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${vigencia(a.nome)}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
-    <td class="n">${botao('baixarArquivo', 'Baixar', { escopo, id, nome: a.nome })} ${opera() ? botao('excluirArquivo', 'Excluir', { escopo, id, nome: a.nome }, 'perigo pequeno', 'Excluir este arquivo?') : ''}</td></tr>`).join('')}</table>`;
+    <td class="n">${botao('baixarArquivo', 'Baixar', { escopo, id, nome: a.nome })} ${opera() && escopo !== 'imovel' ? botao('excluirArquivo', 'Excluir', { escopo, id, nome: a.nome }, 'perigo pequeno', 'Excluir este arquivo?') : ''}</td></tr>`).join('')}</table>`;
 }
 
 /** Renomeia a pasta no disco quando o nome do imóvel ou do inquilino (datas) muda. */
@@ -907,16 +915,18 @@ export const TELAS = {
       const atual = atuais[0];
       return `<tr><td><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td><td>${esc(R.enderecoCompleto(i))}${linhaContas(i)}</td>
         <td>${atual ? atuais.map((c) => `<a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso')}</td>
-        <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td></tr>`;
+        <td class="n">${atual ? `${reais(R.aluguelAtual(d(), atual))}${atual.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(atual))})</span>`}` : '-'}</td>
+        <td class="matricula">${i.matricula ? `<span class="suave">nº ${esc(i.matricula)}</span>` : ''}<div data-arquivos="matricula:${i.id}"></div>
+          ${opera() ? `<label class="link-botao enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">+ anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
-      <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual (bonificado)</th></tr>
-      ${linhas || '<tr><td colspan="4" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
+      <div class="cartao rolagem"><table><tr><th>Imóvel</th><th>Endereço</th><th>Inquilino atual</th><th class="n">Aluguel atual (bonificado)</th><th>Matrícula</th></tr>
+      ${linhas || '<tr><td colspan="5" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
       ${linhas ? (() => {
     const t = R.totaisImoveis(d(), hoje);
-    return `<tr class="total"><td colspan="3">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
+    return `<tr class="total"><td colspan="3">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td><td></td></tr>
       <tr class="total"><td colspan="3">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
-        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td></tr>`;
+        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td><td></td></tr>`;
   })() : ''}</table>
       <p class="suave">Valores bonificados (o que o inquilino paga em dia); no total esperado, o valor cheio vem antes e o bonificado entre parênteses. O total com 100% locado soma os aluguéis atuais bonificados e o último aluguel bonificado de cada imóvel vago; entre parênteses, quanto falta para chegar nele. Boletos de controle não entram.</p></div>`;
   },
@@ -1119,7 +1129,7 @@ function telaImovel(i) {
     ${caixaReformas(i)}
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos('anuncio', i.id, 'Fotos do último anúncio', 'anuncio')}
-    ${caixaArquivos('imovel', i.id, 'Documentos do imóvel', 'documentos', 'Matrícula, cadastro do IPTU e outros documentos do imóvel.')}
+    ${caixaArquivos('imovel', i.id, 'Documentos do imóvel', 'documentos', 'Documentos anexados ao imóvel (só para ver e baixar). A matrícula é anexada e excluída na lista de Imóveis, na coluna Matrícula.', false, false)}
     ${caixaHistorico('Histórico do imóvel', tabelaHistorico(ultimos((h) => h.imovel_id === i.id)))}`;
 }
 
@@ -5202,7 +5212,7 @@ export const ACOES = {
     const [escopo, id] = upload.split(':');
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
-    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, f));
+    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
     const vinc = vinculoDoEscopo(escopo, id);
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
