@@ -2265,6 +2265,45 @@ export function salvarEstilosAlertas(d, estilos, usuario) {
 }
 
 // --------------------------------------------------------------------------
+// Ordem das caixas de cada página, escolhida pelo administrador e vista por todos:
+// d.ordem_caixas = { pagina: { grupo: [nomes das caixas na ordem] } }
+// --------------------------------------------------------------------------
+/**
+ * Nova ordem das caixas visíveis, sem perder o lugar das que não aparecem agora (ex.: "Reserva" só existe em alguns
+ * inquilinos): cada uma ausente volta logo depois da caixa que vinha antes dela na ordem guardada.
+ * Ex.: guardada [A, B, R, C], na tela [C, A, B] → [C, A, B, R].
+ */
+export function juntarOrdem(guardada, visiveis) {
+  const nova = [...visiveis];
+  guardada.forEach((k, n) => {
+    if (nova.includes(k)) return;
+    const antes = guardada.slice(0, n).reverse().find((x) => nova.includes(x));
+    nova.splice(antes === undefined ? 0 : nova.indexOf(antes) + 1, 0, k);
+  });
+  return nova;
+}
+
+/**
+ * Ordem para desenhar as caixas que estão na tela (na ordem do sistema): as já guardadas seguem a ordem guardada,
+ * ocupando os lugares delas; caixa nova (nunca arrumada) fica no lugar de sempre.
+ * Ex.: na tela [A, B, N, C], guardada [C, A, B] → [C, A, N, B].
+ */
+export function ordenarCaixas(naTela, guardada = []) {
+  const conhecidas = naTela.filter((k) => guardada.includes(k)).sort((a, b) => guardada.indexOf(a) - guardada.indexOf(b));
+  return naTela.map((k) => (guardada.includes(k) ? conhecidas.shift() : k));
+}
+
+export const ordemGuardada = (d, pagina, grupo) => (((d && d.ordem_caixas) || {})[pagina] || {})[grupo] || [];
+
+/** Grava a nova ordem das caixas de um grupo da página (fica no histórico). */
+export function salvarOrdemCaixas(d, pagina, grupo, visiveis, usuario) {
+  const antes = ordemGuardada(d, pagina, grupo);
+  const nova = juntarOrdem(antes, visiveis);
+  d.ordem_caixas = { ...(d.ordem_caixas || {}), [pagina]: { ...((d.ordem_caixas || {})[pagina] || {}), [grupo]: nova } };
+  registrar(d, usuario, 'Alteração', null, null, `Ordem das caixas da página ${pagina}${grupo ? ` (${grupo})` : ''}: ${visiveis.join(' → ')}`, { ordem_caixas: { de: antes, para: nova } });
+}
+
+// --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco
 // --------------------------------------------------------------------------
 const rs = (c) => `RS${C.reais(c, false)}`;
