@@ -537,6 +537,20 @@ test('documentos de entrada: alerta para todo inquilino ativo, até marcar os tr
   R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
 });
 
+test('IPTU: guias suas a pagar (vencidas e dos próximos 60 dias), por vencimento', () => {
+  const { d, loja } = base(); // inquilino entra em 07/06/2026; antes disso o imóvel está vazio
+  const p = d.iptus.find((x) => x.imovel_id === loja.id);
+  const guias = R.guiasIptuAPagar(d, '2026-04-20', 60);
+  assert.ok(guias.length >= 2);
+  assert.ok(guias.every((g) => g.parcela.proprietario && !g.parcela.paga && g.faltam <= 60));
+  assert.deepEqual(guias.map((g) => g.venc), [...guias.map((g) => g.venc)].sort());
+  assert.ok(guias.some((g) => g.faltam < 0), 'as vencidas aparecem');
+  const primeira = guias[0];
+  R.marcarIptuPago(d, p.id, primeira.parcela.n, '2026-04-20', 'julio');
+  assert.equal(R.guiasIptuAPagar(d, '2026-04-20', 60).length, guias.length - 1, 'paga sai da lista');
+  assert.ok(R.alertasIptu(d, '2026-04-20').length <= R.guiasIptuAPagar(d, '2026-04-20', 60).length, 'alerta: só até 15 dias');
+});
+
 test('contas pagas por nós abatem do resultado do imóvel', () => {
   const { d, loja } = base();
   const c = d.contratos[0];
