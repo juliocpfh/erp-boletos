@@ -175,6 +175,30 @@ async function completarHeranca(id) {
   return r;
 }
 
+/**
+ * Restaura a garantia herdada que foi desfeita (R.restaurarGarantiaHerdada) e confere os comprovantes: o que não está
+ * na pasta do novo titular vem da pasta do anterior; o que não está em nenhuma é avisado (recuperar da lixeira do OneDrive).
+ */
+async function restaurarGarantia(id) {
+  let r = null;
+  await alterar((db) => { r = R.restaurarGarantiaHerdada(db, Number(id), login()); });
+  if (!r) return null;
+  const c = buscar('contratos', id);
+  const a = R.contratoHerdado(d(), c);
+  const faltando = [];
+  for (const nome of r.arquivos) {
+    let ok = false;
+    try { await S.abrirArquivo(await pastaDoEscopo('contrato', c.id, false), nome); ok = true; } catch { /* não está na pasta do novo */ }
+    if (!ok && a) {
+      try { await S.escreverTexto(await pastaDoEscopo('contrato', c.id), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', a.id, false), nome)); ok = true; } catch { /* nem na do anterior */ }
+    }
+    if (!ok) faltando.push(nome);
+  }
+  aviso(`${c.inquilino_nome}: garantia herdada de ${a ? a.inquilino_nome : 'contrato anterior'} restaurada (${[r.registros && `${r.registros} registro(s)`, r.campos.length && 'comprovante e data do depósito', r.duplicados && `${r.duplicados} depósito(s) repetido(s) retirado(s)`].filter(Boolean).join(', ')}).${faltando.length
+    ? ` Arquivo(s) que não estão mais na pasta: ${faltando.join(', ')}. Recupere da lixeira do OneDrive (ou do backup) para a pasta de ${c.inquilino_nome}.` : ''}`, faltando.length ? 'aviso' : 'info');
+  return r;
+}
+
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
 async function trazerHerancasPendentes() {
@@ -185,7 +209,10 @@ async function trazerHerancasPendentes() {
   // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações) ou a reserva do anterior
   const incompletas = d().contratos.filter((c) => R.herancaIncompleta(d(), c));
   for (const c of incompletas) await completarHeranca(c.id);
-  if (pendentes.length || incompletas.length) await mostrar();
+  // garantia herdada que foi desfeita depois (ex.: "Desfazer último depósito"): volta pelo histórico
+  const desfeitas = d().contratos.filter((c) => R.garantiaHerdadaDesfeita(d(), c));
+  for (const c of desfeitas) await restaurarGarantia(c.id);
+  if (pendentes.length || incompletas.length || desfeitas.length) await mostrar();
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */

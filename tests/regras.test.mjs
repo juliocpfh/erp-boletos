@@ -1413,8 +1413,34 @@ test('herança já feita sem a garantia e a reserva do anterior: completa (compr
   assert.equal(novo.comprovante_caucao, 'caucao.pdf');
   assert.equal(R.garantiaDepositada(novo), true, 'sem o alerta de anexar comprovante');
   assert.equal(R.aplicacoesDo(d, novo.id).length, 1);
-  assert.equal(R.valorGarantia(d, novo), 301000, 'caução do contrato + o depósito que a herdeira já tinha');
+  assert.equal(R.valorGarantia(d, novo), 300000, 'só a caução herdada: o depósito próprio que repetia a caução sai');
+  assert.equal(d.depositos_garantia.some((x) => x.contrato_id === novo.id && x.valor === 1000), false);
   assert.equal(c.garantia_transferida_para, novo.id);
   assert.equal(novo.reserva_valor, 50000);
   assert.equal(R.herancaIncompleta(d, novo), null);
+});
+
+test('garantia herdada desfeita por engano volta pelo histórico; não se pode mais remover/desfazer a herdada', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', reserva_valor: 0 });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2025-02-02', valor: 300000, arquivo: 'dep.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, comprovante_caucao: null, caucao_por_depositos: null, caucao_pago_em: null, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id,
+    data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01' }, 'julio');
+  R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2026-10-02', valor: 1000 }, 'julio');
+  c.data_saida = '2026-09-30';
+  R.completarHeranca(d, novo.id, 'julio');
+  assert.equal(R.garantiaDepositada(novo), true);
+  assert.equal(R.podeRemoverComprovanteGarantia(d, novo, 'caucao'), false, 'herdada: sem "Desfazer último depósito"');
+  // o que aconteceu antes desta correção: o depósito herdado foi desfeito
+  const herdado = R.depositosGarantiaDo(d, novo, 'caucao').find((x) => !x.complementar);
+  R.excluir(d, 'depositos_garantia', herdado.id, 'julio');
+  R.atualizar(d, 'contratos', novo.id, { caucao_pago_em: null, comprovante_caucao: null, caucao_por_depositos: null }, 'julio', 'removido');
+  assert.equal(R.garantiaDepositada(novo), false);
+  assert.ok(R.garantiaHerdadaDesfeita(d, novo));
+  const r = R.restaurarGarantiaHerdada(d, novo.id, 'julio');
+  assert.deepEqual(r.arquivos, ['dep.pdf']);
+  assert.equal(R.garantiaDepositada(novo), true);
+  assert.equal(R.depositosGarantiaDo(d, novo, 'caucao').some((x) => x.id === herdado.id), true);
+  assert.equal(R.garantiaHerdadaDesfeita(d, novo), null);
 });

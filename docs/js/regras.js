@@ -1581,7 +1581,7 @@ export function acertarGarantiaDepositada(d, contratoId, qual, usuario) {
 }
 
 /** Pode remover o comprovante do depósito? Na caução, só sem correções registradas (elas partem do valor depositado). */
-export const podeRemoverComprovanteGarantia = (d, c, qual) => !!(c[GARANTIAS_DEPOSITADAS[qual].comprovante] || c[`${qual}_por_depositos`]) && (qual !== 'caucao' || !correcoesCaucaoAtual(d, c).length);
+export const podeRemoverComprovanteGarantia = (d, c, qual) => !garantiaHerdada(d, c) && !!(c[GARANTIAS_DEPOSITADAS[qual].comprovante] || c[`${qual}_por_depositos`]) && (qual !== 'caucao' || !correcoesCaucaoAtual(d, c).length);
 
 /**
  * Remove o comprovante do depósito (anexado errado): a garantia volta a "Incluir … e anexar comprovante".
@@ -1592,6 +1592,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
   const g = GARANTIAS_DEPOSITADAS[qual];
   if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
   if (!c[g.comprovante] && !c[`${qual}_por_depositos`]) throw new Error('Não há depósito registrado para remover.');
+  if (garantiaHerdada(d, c)) throw new Error('Garantia herdada do contrato anterior: para mudar, use "Corrigir caução".');
   if (!podeRemoverComprovanteGarantia(d, c, qual)) throw new Error('Exclua antes as correções da caução.');
   const ultimo = c[`${qual}_por_depositos`] ? depositosGarantiaDo(d, c, qual).filter((x) => !x.complementar).pop() : null;
   if (ultimo) excluir(d, 'depositos_garantia', ultimo.id, usuario, `${c.inquilino_nome}: depósito de ${C.reais(ultimo.valor)} de ${C.dataBr(ultimo.data)} removido`);
@@ -1819,6 +1820,7 @@ export function completarHeranca(d, novoId, usuario) {
     for (const k of CAMPOS_GARANTIA) if (a[k] !== undefined && a[k] !== null && a[k] !== '' && !proprio(k)) mud[k] = a[k];
     for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k] && !n[k]) out.arquivos.push(a[k]);
     const data = n.data_entrada || n.vigencia_inicio;
+    const proprios = (d.depositos_garantia || []).filter((y) => y.contrato_id === n.id && !y.complementar);
     const passa = (t, x, texto) => atualizar(d, t, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
     for (const t of TABELAS_GARANTIA) {
       for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id)) {
@@ -1827,10 +1829,8 @@ export function completarHeranca(d, novoId, usuario) {
       }
     }
     for (const f of d.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || !data || x.data_saida >= data))) passa('fiadores', f, `Fiador ${f.nome}`);
-    // depósitos que o herdeiro já tinha registrado somam à caução (ficam como depósitos para completar)
-    for (const x of (d.depositos_garantia || []).filter((y) => y.contrato_id === n.id && !y.complementar)) {
-      atualizar(d, 'depositos_garantia', x.id, { complementar: true }, usuario, `${n.inquilino_nome}: depósito de ${C.reais(x.valor)} de ${C.dataBr(x.data)} soma à caução herdada`);
-    }
+    // depósitos que o herdeiro tinha lançado por conta própria repetiam a caução (que é a herdada): saem, sem somar
+    for (const x of proprios) excluir(d, 'depositos_garantia', x.id, usuario, `${n.inquilino_nome}: depósito de ${C.reais(x.valor)} de ${C.dataBr(x.data)} substituído pela caução herdada de ${a.inquilino_nome}`);
     mud.caucao_por_depositos = a.caucao_por_depositos || null;
     mud.deposito_por_depositos = a.deposito_por_depositos || null;
     atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia trazida de ${a.inquilino_nome} (troca de titular)`);
@@ -1846,6 +1846,71 @@ export function completarHeranca(d, novoId, usuario) {
   }
   out.arquivos = [...new Set(out.arquivos)];
   return out;
+}
+
+/** Garantia do herdeiro que veio do contrato anterior (não se remove nem se desfaz: muda só por "Corrigir caução"). */
+export const garantiaHerdada = (d, c) => { const a = contratoHerdado(d, c); return !!(a && a.garantia_transferida_para === c.id); };
+
+/**
+ * Garantia herdada que foi desfeita depois (ex.: "Desfazer último depósito" tirou o depósito que veio do anterior):
+ * pelo histórico, os registros que passaram do anterior para o herdeiro e foram excluídos, e os campos da garantia que
+ * vieram na herança e ficaram vazios. { registros: [{ tabela, dados }], campos: {} } ou null.
+ */
+export function garantiaHerdadaDesfeita(d, c) {
+  if (!garantiaHerdada(d, c) || !(temCaucao(c) || temDeposito(c))) return null;
+  const a = contratoHerdado(d, c);
+  // garantia trocada depois da herança ("Trocar garantia"): a herdada não volta
+  const herdouEm = d.historico.findIndex((h) => h.acao === 'Alteração' && h.tabela === 'contratos' && h.registro_id === a.id && /garantia passa para/.test(h.descricao || ''));
+  if (d.historico.some((h, i) => i > herdouEm && h.acao === 'Inclusão' && h.tabela === 'trocas_garantia' && h.contrato_id === c.id)) return null;
+  const registros = [];
+  const desmarcar = []; // depósitos que vieram do anterior marcados por engano como "para completar"
+  const vistos = new Set();
+  d.historico.forEach((h) => {
+    const m = h.acao === 'Alteração' && TABELAS_GARANTIA.includes(h.tabela) && h.detalhes && h.detalhes.contrato_id;
+    if (!m || m.de !== a.id || m.para !== c.id || vistos.has(`${h.tabela}:${h.registro_id}`)) return;
+    vistos.add(`${h.tabela}:${h.registro_id}`);
+    const atual = buscar(d, h.tabela, h.registro_id);
+    if (atual) { if (h.tabela === 'depositos_garantia' && atual.complementar) desmarcar.push(atual.id); return; }
+    const exc = [...d.historico].reverse().find((x) => x.acao === 'Exclusão' && x.tabela === h.tabela && x.registro_id === h.registro_id && x.detalhes);
+    if (exc) registros.push({ tabela: h.tabela, dados: { ...exc.detalhes, contrato_id: c.id } });
+  });
+  // campos da garantia gravados na herança ("garantia trazida de…" / "dados do contrato trazidos de…") que hoje estão vazios
+  const campos = {};
+  for (const h of d.historico) {
+    if (h.acao !== 'Alteração' || h.tabela !== 'contratos' || h.registro_id !== c.id || !h.detalhes || !/trazid[ao]s? de/.test(h.descricao || '')) continue;
+    for (const k of CAMPOS_GARANTIA) {
+      const m = h.detalhes[k];
+      if (m && typeof m === 'object' && 'para' in m && m.para !== null && m.para !== '' && (c[k] === null || c[k] === undefined || c[k] === '')) campos[k] = m.para;
+    }
+  }
+  // versão anterior: os depósitos próprios do herdeiro foram somados à caução herdada ("soma à caução herdada")
+  const somados = new Set(d.historico.filter((h) => h.acao === 'Alteração' && h.tabela === 'depositos_garantia' && /soma à caução herdada/.test(h.descricao || '')).map((h) => h.registro_id));
+  const duplicados = (d.depositos_garantia || []).filter((x) => x.contrato_id === c.id && x.complementar && somados.has(x.id)).map((x) => x.id);
+  // depósitos herdados que cobrem a caução sem a marca de "registrada em depósitos" (ficou com o depósito próprio, que saiu)
+  const herdadosDeps = (d.depositos_garantia || []).filter((x) => x.contrato_id === c.id && (!x.complementar || desmarcar.includes(x.id)));
+  const somaHerdados = herdadosDeps.reduce((t, x) => t + x.valor, 0) + registros.filter((r) => r.tabela === 'depositos_garantia').reduce((t, r) => t + (r.dados.valor || 0), 0);
+  if (somaHerdados && somaHerdados >= (c.caucao_valor || 0) && !c.caucao_por_depositos && temCaucao(c) && (registros.length || desmarcar.length || duplicados.length)) campos.caucao_por_depositos = true;
+  return registros.length || desmarcar.length || duplicados.length || Object.keys(campos).length ? { registros, desmarcar, duplicados, campos } : null;
+}
+
+/** Restaura a garantia herdada desfeita (garantiaHerdadaDesfeita). Devolve os comprovantes que ela usa (para conferir na pasta). */
+export function restaurarGarantiaHerdada(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const x = c && garantiaHerdadaDesfeita(d, c);
+  if (!x) return null;
+  const arquivos = [];
+  for (const { tabela, dados } of x.registros) {
+    if (buscar(d, tabela, dados.id)) continue;
+    d[tabela].push({ ...dados });
+    d.seq[tabela] = Math.max(d.seq[tabela] || 0, dados.id);
+    registrar(d, usuario, 'Inclusão', tabela, dados.id, `${c.inquilino_nome}: ${TABELAS[tabela]} herdado restaurado`, null, vinculos(d, tabela, dados));
+    if (dados.comprovante) arquivos.push(dados.comprovante);
+  }
+  for (const idDep of x.desmarcar) atualizar(d, 'depositos_garantia', idDep, { complementar: null }, usuario, `${c.inquilino_nome}: depósito herdado volta a ser da caução inicial`);
+  for (const idDep of x.duplicados) excluir(d, 'depositos_garantia', idDep, usuario, `${c.inquilino_nome}: depósito próprio que repetia a caução herdada sai (não soma)`);
+  if (Object.keys(x.campos).length) atualizar(d, 'contratos', c.id, x.campos, usuario, `${c.inquilino_nome}: garantia herdada restaurada`);
+  for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (x.campos[k]) arquivos.push(x.campos[k]);
+  return { registros: x.registros.length + x.desmarcar.length, duplicados: x.duplicados.length, campos: Object.keys(x.campos), arquivos: [...new Set(arquivos)] };
 }
 
 /** Herança feita antes da reserva passar ao novo titular: falta trazer a reserva. */
