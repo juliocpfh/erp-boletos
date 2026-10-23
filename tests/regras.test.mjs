@@ -1202,7 +1202,7 @@ test('caução em depósitos de valores diferentes, cada um com comprovante: som
   assert.equal(c.caucao_pago_em, '2026-10-01');
   assert.equal(c.comprovante_caucao, 'c.pdf');
   assert.equal(R.valorGarantia(d, c), 360000, 'caução atual = soma dos depósitos');
-  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-10-02', valor: 1, arquivo: 'd.pdf' }, 'julio'), /já está registrada/);
+  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-10-02', valor: 1, arquivo: 'd.pdf' }, 'julio'), /já está completa/);
   // excluir um depósito: volta a faltar
   R.excluir(d, 'depositos_garantia', ultimo.deposito.id, 'julio');
   R.acertarGarantiaDepositada(d, c.id, 'caucao', 'julio');
@@ -1272,4 +1272,40 @@ test('depósito da caução sem comprovante: registra com data e valor, conta na
   // troca de garantia: a marca de "registrada em depósitos" não passa para a nova
   R.trocarGarantia(d, c.id, { data: '2026-10-10', garantia_tipo: 'Caução', caucao_valor: 360000, caucao_data: '2026-10-10' }, 'julio');
   assert.equal(R.garantiaDepositada(c), false);
+});
+
+test('caução ainda não depositada inteira: aplicação conta o já depositado e a correção à mão muda o valor a depositar', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 400000, caucao_data: '2026-06-07' });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-10', valor: 150000 }, 'julio');
+  assert.equal(R.situacaoAplicacao(d, c).total, 150000);
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: d.emitentes[0].id, data: '2026-06-11', valor: 150000 }, 'julio');
+  assert.equal(R.situacaoAplicacao(d, c).ok, true);
+  R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2026-07-01', valor_novo: 420000, complemento: 20000 }, 'julio');
+  const s = R.garantiaADepositar(d, c, 'caucao');
+  assert.equal(s.combinado, 420000);
+  assert.equal(s.falta, 270000);
+});
+
+test('caução inicial já depositada e aluguel reajustado: registra depósitos para completar (sem travar) e a caução atual soma', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07', caucao_pago_em: '2026-06-07', comprovante_caucao: 'inicial.pdf' });
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-08-07', indice: 'Negociado', valor_anterior: 135000, valor_novo: 150000, percentual: 0 }, 'julio');
+  let s = R.garantiaADepositar(d, c, 'caucao', '2026-10-01');
+  assert.equal(s.necessaria, 270000, '2 × R$ 1.350,00');
+  assert.equal(s.depositado, 243000);
+  assert.equal(s.falta, 27000);
+  const x = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 15000 }, 'julio');
+  assert.equal(x.deposito.complementar, true);
+  assert.equal(R.valorGarantia(d, c), 258000);
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-10', valor: 12000, arquivo: 'b.pdf' }, 'julio');
+  s = R.garantiaADepositar(d, c, 'caucao', '2026-10-01');
+  assert.equal(s.falta, 0);
+  assert.equal(R.valorGarantia(d, c), 270000);
+  assert.equal(R.situacaoAplicacao(d, c).total, 270000);
+  assert.throws(() => R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-11', valor: 1 }, 'julio'), /completa/);
+  // excluir um depósito para completar não desfaz a caução registrada
+  R.excluir(d, 'depositos_garantia', x.deposito.id, 'julio');
+  assert.equal(R.garantiaDepositada(c), true);
+  assert.equal(R.valorGarantia(d, c), 255000);
 });
