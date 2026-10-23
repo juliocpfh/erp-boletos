@@ -103,6 +103,13 @@ function chavePasta(escopo, id) {
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   return i ? [i.pasta || i.nome, escopo].join('/') : null;
 }
+/** Depois de apagar o arquivo de um campo do formulário: troca só o quadro "Já guardado" (sem redesenhar a página). */
+function arquivoApagadoNoFormulario(el, nome) {
+  const caixa = el.closest('.arquivo-guardado');
+  if (caixa) caixa.outerHTML = `<div class="ajuda"><span class="etiqueta aviso">Arquivo apagado</span> ${esc(nome)}. Para anexar outro, escolha o arquivo acima.</div>`;
+  aviso(`Arquivo apagado: ${nome}.`);
+}
+
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
 const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
 /** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
@@ -4411,27 +4418,28 @@ export const ACOES = {
     await desfazerItens(itens);
   },
 
-  /** "Excluir" do arquivo já guardado num formulário de edição (#/editar/tabela/id): tira do registro e apaga da pasta. */
-  async excluirAnexoDoCampo({ campo }) {
+  /**
+   * "Excluir" do arquivo já guardado num formulário de edição (#/editar/tabela/id): tira do registro e apaga da pasta.
+   * A página não é redesenhada: o que já foi digitado no formulário continua lá (ao salvar, o registro é lido de novo).
+   */
+  async excluirAnexoDoCampo({ campo }, el) {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const [, acao, tabela, id] = location.hash.split('?')[0].split('/');
     const r = acao === 'editar' ? buscar(tabela, id) : null;
     if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
     await alterarApagandoAnexos((db) => R.atualizar(db, tabela, r.id, { [campo]: null }, login(), `Arquivo excluído: ${r[campo]}`));
-    aviso('Arquivo apagado.');
-    await mostrar();
+    arquivoApagadoNoFormulario(el, r[campo]);
   },
 
   /** "Excluir" de uma foto já guardada da vistoria (fachada, relógios, quadro de disjuntores). */
-  async excluirFotoVistoria({ campo, vistoria }) {
+  async excluirFotoVistoria({ campo, vistoria }, el) {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const v = buscar('vistorias', vistoria);
     if (!v || !(v.fotos || {})[campo]) throw new Error('Foto não encontrada.');
     const fotos = { ...v.fotos };
     delete fotos[campo];
     await alterarApagandoAnexos((db) => R.atualizar(db, 'vistorias', v.id, { fotos }, login(), `Foto da vistoria excluída: ${v.fotos[campo]}`));
-    aviso('Foto apagada.');
-    await mostrar();
+    arquivoApagadoNoFormulario(el, v.fotos[campo]);
   },
 
   async removerComprovanteGarantia({ contrato, qual }) {
