@@ -371,3 +371,17 @@ th.centro, td.centro { text-align: center; }
 .linha-deposito input.valor { width: 100px; padding: 2px 6px; }
 /* Campo travado (ex.: garantia herdada na troca de titular): só leitura */
 form input.travado, form select.travado { background: #eceff3 !important; color: #555; pointer-events: none; border-style: dashed; }
+
+/* IPTU do ano: um quadradinho por mês, na cor da situação */
+.mapa-iptu .q, .legenda-iptu .q { display: inline-block; width: 20px; height: 20px; border-radius: 5px; margin-right: 3px; vertical-align: middle; border: 0; padding: 0; min-height: 0; }
+.legenda-iptu .q { width: 13px; height: 13px; }
+.q-inq { background: #9FE1CB; }
+.q-div { background: #85B7EB; }
+.q-paga { background: #888780; }
+.q-aberto { background: #E24B4A; }
+button.q-aberto { cursor: pointer; }
+button.q-aberto:hover { outline: 2px solid #791F1F; }
+.q-vazio { background: transparent !important; border: 1px dashed #c4c7cc !important; }
+.meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; text-transform: none; }
+.legenda-iptu { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-top: 8px; }
+.texto-perigo { color: var(--perigo); }

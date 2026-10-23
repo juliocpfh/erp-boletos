@@ -749,7 +749,11 @@ export function totaisIptu(d, p) {
 }
 
 /** Alertas de IPTU que o proprietário precisa pagar (imóvel vazio ou IPTU não cobrado do inquilino). */
-export function alertasIptu(d, hoje = C.hojeIso()) {
+/**
+ * Guias de IPTU que o proprietário paga e ainda não pagou, vencidas ou vencendo em até ``dias`` dias (IPTU deste ano
+ * e do anterior), por ordem de vencimento: { iptu, parcela, imovel, venc, estimado, faltam }.
+ */
+export function guiasIptuAPagar(d, hoje = C.hojeIso(), dias = 60) {
   const lista = [];
   const ano = Number(hoje.slice(0, 4));
   for (const p of d.iptus.filter((x) => x.ano >= ano - 1)) {
@@ -759,10 +763,17 @@ export function alertasIptu(d, hoje = C.hojeIso()) {
       if (!pc.proprietario || pc.paga) continue;
       const venc = pc.vencimento || `${mesBoletoDaParcela(p, Math.max(pc.n, 1)) || (p.primeira_competencia ? C.somarMeses(p.primeira_competencia, Math.max(pc.n, 1)) : `${p.ano}-02`)}-10`;
       const faltam = C.diasEntre(hoje, venc);
-      if (faltam > 15) continue;
-      lista.push({ nivel: faltam < 0 ? 'perigo' : 'aviso', tipo: 'IPTU do proprietário', imovel_id: i.id, imovel: i.nome, inquilino: '', ancora: 'iptu',
-        texto: `IPTU ${p.ano} ${pc.rotulo} ${pc.n ? 'parcela' : ''} de ${C.reais(pc.valor)} ${faltam < 0 ? `venceu em ${C.dataBr(venc)}` : `vence em ${C.dataBr(venc)}`}${pc.vencimento ? '' : ' (vencimento estimado)'}. ${pc.n === 0 ? 'Pago à vista pelo proprietário.' : pc.valorInquilino ? `Sua parte: ${C.reais(pc.valorProprietario)} (o inquilino paga ${C.reais(pc.valorInquilino)} no boleto, pelos dias em que ocupou).` : 'Imóvel vazio ou sem cobrança de IPTU: a parcela é toda sua.'}`.replace('  ', ' ') });
+      if (faltam <= dias) lista.push({ iptu: p, parcela: pc, imovel: i, venc, estimado: !pc.vencimento, faltam });
     }
+  }
+  return lista.sort((a, b) => a.venc.localeCompare(b.venc) || a.imovel.nome.localeCompare(b.imovel.nome, 'pt-BR'));
+}
+
+export function alertasIptu(d, hoje = C.hojeIso()) {
+  const lista = [];
+  for (const { iptu: p, parcela: pc, imovel: i, venc, faltam } of guiasIptuAPagar(d, hoje, 15)) {
+    lista.push({ nivel: faltam < 0 ? 'perigo' : 'aviso', tipo: 'IPTU do proprietário', imovel_id: i.id, imovel: i.nome, inquilino: '', ancora: 'iptu',
+      texto: `IPTU ${p.ano} ${pc.rotulo} ${pc.n ? 'parcela' : ''} de ${C.reais(pc.valor)} ${faltam < 0 ? `venceu em ${C.dataBr(venc)}` : `vence em ${C.dataBr(venc)}`}${pc.vencimento ? '' : ' (vencimento estimado)'}. ${pc.n === 0 ? 'Pago à vista pelo proprietário.' : pc.valorInquilino ? `Sua parte: ${C.reais(pc.valorProprietario)} (o inquilino paga ${C.reais(pc.valorInquilino)} no boleto, pelos dias em que ocupou).` : 'Imóvel vazio ou sem cobrança de IPTU: a parcela é toda sua.'}`.replace('  ', ' ') });
   }
   return lista;
 }
