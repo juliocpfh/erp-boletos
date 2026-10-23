@@ -1334,3 +1334,49 @@ test('troca de titular: fim do vínculo do anterior na véspera (não é saída)
   assert.equal(R.contratoAtivo(c, '2026-10-01'), false);
   assert.equal(R.fimDeVinculo(d, novo), false);
 });
+
+test('herança do contrato: correções, data-base do reajuste, caução com depósitos e aplicações e boletos a partir da troca', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07', vigencia_inicio: '2026-06-07' });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-08', valor: 243000, arquivo: 'cau.pdf' }, 'julio');
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: d.emitentes[0].id, data: '2026-06-09', valor: 243000, comprovante: 'apl.pdf' }, 'julio');
+  for (const comp of ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']) R.gerarCobrancas(d, comp, 'julio');
+  const pago = R.boletoDoMes(d, c.id, '2026-11');
+  R.registrarPagamento(d, pago.id, '2026-12-05', null, 'julio'); // pago, ainda sem NF
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
+    garantia_tipo: 'Caução', comprovante_caucao: null, caucao_por_depositos: null, aluguel_inicial: 135000 }, 'julio');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-10-07', indice: 'Negociado', valor_anterior: 135000, valor_novo: 140000, percentual: 0 }, 'julio');
+  const r = R.transferirHeranca(d, novo.id, 'julio');
+  assert.equal(c.data_saida, '2026-09-30', 'fim do vínculo');
+  assert.equal(novo.data_base_correcao, '2026-06-07', 'reajuste no aniversário do contrato original');
+  assert.equal(r.correcoes, 1);
+  assert.equal(R.aluguelAtual(d, novo, '2026-12-01'), 140000);
+  assert.equal(r.garantia, true);
+  assert.equal(R.garantiaDepositada(novo), true);
+  assert.equal(R.valorGarantia(d, novo), 243000);
+  assert.equal(R.situacaoAplicacao(d, novo).ok, true);
+  assert.deepEqual(r.arquivos.sort(), ['apl.pdf', 'cau.pdf']);
+  assert.equal(c.garantia_transferida_para, novo.id);
+  assert.equal(R.boletoDoMes(d, novo.id, '2026-10').contrato_id, novo.id, 'boleto em aberto de outubro passa');
+  assert.equal(R.boletoDoMes(d, novo.id, '2026-11').id, pago.id, 'pago sem NF também passa (NF sai no nome do novo)');
+  assert.equal(R.boletoDoMes(d, c.id, '2026-09').contrato_id, c.id, 'setembro fica com o anterior');
+  assert.equal(R.transferirHeranca(d, novo.id, 'julio'), null, 'só uma vez');
+});
+
+test('quem saiu fica inativo quando o boleto do último mês já existe; herdeiro não vê reajuste de antes da entrada', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  c.data_saida = '2026-07-15';
+  assert.equal(R.desativarSeSaiu(d, c, null, '2026-08-01'), false, 'falta o boleto de julho (proporcional)');
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  assert.equal(R.desativarSeSaiu(d, c, 'julio', '2026-08-01'), true);
+  assert.equal(c.ativo, false);
+  const { d: d2, c: ant } = base();
+  Object.assign(ant, { vigencia_inicio: '2025-02-01', data_entrada: '2025-02-01' });
+  R.inserir(d2, 'correcoes', { contrato_id: ant.id, data_vigencia: '2026-02-01', indice: 'IPCA', valor_anterior: 135000, valor_novo: 140000, percentual: 3.7 }, 'julio');
+  const { id, ...resto } = ant;
+  const novo = R.inserir(d2, 'contratos', { ...resto, inquilino_nome: 'Novo', contrato_anterior_id: ant.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', data_base_correcao: '2025-02-01' }, 'julio');
+  assert.equal(R.reajustePendente(d2, novo, '2026-11-01'), null, 'o de 02/2026 foi do anterior');
+  assert.equal(R.reajustePendente(d2, novo, '2027-01-20').competencia, '2027-02', 'o próximo é no aniversário do contrato original');
+});
