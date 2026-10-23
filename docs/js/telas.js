@@ -110,6 +110,48 @@ function arquivoApagadoNoFormulario(el, nome) {
   aviso(`Arquivo apagado: ${nome}.`);
 }
 
+/**
+ * Troca de titular: traz do contrato anterior as correções, a caução (com os comprovantes, que mudam de pasta) e os boletos
+ * a partir da data da troca (R.transferirHeranca). Avisa o que foi feito.
+ */
+async function trazerHeranca(id) {
+  let r = null;
+  await alterar((db) => {
+    // o nome da pasta do anterior muda com a data de saída: guarda o atual antes do fim do vínculo (os arquivos estão nele)
+    const a = R.contratoHerdado(db, R.buscar(db, 'contratos', Number(id)));
+    if (a && !a.pasta) R.atualizar(db, 'contratos', a.id, { pasta: nomePastaContrato(a) }, login(), 'Pasta de arquivos');
+    r = R.transferirHeranca(db, Number(id), login());
+  });
+  if (!r) return null;
+  if (r.arquivos.length) {
+    try {
+      const de = await pastaDoEscopo('contrato', r.anterior.id, false);
+      const para = await pastaDoEscopo('contrato', Number(id));
+      for (const nome of [...new Set(r.arquivos)]) {
+        try {
+          await S.escreverTexto(para, nome, await S.abrirArquivo(de, nome));
+          await de.removeEntry(nome);
+        } catch { /* arquivo já não estava na pasta do anterior */ }
+      }
+    } catch { /* pasta do anterior não existe */ }
+  }
+  const c = buscar('contratos', id);
+  const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, r.garantia && `a garantia (${c.garantia_tipo})`,
+    r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
+  aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}`, 'info');
+  return r;
+}
+
+/** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
+let herancasFeitas = false;
+async function trazerHerancasPendentes() {
+  if (herancasFeitas || !opera() || !E.pasta) return;
+  herancasFeitas = true;
+  const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c));
+  for (const c of pendentes) await trazerHeranca(c.id);
+  if (pendentes.length) await mostrar();
+}
+
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
 const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
 /** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
@@ -696,6 +738,7 @@ export const TELAS = {
   // ------------------------------------------------------------------------
   painel(rota) {
     limparSemImovel().catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, 'aviso'));
+    trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'));
     const hoje = C.hojeIso();
     const alertas = R.todosAlertas(d(), hoje);
     const pend = R.pendentesDeFatura(d());
@@ -1049,6 +1092,11 @@ function caixaGarantia(c) {
   const sug = R.caucaoSugerida(d(), c);
   const trocas = R.trocasGarantiaDo(d(), c.id);
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
+  const herdeiro = c.garantia_transferida_para && buscar('contratos', c.garantia_transferida_para);
+  if (herdeiro) {
+    return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>
+      <p>Passou para <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a> na troca de titular (${dataBr(herdeiro.data_entrada)}), com os depósitos, comprovantes, correções e aplicações.</p></div>`;
+  }
   let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
   /** Título de uma parte com o botão na mesma linha (ex.: "Correções da caução · Corrigir caução"). */
   const subtitulo = (titulo, acao = '', dica = '') => `<div class="sub-garantia"><h3${dica ? ` title="${esc(dica)}"` : ''}>${titulo}</h3>${acao}</div>`;
@@ -1257,7 +1305,9 @@ function caixaBoletosInquilino(c, cobs, hoje) {
   const antigos = cobs.slice(BOLETOS_INQUILINO);
   return `<div class="cartao"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
     <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join('') || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
-    ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join('')}</table></div></details>` : ''}</div>`;
+    ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join('')}</table></div></details>` : ''}
+    ${R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => { const l = d().cobrancas.filter((y) => y.contrato_id === x.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
+    return l.length ? `<details><summary>Boletos do titular anterior: ${esc(x.inquilino_nome)} (${l.length})</summary><div class="rolagem"><table class="compacta">${cab}${l.map(linha).join('')}</table></div></details>` : ''; }).join('')}</div>`;
 }
 
 /** Cabeçalho do inquilino: botões para abrir na hora os documentos já anexados (entrada, assinatura faltante e aditivos). */
@@ -1437,7 +1487,9 @@ function telaContrato(c) {
         Refeitas em cadeia: ${m.map((x) => `${dataBr(x.x.data_vigencia)} ${reais(x.x.valor_novo)} → <b>${reais(x.valor_novo)}</b>`).join('; ')}. O novo valor negociado fica como combinado.
         ${opera() ? `<div class="acoes" style="margin-top:6px">${botao('recalcularCorrecoes', 'Refazer as correções a partir do aluguel inicial', { id: c.id }, 'pequeno', 'Refazer as correções a partir do aluguel inicial? Os boletos em aberto são recalculados.')}</div>` : ''}</div>` : ''; })()}
       <table><tr><th>Vale a partir de</th><th>Previsto no contrato</th><th>Índice usado</th><th class="n">%</th><th class="n">Valor anterior</th><th class="n">Novo valor</th><th></th></tr>
-      <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="4" class="suave">Valor inicial do contrato</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
+      ${cadeia.antes.flatMap((x) => [`<tr class="suave"><td>${dataBr(x.vigencia_inicio)}</td><td colspan="4">Valor inicial · titular anterior: ${esc(x.inquilino_nome)}</td><td class="n">${reais(x.aluguel_inicial)}</td><td></td></tr>`,
+    ...R.correcoesDo(d(), x.id).map((y) => `<tr class="suave"><td>${dataBr(y.data_vigencia)}</td><td>${esc(y.indice_contrato || '-')}</td><td>${esc(y.indice || '-')} <span class="suave">(${esc(x.inquilino_nome)})</span></td><td class="n">${pct(y.percentual)}</td><td class="n">${reais(y.valor_anterior)}</td><td class="n">${reais(y.valor_novo)}</td><td></td></tr>`)]).join('')}
+      <tr><td>${dataBr(c.vigencia_inicio)}</td><td colspan="4" class="suave">${cadeia.antes.length ? 'Valor inicial deste titular (continuação do contrato)' : 'Valor inicial do contrato'}</td><td class="n">${reais(c.aluguel_inicial)}</td><td></td></tr>
       ${R.correcoesDo(d(), c.id).map((x) => `<tr><td>${dataBr(x.data_vigencia)}</td><td>${esc(x.indice_contrato || '-')}</td><td>${x.indice === 'Negociado' ? etiqueta('Negociado', 'aviso') : `${esc(x.indice || '-')}${x.data_indice ? ` <span class="suave">(${compBr(x.data_indice)})</span>` : ''}`}</td><td class="n">${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes', id: x.id }, 'perigo pequeno', 'Excluir esta correção?') : ''}</td></tr>`).join('')}</table></div>
     <div class="cartao" id="renovacoes"><div class="cabecalho"><h2>Renovação e novo valor negociado</h2>${opera() ? link(`#/novo/renovacoes?contrato=${c.id}`, 'Registrar renovação / novo valor') : ''}</div>
       <p class="suave">No aniversário vale a correção pelo índice do contrato. No fim do prazo, o novo valor é negociado com o inquilino e registrado aqui.</p>
@@ -1733,9 +1785,7 @@ const CADASTROS = {
       // troca de titular com o termo aditivo já assinado: vai para "Termos aditivos" do novo contrato
       const cont = continuacao;
       continuacao = null;
-      if (!antigo && cont && salvo.contrato_anterior_id === cont.anteriorId) {
-        await alterar((db) => R.encerrarVinculoPorContinuacao(db, cont.anteriorId, cont.data, salvo.inquilino_nome, login()));
-      }
+      if (!antigo && salvo.contrato_anterior_id) await trazerHeranca(salvo.id);
       if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
         const anterior = buscar('contratos', cont.anteriorId);
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;

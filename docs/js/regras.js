@@ -79,6 +79,8 @@ export function normalizar(d) {
   // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
   // (o termo gerado e ainda não assinado, sem arquivo, não conta)
   for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
+  // quem já saiu (ou teve fim do vínculo) e já tem o boleto do último mês fica inativo
+  for (const c of d.contratos) desativarSeSaiu(d, c);
   // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
   for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
   return d;
@@ -1362,6 +1364,8 @@ export function condicoesDoContrato(d, anterior) {
   const contas = ['conta_agua', 'conta_energia', 'conta_gas', 'conta_condominio', 'conta_internet'];
   const out = Object.fromEntries([...CAMPOS_CONDICOES, ...contas].filter((k) => anterior[k] !== undefined && anterior[k] !== null && anterior[k] !== '').map((k) => [k, anterior[k]]));
   out.aluguel_inicial = aluguelAtual(d, anterior);
+  // o reajuste continua no aniversário do contrato original
+  out.data_base_correcao = dataBaseCorrecao(anterior);
   return out;
 }
 
@@ -1427,6 +1431,7 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
     `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
   atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
+  desativarSeSaiu(d, c, usuario);
   if (leitura) registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data: dados.data_saida, momento: 'Saída do inquilino', ...leitura, observacoes: '' }, usuario);
   return r;
 }
@@ -1690,6 +1695,73 @@ export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
  * Troca de titular: termina o vínculo do inquilino anterior na véspera da data da alteração (ex.: troca em 01/10/2026 →
  * vínculo até 30/09/2026). Os boletos dele vão até essa data e os do novo titular começam na data da troca.
  */
+/** Registros da garantia que pertencem ao contrato (passam ao novo titular junto com a caução ou o depósito). */
+const TABELAS_GARANTIA = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'trocas_garantia'];
+
+/**
+ * Contrato herdado (troca de titular): traz do titular anterior, a partir da data da troca (a entrada do novo), o que é
+ * do contrato e não da pessoa. Ex.: troca em 01/10/2026:
+ * - fim do vínculo do anterior em 30/09/2026;
+ * - reajuste: a data-base continua a do contrato original; correções do aluguel a partir de 01/10/2026 passam ao novo,
+ *   e o aluguel inicial do novo é o vigente do anterior em 30/09/2026 (se o novo ainda não tem correções próprias);
+ * - caução / depósito de garantia: valores, depósitos, correções, aplicações, trocas e fiadores atuais passam ao novo
+ *   (se o novo ainda não tem garantia própria registrada); os comprovantes mudam de pasta (lista ``arquivos``);
+ * - boletos do anterior a partir de 10/2026 passam ao novo (a NF sai com os dados do novo titular), também os já pagos
+ *   ainda sem NF; em aberto, saem se o novo já tem o do mês. Os dois contratos são recalculados. Boleto com NF emitida
+ *   fica com o anterior (``comNf``).
+ * Uma vez por contrato (marca ``heranca_transferida``).
+ */
+export function transferirHeranca(d, novoId, usuario) {
+  const n = buscar(d, 'contratos', novoId);
+  const a = n && contratoHerdado(d, n);
+  const data = n && (n.data_entrada || n.vigencia_inicio);
+  if (!a || !data || n.heranca_transferida) return null;
+  const fim = C.somarDias(data, -1);
+  const out = { anterior: a, data, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0 };
+  encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
+  const passa = (tabela, x, texto) => atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+  // aluguel e reajuste
+  const mud = { heranca_transferida: data };
+  if (!n.data_base_correcao) mud.data_base_correcao = dataBaseCorrecao(a);
+  const semCorrecoesProprias = !correcoesDo(d, n.id).length;
+  if (semCorrecoesProprias) mud.aluguel_inicial = aluguelAtual(d, a, fim);
+  for (const x of correcoesDo(d, a.id).filter((y) => y.data_vigencia >= data)) { passa('correcoes', x, `Correção do aluguel de ${C.dataBr(x.data_vigencia)}`); out.correcoes += 1; }
+  // garantia em dinheiro (e fiadores atuais)
+  const garantiaPropria = n.comprovante_caucao || n.comprovante_deposito || n.caucao_por_depositos || n.deposito_por_depositos
+    || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === n.id));
+  if (!garantiaPropria && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
+    for (const k of CAMPOS_GARANTIA) mud[k] = a[k] ?? null;
+    for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k]) out.arquivos.push(a[k]);
+    for (const t of TABELAS_GARANTIA) {
+      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id)) {
+        if (x.comprovante) out.arquivos.push(x.comprovante);
+        passa(t, x, TABELAS[t]);
+      }
+    }
+    for (const f of d.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || x.data_saida >= data))) passa('fiadores', f, `Fiador ${f.nome}`);
+    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id, comprovante_caucao: null, comprovante_deposito: null }, usuario,
+      `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+    out.garantia = true;
+  }
+  atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: dados do contrato trazidos de ${a.inquilino_nome} (troca de titular em ${C.dataBr(data)})`);
+  // boletos a partir do mês seguinte ao fim do vínculo
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
+    if (ehComplementoCaucao(cb) && !out.garantia) continue;
+    if (faturasDe(d, 'cobranca', cb.id).length) { out.comNf += 1; continue; }
+    if (!cb.data_pagamento && !ehComplementoCaucao(cb) && boletoDoMes(d, n.id, cb.competencia)) {
+      excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${a.inquilino_nome} excluído: o de ${n.inquilino_nome} já existe (troca de titular)`);
+      out.boletosApagados += 1;
+    } else {
+      passa('cobrancas', cb, `Boleto ${C.compBr(cb.competencia)}`);
+      out.boletosMovidos += 1;
+    }
+  }
+  recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
+  desativarSeSaiu(d, a, usuario);
+  out.arquivos = [...new Set(out.arquivos)];
+  return out;
+}
+
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
   const a = buscar(d, 'contratos', anteriorId);
   if (!a || !data) return null;
@@ -2398,7 +2470,21 @@ export function reajustePendente(d, c, hoje = C.hojeIso()) {
   const n = Math.floor(C.mesesEntre(p, limite) / 12);
   if (n < 1) return null;
   const r = reajusteNaCompetencia(d, c, competenciaDoReajuste(c, n));
+  // troca de titular: reajuste de antes da entrada do novo titular é do contrato anterior (já está no aluguel herdado)
+  if (r && contratoHerdado(d, c) && c.data_entrada && r.competencia < c.data_entrada.slice(0, 7)) return null;
   return r && !r.corrigido ? r : null;
+}
+
+/**
+ * Quem saiu (ou teve fim do vínculo na troca de titular) deixa de estar ativo: quando a data já passou e o boleto do
+ * último mês já existe (para não deixar de gerar o aluguel proporcional desse mês). ``usuario`` vazio: só ajusta (ao abrir).
+ */
+export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
+  if (c.ativo === false || !c.data_saida || c.data_saida >= hoje) return false;
+  if (c.imovel_id && !boletoDoMes(d, c.id, c.data_saida.slice(0, 7)) && C.diasOcupados(c.data_saida.slice(0, 7), c.data_entrada, c.data_saida) > 0) return false;
+  if (usuario) atualizar(d, 'contratos', c.id, { ativo: false }, usuario, `${c.inquilino_nome}: inativo (${fimDeVinculo(d, c) ? 'fim do vínculo' : 'saída'} em ${C.dataBr(c.data_saida)})`);
+  else c.ativo = false;
+  return true;
 }
 
 /** Alerta do reajuste: um mês antes (enviar a carta com o boleto anterior) ou atrasado. */
