@@ -556,6 +556,17 @@ function editorLista(c) {
       <div class="ajuda">Só dá para remover o que não estiver em uso.</div></div>`;
 }
 
+/**
+ * Arquivo já guardado num campo de anexo: ✓ verde, o nome e o botão "Excluir" (apaga o arquivo, com confirmação).
+ * ``acao``/``dados``: outra ação para apagar (ex.: foto da vistoria); o padrão apaga o campo do registro em edição.
+ */
+export function arquivoGuardado(campo, nome, acao = 'excluirAnexoDoCampo', dados = {}) {
+  const extra = Object.entries({ campo, ...dados }).map(([k, x]) => `data-${k}="${esc(x)}"`).join(' ');
+  return `<div class="ajuda arquivo-guardado"><span class="etiqueta ok">✓ Já guardado</span> ${esc(nome)}
+    <button type="button" class="perigo pequeno" data-acao="${acao}" ${extra} data-confirmar="${esc(`Apagar o arquivo "${nome}"? Ele sai da pasta e não dá para recuperar.`)}">Excluir</button>
+    <br>Para trocar, escolha outro arquivo.</div>`;
+}
+
 /** HTML dos campos de um formulário. */
 export function camposHtml(campos, valores = {}, erros = {}, { compacto = false } = {}) {
   // seções com "recolher" começam fechadas, com um botão para expandir (abrem sozinhas se algum campo delas tem erro)
@@ -589,8 +600,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     const max = c.max ? `maxlength="${c.max}"` : '';
     if (c.tipo === 'arquivo') {
       // o nome do arquivo já guardado vem do registro; depois de um erro o navegador esquece o arquivo escolhido
-      const guardado = typeof v === 'string' && v ? `Já guardado: ${esc(v)}. Escolha outro só para trocar.` : '';
-      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${guardado ? `<div class="ajuda">${guardado}</div>` : ''}`;
+      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${typeof v === 'string' && v ? arquivoGuardado(c.nome, v) : ''}`;
     } else if (c.tipo === 'area') entrada = `<textarea id="${id}" name="${c.nome}" ${c.linha ? 'rows="1" class="cresce"' : ''} ${max}>${esc(v)}</textarea>`;
     else if (c.tipo === 'opcao') {
       const ops = c.opcoes.map((o) => (Array.isArray(o) ? o : [o, o]));
