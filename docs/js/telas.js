@@ -380,7 +380,8 @@ function ligarContinuacaoDeContrato(raiz) {
       html: `<p>O novo inquilino assume o contrato de <b>${esc(anterior.inquilino_nome)}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${C.hojeIso()}" required></p>
         <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
-        <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>` });
+        <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
+        <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).</p>` });
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
@@ -1048,41 +1049,37 @@ function caixaGarantia(c) {
   const sug = R.caucaoSugerida(d(), c);
   const trocas = R.trocasGarantiaDo(d(), c.id);
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
-  let html = `<div class="cartao" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
-  // caução e depósito: até a soma dos depósitos (cada um com comprovante) chegar ao necessário, o alerta para registrar
-  const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
-      <label style="margin:0">Depositado em</label><input type="date" name="data" value="${esc(C.hojeIso())}" style="width:auto">
-      <label style="margin:0">Valor R$</label><input name="valor" value="${esc(C.reais(falta, false))}" style="width:120px">
-      <label class="botao secundario pequeno enviar" title="Comprovante deste depósito (PDF ou foto); pode anexar depois"><span data-nome-escolhido>Anexar comprovante (opcional)</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-      <button class="pequeno">Registrar depósito</button></form>` : '');
+  let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
+  /** Título de uma parte com o botão na mesma linha (ex.: "Correções da caução · Corrigir caução"). */
+  const subtitulo = (titulo, acao = '', dica = '') => `<div class="sub-garantia"><h3${dica ? ` title="${esc(dica)}"` : ''}>${titulo}</h3>${acao}</div>`;
+  const excluir = (tabela, id, pergunta) => (opera() ? botao('excluir', '✕', { tabela, id }, 'perigo mini', pergunta) : '');
+  // caução e depósito: registro em depósitos (data, valor, comprovante opcional) até completar o valor do contrato
+  const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes linha-deposito"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
+      <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">
+      <input name="valor" value="${esc(C.reais(falta, false))}" title="Valor depositado (R$)" class="valor">
+      <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <button class="mini">Registrar depósito</button></form>` : '');
+  const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
+  /** Depósitos numa tabela curta: data, valor, comprovante e ✕ (só onde pode excluir). */
+  const tabelaDepositos = (qual, lista, podeExcluir) => (lista.length ? `<table class="compacta">${lista.map((x) => `<tr><td class="nw">${dataBr(x.data)}${x.complementar ? ' <span class="suave">complemento</span>' : ''}</td>
+      <td class="n">${reais(x.valor)}</td><td>${linkComprovante(c.id, x.comprovante, anexoDeposito(qual, x))}</td>
+      <td class="n">${podeExcluir(x) ? excluir('depositos_garantia', x.id, `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : '');
   const registrar = (qual, nome, prevista) => {
     const s = R.garantiaADepositar(d(), c, qual);
-    const Nome = `${nome.charAt(0).toLocaleUpperCase('pt-BR')}${nome.slice(1)}`;
-    return `<div class="alerta aviso"><b>Incluir ${nome} e anexar comprovante.</b> ${Nome} de ${reais(s.combinado)} prevista para ${dataBr(prevista)}.
-    ${s.corrigida ? `<br>Com o aluguel já corrigido, depois de registrada a ${nome} deve ser completada até <b>${reais(s.corrigida)}</b> (${c.caucao_meses} aluguéis com bonificação): complemento de ${reais(s.corrigida - s.combinado)} pelos reajustes.` : ''}
-    ${s.depositos.length ? `<table class="compacta" style="margin-top:6px"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th><th></th></tr>${s.depositos.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td>
-      <td>${linkComprovante(c.id, x.comprovante, { tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data })}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : ''}
-    <br>A depositar: <b>${reais(s.necessaria)}</b> · já depositado: <b>${reais(s.depositado)}</b> · falta: <b>${reais(s.falta)}</b>
-    ${opera() ? `${formDeposito(qual, s.falta)}
-      <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes, com a data e o valor de cada uma. Sem o comprovante, o depósito é registrado e fica o aviso "sem comprovante" até anexar. Quando a soma chegar ao valor da ${nome} do contrato (ou da troca de garantia), ela fica registrada; a diferença dos reajustes vem depois, como complemento.</p>` : ''}</div>`;
+    return `<div class="alerta aviso"><b>Incluir ${nome}:</b> ${reais(s.combinado)} (prevista ${dataBr(prevista)}) · depositado ${reais(s.depositado)} · <b>falta ${reais(s.falta)}</b>
+    ${s.corrigida ? `<br><span class="suave">Depois de registrada, completar até ${reais(s.corrigida)} pelos reajustes (+${reais(s.corrigida - s.combinado)}).</span>` : ''}
+    ${tabelaDepositos(qual, s.depositos, () => true)}
+    ${formDeposito(qual, s.falta)}</div>`;
   };
   const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
-    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo pequeno', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
-  const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
-  /** Comprovante da garantia; registrada em depósitos, cada um fica na tabela abaixo (com "Anexar comprovante" no que faltar). */
-  const comprovanteDa = (qual, campo) => (c[`${qual}_por_depositos`] ? '<span class="suave">comprovantes nos depósitos abaixo</span>' : linkComprovante(c.id, c[campo]));
-  const parcelas = (qual) => {
-    const l = R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar);
-    return l.length ? `<table class="compacta"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th><th></th></tr>
-    ${l.map((x) => `<tr><td>${dataBr(x.data)}${x.complementar ? ' <span class="suave">(para completar)</span>' : ''}</td><td class="n">${reais(x.valor)}</td><td>${linkComprovante(c.id, x.comprovante, anexoDeposito(qual, x))}</td>
-      <td class="n">${opera() && x.complementar ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : '';
-  };
+    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo mini', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
+  const comprovanteDa = (qual, campo) => (c[`${qual}_por_depositos`] ? '' : ` · ${linkComprovante(c.id, c[campo])}`);
+  const parcelas = (qual) => tabelaDepositos(qual, R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
   // correções da caução: aparecem também enquanto a caução não foi depositada inteira
-  const correcoesHtml = () => `<h3>Correções da caução</h3><table><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Obs.</th><th></th></tr>
-      ${correcoes.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${esc(x.observacoes || '')}${x.comprovante || x.complemento > 0 ? ` ${linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data })}` : ''}</td>
-        <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'correcoes_garantia', id: x.id }, 'perigo pequeno', 'Excluir esta correção da caução?') : ''}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="suave">Nenhuma correção registrada.</td></tr>'}</table>
-      ${opera() ? `<p>${link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução')}</p>` : ''}`;
+  const correcoesHtml = () => `${subtitulo('Correções da caução', opera() ? link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução') : '')}
+    ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th><th></th></tr>
+      ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data }) : ''} ${esc(x.observacoes || '')}</td>
+        <td class="n">${excluir('correcoes_garantia', x.id, 'Excluir esta correção da caução?')}</td></tr>`).join('')}</table>` : ''}`;
   if (R.temCaucao(c) && !R.garantiaDepositada(c)) {
     html += c.caucao_valor > 0 ? `${registrar('caucao', 'caução', c.caucao_data)}${correcoesHtml()}` : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
   } else if (R.temCaucao(c)) {
@@ -1090,60 +1087,59 @@ function caixaGarantia(c) {
     const s = R.garantiaADepositar(d(), c, 'caucao');
     // falta completar (reajuste do aluguel ou correção): boleto do complemento ou depósitos registrados aqui
     if (s.falta > 0 || (comp && comp.boleto)) {
-      html += `<div class="alerta aviso"><b>Complemento da caução.</b> ${comp ? `Aluguel corrigido em ${dataBr(comp.correcao.data_vigencia)}: a` : 'A'} caução deve ser <b>${reais(s.necessaria)}</b>${s.corrigida ? ` (${c.caucao_meses} aluguéis com bonificação)` : ''}.
-        Já depositado ${reais(s.depositado)}; falta depositar <b>${reais(s.falta)}</b>.
-        ${comp && comp.boleto ? `<br>Boleto do complemento gerado: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`)}. Ao confirmar o pagamento, a caução é corrigida sozinha.`
-    : `${comp && comp.complemento > 0 && opera() ? `<div class="acoes" style="margin-top:6px">${botao('gerarBoletoCaucao', `Gerar boleto do complemento (${reais(comp.complemento)})`, { contrato: c.id }, 'pequeno', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}</div>` : ''}
-      ${s.falta > 0 ? `${comp && comp.complemento > 0 ? '<span class="suave">ou registre os depósitos feitos direto na conta:</span>' : ''}${formDeposito('caucao', s.falta)}
-        <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes; o comprovante pode ser anexado depois.</p>` : ''}`}</div>`;
+      html += `<div class="alerta aviso"><b>Complemento da caução:</b> deve ser ${reais(s.necessaria)}${s.corrigida ? ` (${c.caucao_meses} aluguéis com bonificação)` : ''} · depositado ${reais(s.depositado)} · <b>falta ${reais(s.falta)}</b>
+        ${comp && comp.boleto ? `<br>Boleto do complemento: ${link(`#/cobranca/${comp.boleto.id}`, `vence em ${dataBr(comp.boleto.vencimento)}`, '')} (ao pagar, a caução é corrigida sozinha).`
+    : `${comp && comp.complemento > 0 && opera() ? ` ${botao('gerarBoletoCaucao', `Gerar boleto (${reais(comp.complemento)})`, { contrato: c.id }, 'mini', `Gerar um boleto separado de ${reais(comp.complemento)}, sem tarifa e sem NF?`)}` : ''}
+      ${s.falta > 0 ? formDeposito('caucao', s.falta) : ''}`}</div>`;
     }
-    html += `<div class="grade">${item('Caução', `${reais(R.depositosGarantiaDo(d(), c, 'caucao').filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor)} · paga em ${dataBr(c.caucao_pago_em || c.caucao_data)} · ${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}`)}
-      ${item('Caução atual', `<span class="maior">${reais(R.valorGarantia(d(), c))}</span>`)}
-      ${c.caucao_meses ? item('Equivale a', `${c.caucao_meses} aluguéis (sugerido hoje: ${reais(sug)})`) : ''}</div>${parcelas('caucao')}
-      ${correcoesHtml()}`;
+    const inicial = R.depositosGarantiaDo(d(), c, 'caucao').filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor;
+    html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>, paga em ${dataBr(c.caucao_pago_em || c.caucao_data)}${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}
+      · atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ''}</p>
+      ${parcelas('caucao')}${correcoesHtml()}`;
   }
   if (R.temDeposito(c) && !R.garantiaDepositada(c)) {
     html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
   } else if (R.temDeposito(c)) {
-    html += `<div class="grade">${item('Depósito de garantia', `${reais(R.valorGarantia(d(), c))} · pago em ${dataBr(c.deposito_pago_em || c.deposito_data)} · ${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}`)}
-      ${item('Quando e onde será usado', esc(c.deposito_uso || 'não informado'))}</div>${parcelas('deposito')}`;
+    html += `<p class="linha-garantia">Depósito de garantia <b>${reais(R.valorGarantia(d(), c))}</b>, pago em ${dataBr(c.deposito_pago_em || c.deposito_data)}${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}
+      · uso: ${esc(c.deposito_uso || 'não informado')}</p>${parcelas('deposito')}`;
   }
   if (R.temFiador(c) || fiadores.length) {
-    html += `<h3>Fiadores</h3><table><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th>Vínculo</th><th></th></tr>
+    html += `${subtitulo('Fiadores')}<table class="compacta"><tr><th>Nome</th><th>CPF / RG</th><th>Contato</th><th>Vínculo</th><th></th></tr>
       ${fiadores.map((f) => `<tr><td><b>${esc(f.nome)}</b>${f.endereco ? `<br><span class="suave">${esc(f.endereco)}</span>` : ''}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td>
         <td>${esc([f.telefone, f.email].filter(Boolean).join(' · ') || '-')}</td>
         <td class="nw">${f.data_entrada ? dataBr(f.data_entrada) : 'início do contrato'} a ${f.data_saida ? dataBr(f.data_saida) : 'fim do contrato'}</td>
-        <td class="n">${opera() ? botao('excluirFiador', 'Excluir', { id: f.id }, 'perigo pequeno') : ''}</td></tr>`).join('')
+        <td class="n">${opera() ? botao('excluirFiador', '✕', { id: f.id }, 'perigo mini') : ''}</td></tr>`).join('')
       || `<tr><td colspan="5">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>`;
   }
   if (anteriores.length) {
-    html += `<h3>Fiadores anteriores</h3><table class="suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th><th></th></tr>
+    html += `${subtitulo('Fiadores anteriores')}<table class="compacta suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th><th></th></tr>
       ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td>
-        <td class="n">${opera() ? botao('excluirFiador', 'Excluir', { id: f.id }, 'perigo pequeno') : ''}</td></tr>`).join('')}</table>`;
+        <td class="n">${opera() ? botao('excluirFiador', '✕', { id: f.id }, 'perigo mini') : ''}</td></tr>`).join('')}</table>`;
   }
   if (trocas.length) {
-    html += `<h3>Trocas de garantia</h3><table class="suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>O que aconteceu com a anterior</th><th></th></tr>
-      ${trocas.map((t, i) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
-        <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo pequeno', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
+    html += `${subtitulo('Trocas de garantia')}<table class="compacta suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>Obs.</th><th></th></tr>
+      ${trocas.map((t, i) => `<tr><td class="nw">${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
+        <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo mini', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
   }
   // caução ou depósito em dinheiro: a aplicação aparece também enquanto não foi depositado tudo (aplica o que já entrou)
   if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
-    html += `<h3>Onde o valor foi aplicado</h3>
-      ${!R.garantiaDepositada(c) ? `<p class="suave">Garantia ainda não depositada inteira: conta o que já foi depositado (${reais(sit.total)}).</p>` : ''}
-      ${sit.total && !sit.ok ? `<div class="alerta aviso">Valor integral ainda não aplicado: falta aplicar <b>${reais(sit.falta)}</b> de ${reais(sit.total)}.</div>` : ''}
-      <table><tr><th>Depositado em</th><th class="n">Aplicado</th></tr>
-      ${sit.linhas.map((l) => `<tr><td>${esc(l.emitente.nome)}${l.emitente.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(l.aplicado)}</td></tr>`).join('') || '<tr><td colspan="2" class="suave">Nada aplicado ainda.</td></tr>'}
-      <tr class="total"><td>Total aplicado de ${reais(sit.total)}</td><td class="n">${reais(sit.soma)} ${sit.ok ? etiqueta('100% aplicado', 'ok') : ''}</td></tr></table>
-      ${aplic.length ? `<table class="suave"><tr><th>Data</th><th>Depositado em</th><th class="n">Valor</th><th>Comprovante</th><th>Obs.</th><th></th></tr>${aplic.map((a) => `<tr><td>${dataBr(a.data)}</td><td>${esc(R.recebedorDaAplicacao(d(), a).nome)}</td><td class="n">${reais(a.valor)}</td><td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })}</td><td>${esc(a.observacoes || '')}</td>
-        <td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'aplicacoes', id: a.id }, 'perigo pequeno', 'Excluir esta aplicação?') : ''}</td></tr>`).join('')}</table>` : ''}
-      ${opera() ? `<p>${link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação')}</p>` : ''}
-      <p class="suave">Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final).</p>`;
+    const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
+    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
+      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
+        <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
+        <td class="n">${excluir('aplicacoes', a.id, 'Excluir esta aplicação?')}</td></tr>`; }).join('')}
+      <tr class="total"><td colspan="2">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
   }
   return `${html}</div>`;
 }
 
 function caixaSaida(c) {
   const e = R.encerramentoDo(d(), c.id);
+  const seguinte = R.fimDeVinculo(d(), c) ? R.continuadoPor(d(), c) : null;
+  if (!e && seguinte) {
+    return `<div class="cartao" id="saida"><h2>Fim do vínculo em ${dataBr(c.data_saida)}</h2>
+      <p>O contrato continua com <a href="#/contrato/${seguinte.id}">${esc(seguinte.inquilino_nome)}</a> desde ${dataBr(seguinte.data_entrada)}: mesmo contrato, mesmas regras e mesmos documentos de entrada. Não houve saída do imóvel, por isso não há vistoria de saída nem cálculo final.</p></div>`;
+  }
   if (!e) {
     return opera() ? `<div class="cartao"><div class="cabecalho"><h2>Saída do inquilino</h2>${link(`#/novo/encerramentos?contrato=${c.id}`, 'Registrar saída e cálculo final', 'botao')}</div>
       <p class="suave">Calcula a devolução da garantia corrigida, desconta os débitos e guarda tudo no histórico do inquilino.</p></div>` : '';
@@ -1330,7 +1326,7 @@ function caixaDocumentos(c) {
         : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.')
         : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</td></tr>`).join('');
   return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
-      ${opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
+      ${opera() && !R.fimDeVinculo(d(), c) ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
     <div class="rolagem"><table>${linhas}</table></div>
     ${vistorias.length ? `<h3>Vistorias</h3><table><tr><th>Tipo</th><th>Data</th><th></th></tr>${vistorias.map((v) => `<tr><td>${esc(v.tipo)}</td><td>${dataBr(v.data)}</td>
       <td class="n nw">${link(`#/imprimir/vistoria?id=${v.id}`, 'Ver / imprimir')} ${opera() ? link(`#/vistoria/${v.id}`, 'Editar') : ''}
@@ -1417,7 +1413,7 @@ function telaContrato(c) {
       ${pj ? `<h3>Representante da empresa</h3>${c.representante_nome ? `<p><b>${esc(c.representante_nome)}</b>${c.representante_cargo ? ` (${esc(c.representante_cargo)})` : ''} · ${pessoa('representante')}</p>` : '<div class="alerta aviso">Empresa sem representante cadastrado. Use "Editar".</div>'}` : ''}
       ${c.solidario_nome ? `<h3>Inquilino solidário</h3><p><b>${esc(c.solidario_nome)}</b> · ${pessoa('solidario')}</p><p class="suave">O boleto sai no nome do inquilino principal.</p>` : ''}</div>
     <div class="cartao"><h2>Contrato e valores</h2><div class="grade">
-      ${item('Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
+      ${item(R.fimDeVinculo(d(), c) ? 'Entrada / fim do vínculo' : 'Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
       ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${c.prazo_meses ? ` (${c.prazo_meses} meses)` : ''}`}`)}
       ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
       ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
@@ -1519,9 +1515,11 @@ async function guardarComprovantes(lista, dados, form, pasta) {
  * Link para abrir o comprovante guardado na pasta do inquilino. Sem comprovante: etiqueta e, com ``anexo``
  * ({ tabela, id, campo, tipo, data }), o botão para anexar depois.
  */
-const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}">📎 comprovante</a>`
-  : `${etiqueta('sem comprovante: buscar no banco', 'aviso')}${anexo && opera() ? ` <label class="botao secundario pequeno enviar" title="Comprovante (PDF ou foto)">Anexar comprovante<input type="file" accept="application/pdf,image/*"
-    data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>` : ''}`);
+// sem comprovante: um só botão pequeno "⚠ anexar" (antes: etiqueta "sem comprovante: buscar no banco" + botão grande)
+const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>`
+  : anexo && opera() ? `<label class="anexar-falta" title="Sem comprovante: buscar no banco e anexar (PDF ou foto)">⚠ anexar comprovante<input type="file" accept="application/pdf,image/*"
+    data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>`
+    : etiqueta('sem comprovante', 'aviso'));
 
 let antesDoVinculo = null;
 let fiadoresMudancas = { novos: [], alterados: [] };
@@ -1735,6 +1733,9 @@ const CADASTROS = {
       // troca de titular com o termo aditivo já assinado: vai para "Termos aditivos" do novo contrato
       const cont = continuacao;
       continuacao = null;
+      if (!antigo && cont && salvo.contrato_anterior_id === cont.anteriorId) {
+        await alterar((db) => R.encerrarVinculoPorContinuacao(db, cont.anteriorId, cont.data, salvo.inquilino_nome, login()));
+      }
       if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
         const anterior = buscar('contratos', cont.anteriorId);
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
@@ -2212,7 +2213,7 @@ function conferirContrato(dados, r, q) {
     out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
   }
   if (imovelId && dados.data_entrada) {
-    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.data_entrada && x.data_entrada < dados.data_entrada
+    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== dados.contrato_anterior_id && x.data_entrada && x.data_entrada < dados.data_entrada
       && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
     if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
   }
@@ -2599,7 +2600,7 @@ function telaInquilinos(q) {
   const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ''}`;
   const ativo = (c) => `<input type="checkbox" title="Inquilino ativo (gera boleto)" data-acao="alternarAtivo" data-id="${c.id}" ${c.ativo !== false ? 'checked' : ''} ${opera() ? '' : 'disabled'}>`;
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : etiqueta('Sem imóvel', 'aviso'));
-  const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta('Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
+  const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta(R.fimDeVinculo(d(), c) ? 'Fim do vínculo' : 'Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
   const registrar = (c) => (opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : '');
   const resumo = R.resumoSolicitacoes(d());
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao') : ''}</div>
@@ -2612,7 +2613,7 @@ function telaInquilinos(q) {
       <p class="suave">Desmarque "Ativo" para parar de gerar boleto. O inquilino vai para a lista de inativos e pode ser reativado.</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
       ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
-        ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
+        ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${R.fimDeVinculo(d(), x.c) ? `contrato continua com ${esc(R.continuadoPor(d(), x.c).inquilino_nome)}` : opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
 </tr>`).join('')
       || '<tr><td colspan="8" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
 }

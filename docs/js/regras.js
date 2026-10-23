@@ -1622,6 +1622,8 @@ function alertaFiador(d, c, hoje) {
  * Some quando houver um protocolo "Volta para o proprietário" registrado a partir da data de saída.
  */
 export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
+  // troca de titular: as contas passam para o novo titular (não voltam para o proprietário)
+  if (fimDeVinculo(d, c)) return null;
   if (!c.data_saida || !c.imovel_id || c.data_saida > C.somarDias(hoje, 30) || c.data_saida < C.somarDias(hoje, -180)) return null;
   const feito = d.titularidades.some((t) => t.imovel_id === c.imovel_id && t.tipo === 'Volta para o proprietário'
     && (t.contrato_id === c.id || String(t.data || '') >= c.data_saida));
@@ -1676,6 +1678,26 @@ export const documentoParcial = (d, c, campo) => (c[campoParcialDoc(campo)] && !
  * herda os do contrato original. Devolve o contrato anterior imediato, ou null.
  */
 export const contratoHerdado = (d, c) => (d && c.contrato_anterior_id ? buscar(d, 'contratos', c.contrato_anterior_id) || null : null);
+/** Contrato que continua este (troca de titular): o mesmo contrato passou para outra pessoa. Null se não há. */
+export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anterior_id === c.id) || null;
+/**
+ * Fim do vínculo (e não saída): o contrato passou para outro titular, que continua com as mesmas regras e documentos.
+ * O inquilino anterior não sai do imóvel nem faz cálculo final; o vínculo dele termina na véspera da troca.
+ */
+export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
+
+/**
+ * Troca de titular: termina o vínculo do inquilino anterior na véspera da data da alteração (ex.: troca em 01/10/2026 →
+ * vínculo até 30/09/2026). Os boletos dele vão até essa data e os do novo titular começam na data da troca.
+ */
+export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
+  const a = buscar(d, 'contratos', anteriorId);
+  if (!a || !data) return null;
+  const fim = C.somarDias(data, -1);
+  if (a.data_saida && a.data_saida <= fim) return a;
+  atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${novoNome})`);
+  return a;
+}
 /** Documento que ainda falta: nem assinado, nem perdido, nem anexado com assinatura faltante, nem herdado do contrato original. */
 export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !documentoEntrada(d, c, campo) && !documentoPerdido(d, c, campo) && !documentoParcial(d, c, campo);
 

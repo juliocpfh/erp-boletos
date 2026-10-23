@@ -344,3 +344,19 @@ th.centro, td.centro { text-align: center; }
 /* Lista de Imóveis: contas (Sanepar, Copel, gás, condomínio) numa linha fina embaixo do endereço */
 .contas { font-size: 12px; color: var(--suave); white-space: nowrap; }
 .contas b { color: var(--texto); font-weight: 600; }
+
+/* Garantia compacta: botões e tabelas menores, títulos com o botão na mesma linha */
+.botao.mini, button.mini { padding: 1px 7px; font-size: 12px; line-height: 1.5; }
+.anexar-falta { position: relative; overflow: hidden; display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 12px; line-height: 1.6;
+  background: #fff4dd; color: #8a5300; border: 1px solid #f0c674; cursor: pointer; white-space: nowrap; }
+.anexar-falta:hover { background: #ffe9bd; }
+.anexar-falta input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.garantia-compacta .alerta { padding: 6px 10px; margin: 6px 0; }
+.garantia-compacta h3 { margin: 10px 0 4px; }
+.garantia-compacta table { margin: 2px 0 6px; }
+.sub-garantia { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sub-garantia h3 { margin: 10px 0 4px; }
+.linha-garantia { margin: 4px 0; }
+.linha-deposito { margin-top: 4px; gap: 6px; }
+.linha-deposito input[type=date] { width: auto; padding: 2px 6px; }
+.linha-deposito input.valor { width: 100px; padding: 2px 6px; }

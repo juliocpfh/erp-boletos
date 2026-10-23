@@ -1321,3 +1321,16 @@ test('caução inicial já depositada e aluguel reajustado: registra depósitos 
   assert.equal(R.garantiaDepositada(c), true);
   assert.equal(R.valorGarantia(d, c), 255000);
 });
+
+test('troca de titular: fim do vínculo do anterior na véspera (não é saída), sem lembrete de titularidade de volta', () => {
+  const { d, c } = base();
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01' }, 'julio');
+  R.encerrarVinculoPorContinuacao(d, c.id, '2026-10-01', novo.inquilino_nome, 'julio');
+  assert.equal(c.data_saida, '2026-09-30');
+  assert.equal(R.fimDeVinculo(d, c), true);
+  assert.equal(R.continuadoPor(d, c).id, novo.id);
+  assert.equal(R.alertaTitularidade(d, c, '2026-10-05'), null);
+  assert.equal(R.contratoAtivo(c, '2026-10-01'), false);
+  assert.equal(R.fimDeVinculo(d, novo), false);
+});
