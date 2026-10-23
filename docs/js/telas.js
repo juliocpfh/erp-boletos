@@ -902,9 +902,9 @@ export const TELAS = {
 
   // ------------------------------------------------------------------------
   imoveis() {
-    // contas do imóvel, cada uma na sua coluna (ícone sempre no mesmo lugar); sem número, "vazio"
+    // contas do imóvel numa linha embaixo do endereço, uma do lado da outra; sem número, "vazio"
     const CONTAS = [['💧', 'sanepar_matricula'], ['⚡', 'copel_uc'], ['🔥', 'gas_relogio'], ['📶', 'internet'], ['🏢', 'administradora_nome']];
-    const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta">${t} ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
+    const linhaContas = (i) => `<span class="contas">${CONTAS.map(([t, k]) => `<span class="conta">${t} ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</span>`).join(' ')}</span>`;
     // matrícula na linha de baixo: número (ou vazio), arquivos (📎1 ×, 📎2 ×…) e o botão "Anexar"
     const linhaMatricula = (i) => `<span class="contas matricula">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}
       <span data-arquivos="matricula:${i.id}"></span>
@@ -912,17 +912,17 @@ export const TELAS = {
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
-      const aluguel = atuais.length ? atuais.map((c) => `${reais(R.aluguelAtual(d(), c))}${c.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(c))})</span>`}${R.geraNf(c) ? '' : ` ${etiqueta('boleto de controle', 'controle')}`}`).join('<br>') : etiqueta('Vago', 'aviso');
-      return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td><td>${esc(R.enderecoCompleto(i))}</td>${celulasContas(i)}<td></td></tr>
-        <tr class="imovel-l2"><td></td><td colspan="6">${linhaMatricula(i)}</td><td class="n">${aluguel}</td></tr>`;
+      const aluguel = atuais.length ? atuais.map((c) => `${R.geraNf(c) ? '' : `${etiqueta('boleto de controle', 'controle')}<br>`}${reais(R.aluguelAtual(d(), c))}${c.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(c))})</span>`}`).join('<br>') : etiqueta('Vago', 'aviso');
+      return `<tr><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td>
+        <td><span class="end-imovel">${esc(R.enderecoCompleto(i))}</span><br>${linhaContas(i)}<br>${linhaMatricula(i)}</td><td class="n">${aluguel}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
-      <div class="cartao"><table class="lista-imoveis"><tr><th>Imóvel</th><th>Endereço</th><th>Água</th><th>Energia</th><th>Gás</th><th>Internet</th><th>Condomínio</th><th class="n">Aluguel (bonif.)</th></tr>
-      ${linhas || '<tr><td colspan="8" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
+      <div class="cartao"><table class="lista-imoveis"><tr><th>Imóvel</th><th>Endereço</th><th class="n">Aluguel (bonif.)</th></tr>
+      ${linhas || '<tr><td colspan="3" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
       ${linhas ? (() => {
     const t = R.totaisImoveis(d(), hoje);
-    return `<tr class="total"><td colspan="7">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
-      <tr class="total"><td colspan="7">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
+    return `<tr class="total"><td colspan="2">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
+      <tr class="total"><td colspan="2">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
         <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td></tr>`;
   })() : ''}</table>
       <p class="suave">Valores bonificados (o que o inquilino paga em dia); no total esperado, o valor cheio vem antes e o bonificado entre parênteses. O total com 100% locado soma os aluguéis atuais bonificados e o último aluguel bonificado de cada imóvel vago; entre parênteses, quanto falta para chegar nele. Boletos de controle não entram.</p></div>`;
