@@ -1380,3 +1380,19 @@ test('quem saiu fica inativo quando o boleto do último mês já existe; herdeir
   assert.equal(R.reajustePendente(d2, novo, '2026-11-01'), null, 'o de 02/2026 foi do anterior');
   assert.equal(R.reajustePendente(d2, novo, '2027-01-20').competencia, '2027-02', 'o próximo é no aniversário do contrato original');
 });
+
+test('herança: reserva do contrato passa ao novo titular sem abater de novo o que o anterior já usou; bonificado nas condições', () => {
+  const { d, c } = base(); // reserva de R$ 500,00, aluguel R$ 1.350,00 com 10% de bonificação
+  R.gerarCobrancas(d, '2026-06', 'julio'); // o 1º aluguel do anterior usa a reserva
+  const cond = R.condicoesDoContrato(d, c);
+  assert.equal(cond.aluguel_bonificado, 121500);
+  assert.equal(cond.reserva_valor, 50000);
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, reserva_valor: 50000, inquilino_nome: 'Novo', contrato_anterior_id: c.id, data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01' }, 'julio');
+  R.transferirHeranca(d, novo.id, 'julio');
+  assert.equal(novo.reserva_usada_anterior, 50000);
+  assert.equal(R.saldoReserva(d, novo), 0);
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  assert.equal(R.boletoDoMes(d, novo.id, '2026-08').reserva_utilizada, 0, 'não abate de novo');
+  assert.equal(R.reservaAHerdar(d, novo), false);
+});

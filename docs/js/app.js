@@ -431,6 +431,14 @@ document.addEventListener('submit', async (ev) => {
   }
 });
 
+// datas: o ano tem 4 dígitos (sem o limite, o navegador aceita 6 e o 5º dígito não volta ao começo do ano)
+document.addEventListener('focusin', (ev) => {
+  const el = ev.target;
+  if (el.tagName !== 'INPUT') return;
+  if (el.type === 'date' && !el.max) el.max = '9999-12-31';
+  if (el.type === 'month' && !el.max) el.max = '9999-12';
+});
+
 document.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
