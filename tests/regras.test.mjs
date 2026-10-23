@@ -571,6 +571,20 @@ test('contas nossas: imóvel vago, até 2 meses depois de alugar, depois só as 
   assert.equal(R.contasPermitidas(d, loja.id, '2026-11').motivo, 'vago', 'mês da saída');
 });
 
+test('fechamento: uma conta lançada (do mês ou paga no mês) já tira o imóvel das contas pendentes', () => {
+  const { d, loja } = base();
+  const sala = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Sala vaga', endereco: 'Rua Teste, 1' }, 'julio');
+  const contas = () => R.etapasFechamento(d, '2026-10', '2026-10-20').find((e) => e.chave === 'contas');
+  assert.deepEqual(contas().imoveis, [sala.id], 'só o imóvel vago; a loja não tem conta nossa');
+  R.lancarDespesas(d, sala.id, '2026-09', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-10-05' }], 'julio');
+  assert.equal(contas().feito, true, 'conta de setembro paga em outubro conta para outubro');
+  assert.match(contas().detalhe, /1 imóvel\(is\) com conta lançada/);
+  d.despesas.length = 0;
+  R.lancarDespesas(d, sala.id, '2026-10', [{ tipo: 'Luz', valor: 12000, data_pagamento: '2026-11-03' }], 'julio');
+  assert.equal(contas().feito, true, 'só a luz, sem as outras contas');
+  assert.equal(loja.id > 0, true);
+});
+
 test('fechamento do mês, baixa em lote e condições do inquilino anterior', () => {
   const { d, loja, c } = base(); // entrada 07/06/2026, vencimento no mês seguinte
   R.gerarCobrancas(d, '2026-07', 'julio');
