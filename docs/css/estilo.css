@@ -363,6 +363,7 @@ table.lista-imoveis tr.imovel-l1 td:not([rowspan]) { border-bottom: 0; padding-b
 table.lista-imoveis tr.imovel-l2 td { padding-top: 2px; }
 /* tela estreita: o aluguel bonificado desce para a linha de baixo em vez de sair da caixa (se ainda não couber, a tabela rola dentro da caixa) */
 table.lista-imoveis td.n { white-space: normal; }
+table.lista-imoveis .sublote { color: var(--primaria); }
 table.lista-imoveis .vazio { color: var(--suave); font-style: italic; }
 
 /* Garantia compacta: botões e tabelas menores, títulos com o botão na mesma linha */
