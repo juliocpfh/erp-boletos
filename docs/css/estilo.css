@@ -150,7 +150,7 @@ textarea { min-height: 80px; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
 label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .acoes label.enviar { margin-top: 0; }
-.contas.matricula label.enviar { margin: 0 0 0 4px; display: inline-block; }
+.contas.matricula label.enviar { margin: 2px 0 0 6px; display: inline-block; border-radius: 12px; }
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }

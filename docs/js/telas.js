@@ -902,16 +902,18 @@ export const TELAS = {
 
   // ------------------------------------------------------------------------
   imoveis() {
-    // contas do imóvel numa linha fina embaixo do endereço (só o que estiver preenchido)
+    // contas do imóvel em linhas finas embaixo do endereço, no máximo 3 por linha (só o que estiver preenchido)
     const linhaContas = (i) => {
       const l = [['💧 Sanepar', i.sanepar_matricula], ['⚡ Copel', i.copel_uc], ['🔥 Gás', i.gas_relogio], ['📶 Internet', i.internet], ['🏢', i.administradora_nome]]
         .filter(([, v]) => v).map(([t, v]) => `${t} <b>${esc(v)}</b>`);
-      return l.length ? `<br><span class="contas">${l.join(' · ')}</span>` : '';
+      let html = '';
+      for (let n = 0; n < l.length; n += 3) html += `<br><span class="contas">${l.slice(n, n + 3).join(' · ')}</span>`;
+      return html;
     };
-    // matrícula em outra linha fina: número, arquivos (📎1 ×, 📎2 ×…) e "+ anexar"
+    // matrícula em outra linha fina: número, arquivos (📎1 ×, 📎2 ×…) e o botão "Anexar"
     const linhaMatricula = (i) => `<br><span class="contas matricula">📄 Matrícula${i.matricula ? ` nº <b>${esc(i.matricula)}</b>` : ''}
       <span data-arquivos="matricula:${i.id}"></span>
-      ${opera() ? `<label class="link-botao enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">+ anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</span>`;
+      ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</span>`;
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
