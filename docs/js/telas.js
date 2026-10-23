@@ -103,6 +103,13 @@ function chavePasta(escopo, id) {
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   return i ? [i.pasta || i.nome, escopo].join('/') : null;
 }
+/** Depois de apagar o arquivo de um campo do formulário: troca só o quadro "Já guardado" (sem redesenhar a página). */
+function arquivoApagadoNoFormulario(el, nome) {
+  const caixa = el.closest('.arquivo-guardado');
+  if (caixa) caixa.outerHTML = `<div class="ajuda"><span class="etiqueta aviso">Arquivo apagado</span> ${esc(nome)}. Para anexar outro, escolha o arquivo acima.</div>`;
+  aviso(`Arquivo apagado: ${nome}.`);
+}
+
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
 const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
 /** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
@@ -1028,12 +1035,12 @@ function caixaGarantia(c) {
     const s = R.garantiaADepositar(d(), c, qual);
     const Nome = `${nome.charAt(0).toLocaleUpperCase('pt-BR')}${nome.slice(1)}`;
     return `<div class="alerta aviso"><b>Incluir ${nome} e anexar comprovante.</b> ${Nome} de ${reais(s.combinado)} prevista para ${dataBr(prevista)}.
-    ${s.corrigida ? `<br>Com o aluguel corrigido, a ${nome} deve ser de <b>${reais(s.corrigida)}</b> (${c.caucao_meses} aluguéis com bonificação): complemento de ${reais(s.corrigida - s.combinado)} pelas correções.` : ''}
+    ${s.corrigida ? `<br>Com o aluguel já corrigido, depois de registrada a ${nome} deve ser completada até <b>${reais(s.corrigida)}</b> (${c.caucao_meses} aluguéis com bonificação): complemento de ${reais(s.corrigida - s.combinado)} pelos reajustes.` : ''}
     ${s.depositos.length ? `<table class="compacta" style="margin-top:6px"><tr><th>Depósito</th><th class="n">Valor</th><th>Comprovante</th><th></th></tr>${s.depositos.map((x) => `<tr><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td>
       <td>${linkComprovante(c.id, x.comprovante, { tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data })}</td><td class="n">${opera() ? botao('excluir', 'Excluir', { tabela: 'depositos_garantia', id: x.id }, 'perigo pequeno', `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : ''}
     <br>A depositar: <b>${reais(s.necessaria)}</b> · já depositado: <b>${reais(s.depositado)}</b> · falta: <b>${reais(s.falta)}</b>
     ${opera() ? `${formDeposito(qual, s.falta)}
-      <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes, com a data e o valor de cada uma. Sem o comprovante, o depósito é registrado e fica o aviso "sem comprovante" até anexar. Quando a soma chegar ao valor a depositar, a ${nome} fica registrada.</p>` : ''}</div>`;
+      <p class="suave" style="margin:4px 0 0">Pode ser em parcelas de valores diferentes, com a data e o valor de cada uma. Sem o comprovante, o depósito é registrado e fica o aviso "sem comprovante" até anexar. Quando a soma chegar ao valor da ${nome} do contrato (ou da troca de garantia), ela fica registrada; a diferença dos reajustes vem depois, como complemento.</p>` : ''}</div>`;
   };
   const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
     ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo pequeno', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
@@ -1307,8 +1314,6 @@ function caixaDocumentos(c) {
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
     : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
     <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar". Se ainda falta a assinatura de alguém, anexe o arquivo e clique em "Falta assinatura": fica um alerta até chegar o arquivo completo.</p>
-    <details><summary>Todos os arquivos assinados guardados</summary>${caixaArquivos('assinados', c.id, 'Documentos assinados', 'assinados', '', true, false)}
-      ${R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => caixaArquivos('assinados', x.id, `Histórico: contrato anterior de ${x.inquilino_nome}`, `assinados-${x.id}`, '', true, false)).join('')}</details>
     ${caixaAditivos(c)}</div>`;
 }
 
@@ -1876,7 +1881,7 @@ const CADASTROS = {
       return { data: ult ? ult.data_vigencia : C.hojeIso(), valor_novo: R.caucaoSugerida(d(), c, ult ? ult.data_vigencia : C.hojeIso()) };
     },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return R.garantiaDepositada(c) ? `Caução atual: ${reais(R.valorGarantia(d(), c))}${c.caucao_meses ? ` (${c.caucao_meses} aluguéis com bonificação)` : ''}.`
-      : `Caução ainda não depositada inteira: o novo valor passa a ser o valor a depositar (hoje ${reais(R.garantiaADepositar(d(), c, 'caucao').combinado)}; já depositado ${reais(R.somaDepositos(d(), c, 'caucao'))}).`; },
+      : `Caução ainda não registrada (depositado ${reais(R.somaDepositos(d(), c, 'caucao'))} de ${reais(c.caucao_valor)}): a correção vale depois que o valor inicial for depositado; o complemento é o que passa do valor inicial.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     descricao: (dados) => `Caução corrigida para ${reais(dados.valor_novo)}`,
     ajustar(dados, erros, r, form, q) {
@@ -3669,8 +3674,8 @@ export const FORMULARIOS = {
     const nome = arq ? await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante(g.arquivo, f.data, arq))) : null;
     let s;
     await alterar((db) => { s = R.registrarDepositoGarantia(db, Number(f.contrato), f.qual, { data: f.data, valor, arquivo: nome }, login()); });
-    aviso(`${s.falta > 0 ? `Depósito de ${reais(valor)} registrado. Já depositado ${reais(s.depositado)}; falta ${reais(s.falta)}.`
-      : `Depósito de ${reais(valor)} registrado: ${g.nome} completa (${reais(s.depositado)}).`}${nome ? '' : ' Sem comprovante: fica o aviso até anexar.'}`);
+    aviso(`${s.completou ? `Depósito de ${reais(valor)} registrado: ${g.nome} registrada.${s.falta > 0 ? ` Falta o complemento dos reajustes: ${reais(s.falta)}.` : ''}`
+      : s.falta > 0 ? `Depósito de ${reais(valor)} registrado. Já depositado ${reais(s.depositado)}; falta ${reais(s.falta)}.` : `Depósito de ${reais(valor)} registrado: ${g.nome} completa (${reais(s.depositado)}).`}${nome ? '' : ' Sem comprovante: fica o aviso até anexar.'}`);
     await mostrar();
   },
 
@@ -4411,27 +4416,28 @@ export const ACOES = {
     await desfazerItens(itens);
   },
 
-  /** "Excluir" do arquivo já guardado num formulário de edição (#/editar/tabela/id): tira do registro e apaga da pasta. */
-  async excluirAnexoDoCampo({ campo }) {
+  /**
+   * "Excluir" do arquivo já guardado num formulário de edição (#/editar/tabela/id): tira do registro e apaga da pasta.
+   * A página não é redesenhada: o que já foi digitado no formulário continua lá (ao salvar, o registro é lido de novo).
+   */
+  async excluirAnexoDoCampo({ campo }, el) {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const [, acao, tabela, id] = location.hash.split('?')[0].split('/');
     const r = acao === 'editar' ? buscar(tabela, id) : null;
     if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
     await alterarApagandoAnexos((db) => R.atualizar(db, tabela, r.id, { [campo]: null }, login(), `Arquivo excluído: ${r[campo]}`));
-    aviso('Arquivo apagado.');
-    await mostrar();
+    arquivoApagadoNoFormulario(el, r[campo]);
   },
 
   /** "Excluir" de uma foto já guardada da vistoria (fachada, relógios, quadro de disjuntores). */
-  async excluirFotoVistoria({ campo, vistoria }) {
+  async excluirFotoVistoria({ campo, vistoria }, el) {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
     const v = buscar('vistorias', vistoria);
     if (!v || !(v.fotos || {})[campo]) throw new Error('Foto não encontrada.');
     const fotos = { ...v.fotos };
     delete fotos[campo];
     await alterarApagandoAnexos((db) => R.atualizar(db, 'vistorias', v.id, { fotos }, login(), `Foto da vistoria excluída: ${v.fotos[campo]}`));
-    aviso('Foto apagada.');
-    await mostrar();
+    arquivoApagadoNoFormulario(el, v.fotos[campo]);
   },
 
   async removerComprovanteGarantia({ contrato, qual }) {

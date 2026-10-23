@@ -79,6 +79,8 @@ export function normalizar(d) {
   // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
   // (o termo gerado e ainda não assinado, sem arquivo, não conta)
   for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
+  // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
+  for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
   return d;
 }
 
@@ -400,16 +402,32 @@ export const somaDepositos = (d, c, qual) => depositosGarantiaDo(d, c, qual).red
  * pede R$ 5.670,00; depositados R$ 2.000,00 e R$ 1.500,00 → falta R$ 2.170,00.
  */
 export function garantiaADepositar(d, c, qual, hoje = C.hojeIso()) {
-  // caução corrigida à mão ("Corrigir caução") antes de completar: vale o novo valor
-  const corrigidaAMao = qual === 'caucao' ? correcoesCaucaoAtual(d, c).pop() : null;
-  const combinado = (corrigidaAMao ? corrigidaAMao.valor_novo : (qual === 'caucao' ? c.caucao_valor : c.deposito_valor)) || 0;
+  const inicial = (qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0;
+  const depositos = depositosGarantiaDo(d, c, qual);
+  const registrada = garantiaDepositada(c);
+  // depois de registrada: a caução atual (inicial + correções + depósitos para completar) contra a corrigida pelos reajustes
+  const ultima = qual === 'caucao' ? correcoesCaucaoAtual(d, c).pop() : null;
+  const combinado = registrada && ultima ? ultima.valor_novo : inicial;
   const sugerida = qual === 'caucao' && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
   const corrigida = sugerida > combinado ? sugerida : null;
-  const necessaria = corrigida || combinado;
-  const depositos = depositosGarantiaDo(d, c, qual);
-  // já registrada: o que está depositado é a caução atual (inicial + correções + depósitos para completar)
-  const depositado = garantiaDepositada(c) ? valorGarantia(d, c) : depositos.reduce((s, x) => s + x.valor, 0);
+  // antes de registrada: o primeiro depósito é o da caução do contrato (ou da troca de garantia), sem os reajustes;
+  // a diferença dos reajustes vem depois, como complemento (correção da caução, boleto ou depósito para completar)
+  const necessaria = registrada ? (corrigida || combinado) : inicial;
+  const depositado = registrada ? valorGarantia(d, c) : depositos.filter((x) => !x.complementar).reduce((s, x) => s + x.valor, 0);
   return { combinado, corrigida, necessaria, depositos, depositado, falta: Math.max(necessaria - depositado, 0) };
+}
+
+/** Depósitos da caução (ou do depósito de garantia) que já cobrem o valor inicial, sem estar registrada: registra. */
+function completarPorDepositos(d, c, qual, usuario) {
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  if (garantiaDepositada(c)) return false;
+  const s = garantiaADepositar(d, c, qual);
+  const ultimo = s.depositos.filter((x) => !x.complementar).pop();
+  if (!ultimo || !s.necessaria || s.falta > 0) return false;
+  const dados = { [g.pago]: ultimo.data, [g.comprovante]: ultimo.comprovante || null, [`${qual}_por_depositos`]: true };
+  if (usuario) atualizar(d, 'contratos', c.id, dados, usuario, `${c.inquilino_nome}: ${g.nome} completa (${C.reais(s.depositado)} em ${s.depositos.length} depósito(s))`);
+  else Object.assign(c, dados);
+  return true;
 }
 
 /** Caução sugerida: número de aluguéis × aluguel atual com bonificação. */
@@ -1493,7 +1511,7 @@ export function comprovantesPendentes(d, c) {
   for (const [qual, texto, tipo] of [['caucao', 'depósito da caução', 'caucao'], ['deposito', 'depósito de garantia', 'deposito-garantia']]) {
     if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c))) for (const x of depositosGarantiaDo(d, c, qual)) falta(!x.comprovante, texto, x.valor, x.data, 'depositos_garantia', x.id, 'comprovante', tipo);
   }
-  for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante && !x.antes_do_deposito, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
+  for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
   return out;
 }
@@ -1531,12 +1549,8 @@ export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, ar
   const x = inserir(d, 'depositos_garantia', { contrato_id: c.id, imovel_id: c.imovel_id || null, qual, troca_id: trocaAtual(d, c), data, valor, comprovante: arquivo || null,
     ...(complementar ? { complementar: true } : {}) }, usuario,
     `${c.inquilino_nome}: ${g.nome}, depósito ${complementar ? 'para completar ' : ''}de ${C.reais(valor)} em ${C.dataBr(data)}${arquivo ? '' : ' (sem comprovante)'}`);
-  const s = garantiaADepositar(d, c, qual);
-  if (!complementar && s.falta <= 0) {
-    atualizar(d, 'contratos', c.id, { [g.pago]: data, [g.comprovante]: arquivo || null, [`${qual}_por_depositos`]: true }, usuario,
-      `${c.inquilino_nome}: ${g.nome} completa (${C.reais(s.depositado)} em ${s.depositos.length} depósito(s))`);
-  }
-  return { deposito: x, ...s };
+  if (!complementar) completarPorDepositos(d, c, qual, usuario);
+  return { deposito: x, ...garantiaADepositar(d, c, qual), completou: !complementar && garantiaDepositada(c) };
 }
 
 /** Depois de excluir um depósito: se a soma deixou de cobrir o necessário, a garantia volta a "a depositar". */
@@ -1544,10 +1558,13 @@ export function acertarGarantiaDepositada(d, contratoId, qual, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   const g = GARANTIAS_DEPOSITADAS[qual];
   if (!c || !g || !c[`${qual}_por_depositos`]) return;
-  const s = garantiaADepositar(d, c, qual);
-  const fim = s.depositos[s.depositos.length - 1];
-  const novo = s.falta > 0 ? { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null } : { [g.pago]: fim.data, [g.comprovante]: fim.comprovante };
-  atualizar(d, 'contratos', c.id, novo, usuario, `${c.inquilino_nome}: depósitos de ${g.nome} conferidos (${C.reais(s.depositado)})`);
+  // confere só os depósitos do valor inicial (os reajustes não desfazem a caução registrada)
+  const iniciais = depositosGarantiaDo(d, c, qual).filter((x) => !x.complementar);
+  const soma = iniciais.reduce((s, x) => s + x.valor, 0);
+  const fim = iniciais[iniciais.length - 1];
+  const novo = !fim || soma < ((qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0)
+    ? { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null } : { [g.pago]: fim.data, [g.comprovante]: fim.comprovante || null };
+  atualizar(d, 'contratos', c.id, novo, usuario, `${c.inquilino_nome}: depósitos de ${g.nome} conferidos (${C.reais(soma)})`);
 }
 
 /** Pode remover o comprovante do depósito? Na caução, só sem correções registradas (elas partem do valor depositado). */
