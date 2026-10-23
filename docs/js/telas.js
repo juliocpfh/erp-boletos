@@ -906,27 +906,27 @@ export const TELAS = {
     // o endereço ocupa as colunas das contas e mais uma de sobra, sem quebrar; sem número, "vazio"
     const CONTAS = [['💧', 'sanepar_matricula'], ['⚡', 'copel_uc'], ['🔥', 'gas_relogio'], ['📶', 'internet'], ['🏢', 'administradora_nome']];
     const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta">${t} ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
-    // matrícula embaixo do nome do imóvel: número (ou vazio), arquivos (📎1 ×, 📎2 ×…) e o botão "Anexar"
-    const linhaMatricula = (i) => `<span class="contas matricula">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}
-      <span data-arquivos="matricula:${i.id}"></span>
+    // matrícula ao lado do nome (número ou vazio); embaixo do nome, os arquivos dela (📎1 ×, 📎2 ×…) e o botão "Anexar"
+    const numeroMatricula = (i) => `<span class="contas">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}</span>`;
+    const anexosMatricula = (i) => `<span class="contas matricula"><span data-arquivos="matricula:${i.id}"></span>
       ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</span>`;
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
-      const aluguel = atuais.length ? atuais.map((c) => `${R.geraNf(c) ? '' : `${etiqueta('boleto de controle', 'controle')}<br>`}${reais(R.aluguelAtual(d(), c))}${c.bonificacao === false ? '' : ` <span class="suave">(${reais(valorBonificado(c))})</span>`}`).join('<br>') : etiqueta('Vago', 'aviso');
-      return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a></td>
+      const aluguel = atuais.length ? atuais.map((c) => `${R.geraNf(c) ? '' : `${etiqueta('boleto de controle', 'controle')}<br>`}<span class="nw">${reais(R.aluguelAtual(d(), c))}</span>${c.bonificacao === false ? '' : ` <span class="suave nw">(${reais(valorBonificado(c))})</span>`}`).join('<br>') : etiqueta('Vago', 'aviso');
+      return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b>${i.sublote ? ` (${esc(i.sublote)})` : ''}</a> ${numeroMatricula(i)}</td>
         <td colspan="${CONTAS.length + 1}" class="end-imovel">${esc(R.enderecoCompleto(i))}</td><td class="n" rowspan="2">${aluguel}</td></tr>
-        <tr class="imovel-l2"><td class="nome">${linhaMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td></tr>`;
+        <tr class="imovel-l2"><td class="anexos">${anexosMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
-      <div class="cartao"><table class="lista-imoveis"><tr><th>Imóvel</th><th colspan="6">Endereço</th><th class="n">Aluguel (bonif.)</th></tr>
+      <div class="cartao"><div class="rolagem"><table class="lista-imoveis"><tr><th>Imóvel</th><th colspan="6">Endereço</th><th class="n">Aluguel (bonif.)</th></tr>
       ${linhas || '<tr><td colspan="8" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
       ${linhas ? (() => {
     const t = R.totaisImoveis(d(), hoje);
-    return `<tr class="total"><td colspan="7">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n">${reais(t.cheio)} <span class="suave">(${reais(t.esperado)})</span></td></tr>
+    return `<tr class="total"><td colspan="7">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n"><span class="nw">${reais(t.cheio)}</span> <span class="suave nw">(${reais(t.esperado)})</span></td></tr>
       <tr class="total"><td colspan="7">Total com 100% locado <span class="suave">(alugados + ${t.qtdVagos} vago(s) pelo último aluguel${t.vagosSemValor ? `; ${t.vagosSemValor} vago(s) sem aluguel anterior não entram` : ''})</span></td>
-        <td class="n">${reais(t.cemPorCento)} <span class="suave">(+ ${reais(t.vagos)})</span></td></tr>`;
-  })() : ''}</table>
+        <td class="n"><span class="nw">${reais(t.cemPorCento)}</span> <span class="suave nw">(+ ${reais(t.vagos)})</span></td></tr>`;
+  })() : ''}</table></div>
       <p class="suave">Valores bonificados (o que o inquilino paga em dia); no total esperado, o valor cheio vem antes e o bonificado entre parênteses. O total com 100% locado soma os aluguéis atuais bonificados e o último aluguel bonificado de cada imóvel vago; entre parênteses, quanto falta para chegar nele. Boletos de controle não entram.</p></div>`;
   },
 
