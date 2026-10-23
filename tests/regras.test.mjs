@@ -1467,3 +1467,14 @@ test('garantia herdada cuidada no contrato anterior: comprovante anexado lá apa
   assert.equal(n2.caucao_pago_em, '2025-02-03');
   assert.equal(R.garantiaDepositada(n2), true);
 });
+
+test('garantia herdada com o comprovante anexado no anterior: some o alerta de comprovante dos depósitos que vieram dele', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', reserva_valor: 0 });
+  const novo = R.inserir(d, 'contratos', { inquilino_nome: 'Herdeira', contrato_anterior_id: c.id, garantia_tipo: 'Caução', caucao_valor: 300000, caucao_por_depositos: true, doc_contrato_em: '2026-10-01', data_entrada: '2026-10-01' }, 'julio');
+  R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2025-02-02', valor: 300000 }, 'julio'); // veio do anterior, sem comprovante
+  c.garantia_transferida_para = novo.id;
+  assert.equal(R.comprovantesPendentes(d, novo).filter((x) => x.tabela === 'depositos_garantia').length, 1);
+  R.anexarComprovante(d, 'contratos', c.id, 'comprovante_caucao', 'cau.pdf', 'julio');
+  assert.equal(R.comprovantesPendentes(d, novo).filter((x) => x.tabela === 'depositos_garantia' || x.campo === 'comprovante_caucao').length, 0);
+});

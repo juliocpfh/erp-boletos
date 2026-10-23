@@ -1520,9 +1520,11 @@ export function comprovantesPendentes(d, c) {
   if (assinado && c.garantia_tipo === 'Caução' && !garantiaDepositada(c)) falta(true, ...aDepositar('caucao', 'caução'), c.caucao_data, 'contratos', c.id, 'comprovante_caucao', 'caucao');
   if (assinado && temDeposito(c) && !garantiaDepositada(c)) falta(true, ...aDepositar('deposito', 'depósito de garantia'), c.deposito_data, 'contratos', c.id, 'comprovante_deposito', 'deposito-garantia');
   falta(!c.comprovante_reserva, 'reserva', c.reserva_valor, c.reserva_data, 'contratos', c.id, 'comprovante_reserva', 'reserva');
-  // depósitos registrados sem o comprovante (caução ou depósito de garantia em parcelas)
+  // depósitos registrados sem o comprovante (caução ou depósito de garantia em parcelas). Garantia com o comprovante no
+  // contrato (ex.: herdada, com o comprovante anexado no contrato anterior): os depósitos do valor inicial já estão cobertos
   for (const [qual, texto, tipo] of [['caucao', 'depósito da caução', 'caucao'], ['deposito', 'depósito de garantia', 'deposito-garantia']]) {
-    if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c))) for (const x of depositosGarantiaDo(d, c, qual)) falta(!x.comprovante, texto, x.valor, x.data, 'depositos_garantia', x.id, 'comprovante', tipo);
+    const coberto = c[GARANTIAS_DEPOSITADAS[qual].comprovante] && !c[`${qual}_por_depositos`];
+    if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c))) for (const x of depositosGarantiaDo(d, c, qual)) falta(!x.comprovante && !(coberto && !x.complementar), texto, x.valor, x.data, 'depositos_garantia', x.id, 'comprovante', tipo);
   }
   for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
