@@ -1478,3 +1478,19 @@ test('garantia herdada com o comprovante anexado no anterior: some o alerta de c
   R.anexarComprovante(d, 'contratos', c.id, 'comprovante_caucao', 'cau.pdf', 'julio');
   assert.equal(R.comprovantesPendentes(d, novo).filter((x) => x.tabela === 'depositos_garantia' || x.campo === 'comprovante_caucao').length, 0);
 });
+
+test('ordem das caixas: a guardada vale para as que estão na tela; ausentes e novas não se perdem', () => {
+  // caixa nova (nunca arrumada) fica no lugar de sempre
+  assert.deepEqual(R.ordenarCaixas(['A', 'B', 'N', 'C'], ['C', 'A', 'B']), ['C', 'A', 'N', 'B']);
+  assert.deepEqual(R.ordenarCaixas(['A', 'B'], []), ['A', 'B']);
+  // "R" (ex.: Reserva) não aparece neste inquilino: volta logo depois da que vinha antes dela
+  assert.deepEqual(R.juntarOrdem(['A', 'B', 'R', 'C'], ['C', 'A', 'B']), ['C', 'A', 'B', 'R']);
+  assert.deepEqual(R.juntarOrdem(['R', 'A', 'B'], ['B', 'A']), ['R', 'B', 'A']);
+  const d = R.bancoVazio();
+  R.salvarOrdemCaixas(d, 'contrato', '', ['Histórico', 'Identificação e contato'], 'julio');
+  R.salvarOrdemCaixas(d, 'contrato', 'Contrato e valores', ['Observações', 'Reserva dada na visita'], 'julio');
+  assert.deepEqual(R.ordemGuardada(d, 'contrato', ''), ['Histórico', 'Identificação e contato']);
+  assert.deepEqual(R.ordemGuardada(d, 'contrato', 'Contrato e valores'), ['Observações', 'Reserva dada na visita']);
+  assert.deepEqual(R.ordemGuardada(d, 'painel', ''), []);
+  assert.match(d.historico.at(-1).descricao, /Ordem das caixas/);
+});

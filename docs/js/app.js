@@ -2,6 +2,7 @@
 import * as S from './armazenamento.js';
 import { conferirSenha, novoSal, pode, resumoSenha } from './auth.js';
 import * as B from './backup-seguro.js';
+import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
@@ -385,6 +386,12 @@ export async function mostrar(estadoForm = null) {
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
     }
     app.innerHTML = html;
+    if (E.usuario && E.d) {
+      // ordem das caixas escolhida pelo administrador (só ele vê o ícone ☰ para arrastar)
+      const pagina = rota.partes[0] || 'painel';
+      arrumarCaixas(app.querySelector('main'), pagina, (grupo) => R.ordemGuardada(E.d, pagina, grupo),
+        podeUsuario('admin') ? (grupo, nomes) => alterar((db) => R.salvarOrdemCaixas(db, pagina, grupo, nomes, login())).catch((e) => aviso(e.message, 'erro')) : null);
+    }
     atualizarFaixa();
     desenharMensagens();
     mensagens = [];

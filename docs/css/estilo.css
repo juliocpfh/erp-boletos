@@ -154,6 +154,15 @@ label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; 
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 
+/* Ordem das caixas: ícone ☰ para o administrador arrastar */
+.caixa-movel { position: relative; }
+.alca-caixa { position: absolute; top: 3px; left: 3px; z-index: 2; font-size: 15px; line-height: 1; padding: 1px 2px; color: var(--primaria); cursor: grab; user-select: none; touch-action: none; opacity: .7; }
+.alca-caixa:hover { opacity: 1; color: var(--primaria); }
+.setor-movel > .alca-caixa { top: 16px; left: -17px; }
+[data-caixa] > .alca-caixa { top: 12px; left: -17px; }
+.caixa-movel.arrastando { opacity: .4; outline: 2px dashed var(--primaria); }
+body.arrastando-caixa { user-select: none; cursor: grabbing; }
+
 .so-impressao { display: none; }
 @page { size: A4; margin: 10mm; }
 @media print {
