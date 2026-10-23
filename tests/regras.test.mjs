@@ -724,7 +724,7 @@ test('reajuste: o mês de entrada conta como 1º mês, qualquer que seja o dia; 
     assert.equal(R.competenciaDoReajuste(c, 2), '2027-01');
     assert.ok(R.reajusteNaCompetencia(d, c, '2026-01'));
     assert.equal(R.reajusteNaCompetencia(d, c, '2026-02'), null);
-    // aviso em dezembro: a carta vai com o boleto de 12/2025; o boleto do aluguel de 01/2026 vence em 10/02/2026, já corrigido
+    // aviso já em dezembro; o índice até 12/2025 sai no começo de janeiro e a carta vai com o boleto do aluguel de 01/2026 (vence em 10/02/2026), já corrigido
     assert.equal(R.reajustePendente(d, c, '2025-12-05').competencia, '2026-01');
     assert.equal(R.reajustePendente(d, c, '2025-11-05'), null);
   }
@@ -747,9 +747,43 @@ test('reajustes não corrigidos: some depois de corrigido e o atrasado aparece m
   const nomes = () => R.reajustesNaoCorrigidos(d, '2026-08', '2027-01', '2026-10-05').map((r) => `${r.contrato.inquilino_nome} ${r.competencia}`);
   assert.deepEqual(nomes(), ['Ana 2026-03', 'Bia 2026-11']);
   R.inserir(d, 'correcoes', { contrato_id: b.id, data_vigencia: '2026-11-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
+  assert.deepEqual(nomes(), ['Ana 2026-03', 'Bia 2026-11'], 'corrigido, mas falta a carta (vai com o boleto já corrigido)');
+  R.marcarCartaEnviada(d, b.id, '2026-11', true, 'j');
   assert.deepEqual(nomes(), ['Ana 2026-03']);
   R.inserir(d, 'correcoes', { contrato_id: a.id, data_vigencia: '2026-03-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
-  assert.deepEqual(nomes(), []);
+  assert.deepEqual(nomes(), [], 'reajuste da regra antiga: corrigido basta');
+});
+
+test('carta de reajuste vai com o boleto do aluguel já corrigido (o índice sai no começo do mês do reajuste)', () => {
+  const d = R.bancoVazio();
+  const i = R.inserir(d, 'imoveis', { nome: 'Casa', endereco: 'Rua A, 1' }, 'j');
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Bia', data_entrada: '2025-11-15', vigencia_inicio: '2025-11-15', aluguel_inicial: 100000,
+    dia_vencimento: 10, cobranca_mes_seguinte: true, indice_correcao: 'IPCA' }, 'j');
+  const alerta = (hoje) => R.alertasContrato(d, c, hoje).find((a) => a.tipo === 'Reajuste do aluguel');
+  // outubro (boleto de 10/2026 emitido por volta de 25/10): só o aviso, a carta não vai com ele
+  let a = alerta('2026-10-25');
+  assert.equal(a.nivel, 'aviso');
+  assert.match(a.texto, /índice acumulado até 10\/2026 sai no começo de 11\/2026/);
+  assert.match(a.texto, /boleto do aluguel de 11\/2026 \(vence em 10\/12\/2026\)/);
+  // novembro: corrigir antes de gerar o boleto de 11/2026
+  assert.match(alerta('2026-11-06').texto, /^Corrija o aluguel de 11\/2026/);
+  // fechamento de 11/2026 (boletos de 10/2026) não pede a carta; o de 12/2026 (boletos de 11/2026) pede
+  const cartas = (mes) => R.etapasFechamento(d, mes, '2026-11-06').find((e) => e.chave === 'cartas');
+  assert.equal(cartas('2026-11').pendentes, 0);
+  assert.equal(cartas('2026-12').pendentes, 1);
+  assert.match(cartas('2026-12').detalhe, /1 ainda sem correção/);
+  // calendário: no vencimento do boleto corrigido (10/12/2026), não no de 10/11/2026
+  const ev = (mes) => R.eventosDoMes(d, mes, '2026-11-06').filter((e) => e.tipo === 'Reajuste').map((e) => e.data);
+  assert.deepEqual(ev('2026-11'), []);
+  assert.deepEqual(ev('2026-12'), ['2026-12-10']);
+  // corrigido: o alerta continua até mandar a carta
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-11-01', valor_novo: 104500, indice: 'IPCA' }, 'j');
+  a = alerta('2026-11-20');
+  assert.match(a.texto, /já foi corrigido pelo IPCA\. Envie a carta/);
+  assert.equal(alerta('2026-12-11').nivel, 'perigo', 'boleto já venceu sem a carta');
+  R.marcarCartaEnviada(d, c.id, '2026-11', true, 'j');
+  assert.equal(alerta('2026-11-20'), undefined);
+  assert.equal(cartas('2026-12').feito, true);
 });
 
 test('imóveis do mesmo endereço ficam juntos, mesmo fora da ordem alfabética', () => {
