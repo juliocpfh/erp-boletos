@@ -2364,10 +2364,13 @@ function cadastrosIncompletos() {
     if (!c.inquilino_telefone) falta.push('telefone');
     if (!c.inquilino_email) falta.push('e-mail');
     for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) {
-      if (R.documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo' });
-      else if (R.documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (falta assinatura)`, nivel: 'aviso' });
+      if (R.documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo', doc: true });
+      else if (R.documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (falta assinatura)`, nivel: 'aviso', doc: true });
     }
-    if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta, editar: `#/editar/contratos/${c.id}`, ver: `#/contrato/${c.id}` });
+    // Dados faltando se completam na edição; documentos, na página do inquilino.
+    const temDados = falta.some((f) => !f.doc);
+    if (falta.length) out.push({ tipo: 'Inquilino', nome: c.inquilino_nome, onde: (buscar('imoveis', c.imovel_id) || {}).nome || '', falta,
+      editar: temDados ? `#/editar/contratos/${c.id}` : '', documentos: falta.some((f) => f.doc) ? `#/contrato/${c.id}?ir=documentos` : '', ver: `#/contrato/${c.id}` });
   }
   for (const i of d().imoveis) {
     const falta = [];
@@ -2394,7 +2397,8 @@ function telaPendencias() {
     <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
     ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === 'Imóvel' ? 'Imóveis' : t === 'Empresa' ? 'Empresas' : 'Inquilinos'} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
       ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ''}</td><td>${x.falta.map((f) => (typeof f === 'string' ? etiqueta(f, 'aviso') : etiqueta(f.texto, f.nivel))).join(' ')}</td>
-        <td class="n nw">${opera() || (t === 'Empresa' && podeUsuario('admin')) ? link(x.editar, 'Completar', 'botao pequeno') : ''}</td></tr>`).join('')}</table></div></div>`).join('')
+        <td class="n nw">${opera() || (t === 'Empresa' && podeUsuario('admin')) ? [x.editar && link(x.editar, x.documentos ? 'Completar dados' : 'Completar', 'botao pequeno'),
+          x.documentos && link(x.documentos, 'Ver documentos', 'botao secundario pequeno')].filter(Boolean).join(' ') : ''}</td></tr>`).join('')}</table></div></div>`).join('')
     || '<div class="alerta ok">Todos os cadastros estão completos.</div>'}`;
 }
 
