@@ -354,9 +354,13 @@ th.centro, td.centro { text-align: center; }
 /* Lista de Imóveis: contas (Sanepar, Copel, gás, condomínio) numa linha fina embaixo do endereço */
 .contas { font-size: 12px; color: var(--suave); white-space: nowrap; }
 .contas b { color: var(--texto); font-weight: 600; }
-/* a lista cabe na largura da tela: os textos longos quebram em vez de empurrar a tabela para o lado */
-table.lista-imoveis .contas { white-space: normal; }
-table.lista-imoveis td { overflow-wrap: anywhere; }
+/* Lista de Imóveis: linha 1 = imóvel, endereço e contas (uma coluna cada, sem quebrar); linha 2 = matrícula e aluguel */
+table.lista-imoveis td.nome, table.lista-imoveis td.conta { white-space: nowrap; }
+table.lista-imoveis td.conta { font-size: 12px; color: var(--suave); }
+table.lista-imoveis td.conta b { color: var(--texto); font-weight: 600; }
+table.lista-imoveis .vazio { color: var(--suave); font-style: italic; }
+table.lista-imoveis tr.imovel-l1 td { border-bottom: 0; padding-bottom: 2px; }
+table.lista-imoveis tr.imovel-l2 td { padding-top: 2px; }
 
 /* Garantia compacta: botões e tabelas menores, títulos com o botão na mesma linha */
 .botao.mini, button.mini { padding: 1px 7px; font-size: 12px; line-height: 1.5; }
