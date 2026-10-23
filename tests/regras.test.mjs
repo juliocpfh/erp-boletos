@@ -1396,3 +1396,25 @@ test('herança: reserva do contrato passa ao novo titular sem abater de novo o q
   assert.equal(R.boletoDoMes(d, novo.id, '2026-08').reserva_utilizada, 0, 'não abate de novo');
   assert.equal(R.reservaAHerdar(d, novo), false);
 });
+
+test('herança já feita sem a garantia e a reserva do anterior: completa (comprovante, aplicação e reserva vêm para o herdeiro)', () => {
+  const { d, c } = base(); // reserva R$ 500,00
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', caucao_pago_em: '2025-02-01', comprovante_caucao: 'caucao.pdf' });
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: d.emitentes[0].id, data: '2025-02-05', valor: 300000, comprovante: 'apl.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  // herdeiro antigo: tinha um registro próprio de depósito, a transferência pulou a garantia; reserva ficou zerada
+  const novo = R.inserir(d, 'contratos', { ...resto, comprovante_caucao: null, reserva_valor: 0, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id,
+    data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01', reserva_usada_anterior: 0 }, 'julio');
+  R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2026-10-02', valor: 1000 }, 'julio');
+  c.data_saida = '2026-09-30';
+  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true });
+  const r = R.completarHeranca(d, novo.id, 'julio');
+  assert.deepEqual(r.arquivos.sort(), ['apl.pdf', 'caucao.pdf']);
+  assert.equal(novo.comprovante_caucao, 'caucao.pdf');
+  assert.equal(R.garantiaDepositada(novo), true, 'sem o alerta de anexar comprovante');
+  assert.equal(R.aplicacoesDo(d, novo.id).length, 1);
+  assert.equal(R.valorGarantia(d, novo), 301000, 'caução do contrato + o depósito que a herdeira já tinha');
+  assert.equal(c.garantia_transferida_para, novo.id);
+  assert.equal(novo.reserva_valor, 50000);
+  assert.equal(R.herancaIncompleta(d, novo), null);
+});

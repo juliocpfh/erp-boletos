@@ -384,7 +384,10 @@ export function valorGarantia(d, c) {
   const soma = (l) => l.reduce((s, x) => s + x.valor, 0);
   const extras = soma(deps.filter((x) => x.complementar && (!ult || x.data > ult.data)));
   if (ult) return ult.valor_novo + extras;
-  return (soma(deps.filter((x) => !x.complementar)) || (qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0) + extras;
+  const inicial = (qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0;
+  // registrada pelo comprovante (não em depósitos): vale o valor do contrato
+  if (garantiaDepositada(c) && !c[`${qual}_por_depositos`]) return inicial + extras;
+  return (soma(deps.filter((x) => !x.complementar)) || inicial) + extras;
 }
 
 /** Troca de garantia em vigor (os depósitos de antes dela são da garantia anterior). */
@@ -1773,8 +1776,8 @@ export function transferirHeranca(d, novoId, usuario) {
  * o anterior já usou (nos boletos que ficaram com ele, ou abatido fora do sistema) não volta a abater. Ex.: reserva de
  * R$ 500,00 já usada no 1º aluguel do anterior → saldo R$ 0,00 no novo. Devolve o comprovante a copiar ([nome] ou []).
  */
-export function herdarReserva(d, n, a, usuario) {
-  if (!(a.reserva_valor > 0) || n.reserva_usada_anterior !== undefined) return [];
+export function herdarReserva(d, n, a, usuario, forcar = false) {
+  if (!(a.reserva_valor > 0) || (n.reserva_usada_anterior !== undefined && !forcar)) return [];
   const usada = d.cobrancas.filter((cb) => cb.contrato_id === a.id).reduce((t, cb) => t + (cb.reserva_utilizada || 0), 0) + (a.reserva_abatida_valor || 0);
   const res = { reserva_valor: a.reserva_valor, reserva_data: a.reserva_data || null, reserva_competencia: a.reserva_competencia || null,
     reserva_usada_anterior: Math.min(usada, a.reserva_valor), reserva_abatida_comp: null, reserva_abatida_valor: null };
@@ -1782,6 +1785,67 @@ export function herdarReserva(d, n, a, usuario) {
   if (copiar.length) res.comprovante_reserva = a.comprovante_reserva;
   atualizar(d, 'contratos', n.id, res, usuario, `${n.inquilino_nome}: reserva de ${C.reais(a.reserva_valor)} do contrato (já usada ${C.reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
   return copiar;
+}
+
+/** O contrato anterior ainda guarda a garantia em dinheiro (comprovante, depósitos, correções, aplicações) que é do herdeiro. */
+const garantiaAHerdar = (d, a) => !!(a && (temCaucao(a) || temDeposito(a)) && !a.garantia_transferida_para
+  && (a.comprovante_caucao || a.comprovante_deposito || a.caucao_por_depositos || a.deposito_por_depositos || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === a.id))));
+
+/** Herança já feita em que ficou faltando a garantia ou a reserva do contrato anterior (dados cadastrados antes). */
+export function herancaIncompleta(d, c) {
+  const a = c.heranca_transferida && contratoHerdado(d, c);
+  if (!a) return null;
+  const garantia = garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
+  const reserva = a.reserva_valor > 0 && !(c.reserva_valor > 0);
+  return garantia || reserva ? { garantia, reserva } : null;
+}
+
+/**
+ * Completa uma herança já feita: traz do contrato anterior a garantia em dinheiro que ficou nele (valores, comprovantes,
+ * depósitos, correções, aplicações, trocas e fiadores atuais), somando ao que o herdeiro já tiver registrado, e a reserva
+ * (se o herdeiro ficou sem). Devolve { arquivos (comprovantes a mudar de pasta), arquivosReserva (a copiar), garantia, reserva }.
+ */
+export function completarHeranca(d, novoId, usuario) {
+  const n = buscar(d, 'contratos', novoId);
+  const falta = n && herancaIncompleta(d, n);
+  if (!falta) return null;
+  const a = contratoHerdado(d, n);
+  const out = { anterior: a, arquivos: [], arquivosReserva: [], garantia: false, reserva: false };
+  if (falta.garantia) {
+    // valores da garantia: os do contrato (o que o herdeiro tiver e o anterior não, fica)
+    const mud = {};
+    // comprovante que o herdeiro já tem (anexado nele) fica; o do anterior só vem se faltar no herdeiro
+    const proprio = (k) => ['comprovante_caucao', 'comprovante_deposito'].includes(k) && n[k];
+    for (const k of CAMPOS_GARANTIA) if (a[k] !== undefined && a[k] !== null && a[k] !== '' && !proprio(k)) mud[k] = a[k];
+    for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k] && !n[k]) out.arquivos.push(a[k]);
+    const data = n.data_entrada || n.vigencia_inicio;
+    const passa = (t, x, texto) => atualizar(d, t, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+    for (const t of TABELAS_GARANTIA) {
+      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id)) {
+        if (x.comprovante) out.arquivos.push(x.comprovante);
+        passa(t, x, TABELAS[t]);
+      }
+    }
+    for (const f of d.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || !data || x.data_saida >= data))) passa('fiadores', f, `Fiador ${f.nome}`);
+    // depósitos que o herdeiro já tinha registrado somam à caução (ficam como depósitos para completar)
+    for (const x of (d.depositos_garantia || []).filter((y) => y.contrato_id === n.id && !y.complementar)) {
+      atualizar(d, 'depositos_garantia', x.id, { complementar: true }, usuario, `${n.inquilino_nome}: depósito de ${C.reais(x.valor)} de ${C.dataBr(x.data)} soma à caução herdada`);
+    }
+    mud.caucao_por_depositos = a.caucao_por_depositos || null;
+    mud.deposito_por_depositos = a.deposito_por_depositos || null;
+    atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia trazida de ${a.inquilino_nome} (troca de titular)`);
+    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id, ...(n.comprovante_caucao && n.comprovante_caucao !== a.comprovante_caucao ? {} : { comprovante_caucao: null }),
+      ...(n.comprovante_deposito && n.comprovante_deposito !== a.comprovante_deposito ? {} : { comprovante_deposito: null }) }, usuario,
+      `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+    out.garantia = true;
+  }
+  if (falta.reserva) {
+    out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
+    recalcularCobrancas(d, (cb) => cb.contrato_id === n.id, usuario);
+    out.reserva = true;
+  }
+  out.arquivos = [...new Set(out.arquivos)];
+  return out;
 }
 
 /** Herança feita antes da reserva passar ao novo titular: falta trazer a reserva. */
