@@ -62,7 +62,7 @@ test('comprovante (arquivo) não entra na leitura do formulário: é gravado à 
   const { dados, erros } = F.ler(F.APLICACAO.filter((c) => ['valor', 'comprovante'].includes(c.nome)), fd);
   assert.deepEqual(dados, { valor: 100000 });
   assert.deepEqual(erros, {});
-  assert.match(F.camposHtml(F.APLICACAO.filter((c) => c.nome === 'comprovante'), { comprovante: 'comprovante-aplicacao.pdf' }), /type="file"[\s\S]*✓ Já guardado<\/span> comprovante-aplicacao\.pdf[\s\S]*data-acao="excluirAnexoDoCampo" data-campo="comprovante"/);
+  assert.match(F.camposHtml(F.APLICACAO.filter((c) => c.nome === 'comprovante'), { comprovante: 'comprovante-aplicacao.pdf' }), /type="file"[\s\S]*✓ Já guardado<\/span>[\s\S]*data-acao="abrirAnexoDoCampo" data-campo="comprovante"[^>]*>📎 comprovante-aplicacao\.pdf<\/a>[\s\S]*data-acao="excluirAnexoDoCampo" data-campo="comprovante"[^>]*>×<\/button>/);
 });
 
 test('valores do contrato: aluguel, vencimento, bonificado e %, as duas caixas juntas; tarifa, multa e juros na linha de baixo', () => {

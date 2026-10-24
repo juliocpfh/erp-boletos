@@ -388,6 +388,13 @@ export const APLICACAO = [
   campo('observacoes', 'Observações (banco, aplicação)', 'area'),
 ];
 
+/** Editar um depósito da caução ou do depósito de garantia (registrado na página do inquilino). */
+export const DEPOSITO_GARANTIA = [
+  campo('data', 'Data do depósito', 'data', { obrig: true }),
+  campo('valor', 'Valor depositado', 'dinheiro', { obrig: true }),
+  comprovante('comprovante', 'Comprovante do depósito'),
+];
+
 export const CORRECAO_GARANTIA = [
   campo('data', 'Data', 'data', { obrig: true }),
   campo('valor_novo', 'Novo valor da caução', 'dinheiro', { obrig: true }),
@@ -557,13 +564,15 @@ function editorLista(c) {
 }
 
 /**
- * Arquivo já guardado num campo de anexo: ✓ verde, o nome e o botão "Excluir" (apaga o arquivo, com confirmação).
+ * Arquivo já guardado num campo de anexo: ✓ verde, o nome (clique abre o arquivo) e o "×" (apaga só o arquivo, com confirmação).
  * ``acao``/``dados``: outra ação para apagar (ex.: foto da vistoria); o padrão apaga o campo do registro em edição.
+ * ``abrir`` ({ escopo, id }): pasta do arquivo; sem ela, a pasta sai do registro em edição (abrirAnexoDoCampo).
  */
-export function arquivoGuardado(campo, nome, acao = 'excluirAnexoDoCampo', dados = {}) {
+export function arquivoGuardado(campo, nome, acao = 'excluirAnexoDoCampo', dados = {}, abrir = null) {
   const extra = Object.entries({ campo, ...dados }).map(([k, x]) => `data-${k}="${esc(x)}"`).join(' ');
-  return `<div class="ajuda arquivo-guardado"><span class="etiqueta ok">✓ Já guardado</span> ${esc(nome)}
-    <button type="button" class="perigo pequeno" data-acao="${acao}" ${extra} data-confirmar="${esc(`Apagar o arquivo "${nome}"? Ele sai da pasta e não dá para recuperar.`)}">Excluir</button>
+  const link = abrir ? `data-acao="abrirArquivo" data-escopo="${esc(abrir.escopo)}" data-id="${esc(abrir.id)}" data-nome="${esc(nome)}"` : `data-acao="abrirAnexoDoCampo" data-campo="${esc(campo)}"`;
+  return `<div class="ajuda arquivo-guardado"><span class="etiqueta ok">✓ Já guardado</span> <span class="nw"><a href="#" ${link} title="Abrir o arquivo">📎 ${esc(nome)}</a>
+    <button type="button" class="link-botao excluir-mini" title="Apagar só o arquivo" data-acao="${acao}" ${extra} data-confirmar="${esc(`Apagar o arquivo "${nome}"? Ele sai da pasta e não dá para recuperar.`)}">×</button></span>
     <br>Para trocar, escolha outro arquivo.</div>`;
 }
 

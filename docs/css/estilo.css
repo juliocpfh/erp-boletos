@@ -182,6 +182,14 @@ tr.amarelo td { background: #fef9c3; }
 tr.doc-perdido td { background: #fee2e2; }
 .selos { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 14px; }
 .selos .etiqueta { font-size: 13px; padding: 3px 10px; }
+/* o que está incluso no contrato: linha compacta embaixo dos selos (verde incluso, azul inquilino, cinza riscado não tem) */
+.incluso { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: -8px 0 14px; font-size: 13px; }
+.incluso .sep { width: 8px; }
+.incluso .ic { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+.incluso .ic.inc { background: #dcfce7; color: #166534; }
+.incluso .ic.inq { background: #e0f2fe; color: #075985; }
+.incluso .ic.nao { background: #f1f5f9; color: #64748b; text-decoration: line-through; font-weight: 500; }
+.incluso .ic.ni { background: #fef3c7; color: #92400e; }
 .descricao-boleto { background: #f8fafc; border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px; margin: 0; font-size: 14px; }
 .boleto td { padding: 4px 8px; }
 [hidden] { display: none !important; }
