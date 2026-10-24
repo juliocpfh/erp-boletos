@@ -10,7 +10,7 @@
    ];
    ```
    Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`; seção que começa recolhida (abre sozinha se tiver algo preenchido): `{ secao, recolher: 'texto do botão' }`; caixa de uma linha que cresce: `area` com `linha: true`; texto com sugestões do que já foi digitado: `sugestoes: [...]`.
-3. `docs/js/telas.js` → entrada em `CADASTROS` (modelo: `reformas`):
+3. `docs/js/telas/cadastros.js` → entrada em `CADASTROS` (modelo: `reformas`):
    ```js
    reformas: {
      titulo: (r, q) => `Reforma - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
@@ -21,12 +21,12 @@
    ```
    Opcionais: `padrao`, `valores`, `ajustar` (validação/erros; lançar `Error` mantém o que foi digitado), `ajustarAsync` (ex.: gravar arquivos anexados antes de salvar, como em `seguros` e nos comprovantes via `guardarComprovantes`), `extraHtml` (HTML extra no formulário, ex.: campos de arquivo), `conferir` (avisos com confirmação), `confirmar` (async, janela própria antes de gravar; ex.: valores do contrato inicial), `salvar` (gravação própria), `depois`, `recalcular` (boletos em aberto), `destino`, `aviso`.
 4. Links: novo `#/novo/<tabela>?...`; editar `#/editar/<tabela>/<id>`. A gravação genérica é `FORMULARIOS.cadastro`.
-5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Campo com nome de arquivo: inclua-o em `arquivosReferenciados` (`regras.js`), para o anexo ser apagado junto com o lançamento. Se a tabela pertence a um contrato, inclua-a na cascata de `R.excluirContrato` (`regras.js`); se pertence a um imóvel, na de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
+5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas/acoes.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Campo com nome de arquivo: inclua-o em `arquivosReferenciados` (`regras.js`), para o anexo ser apagado junto com o lançamento. Se a tabela pertence a um contrato, inclua-a na cascata de `R.excluirContrato` (`regras.js`); se pertence a um imóvel, na de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
 
 ## Adicionar uma tela
-1. `telas.js` → função `telaX(rota)` que devolve HTML em texto; registre em `TELAS` com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
+1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`.
-3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES`. Formulários: `<form data-form="nome">` + função em `FORMULARIOS`.
+3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`). Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`). Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
 4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`).
 5. Telas de impressão: um tipo novo em `telaImprimir` (`#/imprimir/<tipo>`), que desenha sem o menu.
 
@@ -45,10 +45,10 @@
 ## Adicionar um relatório
 | Tipo | Como fazer (exemplo existente) |
 |---|---|
-| Tela com tabela | Função em `regras.js` que devolve linhas + tela em `telas.js` (`resultadosFinanceiros` + `telaResultados`) |
+| Tela com tabela | Função em `regras.js` que devolve linhas + tela em `telas/` (`resultadosFinanceiros` + `telas/financeiro.js` → `telaResultados`) |
 | Excel | `ACOES.excelResultados` (ExcelJS via `excelJs()` de `app.js`, download com `baixar()`) |
 | PDF/impressão | Tipo novo em `telaImprimir` + CSS de `@media print` em `docs/css/estilo.css`; botão "Baixar PDF": `ACOES.baixarPdfTela` (seletor + nome de `nomeArquivoDoc`) |
-| Documento Word | Blocos de `contratos.js` + `contratoDocx` (ex.: `documentoMontado` em `telas.js`) |
+| Documento Word | Blocos de `contratos.js` + `contratoDocx` (ex.: `documentoMontado` em `telas/documentos.js`) |
 
 ## Checklist antes de alterar
 - [ ] Ler a função e os testes da área (`tests/*.test.mjs`).
@@ -62,9 +62,9 @@
 ## Arquivos que costumam mudar juntos
 | Mudança | Arquivos |
 |---|---|
-| Campo novo de cadastro | `formularios.js` + (`regras.js` se entra em regra) + `telas.js` (exibição) |
+| Campo novo de cadastro | `formularios.js` + (`regras.js` se entra em regra) + o arquivo do assunto em `telas/` (exibição) |
 | Regra de boleto | `regras.js` (`montarCobranca`, `CAMPOS_RECALCULO`) + `calculos.js` + `tests/regras.test.mjs` |
-| Tela nova | `telas.js` + `app.js` (`MENU`) + `estilo.css` |
+| Tela nova | arquivo do assunto em `telas/` + `telas.js` (`TELAS`) + `app.js` (`MENU`) + `estilo.css` |
 | Qualquer mudança em `docs/js` | `docs/offline/administracao-imoveis.html` (gerado) |
 
 ## Convenções

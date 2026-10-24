@@ -3,19 +3,19 @@
 ## Camadas
 | Camada | Arquivos | Fala com |
 |---|---|---|
-| Interface (HTML em texto) | `docs/js/telas.js`, `docs/js/formularios.js`, `docs/css/estilo.css`, `docs/index.html` | chama `regras.js` dentro de `alterar()`; lê `E.d` direto para desenhar |
-| Aplicação (estado, rotas, eventos) | `docs/js/app.js` | `telas.js` (TELAS/FORMULARIOS/ACOES), `armazenamento.js`, `backup-seguro.js` |
+| Interface (HTML em texto) | `docs/js/telas.js` (rotas `TELAS`) e `docs/js/telas/*.js` (um arquivo por assunto), `docs/js/formularios.js`, `docs/css/estilo.css`, `docs/index.html` | chama `regras.js` dentro de `alterar()`; lê `E.d` direto para desenhar |
+| Aplicação (estado, rotas, eventos) | `docs/js/app.js` | `telas.js` (TELAS; repassa FORMULARIOS de `telas/envios.js` e ACOES de `telas/acoes.js`), `armazenamento.js`, `backup-seguro.js` |
 | Regras de negócio | `docs/js/regras.js`, `docs/js/alertas.js`, `docs/js/contratos.js` | `calculos.js`; recebem o banco `d` como parâmetro (não tocam em disco nem em DOM, exceto `contratos.js`, que só gera texto/HTML/DOCX) |
 | Cálculo puro | `docs/js/calculos.js` | nada (só funções) |
 | Dados | `docs/js/armazenamento.js` | File System Access API e IndexedDB (atalho da pasta) |
 
-Regra prática: `regras.js` e `calculos.js` rodam no Node (são os testados em `tests/`). `telas.js` e `app.js` só rodam no navegador.
+Regra prática: `regras.js` e `calculos.js` rodam no Node (são os testados em `tests/`). `telas.js`, `telas/` e `app.js` só rodam no navegador. Nas tabelas abaixo, "`telas.js` → X" é o grupo das telas: X fica em `docs/js/telas.js` ou num arquivo de `docs/js/telas/` (`node tools/mapa.mjs X` diz qual).
 
 ## Mapa de pastas
 | Caminho | Responsabilidade |
 |---|---|
 | `docs/` | Raiz do site (GitHub Pages). Tudo que o navegador carrega |
-| `docs/js/` | Código do sistema (ver `documentacao/RESUMO.md`) |
+| `docs/js/` | Código do sistema (ver `documentacao/RESUMO.md`); `docs/js/telas/`: telas por assunto (1ª linha de cada arquivo diz o que tem; estado compartilhado entre eles em `memoria`, `telas/comum.js`) |
 | `docs/css/estilo.css` | Estilo único, inclusive impressão (`@media print`) |
 | `docs/vendor/` | Bibliotecas de terceiros copiadas (Excel, ZIP, PDF, captura de tela) |
 | `docs/modelos/fatura-modelo.xlsx` | Modelo Excel da NF (abas por empresa) |
@@ -48,12 +48,12 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Alertas e calendário | `regras.js` → `alertasContrato`, `todosAlertas` (ordem por `estiloAlerta`), `salvarEstilosAlertas`, `eventosDoMes`; `alertas.js`; `telas.js` → `classeAlerta` |
 | Ordem das caixas; exportar planilha e PDF | `caixas.js` → `arrumarCaixas` (chamado em `app.js` → `mostrar`; nome da caixa: `data-caixa`, id ou título limpo), `regras.js` → `salvarOrdemCaixas`, `ordenarCaixas`, `juntarOrdem`, `ordemGuardada` (`d.ordem_caixas`); `exportar.js` → `planilhaDeTudo`, `pdfDeTudo`, `dadosParaExportar` (`ACOES.exportarPlanilhaPdf`) |
 | Fechamento, resultados e impostos | `regras.js` → `etapasFechamento`, `resultadosFinanceiros`, `inadimplencia`; impostos: `impostosDoMes` (`IMPOSTOS`, adicional do IRPJ, `excedenteLc224`, guia abaixo de R$ 10 em `transportado`), `faturamentoNf`, `vencimentoGuia`/`diaUtilAteh` (feriados nacionais), `salvarGuiaImposto`; `telas.js` → `telaImpostos`, `abasResultados` |
-| Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir`; comprovantes (reserva, aplicação, complemento; caução e depósito só na página do inquilino) opcionais, com alerta até anexar: `COMPROVANTES_CONTRATO`, `conferirComprovantes`, `guardarComprovantes`, `regras.js` → `comprovantesPendentes`, `anexarComprovante`; caixa de arquivos: `rotulosDosArquivos` (etiqueta do dono, sem "Excluir"); nome do comprovante pela data: `comprovantesComNome`, `nomeBate`, `renomearReferencias`, `telas.js` → `acertarNomesDosComprovantes`; valores do contrato inicial pedem duas confirmações: `confirmarValoresIniciais` (janela de `app.js` → `janela`); caução calculada: `ligarCaucao`, `regras.js` → `completarCaucao`; fiadores no cadastro do contrato (só os do contrato assinado, sem excluir): `formularios.js` → `fiadoresNoCadastro`, `vagasFiador`, `regras.js` → `fiadoresDoContrato`; partes recolhidas (`recolher`), quebra de linha (`QUEBRA`), caixa colada (`colado`) e rótulo CPF/CNPJ (`rotuloSe`) em `camposHtml` |
+| Validação de formulário | `formularios.js` → `ler`, `conferirDocumento`; `telas.js` → `CADASTROS.<tabela>.ajustar` e `conferir` (avisos antes de salvar em `telas/avisos.js`: `conferirContrato`, `conferirPessoa`, `conferirSeguro`, `conferirIptu`, `conferirLeitura`, `conferirRessarcimento`, `conferirAvulsa`, `confirmarAvisos`); comprovantes (reserva, aplicação, complemento; caução e depósito só na página do inquilino) opcionais, com alerta até anexar: `COMPROVANTES_CONTRATO`, `conferirComprovantes`, `guardarComprovantes`, `regras.js` → `comprovantesPendentes`, `anexarComprovante`; caixa de arquivos: `rotulosDosArquivos` (etiqueta do dono, sem "Excluir"); nome do comprovante pela data: `comprovantesComNome`, `nomeBate`, `renomearReferencias`, `telas.js` → `acertarNomesDosComprovantes`; valores do contrato inicial pedem duas confirmações: `confirmarValoresIniciais` (janela de `app.js` → `janela`); caução calculada: `ligarCaucao`, `regras.js` → `completarCaucao`; fiadores no cadastro do contrato (só os do contrato assinado, sem excluir): `formularios.js` → `fiadoresNoCadastro`, `vagasFiador`, `regras.js` → `fiadoresDoContrato`; partes recolhidas (`recolher`), quebra de linha (`QUEBRA`), caixa colada (`colado`) e rótulo CPF/CNPJ (`rotuloSe`) em `camposHtml` |
 | Contrato e documentos | `contratos.js` → `dadosDoContrato`, `montarContrato`, `vistoriaBlocos`, `contratoDocx`; `regras.js` → `documentoEntrada` (próprio ou herdado; herdeiro nunca pendente: `contratoHerdado`, aditivo obrigatório `alertaAditivoHerdeiro`), `marcarDocumento`, `documentoPerdido`, `marcarDocumentoPerdido`, assinatura faltante `documentoParcial`/`anexarDocumentoParcial` (nomes de `partesDoContrato`), análise do administrador `analisarDocumento`, `registrarAditivo`, `marcarAditivos`, `cadeiaDeContratos`, `condicoesDoContrato`, `dadosDaPessoa`; locadora dos documentos (só ANK por enquanto): `contratos.js` → `locadorasDoContrato`; marca-d'água `marcaDagua`, assinaturas em conjuntos `gruposAssinatura`, "Página X de Y" `estiloRodape`; vistoria: `tirarDoModelo`, `vistoriaFinal`, `telas.js` → rascunho `ligarRascunhoVistoria`, `ligarNaoSeAplica`; PDF baixado `pdfDoDocumento` e nome `nomeArquivoDoc`; aditivo de vencimento: `regras.js` → `salvarAditivoVencimento`, `assinarAditivo`, `aditivosAguardando`, `contratos.js` → `dadosDoAditivo`, `modelosDe(d, tipo)`, `telas.js` → `telaAditivo`. Anexos: `regras.js` → `arquivosReferenciados`; `telas.js` → `alterarApagandoAnexos` (exclusão apaga o arquivo), `ACOES.limparAnexosSoltos`, `F.arquivoGuardado` ("✓ Já guardado" + Excluir); matrícula: escopo `matricula` (mesma pasta dos documentos do imóvel, nome começando por "Matricula", `ehMatricula`). Exclusão e contrato sem imóvel: `regras.js` → `excluirContrato`, `contratosSemImovelVencidos`, `dataApagarSemImovel` (`DIAS_SEM_IMOVEL`); `telas.js` → `limparSemImovel` (ao abrir o Painel) |
 
 ## Fluxo típico: confirmar um pagamento
-1. Tela `#/cobrancas` (`telas.js` → `telaCobrancas`) desenha o form `data-form="pagamento"`.
-2. `app.js` captura o `submit` e chama `FORMULARIOS.pagamento(form)` em `telas.js`; um erro lançado abre a janela "Entendi" (`aviso(…, 'erro')` → `janelaErro`).
+1. Tela `#/cobrancas` (`telas/cobrancas.js` → `telaCobrancas`) desenha o form `data-form="pagamento"`.
+2. `app.js` captura o `submit` e chama `FORMULARIOS.pagamento(form)` em `telas/envios.js`; um erro lançado abre a janela "Entendi" (`aviso(…, 'erro')` → `janelaErro`).
 3. `FORMULARIOS.pagamento` valida e chama `alterar((db) => R.registrarPagamento(db, id, data, …))`.
 4. `alterar` (`app.js`): relê `imoveis-dados.json`; se a `revisao` do disco mudou, troca `E.d` pela versão do disco; clona; aplica a função.
 5. `registrarPagamento` usa `C.liquidar` e grava via `atualizar` → `registrar` adiciona a linha em `d.historico`.
@@ -65,8 +65,8 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 |---|---|---|
 | Pasta local / OneDrive | `armazenamento.js` | O OneDrive só sincroniza a pasta; o código não fala com ele. Cópias em conflito são detectadas por nome (`copiasEmConflito`) |
 | GitHub Pages | — | Hospeda `docs/` (README). Não há backend |
-| ViaCEP | `telas.js` → `consultarCep` | `https://viacep.com.br/ws/<cep>/json/`; só preenche campos vazios, exceto o Estado (UF), que sempre segue o CEP; sem internet, `calculos.js` → `ufDoCep` |
-| BrasilAPI (CNPJ) | `telas.js` → `consultarCnpj` | `https://brasilapi.com.br/api/cnpj/v1/<cnpj>` |
+| ViaCEP | `telas/campos.js` → `consultarCep` | `https://viacep.com.br/ws/<cep>/json/`; só preenche campos vazios, exceto o Estado (UF), que sempre segue o CEP; sem internet, `calculos.js` → `ufDoCep`. Endereço de uma linha das pessoas: campo virtual `<prefixo>cep_busca` → `enderecoNaLinha` |
+| BrasilAPI (CNPJ); Banco Central (índices) | `telas/campos.js` → `consultarCnpj`; `acumuladoNoBancoCentral`, `ligarIndiceBancoCentral` | `https://brasilapi.com.br/api/cnpj/v1/<cnpj>` (razão social, fantasia, endereço, telefone, e-mail, representante único); `https://api.bcb.gov.br/dados/serie/bcdata.sgs.<série>/dados` (`SERIES_BC`: IGP-M, IPCA, INPC, IGP-DI; acumulado por `calculos.js` → `acumuladoDosMeses`; só sugere o %, quem salva é o usuário) |
 | Planilhas Excel | `fatura.js`, `telas.js` (`excelResultados`, `excelDoNumero`) | ExcelJS; modelo `docs/modelos/fatura-modelo.xlsx` ou o enviado pelo usuário |
 | PDF | `telas.js` → `pdfDaFatura` (NF), `pdfDoDocumento` (demais documentos: A4 cortado entre blocos); impressão do navegador | html2canvas + jsPDF (o texto do PDF baixado é imagem) |
 | Word | `contratos.js` → `contratoDocx` | `.docx` montado à mão com JSZip |
@@ -85,5 +85,5 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 | Reserva (`reservaParaCompetencia`, `realocarReserva`) | Já teve dois bugs corrigidos; há testes específicos em `tests/regras.test.mjs` |
 | Reajuste (`mesDeAniversario`) | Regra de negócio definida pelo usuário (ver `documentacao/DECISOES.md`) |
 | `auth.js` e `backup-seguro.js` | Mudar parâmetros de cifragem/iterações invalida senhas e backups já gravados |
-| `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js`, `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs`. Usa caminhos com `/` e quebras de linha LF, para o mesmo hash no Windows (CRLF do Git) e no Linux |
+| `tools/fontes-offline.mjs` | O hash decide se o teste do offline passa; inclui `docs/js` (com as subpastas), `docs/vendor`, `docs/css/estilo.css`, o modelo xlsx e `tools/gerar-offline.mjs`. Usa caminhos com `/` e quebras de linha LF, para o mesmo hash no Windows (CRLF do Git) e no Linux |
 | Nomes de arquivo gerados pelo sistema | Os nomes atuais usam só ASCII (ex.: `vistoria-entrada-…jpg`, `contrato-de-locacao-assinado-2026-10-15.pdf` via `salvarAssinado`, `programa/administracao-imoveis.html`). Manter sem acento: a pasta interna do navegador (`?teste`) recusou nome com acento, e o usuário não precisa de acentos nos nomes. Para só listar arquivos use `pastaDoEscopo(escopo, id, false)`: abrir uma página não pode criar pasta vazia |

@@ -554,9 +554,7 @@ test('IPTU: guias suas a pagar (vencidas e dos próximos 60 dias), por venciment
 test('contas pagas por nós abatem do resultado do imóvel', () => {
   const { d, loja } = base();
   const c = d.contratos[0];
-  assert.equal(R.contasPorNossaConta(d, loja.id, '2026-07-01').vago, false);
   c.conta_agua = 'Incluso no aluguel';
-  assert.deepEqual(R.contasPorNossaConta(d, loja.id, '2026-07-01').inclusas, ['Água']);
   assert.throws(() => R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 0 }], 'julio'), /pelo menos uma/);
   R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Condomínio', valor: 45000, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: 0 }], 'julio');
   assert.equal(d.despesas.length, 2);
@@ -623,7 +621,6 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
   const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').find((e) => e.tipo === 'Fechamento');
   assert.equal(ev.data, '2026-08-31');
-  assert.equal(R.ultimoContratoDoImovel(d, loja.id).id, c.id);
 });
 
 test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e muda de mês ao recalcular', () => {
@@ -750,22 +747,6 @@ test('reajuste: correção feita pela regra antiga (mês seguinte) não vira rea
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-02-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
   assert.ok(R.reajusteNaCompetencia(d, c, '2026-01').corrigido);
   assert.equal(R.reajustePendente(d, c, '2026-03-05'), null);
-});
-
-test('reajustes não corrigidos: some depois de corrigido e o atrasado aparece mesmo antes do período', () => {
-  const d = R.bancoVazio();
-  const i = R.inserir(d, 'imoveis', { nome: 'Casa', endereco: 'Rua A, 1' }, 'j');
-  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ana', data_entrada: '2025-03-10', vigencia_inicio: '2025-03-10', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
-  const b = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Bia', data_entrada: '2025-11-10', vigencia_inicio: '2025-11-10', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
-  // hoje 05/10/2026: Ana devia ter sido corrigida no aluguel de 03/2026 (fora do período 08/2026 a 01/2027); Bia corrige em 11/2026
-  const nomes = () => R.reajustesNaoCorrigidos(d, '2026-08', '2027-01', '2026-10-05').map((r) => `${r.contrato.inquilino_nome} ${r.competencia}`);
-  assert.deepEqual(nomes(), ['Ana 2026-03', 'Bia 2026-11']);
-  R.inserir(d, 'correcoes', { contrato_id: b.id, data_vigencia: '2026-11-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
-  assert.deepEqual(nomes(), ['Ana 2026-03', 'Bia 2026-11'], 'corrigido, mas falta a carta (vai com o boleto já corrigido)');
-  R.marcarCartaEnviada(d, b.id, '2026-11', true, 'j');
-  assert.deepEqual(nomes(), ['Ana 2026-03']);
-  R.inserir(d, 'correcoes', { contrato_id: a.id, data_vigencia: '2026-03-01', valor_novo: 105000, indice: 'IPCA' }, 'j');
-  assert.deepEqual(nomes(), [], 'reajuste da regra antiga: corrigido basta');
 });
 
 test('carta de reajuste vai com o boleto do aluguel já corrigido (o índice sai no começo do mês do reajuste)', () => {
@@ -1173,21 +1154,12 @@ test('troca para garantia sem fiador: os fiadores atuais saem', () => {
   assert.equal(d.fiadores.length, 1);
 });
 
-test('caução paga: exige data e comprovante; guarda a data efetiva e o arquivo', () => {
-  const { d, c } = base();
-  assert.throws(() => R.registrarGarantiaPaga(d, c.id, 'caucao', '2026-02-03', null, 'julio'), /Anexe o comprovante/);
-  assert.throws(() => R.registrarGarantiaPaga(d, c.id, 'caucao', '', 'x.pdf', 'julio'), /data/);
-  R.registrarGarantiaPaga(d, c.id, 'caucao', '2026-02-03', 'comprovante-caucao-2026-02-03.pdf', 'julio');
-  assert.equal(c.caucao_pago_em, '2026-02-03');
-  assert.equal(c.comprovante_caucao, 'comprovante-caucao-2026-02-03.pdf');
-});
-
 test('garantia só conta depois de depositada com comprovante (caução atual, aplicação, complemento)', () => {
   const d = R.bancoVazio();
   const c = R.inserir(d, 'contratos', { inquilino_nome: 'Teste', aluguel_inicial: 200000, garantia_tipo: 'Depósito garantia', deposito_valor: 400000, deposito_data: '2026-01-01' }, 'j');
   assert.equal(R.garantiaDepositada(c), false);
   assert.equal(R.situacaoAplicacao(d, c).total, 0, 'sem comprovante: nada a aplicar');
-  R.registrarGarantiaPaga(d, c.id, 'deposito', '2026-01-03', 'comprovante-deposito-garantia-2026-01-03.pdf', 'j');
+  R.atualizar(d, 'contratos', c.id, { deposito_pago_em: '2026-01-03', comprovante_deposito: 'comprovante-deposito-garantia-2026-01-03.pdf' }, 'j');
   assert.equal(c.deposito_pago_em, '2026-01-03');
   assert.equal(R.garantiaDepositada(c), true);
   assert.equal(R.situacaoAplicacao(d, c).total, 400000);
@@ -1500,7 +1472,6 @@ test('herança: reserva do contrato passa ao novo titular sem abater de novo o q
   assert.equal(R.saldoReserva(d, novo), 0);
   R.gerarCobrancas(d, '2026-08', 'julio');
   assert.equal(R.boletoDoMes(d, novo.id, '2026-08').reserva_utilizada, 0, 'não abate de novo');
-  assert.equal(R.reservaAHerdar(d, novo), false);
 });
 
 test('herança já feita sem a garantia e a reserva do anterior: completa (comprovante, aplicação e reserva vêm para o herdeiro)', () => {

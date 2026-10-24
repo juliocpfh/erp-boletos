@@ -20,6 +20,15 @@ export function centavos(texto) {
   return arred(n * 100);
 }
 
+/**
+ * Índice acumulado a partir das variações de cada mês (em %): multiplica (1 + mês) e tira 1.
+ * Ex.: 0,27% e -0,01% → 0,2600%. Quatro casas, como nas cartas de reajuste.
+ */
+export function acumuladoDosMeses(mensais) {
+  const fator = mensais.reduce((f, v) => f * (1 + v / 100), 1);
+  return Math.round((fator - 1) * 1e6) / 1e4;
+}
+
 /** Converte texto de percentual ("10", "8,5", "1,25%") em número. */
 export function numero(texto) {
   if (texto === null || texto === undefined || texto === '') return 0;
