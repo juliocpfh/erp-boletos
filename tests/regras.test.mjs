@@ -178,7 +178,7 @@ test('bonificação desligada, renovação com novo valor, caução e saída', (
   assert.equal(R.aluguelAtual(d, c, '2027-09-15'), 600000);
   assert.ok(d.historico.some((h) => h.tabela === 'renovacoes' && h.contrato_id === c.id));
   // saída com garantia corrigida pela poupança
-  R.encerrarContrato(d, c.id, { data_saida: '2027-12-31', garantia_valor: 1413255, indice_percentual: 10, debitos: 100000 }, 'julio');
+  R.encerrarContrato(d, c.id, { data_saida: '2027-12-31', garantia_valor: 1413255, indice_percentual: 10, debitos: 100000, leitura_agua: '0100', leitura_energia: '0200' }, 'julio');
   const e = R.encerramentoDo(d, c.id);
   assert.equal(e.garantia_corrigida, 1554581);
   assert.equal(e.saldo, 1454581);
@@ -259,10 +259,10 @@ test('vincular inquilino ao imóvel grava a leitura dos relógios; a saída tamb
   const ct = R.buscar(d, 'contratos', c.id);
   assert.deepEqual([ct.imovel_id, ct.data_entrada, ct.ativo, ct.leitura_agua], [casa.id, '2026-02-01', true, undefined]);
   assert.throws(() => R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-02-01' }, 'julio'));
-  R.encerrarContrato(d, c.id, { data_saida: '2026-09-30', leitura_agua: '0456', leitura_energia: '', leitura_gas: '' }, 'julio');
+  R.encerrarContrato(d, c.id, { data_saida: '2026-09-30', leitura_agua: '0456', leitura_energia: '0789', leitura_gas: '' }, 'julio');
   assert.equal(d.encerramentos[0].leitura_agua, undefined);
   assert.deepEqual(R.leiturasDoImovel(d, casa.id).map((l) => [l.momento, l.data, l.agua, l.energia]),
-    [['Saída do inquilino', '2026-09-30', '0456', ''], ['Entrada do inquilino', '2026-02-01', '0123', '45678']]);
+    [['Saída do inquilino', '2026-09-30', '0456', '0789'], ['Entrada do inquilino', '2026-02-01', '0123', '45678']]);
   assert.equal(R.textoLeitura(d.leituras[0]), 'água 0123 · energia 45678');
   // sem leitura informada, nada é gravado
   const y = R.inserir(d, 'contratos', { inquilino_nome: 'Y', data_entrada: '2026-03-01' }, 'julio');
@@ -431,7 +431,7 @@ test('mesmo inquilino em dois imóveis: contrato novo só com os dados da pessoa
 
 test('saída lembra a titularidade até registrar a volta para o proprietário', () => {
   const { d, c, loja } = base();
-  R.encerrarContrato(d, c.id, { data_saida: '2026-09-30' }, 'julio');
+  R.encerrarContrato(d, c.id, { data_saida: '2026-09-30', leitura_agua: '0100', leitura_energia: '0200' }, 'julio');
   assert.ok(R.todosAlertas(d, '2026-10-05').some((a) => a.tipo === 'Titularidade'));
   R.inserir(d, 'titularidades', { imovel_id: loja.id, contrato_id: c.id, concessionaria: 'Copel', tipo: 'Volta para o proprietário', data: '2026-10-02' }, 'julio');
   assert.ok(!R.todosAlertas(d, '2026-10-05').some((a) => a.tipo === 'Titularidade'));
@@ -912,7 +912,7 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   assert.equal(R.valorGarantia(d, c), 540000);
 });
 
-test('complemento da caução sai junto ao gerar os boletos do mês e não esconde o boleto do aluguel', () => {
+test('complemento da caução não sai sozinho com os boletos do mês: fica em "Caução a completar"', () => {
   const d = R.bancoVazio();
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 3', endereco: 'Rua Teste, 20', cidade: 'Curitiba' }, 'julio');
   const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
@@ -923,13 +923,15 @@ test('complemento da caução sai junto ao gerar os boletos do mês e não escon
   assert.deepEqual(R.gerarCobrancas(d, '2026-02', 'julio'), { geradas: 1, existentes: 0 });
   assert.equal(R.complementosCaucaoPendentes(d, '2026-02').length, 0);
   assert.equal(R.complementosCaucaoPendentes(d, '2026-03').length, 1);
-  // março: aluguel corrigido + complemento da caução
-  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 2, existentes: 0 });
-  const doMes = d.cobrancas.filter((x) => x.competencia === '2026-03');
-  assert.equal(doMes.filter(R.ehComplementoCaucao).length, 1);
-  assert.equal(doMes.find(R.ehComplementoCaucao).caucao_complemento, 27000);
-  assert.equal(R.complementosCaucaoPendentes(d, '2026-03').length, 0);
-  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 0, existentes: 1 });
+  // março: só o aluguel corrigido; o complemento é gerado na tela Reajustes
+  assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 1, existentes: 0 });
+  assert.equal(d.cobrancas.filter(R.ehComplementoCaucao).length, 0);
+  assert.deepEqual(R.caucoesACompletar(d).map((y) => [y.contrato.id, y.x.complemento]), [[c.id, 27000]]);
+  // depósito feito pelo inquilino (sem boleto): a caução passa ao necessário e sai da lista
+  R.registrarComplementoDepositado(d, c.id, { data: '2026-03-20' }, 'julio');
+  assert.equal(R.valorGarantia(d, c), 567000);
+  assert.deepEqual(R.caucoesACompletar(d), []);
+  assert.equal(R.complementoCaucao(d, c), null);
 });
 
 test('impostos: PIS/COFINS mensal e IRPJ/CSLL do trimestre acumulando mês a mês; valor do contador ao lado', () => {
@@ -1597,4 +1599,135 @@ test('ordem das caixas: a guardada vale para as que estão na tela; ausentes e n
   assert.deepEqual(R.ordemGuardada(d, 'contrato', 'Contrato e valores'), ['Observações', 'Reserva dada na visita']);
   assert.deepEqual(R.ordemGuardada(d, 'painel', ''), []);
   assert.match(d.historico.at(-1).descricao, /Ordem das caixas/);
+});
+
+test('tela Reajustes: abertos de qualquer ano, % digitado sem índice, carta só no ano corrente e desfazer', () => {
+  const d = R.bancoVazio();
+  const i = R.inserir(d, 'imoveis', { nome: 'Casa', endereco: 'Rua A, 1' }, 'j');
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ana Teste', data_entrada: '2023-11-10', vigencia_inicio: '2023-11-10', aluguel_inicial: 200000,
+    dia_vencimento: 10, indice_correcao: 'IPCA' }, 'j');
+  const abertos = () => R.reajustesAbertos(d, '2026-10-24').map((r) => `${r.competencia}${r.comCarta ? ' carta' : ''}`);
+  assert.deepEqual(abertos(), ['2024-11', '2025-11', '2026-11 carta']);
+  // fora de ordem: a de 2025 só depois da de 2024
+  assert.throws(() => R.aplicarReajuste(d, c.id, '2026-11', 'j', { percentual: 4 }), /Aplique antes o reajuste de 11.2024/);
+  assert.throws(() => R.aplicarReajuste(d, c.id, '2024-11', 'j'), /digite o %/);
+  R.aplicarReajuste(d, c.id, '2024-11', 'j', { percentual: 5 });
+  assert.equal(R.aluguelAtual(d, c, '2024-12-01'), 210000);
+  R.aplicarReajuste(d, c.id, '2025-11', 'j', { valor_novo: 220000 });
+  assert.throws(() => R.aplicarReajuste(d, c.id, '2025-11', 'j', { percentual: 3 }), /já foi registrado/);
+  assert.deepEqual(abertos(), ['2026-11 carta'], 'de ano anterior não pede carta');
+  // desfazer: só a mais recente
+  const [a2024, a2025] = R.correcoesDo(d, c.id);
+  assert.throws(() => R.desfazerReajuste(d, a2024.id, 'j'), /mais recente/);
+  R.desfazerReajuste(d, a2025.id, 'j');
+  assert.equal(R.aluguelAtual(d, c, '2026-01-01'), 210000);
+  assert.deepEqual(R.reajustesFeitos(d).map((x) => x.correcao.data_vigencia), ['2024-11-01']);
+});
+
+test('complemento da caução: vencimento escolhido, parcelas que somam na caução e desfazer o reajuste', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 4', endereco: 'Rua Teste, 30', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
+    data_entrada: '2025-11-01', vigencia_inicio: '2025-11-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
+    desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-11-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
+  R.inserir(d, 'indices_acumulados', { indice: 'IGP-M', mes_ref: '2026-10', percentual: 5 }, 'julio');
+  R.atualizar(d, 'contratos', c.id, { indice_correcao: 'IGP-M' }, 'julio');
+  const corr = R.aplicarReajuste(d, c.id, '2026-11', 'julio');
+  assert.equal(R.complementoCaucao(d, c).complemento, 27000);
+  // 2 × R$ 135,00, a 1ª com mais prazo (10/01/2027) e a 2ª um mês depois
+  const cbs = R.gerarBoletosCaucao(d, c.id, 'julio', null, { vencimento: '2027-01-10', parcelas: 2 });
+  assert.deepEqual(cbs.map((x) => [x.competencia, x.vencimento, x.caucao_complemento, x.caucao_parcela, x.valor_nf]), [['2026-12', '2027-01-10', 13500, '1/2', null], ['2027-01', '2027-02-10', 13500, '2/2', null]]);
+  assert.throws(() => R.gerarBoletoCaucao(d, c.id, 'julio'), /já foi gerado/);
+  // paga a 2ª antes da 1ª: cada uma soma
+  R.registrarPagamento(d, cbs[1].id, '2027-01-05', null, 'julio');
+  assert.equal(R.valorGarantia(d, c), 553500);
+  assert.equal(cbs[1].valor_nf, 0);
+  R.registrarPagamento(d, cbs[0].id, '2026-12-20', null, 'julio');
+  assert.equal(R.valorGarantia(d, c), 567000);
+  // desfazer: a parcela paga por último primeiro; com parcela paga, o reajuste não sai
+  assert.throws(() => R.estornarPagamento(d, cbs[1].id, 'julio'), /parcela mais recente/);
+  assert.throws(() => R.desfazerReajuste(d, corr.id, 'julio'), /desfaça o pagamento/);
+  R.estornarPagamento(d, cbs[0].id, 'julio');
+  R.estornarPagamento(d, cbs[1].id, 'julio');
+  assert.equal(R.valorGarantia(d, c), 540000);
+  R.desfazerReajuste(d, corr.id, 'julio');
+  assert.equal(d.cobrancas.filter((x) => R.ehComplementoCaucao(x)).length, 0, 'boletos da caução em aberto saem junto');
+  assert.equal(R.aluguelAtual(d, c, '2026-12-01'), 200000);
+});
+
+test('caução paga por boleto vale para o reajuste do boleto, mesmo paga depois de um reajuste mais novo', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 5', endereco: 'Rua Teste, 40', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', data_entrada: '2024-11-01', vigencia_inicio: '2024-11-01', aluguel_inicial: 200000,
+    dia_vencimento: 10, garantia_tipo: 'Caução', caucao_valor: 600000, caucao_data: '2024-11-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
+  R.aplicarReajuste(d, c.id, '2025-11', 'julio', { valor_novo: 210000 });
+  const [cb] = R.gerarBoletosCaucao(d, c.id, 'julio');
+  assert.equal(cb.caucao_complemento, 30000);
+  R.aplicarReajuste(d, c.id, '2026-11', 'julio', { valor_novo: 220000 });
+  assert.ok(R.complementoCaucao(d, c).boleto, 'espera o boleto anterior ser pago');
+  R.registrarPagamento(d, cb.id, '2026-11-20', null, 'julio');
+  assert.equal(R.valorGarantia(d, c), 630000);
+  assert.equal(R.complementoCaucao(d, c).complemento, 30000, 'o reajuste de 2026 ainda pede o seu complemento');
+});
+
+test('caução a completar: novo valor negociado também aparece; com boleto em aberto não registra depósito', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 6', endereco: 'Rua Teste, 50', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', data_entrada: '2024-11-01', vigencia_inicio: '2024-11-01', aluguel_inicial: 200000,
+    dia_vencimento: 10, garantia_tipo: 'Caução', caucao_valor: 600000, caucao_data: '2024-11-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
+  R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-05-01', indice: 'Negociado', valor_anterior: 200000, valor_novo: 230000 }, 'julio');
+  const [y] = R.caucoesACompletar(d);
+  assert.equal(y.x.correcao.indice, 'Negociado');
+  assert.equal(y.x.complemento, 90000);
+  R.gerarBoletosCaucao(d, c.id, 'julio', null, { parcelas: 3 });
+  assert.throws(() => R.registrarComplementoDepositado(d, c.id, { data: '2026-05-10' }, 'julio'), /boleto do complemento/);
+  assert.equal(R.caucoesACompletar(d)[0].abertos.length, 3);
+});
+
+test('arquivos dos lançamentos: nome esperado pelo tipo e data, etiqueta do dono e renomear em todos os lançamentos', () => {
+  const d = R.bancoVazio();
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'Ana Teste', garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-03-01', caucao_pago_em: '2026-03-05', comprovante_caucao: 'caucao ana.pdf' }, 'j');
+  const dep = R.inserir(d, 'depositos_garantia', { contrato_id: c.id, qual: 'caucao', data: '2026-04-10', valor: 10000, comprovante: 'comprovante-caucao-2026-04-10 (2).pdf' }, 'j');
+  R.inserir(d, 'vistorias', { contrato_id: c.id, tipo: 'Entrada', data: '2026-03-01', fotos: { fachada: 'vistoria-entrada-2026-03-01-fachada.jpg' } }, 'j');
+  const lista = R.comprovantesComNome(d);
+  assert.deepEqual(lista.map((x) => [x.nome, x.esperado, R.nomeBate(x.nome, x.esperado)]), [
+    ['caucao ana.pdf', 'comprovante-caucao-2026-03-05', false],
+    ['comprovante-caucao-2026-04-10 (2).pdf', 'comprovante-caucao-2026-04-10', true],
+  ]);
+  const rot = R.rotulosDosArquivos(d);
+  assert.equal(rot.get(`contrato:${c.id}|caucao ana.pdf`), 'comprovante da caução');
+  assert.match(rot.get(`contrato:${c.id}|vistoria-entrada-2026-03-01-fachada.jpg`), /foto da vistoria de entrada/);
+  assert.equal(rot.get(`contrato:${c.id}|ficha.pdf`), undefined, 'arquivo solto não tem dono');
+  // herdeiro que aponta para o comprovante do anterior também é trocado
+  const h = R.inserir(d, 'contratos', { inquilino_nome: 'Bia Teste', comprovante_caucao: 'caucao ana.pdf', comprovante_caucao_contrato: c.id }, 'j');
+  R.renomearReferencias(d, c.id, 'caucao ana.pdf', 'comprovante-caucao-2026-03-05.pdf', 'j');
+  assert.equal(c.comprovante_caucao, 'comprovante-caucao-2026-03-05.pdf');
+  assert.equal(h.comprovante_caucao, 'comprovante-caucao-2026-03-05.pdf');
+  assert.equal(dep.comprovante, 'comprovante-caucao-2026-04-10 (2).pdf');
+});
+
+test('saída em duas etapas, leitura obrigatória (a mesma da vistoria) e imóvel corrigido só sem boleto pago', () => {
+  const d = R.bancoVazio();
+  const a = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa A', endereco: 'Rua A, 1' }, 'j');
+  const b = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa B', endereco: 'Rua B, 2' }, 'j');
+  const c = R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Ana Teste', data_entrada: '2026-01-10', vigencia_inicio: '2026-01-10', aluguel_inicial: 100000, dia_vencimento: 10, conta_gas: 'Não tem' }, 'j');
+  assert.deepEqual(R.relogiosDoContrato(c), ['agua', 'energia']);
+  // imóvel lançado errado: corrige enquanto não há boleto pago (a leitura de entrada acompanha)
+  R.gravarLeitura(d, c, 'Entrada do inquilino', '2026-01-10', { agua: '10', energia: '20' }, 'j');
+  R.corrigirImovel(d, c.id, b.id, 'j');
+  assert.equal(c.imovel_id, b.id);
+  assert.equal(R.leituraDo(d, c.id, 'Entrada do inquilino').imovel_id, b.id);
+  R.gerarCobrancas(d, '2026-01', 'j');
+  R.registrarPagamento(d, d.cobrancas[0].id, '2026-02-10', null, 'j');
+  assert.throws(() => R.corrigirImovel(d, c.id, a.id, 'j'), /boleto pago/);
+  // 1ª etapa: a data; a vistoria de saída grava a leitura; 2ª etapa: o cálculo final usa a mesma leitura
+  assert.throws(() => R.informarSaida(d, c.id, '2025-12-01', 'j'), /antes da entrada/);
+  R.informarSaida(d, c.id, '2026-11-30', 'j');
+  assert.equal(c.data_saida, '2026-11-30');
+  assert.throws(() => R.gravarLeitura(d, c, 'Saída do inquilino', '2026-11-30', { agua: '50' }, 'j'), /energia/);
+  R.gravarLeitura(d, c, 'Saída do inquilino', '2026-11-30', { agua: '50', energia: '60' }, 'j');
+  R.encerrarContrato(d, c.id, { data_saida: '2026-11-30' }, 'j');
+  assert.equal(d.leituras.filter((l) => l.momento === 'Saída do inquilino').length, 1, 'uma leitura de saída só');
+  assert.throws(() => R.informarSaida(d, c.id, '2026-12-15', 'j'), /cálculo final/);
+  assert.throws(() => R.desfazerSaida(d, c.id, 'j'), /cálculo final/);
 });

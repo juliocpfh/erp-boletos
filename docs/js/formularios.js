@@ -148,14 +148,6 @@ export const LEITURA = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
-/** Vincular ao imóvel um inquilino já cadastrado, com a leitura dos relógios na entrada. */
-export const VINCULO = [
-  campo('contrato_id', 'Inquilino', 'opcao', { obrig: true, opcoes: [], ajuda: 'Inquilino que já está em outro imóvel: abre o cadastro de um contrato novo para este imóvel (com condições próprias)' }),
-  campo('data_entrada', 'Data de entrada no imóvel', 'data', { obrig: true }),
-  secao('Leitura dos relógios na entrada'),
-  ...LEITURAS.map(([nome, rotulo], n) => campo(`leitura_${nome}`, rotulo, 'texto', { ajuda: n ? '' : 'O número que aparece no relógio. Fica no histórico de leituras do imóvel' })),
-];
-
 /** Qualificação da pessoa no contrato (nacionalidade, estado civil, profissão, nascimento, endereço). */
 /** Sexo para a concordância no contrato; "Neutro" escreve brasileiro(a), solteiro(a), portador(a). */
 export const GENEROS = ['Masculino', 'Feminino', 'Neutro – o(a)'];
@@ -211,8 +203,9 @@ const rotuloPJ = (rotulo) => ({ rotuloSe: { campo: 'inquilino_tipo', valor: 'Pes
 
 export const CONTRATO = [
   secao('Imóvel e situação'),
-  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soEditar: true, ajuda: 'Para vincular a um imóvel, use "Vincular inquilino" na página do imóvel. Em branco: sem imóvel (não gera boleto)' }),
-  campo('ativo', 'Inquilino ativo', 'simnao', { padrao: true, ajuda: 'Desmarcado: não gera boleto e vai para a lista de inativos' }),
+  // o imóvel é escolhido só no contrato novo (obrigatório); imóvel lançado errado: "Corrigir imóvel" na página do inquilino.
+  // "Ativo" não é mais campo: o inquilino fica inativo pela saída
+  campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soNovo: true, obrig: true, ajuda: 'Escolha o imóvel deste inquilino' }),
   campo('gerar_nf', 'Emite NF (desmarcado: boleto de controle)', 'simnao', { padrao: true, ajuda: 'Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados' }),
   secao('Inquilino (responsável pelo contrato)'),
   campo('inquilino_tipo', 'Tipo', 'opcao', { obrig: true, padrao: 'Pessoa física', opcoes: ['Pessoa física', 'Pessoa jurídica (empresa)'] }),
@@ -289,7 +282,6 @@ export const CONTRATO = [
   campo('prazo_tipo', 'Prazo', 'opcao', { obrig: true, padrao: 'Determinado', opcoes: ['Determinado', 'Indeterminado'] }),
   campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ...quando('prazo_tipo', 'Determinado'), ajuda: 'Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia)' }),
   campo('renovacao_automatica', 'Renovação automática', 'simnao'),
-  campo('data_saida', 'Data de saída', 'data', { ajuda: 'Use o botão "Registrar saída" na página do inquilino para fazer o cálculo final' }),
   secao('Correção anual'),
   campo('indice_correcao', 'Índice de correção previsto no contrato', 'opcao', { lista: 'indices', ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
@@ -412,8 +404,9 @@ export const RENOVACAO = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+// a data de saída vem do contrato ("Informar data de saída"); a leitura dos relógios na saída é a mesma da vistoria de saída
+// (vem preenchida e, se mudar aqui, muda lá também)
 export const ENCERRAMENTO = [
-  campo('data_saida', 'Data de saída', 'data', { obrig: true }),
   ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct'),
