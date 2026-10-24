@@ -1282,6 +1282,42 @@ test('caução em depósitos de valores diferentes: o primeiro valor é o do con
   assert.equal(R.garantiaADepositar(d, c, 'caucao').depositado, 0);
 });
 
+test('"×" apaga só o anexo e "Editar" do depósito confere a soma de novo', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07', comprovante_reserva: 'reserva.pdf', reserva_valor: 50000 });
+  // reserva: sai só o arquivo (o valor continua)
+  R.removerAnexo(d, 'contratos', c.id, 'comprovante_reserva', 'julio');
+  assert.equal(c.comprovante_reserva, null);
+  assert.equal(c.reserva_valor, 50000);
+  assert.throws(() => R.removerAnexo(d, 'contratos', c.id, 'comprovante_caucao', 'julio'), /não pode/);
+  // caução em dois depósitos: o contrato guarda a cópia do comprovante do último
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-01', valor: 200000, arquivo: 'a.pdf' }, 'julio');
+  const { deposito } = R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-15', valor: 100000, arquivo: 'b.pdf' }, 'julio');
+  assert.equal(c.comprovante_caucao, 'b.pdf');
+  R.removerAnexo(d, 'depositos_garantia', deposito.id, 'comprovante', 'julio');
+  assert.equal(R.buscar(d, 'depositos_garantia', deposito.id).valor, 100000, 'o depósito continua');
+  assert.equal(c.comprovante_caucao, null, 'a cópia no contrato também sai');
+  assert.equal(R.garantiaDepositada(c), true, 'a caução continua registrada');
+  // editar: R$ 1.000,00 → R$ 500,00 deixa de cobrir R$ 3.000,00; volta para R$ 1.000,00 e completa de novo
+  R.editarDepositoGarantia(d, deposito.id, { data: '2026-09-16', valor: 50000 }, 'julio');
+  assert.equal(R.garantiaDepositada(c), false);
+  R.editarDepositoGarantia(d, deposito.id, { data: '2026-09-16', valor: 100000 }, 'julio');
+  assert.equal(R.garantiaDepositada(c), true);
+  assert.equal(c.caucao_pago_em, '2026-09-16');
+  // documento assinado: o arquivo sai, continua assinado; termo aditivo volta a aguardar assinatura
+  Object.assign(c, { doc_contrato_em: '2026-06-01', doc_contrato_arquivo: 'contrato.pdf' });
+  R.arquivoDocumento(d, c.id, 'doc_contrato_em', null, 'julio');
+  assert.equal(c.doc_contrato_em, '2026-06-01');
+  assert.equal(c.doc_contrato_arquivo, null);
+  R.arquivoDocumento(d, c.id, 'doc_contrato_em', 'contrato-certo.pdf', 'julio');
+  assert.equal(c.doc_contrato_arquivo, 'contrato-certo.pdf');
+  const a = R.registrarAditivo(d, c.id, { data: '2026-10-01', assunto: 'Troca do vencimento', arquivo: 'aditivo.pdf' }, 'julio');
+  R.removerArquivoAditivo(d, a.id, 'julio');
+  assert.equal(R.aditivosDo(d, c.id).length, 0);
+  assert.equal(R.aditivosAguardando(d, c.id).length, 1);
+  assert.equal(c.possui_aditivos, false);
+});
+
 test('arquivos anexados que os lançamentos usam (para apagar o anexo junto com o lançamento)', () => {
   const { d, c, loja } = base();
   Object.assign(c, { comprovante_reserva: 'comprovante-reserva.pdf', doc_contrato_arquivo: 'contrato.pdf', doc_vistoria_parcial: { arquivo: 'vistoria-parcial.pdf' } });

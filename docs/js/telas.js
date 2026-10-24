@@ -1225,7 +1225,9 @@ function caixaGarantia(c) {
   }
   /** Título de uma parte com o botão na mesma linha (ex.: "Correções da caução · Corrigir caução"). */
   const subtitulo = (titulo, acao = '', dica = '') => `<div class="sub-garantia"><h3${dica ? ` title="${esc(dica)}"` : ''}>${titulo}</h3>${acao}</div>`;
-  const excluir = (tabela, id, pergunta) => (opera() ? botao('excluir', '✕', { tabela, id }, 'perigo mini', pergunta) : '');
+  // "Excluir" apaga o lançamento inteiro (com o arquivo); o "×" ao lado do 📎 apaga só o arquivo; "Editar" muda os dados
+  const excluir = (tabela, id, pergunta) => (opera() ? botao('excluir', 'Excluir', { tabela, id }, 'perigo mini', pergunta) : '');
+  const editar = (hash) => (opera() ? link(hash, 'Editar', 'botao secundario mini') : '');
   // caução e depósito: registro em depósitos (data, valor, comprovante opcional) até completar o valor do contrato
   const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes linha-deposito"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
       <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">
@@ -1233,10 +1235,10 @@ function caixaGarantia(c) {
       <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
       <button class="mini">Registrar depósito</button></form>` : '');
   const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
-  /** Depósitos numa tabela curta: data, valor, comprovante e ✕ (só onde pode excluir). */
+  /** Depósitos numa tabela curta: data, valor, comprovante (com ×), Editar e Excluir (só onde pode excluir). */
   const tabelaDepositos = (qual, lista, podeExcluir) => (lista.length ? `<table class="compacta">${lista.map((x) => `<tr><td class="nw">${dataBr(x.data)}${x.complementar ? ' <span class="suave">complemento</span>' : ''}</td>
       <td class="n">${reais(x.valor)}</td><td>${linkComprovante(c.id, x.comprovante, anexoDeposito(qual, x))}</td>
-      <td class="n">${podeExcluir(x) ? excluir('depositos_garantia', x.id, `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : '');
+      <td class="n nw">${editar(`#/editar/depositos_garantia/${x.id}`)} ${podeExcluir(x) ? excluir('depositos_garantia', x.id, `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ''}</td></tr>`).join('')}</table>` : '');
   const registrar = (qual, nome, prevista) => {
     const s = R.garantiaADepositar(d(), c, qual);
     return `<div class="alerta aviso"><b>Incluir ${nome}:</b> ${reais(s.combinado)} (prevista ${dataBr(prevista)}) · depositado ${reais(s.depositado)} · <b>falta ${reais(s.falta)}</b>
@@ -1244,23 +1246,27 @@ function caixaGarantia(c) {
     ${tabelaDepositos(qual, s.depositos, () => true)}
     ${formDeposito(qual, s.falta)}</div>`;
   };
-  const remover = (qual) => (opera() && R.podeRemoverComprovanteGarantia(d(), c, qual)
-    ? ` ${botao('removerComprovanteGarantia', c[`${qual}_por_depositos`] && R.depositosGarantiaDo(d(), c, qual).some((x) => !x.complementar) ? 'Desfazer último depósito' : 'Remover comprovante', { contrato: c.id, qual }, 'perigo mini', `${c[`${qual}_por_depositos`] ? 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e' : 'Remover o comprovante do depósito? O arquivo é apagado e'} a garantia volta a "anexar comprovante".`)}` : '');
+  // paga em depósitos: desfaz o último (sai da lista); paga de uma vez: o "×" ao lado do comprovante (em comprovanteDa)
+  const remover = (qual) => (opera() && c[`${qual}_por_depositos`] && R.podeRemoverComprovanteGarantia(d(), c, qual)
+    ? ` ${botao('removerComprovanteGarantia', 'Desfazer último depósito', { contrato: c.id, qual }, 'perigo mini', 'Desfazer o último depósito? Ele sai da lista (com o arquivo, se tiver) e a garantia volta a "anexar comprovante".')}` : '');
   const irParaAnterior = anteriorDaGarantia && opera() ? ` ${link(`#/contrato/${anteriorDaGarantia.id}?ir=garantia`, `Anexar na garantia de ${esc(anteriorDaGarantia.inquilino_nome)}`, 'botao secundario mini')}` : '';
   const comprovanteDa = (qual, campo) => {
+    // paga de uma vez: o "×" apaga o comprovante e a garantia volta a "anexar comprovante"
+    const x = c[campo] && !c[`${qual}_por_depositos`] && R.podeRemoverComprovanteGarantia(d(), c, qual)
+      ? xAnexo('removerComprovanteGarantia', { contrato: c.id, qual }, `Apagar o comprovante "${c[campo]}"? A garantia volta a "anexar comprovante".`) : '';
     // contrato anterior da troca de titular: comprovante anexado aqui (vale para o novo titular), mesmo se os depósitos passaram para lá
     if (herdeiro && !R.depositosGarantiaDo(d(), c, qual).some((x) => x.comprovante)) {
-      return ` · ${linkComprovante(c.id, c[campo] || null, { tabela: 'contratos', id: c.id, campo, tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: c[`${qual}_pago_em`] || c[`${qual}_data`] || '' })}`;
+      return ` · ${linkComprovante(c.id, c[campo] || null, { tabela: 'contratos', id: c.id, campo, tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: c[`${qual}_pago_em`] || c[`${qual}_data`] || '' })}${x}`;
     }
     if (c[`${qual}_por_depositos`]) return '';
-    return ` · ${c[campo] ? linkComprovante(c[`${campo}_contrato`] || c.id, c[campo]) : `${etiqueta('sem comprovante', 'aviso')}${irParaAnterior}`}`;
+    return ` · ${c[campo] ? `<span class="nw">${linkComprovante(c[`${campo}_contrato`] || c.id, c[campo])}${x}</span>` : `${etiqueta('sem comprovante', 'aviso')}${irParaAnterior}`}`;
   };
   const parcelas = (qual) => tabelaDepositos(qual, R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
   // correções da caução: aparecem também enquanto a caução não foi depositada inteira
   const correcoesHtml = () => `${subtitulo('Correções da caução', opera() ? link(`#/novo/correcoes_garantia?contrato=${c.id}`, 'Corrigir caução') : '')}
     ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th><th></th></tr>
       ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data }) : ''} ${esc(x.observacoes || '')}</td>
-        <td class="n">${excluir('correcoes_garantia', x.id, 'Excluir esta correção da caução?')}</td></tr>`).join('')}</table>` : ''}`;
+        <td class="n nw">${editar(`#/editar/correcoes_garantia/${x.id}?contrato=${c.id}`)} ${excluir('correcoes_garantia', x.id, 'Excluir esta correção da caução? O comprovante também é apagado.')}</td></tr>`).join('')}</table>` : ''}`;
   if (anteriorDaGarantia && (R.temCaucao(c) || R.temDeposito(c)) && !R.garantiaDepositada(c)) {
     // herdada e ainda sem comprovante: o depósito e o comprovante são anexados no contrato anterior
     const qual = R.temCaucao(c) ? 'caucao' : 'deposito';
@@ -1313,7 +1319,7 @@ function caixaGarantia(c) {
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
       <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
         <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
-        <td class="n">${excluir('aplicacoes', a.id, 'Excluir esta aplicação?')}</td></tr>`; }).join('')}
+        <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
   }
   return `${html}</div>`;
@@ -1354,14 +1360,20 @@ function caixaLeituras(lista, botaoNovo, comInquilino) {
 }
 
 /** O que o contrato inclui: IPTU, água, energia, gás, condomínio, internet e contas adicionais. */
-function caixaIncluso(c) {
-  const sit = (v) => (!v ? '<span class="suave">não informado</span>'
-    : v === 'Incluso no aluguel' ? etiqueta(v, 'ok') : v === 'Por conta do inquilino' ? etiqueta(v, 'info') : etiqueta(v, 'neutra'));
-  return `<div class="cartao"><h2>O que está incluso no contrato</h2><div class="grade compacta">
-    ${item('IPTU', sit(c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])))}
-    ${item('Seguro obrigatório', sit(c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])))}
-    ${F.CONTAS.map(([k, t]) => item(t, sit(c[k]))).join('')}</div>
-    ${c.contas_adicionais ? `<p class="pre" style="margin:8px 0 0"><span class="suave">Contas adicionais:</span> ${esc(c.contas_adicionais)}</p>` : ''}</div>`;
+/**
+ * O que está incluso no contrato, numa linha embaixo dos selos: os itens agrupados por situação, com os símbolos da
+ * lista de Imóveis (💧 ⚡ 🔥 📶 🏢; IPTU 🏛️ e seguro 🛡️). Ex.: "Incluso no aluguel: 🏛️ IPTU 🛡️ Seguro · Por conta do inquilino: 💧 Água…".
+ */
+const SIMBOLOS_CONTAS = { conta_agua: '💧', conta_energia: '⚡', conta_gas: '🔥', conta_internet: '📶', conta_condominio: '🏢' };
+function linhaIncluso(c) {
+  const itens = [['🏛️', 'IPTU', c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])],
+    ['🛡️', 'Seguro', c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])],
+    ...F.CONTAS.map(([k, t]) => [SIMBOLOS_CONTAS[k], t, c[k]])];
+  const grupos = [['Incluso no aluguel', 'inc'], ['Por conta do inquilino', 'inq'], ['Não tem', 'nao'], [null, 'ni']].map(([sit, cls]) => {
+    const l = itens.filter(([, , v]) => (sit ? v === sit : !R.SITUACOES.includes(v)));
+    return l.length ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t]) => `<span class="ic ${cls}">${s} ${esc(t)}</span>`).join('')}` : '';
+  }).filter(Boolean);
+  return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
@@ -1479,6 +1491,9 @@ function caixaDocumentos(c) {
   const doc = (k) => R.documentoEntrada(d(), c, k);
   const herdado = (k) => doc(k) && doc(k).contrato.id !== c.id;
   const abrir = (k) => (doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc(doc(k).arquivo)}">📎 ${esc(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>');
+  // assinado neste contrato: o "×" apaga só o arquivo (continua assinado) e, sem arquivo, "⚠ anexar" põe o arquivo de volta
+  const abrirProprio = (k) => (c[R.campoArquivoDoc(k)] ? `<span class="nw">${abrir(k)}${xAnexo('removerArquivoDocumento', { contrato: c.id, campo: k }, `Apagar o arquivo "${c[R.campoArquivoDoc(k)]}"? O documento continua marcado como assinado; anexe o arquivo certo depois.`)}</span>`
+    : opera() ? `<label class="anexar-falta" title="Anexar o arquivo assinado (PDF ou foto)">⚠ anexar arquivo<input type="file" accept="application/pdf,image/*" data-acao-arquivo="anexarArquivoDocumento" data-contrato="${c.id}" data-campo="${k}"></label>` : abrir(k));
   // troca de titular: os documentos de entrada vêm do contrato original (não se gera novo, não fica pendente)
   const original = R.contratoHerdado(d(), c);
   const perdido = (k) => R.documentoPerdido(d(), c, k);
@@ -1503,7 +1518,7 @@ function caixaDocumentos(c) {
   const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) && !aguardaPerda(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ''}><td><b>${esc(nome)}</b></td>
     <td>${situacaoDoc(k, feito)}</td>
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
-    <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrir(k)}
+    <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
       ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ''}`
     : !opera() || perdido(k) || original ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${hoje}" style="width:auto">
@@ -1537,12 +1552,12 @@ function caixaAditivos(c) {
     ${ant && !lista.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). Registre-o com o arquivo assinado.</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? `${link(`#/aditivo/${a.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ''}
+      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
-    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td>
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}</td>
       <td class="n nw">${ver(a)} ${opera() ? botao('excluir', 'Excluir', { tabela: 'aditivos', id: a.id }, 'perigo pequeno', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo assinado também é apagado.`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
@@ -1588,6 +1603,7 @@ function telaContrato(c) {
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
+    ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
     ${faixaDocumentosEntrada(c)}
     ${caixaVerificar(c.verificar)}
@@ -1610,10 +1626,9 @@ function telaContrato(c) {
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<h3 id="reserva">Reserva dada na visita</h3><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)} · ${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+      ${c.reserva_valor > 0 ? `<div class="cabecalho"><h3 id="reserva">Reserva dada na visita</h3>${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao secundario mini') : ''}</div><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}<br>${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
         ${caixaReservaAbatida(c)}` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
-    ${caixaIncluso(c)}
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
@@ -1652,7 +1667,7 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 // --------------------------------------------------------------------------
 /**
  * Uso da reserva: nos boletos do sistema e/ou marcada como já abatida em aluguéis antigos (fora do sistema).
- * Marcada: mostra o mês e o valor, com "Excluir registro" no lugar de "Reaplicar a reserva".
+ * Marcada: mostra o mês e o valor, com "Excluir registro". A reserva vai para o mês certo sozinha ao salvar o contrato.
  */
 function caixaReservaAbatida(c) {
   const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
@@ -1666,8 +1681,7 @@ function caixaReservaAbatida(c) {
   }
   const max = R.reservaParaMarcarAbatida(d(), c);
   return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
-    ${opera() ? `<div class="acoes">${botao('reaplicarReserva', 'Reaplicar a reserva nos boletos em aberto', { id: c.id }, 'secundario pequeno')}</div>
-      ${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
+    ${opera() ? `${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
         <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
         <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" required>
         <button class="secundario pequeno">Marcar como já abatida</button></form>` : ''}` : ''}`;
@@ -1682,6 +1696,7 @@ const COMPROVANTES_CONTRATO = [
   { campo: 'comprovante_reserva', valor: 'reserva_valor', data: 'reserva_data', nome: 'reserva', texto: 'da reserva', vale: () => true },
 ];
 const COMPROVANTE_APLICACAO = [{ campo: 'comprovante', valor: 'valor', data: 'data', nome: 'aplicacao-garantia', texto: 'da aplicação', vale: () => true }];
+const comprovanteDoDeposito = (r) => [{ campo: 'comprovante', valor: 'valor', data: 'data', nome: r.qual === 'caucao' ? 'caucao' : 'deposito-garantia', texto: 'do depósito', vale: () => true }];
 const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
 const arquivoEscolhido = (form, campo) => { const el = form.querySelector(`[name="${campo}"]`); return (el && el.files && el.files[0]) || null; };
 
@@ -1704,12 +1719,18 @@ async function guardarComprovantes(lista, dados, form, pasta) {
   }
 }
 
+/** "×" ao lado de um anexo: apaga só o arquivo (o lançamento continua). */
+const xAnexo = (acao, dados, confirmar) => (opera() ? botao(acao, '×', dados, 'link-botao excluir-mini', confirmar).replace('<button ', '<button title="Apagar só o arquivo" ') : '');
+/** Campos de comprovante que o "×" apaga sozinho (caução e depósito pagos de uma vez têm o próprio: removerComprovanteGarantia). */
+const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'] };
+
 /**
- * Link para abrir o comprovante guardado na pasta do inquilino. Sem comprovante: etiqueta e, com ``anexo``
- * ({ tabela, id, campo, tipo, data }), o botão para anexar depois.
+ * Link para abrir o comprovante guardado na pasta do inquilino, com o "×" que apaga só o arquivo. Sem comprovante:
+ * etiqueta e, com ``anexo`` ({ tabela, id, campo, tipo, data }), o botão para anexar depois.
  */
 // sem comprovante: um só botão pequeno "⚠ anexar" (antes: etiqueta "sem comprovante: buscar no banco" + botão grande)
-const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>`
+const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo)
+  ? xAnexo('removerAnexo', { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ''}</span>`
   : anexo && opera() ? `<label class="anexar-falta" title="Sem comprovante: buscar no banco e anexar (PDF ou foto)">⚠ anexar comprovante<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>`
     : etiqueta('sem comprovante', 'aviso'));
@@ -2113,6 +2134,15 @@ const CADASTROS = {
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_APLICACAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
   },
+  depositos_garantia: {
+    titulo: (r) => `${r.qual === 'caucao' ? 'Depósito da caução' : 'Depósito de garantia'}${r.complementar ? ' (complemento)' : ''} - ${buscar('contratos', r.contrato_id).inquilino_nome}`,
+    campos: () => F.DEPOSITO_GARANTIA,
+    voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia`,
+    // a soma dos depósitos é conferida de novo (a garantia pode ficar completa ou voltar a "a depositar")
+    salvar: (db, dados, q, r) => R.editarDepositoGarantia(db, r.id, dados, login()),
+    ajustar: (dados, erros, r, form) => conferirComprovantes(comprovanteDoDeposito(r), dados, r, form),
+    ajustarAsync: (dados, erros, r, form) => guardarComprovantes(comprovanteDoDeposito(r), dados, form, () => pastaDoEscopo('contrato', r.contrato_id)),
+  },
   correcoes_garantia: {
     titulo: (r, q) => `Correção da caução - ${buscar('contratos', q.contrato).inquilino_nome}`,
     campos: () => F.CORRECAO_GARANTIA,
@@ -2128,6 +2158,11 @@ const CADASTROS = {
     descricao: (dados) => `Caução corrigida para ${reais(dados.valor_novo)}`,
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
+      if (r) {
+        // edição: o valor anterior é o da época da correção; complemento não mexido acompanha o novo valor
+        if (dados.complemento === null || (dados.complemento === r.complemento && dados.valor_novo !== r.valor_novo)) dados.complemento = dados.valor_novo - (r.valor_anterior ?? r.valor_novo - (r.complemento || 0));
+        return conferirComprovantes(COMPROVANTE_COMPLEMENTO, dados, r, form);
+      }
       // caução ainda não depositada inteira: corrige o valor a depositar (o complemento entra nos depósitos, sem comprovante próprio)
       const antes = !R.garantiaDepositada(c);
       const anterior = antes ? R.garantiaADepositar(d(), c, 'caucao').combinado : R.valorGarantia(d(), c);
@@ -2325,7 +2360,7 @@ const CADASTROS = {
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
       if (dados.reserva_utilizada > disp) {
         const outros = d().cobrancas.filter((x) => x.contrato_id === r.contrato_id && x.id !== r.id && x.reserva_utilizada > 0);
-        erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}${outros.length ? ` (está no boleto de ${outros.map((x) => compBr(x.competencia)).join(', ')}). Para trocar de mês, use "Reaplicar a reserva" na página do inquilino` : ''}`;
+        erros.reserva_utilizada = `Saldo da reserva disponível: ${reais(disp)}${outros.length ? ` (está no boleto de ${outros.map((x) => compBr(x.competencia)).join(', ')}). Para trocar de mês, mude "Usar a reserva no aluguel de" no Editar do contrato` : ''}`;
       }
     },
   },
@@ -3368,7 +3403,7 @@ function telaVistoria(rota) {
       ${grade}
       <h2>Fotos que vão no documento</h2>
       <p class="suave">A fachada vai na capa; os relógios e o quadro de disjuntores, na página de registros. As fotos gerais e de detalhe continuam no link da nuvem. Enviar outra foto substitui a anterior.</p>
-      <div class="formulario">${K.FOTOS_VISTORIA.map(([k, t]) => `<div><label>${esc(t)}</label><input type="file" name="foto_${k}" accept="image/*">${v && v.fotos && v.fotos[k] && opera() ? F.arquivoGuardado(k, v.fotos[k], 'excluirFotoVistoria', { vistoria: v.id }) : ''}</div>`).join('')}</div>
+      <div class="formulario">${K.FOTOS_VISTORIA.map(([k, t]) => `<div><label>${esc(t)}</label><input type="file" name="foto_${k}" accept="image/*">${v && v.fotos && v.fotos[k] && opera() ? F.arquivoGuardado(k, v.fotos[k], 'excluirFotoVistoria', { vistoria: v.id }, { escopo: 'contrato', id: v.contrato_id }) : ''}</div>`).join('')}</div>
       <p><label>${grade ? 'Outras observações (opcional)' : 'Descritivo do imóvel'}</label>
         <span class="suave">Uma linha por item. <code>## SALA</code> abre um cômodo; <code>- item: estado</code> vira marcador. Item do roteiro que ficar sem preencher (termina em ":") não sai no documento.
         Use sempre as mesmas palavras para o estado: <b>novo · bom estado · com marcas de uso · com avaria (descrever) · não funciona</b>, e cite o nº da foto quando houver avaria.</span>
@@ -4588,16 +4623,6 @@ export const ACOES = {
     await mostrar();
   },
 
-  /** Tira a reserva dos boletos em aberto e aplica de novo a partir do mês marcado (também nos alterados à mão). */
-  async reaplicarReserva({ id }) {
-    const n = await alterar((db) => R.realocarReserva(db, R.buscar(db, 'contratos', Number(id)), login()));
-    const c = buscar('contratos', id);
-    const alerta = R.alertaReservaParada(d(), c);
-    aviso(n ? `Reserva reaplicada: ${n} boleto(s) ajustado(s).` : 'A reserva já estava nos boletos certos.', n ? 'ok' : 'info');
-    if (alerta) aviso(alerta.texto, 'aviso');
-    await mostrar();
-  },
-
   async ressarcimentoNaNf({ valor }) {
     if (!podeUsuario('admin')) throw new Error('Só administradores mudam esta opção.');
     await alterar((db) => {
@@ -4693,8 +4718,19 @@ export const ACOES = {
     const [, acao, tabela, id] = location.hash.split('?')[0].split('/');
     const r = acao === 'editar' ? buscar(tabela, id) : null;
     if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
-    await alterarApagandoAnexos((db) => R.atualizar(db, tabela, r.id, { [campo]: null }, login(), `Arquivo excluído: ${r[campo]}`));
+    // comprovante de depósito, correção, aplicação ou reserva: as mesmas contas do "×" da página do inquilino
+    await alterarApagandoAnexos((db) => ((ANEXOS_COM_X[tabela] || []).includes(campo) ? R.removerAnexo(db, tabela, r.id, campo, login())
+      : R.atualizar(db, tabela, r.id, { [campo]: null }, login(), `Arquivo excluído: ${r[campo]}`)));
     arquivoApagadoNoFormulario(el, r[campo]);
+  },
+
+  /** Nome do arquivo já guardado num formulário de edição (#/editar/tabela/id): abre o arquivo (seguro na pasta do imóvel; os demais, na do inquilino). */
+  async abrirAnexoDoCampo({ campo }) {
+    const [, , tabela, id] = location.hash.split('?')[0].split('/');
+    const r = buscar(tabela, id);
+    if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
+    const [escopo, dono] = tabela === 'seguros' ? ['seguro', r.imovel_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
+    await ACOES.abrirArquivo({ escopo, id: dono, nome: r[campo] });
   },
 
   /** "Excluir" de uma foto já guardada da vistoria (fachada, relógios, quadro de disjuntores). */
@@ -4719,6 +4755,37 @@ export const ACOES = {
   async removerComprovanteGarantia({ contrato, qual }) {
     await alterarApagandoAnexos((db) => R.removerComprovanteGarantia(db, Number(contrato), qual, login()));
     aviso('Comprovante removido: anexe o certo em "Incluir … e anexar comprovante".');
+    await mostrar();
+  },
+
+  /** "×" ao lado do comprovante (reserva, depósito, correção, aplicação): apaga só o arquivo; o lançamento continua. */
+  async removerAnexo({ tabela, id, campo }) {
+    await alterarApagandoAnexos((db) => R.removerAnexo(db, tabela, Number(id), campo, login()));
+    aviso('Comprovante apagado: fica o aviso para anexar o certo.');
+    await mostrar();
+  },
+
+  /** "×" no arquivo do documento assinado: apaga só o arquivo (continua assinado). */
+  async removerArquivoDocumento({ contrato, campo }) {
+    await alterarApagandoAnexos((db) => R.arquivoDocumento(db, Number(contrato), campo, null, login()));
+    aviso('Arquivo apagado: o documento continua assinado. Use "⚠ anexar arquivo" para pôr o certo.');
+    await mostrar();
+  },
+
+  /** "⚠ anexar arquivo" no documento já assinado sem arquivo. */
+  async anexarArquivoDocumento({ contrato, campo }, el) {
+    const c = buscar('contratos', contrato);
+    const doc = R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+    const nome = await salvarAssinado('assinados', c.id, el.files[0], `${doc[1]} ${doc[2]} ${c[campo]}`);
+    await alterar((db) => R.arquivoDocumento(db, c.id, campo, nome, login()));
+    aviso('Arquivo anexado.');
+    await mostrar();
+  },
+
+  /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */
+  async removerArquivoAditivo({ id }) {
+    await alterarApagandoAnexos((db) => R.removerArquivoAditivo(db, Number(id), login()));
+    aviso('Arquivo apagado: o termo aditivo voltou a "aguardando assinatura".');
     await mostrar();
   },
 

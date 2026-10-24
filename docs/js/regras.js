@@ -611,7 +611,7 @@ export function alertaReservaParada(d, contrato) {
   const alvoAberto = doContrato.find((cb) => cb.competencia === alvo && !cb.data_pagamento);
   if (presa && alvoAberto) {
     return { nivel: 'aviso', tipo: 'Reserva do imóvel', ancora: 'reserva',
-      texto: `A reserva de ${C.reais(presa.reserva_utilizada)} está no boleto de ${C.compBr(presa.competencia)}, que já foi pago, mas deveria abater o de ${C.compBr(alvo)}. Para mudar: desfaça o pagamento de ${C.compBr(presa.competencia)} e clique em "Reaplicar a reserva"; ou deixe como está escolhendo ${C.compBr(presa.competencia)} em "Usar a reserva no aluguel de".` };
+      texto: `A reserva de ${C.reais(presa.reserva_utilizada)} está no boleto de ${C.compBr(presa.competencia)}, que já foi pago, mas deveria abater o de ${C.compBr(alvo)}. Para mudar: desfaça o pagamento de ${C.compBr(presa.competencia)} e salve o contrato em "Editar" (a reserva vai para o mês certo); ou deixe como está escolhendo ${C.compBr(presa.competencia)} em "Usar a reserva no aluguel de".` };
   }
   if (!(saldo > 0) || doContrato.some((cb) => cb.reserva_utilizada > 0)) return null;
   const doAlvo = doContrato.find((cb) => cb.competencia === alvo);
@@ -1614,6 +1614,63 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
   if (ultimo) excluir(d, 'depositos_garantia', ultimo.id, usuario, `${c.inquilino_nome}: depósito de ${C.reais(ultimo.valor)} de ${C.dataBr(ultimo.data)} removido`);
   atualizar(d, 'contratos', c.id, { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null }, usuario,
     `${c.inquilino_nome}: comprovante de ${g.nome} removido (volta a depositar)`);
+}
+
+/**
+ * "×" ao lado do anexo: apaga só o comprovante (o lançamento continua e volta o alerta para anexar). Depósito da garantia
+ * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
+ */
+export function removerAnexo(d, tabela, id, campo, usuario) {
+  const ok = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'] };
+  if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
+  const r = buscar(d, tabela, id);
+  if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
+  atualizar(d, tabela, r.id, { [campo]: null }, usuario, `Comprovante apagado: ${r[campo]}`);
+  if (tabela === 'depositos_garantia') {
+    if (!r.complementar) acertarGarantiaDepositada(d, r.contrato_id, r.qual, usuario);
+    sincronizarGarantiaHerdeiro(d, r.contrato_id, usuario);
+  }
+}
+
+/**
+ * Editar um depósito da garantia (data, valor, comprovante). Depois confere se a soma ainda cobre o valor inicial
+ * (ou passou a cobrir). Caução com correções: o valor dos depósitos iniciais não muda (as correções partem dele).
+ */
+export function editarDepositoGarantia(d, id, dados, usuario) {
+  const x = buscar(d, 'depositos_garantia', id);
+  if (!x) throw new Error('Depósito não encontrado.');
+  if (!dados.data) throw new Error('Informe a data do depósito.');
+  if (!(dados.valor > 0)) throw new Error('Informe o valor depositado.');
+  const c = buscar(d, 'contratos', x.contrato_id);
+  if (!x.complementar && dados.valor !== x.valor && x.qual === 'caucao' && garantiaDepositada(c) && correcoesCaucaoAtual(d, c).length) {
+    throw new Error('A caução já tem correções: exclua antes as correções para mudar o valor deste depósito.');
+  }
+  atualizar(d, 'depositos_garantia', x.id, dados, usuario, `${c.inquilino_nome}: depósito de ${C.reais(dados.valor)} de ${C.dataBr(dados.data)} alterado`);
+  if (!x.complementar) {
+    if (c[`${x.qual}_por_depositos`]) acertarGarantiaDepositada(d, c.id, x.qual, usuario);
+    else completarPorDepositos(d, c, x.qual, usuario);
+  }
+  sincronizarGarantiaHerdeiro(d, c.id, usuario);
+  return buscar(d, 'depositos_garantia', x.id);
+}
+
+/** Arquivo do documento já assinado (contrato, vistoria, chaves): anexa ou, com ``arquivo`` null, apaga só o arquivo (continua assinado). */
+export function arquivoDocumento(d, contratoId, campo, arquivo, usuario) {
+  const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
+  if (!doc) throw new Error('Documento desconhecido.');
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c[campo]) throw new Error('Este documento ainda não foi marcado como assinado.');
+  atualizar(d, 'contratos', c.id, { [campoArquivoDoc(campo)]: arquivo || null }, usuario,
+    `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')}, arquivo ${arquivo ? `anexado (${arquivo})` : 'apagado'}`);
+}
+
+/** Termo aditivo assinado: apaga só o arquivo; o termo volta a "aguardando assinatura". */
+export function removerArquivoAditivo(d, id, usuario) {
+  const a = buscar(d, 'aditivos', id);
+  if (!a || !a.arquivo) throw new Error('Arquivo não encontrado.');
+  const c = buscar(d, 'contratos', a.contrato_id);
+  atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${C.dataBr(a.data)} apagado (volta a aguardar assinatura)`);
+  marcarAditivos(d, c.id, usuario);
 }
 
 /** Caução ou depósito de garantia pago: a data efetiva do depósito e o comprovante (os dois obrigatórios). */
