@@ -7,9 +7,13 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DESTINO = path.join(RAIZ, 'docs', 'offline', 'administracao-imoveis.html');
 
+/** Arquivos .js de docs/js e das subpastas (ex.: docs/js/telas), em ordem. */
+const programas = (pasta) => fs.readdirSync(path.join(RAIZ, pasta), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+  .flatMap((e) => (e.isDirectory() ? programas(path.join(pasta, e.name)) : e.name.endsWith('.js') ? [path.join(pasta, e.name)] : []));
+
 export function hashDasFontes() {
   const arquivos = [
-    ...fs.readdirSync(path.join(RAIZ, 'docs', 'js')).filter((n) => n.endsWith('.js')).sort().map((n) => path.join('docs', 'js', n)),
+    ...programas(path.join('docs', 'js')),
     ...fs.readdirSync(path.join(RAIZ, 'docs', 'vendor')).sort().map((n) => path.join('docs', 'vendor', n)),
     path.join('docs', 'css', 'estilo.css'), path.join('docs', 'modelos', 'fatura-modelo.xlsx'), path.join('tools', 'gerar-offline.mjs'),
   ];

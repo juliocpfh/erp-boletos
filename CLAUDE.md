@@ -15,7 +15,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 `node --check` NÃO detecta erros nestes módulos; use `tools/checar.mjs`.
 
 ## Leia por partes (economia de contexto)
-- `docs/js/telas.js` (~4.100 linhas) e `docs/js/regras.js` (~2.100): use `tools/mapa.mjs` e leia só o trecho (`Read` com offset/limit).
+- Telas divididas por assunto em `docs/js/telas/` (o maior, `acoes.js`, ~1.100 linhas; `docs/js/telas.js` só tem as rotas `TELAS`); `docs/js/regras.js` (~3.300): use `tools/mapa.mjs` (sem trecho mostra o assunto de cada arquivo) e leia só o trecho (`Read` com offset/limit). Os arquivos de `telas/` importam uns dos outros (import é só leitura: estado alterado por dois assuntos fica em `memoria`, `telas/comum.js`).
 - Não leia `docs/offline/` (gerado, ~2 MB) nem `docs/vendor/` (bibliotecas minificadas).
 
 ## Regras que não podem quebrar

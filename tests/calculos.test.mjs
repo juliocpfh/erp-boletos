@@ -3,6 +3,12 @@ import test from 'node:test';
 import * as C from '../docs/js/calculos.js';
 import * as A from '../docs/js/alertas.js';
 
+test('índice acumulado em 12 meses a partir das variações de cada mês', () => {
+  assert.equal(C.acumuladoDosMeses([0.27, -0.01]), 0.26);
+  assert.equal(C.acumuladoDosMeses(Array(12).fill(1)), 12.6825);
+  assert.equal(C.acumuladoDosMeses([]), 0);
+});
+
 test('converte valores digitados em centavos', () => {
   assert.equal(C.centavos('1.234,56'), 123456);
   assert.equal(C.centavos('R$ 1.350,00'), 135000);
@@ -108,12 +114,7 @@ test('divisão da fatura entre as empresas', () => {
   assert.deepEqual(C.dividir(121501, [50, 50]), [60751, 60750]);
 });
 
-test('alertas de correção, seguro e reserva', () => {
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-08-15', []), null);
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-09-15', []).nivel, 'aviso'); // 60 dias antes
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-10-05', []).nivel, 'aviso');
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', []).nivel, 'perigo');
-  assert.equal(A.alertaCorrecao('2025-11-01', '2026-11-20', ['2026-11-01']), null);
+test('alertas de seguro e reserva', () => {
   assert.match(A.alertaSeguro('2025-11-01', '2026-10-05', [{ vigencia_fim: '2026-10-31' }]).texto, /vence/);
   assert.equal(A.alertaSeguro('2025-03-01', '2026-10-05', [{ vigencia_fim: '2027-03-01' }]), null);
   assert.match(A.alertaReserva(50000, 50000, '2026-11', '2026-10-05').texto, /500,00.*11\/2026/);

@@ -35,7 +35,6 @@ async function idbOp(modo, fn) {
 
 export const lembrarPasta = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta'));
 export const pastaLembrada = () => idbOp('readonly', (s) => s.get('pasta')).catch(() => null);
-export const esquecerPasta = () => idbOp('readwrite', (s) => s.delete('pasta'));
 // pasta do backup seguro (só no computador do administrador)
 export const lembrarPastaSegura = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta_segura'));
 export const pastaSeguraLembrada = () => idbOp('readonly', (s) => s.get('pasta_segura')).catch(() => null);

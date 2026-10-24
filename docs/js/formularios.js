@@ -58,6 +58,12 @@ const DOCUMENTOS = ['cpf', 'cnpj', 'cpfcnpj', 'cep'];
 /** CEP que preenche o endereço (ViaCEP) e CNPJ que preenche a empresa (BrasilAPI): só os campos vazios. */
 const PREENCHE_CEP = (endereco, bairro, cidade, uf) => ({ preencher: { fonte: 'cep', endereco, bairro, cidade, uf } });
 const PREENCHE_CNPJ = (alvos) => ({ preencher: { fonte: 'cnpj', ...alvos } });
+/**
+ * CEP só para preencher o endereço de uma linha da pessoa (não é gravado). O campo que recebe é o "endereco" com o mesmo
+ * prefixo do nome do CEP (ex.: fiador1_cep_busca → fiador1_endereco), por isso serve também nos blocos repetidos.
+ */
+const CEP_DA_PESSOA = (prefixo, extra = {}) => campo(`${prefixo}cep_busca`, 'CEP (preenche o endereço)', 'cep', { virtual: true, preencher: { fonte: 'cep', linha: 'endereco' },
+  ajuda: 'Digite o CEP: rua, bairro, cidade e Estado vão para o endereço. Depois complete o número', ...extra });
 
 /** Mostra o campo só quando outro campo tem um destes valores (caixa de seleção marcada = '1'). */
 const quando = (campoNome, ...valores) => ({ mostrarSe: { campo: campoNome, valores } });
@@ -68,12 +74,12 @@ export const LIMITES = { tomador_nome: 60, tomador_endereco: 70, municipio: 25, 
 export const IMOVEL = [
   secao('Identificação'),
   campo('nome', 'Nome do imóvel', 'texto', { obrig: true, ajuda: 'Ex.: Loja 1 - Nilo Brandão' }),
+  campo('cep', 'CEP', 'cep', { ...PREENCHE_CEP('endereco', 'bairro', 'cidade', 'uf'), ajuda: 'Comece pelo CEP: rua, bairro, cidade e Estado são preenchidos' }),
   campo('endereco', 'Endereço', 'texto', { obrig: true, largo: true, max: 55, ajuda: 'Aparece na NF junto com o complemento' }),
   campo('complemento', 'Complemento', 'texto', { max: 25 }),
   campo('bairro', 'Bairro'),
   campo('cidade', 'Cidade (município)', 'texto', { max: LIMITES.municipio }),
   campo('uf', 'Estado (UF)', 'texto', { max: 2, ajuda: 'Vem do CEP. Ex.: PR' }),
-  campo('cep', 'CEP', 'cep', { ...PREENCHE_CEP('endereco', 'bairro', 'cidade', 'uf'), ajuda: 'Digite o CEP para preencher rua, bairro, cidade e Estado' }),
   secao('Registros'),
   campo('matricula', 'Matrícula'),
   campo('sublote', 'Identificação do sublote', 'texto', { ajuda: 'Para imóveis que são sublotes internos. Ex.: Sublote 3' }),
@@ -167,6 +173,7 @@ export const FIADOR = [
   campo('rg', 'RG'),
   campo('telefone', 'Telefone', 'tel'),
   campo('email', 'E-mail', 'email'),
+  CEP_DA_PESSOA(''),
   campo('endereco', 'Endereço', 'texto', { largo: true }),
   ...qualificacao('', {}, false),
   campo('imovel_garantia', 'Imóvel do fiador (endereço, matrícula e registro)', 'area', { largo: true, ajuda: 'Ex.: Rua Abílio Peixoto, 359, Curitiba/PR, matrícula 53.271 da 9ª Circunscrição. Aparece no contrato' }),
@@ -175,8 +182,9 @@ export const FIADOR = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
-/** Fiadores direto no cadastro do contrato (campos fiador1_nome, fiador2_nome...). */
-export const CAMPOS_FIADOR = FIADOR.filter((c) => c.nome !== 'observacoes');
+/** Fiadores direto no cadastro do contrato (campos fiador1_nome, fiador2_nome...): no formulário (com o CEP) e gravados (sem os campos virtuais). */
+const FORM_FIADOR = FIADOR.filter((c) => c.nome !== 'observacoes');
+export const CAMPOS_FIADOR = FORM_FIADOR.filter((c) => !c.virtual);
 /** Quantos blocos de fiador o cadastro mostra: os já cadastrados e mais um em branco (pelo menos dois). */
 export const vagasFiador = (existentes = []) => Math.max(2, existentes.length + 1);
 /** Texto do botão das partes que começam recolhidas (fiador a mais, inquilino solidário). */
@@ -190,7 +198,7 @@ export const fiadoresNoCadastro = (existentes = []) => Array.from({ length: vaga
   const atual = existentes[n - 1];
   return [
     { secao: atual ? `Fiador ${n}: ${atual.nome}` : n === 1 ? 'Fiador' : `Mais um fiador (se houver)`, fiador: n, ...GARANTIA_FIADOR, ...(atual || n === 1 ? {} : { recolher: EXPANDIR_PARTE }) },
-    ...CAMPOS_FIADOR.map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, fiador: n, ...GARANTIA_FIADOR })),
+    ...FORM_FIADOR.map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, fiador: n, ...GARANTIA_FIADOR })),
   ];
 });
 /** Comprovante: PDF ou foto, guardado na pasta do inquilino. Sem ele, o valor é salvo e fica um alerta para anexar depois. */
@@ -214,10 +222,11 @@ export const CONTRATO = [
   campo('inquilino_telefone', 'Telefone', 'tel'),
   campo('inquilino_whatsapp', 'Este telefone é WhatsApp', 'simnao'),
   campo('inquilino_email', 'E-mail', 'email'),
-  campo('inquilino_cpf', 'CPF', 'cpfcnpj', { buscarPessoa: true, ...rotuloPJ('CNPJ'), ...PREENCHE_CNPJ({ nome: 'inquilino_nome', endereco: 'inquilino_endereco' }) }),
+  campo('inquilino_cpf', 'CPF', 'cpfcnpj', { buscarPessoa: true, ...rotuloPJ('CNPJ'), ...PREENCHE_CNPJ({ nome: 'inquilino_nome', fantasia: 'inquilino_apelido', endereco: 'inquilino_endereco', telefone: 'inquilino_telefone', email: 'inquilino_email', representante: 'representante_nome' }) }),
   campo('inquilino_rg', 'RG', 'texto', rotuloPJ('Inscrição estadual')),
   ...qualificacao('inquilino_', quando('inquilino_tipo', 'Pessoa física'), false),
   campo('usar_endereco_imovel', 'Usar o endereço do imóvel deste contrato', 'simnao', { virtual: true, autoMsg: true, ajuda: 'Marcado: o endereço do inquilino fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)' }),
+  CEP_DA_PESSOA('inquilino_'),
   campo('inquilino_endereco', 'Endereço (residência, comercial ou sede da empresa)', 'texto', { largo: true }),
   campo('responsavel_nome', 'Outro contato (se houver)'),
   campo('responsavel_telefone', 'Telefone do contato', 'tel'),
@@ -230,17 +239,19 @@ export const CONTRATO = [
   campo('representante_cargo', 'Cargo', 'texto', PJ),
   ...qualificacao('representante_', PJ, false),
   campo('representante_usar_endereco_imovel', 'Usar o endereço do imóvel deste contrato', 'simnao', { virtual: true, autoMsg: true, ...PJ, ajuda: 'Marcado: o endereço do representante fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)' }),
+  CEP_DA_PESSOA('representante_', PJ),
   campo('representante_endereco', 'Endereço (residência ou comercial)', 'texto', { largo: true, ...PJ }),
   campo('representante_telefone', 'Telefone do representante', 'tel', PJ),
   campo('representante_email', 'E-mail do representante', 'email', PJ),
   { secao: 'Inquilino solidário', recolher: EXPANDIR_PARTE },
   campo('solidario_nome', 'Nome do inquilino solidário', 'texto', { largo: true, ajuda: 'Quem assina o contrato junto. O boleto continua saindo no nome do inquilino principal. Para tirar o solidário, apague o nome' }),
-  campo('solidario_cpf', 'CPF / CNPJ do solidário', 'cpfcnpj'),
+  campo('solidario_cpf', 'CPF / CNPJ do solidário', 'cpfcnpj', PREENCHE_CNPJ({ nome: 'solidario_nome', endereco: 'solidario_endereco', telefone: 'solidario_telefone', email: 'solidario_email' })),
   campo('solidario_rg', 'RG do solidário'),
   campo('solidario_telefone', 'Telefone do solidário', 'tel'),
   campo('solidario_email', 'E-mail do solidário', 'email'),
   ...qualificacao('solidario_', {}, false),
   campo('solidario_usar_endereco_imovel', 'Usar o endereço do imóvel deste contrato', 'simnao', { virtual: true, autoMsg: true, ajuda: 'Marcado: o endereço do solidário fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)' }),
+  CEP_DA_PESSOA('solidario_'),
   campo('solidario_endereco', 'Endereço (residência ou comercial)', 'texto', { largo: true }),
   secao('Objeto da locação (para o contrato)'),
   campo('finalidade', 'Finalidade', 'opcao', { padrao: 'Residencial', opcoes: ['Residencial', 'Não residencial'] }),
@@ -349,7 +360,8 @@ export const TITULARIDADE = [
 export const TROCA_FIADOR = [campo('data_troca', 'Data da troca', 'data', { obrig: true, ajuda: 'É o início do vínculo do novo fiador' }), ...FIADOR.filter((c) => c.nome !== 'data_entrada')];
 
 /** Campos do fiador na troca de garantia (o início do vínculo é a data da troca; o fim, quando ele sair). */
-export const CAMPOS_FIADOR_TROCA = CAMPOS_FIADOR.filter((c) => !['data_entrada', 'data_saida'].includes(c.nome));
+const FORM_FIADOR_TROCA = FORM_FIADOR.filter((c) => !['data_entrada', 'data_saida'].includes(c.nome));
+export const CAMPOS_FIADOR_TROCA = FORM_FIADOR_TROCA.filter((c) => !c.virtual);
 /** Quantos blocos de fiador novo a troca mostra. */
 export const NOVOS_FIADORES_TROCA = 2;
 /**
@@ -363,11 +375,11 @@ export const trocaGarantia = (atuais = []) => [
   ...atuais.flatMap((f, k) => [
     { secao: `Fiador atual: ${f.nome}`, ...GARANTIA_FIADOR },
     campo(`tf${k + 1}_sai`, 'Este fiador sai nesta troca', 'simnao', { virtual: true, ...GARANTIA_FIADOR, ajuda: 'Fica guardado em "Fiadores anteriores", com o fim do vínculo na véspera da troca' }),
-    ...CAMPOS_FIADOR_TROCA.map((c) => ({ ...c, nome: `tf${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
+    ...FORM_FIADOR_TROCA.map((c) => ({ ...c, nome: `tf${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
   ]),
   ...Array.from({ length: NOVOS_FIADORES_TROCA }, (_, k) => [
     { secao: k ? 'Mais um fiador novo (se houver)' : 'Fiador novo (se entrar alguém)', ...GARANTIA_FIADOR },
-    ...CAMPOS_FIADOR_TROCA.map((c) => ({ ...c, nome: `tn${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
+    ...FORM_FIADOR_TROCA.map((c) => ({ ...c, nome: `tn${k + 1}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
   ]).flat(),
   campo('observacoes', 'O que aconteceu com a garantia anterior', 'area', { ajuda: 'Ex.: caução devolvida em 10/10/2026 por PIX; fiador substituído a pedido do inquilino' }),
 ];

@@ -1,7 +1,6 @@
-// Alertas do painel: correção anual, seguro, reserva e fim de vigência.
+// Alertas do painel: seguro, reserva e fim de vigência (o do reajuste fica em regras.js).
 import { compBr, competenciaDe, dataBr, diasEntre, reais, somarAnos, somarDias, somarMeses } from './calculos.js';
 
-export const ANTECEDENCIA_CORRECAO = 60; // avisar dois meses antes do aniversário do contrato
 export const ANTECEDENCIA_SEGURO = 60;
 export const ANTECEDENCIA_VIGENCIA = 60;
 
@@ -14,23 +13,6 @@ export function aniversarios(inicio, hoje) {
     anos += 1;
   }
   return [ultimo, somarAnos(inicio, anos)];
-}
-
-export function alertaCorrecao(inicio, hoje, datasCorrecoes) {
-  if (!inicio) return null;
-  const [ultimo, proximo] = aniversarios(inicio, hoje);
-  // considera feita a correção registrada dentro da antecedência do aviso
-  const jaCorrigido = (aniv) => datasCorrecoes.some((d) => d >= somarDias(aniv, -(ANTECEDENCIA_CORRECAO + 1)));
-  if (ultimo && !jaCorrigido(ultimo)) {
-    return { nivel: 'perigo', tipo: 'Correção do aluguel',
-      texto: `Contrato fez aniversário em ${dataBr(ultimo)} e a correção ainda não foi registrada.` };
-  }
-  const faltam = diasEntre(hoje, proximo);
-  if (faltam <= ANTECEDENCIA_CORRECAO && !jaCorrigido(proximo)) {
-    return { nivel: 'aviso', tipo: 'Correção do aluguel',
-      texto: `Aniversário do contrato em ${dataBr(proximo)} (faltam ${faltam} dias). Avise o inquilino que o aluguel será corrigido.` };
-  }
-  return null;
 }
 
 export function alertaSeguro(inicio, hoje, seguros) {

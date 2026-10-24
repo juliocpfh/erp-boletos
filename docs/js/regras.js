@@ -347,7 +347,6 @@ export const dataBaseCorrecao = (c) => c.data_base_correcao || c.vigencia_inicio
 // --------------------------------------------------------------------------
 // Garantias: caução, depósito, fiadores e aplicação do valor nas empresas
 // --------------------------------------------------------------------------
-export const GARANTIAS = ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'];
 export const temCaucao = (c) => c.garantia_tipo === 'Caução';
 export const temDeposito = (c) => ['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo);
 export const temFiador = (c) => ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo);
@@ -1288,7 +1287,6 @@ export function desfazerNumeracao(d, aPartirDe, usuario) {
 // --------------------------------------------------------------------------
 // Renovação, novo valor negociado e saída do inquilino
 // --------------------------------------------------------------------------
-export const TIPOS_RENOVACAO = ['Renovado com nova data de término', 'Passou a prazo indeterminado', 'Novo valor negociado'];
 
 /** Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). */
 export function registrarRenovacao(d, contratoId, dados, usuario) {
@@ -1458,10 +1456,6 @@ export function condicoesDoContrato(d, anterior, data = null) {
   out.data_base_correcao = dataBaseCorrecao(anterior);
   return out;
 }
-
-/** Último inquilino do imóvel (pela data de entrada). */
-export const ultimoContratoDoImovel = (d, imovelId) => d.contratos.filter((c) => c.imovel_id === imovelId)
-  .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')) || b.id - a.id)[0] || null;
 
 /** Outros contratos ativos da mesma pessoa (pelo CPF/CNPJ, ou pelo nome quando não há documento). */
 export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
@@ -1798,16 +1792,6 @@ export function removerArquivoAditivo(d, id, usuario) {
   marcarAditivos(d, c.id, usuario);
 }
 
-/** Caução ou depósito de garantia pago: a data efetiva do depósito e o comprovante (os dois obrigatórios). */
-export function registrarGarantiaPaga(d, contratoId, qual, data, arquivo, usuario) {
-  const c = buscar(d, 'contratos', contratoId);
-  const g = GARANTIAS_DEPOSITADAS[qual];
-  if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
-  if (!data) throw new Error(`Informe a data em que ${g.nome} foi paga.`);
-  if (!arquivo) throw new Error(`Anexe o comprovante: ${g.nome}.`);
-  atualizar(d, 'contratos', c.id, { [g.pago]: data, [g.comprovante]: arquivo }, usuario, `${c.inquilino_nome}: ${g.nome} paga em ${C.dataBr(data)}`);
-}
-
 function alertaComprovantes(d, c) {
   const l = comprovantesPendentes(d, c);
   if (!l.length) return null;
@@ -2135,9 +2119,6 @@ export function sincronizarGarantiaHerdeiro(d, anteriorId, usuario) {
   atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
   return n;
 }
-
-/** Herança feita antes da reserva passar ao novo titular: falta trazer a reserva. */
-export const reservaAHerdar = (d, c) => { const a = c.heranca_transferida && contratoHerdado(d, c); return !!(a && a.reserva_valor > 0 && c.reserva_usada_anterior === undefined); };
 
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
   const a = buscar(d, 'contratos', anteriorId);
@@ -2660,13 +2641,6 @@ export function ultimosValores(d, imovelId) {
   return out;
 }
 
-/** Contas que o inquilino atual não paga: as marcadas "Incluso no aluguel" (ou todas, se o imóvel está vago). */
-export function contasPorNossaConta(d, imovelId, hoje = C.hojeIso()) {
-  const atual = d.contratos.find((c) => c.imovel_id === imovelId && contratoAtivo(c, hoje));
-  if (!atual) return { vago: true, inclusas: [] };
-  return { vago: false, inclusas: Object.entries(NOMES_CONTAS).filter(([k]) => atual[k] === SITUACOES[1]).map(([, t]) => t) };
-}
-
 /** Contrato ocupando o imóvel no dia (pela entrada e saída). */
 const ocupadoEm = (d, imovelId, dia) => d.contratos.some((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= dia
   && (c.data_saida ? c.data_saida >= dia : c.ativo !== false));
@@ -2717,8 +2691,6 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
 // Ressarcimento de condomínio: taxas do proprietário que o inquilino pagou no boleto do condomínio
 // (Lei 8.245/91, art. 22, X: despesas extraordinárias). Abatem no boleto do aluguel do mês seguinte ao pagamento.
 // --------------------------------------------------------------------------
-export const TAXAS_DO_PROPRIETARIO = ['Fundo de obras', 'Constituição do fundo de reserva', 'Chamada extra (obra)', 'Obra na estrutura / reforma',
-  'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação', 'Outra'];
 export const inquilinoPagaCondominio = (c) => c.conta_condominio === SITUACOES[0];
 export const ressarcimentosDo = (d, contratoId) => d.ressarcimentos.filter((r) => r.contrato_id === contratoId)
   .sort((a, b) => String(b.competencia_condominio).localeCompare(String(a.competencia_condominio)) || b.id - a.id);
@@ -3126,29 +3098,6 @@ export function marcarCartaEnviada(d, contratoId, comp, enviada, usuario) {
   const atual = cartaDoReajuste(d, c, comp);
   if (enviada && !atual) inserir(d, 'cartas_reajuste', { contrato_id: c.id, competencia: comp, enviada_em: C.hojeIso() }, usuario, `Carta de reajuste de ${C.compBr(comp)} enviada`);
   if (!enviada && atual) excluir(d, 'cartas_reajuste', atual.id, usuario, `Carta de reajuste de ${C.compBr(comp)}: envio desfeito`);
-}
-
-/** Reajustes do período (competências), para a tela de Reajustes. */
-export function reajustesEntre(d, de, ate) {
-  const lista = [];
-  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id)) {
-    for (let comp = de; comp <= ate; comp = C.somarMeses(comp, 1)) {
-      if (!contratoAtivo(c, `${comp}-01`)) continue;
-      const r = reajusteNaCompetencia(d, c, comp);
-      if (r) lista.push({ contrato: c, ...r, calculo: calcularReajuste(d, c, comp) });
-    }
-  }
-  return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
-}
-
-/** Reajustes ainda não corrigidos até a competência "ate", inclusive os atrasados de antes de "de". */
-export function reajustesNaoCorrigidos(d, de, ate, hoje = C.hojeIso()) {
-  const lista = reajustesEntre(d, de, ate).filter((r) => !r.corrigido || r.faltaCarta);
-  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id && contratoAtivo(x, hoje))) {
-    const r = reajustePendente(d, c, hoje);
-    if (r && r.competencia < de) lista.push({ contrato: c, ...r, calculo: calcularReajuste(d, c, r.competencia) });
-  }
-  return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
 }
 
 // --------------------------------------------------------------------------
