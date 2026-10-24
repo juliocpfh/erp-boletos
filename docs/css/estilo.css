@@ -49,6 +49,9 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .etiqueta.aviso { background: #fef3c7; color: var(--aviso); }
 .etiqueta.perigo { background: #fee2e2; color: var(--perigo); }
 .etiqueta.info, .etiqueta.neutra { background: #e0f2fe; color: var(--info); }
+.grupo-alerta { margin-bottom: 14px; }
+.grupo-alerta h3 { margin: 0 0 6px; font-size: 15px; }
+.grupo-alerta .alerta { margin-bottom: 4px; }
 .alerta { border-left: 5px solid; padding: 9px 12px; border-radius: 6px; margin-bottom: 8px; background: #fff; }
 .alerta.perigo { border-color: var(--perigo); background: #fef2f2; }
 .alerta.aviso { border-color: #f59e0b; background: #fffbeb; }
