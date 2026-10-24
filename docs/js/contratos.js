@@ -711,8 +711,10 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
 export function reciboChavesBlocos(d, c, chaves, data = '') {
   const dados = dadosDoContrato(d, c, { data: data || undefined });
   const blocos = [{ tipo: 'titulo', runs: negritos('RECIBO DE ENTREGA DAS CHAVES') }, ...cabecalhoDoc(d, c, dados)];
-  blocos.push(p(`O LOCATÁRIO declara, para os devidos fins, que neste ato recebe as chaves do imóvel acima descrito, locado conforme o contrato de locação assinado, e que, a partir deste momento, é responsável pela sua utilização e conservação, assumindo as obrigações civis que forem de sua responsabilidade.`));
-  blocos.push({ tipo: 'secao', runs: negritos('RELAÇÃO DE CHAVES E CONTROLES ENTREGUES') }, ...(linhasDe(chaves).length ? linhasDe(chaves).map((l) => it(`• ${l}`)) : [it('• ______________________________________________'), it('• ______________________________________________')]));
+  // imóvel sem chave nem controle (ex.: terreno): o termo registra só a entrega da posse
+  const semChaves = !linhasDe(chaves).length && !!(d.imoveis.find((i) => i.id === c.imovel_id) || {}).sem_chaves;
+  blocos.push(p(`O LOCATÁRIO declara, para os devidos fins, que neste ato recebe ${semChaves ? 'a posse do imóvel acima descrito, que não possui chaves nem controles' : 'as chaves do imóvel acima descrito'}, locado conforme o contrato de locação assinado, e que, a partir deste momento, é responsável pela sua utilização e conservação, assumindo as obrigações civis que forem de sua responsabilidade.`));
+  if (!semChaves) blocos.push({ tipo: 'secao', runs: negritos('RELAÇÃO DE CHAVES E CONTROLES ENTREGUES') }, ...(linhasDe(chaves).length ? linhasDe(chaves).map((l) => it(`• ${l}`)) : [it('• ______________________________________________'), it('• ______________________________________________')]));
   blocos.push(it(data ? `Data do recebimento: ${dataPorExtenso(data)}, às ____:____.` : 'Data do recebimento: _____/_____/_________, às ____:____.'));
   blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => ['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO', 'LOCADORA'].includes(a.papel)) });
   return { blocos, rodape: dados.rodape };

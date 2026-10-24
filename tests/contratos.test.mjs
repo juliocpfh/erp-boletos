@@ -95,6 +95,14 @@ test('recibo de entrega das chaves', () => {
   assert.match(t, /\[LOCADORA, LOCATÁRIO\]$/);
 });
 
+test('recibo das chaves de imóvel sem chave (terreno): registra a entrega da posse, sem a lista', () => {
+  const { d, c } = base();
+  d.imoveis.find((i) => i.id === c.imovel_id).sem_chaves = true;
+  const t = texto(K.reciboChavesBlocos(d, c, '').blocos);
+  assert.match(t, /recebe a posse do imóvel acima descrito, que não possui chaves nem controles/);
+  assert.doesNotMatch(t, /RELAÇÃO DE CHAVES|_{20}/);
+});
+
 test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', () => {
   const modelo = K.lerModeloVistoria('## Sala\nTeto\nParedes\nMóvel:\nMóvel: sofá cinza\n\n## Banheiro\nHidráulica\n## Vazio');
   assert.deepEqual(modelo, [{ comodo: 'Sala', itens: ['Teto', 'Paredes', 'Móvel: sofá cinza'] }, { comodo: 'Banheiro', itens: ['Hidráulica'] }]);

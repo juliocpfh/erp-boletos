@@ -1105,7 +1105,7 @@ function telaImovel(i) {
       ${item('UC Copel / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Matrícula Sanepar / Código hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
       ${item('Administradora do condomínio', esc(i.administradora_nome || '-'))}${item('Relógio de gás', esc(i.gas_relogio || '-'))}
       ${item('Internet / telefone', esc(i.internet || '-'))}
-      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Modelo de vistoria', `${K.lerModeloVistoria(i.modelo_vistoria).length ? `${K.lerModeloVistoria(i.modelo_vistoria).length} cômodo(s)` : '<span class="suave">não montado</span>'} ${opera() ? link(`#/modelo-vistoria/${i.id}`, i.modelo_vistoria ? 'Editar' : 'Montar') : ''}`)}${item('Chaves e controles', i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
+      ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Modelo de vistoria', `${K.lerModeloVistoria(i.modelo_vistoria).length ? `${K.lerModeloVistoria(i.modelo_vistoria).length} cômodo(s)` : '<span class="suave">não montado</span>'} ${opera() ? link(`#/modelo-vistoria/${i.id}`, i.modelo_vistoria ? 'Editar' : 'Montar') : ''}`)}${item('Chaves e controles', i.sem_chaves ? 'não se aplica' : i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>
       ${i.observacoes ? `<p class="pre">${esc(i.observacoes)}</p>` : ''}</div>
     <div class="cartao"><h2>Inquilinos deste imóvel</h2><div class="rolagem"><table>
       <tr><th>Ativo</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Aluguel atual</th><th>Situação</th><th>NF ou controle</th></tr>
@@ -2407,8 +2407,7 @@ function cadastrosIncompletos() {
     const falta = [];
     if (!i.cep) falta.push('CEP');
     if (!i.cidade) falta.push('cidade');
-    if (!i.chaves) falta.push('chaves e controles');
-    if (!K.lerModeloVistoria(i.modelo_vistoria).length) falta.push('modelo de vistoria');
+    if (!i.chaves && !i.sem_chaves) falta.push('chaves e controles');
     if (!R.participacoesDo(d(), i.id).length && !R.imovelSoControle(d(), i.id)) falta.push('empresas que emitem a NF');
     if (!i.valor_imovel) falta.push('valor do imóvel (para os Resultados)');
     if (falta.length) out.push({ tipo: 'Imóvel', nome: i.nome, onde: R.enderecoCompleto(i), falta, editar: `#/editar/imoveis/${i.id}`, ver: `#/imovel/${i.id}` });
@@ -3338,13 +3337,13 @@ async function documentoMontado(tipo, q) {
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
   const chaves = chavesDoContrato(c);
-  return { c, temChaves: !!chaves.trim(), ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves', arquivo: nomeArquivoDoc('Recibo entrega chaves', c) };
+  return { c, temChaves: !!chaves.trim() || !!(buscar('imoveis', c.imovel_id) || {}).sem_chaves, ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves', arquivo: nomeArquivoDoc('Recibo entrega chaves', c) };
 }
 
 /** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
 function chavesDoContrato(c) {
   const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
-  return (entrada && entrada.chaves) || (buscar('imoveis', c.imovel_id) || {}).chaves || '';
+  return (entrada && entrada.chaves) || ((i) => (i.sem_chaves ? '' : i.chaves))(buscar('imoveis', c.imovel_id) || {}) || '';
 }
 
 /** Roteiro por cômodo: o que conferir em cada um (o que ficar sem preencher não sai no documento). */
@@ -3398,7 +3397,7 @@ function telaVistoria(rota) {
       </div>
       <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>
       <p><label>Chaves e controles ${tipo === 'Saída' ? 'devolvidos' : 'que serão entregues'} <span class="suave">(um por linha, com a quantidade)</span></label>
-        <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.chaves || base.chaves || ''))}</textarea></p>
+        <textarea name="chaves" rows="5">${v ? esc(v.chaves || '') : (tipo === 'Saída' && entrada ? esc(entrada.chaves || '') : esc(i.sem_chaves ? '' : i.chaves || base.chaves || ''))}</textarea></p>
       ${tipo === 'Entrada' ? '<p class="check"><label><input type="checkbox" name="atualizar_imovel" value="1" checked> Guardar esta relação de chaves também no imóvel (para o recibo e as próximas vistorias)</label></p>' : ''}
       ${grade}
       <h2>Fotos que vão no documento</h2>
@@ -4036,7 +4035,7 @@ export const FORMULARIOS = {
         const modelo = K.tirarDoModelo(im.modelo_vistoria, tirados);
         if (modelo !== (im.modelo_vistoria || '')) R.atualizar(db, 'imoveis', im.id, { modelo_vistoria: modelo }, login(), `Modelo de vistoria: tirado o que não se aplica (${tirados.map((x) => `${x.comodo} – ${x.item}`).join(', ')})`);
       }
-      if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim() }, login(), 'Chaves e controles do imóvel');
+      if (f.atualizar_imovel === '1' && c.imovel_id && dados.chaves.trim()) R.atualizar(db, 'imoveis', c.imovel_id, { chaves: dados.chaves.trim(), sem_chaves: false }, login(), 'Chaves e controles do imóvel');
       if (dados.link_fotos && f.tipo === 'Entrada' && !c.vistoria_link) R.atualizar(db, 'contratos', c.id, { vistoria_link: dados.link_fotos }, login(), `${c.inquilino_nome}: link das fotos da vistoria`);
     });
     apagarRascunhoVistoria(form.dataset.rascunho);
