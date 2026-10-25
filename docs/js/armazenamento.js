@@ -261,8 +261,9 @@ async function juntarConteudo(origem, destino) {
     const arq = await lerConteudo(h);
     let la = null;
     try { la = await (await destino.getFileHandle(nome)).getFile(); } catch { /* não existe no destino */ }
-    if (la && la.size !== arq.size) { sobrou += 1; continue; }
-    if (!la) await escreverTexto(destino, nome, arq);
+    // vazio no destino: sobra de uma cópia que falhou no meio (ex.: OneDrive sincronizando); o de verdade é o da origem
+    if (la && la.size !== arq.size && la.size && arq.size) { sobrou += 1; continue; }
+    if (!la || (!la.size && arq.size)) await escreverTexto(destino, nome, arq);
     feitos.push(nome);
   }
   for (const nome of feitos) await origem.removeEntry(nome, { recursive: true });
