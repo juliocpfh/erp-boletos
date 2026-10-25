@@ -59,11 +59,11 @@ function caixaIptu(i) {
   const ano = (p, atual) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
       ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
       ${resumoIptu(p)}${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}
-      ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Anexe aqui a guia (carnê) deste ano. Ao lançar o IPTU do próximo ano, estas guias passam para o histórico.' : '', true)}`;
+      ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Para anexar a guia, use o clipe ao lado do imóvel na página IPTU (botão "IPTU\'s" em Imóveis).' : '', true, false)}`;
   const [atual, ...anteriores] = iptus;
   return `<div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, 'Lançar IPTU do ano') : ''}</div>
     <p class="suave">Você paga todas as guias na prefeitura; o inquilino devolve a parte dele no boleto. No mês de entrada e no de saída, o inquilino paga os dias em que ocupou e você paga o resto. Imóvel vazio (ou contrato sem IPTU): a parcela é toda sua e aparece nos alertas 15 dias antes do vencimento, até ser marcada como paga.</p>
-    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? '' : caixaArquivos('iptu', i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, 'guias-iptu', '', true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos('iptu', i.id, 'Guias do IPTU', 'guias-iptu', 'Pode anexar a guia aqui; ao lançar o IPTU do ano ela vai para o histórico do ano anterior.', true)}`}
+    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? '' : caixaArquivos('iptu', i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, 'guias-iptu', '', true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos('iptuano', idGuiasDoAno(i.id, Number(C.hojeIso().slice(0, 4))), `Guias do IPTU ${C.hojeIso().slice(0, 4)}`, 'guias-iptu', 'Para anexar a guia, use o clipe ao lado do imóvel na página IPTU.', true, false)}${i.guias_iptu_por_ano ? '' : caixaArquivos('iptu', i.id, 'Guias anteriores', 'guias-iptu-anteriores', '', true, false)}`}
     ${atual ? `<details class="historico-iptu"><summary><b>Histórico do IPTU</b> <span class="suave">· anos anteriores e as guias de cada ano (${anteriores.length} ano(s))</span></summary>
       ${anteriores.map((p) => ano(p, false)).join('')}
       ${i.guias_iptu_por_ano ? caixaArquivos('iptu', i.id, 'Guias anteriores', 'guias-iptu-anteriores', 'Guias anexadas antes de haver IPTU lançado por ano.', true, false) : ''}</details>` : ''}</div>`;
@@ -125,6 +125,6 @@ export function telaImovel(i) {
     ${caixaReformas(i)}
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos('anuncio', i.id, 'Fotos do último anúncio', 'anuncio')}
-    ${caixaArquivos('imovel', i.id, 'Documentos do imóvel', 'documentos', 'Documentos anexados ao imóvel (só para ver e baixar). A matrícula é anexada e excluída na lista de Imóveis, na coluna Matrícula.', false, false)}
+    ${caixaArquivos('imovel', i.id, 'Matrículas', 'documentos', 'Arquivos da pasta "Matrículas" do imóvel (só para ver e baixar). A matrícula é anexada e excluída na lista de Imóveis, na coluna Matrícula.', false, false)}
     ${caixaHistorico('Histórico do imóvel', tabelaHistorico(ultimos((h) => h.imovel_id === i.id)))}`;
 }

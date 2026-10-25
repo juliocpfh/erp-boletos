@@ -406,6 +406,12 @@ button.q-aberto { cursor: pointer; }
 button.q-aberto:hover { outline: 2px solid #791F1F; }
 .q-vazio { background: transparent !important; border: 1px dashed #c4c7cc !important; }
 .meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; text-transform: none; }
+.meses-iptu span:not(.sep-ano) + span { white-space: nowrap; }
+.mapa-iptu .sep-ano, .meses-iptu .sep-ano { display: inline-block; width: 2px; height: 20px; background: #888780; margin: 0 5px 0 2px; vertical-align: middle; }
+.mapa-iptu .meses-iptu .sep-ano + span, .mapa-iptu .meses-iptu .sep-ano ~ span { font-size: 9px; }
+.clipes-iptu { white-space: nowrap; }
+.clipes-iptu .clipe-anexar { display: inline-block; margin: 0 0 0 2px; cursor: pointer; filter: grayscale(1); opacity: .55; }
+.clipes-iptu .clipe-anexar:hover { opacity: 1; }
 .legenda-iptu { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-top: 8px; }
 .texto-perigo { color: var(--perigo); }
 

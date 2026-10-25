@@ -73,7 +73,13 @@ export const ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n
 // --------------------------------------------------------------------------
 // Pastas de arquivos
 // --------------------------------------------------------------------------
-export const SUB_DOCS = 'Documentos do imóvel';
+export const SUB_DOCS = 'Matrículas';
+
+/** Nome antigo da pasta das matrículas (renomeada em organizarPastas). */
+const SUB_DOCS_ANTIGA = 'Documentos do imóvel';
+
+/** Pasta dos inquilinos dentro da pasta do imóvel: "Imóvel/Inquilinos/Fulano (01-03-2025 a 31-08-2026)". */
+export const SUB_INQUILINOS = 'Inquilinos';
 
 export const SUB_ANUNCIO = 'Anúncio';
 
@@ -85,10 +91,10 @@ const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO,
 
 export const PASTA_SEM_IMOVEL = 'Sem imóvel';
 
-/** Pasta-mãe dos arquivos do inquilino: a do imóvel, ou "Sem imóvel". */
+/** Pasta-mãe dos arquivos do inquilino (partes do caminho): "Imóvel/Inquilinos", ou "Sem imóvel". */
 export function pastaPaiContrato(c) {
   const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null;
-  return i ? i.pasta || i.nome : PASTA_SEM_IMOVEL;
+  return i ? [i.pasta || i.nome, SUB_INQUILINOS] : [PASTA_SEM_IMOVEL];
 }
 
 export function nomePastaContrato(c) {
@@ -114,7 +120,7 @@ export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { con
 export function chavePasta(escopo, id) {
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return c ? [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === 'assinados' ? SUB_ASSINADOS : escopo === 'aditivos' ? SUB_ADITIVOS : ''].join('/') : null;
+    return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === 'assinados' ? SUB_ASSINADOS : escopo === 'aditivos' ? SUB_ADITIVOS : ''].join('/') : null;
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   return i ? [i.pasta || i.nome, escopo].join('/') : null;
@@ -155,6 +161,7 @@ export async function trazerHeranca(id) {
   for (const nome of r.arquivosReserva || []) {
     try { await S.escreverTexto(await pastaDoEscopo('contrato', Number(id)), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', r.anterior.id, false), nome)); } catch { /* sem o arquivo */ }
   }
+  await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
   const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`,
     r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
@@ -187,6 +194,7 @@ async function completarHeranca(id) {
   if (!r) return null;
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivos, true);
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
+  await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
   aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.reserva && `reserva de ${reais(c.reserva_valor)}`].filter(Boolean).join(' e ')} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
   return r;
@@ -267,7 +275,7 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return S.subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : escopo === 'aditivos' ? [SUB_ADITIVOS] : [])], criar);
+    return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : escopo === 'aditivos' ? [SUB_ADITIVOS] : [])], criar);
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)], criar);
@@ -303,6 +311,57 @@ export async function limparSemImovel() {
 }
 
 export let pastasComArquivos = [];
+
+/**
+ * Organiza as pastas no disco (uma vez por sessão, ao abrir o Painel; e depois de uma troca de titular):
+ * - "Documentos do imóvel" passa a se chamar "Matrículas";
+ * - a pasta de cada inquilino vai para "Imóvel/Inquilinos" com o nome certo (datas de entrada e saída).
+ * Pasta usada por mais de um contrato não é renomeada (só vai para "Inquilinos"), para os arquivos não se separarem.
+ * ``ids``: só esses contratos (sem: todos, e também as matrículas). Devolve os avisos do que não deu para juntar.
+ */
+export async function organizarPastas(ids = null) {
+  if (!opera() || !E.pasta) return [];
+  const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+  const abrir = async (partes) => { try { return await S.subpasta(raiz, partes, false); } catch { return null; } };
+  const avisos = [];
+  if (!ids) {
+    for (const i of d().imoveis) {
+      const base = await abrir([i.pasta || i.nome]);
+      const sobrou = base ? await S.juntarPasta(base, SUB_DOCS_ANTIGA, base, SUB_DOCS) : 0;
+      if (sobrou) avisos.push(`${i.nome}: ${sobrou} arquivo(s) ficaram em "${SUB_DOCS_ANTIGA}" (já existe um com o mesmo nome em "${SUB_DOCS}")`);
+    }
+  }
+  const chave = (c) => `${c.imovel_id || 0}|${S.limparNome(c.pasta || nomePastaContrato(c))}`;
+  const usos = new Map();
+  for (const c of d().contratos) usos.set(chave(c), (usos.get(chave(c)) || 0) + 1);
+  const novosNomes = [];
+  for (const c of d().contratos.filter((x) => !ids || ids.includes(x.id))) {
+    const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null;
+    const atual = S.limparNome(c.pasta || nomePastaContrato(c));
+    const certo = usos.get(chave(c)) > 1 ? atual : S.limparNome(nomePastaContrato(c));
+    // onde a pasta pode estar: solta na pasta do imóvel (como era antes) ou já em "Inquilinos" com o nome antigo
+    const origens = i ? [[[i.pasta || i.nome], atual], [[i.pasta || i.nome], certo], [pastaPaiContrato(c), atual]] : [[[PASTA_SEM_IMOVEL], atual]];
+    for (const [pai, nome] of origens) {
+      const dirPai = await abrir(pai);
+      if (!dirPai) continue;
+      try { await dirPai.getDirectoryHandle(nome); } catch { continue; }
+      const sobrou = await S.juntarPasta(dirPai, nome, await S.subpasta(raiz, pastaPaiContrato(c)), certo);
+      if (sobrou) avisos.push(`${c.inquilino_nome}: ${sobrou} arquivo(s) ficaram em "${[...pai, nome].join('/')}" (já existe um com o mesmo nome na pasta nova)`);
+    }
+    if (c.pasta && c.pasta !== certo) novosNomes.push([c.id, certo]);
+  }
+  if (novosNomes.length) await alterar((db) => novosNomes.forEach(([id, pasta]) => R.atualizar(db, 'contratos', id, { pasta }, login(), 'Pasta de arquivos (entrada e saída)')));
+  return avisos;
+}
+
+let pastasOrganizadas = false;
+
+export async function organizarPastasUmaVez() {
+  if (pastasOrganizadas || !opera() || !E.pasta) return;
+  pastasOrganizadas = true;
+  const avisos = await organizarPastas();
+  if (avisos.length) aviso(`Pastas organizadas; confira: ${avisos.join('; ')}.`, 'aviso');
+}
 
 /**
  * Primeiro IPTU lançado depois da separação por ano: as guias que estavam soltas na pasta do IPTU são do ano
@@ -373,14 +432,16 @@ export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = f
 
 export const urls = [];
 
-export async function listaArquivos(escopo, id) {
+export async function listaArquivos(escopo, id, modo = '') {
   urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
   let dir;
   try { dir = await pastaDoEscopo(escopo, id, false); } catch { dir = null; } // pasta ainda não existe: nada anexado
   const todos = dir ? await S.listar(dir) : [];
   // matrícula na lista de imóveis (embaixo do endereço): 📎1, 📎2… com o nome no "title" e o "×" para excluir
-  if (escopo === 'matricula') {
-    return todos.filter((a) => ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo da matrícula "${a.nome}"?`) : ''}</span>`).join(' ');
+  // guias do IPTU na página IPTU (ao lado do nome do imóvel): igual, com todos os arquivos da pasta do ano
+  if (escopo === 'matricula' || modo === 'clipe') {
+    const tipo = escopo === 'matricula' ? 'da matrícula' : 'da guia';
+    return todos.filter((a) => escopo !== 'matricula' || ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo ${tipo} "${a.nome}"?`) : ''}</span>`).join(' ');
   }
   const itens = todos;
   if (!itens.length && escopo !== 'contrato') return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
