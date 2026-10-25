@@ -115,7 +115,7 @@ export function telaReajustes(q) {
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(x.valor_anterior)} → <b>${reais(x.valor_novo)}</b></div></div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucaoDoReajuste(c, x)}</div></div>
-        <div class="reajuste-botoes"><div class="acoes">${carta}</div>${opera() && ultimaDo(c) === x ? `<div class="acoes">${botao('desfazerReajuste', 'Desfazer correção', { id: x.id }, 'perigo pequeno', `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`)}</div>` : ''}</div></div></div>`; }).join('')
+        <div class="reajuste-botoes"><div class="acoes">${carta}${opera() && ultimaDo(c) === x ? `${botao('desfazerReajuste', 'Desfazer correção', { id: x.id }, 'perigo pequeno', `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`)}` : ''}</div></div></div></div>`; }).join('')
       || '<p class="suave">Nenhum reajuste aplicado ainda.</p>'}
       </div>
       <p class="suave">"Desfazer correção" aparece só na correção mais recente de cada inquilino; com boleto da caução já pago, desfaça o pagamento antes.</p></div>`;

@@ -411,7 +411,7 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 
 /* Reajustes: um cartão por reajuste (identificação, valores lado a lado e botões à direita) */
 .reajustes-lista { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
-.reajuste-card { border: 1px solid var(--borda); border-radius: 10px; padding: 12px 14px; }
+.reajuste-card { border: 1px solid #c7d4e8; border-radius: 10px; padding: 12px 14px; background: #f1f5fb; }
 .reajuste-card.amarelo { background: #fef9c3; }
 .reajuste-topo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
 .reajuste-nome { font-size: 16px; }
