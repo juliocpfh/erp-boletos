@@ -597,7 +597,7 @@ export const ACOES = {
     });
     // contrato excluído: a pasta dele sai junto se estiver vazia (pasta com documentos fica guardada)
     if (tabela === 'contratos') {
-      try { await S.apagarPastaVazia(await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), [pastaPaiContrato(r)], false), r.pasta || nomePastaContrato(r)); } catch { /* pasta nem existia */ }
+      try { await S.apagarPastaVazia(await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), pastaPaiContrato(r), false), r.pasta || nomePastaContrato(r)); } catch { /* pasta nem existia */ }
     }
     aviso('Excluído.');
     if (destino) ir(destino); else await mostrar();

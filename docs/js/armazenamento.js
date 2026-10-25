@@ -208,6 +208,49 @@ export async function moverPasta(paiAntigo, antigo, paiNovo, novo) {
   await paiAntigo.removeEntry(antigo, { recursive: true });
 }
 
+/**
+ * Leva a pasta "antigo" (em paiAntigo) para "novo" (em paiNovo). Se o destino já existe, junta: cada arquivo vai para lá,
+ * e o de mesmo nome e mesmo tamanho é tido como repetido. Arquivo com o mesmo nome e conteúdo diferente fica onde estava.
+ * Devolve quantos arquivos ficaram para trás (0 = a pasta antiga sumiu).
+ */
+export async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
+  antigo = limparNome(antigo);
+  novo = limparNome(novo);
+  let origem;
+  try { origem = await paiAntigo.getDirectoryHandle(antigo); } catch { return 0; }
+  if (antigo === novo && await paiAntigo.isSameEntry(paiNovo)) return 0;
+  let existe = true;
+  try { await paiNovo.getDirectoryHandle(novo); } catch { existe = false; }
+  if (!existe) {
+    await moverPasta(paiAntigo, antigo, paiNovo, novo);
+    return 0;
+  }
+  const sobrou = await juntarConteudo(origem, await paiNovo.getDirectoryHandle(novo));
+  if (!sobrou) await paiAntigo.removeEntry(antigo, { recursive: true });
+  return sobrou;
+}
+
+async function juntarConteudo(origem, destino) {
+  let sobrou = 0;
+  const feitos = [];
+  for await (const [nome, h] of origem.entries()) {
+    if (h.kind === 'directory') {
+      const n = await juntarConteudo(h, await destino.getDirectoryHandle(nome, { create: true }));
+      sobrou += n;
+      if (!n) feitos.push(nome);
+      continue;
+    }
+    const arq = await h.getFile();
+    let la = null;
+    try { la = await (await destino.getFileHandle(nome)).getFile(); } catch { /* não existe no destino */ }
+    if (la && la.size !== arq.size) { sobrou += 1; continue; }
+    if (!la) await escreverTexto(destino, nome, arq);
+    feitos.push(nome);
+  }
+  for (const nome of feitos) await origem.removeEntry(nome, { recursive: true });
+  return sobrou;
+}
+
 // --------------------------------------------------------------------------
 // Exportar / importar tudo em ZIP
 // --------------------------------------------------------------------------

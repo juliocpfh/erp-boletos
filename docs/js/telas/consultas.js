@@ -4,7 +4,7 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { botao, buscar, d, etiqueta, link, opera, ordenar } from './comum.js';
+import { botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
 
 /** Situações da solicitação, com o símbolo do resumo (tela Inquilinos) e da lista de solicitações. */
 export const SITUACOES_SOLICITACAO = [
@@ -76,14 +76,17 @@ export function telaIptu(ano) {
   const imoveis = ordenar(d().imoveis, 'nome');
   const doAno = (i) => d().iptus.find((p) => p.imovel_id === i.id && p.ano === ano);
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  const meses = MESES.map((_, k) => `${ano}-${String(k + 1).padStart(2, '0')}`);
   // valor e forma numa coluna só; entre parênteses, o valor pago à vista com desconto (quando houver)
   const valor = (p) => `<b>${reais(p.valor_total)}</b> · ${p.pago_avista ? 'à vista' : `${p.num_parcelas}x`}${p.pago_avista && p.valor_avista ? ` <span class="suave">(à vista ${reais(p.valor_avista)})</span>` : ''}`;
   const primeira = (p) => { const m = !p.pago_avista && (p.primeiro_vencimento_boleto || (p.primeira_competencia && C.somarMeses(p.primeira_competencia, 1))); return m ? `<br><span class="suave">1ª no boleto de ${compBr(m)}</span>` : ''; };
   // um quadradinho por mês (mês do boleto), na cor da situação; o valor aparece ao passar o mouse; o vermelho marca a guia paga
   const quadrado = (pc, p, mes) => {
-    if (!pc) return `<span class="q q-vazio" title="${MESES[Number(mes.slice(5)) - 1]}: sem parcela"></span>`;
-    const nome = `${MESES[Number(mes.slice(5)) - 1]} · ${pc.n === 0 ? 'cota única' : `${pc.rotulo} parcela`}`;
+    const sep = mes === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : '';
+    return sep + quadradoDoMes(pc, p, mes);
+  };
+  const quadradoDoMes = (pc, p, mes) => {
+    if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
+    const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? 'cota única' : `${pc.rotulo} parcela`}`;
     if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
     const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : '';
     const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : '';
@@ -92,14 +95,25 @@ export function telaIptu(ano) {
     return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p.id}" data-n="${pc.n}" data-texto="${esc(titulo)}" title="${esc(titulo)} (clique para marcar como paga)"></button>`
       : `<span class="q q-aberto" title="${esc(titulo)}"></span>`;
   };
+  const rotuloMes = (mes) => `${MESES[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? '' : `/${mes.slice(2, 4)}`}`;
   const mesDaParcela = (pc, p) => (pc.n === 0 ? (p.data_quitacao || p.vencimento_primeira || '').slice(0, 7) : pc.mesBoleto || (pc.comp && C.somarMeses(pc.comp, 1)) || '');
+  const mapas = new Map(imoveis.filter(doAno).map((i) => {
+    const p = doAno(i);
+    return [i.id, new Map(R.parcelasIptu(d(), p).map((pc) => [mesDaParcela(pc, p), pc]))];
+  }));
+  // o ano todo e mais os meses do ano seguinte que ainda têm parcela deste IPTU (ex.: 10 parcelas a partir de abril vão até janeiro)
+  const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
+  const meses = [];
+  for (let m = `${ano}-01`; m <= ultimo; m = C.somarMeses(m, 1)) meses.push(m);
   const soma = { inquilino: 0, sua: 0, aberto: 0 };
   const linhas = imoveis.map((i) => {
     const p = doAno(i);
-    const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a>`;
+    const idGuias = idGuiasDoAno(i.id, ano);
+    // guias do ano: 📎1 ×, 📎2 ×… e o clipe cinza para anexar mais uma
+    const guias = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-upload="iptuano:${idGuias}"></label>` : ''}</span>`;
+    const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias}`;
     if (!p) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, 'aviso')} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno') : ''}</td></tr>`;
-    const mapa = new Map();
-    for (const pc of R.parcelasIptu(d(), p)) mapa.set(mesDaParcela(pc, p), pc);
+    const mapa = mapas.get(i.id);
     const t = R.totaisIptu(d(), p);
     soma.inquilino += t.inquilino; soma.sua += t.proprietario; soma.aberto += t.emAberto;
     return `<tr><td>${nome}</td><td class="nw">${valor(p)}${primeira(p)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p, m)).join('')}</td>
@@ -121,7 +135,7 @@ export function telaIptu(ano) {
         <td class="n nw"><b>${reais(g.parcela.valorProprietario)}</b></td>
         <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje}"><button class="pequeno">Paga</button></form>` : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${MESES.map((m) => `<span>${m}</span>`).join('')}</th><th class="n">Inquilino paga</th><th class="n">Você paga</th><th></th></tr>
+    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${rotuloMes(m)}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${reais(soma.sua)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ''}</td><td></td></tr>` : ''}</table>
     <div class="legenda-iptu">${legenda}</div>

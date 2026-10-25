@@ -412,8 +412,8 @@ export async function mostrar(estadoForm = null) {
 /** Partes que precisam ler a pasta depois de desenhadas: listas de arquivos e fotos. */
 async function montarExtras(raiz) {
   for (const el of raiz.querySelectorAll('[data-arquivos]')) {
-    const [escopo, id] = el.dataset.arquivos.split(':');
-    el.innerHTML = await TELAS._listaArquivos(escopo, Number(id));
+    const [escopo, id, modo] = el.dataset.arquivos.split(':');
+    el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
   }
   TELAS._ligarDesconto(raiz);
 }

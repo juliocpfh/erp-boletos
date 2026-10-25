@@ -295,7 +295,7 @@ export const CADASTROS = {
     // contrato já salvo: grava na pasta atual (se o nome mudar, a pasta inteira é renomeada depois); contrato novo: na pasta que ele vai ter
     async ajustarAsync(dados, erros, r, form) {
       const pasta = r ? () => pastaDoEscopo('contrato', r.id)
-        : async () => S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [pastaPaiContrato(dados), dados.pasta]);
+        : async () => S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [...pastaPaiContrato(dados), dados.pasta]);
       await guardarComprovantes(COMPROVANTES_CONTRATO, dados, form, pasta);
     },
     salvar(db, dados, q, r) {
@@ -331,15 +331,15 @@ export const CADASTROS = {
       if (!antigo || !antigo.pasta) return;
       const paiAntigo = pastaPaiContrato(antigo);
       const paiNovo = pastaPaiContrato(salvo);
-      if (paiAntigo === paiNovo) {
-        if (antigo.pasta !== salvo.pasta) await renomearNoDisco([paiNovo], antigo.pasta, salvo.pasta);
+      if (paiAntigo.join('/') === paiNovo.join('/')) {
+        if (antigo.pasta !== salvo.pasta) await renomearNoDisco(paiNovo, antigo.pasta, salvo.pasta);
         return;
       }
       try {
         const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
-        await S.moverPasta(await S.subpasta(raiz, [paiAntigo]), antigo.pasta, await S.subpasta(raiz, [paiNovo]), salvo.pasta);
+        await S.moverPasta(await S.subpasta(raiz, paiAntigo), antigo.pasta, await S.subpasta(raiz, paiNovo), salvo.pasta);
       } catch (e) {
-        aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo}": ${e.message}`, 'aviso');
+        aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo.join('/')}": ${e.message}`, 'aviso');
       }
     },
     destino: (salvo) => `#/contrato/${salvo.id}`,
