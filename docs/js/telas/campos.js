@@ -465,7 +465,9 @@ export function ligarCamposAutomaticos(raiz) {
       el.classList.toggle('doc-invalido', !!erro);
       el.title = erro;
       if (erro) return mensagemAuto(el, `<span class="erro-campo">${esc(erro)}</span>`);
-      mensagemAuto(el, '');
+      // CPF/CNPJ certo: confirma logo (a consulta do CNPJ e a pessoa já cadastrada trocam a mensagem depois)
+      const n = F.soDigitos(el.value);
+      mensagemAuto(el, tipo !== 'cep' && tipo !== 'tel' && n ? `<span class="etiqueta ok">✓ ${n.length === 11 ? 'CPF' : 'CNPJ'} válido</span>` : '');
       if (el.dataset.preencher) {
         const cfg = JSON.parse(el.dataset.preencher);
         if (cfg.fonte === 'cep') consultarCep(el, cfg);

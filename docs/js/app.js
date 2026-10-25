@@ -346,9 +346,9 @@ function atualizarFaixa() {
 }
 
 const MENU = [
-  ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
-  ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'],
-  ['#/faturas', 'NF', 'fatura'], ['#/resultados', 'Resultados', '^resultados|^contas|^impostos'],
+  ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
+  ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'], ['#/faturas', 'NF', 'fatura'],
+  ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/resultados', 'Resultados', '^resultados|^contas|^impostos'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^backup|^empresas'],
 ];
 
