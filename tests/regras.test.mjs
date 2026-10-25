@@ -1650,7 +1650,10 @@ test('caução a completar: novo valor negociado também aparece; com boleto em 
   const [y] = R.caucoesACompletar(d);
   assert.equal(y.x.correcao.indice, 'Negociado');
   assert.equal(y.x.complemento, 90000);
-  R.gerarBoletosCaucao(d, c.id, 'julio', null, { parcelas: 3 });
+  // parcelamento negociado: cada boleto com a sua data e o seu valor (a soma tem de dar o complemento)
+  assert.throws(() => R.gerarBoletosCaucao(d, c.id, 'julio', null, { plano: [{ vencimento: '2026-06-10', valor: 50000 }, { vencimento: '2026-08-20', valor: 30000 }] }), /somam R\$ 800,00/);
+  const plano = R.gerarBoletosCaucao(d, c.id, 'julio', null, { plano: [{ vencimento: '2026-06-10', valor: 50000 }, { vencimento: '2026-06-25', valor: 10000 }, { vencimento: '2026-08-20', valor: 30000 }] });
+  assert.deepEqual(plano.map((x) => [x.vencimento, x.caucao_complemento, x.caucao_parcela]), [['2026-06-10', 50000, '1/3'], ['2026-06-25', 10000, '2/3'], ['2026-08-20', 30000, '3/3']]);
   assert.throws(() => R.registrarComplementoDepositado(d, c.id, { data: '2026-05-10' }, 'julio'), /boleto do complemento/);
   assert.equal(R.caucoesACompletar(d)[0].abertos.length, 3);
 });

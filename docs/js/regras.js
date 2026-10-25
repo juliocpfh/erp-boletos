@@ -481,28 +481,38 @@ export function gerarBoletoCaucao(d, contratoId, usuario, comp = null, opcoes = 
 /**
  * Boleto(s) do complemento da caução. ``vencimento``: outra data (mais prazo); ``parcelas``: boletos mensais
  * (ex.: R$ 270,00 em 2 × R$ 135,00, vencendo em 10/12 e 10/01). Cada parcela paga soma na caução.
+ * ``plano``: parcelamento negociado, cada boleto com a sua data e o seu valor ([{ vencimento, valor }]; a soma é o complemento).
  */
-export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencimento = null, parcelas = 1 } = {}) {
+export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencimento = null, parcelas = 1, plano = null } = {}) {
   const c = buscar(d, 'contratos', contratoId);
   const x = complementoCaucao(d, c);
   if (!x) throw new Error('Não há correção do aluguel esperando a correção da caução.');
   if (x.boleto) throw new Error('O boleto do complemento da caução já foi gerado.');
   if (x.necessaria === null) throw new Error('Informe no contrato a quantos aluguéis a caução equivale.');
   if (!(x.complemento > 0)) throw new Error('A caução depositada já cobre o valor necessário.');
-  const n = Math.trunc(Number(parcelas) || 1);
+  const n = plano && plano.length ? plano.length : Math.trunc(Number(parcelas) || 1);
   if (n < 1 || n > 12) throw new Error('Parcelas da caução: de 1 a 12.');
-  if (vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimento)) throw new Error('Informe o vencimento do boleto da caução.');
+  const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+  if (vencimento && !dataOk(vencimento)) throw new Error('Informe o vencimento do boleto da caução.');
+  if (plano && plano.length) {
+    if (plano.some((p) => !dataOk(p.vencimento))) throw new Error('Informe o vencimento de cada boleto da caução.');
+    if (plano.some((p) => !Number.isInteger(p.valor) || p.valor <= 0)) throw new Error('Cada boleto da caução precisa de um valor maior que zero.');
+    const soma = plano.reduce((t, p) => t + p.valor, 0);
+    if (soma !== x.complemento) throw new Error(`As parcelas somam ${C.reais(soma)}, mas o complemento é ${C.reais(x.complemento)}.`);
+  }
   comp = comp && comp > x.competencia ? comp : x.competencia;
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
-  const venc0 = vencimento || C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, mesSeguinte);
   // vencimento escolhido: a competência acompanha (o boleto aparece no mês certo da tela Boletos)
-  const comp0 = vencimento ? (mesSeguinte ? C.somarMeses(venc0.slice(0, 7), -1) : venc0.slice(0, 7)) : comp;
+  const compDoVencimento = (v) => (mesSeguinte ? C.somarMeses(v.slice(0, 7), -1) : v.slice(0, 7));
+  const venc0 = vencimento || C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, mesSeguinte);
+  const comp0 = vencimento ? compDoVencimento(venc0) : comp;
+  const boletos = plano && plano.length ? plano.map((p) => ({ valor: p.valor, vencimento: p.vencimento, mes: compDoVencimento(p.vencimento) }))
+    : C.parcelas(x.complemento, n).map((valor, k) => ({ valor, vencimento: C.somarMesesData(venc0, k), mes: C.somarMeses(comp0, k) }));
   let anterior = x.atual;
-  return C.parcelas(x.complemento, n).map((valor, k) => {
+  return boletos.map(({ valor, vencimento: venc, mes }, k) => {
     const parcela = n > 1 ? `${k + 1}/${n}` : '';
-    const mes = C.somarMeses(comp0, k);
     const cb = inserir(d, 'cobrancas', {
-      contrato_id: c.id, competencia: mes, vencimento: C.somarMesesData(venc0, k),
+      contrato_id: c.id, competencia: mes, vencimento: venc,
       dias_cobrados: C.diasNoMes(mes), dias_mes: C.diasNoMes(mes), aluguel_mensal: 0, aluguel: 0, desconto: 0,
       iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, outros: valor, outros_descricao: `Complemento da caução${parcela ? ` (${parcela})` : ''}`,
       reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,

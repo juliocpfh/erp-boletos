@@ -419,3 +419,4 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 .reajuste-corpo { display: flex; gap: 28px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--borda); }
 .reajuste-valor { min-width: 140px; }
 .reajuste-botoes { margin-left: auto; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.caucao-parcelas { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }

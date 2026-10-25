@@ -186,7 +186,8 @@ function janelaErro(texto) {
  * Janela de pergunta no meio da tela. ``html`` já vem escapado por quem chama; ``forte`` = borda e botão vermelhos (mais chamativa).
  * Devolve os campos marcados/preenchidos da janela ({ nome: [valores] }) ao confirmar, ou null ao cancelar.
  */
-export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', forte = false }) {
+/** ``ligar(dlg)``: liga os campos da janela (ex.: botão que mostra mais campos) depois de aberta. */
+export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', forte = false, ligar = null }) {
   return new Promise((resolver) => {
     const dlg = document.createElement('dialog');
     dlg.className = `janela-erro janela-pergunta${forte ? ' forte' : ''}`;
@@ -202,6 +203,7 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
     dlg.addEventListener('close', () => { dlg.remove(); resolver(resposta); });
     document.body.appendChild(dlg);
     dlg.showModal();
+    if (ligar) ligar(dlg);
   });
 }
 

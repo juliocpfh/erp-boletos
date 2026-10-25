@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="d095ace60cab34ee">
+<meta name="fontes" content="57371674c2356e7d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -416,6 +416,18 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 .meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; text-transform: none; }
 .legenda-iptu { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-top: 8px; }
 .texto-perigo { color: var(--perigo); }
+
+/* Reajustes: um cartão por reajuste (identificação, valores lado a lado e botões à direita) */
+.reajustes-lista { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.reajuste-card { border: 1px solid #c7d4e8; border-radius: 10px; padding: 12px 14px; background: #f1f5fb; }
+.reajuste-card.amarelo { background: #fef9c3; }
+.reajuste-topo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.reajuste-nome { font-size: 16px; }
+.reajuste-mes { text-align: right; }
+.reajuste-corpo { display: flex; gap: 28px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--borda); }
+.reajuste-valor { min-width: 140px; }
+.reajuste-botoes { margin-left: auto; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.caucao-parcelas { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
 </style>
 </head>
 <body>
@@ -2875,28 +2887,36 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function gerarBoletoCaucao(d2, contratoId, usuario, comp = null, opcoes = {}) {
     return gerarBoletosCaucao(d2, contratoId, usuario, comp, opcoes)[0];
   }
-  function gerarBoletosCaucao(d2, contratoId, usuario, comp = null, { vencimento = null, parcelas: parcelas2 = 1 } = {}) {
+  function gerarBoletosCaucao(d2, contratoId, usuario, comp = null, { vencimento = null, parcelas: parcelas2 = 1, plano = null } = {}) {
     const c = buscar(d2, "contratos", contratoId);
     const x = complementoCaucao(d2, c);
     if (!x) throw new Error("Não há correção do aluguel esperando a correção da caução.");
     if (x.boleto) throw new Error("O boleto do complemento da caução já foi gerado.");
     if (x.necessaria === null) throw new Error("Informe no contrato a quantos aluguéis a caução equivale.");
     if (!(x.complemento > 0)) throw new Error("A caução depositada já cobre o valor necessário.");
-    const n = Math.trunc(Number(parcelas2) || 1);
+    const n = plano && plano.length ? plano.length : Math.trunc(Number(parcelas2) || 1);
     if (n < 1 || n > 12) throw new Error("Parcelas da caução: de 1 a 12.");
-    if (vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(vencimento)) throw new Error("Informe o vencimento do boleto da caução.");
+    const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || "");
+    if (vencimento && !dataOk(vencimento)) throw new Error("Informe o vencimento do boleto da caução.");
+    if (plano && plano.length) {
+      if (plano.some((p2) => !dataOk(p2.vencimento))) throw new Error("Informe o vencimento de cada boleto da caução.");
+      if (plano.some((p2) => !Number.isInteger(p2.valor) || p2.valor <= 0)) throw new Error("Cada boleto da caução precisa de um valor maior que zero.");
+      const soma = plano.reduce((t, p2) => t + p2.valor, 0);
+      if (soma !== x.complemento) throw new Error(`As parcelas somam ${reais(soma)}, mas o complemento é ${reais(x.complemento)}.`);
+    }
     comp = comp && comp > x.competencia ? comp : x.competencia;
     const mesSeguinte = c.cobranca_mes_seguinte !== false;
+    const compDoVencimento = (v) => mesSeguinte ? somarMeses(v.slice(0, 7), -1) : v.slice(0, 7);
     const venc0 = vencimento || vencimentoDaCompetencia(comp, c.dia_vencimento || 10, mesSeguinte);
-    const comp0 = vencimento ? mesSeguinte ? somarMeses(venc0.slice(0, 7), -1) : venc0.slice(0, 7) : comp;
+    const comp0 = vencimento ? compDoVencimento(venc0) : comp;
+    const boletos = plano && plano.length ? plano.map((p2) => ({ valor: p2.valor, vencimento: p2.vencimento, mes: compDoVencimento(p2.vencimento) })) : parcelas(x.complemento, n).map((valor, k) => ({ valor, vencimento: somarMesesData(venc0, k), mes: somarMeses(comp0, k) }));
     let anterior = x.atual;
-    return parcelas(x.complemento, n).map((valor, k) => {
+    return boletos.map(({ valor, vencimento: venc, mes }, k) => {
       const parcela = n > 1 ? `${k + 1}/${n}` : "";
-      const mes = somarMeses(comp0, k);
       const cb = inserir(d2, "cobrancas", {
         contrato_id: c.id,
         competencia: mes,
-        vencimento: somarMesesData(venc0, k),
+        vencimento: venc,
         dias_cobrados: diasNoMes(mes),
         dias_mes: diasNoMes(mes),
         aluguel_mensal: 0,
@@ -6374,15 +6394,18 @@ ${JSON.stringify(cabecalho)}
     campo("imovel_id", "Imóvel", "opcao", { opcoes: [], soNovo: true, obrig: true, ajuda: "Escolha o imóvel deste inquilino" }),
     campo("gerar_nf", "Emite NF (desmarcado: boleto de controle)", "simnao", { padrao: true, ajuda: "Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados" }),
     secao("Inquilino (responsável pelo contrato)"),
+    // ordem pedida: tipo, documento e RG/inscrição estadual na mesma linha; depois nome, contatos e, numa linha nova, o endereço
     campo("inquilino_tipo", "Tipo", "opcao", { obrig: true, padrao: "Pessoa física", opcoes: ["Pessoa física", "Pessoa jurídica (empresa)"] }),
-    campo("inquilino_nome", "Nome completo / razão social", "texto", { obrig: true, largo: true, max: LIMITES.tomador_nome, ajuda: "O boleto e a NF saem neste nome" }),
-    campo("inquilino_apelido", "Nome fantasia", "texto", PJ),
-    campo("inquilino_telefone", "Telefone", "tel"),
-    campo("inquilino_whatsapp", "Este telefone é WhatsApp", "simnao"),
-    campo("inquilino_email", "E-mail", "email"),
     campo("inquilino_cpf", "CPF", "cpfcnpj", { buscarPessoa: true, ...rotuloPJ("CNPJ"), ...PREENCHE_CNPJ({ nome: "inquilino_nome", fantasia: "inquilino_apelido", endereco: "inquilino_endereco", telefone: "inquilino_telefone", email: "inquilino_email", representante: "representante_nome" }) }),
     campo("inquilino_rg", "RG", "texto", rotuloPJ("Inscrição estadual")),
+    QUEBRA,
+    campo("inquilino_nome", "Nome completo", "texto", { obrig: true, largo: true, max: LIMITES.tomador_nome, ...rotuloPJ("Razão social"), ajuda: "O boleto e a NF saem neste nome. Na empresa, vem do CNPJ" }),
+    campo("inquilino_apelido", "Nome fantasia", "texto", PJ),
+    campo("inquilino_telefone", "Telefone", "tel"),
+    campo("inquilino_whatsapp", "Este telefone é WhatsApp", "simnao", { colado: true }),
+    campo("inquilino_email", "E-mail", "email"),
     ...qualificacao("inquilino_", quando("inquilino_tipo", "Pessoa física"), false),
+    QUEBRA,
     campo("usar_endereco_imovel", "Usar o endereço do imóvel deste contrato", "simnao", { virtual: true, autoMsg: true, ajuda: "Marcado: o endereço do inquilino fica igual ao do imóvel (rua, bairro, cidade/UF e CEP)" }),
     CEP_DA_PESSOA("inquilino_"),
     campo("inquilino_endereco", "Endereço (residência, comercial ou sede da empresa)", "texto", { largo: true }),
@@ -7676,7 +7699,8 @@ Salvar assim mesmo?`)) {
         el.classList.toggle("doc-invalido", !!erro);
         el.title = erro;
         if (erro) return mensagemAuto(el, `<span class="erro-campo">${esc(erro)}</span>`);
-        mensagemAuto(el, "");
+        const n = soDigitos(el.value);
+        mensagemAuto(el, tipo !== "cep" && tipo !== "tel" && n ? `<span class="etiqueta ok">✓ ${n.length === 11 ? "CPF" : "CNPJ"} válido</span>` : "");
         if (el.dataset.preencher) {
           const cfg = JSON.parse(el.dataset.preencher);
           if (cfg.fonte === "cep") consultarCep(el, cfg);
@@ -9186,15 +9210,19 @@ Salvar assim mesmo?`)) {
   // docs/js/telas/reajustes.js
   var MESES3 = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   var dataExtenso = (iso2) => `${Number(iso2.slice(8, 10))} de ${MESES3[Number(iso2.slice(5, 7)) - 1]} de ${iso2.slice(0, 4)}`;
-  function botoesReajuste(c, r, naCarta = false) {
+  function partesReajuste(c, r, naCarta = false) {
     const carta = !r.comCarta || !r.faltaCarta && !r.carta ? "" : `${naCarta ? "" : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, "Gerar carta", "botao pequeno")}
     ${opera() ? botao("cartaEnviada", r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : "Marcar carta enviada", { contrato: c.id, comp: r.competencia, enviada: r.carta ? "" : "1" }, r.carta ? "link-botao" : "secundario pequeno", r.carta ? "Desfazer o envio da carta?" : "") : ""}`;
-    if (r.corrigido) return `${etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, "ok")} ${carta}`;
-    if (!opera()) return carta;
+    if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, "ok") };
+    if (!opera()) return { carta, correcao: "" };
     const k = r.calculo || calcularReajuste(d(), c, r.competencia);
-    return `${carta}
-    ${k.percentual !== null ? botao("aplicarReajuste", "Aplicar correção", { contrato: c.id, comp: r.competencia }, "secundario pequeno", `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`) : `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${percentualBonificacao(c)}" class="acoes"><input name="percentual" placeholder="%" inputmode="decimal" style="width:70px" title="Percentual da correção: calcula o novo valor ao lado">
-      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>`}`;
+    return { carta, correcao: k.percentual !== null ? botao("aplicarReajuste", "Aplicar correção", { contrato: c.id, comp: r.competencia }, "secundario pequeno", `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`) : `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${percentualBonificacao(c)}" class="acoes"><input name="percentual" placeholder="%" inputmode="decimal" style="width:70px" title="Percentual da correção: calcula o novo valor ao lado">
+      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>` };
+  }
+  function botoesReajuste(c, r, naCarta = false) {
+    const p2 = partesReajuste(c, r, naCarta);
+    return r.corrigido ? `${p2.correcao} ${p2.carta}` : `${p2.carta}
+    ${p2.correcao}`;
   }
   function caucaoDoReajuste(c, correcao) {
     if (!temCaucao(c)) return '<span class="suave">-</span>';
@@ -9249,33 +9277,44 @@ Salvar assim mesmo?`)) {
       ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join("")}</tr>`).join("")}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista3.length})</h2>
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). De anos anteriores não há carta; sem o índice daquele mês cadastrado, digite o % ou o novo valor. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
-      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual (bonificado)</th><th class="n">Novo (bonificado)</th><th>Caução</th><th>Carta e correção</th></tr>
+      <div class="reajustes-lista">
       ${lista3.map((r) => {
       const k = r.calculo;
       const c = r.contrato;
       const i = buscar2("imoveis", c.imovel_id);
+      const p2 = partesReajuste(c, r);
       const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : temCaucao(c) && garantiaDepositada(c) && c.caucao_meses > 0 && k.novoBonificado !== null ? `${reais(valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * k.novoBonificado)}</b>` : '<span class="suave">-</span>';
-      return `<tr class="${String(c.id) === q.contrato ? "amarelo" : ""}"><td><b>${compBr(r.competencia)}</b><br><span class="suave">${r.comCarta ? `carta com o boleto deste aluguel (vence em ${dataBr(vencimentoDoReajuste(d(), c, r.competencia))})` : "ano anterior: sem carta"}</span></td>
-        <td><a href="#/contrato/${c.id}"><b>${esc(i ? i.nome : "")}</b></a><br>${esc(c.inquilino_nome)} · ${r.anos} ano(s)</td>
-        <td>${esc(k.indiceContrato || "não informado")}${k.escolhido ? `<br><span class="suave">usa ${esc(k.escolhido.indice)} até ${compBr(k.escolhido.registro.mes_ref)}: ${pct(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(" e ")}`, "perigo")}` : ""}</td>
-        <td class="n">${reais(k.atual)}${k.bonificacao ? ` <span class="suave">(${reais(k.atualBonificado)})</span>` : ""}</td>
-        <td class="n">${k.novo !== null ? `<b>${reais(k.novo)}</b>${k.bonificacao ? ` <span class="suave">(${reais(k.novoBonificado)})</span>` : ""}` : "-"}</td>
-        <td class="nw">${caucao}</td>
-        <td class="nw">${botoesReajuste(c, r)}</td></tr>`;
-    }).join("") || '<tr><td colspan="7" class="suave">Nenhum reajuste em aberto.</td></tr>'}</table>
-      <p class="suave">Valores: aluguel cheio e, entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
+      return `<div class="reajuste-card ${String(c.id) === q.contrato ? "amarelo" : ""}"><div class="reajuste-topo">
+        <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : "")} – ${esc(c.inquilino_nome)}</b></a>
+          <div class="suave">${r.anos} ano(s) · ${esc(k.indiceContrato || "índice não informado")}${k.escolhido ? ` ${pct(k.percentual)} até ${compBr(k.escolhido.registro.mes_ref)}` : ""} ${!k.escolhido && k.faltando.length ? etiqueta(`falta ${k.faltando.join(" e ")}`, "perigo") : ""}</div></div>
+        <div class="reajuste-mes"><b>Reajuste no aluguel de ${compBr(r.competencia)}</b><div class="suave">${r.comCarta ? `Boleto vence em ${dataBr(vencimentoDoReajuste(d(), c, r.competencia))}` : "ano anterior: sem carta"}</div></div></div>
+      <div class="reajuste-corpo">
+        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : "-"}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : "-"})</div>` : ""}</div>
+        <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
+        <div class="reajuste-botoes"><div class="acoes">${p2.carta}</div>${p2.correcao ? `<div class="acoes">${p2.correcao}</div>` : ""}</div></div></div>`;
+    }).join("") || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+      </div>
+      <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
     <div class="cartao rolagem" data-caixa="Já reajustados"><div class="cabecalho"><h2>Já reajustados${todos ? "" : " (os 3 últimos)"}</h2>
       ${feitos.length > 3 ? link(`#/reajustes${todos ? "" : "?todos=1"}`, todos ? "Mostrar só os 3 últimos" : `Mostrar todos (${feitos.length})`, "botao secundario pequeno") : ""}</div>
-      <table><tr><th>Vale a partir de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Anterior</th><th class="n">Novo</th><th>Caução</th><th>Carta</th><th></th></tr>
+      <div class="reajustes-lista">
       ${(todos ? feitos : feitos.slice(0, 3)).map(({ correcao: x, contrato: c }) => {
       const i = buscar2("imoveis", c.imovel_id);
       const r = reajusteNaCompetencia(d(), c, x.data_vigencia.slice(0, 7));
-      return `<tr class="${String(c.id) === q.contrato ? "amarelo" : ""}"><td class="nw">${dataBr(x.data_vigencia)}</td><td><a href="#/contrato/${c.id}"><b>${esc(i ? i.nome : "")}</b></a><br>${esc(c.inquilino_nome)}</td>
-        <td>${esc(x.indice || "-")} ${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td>
-        <td class="nw">${caucaoDoReajuste(c, x)}</td><td class="nw">${r && r.comCarta ? botoesReajuste(c, r) : '<span class="suave">-</span>'}</td>
-        <td class="n">${opera() && ultimaDo(c) === x ? botao("desfazerReajuste", "Desfazer correção", { id: x.id }, "perigo pequeno", `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`) : ""}</td></tr>`;
-    }).join("") || '<tr><td colspan="8" class="suave">Nenhum reajuste aplicado ainda.</td></tr>'}</table>
+      const carta = r && r.comCarta ? partesReajuste(c, r).carta : "";
+      const pctBonif = percentualBonificacao(c);
+      const bonif = (v) => reais(v - descontoPorPercentual(v, pctBonif));
+      return `<div class="reajuste-card ${String(c.id) === q.contrato ? "amarelo" : ""}"><div class="reajuste-topo">
+        <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : "")} – ${esc(c.inquilino_nome)}</b></a>
+          <div class="suave">${esc(x.indice || "-")} ${pct(x.percentual)}</div></div>
+        <div class="reajuste-mes"><b>Vale a partir de ${dataBr(x.data_vigencia)}</b></div></div>
+      <div class="reajuste-corpo">
+        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(x.valor_anterior)} → <b>${reais(x.valor_novo)}</b></div>${pctBonif > 0 ? `<div class="suave nw">(${bonif(x.valor_anterior)} → ${bonif(x.valor_novo)})</div>` : ""}</div>
+        <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucaoDoReajuste(c, x)}</div></div>
+        <div class="reajuste-botoes"><div class="acoes">${carta}${opera() && ultimaDo(c) === x ? `${botao("desfazerReajuste", "Desfazer correção", { id: x.id }, "perigo pequeno", `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`)}` : ""}</div></div></div></div>`;
+    }).join("") || '<p class="suave">Nenhum reajuste aplicado ainda.</p>'}
+      </div>
       <p class="suave">"Desfazer correção" aparece só na correção mais recente de cada inquilino; com boleto da caução já pago, desfaça o pagamento antes.</p></div>`;
   }
   function cartaReajuste(c, comp) {
@@ -10090,7 +10129,6 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const anteriores = todos.filter((x) => !contratoAtivo(x.c, hoje2)).sort((a, b) => String(b.c.data_saida || "9").localeCompare(String(a.c.data_saida || "9")));
     const anterior = (c) => c.contrato_anterior_id ? buscar2("contratos", c.contrato_anterior_id) : null;
     const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ""}${geraNf(c) ? "" : ` ${etiqueta("boleto de controle", "controle")}`}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ""}`;
-    const ativo = (c) => c.ativo !== false ? "✓" : '<span class="suave">não</span>';
     const imovel = (x) => x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : `${etiqueta("Sem imóvel", "aviso")}${podeUsuario("admin") ? ` ${botao("excluir", "Apagar", { tabela: "contratos", id: x.c.id }, "perigo pequeno", `Apagar o contrato sem imóvel de ${x.c.inquilino_nome}? (Para alugar um imóvel, faça um novo contrato.)`)}` : ""}`;
     const situacao2 = (c) => c.data_saida && c.data_saida < hoje2 ? etiqueta(fimDeVinculo(d(), c) ? "Fim do vínculo" : "Saiu", "neutra") : c.ativo === false ? etiqueta("Inativo", "neutra") : "";
     const registrar2 = (c) => opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : "";
@@ -10098,15 +10136,15 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link("#/novo/contratos", "Novo contrato", "botao") : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ""}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ""}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.data_entrada || x.c.vigencia_inicio ? `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(aluguelAtual(d(), x.c))}</td>
-        <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhum.</td></tr>'}</table>
+        <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
-    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Ativo</th><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
-      ${anteriores.map((x) => `<tr><td>${ativo(x.c)}</td><td>${imovel(x)}</td><td>${nome(x)} ${situacao2(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
+    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
+      ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)} ${situacao2(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
         ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${fimDeVinculo(d(), x.c) ? `contrato continua com ${esc(continuadoPor(d(), x.c).inquilino_nome)}` : opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, "Fazer cálculo final") : x.c.data_saida ? "sem cálculo final" : "-"}</td>`}
-</tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
+</tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
   }
   function telaIptu(ano) {
     const hoje2 = hojeIso();
@@ -10706,7 +10744,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - Tipos: caução, depósito de garantia, fiador, seguro fiança.
 - Caução necessária = número de aluguéis x aluguel corrigido com bonificação (sem bonificação, o aluguel cheio).
 - Caução e depósito podem ser pagos em depósitos de valores diferentes; a garantia fica registrada quando a soma chega ao valor do contrato. O comprovante é opcional, mas fica o alerta "Comprovante a buscar no banco" até anexar.
-- Quando o aluguel é corrigido, a caução acompanha: a diferença (complemento) é tratada só na tela Reajustes ("Caução a completar"), em boleto separado (sem tarifa, sem IPTU, sem seguro, sem NF; uma ou mais parcelas) ou por depósito do inquilino. Cada parcela paga soma na caução.
+- Quando o aluguel é corrigido, a caução acompanha: a diferença (complemento) é tratada só na tela Reajustes ("Caução a completar"), em boleto separado (sem tarifa, sem IPTU, sem seguro, sem NF; à vista por padrão ou parcelado, cada parcela com a sua data e o seu valor) ou por depósito do inquilino. Cada parcela paga soma na caução.
 - A garantia pode ser aplicada na empresa ou na conta de outra pessoa; na saída, a devolução sai de onde foi depositado, na proporção do aplicado.
 - Fiador é incluído, trocado ou tirado pela troca de garantia, que pode ser cancelada (só a mais recente).
 - Garantia herdada na troca de titular é cuidada no contrato do titular anterior.
@@ -10871,6 +10909,71 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     else await perguntarCaucao(contratoId);
     await mostrar();
   }
+  function ligarParcelasCaucao(dlg, total, padrao) {
+    const avista = dlg.querySelector("[data-avista]");
+    const parcelado = dlg.querySelector("[data-parcelado]");
+    const sel = dlg.querySelector("select[name=parcelas]");
+    const linhas2 = dlg.querySelector("[data-linhas]");
+    const somaEl = dlg.querySelector("[data-soma]");
+    const cent = (t) => {
+      try {
+        return centavos(String(t || "0"));
+      } catch {
+        return NaN;
+      }
+    };
+    const conferir = () => {
+      const valores = [...linhas2.querySelectorAll("[name=parcela_valor]")].map((el) => cent(el.value));
+      const soma = valores.reduce((t, v) => t + v, 0);
+      somaEl.innerHTML = soma === total ? `Soma: ${reais(soma)} ✓` : `<span class="texto-perigo">Soma: ${Number.isFinite(soma) ? reais(soma) : "?"} · o complemento é ${reais(total)}</span>`;
+    };
+    const montar = () => {
+      const n = Number(sel.value);
+      const datas = [...linhas2.querySelectorAll("[name=parcela_vencimento]")].map((el) => el.value);
+      linhas2.innerHTML = parcelas(total, n).map((v, k) => `<div class="acoes"><span class="nw" style="min-width:32px">${k + 1}/${n}</span>
+      <input type="date" name="parcela_vencimento" value="${datas[k] || somarMesesData(datas[0] || padrao, k)}" required style="width:auto">
+      <input name="parcela_valor" value="${dinheiroTexto(v)}" inputmode="decimal" data-dinheiro required style="width:120px"></div>`).join("");
+      conferir();
+    };
+    const trocar = (parcelar) => {
+      avista.hidden = parcelar;
+      parcelado.hidden = !parcelar;
+      avista.querySelectorAll("input").forEach((el) => {
+        el.disabled = parcelar;
+      });
+      if (parcelar) {
+        linhas2.innerHTML = "";
+        montar();
+      } else linhas2.innerHTML = "";
+      sel.disabled = !parcelar;
+    };
+    dlg.querySelector("[data-parcelar]").addEventListener("click", () => {
+      const v = avista.querySelector("[name=vencimento]").value;
+      if (v) padrao = v;
+      trocar(true);
+    });
+    dlg.querySelector("[data-avista-volta]").addEventListener("click", () => trocar(false));
+    sel.addEventListener("change", montar);
+    linhas2.addEventListener("change", (ev) => {
+      if (ev.target.name !== "parcela_valor") return conferir();
+      const campos = [...linhas2.querySelectorAll("[name=parcela_valor]")];
+      const ultimo = campos[campos.length - 1];
+      if (ev.target !== ultimo) {
+        const resto = total - campos.slice(0, -1).reduce((t, el) => t + cent(el.value), 0);
+        if (Number.isFinite(resto)) ultimo.value = dinheiroTexto(resto);
+      }
+      conferir();
+    });
+    dlg.querySelector("form").addEventListener("submit", (ev) => {
+      if (parcelado.hidden) return;
+      const valores = [...linhas2.querySelectorAll("[name=parcela_valor]")].map((el) => cent(el.value));
+      if (valores.reduce((t, v) => t + v, 0) !== total || valores.some((v) => !(v > 0))) {
+        ev.preventDefault();
+        conferir();
+      }
+    }, true);
+    sel.disabled = true;
+  }
   async function perguntarCaucao(contratoId, comp = null) {
     const c = buscar2("contratos", contratoId);
     const x = complementoCaucao(d(), c);
@@ -10897,16 +11000,20 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       nao: "Depois",
       html: `<p>Caução depositada <b>${reais(x.atual)}</b> · necessária <b>${reais(x.necessaria)}</b> (${c.caucao_meses} aluguéis com bonificação) · complemento <b>${reais(x.complemento)}</b>.</p>
       <p class="suave">Boleto separado, sem tarifa e sem NF. Cada parcela paga soma na caução.</p>
-      <label>Vencimento do 1º boleto</label><input type="date" name="vencimento" value="${padrao}" required>
-      <label>Parcelas (uma por mês)</label><select name="parcelas">${[1, 2, 3, 4, 5, 6].map((p2) => `<option value="${p2}">${p2 === 1 ? "À vista (1 boleto)" : `${p2} × ${reais(parcelas(x.complemento, p2)[1])}`}</option>`).join("")}</select>`
+      <div data-avista><label>Vencimento do boleto (à vista: ${reais(x.complemento)})</label><input type="date" name="vencimento" value="${padrao}" required>
+        <p><button type="button" class="secundario pequeno" data-parcelar>Parcelar caução complementar</button></p></div>
+      <div data-parcelado hidden><label>Parcelas (uma linha por boleto)</label><select name="parcelas">${[2, 3, 4, 5, 6].map((p2) => `<option value="${p2}">${p2} boletos</option>`).join("")}</select>
+        <div data-linhas class="caucao-parcelas"></div><div class="suave" data-soma></div>
+        <p><button type="button" class="link-botao" data-avista-volta>Voltar para à vista</button></p></div>`,
+      ligar: (dlg) => ligarParcelasCaucao(dlg, x.complemento, padrao)
     });
     if (!r) {
       aviso('Complemento da caução fica em "Caução a completar", na tela Reajustes.', "info");
       return;
     }
     const vencimento = String((r.vencimento || [])[0] || "");
-    const parcelas2 = Number((r.parcelas || [])[0] || 1);
-    const cbs = await alterar((db) => gerarBoletosCaucao(db, contratoId, login(), comp, { vencimento, parcelas: parcelas2 }));
+    const plano = (r.parcela_vencimento || []).map((v, k) => ({ vencimento: String(v), valor: centavos(String(r.parcela_valor[k] || "0")) }));
+    const cbs = await alterar((db) => gerarBoletosCaucao(db, contratoId, login(), comp, plano.length ? { plano } : { vencimento }));
     aviso(`Boleto${cbs.length > 1 ? "s" : ""} do complemento da caução gerado${cbs.length > 1 ? "s" : ""}: ${cbs.map((cb) => `${reais(cb.caucao_complemento)} vence em ${dataBr(cb.vencimento)}`).join("; ")}.`, "ok");
   }
   var ACOES = {
@@ -12803,7 +12910,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     document.body.appendChild(dlg);
     dlg.showModal();
   }
-  function janela({ titulo: titulo2, html, sim = "Confirmar", nao = "Cancelar", forte = false }) {
+  function janela({ titulo: titulo2, html, sim = "Confirmar", nao = "Cancelar", forte = false, ligar = null }) {
     return new Promise((resolver) => {
       const dlg = document.createElement("dialog");
       dlg.className = `janela-erro janela-pergunta${forte ? " forte" : ""}`;
@@ -12822,6 +12929,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       });
       document.body.appendChild(dlg);
       dlg.showModal();
+      if (ligar) ligar(dlg);
     });
   }
   function fecharMensagem(id) {
@@ -12953,11 +13061,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   var MENU = [
     ["#/", "Painel", "^$|^fechamento|^pendencias"],
-    ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
     ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes"],
     ["#/reajustes", "Reajustes", "reajustes"],
     ["#/cobrancas", "Boletos", "cobranca|inadimplencia"],
     ["#/faturas", "NF", "fatura"],
+    ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
     ["#/resultados", "Resultados", "^resultados|^contas|^impostos"],
     ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^backup|^empresas"]
   ];
