@@ -159,7 +159,9 @@ export async function telaDados() {
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
-      ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', {}, 'secundario') : ''}</div>
+      ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', {}, 'secundario') : ''}
+      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto.</p>
+      ${botao('baixarRegras', 'Baixar regras do sistema (TXT)', {}, 'secundario')}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ''}

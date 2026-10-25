@@ -7,7 +7,7 @@
 - Registra pagamentos (data contábil, multa e juros; valor recebido diferente do previsto pede justificativa e NF digitada à mão) e numera as NFs em sequência contínua, dividida entre as empresas.
 - Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste, demonstrativo do boleto e termo aditivo de troca do vencimento (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
 - Mostra alertas, calendário, fechamento do mês, inadimplência, resultados financeiros por imóvel e a guia de impostos esperada por empresa.
-- O administrador muda a ordem das caixas de cada página (ícone ☰, todos veem); Dados e backup baixa todos os dados em planilha e PDF.
+- O administrador muda a ordem das caixas de cada página (ícone ☰, todos veem); Dados e backup baixa todos os dados em planilha e PDF e as regras do sistema em TXT.
 - Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor.
 
 ## Módulos (`docs/js/`)
@@ -25,6 +25,7 @@
 | `alertas.js` | Alertas de seguro, reserva e vigência (o do reajuste é de `regras.js`) |
 | `caixas.js` | Ordem das caixas e setores de cada página (arrastar pelo ícone ☰, só administrador) |
 | `exportar.js` | Todos os dados numa planilha Excel e num PDF (sem senhas e anexos) |
+| `regras-texto.js` | `REGRAS_TEXTO`: as regras de negócio em texto objetivo, baixado em Dados e backup (TXT) |
 | `auth.js` | Senhas PBKDF2-SHA256 e papéis (admin, operador, consulta) |
 | `backup-seguro.js` | Segunda pasta cifrada do administrador (RSA-OAEP + AES-GCM) |
 
