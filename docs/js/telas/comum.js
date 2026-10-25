@@ -344,7 +344,8 @@ export async function organizarPastas(ids = null) {
     const certo = usos.get(chave(c)) > 1 ? atual : S.limparNome(nomePastaContrato(c));
     // onde a pasta pode estar: solta na pasta do imóvel (como era antes) ou já em "Inquilinos" com o nome antigo
     let falhou = false;
-    const origens = i ? [[[i.pasta || i.nome], atual], [[i.pasta || i.nome], certo], [pastaPaiContrato(c), atual]] : [[[PASTA_SEM_IMOVEL], atual]];
+    const origens = (i ? [[[i.pasta || i.nome], atual], [[i.pasta || i.nome], certo], [pastaPaiContrato(c), atual]] : [[[PASTA_SEM_IMOVEL], atual]])
+      .filter(([pai, nome], n, l) => l.findIndex(([p2, n2]) => p2.join('/') === pai.join('/') && n2 === nome) === n); // quem não saiu: nome antigo = novo
     for (const [pai, nome] of origens) {
       const dirPai = await abrir(pai);
       if (!dirPai) continue;
