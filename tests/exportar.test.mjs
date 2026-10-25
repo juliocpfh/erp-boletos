@@ -26,3 +26,9 @@ test('exportar em planilha e PDF: todas as tabelas, sem senha, valores legíveis
   assert.equal(X.nomeAba('Depósito da caução / garantia', usados), 'Depósito da caução - garantia');
   assert.equal(X.nomeAba('Depósito da caução / garantia', usados), 'Depósito da caução - garant (2)');
 });
+
+test('texto das regras do sistema tem as seções principais e não traz dado de pessoa', async () => {
+  const { REGRAS_TEXTO } = await import('../docs/js/regras-texto.js');
+  for (const t of ['REAJUSTE DO ALUGUEL', 'GARANTIAS', 'NOTAS FISCAIS', 'IPTU', 'IMPOSTOS']) assert.ok(REGRAS_TEXTO.includes(t), t);
+  assert.ok(!/\d{3}\.\d{3}\.\d{3}-\d{2}/.test(REGRAS_TEXTO));
+});
