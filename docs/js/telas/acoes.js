@@ -8,7 +8,7 @@ import { compBr, dataBr, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { faturaExcel, faturaHtml } from '../fatura.js';
-import { esc } from '../formularios.js';
+import { dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
@@ -151,6 +151,59 @@ export async function aplicarReajusteNaTela(contratoId, comp, manual = null) {
  * Complemento da caução depois do reajuste: janela com o vencimento (pode dar mais prazo) e as parcelas;
  * "Depois" deixa para gerar na tela Reajustes (ou sai sozinho com os boletos do mês). Caução que já cobre: confirma.
  */
+/**
+ * Janela do complemento da caução: troca à vista ↔ parcelado e mantém as linhas das parcelas (vencimento mensal a partir
+ * do padrão; valores iguais). Mudou um valor: a última parcela se ajusta para a soma dar o complemento.
+ */
+function ligarParcelasCaucao(dlg, total, padrao) {
+  const avista = dlg.querySelector('[data-avista]');
+  const parcelado = dlg.querySelector('[data-parcelado]');
+  const sel = dlg.querySelector('select[name=parcelas]');
+  const linhas = dlg.querySelector('[data-linhas]');
+  const somaEl = dlg.querySelector('[data-soma]');
+  const cent = (t) => { try { return C.centavos(String(t || '0')); } catch { return NaN; } };
+  const conferir = () => {
+    const valores = [...linhas.querySelectorAll('[name=parcela_valor]')].map((el) => cent(el.value));
+    const soma = valores.reduce((t, v) => t + v, 0);
+    somaEl.innerHTML = soma === total ? `Soma: ${reais(soma)} ✓` : `<span class="texto-perigo">Soma: ${Number.isFinite(soma) ? reais(soma) : '?'} · o complemento é ${reais(total)}</span>`;
+  };
+  const montar = () => {
+    const n = Number(sel.value);
+    const datas = [...linhas.querySelectorAll('[name=parcela_vencimento]')].map((el) => el.value);
+    linhas.innerHTML = C.parcelas(total, n).map((v, k) => `<div class="acoes"><span class="nw" style="min-width:32px">${k + 1}/${n}</span>
+      <input type="date" name="parcela_vencimento" value="${datas[k] || C.somarMesesData(datas[0] || padrao, k)}" required style="width:auto">
+      <input name="parcela_valor" value="${dinheiroTexto(v)}" inputmode="decimal" data-dinheiro required style="width:120px"></div>`).join('');
+    conferir();
+  };
+  const trocar = (parcelar) => {
+    avista.hidden = parcelar;
+    parcelado.hidden = !parcelar;
+    // os campos escondidos ficam desligados: não vão na resposta nem bloqueiam o "Gerar"
+    avista.querySelectorAll('input').forEach((el) => { el.disabled = parcelar; });
+    if (parcelar) { linhas.innerHTML = ''; montar(); } else linhas.innerHTML = '';
+    sel.disabled = !parcelar;
+  };
+  dlg.querySelector('[data-parcelar]').addEventListener('click', () => { const v = avista.querySelector('[name=vencimento]').value; if (v) padrao = v; trocar(true); });
+  dlg.querySelector('[data-avista-volta]').addEventListener('click', () => trocar(false));
+  sel.addEventListener('change', montar);
+  linhas.addEventListener('change', (ev) => {
+    if (ev.target.name !== 'parcela_valor') return conferir();
+    const campos = [...linhas.querySelectorAll('[name=parcela_valor]')];
+    const ultimo = campos[campos.length - 1];
+    if (ev.target !== ultimo) {
+      const resto = total - campos.slice(0, -1).reduce((t, el) => t + cent(el.value), 0);
+      if (Number.isFinite(resto)) ultimo.value = dinheiroTexto(resto);
+    }
+    conferir();
+  });
+  dlg.querySelector('form').addEventListener('submit', (ev) => {
+    if (parcelado.hidden) return;
+    const valores = [...linhas.querySelectorAll('[name=parcela_valor]')].map((el) => cent(el.value));
+    if (valores.reduce((t, v) => t + v, 0) !== total || valores.some((v) => !(v > 0))) { ev.preventDefault(); conferir(); }
+  }, true);
+  sel.disabled = true;
+}
+
 async function perguntarCaucao(contratoId, comp = null) {
   const c = buscar('contratos', contratoId);
   const x = R.complementoCaucao(d(), c);
@@ -165,15 +218,20 @@ async function perguntarCaucao(contratoId, comp = null) {
   // reajuste de ano anterior: sugere o próximo vencimento (nunca uma data que já passou)
   const inicio = [x.competencia, comp || '', C.competenciaDe(C.hojeIso())].sort().pop();
   const padrao = C.vencimentoDaCompetencia(inicio, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+  // à vista por padrão; "Parcelar" mostra uma linha por boleto (data e valor; a última parcela fecha a soma)
   const r = await janela({ titulo: `Complemento da caução - ${c.inquilino_nome}`, sim: 'Gerar boleto(s)', nao: 'Depois',
     html: `<p>Caução depositada <b>${reais(x.atual)}</b> · necessária <b>${reais(x.necessaria)}</b> (${c.caucao_meses} aluguéis com bonificação) · complemento <b>${reais(x.complemento)}</b>.</p>
       <p class="suave">Boleto separado, sem tarifa e sem NF. Cada parcela paga soma na caução.</p>
-      <label>Vencimento do 1º boleto</label><input type="date" name="vencimento" value="${padrao}" required>
-      <label>Parcelas (uma por mês)</label><select name="parcelas">${[1, 2, 3, 4, 5, 6].map((p) => `<option value="${p}">${p === 1 ? 'À vista (1 boleto)' : `${p} × ${reais(C.parcelas(x.complemento, p)[1])}`}</option>`).join('')}</select>` });
+      <div data-avista><label>Vencimento do boleto (à vista: ${reais(x.complemento)})</label><input type="date" name="vencimento" value="${padrao}" required>
+        <p><button type="button" class="secundario pequeno" data-parcelar>Parcelar caução complementar</button></p></div>
+      <div data-parcelado hidden><label>Parcelas (uma linha por boleto)</label><select name="parcelas">${[2, 3, 4, 5, 6].map((p) => `<option value="${p}">${p} boletos</option>`).join('')}</select>
+        <div data-linhas class="caucao-parcelas"></div><div class="suave" data-soma></div>
+        <p><button type="button" class="link-botao" data-avista-volta>Voltar para à vista</button></p></div>`,
+    ligar: (dlg) => ligarParcelasCaucao(dlg, x.complemento, padrao) });
   if (!r) { aviso('Complemento da caução fica em "Caução a completar", na tela Reajustes.', 'info'); return; }
   const vencimento = String((r.vencimento || [])[0] || '');
-  const parcelas = Number((r.parcelas || [])[0] || 1);
-  const cbs = await alterar((db) => R.gerarBoletosCaucao(db, contratoId, login(), comp, { vencimento, parcelas }));
+  const plano = (r.parcela_vencimento || []).map((v, k) => ({ vencimento: String(v), valor: C.centavos(String(r.parcela_valor[k] || '0')) }));
+  const cbs = await alterar((db) => R.gerarBoletosCaucao(db, contratoId, login(), comp, plano.length ? { plano } : { vencimento }));
   aviso(`Boleto${cbs.length > 1 ? 's' : ''} do complemento da caução gerado${cbs.length > 1 ? 's' : ''}: ${cbs.map((cb) => `${reais(cb.caucao_complemento)} vence em ${dataBr(cb.vencimento)}`).join('; ')}.`, 'ok');
 }
 

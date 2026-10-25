@@ -221,7 +221,7 @@ export const CONTRATO = [
   campo('inquilino_cpf', 'CPF', 'cpfcnpj', { buscarPessoa: true, ...rotuloPJ('CNPJ'), ...PREENCHE_CNPJ({ nome: 'inquilino_nome', fantasia: 'inquilino_apelido', endereco: 'inquilino_endereco', telefone: 'inquilino_telefone', email: 'inquilino_email', representante: 'representante_nome' }) }),
   campo('inquilino_rg', 'RG', 'texto', rotuloPJ('Inscrição estadual')),
   QUEBRA,
-  campo('inquilino_nome', 'Nome completo / razão social', 'texto', { obrig: true, largo: true, max: LIMITES.tomador_nome, ajuda: 'O boleto e a NF saem neste nome. Na empresa, vem do CNPJ' }),
+  campo('inquilino_nome', 'Nome completo', 'texto', { obrig: true, largo: true, max: LIMITES.tomador_nome, ...rotuloPJ('Razão social'), ajuda: 'O boleto e a NF saem neste nome. Na empresa, vem do CNPJ' }),
   campo('inquilino_apelido', 'Nome fantasia', 'texto', PJ),
   campo('inquilino_telefone', 'Telefone', 'tel'),
   campo('inquilino_whatsapp', 'Este telefone é WhatsApp', 'simnao', { colado: true }),

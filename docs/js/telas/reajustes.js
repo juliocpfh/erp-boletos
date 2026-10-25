@@ -95,7 +95,7 @@ export function telaReajustes(q) {
     return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
         <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
           <div class="suave">${r.anos} ano(s) · ${esc(k.indiceContrato || 'índice não informado')}${k.escolhido ? ` ${pct(k.percentual)} até ${compBr(k.escolhido.registro.mes_ref)}` : ''} ${!k.escolhido && k.faltando.length ? etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo') : ''}</div></div>
-        <div class="reajuste-mes"><b>Aluguel de ${compBr(r.competencia)}</b><div class="suave">${r.comCarta ? `Boleto vence em ${dataBr(R.vencimentoDoReajuste(d(), c, r.competencia))}` : 'ano anterior: sem carta'}</div></div></div>
+        <div class="reajuste-mes"><b>Reajuste no aluguel de ${compBr(r.competencia)}</b><div class="suave">${r.comCarta ? `Boleto vence em ${dataBr(R.vencimentoDoReajuste(d(), c, r.competencia))}` : 'ano anterior: sem carta'}</div></div></div>
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : '-'}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : '-'})</div>` : ''}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
@@ -108,12 +108,15 @@ export function telaReajustes(q) {
       <div class="reajustes-lista">
       ${(todos ? feitos : feitos.slice(0, 3)).map(({ correcao: x, contrato: c }) => { const i = buscar('imoveis', c.imovel_id); const r = R.reajusteNaCompetencia(d(), c, x.data_vigencia.slice(0, 7));
     const carta = r && r.comCarta ? partesReajuste(c, r).carta : '';
+    // bonificado com o percentual atual do contrato (igual aos reajustes em aberto)
+    const pctBonif = R.percentualBonificacao(c);
+    const bonif = (v) => reais(v - C.descontoPorPercentual(v, pctBonif));
     return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
         <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
           <div class="suave">${esc(x.indice || '-')} ${pct(x.percentual)}</div></div>
         <div class="reajuste-mes"><b>Vale a partir de ${dataBr(x.data_vigencia)}</b></div></div>
       <div class="reajuste-corpo">
-        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(x.valor_anterior)} → <b>${reais(x.valor_novo)}</b></div></div>
+        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(x.valor_anterior)} → <b>${reais(x.valor_novo)}</b></div>${pctBonif > 0 ? `<div class="suave nw">(${bonif(x.valor_anterior)} → ${bonif(x.valor_novo)})</div>` : ''}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucaoDoReajuste(c, x)}</div></div>
         <div class="reajuste-botoes"><div class="acoes">${carta}${opera() && ultimaDo(c) === x ? `${botao('desfazerReajuste', 'Desfazer correção', { id: x.id }, 'perigo pequeno', `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`)}` : ''}</div></div></div></div>`; }).join('')
       || '<p class="suave">Nenhum reajuste aplicado ainda.</p>'}

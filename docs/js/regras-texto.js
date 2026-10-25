@@ -33,7 +33,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Tipos: caução, depósito de garantia, fiador, seguro fiança.
 - Caução necessária = número de aluguéis x aluguel corrigido com bonificação (sem bonificação, o aluguel cheio).
 - Caução e depósito podem ser pagos em depósitos de valores diferentes; a garantia fica registrada quando a soma chega ao valor do contrato. O comprovante é opcional, mas fica o alerta "Comprovante a buscar no banco" até anexar.
-- Quando o aluguel é corrigido, a caução acompanha: a diferença (complemento) é tratada só na tela Reajustes ("Caução a completar"), em boleto separado (sem tarifa, sem IPTU, sem seguro, sem NF; uma ou mais parcelas) ou por depósito do inquilino. Cada parcela paga soma na caução.
+- Quando o aluguel é corrigido, a caução acompanha: a diferença (complemento) é tratada só na tela Reajustes ("Caução a completar"), em boleto separado (sem tarifa, sem IPTU, sem seguro, sem NF; à vista por padrão ou parcelado, cada parcela com a sua data e o seu valor) ou por depósito do inquilino. Cada parcela paga soma na caução.
 - A garantia pode ser aplicada na empresa ou na conta de outra pessoa; na saída, a devolução sai de onde foi depositado, na proporção do aplicado.
 - Fiador é incluído, trocado ou tirado pela troca de garantia, que pode ser cancelada (só a mais recente).
 - Garantia herdada na troca de titular é cuidada no contrato do titular anterior.
