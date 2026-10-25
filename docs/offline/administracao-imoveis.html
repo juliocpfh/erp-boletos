@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="57371674c2356e7d">
+<meta name="fontes" content="98f356a0972496c8">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -414,6 +414,12 @@ button.q-aberto { cursor: pointer; }
 button.q-aberto:hover { outline: 2px solid #791F1F; }
 .q-vazio { background: transparent !important; border: 1px dashed #c4c7cc !important; }
 .meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; text-transform: none; }
+.meses-iptu span:not(.sep-ano) + span { white-space: nowrap; }
+.mapa-iptu .sep-ano, .meses-iptu .sep-ano { display: inline-block; width: 2px; height: 20px; background: #888780; margin: 0 5px 0 2px; vertical-align: middle; }
+.mapa-iptu .meses-iptu .sep-ano + span, .mapa-iptu .meses-iptu .sep-ano ~ span { font-size: 9px; }
+.clipes-iptu { white-space: nowrap; }
+.clipes-iptu .clipe-anexar { display: inline-block; margin: 0 0 0 2px; cursor: pointer; filter: grayscale(1); opacity: .55; }
+.clipes-iptu .clipe-anexar:hover { opacity: 1; }
 .legenda-iptu { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-top: 8px; }
 .texto-perigo { color: var(--perigo); }
 
@@ -937,9 +943,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     exportarZip: () => exportarZip,
     gravarBanco: () => gravarBanco,
     importarZip: () => importarZip,
+    juntarPasta: () => juntarPasta,
     lembrarPasta: () => lembrarPasta,
     lembrarPastaSegura: () => lembrarPastaSegura,
     lerBanco: () => lerBanco,
+    lerConteudo: () => lerConteudo,
     limparNome: () => limparNome,
     listar: () => listar,
     moverPasta: () => moverPasta,
@@ -5649,9 +5657,22 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   async function abrirArquivo(dir, nome) {
     return (await dir.getFileHandle(nome)).getFile();
   }
+  async function lerConteudo(h) {
+    for (let n = 1; ; n += 1) {
+      try {
+        const f = await h.getFile();
+        return new File([await f.arrayBuffer()], f.name, { type: f.type });
+      } catch (e) {
+        if (n >= 4) throw e;
+        await new Promise((ok) => {
+          setTimeout(ok, 400 * n);
+        });
+      }
+    }
+  }
   async function copiarPasta(origem, destino) {
     for await (const [nome, h] of origem.entries()) {
-      if (h.kind === "file") await escreverTexto(destino, nome, await h.getFile());
+      if (h.kind === "file") await escreverTexto(destino, nome, await lerConteudo(h));
       else await copiarPasta(h, await destino.getDirectoryHandle(nome, { create: true }));
     }
   }
@@ -5676,6 +5697,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         await origem.move(pai, novo);
         return;
       } catch {
+      }
+      try {
+        origem = await pai.getDirectoryHandle(antigo);
+      } catch {
+        return;
       }
     }
     await copiarPasta(origem, await pai.getDirectoryHandle(novo, { create: true }));
@@ -5702,9 +5728,64 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         return;
       } catch {
       }
+      try {
+        origem = await paiAntigo.getDirectoryHandle(antigo);
+      } catch {
+        return;
+      }
     }
     await copiarPasta(origem, await paiNovo.getDirectoryHandle(novo, { create: true }));
     await paiAntigo.removeEntry(antigo, { recursive: true });
+  }
+  async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
+    antigo = limparNome(antigo);
+    novo = limparNome(novo);
+    let origem;
+    try {
+      origem = await paiAntigo.getDirectoryHandle(antigo);
+    } catch {
+      return 0;
+    }
+    if (antigo === novo && await paiAntigo.isSameEntry(paiNovo)) return 0;
+    let existe = true;
+    try {
+      await paiNovo.getDirectoryHandle(novo);
+    } catch {
+      existe = false;
+    }
+    if (!existe) {
+      await moverPasta(paiAntigo, antigo, paiNovo, novo);
+      return 0;
+    }
+    const sobrou = await juntarConteudo(origem, await paiNovo.getDirectoryHandle(novo));
+    if (!sobrou) await paiAntigo.removeEntry(antigo, { recursive: true });
+    return sobrou;
+  }
+  async function juntarConteudo(origem, destino) {
+    let sobrou = 0;
+    const feitos = [];
+    for await (const [nome, h] of origem.entries()) {
+      if (h.kind === "directory") {
+        const n = await juntarConteudo(h, await destino.getDirectoryHandle(nome, { create: true }));
+        sobrou += n;
+        if (!n) feitos.push(nome);
+        continue;
+      }
+      const arq = await lerConteudo(h);
+      let la = null;
+      try {
+        la = await (await destino.getFileHandle(nome)).getFile();
+      } catch {
+      }
+      if (la && la.size !== arq.size && la.size && arq.size) {
+        sobrou += 1;
+        continue;
+      }
+      if (!la || !la.size && arq.size) await escreverTexto(destino, nome, arq);
+      feitos.push(nome);
+    }
+    for (const nome of feitos) await origem.removeEntry(nome, { recursive: true });
+    return sobrou;
   }
   async function adicionarAoZip(zip, dir, prefixo) {
     for await (const [nome, h] of dir.entries()) {
@@ -6827,14 +6908,16 @@ ${JSON.stringify(cabecalho)}
     return `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nada registrado ainda.</td></tr>'}</table></div>`;
   }
   var ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n).reverse();
-  var SUB_DOCS = "Documentos do imóvel";
+  var SUB_DOCS = "Matrículas";
+  var SUB_DOCS_ANTIGA = "Documentos do imóvel";
+  var SUB_INQUILINOS = "Inquilinos";
   var SUB_ANUNCIO = "Anúncio";
   var ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
   var SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: "IPTU (guias)", seguro: "Seguro (apólices)", reformas: "Reformas" };
   var PASTA_SEM_IMOVEL = "Sem imóvel";
   function pastaPaiContrato(c) {
     const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
-    return i ? i.pasta || i.nome : PASTA_SEM_IMOVEL;
+    return i ? [i.pasta || i.nome, SUB_INQUILINOS] : [PASTA_SEM_IMOVEL];
   }
   function nomePastaContrato(c) {
     const fmt = (x) => x ? dataBr(x).replace(/\//g, "-") : "-";
@@ -6851,7 +6934,7 @@ ${JSON.stringify(cabecalho)}
   function chavePasta(escopo, id) {
     if (escopoDoContrato(escopo)) {
       const c = buscar2("contratos", id);
-      return c ? [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === "assinados" ? SUB_ASSINADOS : escopo === "aditivos" ? SUB_ADITIVOS : ""].join("/") : null;
+      return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === "assinados" ? SUB_ASSINADOS : escopo === "aditivos" ? SUB_ADITIVOS : ""].join("/") : null;
     }
     const i = buscar2("imoveis", imovelDoEscopo(escopo, id));
     return i ? [i.pasta || i.nome, escopo].join("/") : null;
@@ -6889,6 +6972,7 @@ ${JSON.stringify(cabecalho)}
       } catch {
       }
     }
+    await organizarPastas([r.anterior.id]);
     const c = buscar2("contratos", id);
     const partes = [
       r.correcoes && `${r.correcoes} correção(ões) do aluguel`,
@@ -6926,6 +7010,7 @@ ${JSON.stringify(cabecalho)}
     if (!r) return null;
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivos, true);
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
+    await organizarPastas([r.anterior.id]);
     const c = buscar2("contratos", id);
     aviso(`${c.inquilino_nome}: ${[r.garantia && "garantia (comprovantes, depósitos e aplicações)", r.reserva && `reserva de ${reais(c.reserva_valor)}`].filter(Boolean).join(" e ")} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, "info");
     return r;
@@ -6988,7 +7073,7 @@ ${JSON.stringify(cabecalho)}
     const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
     if (escopoDoContrato(escopo)) {
       const c = buscar2("contratos", id);
-      return subpasta(raiz, [pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...escopo === "assinados" ? [SUB_ASSINADOS] : escopo === "aditivos" ? [SUB_ADITIVOS] : []], criar);
+      return subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...escopo === "assinados" ? [SUB_ASSINADOS] : escopo === "aditivos" ? [SUB_ADITIVOS] : []], criar);
     }
     const i = buscar2("imoveis", imovelDoEscopo(escopo, id));
     if (escopo === "iptuano") return subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 1e4)], criar);
@@ -7019,6 +7104,70 @@ ${JSON.stringify(cabecalho)}
     if (vencidos.length || pastasComArquivos.length) await mostrar();
   }
   var pastasComArquivos = [];
+  async function organizarPastas(ids = null) {
+    if (!opera() || !E.pasta) return [];
+    const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
+    const abrir = async (partes) => {
+      try {
+        return await subpasta(raiz, partes, false);
+      } catch {
+        return null;
+      }
+    };
+    const avisos = [];
+    if (!ids) {
+      for (const i of d().imoveis) {
+        let sobrou = 0;
+        try {
+          const base = await abrir([i.pasta || i.nome]);
+          sobrou = base ? await juntarPasta(base, SUB_DOCS_ANTIGA, base, SUB_DOCS) : 0;
+        } catch (e) {
+          avisos.push(`${i.nome}, pasta "${SUB_DOCS_ANTIGA}": ${motivoDisco(e)}`);
+        }
+        if (sobrou) avisos.push(`${i.nome}: ${sobrou} arquivo(s) ficaram em "${SUB_DOCS_ANTIGA}" (já existe um com o mesmo nome em "${SUB_DOCS}")`);
+      }
+    }
+    const chave = (c) => `${c.imovel_id || 0}|${limparNome(c.pasta || nomePastaContrato(c))}`;
+    const usos = /* @__PURE__ */ new Map();
+    for (const c of d().contratos) usos.set(chave(c), (usos.get(chave(c)) || 0) + 1);
+    const novosNomes = [];
+    for (const c of d().contratos.filter((x) => !ids || ids.includes(x.id))) {
+      const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
+      const atual = limparNome(c.pasta || nomePastaContrato(c));
+      const certo = usos.get(chave(c)) > 1 ? atual : limparNome(nomePastaContrato(c));
+      let falhou = false;
+      const origens = (i ? [[[i.pasta || i.nome], atual], [[i.pasta || i.nome], certo], [pastaPaiContrato(c), atual]] : [[[PASTA_SEM_IMOVEL], atual]]).filter(([pai, nome], n, l) => l.findIndex(([p2, n2]) => p2.join("/") === pai.join("/") && n2 === nome) === n);
+      for (const [pai, nome] of origens) {
+        const dirPai = await abrir(pai);
+        if (!dirPai) continue;
+        try {
+          await dirPai.getDirectoryHandle(nome);
+        } catch {
+          continue;
+        }
+        let sobrou = 0;
+        try {
+          sobrou = await juntarPasta(dirPai, nome, await subpasta(raiz, pastaPaiContrato(c)), certo);
+        } catch (e) {
+          avisos.push(`${c.inquilino_nome}: ${motivoDisco(e)}`);
+          falhou = true;
+          continue;
+        }
+        if (sobrou) avisos.push(`${c.inquilino_nome}: ${sobrou} arquivo(s) ficaram em "${[...pai, nome].join("/")}" (já existe um com o mesmo nome na pasta nova)`);
+      }
+      if (!falhou && c.pasta && c.pasta !== certo) novosNomes.push([c.id, certo]);
+    }
+    if (novosNomes.length) await alterar((db) => novosNomes.forEach(([id, pasta]) => atualizar(db, "contratos", id, { pasta }, login(), "Pasta de arquivos (entrada e saída)")));
+    return avisos;
+  }
+  var motivoDisco = (e) => ["InvalidStateError", "NotReadableError", "NoModificationAllowedError"].includes(e && e.name) ? "um arquivo estava sendo usado ou sincronizado (OneDrive); nada foi perdido, e a organização continua na próxima vez que abrir o Painel" : e.message;
+  var pastasOrganizadas = false;
+  async function organizarPastasUmaVez() {
+    if (pastasOrganizadas || !opera() || !E.pasta) return;
+    pastasOrganizadas = true;
+    const avisos = await organizarPastas();
+    if (avisos.length) aviso(`Organização das pastas, confira: ${avisos.join("; ")}.`, "aviso");
+  }
   async function guardarGuiasSoltas(imovelId, anoNovo) {
     const imovel = buscar2("imoveis", imovelId);
     if (imovel.guias_iptu_por_ano) return 0;
@@ -7067,7 +7216,7 @@ ${JSON.stringify(cabecalho)}
     ${opera() && enviar && ["contrato", "seguro"].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === "contrato" ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'A apólice: anexe em "Cadastrar apólice" (fica ligada à vigência). Aqui, só os documentos soltos.'}</p>` : ""}</div>`;
   }
   var urls = [];
-  async function listaArquivos(escopo, id) {
+  async function listaArquivos(escopo, id, modo = "") {
     urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
     let dir;
     try {
@@ -7076,8 +7225,9 @@ ${JSON.stringify(cabecalho)}
       dir = null;
     }
     const todos = dir ? await listar(dir) : [];
-    if (escopo === "matricula") {
-      return todos.filter((a) => ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao("excluirArquivo", "×", { escopo, id, nome: a.nome }, "link-botao excluir-mini", `Excluir o arquivo da matrícula "${a.nome}"?`) : ""}</span>`).join(" ");
+    if (escopo === "matricula" || modo === "clipe") {
+      const tipo = escopo === "matricula" ? "da matrícula" : "da guia";
+      return todos.filter((a) => escopo !== "matricula" || ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao("excluirArquivo", "×", { escopo, id, nome: a.nome }, "link-botao excluir-mini", `Excluir o arquivo ${tipo} "${a.nome}"?`) : ""}</span>`).join(" ");
     }
     const itens = todos;
     if (!itens.length && escopo !== "contrato") return `<p class="suave">${escopo === "anuncio" ? "Nenhuma foto ainda." : "Nenhum arquivo ainda."}</p>`;
@@ -8439,7 +8589,7 @@ Salvar assim mesmo?`)) {
       confirmar: confirmarValoresIniciais,
       // contrato já salvo: grava na pasta atual (se o nome mudar, a pasta inteira é renomeada depois); contrato novo: na pasta que ele vai ter
       async ajustarAsync(dados, erros, r, form) {
-        const pasta = r ? () => pastaDoEscopo("contrato", r.id) : async () => subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [pastaPaiContrato(dados), dados.pasta]);
+        const pasta = r ? () => pastaDoEscopo("contrato", r.id) : async () => subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [...pastaPaiContrato(dados), dados.pasta]);
         await guardarComprovantes(COMPROVANTES_CONTRATO, dados, form, pasta);
       },
       salvar(db, dados, q, r) {
@@ -8473,15 +8623,15 @@ Salvar assim mesmo?`)) {
         if (!antigo || !antigo.pasta) return;
         const paiAntigo = pastaPaiContrato(antigo);
         const paiNovo = pastaPaiContrato(salvo);
-        if (paiAntigo === paiNovo) {
-          if (antigo.pasta !== salvo.pasta) await renomearNoDisco([paiNovo], antigo.pasta, salvo.pasta);
+        if (paiAntigo.join("/") === paiNovo.join("/")) {
+          if (antigo.pasta !== salvo.pasta) await renomearNoDisco(paiNovo, antigo.pasta, salvo.pasta);
           return;
         }
         try {
           const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
-          await moverPasta(await subpasta(raiz, [paiAntigo]), antigo.pasta, await subpasta(raiz, [paiNovo]), salvo.pasta);
+          await moverPasta(await subpasta(raiz, paiAntigo), antigo.pasta, await subpasta(raiz, paiNovo), salvo.pasta);
         } catch (e) {
-          aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo}": ${e.message}`, "aviso");
+          aviso(`Não consegui mover a pasta "${antigo.pasta}" para "${paiNovo.join("/")}": ${e.message}`, "aviso");
         }
       },
       destino: (salvo) => `#/contrato/${salvo.id}`
@@ -10151,15 +10301,18 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const imoveis = ordenar(d().imoveis, "nome");
     const doAno = (i) => d().iptus.find((p2) => p2.imovel_id === i.id && p2.ano === ano);
     const MESES4 = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-    const meses = MESES4.map((_, k) => `${ano}-${String(k + 1).padStart(2, "0")}`);
     const valor = (p2) => `<b>${reais(p2.valor_total)}</b> · ${p2.pago_avista ? "à vista" : `${p2.num_parcelas}x`}${p2.pago_avista && p2.valor_avista ? ` <span class="suave">(à vista ${reais(p2.valor_avista)})</span>` : ""}`;
     const primeira = (p2) => {
       const m = !p2.pago_avista && (p2.primeiro_vencimento_boleto || p2.primeira_competencia && somarMeses(p2.primeira_competencia, 1));
       return m ? `<br><span class="suave">1ª no boleto de ${compBr(m)}</span>` : "";
     };
     const quadrado = (pc, p2, mes) => {
-      if (!pc) return `<span class="q q-vazio" title="${MESES4[Number(mes.slice(5)) - 1]}: sem parcela"></span>`;
-      const nome = `${MESES4[Number(mes.slice(5)) - 1]} · ${pc.n === 0 ? "cota única" : `${pc.rotulo} parcela`}`;
+      const sep = mes === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : "";
+      return sep + quadradoDoMes(pc, p2, mes);
+    };
+    const quadradoDoMes = (pc, p2, mes) => {
+      if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
+      const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? "cota única" : `${pc.rotulo} parcela`}`;
       if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
       const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : "";
       const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : "";
@@ -10167,14 +10320,23 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const titulo2 = `${nome}: sua parte ${reais(pc.valorProprietario)}${inq}${venc} · em aberto`;
       return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p2.id}" data-n="${pc.n}" data-texto="${esc(titulo2)}" title="${esc(titulo2)} (clique para marcar como paga)"></button>` : `<span class="q q-aberto" title="${esc(titulo2)}"></span>`;
     };
+    const rotuloMes = (mes) => `${MESES4[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? "" : `/${mes.slice(2, 4)}`}`;
     const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
+    const mapas = new Map(imoveis.filter(doAno).map((i) => {
+      const p2 = doAno(i);
+      return [i.id, new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]))];
+    }));
+    const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
+    const meses = [];
+    for (let m = `${ano}-01`; m <= ultimo; m = somarMeses(m, 1)) meses.push(m);
     const soma = { inquilino: 0, sua: 0, aberto: 0 };
     const linhas2 = imoveis.map((i) => {
       const p2 = doAno(i);
-      const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a>`;
+      const idGuias = idGuiasDoAno(i.id, ano);
+      const guias2 = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-upload="iptuano:${idGuias}"></label>` : ""}</span>`;
+      const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias2}`;
       if (!p2) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, "aviso")} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, "botao pequeno") : ""}</td></tr>`;
-      const mapa = /* @__PURE__ */ new Map();
-      for (const pc of parcelasIptu(d(), p2)) mapa.set(mesDaParcela(pc, p2), pc);
+      const mapa = mapas.get(i.id);
       const t = totaisIptu(d(), p2);
       soma.inquilino += t.inquilino;
       soma.sua += t.proprietario;
@@ -10196,7 +10358,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <td class="suave">${g.parcela.n === 0 ? "pago à vista por você" : g.parcela.valorInquilino ? `entrada ou saída (inquilino paga ${reais(g.parcela.valorInquilino)})` : "imóvel vazio ou contrato sem IPTU"}</td>
         <td class="n nw"><b>${reais(g.parcela.valorProprietario)}</b></td>
         <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje2}"><button class="pequeno">Paga</button></form>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${MESES4.map((m) => `<span>${m}</span>`).join("")}</th><th class="n">Inquilino paga</th><th class="n">Você paga</th><th></th></tr>
+    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ""}<span>${rotuloMes(m)}</span>`).join("")}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas2 || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${reais(soma.sua)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
     <div class="legenda-iptu">${legenda}</div>
@@ -10484,11 +10646,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const ano = (p2, atual2) => `<h3>${p2.ano} · total ${reais(p2.valor_total)} em ${p2.num_parcelas} parcela(s)${p2.pago_avista ? ` · ${etiqueta(`quitado à vista${p2.valor_avista ? ` ${reais(p2.valor_avista)}` : ""}${p2.data_quitacao ? ` em ${dataBr(p2.data_quitacao)}` : " (falta data)"}`, "info")}` : ""}
       ${opera() ? `${link(`#/editar/iptus/${p2.id}`, "Editar")} ${botao("excluir", "Excluir", { tabela: "iptus", id: p2.id }, "perigo pequeno", "Excluir o IPTU deste ano?")}` : ""}</h3>
       ${resumoIptu(p2)}${p2.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p2.cobranca_inquilino || COBRANCA_IPTU_QUITADO[0])}.</p>` : ""}${tabelaIptu(p2)}
-      ${caixaArquivos("iptuano", idGuiasDoAno(i.id, p2.ano), `Guias do IPTU ${p2.ano}`, `guias-iptu-${p2.ano}`, atual2 ? "Anexe aqui a guia (carnê) deste ano. Ao lançar o IPTU do próximo ano, estas guias passam para o histórico." : "", true)}`;
+      ${caixaArquivos("iptuano", idGuiasDoAno(i.id, p2.ano), `Guias do IPTU ${p2.ano}`, `guias-iptu-${p2.ano}`, atual2 ? `Para anexar a guia, use o clipe ao lado do imóvel na página IPTU (botão "IPTU's" em Imóveis).` : "", true, false)}`;
     const [atual, ...anteriores] = iptus;
     return `<div class="cartao" id="iptu"><div class="cabecalho"><h2>IPTU</h2>${opera() ? link(`#/novo/iptus?imovel=${i.id}`, "Lançar IPTU do ano") : ""}</div>
     <p class="suave">Você paga todas as guias na prefeitura; o inquilino devolve a parte dele no boleto. No mês de entrada e no de saída, o inquilino paga os dias em que ocupou e você paga o resto. Imóvel vazio (ou contrato sem IPTU): a parcela é toda sua e aparece nos alertas 15 dias antes do vencimento, até ser marcada como paga.</p>
-    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? "" : caixaArquivos("iptu", i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, "guias-iptu", "", true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos("iptu", i.id, "Guias do IPTU", "guias-iptu", "Pode anexar a guia aqui; ao lançar o IPTU do ano ela vai para o histórico do ano anterior.", true)}`}
+    ${atual ? `${ano(atual, true)}${i.guias_iptu_por_ano ? "" : caixaArquivos("iptu", i.id, `Guias já anexadas (vão para o histórico de ${atual.ano} quando o próximo IPTU for lançado)`, "guias-iptu", "", true, false)}` : `<p class="suave">Nenhum IPTU lançado.</p>${caixaArquivos("iptuano", idGuiasDoAno(i.id, Number(hojeIso().slice(0, 4))), `Guias do IPTU ${hojeIso().slice(0, 4)}`, "guias-iptu", "Para anexar a guia, use o clipe ao lado do imóvel na página IPTU.", true, false)}${i.guias_iptu_por_ano ? "" : caixaArquivos("iptu", i.id, "Guias anteriores", "guias-iptu-anteriores", "", true, false)}`}
     ${atual ? `<details class="historico-iptu"><summary><b>Histórico do IPTU</b> <span class="suave">· anos anteriores e as guias de cada ano (${anteriores.length} ano(s))</span></summary>
       ${anteriores.map((p2) => ano(p2, false)).join("")}
       ${i.guias_iptu_por_ano ? caixaArquivos("iptu", i.id, "Guias anteriores", "guias-iptu-anteriores", "Guias anexadas antes de haver IPTU lançado por ano.", true, false) : ""}</details>` : ""}</div>`;
@@ -10551,7 +10713,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${caixaReformas(i)}
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
     ${caixaArquivos("anuncio", i.id, "Fotos do último anúncio", "anuncio")}
-    ${caixaArquivos("imovel", i.id, "Documentos do imóvel", "documentos", "Documentos anexados ao imóvel (só para ver e baixar). A matrícula é anexada e excluída na lista de Imóveis, na coluna Matrícula.", false, false)}
+    ${caixaArquivos("imovel", i.id, "Matrículas", "documentos", 'Arquivos da pasta "Matrículas" do imóvel (só para ver e baixar). A matrícula é anexada e excluída na lista de Imóveis, na coluna Matrícula.', false, false)}
     ${caixaHistorico("Histórico do imóvel", tabelaHistorico(ultimos((h) => h.imovel_id === i.id)))}`;
   }
 
@@ -11345,7 +11507,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
       });
       if (tabela === "contratos") {
         try {
-          await apagarPastaVazia(await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), [pastaPaiContrato(r)], false), r.pasta || nomePastaContrato(r));
+          await apagarPastaVazia(await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), pastaPaiContrato(r), false), r.pasta || nomePastaContrato(r));
         } catch {
         }
       }
@@ -12612,7 +12774,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     </form></div></main>`,
     // ------------------------------------------------------------------------
     painel(rota) {
-      limparSemImovel().catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso"));
+      organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso"));
       trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
       const hoje2 = hojeIso();
       const alertas = todosAlertas(d(), hoje2);
@@ -13123,8 +13285,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   async function montarExtras(raiz) {
     for (const el of raiz.querySelectorAll("[data-arquivos]")) {
-      const [escopo, id] = el.dataset.arquivos.split(":");
-      el.innerHTML = await TELAS._listaArquivos(escopo, Number(id));
+      const [escopo, id, modo] = el.dataset.arquivos.split(":");
+      el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
     }
     TELAS._ligarDesconto(raiz);
   }
