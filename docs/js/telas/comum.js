@@ -326,8 +326,11 @@ export async function organizarPastas(ids = null) {
   const avisos = [];
   if (!ids) {
     for (const i of d().imoveis) {
-      const base = await abrir([i.pasta || i.nome]);
-      const sobrou = base ? await S.juntarPasta(base, SUB_DOCS_ANTIGA, base, SUB_DOCS) : 0;
+      let sobrou = 0;
+      try {
+        const base = await abrir([i.pasta || i.nome]);
+        sobrou = base ? await S.juntarPasta(base, SUB_DOCS_ANTIGA, base, SUB_DOCS) : 0;
+      } catch (e) { avisos.push(`${i.nome}, pasta "${SUB_DOCS_ANTIGA}": ${motivoDisco(e)}`); }
       if (sobrou) avisos.push(`${i.nome}: ${sobrou} arquivo(s) ficaram em "${SUB_DOCS_ANTIGA}" (já existe um com o mesmo nome em "${SUB_DOCS}")`);
     }
   }
@@ -340,19 +343,30 @@ export async function organizarPastas(ids = null) {
     const atual = S.limparNome(c.pasta || nomePastaContrato(c));
     const certo = usos.get(chave(c)) > 1 ? atual : S.limparNome(nomePastaContrato(c));
     // onde a pasta pode estar: solta na pasta do imóvel (como era antes) ou já em "Inquilinos" com o nome antigo
+    let falhou = false;
     const origens = i ? [[[i.pasta || i.nome], atual], [[i.pasta || i.nome], certo], [pastaPaiContrato(c), atual]] : [[[PASTA_SEM_IMOVEL], atual]];
     for (const [pai, nome] of origens) {
       const dirPai = await abrir(pai);
       if (!dirPai) continue;
       try { await dirPai.getDirectoryHandle(nome); } catch { continue; }
-      const sobrou = await S.juntarPasta(dirPai, nome, await S.subpasta(raiz, pastaPaiContrato(c)), certo);
+      let sobrou = 0;
+      try { sobrou = await S.juntarPasta(dirPai, nome, await S.subpasta(raiz, pastaPaiContrato(c)), certo); } catch (e) {
+        avisos.push(`${c.inquilino_nome}: ${motivoDisco(e)}`);
+        falhou = true;
+        continue;
+      }
       if (sobrou) avisos.push(`${c.inquilino_nome}: ${sobrou} arquivo(s) ficaram em "${[...pai, nome].join('/')}" (já existe um com o mesmo nome na pasta nova)`);
     }
-    if (c.pasta && c.pasta !== certo) novosNomes.push([c.id, certo]);
+    if (!falhou && c.pasta && c.pasta !== certo) novosNomes.push([c.id, certo]);
   }
   if (novosNomes.length) await alterar((db) => novosNomes.forEach(([id, pasta]) => R.atualizar(db, 'contratos', id, { pasta }, login(), 'Pasta de arquivos (entrada e saída)')));
   return avisos;
 }
+
+/** Erro do disco em palavras simples (o mais comum: OneDrive mexendo no arquivo enquanto ele é copiado). */
+const motivoDisco = (e) => (['InvalidStateError', 'NotReadableError', 'NoModificationAllowedError'].includes(e && e.name)
+  ? 'um arquivo estava sendo usado ou sincronizado (OneDrive); nada foi perdido, e a organização continua na próxima vez que abrir o Painel'
+  : e.message);
 
 let pastasOrganizadas = false;
 
@@ -360,7 +374,7 @@ export async function organizarPastasUmaVez() {
   if (pastasOrganizadas || !opera() || !E.pasta) return;
   pastasOrganizadas = true;
   const avisos = await organizarPastas();
-  if (avisos.length) aviso(`Pastas organizadas; confira: ${avisos.join('; ')}.`, 'aviso');
+  if (avisos.length) aviso(`Organização das pastas, confira: ${avisos.join('; ')}.`, 'aviso');
 }
 
 /**

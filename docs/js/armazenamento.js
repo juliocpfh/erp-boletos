@@ -150,9 +150,25 @@ export async function abrirArquivo(dir, nome) {
   return (await dir.getFileHandle(nome)).getFile();
 }
 
+/**
+ * Lê o arquivo inteiro na hora (o OneDrive pode estar baixando ou sincronizando, e o arquivo muda entre abrir e ler:
+ * "the state had changed since it was read from disk"). Tenta de novo algumas vezes antes de desistir.
+ */
+export async function lerConteudo(h) {
+  for (let n = 1; ; n += 1) {
+    try {
+      const f = await h.getFile();
+      return new File([await f.arrayBuffer()], f.name, { type: f.type });
+    } catch (e) {
+      if (n >= 4) throw e;
+      await new Promise((ok) => { setTimeout(ok, 400 * n); });
+    }
+  }
+}
+
 async function copiarPasta(origem, destino) {
   for await (const [nome, h] of origem.entries()) {
-    if (h.kind === 'file') await escreverTexto(destino, nome, await h.getFile());
+    if (h.kind === 'file') await escreverTexto(destino, nome, await lerConteudo(h));
     else await copiarPasta(h, await destino.getDirectoryHandle(nome, { create: true }));
   }
 }
@@ -178,6 +194,7 @@ export async function renomearPasta(pai, antigo, novo) {
       await origem.move(pai, novo);
       return;
     } catch { /* navegador sem suporte: copia e apaga */ }
+    try { origem = await pai.getDirectoryHandle(antigo); } catch { return; } // a pasta acabou indo mesmo assim
   }
   await copiarPasta(origem, await pai.getDirectoryHandle(novo, { create: true }));
   await pai.removeEntry(antigo, { recursive: true });
@@ -203,6 +220,7 @@ export async function moverPasta(paiAntigo, antigo, paiNovo, novo) {
       await origem.move(paiNovo, novo);
       return;
     } catch { /* navegador sem suporte: copia e apaga */ }
+    try { origem = await paiAntigo.getDirectoryHandle(antigo); } catch { return; } // a pasta acabou indo mesmo assim
   }
   await copiarPasta(origem, await paiNovo.getDirectoryHandle(novo, { create: true }));
   await paiAntigo.removeEntry(antigo, { recursive: true });
@@ -240,7 +258,7 @@ async function juntarConteudo(origem, destino) {
       if (!n) feitos.push(nome);
       continue;
     }
-    const arq = await h.getFile();
+    const arq = await lerConteudo(h);
     let la = null;
     try { la = await (await destino.getFileHandle(nome)).getFile(); } catch { /* não existe no destino */ }
     if (la && la.size !== arq.size) { sobrou += 1; continue; }
