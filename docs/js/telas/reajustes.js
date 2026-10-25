@@ -10,19 +10,25 @@ export const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho'
 
 const dataExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
 
-/** Botões do reajuste de um contrato numa competência (gerar carta, marcar enviada, aplicar correção). */
-export function botoesReajuste(c, r, naCarta = false) {
+/** Partes dos botões do reajuste de um contrato numa competência: a carta (gerar, marcar enviada) e a correção (aplicar ou "corrigido"). */
+export function partesReajuste(c, r, naCarta = false) {
   // reajuste de ano anterior: só a correção (sem carta)
   const carta = !r.comCarta || (!r.faltaCarta && !r.carta) ? '' : `${naCarta ? '' : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, 'Gerar carta', 'botao pequeno')}
     ${opera() ? botao('cartaEnviada', r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : 'Marcar carta enviada', { contrato: c.id, comp: r.competencia, enviada: r.carta ? '' : '1' }, r.carta ? 'link-botao' : 'secundario pequeno', r.carta ? 'Desfazer o envio da carta?' : '') : ''}`;
-  if (r.corrigido) return `${etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok')} ${carta}`;
-  if (!opera()) return carta;
+  if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok') };
+  if (!opera()) return { carta, correcao: '' };
   // sem o índice cadastrado (ex.: reajuste de ano anterior): digita o % ou o novo valor
   const k = r.calculo || R.calcularReajuste(d(), c, r.competencia);
-  return `${carta}
-    ${k.percentual !== null ? botao('aplicarReajuste', 'Aplicar correção', { contrato: c.id, comp: r.competencia }, 'secundario pequeno', `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`)
+  return { carta, correcao: k.percentual !== null ? botao('aplicarReajuste', 'Aplicar correção', { contrato: c.id, comp: r.competencia }, 'secundario pequeno', `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`)
     : `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${R.percentualBonificacao(c)}" class="acoes"><input name="percentual" placeholder="%" inputmode="decimal" style="width:70px" title="Percentual da correção: calcula o novo valor ao lado">
-      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>`}`;
+      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>` };
+}
+
+/** Botões do reajuste de um contrato numa competência (gerar carta, marcar enviada, aplicar correção). */
+export function botoesReajuste(c, r, naCarta = false) {
+  const p = partesReajuste(c, r, naCarta);
+  return r.corrigido ? `${p.correcao} ${p.carta}` : `${p.carta}
+    ${p.correcao}`;
 }
 
 /** Caução do reajuste já aplicado (tela Reajustes): boletos do complemento ou o botão para gerar/confirmar. */
@@ -82,28 +88,36 @@ export function telaReajustes(q) {
       ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista.length})</h2>
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). De anos anteriores não há carta; sem o índice daquele mês cadastrado, digite o % ou o novo valor. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
-      <table><tr><th>Aluguel de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Atual (bonificado)</th><th class="n">Novo (bonificado)</th><th>Caução</th><th>Carta e correção</th></tr>
-      ${lista.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id);
+      <div class="reajustes-lista">
+      ${lista.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
     const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novoBonificado !== null
       ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * k.novoBonificado)}</b>` : '<span class="suave">-</span>';
-    return `<tr class="${String(c.id) === q.contrato ? 'amarelo' : ''}"><td><b>${compBr(r.competencia)}</b><br><span class="suave">${r.comCarta ? `carta com o boleto deste aluguel (vence em ${dataBr(R.vencimentoDoReajuste(d(), c, r.competencia))})` : 'ano anterior: sem carta'}</span></td>
-        <td><a href="#/contrato/${c.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(c.inquilino_nome)} · ${r.anos} ano(s)</td>
-        <td>${esc(k.indiceContrato || 'não informado')}${k.escolhido ? `<br><span class="suave">usa ${esc(k.escolhido.indice)} até ${compBr(k.escolhido.registro.mes_ref)}: ${pct(k.percentual)}</span>` : k.faltando.length ? `<br>${etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo')}` : ''}</td>
-        <td class="n">${reais(k.atual)}${k.bonificacao ? ` <span class="suave">(${reais(k.atualBonificado)})</span>` : ''}</td>
-        <td class="n">${k.novo !== null ? `<b>${reais(k.novo)}</b>${k.bonificacao ? ` <span class="suave">(${reais(k.novoBonificado)})</span>` : ''}` : '-'}</td>
-        <td class="nw">${caucao}</td>
-        <td class="nw">${botoesReajuste(c, r)}</td></tr>`; }).join('') || '<tr><td colspan="7" class="suave">Nenhum reajuste em aberto.</td></tr>'}</table>
-      <p class="suave">Valores: aluguel cheio e, entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
+    return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
+        <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
+          <div class="suave">${r.anos} ano(s) · ${esc(k.indiceContrato || 'índice não informado')}${k.escolhido ? ` ${pct(k.percentual)} até ${compBr(k.escolhido.registro.mes_ref)}` : ''} ${!k.escolhido && k.faltando.length ? etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo') : ''}</div></div>
+        <div class="reajuste-mes"><b>Aluguel de ${compBr(r.competencia)}</b><div class="suave">${r.comCarta ? `Boleto vence em ${dataBr(R.vencimentoDoReajuste(d(), c, r.competencia))}` : 'ano anterior: sem carta'}</div></div></div>
+      <div class="reajuste-corpo">
+        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : '-'}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : '-'})</div>` : ''}</div>
+        <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
+        <div class="reajuste-botoes"><div class="acoes">${p.carta}</div>${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}</div></div></div>`; }).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+      </div>
+      <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
     <div class="cartao rolagem" data-caixa="Já reajustados"><div class="cabecalho"><h2>Já reajustados${todos ? '' : ' (os 3 últimos)'}</h2>
       ${feitos.length > 3 ? link(`#/reajustes${todos ? '' : '?todos=1'}`, todos ? 'Mostrar só os 3 últimos' : `Mostrar todos (${feitos.length})`, 'botao secundario pequeno') : ''}</div>
-      <table><tr><th>Vale a partir de</th><th>Imóvel / inquilino</th><th>Índice</th><th class="n">Anterior</th><th class="n">Novo</th><th>Caução</th><th>Carta</th><th></th></tr>
+      <div class="reajustes-lista">
       ${(todos ? feitos : feitos.slice(0, 3)).map(({ correcao: x, contrato: c }) => { const i = buscar('imoveis', c.imovel_id); const r = R.reajusteNaCompetencia(d(), c, x.data_vigencia.slice(0, 7));
-    return `<tr class="${String(c.id) === q.contrato ? 'amarelo' : ''}"><td class="nw">${dataBr(x.data_vigencia)}</td><td><a href="#/contrato/${c.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(c.inquilino_nome)}</td>
-        <td>${esc(x.indice || '-')} ${pct(x.percentual)}</td><td class="n">${reais(x.valor_anterior)}</td><td class="n"><b>${reais(x.valor_novo)}</b></td>
-        <td class="nw">${caucaoDoReajuste(c, x)}</td><td class="nw">${r && r.comCarta ? botoesReajuste(c, r) : '<span class="suave">-</span>'}</td>
-        <td class="n">${opera() && ultimaDo(c) === x ? botao('desfazerReajuste', 'Desfazer correção', { id: x.id }, 'perigo pequeno', `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`) : ''}</td></tr>`; }).join('')
-      || '<tr><td colspan="8" class="suave">Nenhum reajuste aplicado ainda.</td></tr>'}</table>
+    const carta = r && r.comCarta ? partesReajuste(c, r).carta : '';
+    return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
+        <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
+          <div class="suave">${esc(x.indice || '-')} ${pct(x.percentual)}</div></div>
+        <div class="reajuste-mes"><b>Vale a partir de ${dataBr(x.data_vigencia)}</b></div></div>
+      <div class="reajuste-corpo">
+        <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(x.valor_anterior)} → <b>${reais(x.valor_novo)}</b></div></div>
+        <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucaoDoReajuste(c, x)}</div></div>
+        <div class="reajuste-botoes"><div class="acoes">${carta}</div>${opera() && ultimaDo(c) === x ? `<div class="acoes">${botao('desfazerReajuste', 'Desfazer correção', { id: x.id }, 'perigo pequeno', `Desfazer a correção de ${dataBr(x.data_vigencia)} de ${c.inquilino_nome}? O aluguel volta a ${reais(x.valor_anterior)}, os boletos em aberto são recalculados e os boletos da caução ainda não pagos deste reajuste são excluídos.`)}</div>` : ''}</div></div></div>`; }).join('')
+      || '<p class="suave">Nenhum reajuste aplicado ainda.</p>'}
+      </div>
       <p class="suave">"Desfazer correção" aparece só na correção mais recente de cada inquilino; com boleto da caução já pago, desfaça o pagamento antes.</p></div>`;
 }
 
