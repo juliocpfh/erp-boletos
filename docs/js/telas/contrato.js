@@ -300,18 +300,19 @@ function caixaSolicitacoes(c) {
     || '<tr><td colspan="6" class="suave">Nenhuma solicitação registrada.</td></tr>'}</table></div></div>`;
 }
 
-/** Seguro obrigatório: fica no imóvel e é cobrado do inquilino que estiver nele no mês da parcela. */
-export function caixaSeguros(i) {
-  if (!i) return '';
-  const alerta = R.alertaSeguroImovel(d(), i);
-  const seguros = R.segurosDoImovel(d(), i.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
-  return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório do imóvel ${esc(i.nome)}</h2>${opera() ? link(`#/novo/seguros?imovel=${i.id}`, 'Cadastrar apólice') : ''}</div>
+/** Seguro obrigatório: cada inquilino tem a sua apólice (sai com ele; quem entra precisa de outra). */
+export function caixaSeguros(c) {
+  const i = buscar('imoveis', c.imovel_id);
+  const seguros = R.segurosDoContrato(d(), c.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length)) return '';
+  const alerta = [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
+  return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
-      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${i.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
+      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'seguros', id: s.id }, 'perigo pequeno', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
-    <p class="suave">As parcelas entram no boleto do inquilino que estiver no imóvel no mês de cada parcela (se o contrato dele inclui o seguro).</p>
-    ${caixaArquivos('seguro', i.id, 'Apólices', 'apolices', 'O arquivo da apólice é anexado ao cadastrar a apólice (botão "Cadastrar apólice"); aqui ficam todos, com a vigência ao lado.', true)}</div>`;
+    <p class="suave">As parcelas entram nos boletos deste inquilino (se o contrato dele inclui o seguro). A apólice é dele: quando ele sai, ela vai junto, e quem entra precisa de uma apólice nova.</p>
+    ${caixaArquivos('seguro', c.id, 'Apólices', 'apolices', 'O arquivo da apólice é anexado ao cadastrar a apólice (botão "Cadastrar apólice"); aqui ficam todos, com a vigência ao lado.', true)}</div>`;
 }
 
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
@@ -527,6 +528,7 @@ export function telaContrato(c) {
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
+    ${caixaSeguros(c)}
     ${novo ? contas : ''}
     ${caixaBoletosInquilino(c, cobs, hoje)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>
