@@ -151,7 +151,7 @@ export function calendarioDoPainel(mes, hoje) {
   const porDia = new Map();
   for (const e of eventos) { if (!porDia.has(e.data)) porDia.set(e.data, []); porDia.get(e.data).push(e); }
   const destino = (e) => (e.fechamento ? `#/fechamento?mes=${e.fechamento}` : e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === 'Boleto' ? `#/cobrancas?comp=${C.somarMeses(e.data.slice(0, 7), -1)}`
-    : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/imovel/${e.imovel_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
+    : e.tipo === 'IPTU' ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === 'Seguro' ? `#/contrato/${e.contrato_id}?ir=seguros` : `#/contrato/${e.contrato_id}`);
   const curto = (e) => `${e.tipo} ${e.texto.split(' · ')[0]}`;
   const [ini] = C.limitesCompetencia(mes);
   const vazios = C.paraData(ini).getUTCDay();

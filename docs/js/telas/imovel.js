@@ -1,4 +1,4 @@
-// Página do imóvel (#/imovel/ID): empresas e percentuais, IPTU, reformas, seguros, leituras e documentos do imóvel.
+// Página do imóvel (#/imovel/ID): empresas e percentuais, IPTU, reformas, leituras e documentos do imóvel (o seguro fica no inquilino).
 import { podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
@@ -7,7 +7,7 @@ import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao, buscar, caixaArquivos, caixaHistorico, d, endereco, etiqueta, idGuiasDoAno, item, link, nomePastaContrato, opera, tabelaHistorico, ultimos } from './comum.js';
-import { AVISO_CONTROLE, caixaLeituras, caixaSeguros, caixaVerificar, seloControle } from './contrato.js';
+import { AVISO_CONTROLE, caixaLeituras, caixaVerificar, seloControle } from './contrato.js';
 
 // --------------------------------------------------------------------------
 // Imóvel
@@ -114,7 +114,6 @@ export function telaImovel(i) {
           ${R.geraNf(c) ? '' : `<br>${seloControle()}`}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum inquilino cadastrado.</td></tr>'}
     </table></div><p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída, na página dele. Desmarque "emite NF" para boleto de controle: o pagamento é acompanhado, mas não gera NF nem entra nas somas dos boletos e nos resultados.</p></div>
     ${caixaIptu(i)}
-    ${caixaSeguros(i)}
     ${caixaLeituras(R.leiturasDoImovel(d(), i.id), opera() ? link(`#/novo/leituras?imovel=${i.id}`, 'Registrar leitura') : '', true)}
     <div class="cartao" id="titularidade"><div class="cabecalho"><h2>Troca de titularidade (água, energia, gás, condomínio)</h2>${opera() ? link(`#/novo/titularidades?imovel=${i.id}`, 'Registrar protocolo') : ''}</div>
       ${lembretes.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}

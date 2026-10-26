@@ -135,7 +135,7 @@ test('texto do boleto no formato do banco', () => {
   const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'INQUILINO EXEMPLO', data_entrada: '2026-06-15',
     vigencia_inicio: '2026-06-15', aluguel_inicial: 364445, dia_vencimento: 5, cobranca_mes_seguinte: true, bonificacao: true,
     desconto_pontualidade_percentual: 10, taxa_boleto: 850, multa_percentual: 2, juros_mensal_percentual: 1, cobrar_iptu: false }, 'julio');
-  R.inserir(d, 'seguros', { imovel_id: casa.id, seguradora: 'Bradesco', vigencia_inicio: '2026-06-15', vigencia_fim: '2027-06-15',
+  R.inserir(d, 'seguros', { contrato_id: c.id, imovel_id: casa.id, seguradora: 'Bradesco', vigencia_inicio: '2026-06-15', vigencia_fim: '2027-06-15',
     valor_total: 22500, num_parcelas: 4, primeira_competencia: '2026-06' }, 'julio');
   R.gerarCobrancas(d, '2026-08', 'julio');
   const cb = d.cobrancas[0];
@@ -220,24 +220,29 @@ test('inquilino sem imóvel ou inativo não gera cobrança', () => {
   assert.equal(R.contratoAtivo(R.buscar(d, 'contratos', c.id), '2026-07-01'), false);
 });
 
-test('seguro é do imóvel: cobrado de quem está no imóvel no mês, e migra seguros antigos', () => {
+test('seguro é do inquilino: o anterior leva a apólice, quem entra precisa de outra; migra seguros do imóvel', () => {
   const d = R.bancoVazio();
   const loja = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Loja 2' }, 'julio');
   const base = { imovel_id: loja.id, aluguel_inicial: 139000, dia_vencimento: 1, cobranca_mes_seguinte: true, cobrar_iptu: false };
   const v = R.inserir(d, 'contratos', { ...base, inquilino_nome: 'Antigo', data_entrada: '2026-01-27', data_saida: '2026-04-26' }, 'julio');
   const l = R.inserir(d, 'contratos', { ...base, inquilino_nome: 'Novo', data_entrada: '2026-04-27' }, 'julio');
-  // seguro gravado no formato antigo (no contrato do primeiro inquilino)
-  d.seguros.push({ id: 1, contrato_id: v.id, seguradora: 'Allianz', vigencia_inicio: '2026-01-27', vigencia_fim: '2027-01-27',
+  // seguro gravado no formato de quando era do imóvel: vai para quem estava no imóvel no início da vigência
+  d.seguros.push({ id: 1, imovel_id: loja.id, seguradora: 'Allianz', vigencia_inicio: '2026-01-27', vigencia_fim: '2027-01-27',
     valor_total: 60000, num_parcelas: 6, primeira_competencia: '2026-02' });
+  // apólice começada com o imóvel vago: fica com quem mais ocupou o imóvel na vigência (Antigo 90 dias, Novo 219)
+  d.seguros.push({ id: 2, imovel_id: loja.id, seguradora: 'Porto', vigencia_inicio: '2025-12-01', vigencia_fim: '2026-12-01',
+    valor_total: 30000, num_parcelas: 3, primeira_competencia: '2026-05' });
+  // formato mais antigo (só no contrato): continua no contrato e ganha o imóvel
+  d.seguros.push({ id: 3, contrato_id: v.id, seguradora: 'Tokio', vigencia_inicio: '2025-01-27', vigencia_fim: '2026-01-27',
+    valor_total: 1000, num_parcelas: 1, primeira_competencia: '2025-02' });
   R.normalizar(d);
-  assert.equal(d.seguros[0].imovel_id, loja.id);
-  assert.equal(d.seguros[0].contrato_id, undefined);
+  assert.deepEqual(d.seguros.map((s) => [s.contrato_id, s.imovel_id]), [[v.id, loja.id], [l.id, loja.id], [v.id, loja.id]]);
   for (const comp of ['2026-03', '2026-04', '2026-05']) R.gerarCobrancas(d, comp, 'julio');
   const seg = (c, comp) => d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp)?.seguro;
   assert.equal(seg(v, '2026-03'), 10000);
-  assert.equal(seg(v, '2026-04'), 0);
-  assert.equal(seg(l, '2026-04'), 10000);
-  assert.equal(seg(l, '2026-05'), 10000);
+  assert.equal(seg(v, '2026-04'), 10000, 'no mês da saída, o anterior paga a parcela da apólice dele');
+  assert.equal(seg(l, '2026-04'), 0, 'quem entra não paga a apólice do anterior');
+  assert.equal(seg(l, '2026-05'), 10000, 'só a apólice dele (1ª de 3 parcelas)');
 });
 
 test('troca de garantia e de fiador ficam no histórico', () => {
@@ -1306,7 +1311,7 @@ test('arquivos anexados que os lançamentos usam (para apagar o anexo junto com 
   Object.assign(c, { comprovante_reserva: 'comprovante-reserva.pdf', doc_contrato_arquivo: 'contrato.pdf', doc_vistoria_parcial: { arquivo: 'vistoria-parcial.pdf' } });
   R.registrarAditivo(d, c.id, { data: '2026-10-01', assunto: 'Troca do vencimento', arquivo: 'aditivo.pdf' }, 'julio');
   R.inserir(d, 'vistorias', { contrato_id: c.id, tipo: 'Entrada', data: '2026-06-07', fotos: { fachada: 'vistoria-entrada-2026-06-07-fachada.jpg' } }, 'julio');
-  R.inserir(d, 'seguros', { imovel_id: loja.id, arquivo_apolice: 'apolice-1.pdf', outros_arquivos: ['seguro-1-a.pdf'] }, 'julio');
+  R.inserir(d, 'seguros', { contrato_id: c.id, imovel_id: loja.id, arquivo_apolice: 'apolice-1.pdf', outros_arquivos: ['seguro-1-a.pdf'] }, 'julio');
   const lista = () => R.arquivosReferenciados(d).map((a) => `${a.escopo}:${a.nome}`).sort();
   assert.deepEqual(lista(), ['aditivos:aditivo.pdf', 'assinados:contrato.pdf', 'assinados:vistoria-parcial.pdf', 'contrato:comprovante-reserva.pdf',
     'contrato:vistoria-entrada-2026-06-07-fachada.jpg', 'seguro:apolice-1.pdf', 'seguro:seguro-1-a.pdf']);
