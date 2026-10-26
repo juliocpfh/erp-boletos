@@ -2555,6 +2555,8 @@ export function salvarOrdemCaixas(d, pagina, grupo, visiveis, usuario) {
 // Boleto: textos para copiar no site do banco
 // --------------------------------------------------------------------------
 const rs = (c) => `RS${C.reais(c, false)}`;
+/** Tamanho máximo da descrição da cobrança no C6 (Bolepix). */
+export const LIMITE_DESCRICAO_BOLETO = 100;
 
 /** Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL RS3.644,45"). */
 export function dadosBoleto(d, cb) {
@@ -2572,11 +2574,18 @@ export function dadosBoleto(d, cb) {
     const parc = /(\d+\/\d+)/.exec(cb.seguro_parcela || '');
     extras.push(`SEGURO${parc ? parc[1] : ''} ${rs(cb.seguro)}`);
   }
-  if (cb.taxa_boleto) extras.push(`TARIFA ${rs(cb.taxa_boleto)}`);
+  const iTarifa = extras.length;
+  if (cb.taxa_boleto) extras.push(`TARIFA COBRANÇA ${rs(cb.taxa_boleto)}`);
   if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
   if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
   if (extras.length && !ehComplementoCaucao(cb)) linhas.push(extras.join(' '));
+  // a tarifa encurta quando a descrição passa do limite do C6: "TARIFA COBRANÇA" → "TAR. COBRANÇA" → "TAR. COBR." → "TARIFA"
+  for (const curto of ['TAR. COBRANÇA', 'TAR. COBR.', 'TARIFA']) {
+    if (!cb.taxa_boleto || ehComplementoCaucao(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
+    extras[iTarifa] = `${curto} ${rs(cb.taxa_boleto)}`;
+    linhas[linhas.length - 1] = extras.join(' ');
+  }
   const valor = t.a_pagar_sem_desconto;
   return {
     pagador: c.inquilino_nome, documento_pagador: c.inquilino_cpf || '',

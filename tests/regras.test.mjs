@@ -141,7 +141,16 @@ test('texto do boleto no formato do banco', () => {
   const cb = d.cobrancas[0];
   cb.iptu = 9100;
   const b = R.dadosBoleto(d, cb);
-  assert.equal(b.descricao, 'ALUGUEL RS3.644,45\nCOM BONF. RS3.280,00\nIPTU RS91,00 SEGURO3/4 RS56,25 TARIFA RS8,50');
+  assert.equal(b.descricao, 'ALUGUEL RS3.644,45\nCOM BONF. RS3.280,00\nIPTU RS91,00 SEGURO3/4 RS56,25 TARIFA COBRANÇA RS8,50');
+  // descrição longa (limite de 100 do C6): a tarifa encurta só o necessário para caber
+  cb.iptu = 0; cb.outros = 5000;
+  const tarifa = (motivo) => { cb.outros_descricao = motivo; const t = R.dadosBoleto(d, cb).descricao; assert.ok(t.length <= 100 || motivo.length > 20); return / (TAR[A-ZÇ. ]*?) RS8,50 /.exec(t)[1]; };
+  assert.equal(tarifa('REPARO PIA'), 'TARIFA COBRANÇA');
+  assert.equal(tarifa('REPARO DA PIA'), 'TAR. COBRANÇA');
+  assert.equal(tarifa('REPARO DO PORTAO'), 'TAR. COBR.');
+  assert.equal(tarifa('REPARO DA GARAGEM'), 'TARIFA');
+  assert.equal(tarifa('REPARO DO PORTAO DA GARAGEM'), 'TARIFA'); // nem assim cabe: fica a mais curta
+  cb.iptu = 9100; cb.outros = 0; cb.outros_descricao = '';
   assert.equal(b.valor, 380020);
   assert.equal(b.desconto, 36445);
   assert.equal(b.juros_ao_dia, 126);
