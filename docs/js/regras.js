@@ -755,12 +755,29 @@ export const temFci = (c) => !!c && c.fci_percentual > 0;
 /** FCI do mês: % sobre o aluguel bonificado do boleto (proporcional aos dias; zero na carência). Ex.: 5% de R$ 1.800,00 = R$ 90,00. */
 export const fciDoMes = (c, aluguel, desconto) => (temFci(c) ? C.arred(((aluguel - desconto) * c.fci_percentual) / 100) : 0);
 
-/** Pagamentos do FCI: boletos pagos com FCI deste contrato e dos anteriores da troca de titular (o fundo continua com a locação). */
+/**
+ * Pagamentos do FCI: boletos pagos com FCI deste contrato e dos anteriores da troca de titular (o fundo continua com a locação),
+ * mais os depósitos de antes do sistema lançados à mão na caixa do FCI (contrato.fci_previos: [{ data, valor }]).
+ */
 export function depositosFci(d, c) {
-  const ids = new Set([c.id, ...cadeiaDeContratos(d, c).antes.map((x) => x.id)]);
+  const contratos = [c, ...cadeiaDeContratos(d, c).antes];
+  const ids = new Set(contratos.map((x) => x.id));
+  const previos = contratos.flatMap((x) => (x.fci_previos || []).map((p) => ({ cobranca_id: null, competencia: '', data: p.data, valor: p.valor, previo: true })));
   return d.cobrancas.filter((cb) => ids.has(cb.contrato_id) && cb.data_pagamento && cb.fci > 0)
     .map((cb) => ({ cobranca_id: cb.id, competencia: cb.competencia, data: cb.data_pagamento, valor: cb.fci }))
+    .concat(previos.filter((p) => p.data && p.valor > 0))
     .sort((a, b) => a.data.localeCompare(b.data) || a.competencia.localeCompare(b.competencia));
+}
+
+/** Confere os depósitos anteriores digitados ([{ data, valor }], valor em centavos): linhas em branco saem; data e valor > 0 obrigatórios. */
+export function validarFciPrevios(linhas) {
+  const ok = [];
+  for (const [i, x] of linhas.entries()) {
+    if (!x.data && !x.valor) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(x.data || '') || !(x.valor > 0)) throw new Error(`Linha ${i + 1}: preencha a data e um valor maior que zero.`);
+    ok.push({ data: x.data, valor: x.valor });
+  }
+  return ok.sort((a, b) => a.data.localeCompare(b.data));
 }
 
 /**

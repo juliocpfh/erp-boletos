@@ -677,6 +677,21 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Grava os depósitos do FCI de antes do sistema (caixa do FCI); a correção antiga fica para refazer no "Calcular atualização". */
+  async salvarFciPrevios({ id }, el) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    const linhas = [...el.closest('details').querySelectorAll('[data-linhas-fci] tr')].map((tr) => {
+      const v = tr.querySelector('[name=fci_valor]').value.trim();
+      return { data: tr.querySelector('[name=fci_data]').value, valor: v ? C.centavos(v) : 0 };
+    });
+    const lista = R.validarFciPrevios(linhas);
+    const c = buscar('contratos', id);
+    await alterar((db) => R.atualizar(db, 'contratos', c.id, { fci_previos: lista, fci_indices: {}, fci_calculado_em: null }, login(),
+      `FCI: ${lista.length} depósito(s) anterior(es) ao sistema, ${reais(lista.reduce((s, x) => s + x.valor, 0))}`));
+    aviso(`${lista.length} depósito(s) gravado(s). Clique em "Calcular atualização" para corrigir.`, 'info');
+    await mostrar();
+  },
+
   async alternarNf({ id }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar.');
     await alterar((db) => {

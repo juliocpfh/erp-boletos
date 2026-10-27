@@ -448,6 +448,27 @@ document.addEventListener('focusin', (ev) => {
   if (el.type === 'month' && !el.max) el.max = '9999-12';
 });
 
+// Lista que cresce (depósitos anteriores do FCI): preencher a última linha cria outra em branco; 🗑️ tira a linha.
+document.addEventListener('input', (ev) => {
+  const corpo = ev.target.closest('[data-linhas-fci]');
+  if (!corpo) return;
+  const ultima = corpo.lastElementChild;
+  if (ultima && [...ultima.querySelectorAll('input')].every((x) => x.value.trim())) {
+    const nova = ultima.cloneNode(true);
+    nova.querySelectorAll('input').forEach((x) => { x.value = ''; });
+    corpo.append(nova);
+  }
+});
+
+document.addEventListener('click', (ev) => {
+  const lixo = ev.target.closest('[data-remover-linha]');
+  if (!lixo) return;
+  const tr = lixo.closest('tr');
+  const corpo = tr.parentElement;
+  if (corpo.children.length > 1) tr.remove();
+  else tr.querySelectorAll('input').forEach((x) => { x.value = ''; });
+});
+
 document.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-acao]');
   if (!el) return;

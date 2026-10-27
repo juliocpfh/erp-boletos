@@ -85,3 +85,18 @@ test('cláusulas do FCI no contrato só com o FCI ativado; modelos gravados rece
   assert.equal(d.modelos_contrato[0].texto.split('[se fci]').length, 2, 'entra uma vez só');
   assert.ok(d.modelos_contrato[0].texto.indexOf('[se fci]') < d.modelos_contrato[0].texto.indexOf('## RENOVAÇÃO'));
 });
+
+test('FCI: depósitos de antes do sistema somam com os boletos e são corrigidos a partir do mês seguinte', () => {
+  const { d, c } = base();
+  assert.throws(() => R.validarFciPrevios([{ data: '2025-03-10', valor: 0 }]), /Linha 1/);
+  const previos = R.validarFciPrevios([{ data: '2025-09-10', valor: 54000 }, { data: '', valor: 0 }, { data: '2025-03-10', valor: 150000 }]);
+  assert.deepEqual(previos.map((x) => x.data), ['2025-03-10', '2025-09-10'], 'linha em branco sai, ordem por data');
+  R.atualizar(d, 'contratos', c.id, { fci_previos: previos }, 'j');
+  R.gerarCobrancas(d, '2026-10', 'j');
+  R.atualizar(d, 'cobrancas', R.boletoDoMes(d, c.id, '2026-10').id, { data_pagamento: '2026-10-05' }, 'j');
+  const s = R.saldoFci(d, R.buscar(d, 'contratos', c.id), { '2025-04': 1, '2025-10': 1 });
+  assert.equal(s.depositos.length, 3);
+  assert.equal(s.total, 150000 + 54000 + 9000, 'R$ 1.500,00 + R$ 540,00 + R$ 90,00');
+  assert.equal(s.depositos[0].corrigido, 151500, 'R$ 1.500,00 de 10/03/2025 com 1% de abr/25 (para no 1º mês sem índice)');
+  assert.equal(s.depositos[1].corrigido, 54540, 'R$ 540,00 de 10/09/2025 com 1% de out/25');
+});
