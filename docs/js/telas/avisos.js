@@ -93,15 +93,17 @@ function pessoasDoContrato(dados) {
 /** Avisos do seguro: vigência que não é de um ano, outro seguro no mesmo período, valor muito diferente do anterior. */
 export function conferirSeguro(dados, r, q) {
   const out = [];
-  const iid = r ? r.imovel_id : Number(q.imovel);
+  const cid = r ? r.contrato_id : Number(q.contrato);
+  const iid = (buscar('contratos', cid) || {}).imovel_id;
   const { vigencia_inicio: ini, vigencia_fim: fim } = dados;
   if (ini && fim && fim > ini) {
     const dias = C.diasEntre(ini, fim);
     if (dias < 330 || dias > 400) out.push(`A vigência (${dataBr(ini)} a ${dataBr(fim)}) tem ${dias} dias, não um ano.`);
   }
   const outros = d().seguros.filter((x) => x.imovel_id === iid && (!r || x.id !== r.id));
-  const junto = ini && fim && outros.find((x) => x.vigencia_inicio && x.vigencia_fim && x.vigencia_inicio < fim && x.vigencia_fim > ini);
-  if (junto) out.push(`Já há seguro deste imóvel de ${dataBr(junto.vigencia_inicio)} a ${dataBr(junto.vigencia_fim)}, no mesmo período.`);
+  // sobreposição só conta no mesmo inquilino (quem entra no meio da vigência do anterior precisa de apólice própria)
+  const junto = ini && fim && outros.filter((x) => x.contrato_id === cid).find((x) => x.vigencia_inicio && x.vigencia_fim && x.vigencia_inicio < fim && x.vigencia_fim > ini);
+  if (junto) out.push(`Já há seguro deste inquilino de ${dataBr(junto.vigencia_inicio)} a ${dataBr(junto.vigencia_fim)}, no mesmo período.`);
   const ant = outros.filter((x) => x.vigencia_inicio && x.vigencia_inicio < (ini || '')).sort((a, b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
   if (ant && diferencaGrande(dados.valor_total, ant.valor_total) && (!r || dados.valor_total !== r.valor_total)) out.push(`Valor de ${reais(dados.valor_total)} está ${pctDif(dados.valor_total, ant.valor_total)} do seguro anterior (${reais(ant.valor_total)}).`);
   return out;

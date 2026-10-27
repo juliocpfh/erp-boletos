@@ -48,7 +48,7 @@ const TABELAS_EXCLUSAO = {
   cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   iptus: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
-  seguros: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
+  seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   encerramentos: { admin: true },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
@@ -470,12 +470,12 @@ export const ACOES = {
     arquivoApagadoNoFormulario(el, r[campo]);
   },
 
-  /** Nome do arquivo já guardado num formulário de edição (#/editar/tabela/id): abre o arquivo (seguro na pasta do imóvel; os demais, na do inquilino). */
+  /** Nome do arquivo já guardado num formulário de edição (#/editar/tabela/id): abre o arquivo (na pasta do inquilino; o seguro, na subpasta das apólices). */
   async abrirAnexoDoCampo({ campo }) {
     const [, , tabela, id] = location.hash.split('?')[0].split('/');
     const r = buscar(tabela, id);
     if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
-    const [escopo, dono] = tabela === 'seguros' ? ['seguro', r.imovel_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
+    const [escopo, dono] = tabela === 'seguros' ? ['seguro', r.contrato_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
     await ACOES.abrirArquivo({ escopo, id: dono, nome: r[campo] });
   },
 
@@ -623,12 +623,14 @@ export const ACOES = {
         }
       }
     }
-    for (const i of d().imoveis) {
+    for (const c of d().contratos) {
+      const pasta = chavePasta('seguro', c.id);
+      if (vistas.has(pasta)) continue;
+      vistas.add(pasta);
       let dir;
-      try { dir = await pastaDoEscopo('seguro', i.id, false); } catch { continue; }
-      const pasta = chavePasta('seguro', i.id);
+      try { dir = await pastaDoEscopo('seguro', c.id, false); } catch { continue; }
       // apólices: só os arquivos que já foram de uma apólice (os anexados à mão na caixa ficam)
-      for (const a of await S.listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: 'seguro', id: i.id, nome: a.nome, quem: i.nome });
+      for (const a of await S.listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: 'seguro', id: c.id, nome: a.nome, quem: c.inquilino_nome });
     }
     if (!soltos.length) { aviso('Nenhum arquivo sobrando: todos os anexos têm lançamento.', 'info'); return; }
     const ok = await janela({ titulo: `${soltos.length} arquivo(s) sem lançamento`, forte: true,

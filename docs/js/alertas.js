@@ -18,7 +18,7 @@ export function aniversarios(inicio, hoje) {
 export function alertaSeguro(inicio, hoje, seguros) {
   const fins = seguros.map((s) => s.vigencia_fim).filter(Boolean).sort();
   if (!fins.length) {
-    return { nivel: 'aviso', tipo: 'Seguro obrigatório', texto: 'Nenhum seguro cadastrado para este imóvel.' };
+    return { nivel: 'aviso', tipo: 'Seguro obrigatório', texto: 'Nenhum seguro cadastrado para este inquilino.' };
   }
   const fim = fins[fins.length - 1];
   const faltam = diasEntre(hoje, fim);

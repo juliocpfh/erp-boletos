@@ -63,13 +63,16 @@ export function normalizar(d) {
     }
     for (const k of ['fiador_nome', 'fiador_cpf', 'fiador_rg', 'fiador_telefone', 'fiador_email', 'fiador_endereco']) delete c[k];
   }
-  // o seguro obrigatório era do inquilino; agora é do imóvel
+  // o seguro obrigatório era do inquilino; foi para o imóvel (2026-10-09) e voltou a ser do inquilino (2026-10-26):
+  // a apólice sem inquilino vai para quem estava no imóvel no início da vigência
   for (const s of d.seguros) {
     if (!s.imovel_id && s.contrato_id) {
       const c = d.contratos.find((x) => x.id === s.contrato_id);
       if (c) s.imovel_id = c.imovel_id;
     }
-    delete s.contrato_id;
+    if (!s.contrato_id) s.contrato_id = contratoDoSeguro(d, s);
+    const c = s.contrato_id && d.contratos.find((x) => x.id === s.contrato_id);
+    if (c) s.imovel_id = c.imovel_id; // acompanha o imóvel do contrato (ex.: "Corrigir imóvel")
   }
   // cláusulas do FCI (só saem com o FCI ativado) entram nos modelos de contrato já gravados, antes da renovação
   for (const m of d.modelos_contrato || []) {
@@ -90,6 +93,28 @@ export function normalizar(d) {
   // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
   for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
   return d;
+}
+
+/**
+ * Contrato dono de uma apólice antiga (do tempo em que o seguro era do imóvel): quem estava no imóvel no início da
+ * vigência (se dois, o que entrou depois); ninguém nesse dia: o que mais ocupou o imóvel na vigência.
+ * Ex.: vigência 27/01/2026 a 27/01/2027, Antigo de 27/01 a 26/04 e Novo desde 27/04 → Antigo (leva a apólice ao sair).
+ */
+export function contratoDoSeguro(d, s) {
+  const ini = s.vigencia_inicio;
+  if (!ini || !s.imovel_id) return null;
+  const fim = s.vigencia_fim || C.somarMesesData(ini, 12);
+  const dias = (c) => {
+    const de = c.data_entrada > ini ? c.data_entrada : ini;
+    const ate = c.data_saida && c.data_saida < fim ? c.data_saida : fim;
+    return ate >= de ? C.diasEntre(de, ate) + 1 : 0;
+  };
+  const doImovel = d.contratos.filter((c) => c.imovel_id === s.imovel_id && c.data_entrada)
+    .sort((a, b) => b.data_entrada.localeCompare(a.data_entrada) || b.id - a.id);
+  const noInicio = doImovel.find((c) => c.data_entrada <= ini && (!c.data_saida || c.data_saida >= ini));
+  if (noInicio) return noInicio.id;
+  const [maior] = doImovel.map((c) => [c, dias(c)]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  return maior ? maior[0].id : null;
 }
 
 /**
@@ -718,7 +743,8 @@ function parcelasDoMes(lista, comp, rotulo) {
   return [total, rotulos.join('; ')];
 }
 
-export const segurosDoImovel = (d, imovelId) => d.seguros.filter((s) => imovelId && s.imovel_id === imovelId);
+/** Apólices do inquilino: cada contrato tem a sua (a do anterior não passa para o próximo). */
+export const segurosDoContrato = (d, contratoId) => d.seguros.filter((s) => contratoId && s.contrato_id === contratoId);
 
 // --------------------------------------------------------------------------
 // FCI: fundo de conservação do imóvel
@@ -914,13 +940,6 @@ export function marcarIptuPago(d, iptuId, n, data, usuario) {
   atualizar(d, 'iptus', p.id, { pagas }, usuario, data ? `IPTU ${p.ano} ${n}ª parcela paga pelo proprietário em ${C.dataBr(data)}` : `IPTU ${p.ano} ${n}ª parcela: pagamento desfeito`);
 }
 
-/** O seguro do imóvel entra na cobrança do inquilino que está no imóvel no mês (o mais recente, se trocou no meio do mês). */
-function pagaSeguroNoMes(d, contrato, comp) {
-  const ocupando = d.contratos.filter((c) => c.imovel_id === contrato.imovel_id && c.ativo !== false && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0);
-  const ultimo = ocupando.sort((a, b) => b.data_entrada.localeCompare(a.data_entrada) || b.id - a.id)[0];
-  return ultimo ? ultimo.id === contrato.id : true;
-}
-
 /** Calcula (sem gravar) a cobrança de um contrato numa competência. */
 export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
@@ -941,7 +960,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     }
   }
   const [seguro, seguroRot] = contrato.cobrar_seguro !== false && cobra('seguro')
-    ? parcelasDoMes(pagaSeguroNoMes(d, contrato, comp) ? segurosDoImovel(d, contrato.imovel_id) : [], comp,
+    ? parcelasDoMes(segurosDoContrato(d, contrato.id), comp,
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
   const reserva = reservaParaCompetencia(d, contrato, comp, ignorarCobranca);
@@ -1550,7 +1569,7 @@ export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
-  for (const t of ['cobrancas', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
+  for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
     d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
   }
   excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
@@ -2319,7 +2338,7 @@ export function documentoEntrada(d, c, campo) {
 
 /**
  * Arquivos anexados que algum lançamento usa: [{ escopo, id, nome }] (escopo e id da pasta, como nas caixas de arquivos:
- * "contrato", "assinados" e "aditivos" pelo contrato; "seguro" pelo imóvel). O que sair desta lista ao excluir ou desfazer
+ * "contrato", "assinados", "aditivos" e "seguro" pelo contrato). O que sair desta lista ao excluir ou desfazer
  * um lançamento é apagado da pasta.
  */
 export function arquivosReferenciados(d) {
@@ -2335,7 +2354,7 @@ export function arquivosReferenciados(d) {
   for (const t of ['depositos_garantia', 'correcoes_garantia', 'aplicacoes']) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
-  for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.imovel_id, nome);
+  for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
   return out;
 }
 
@@ -2384,8 +2403,8 @@ export function rotulosDosArquivos(d) {
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const s of d.seguros) {
-    poe('seguro', s.imovel_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
-    for (const nome of s.outros_arquivos || []) poe('seguro', s.imovel_id, nome, `outro arquivo da apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
+    poe('seguro', s.contrato_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
+    for (const nome of s.outros_arquivos || []) poe('seguro', s.contrato_id, nome, `outro arquivo da apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
   }
   return m;
 }
@@ -2474,11 +2493,12 @@ export const vistoriasDo = (d, contratoId) => d.vistorias.filter((v) => v.contra
 /** Vistoria mais recente do imóvel (para começar a próxima a partir dela). */
 export const ultimaVistoriaDoImovel = (d, imovelId) => d.vistorias.filter((v) => v.imovel_id === imovelId).sort(porDataVistoria)[0] || null;
 
-/** Seguro obrigatório é do imóvel: só cobra apólice enquanto houver inquilino ativo nele. */
+/** Seguro obrigatório é do inquilino: cobra a apólice do inquilino atual do imóvel (o anterior leva a dele). */
 export function alertaSeguroImovel(d, i, hoje = C.hojeIso()) {
   const atual = d.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))[0];
   if (!atual || atual.conta_seguro === SITUACOES[2]) return null; // contrato sem seguro ("não tem"): nada a cobrar
-  return alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoImovel(d, i.id));
+  const a = alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoContrato(d, atual.id));
+  return a && { ...a, contrato_id: atual.id, ancora: 'seguros' };
 }
 
 /**
@@ -2521,7 +2541,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   }
   for (const i of d.imoveis) {
     const a = alertaSeguroImovel(d, i, hoje);
-    if (a) lista.push({ ...a, imovel_id: i.id, imovel: i.nome, inquilino: '' });
+    if (a) lista.push({ ...a, imovel_id: i.id, imovel: i.nome, inquilino: (buscar(d, 'contratos', a.contrato_id) || {}).inquilino_nome || '' });
     if (i.verificar) lista.push({ nivel: 'aviso', tipo: 'A verificar', texto: i.verificar, imovel_id: i.id, imovel: i.nome, inquilino: '' });
   }
   lista.push(...alertasIptu(d, hoje));
@@ -2931,8 +2951,8 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
   // seguro obrigatório: fim da vigência
   for (const s of d.seguros) {
     if (!no(s.vigencia_fim)) continue;
-    const renovado = d.seguros.some((x) => x.imovel_id === s.imovel_id && x.vigencia_fim > s.vigencia_fim);
-    ev.push({ data: s.vigencia_fim, tipo: 'Seguro', imovel_id: s.imovel_id, texto: `${nomeImovel(s.imovel_id)} · fim do seguro${s.seguradora ? ` ${s.seguradora}` : ''}`,
+    const renovado = d.seguros.some((x) => x.contrato_id === s.contrato_id && x.vigencia_fim > s.vigencia_fim);
+    ev.push({ data: s.vigencia_fim, tipo: 'Seguro', imovel_id: s.imovel_id, contrato_id: s.contrato_id, texto: `${nomeImovel(s.imovel_id)} · fim do seguro${s.seguradora ? ` ${s.seguradora}` : ''}`,
       situacao: renovado ? 'ok' : 'aviso', estado: renovado ? 'renovado' : 'renovar' });
   }
   for (const c of d.contratos.filter((x) => contratoAtivo(x, hoje) && x.imovel_id)) {

@@ -87,7 +87,10 @@ export const SUB_ANUNCIO = 'Anúncio';
 /** Arquivo da matrícula: fica nos documentos do imóvel, com o nome começando por "Matricula". */
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
-const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', seguro: 'Seguro (apólices)', reformas: 'Reformas' };
+const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas' };
+
+/** Apólices do seguro obrigatório: subpasta dentro da pasta do inquilino (antes ficava na pasta do imóvel). */
+const SUB_SEGURO = 'Seguro (apólices)';
 
 export const PASTA_SEM_IMOVEL = 'Sem imóvel';
 
@@ -112,7 +115,9 @@ const SUB_ASSINADOS = 'Documentos assinados';
 
 const SUB_ADITIVOS = 'Termos aditivos';
 
-const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos'].includes(escopo);
+const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos', 'seguro'].includes(escopo);
+
+const SUB_DO_ESCOPO = { assinados: SUB_ASSINADOS, aditivos: SUB_ADITIVOS, seguro: SUB_SEGURO };
 
 export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
@@ -120,7 +125,7 @@ export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { con
 export function chavePasta(escopo, id) {
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), escopo === 'assinados' ? SUB_ASSINADOS : escopo === 'aditivos' ? SUB_ADITIVOS : ''].join('/') : null;
+    return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), SUB_DO_ESCOPO[escopo] || ''].join('/') : null;
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   return i ? [i.pasta || i.nome, escopo].join('/') : null;
@@ -275,7 +280,7 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
-    return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(escopo === 'assinados' ? [SUB_ASSINADOS] : escopo === 'aditivos' ? [SUB_ADITIVOS] : [])], criar);
+    return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)], criar);
@@ -315,6 +320,7 @@ export let pastasComArquivos = [];
 /**
  * Organiza as pastas no disco (uma vez por sessão, ao abrir o Painel; e depois de uma troca de titular):
  * - "Documentos do imóvel" passa a se chamar "Matrículas";
+ * - as apólices saem de "Imóvel/Seguro (apólices)" e vão para a pasta do inquilino dono de cada uma;
  * - a pasta de cada inquilino vai para "Imóvel/Inquilinos" com o nome certo (datas de entrada e saída).
  * Pasta usada por mais de um contrato não é renomeada (só vai para "Inquilinos"), para os arquivos não se separarem.
  * ``ids``: só esses contratos (sem: todos, e também as matrículas). Devolve os avisos do que não deu para juntar.
@@ -332,6 +338,7 @@ export async function organizarPastas(ids = null) {
         sobrou = base ? await S.juntarPasta(base, SUB_DOCS_ANTIGA, base, SUB_DOCS) : 0;
       } catch (e) { avisos.push(`${i.nome}, pasta "${SUB_DOCS_ANTIGA}": ${motivoDisco(e)}`); }
       if (sobrou) avisos.push(`${i.nome}: ${sobrou} arquivo(s) ficaram em "${SUB_DOCS_ANTIGA}" (já existe um com o mesmo nome em "${SUB_DOCS}")`);
+      try { avisos.push(...await levarApolicesParaInquilinos(i, await abrir([i.pasta || i.nome]))); } catch (e) { avisos.push(`${i.nome}, pasta "${SUB_SEGURO}": ${motivoDisco(e)}`); }
     }
   }
   const chave = (c) => `${c.imovel_id || 0}|${S.limparNome(c.pasta || nomePastaContrato(c))}`;
@@ -362,6 +369,35 @@ export async function organizarPastas(ids = null) {
   }
   if (novosNomes.length) await alterar((db) => novosNomes.forEach(([id, pasta]) => R.atualizar(db, 'contratos', id, { pasta }, login(), 'Pasta de arquivos (entrada e saída)')));
   return avisos;
+}
+
+/**
+ * O seguro passou a ser do inquilino: cada arquivo da pasta antiga "Imóvel/Seguro (apólices)" vai para a pasta do
+ * inquilino dono da apólice; os anexados à mão (sem apólice) vão para o dono da apólice mais recente do imóvel.
+ * A pasta antiga é apagada quando fica vazia. Devolve os avisos do que ficou para trás.
+ */
+async function levarApolicesParaInquilinos(i, base) {
+  if (!base) return [];
+  let velha;
+  try { velha = await base.getDirectoryHandle(SUB_SEGURO); } catch { return []; }
+  const seguros = d().seguros.filter((s) => s.imovel_id === i.id && s.contrato_id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  const dono = new Map();
+  for (const s of seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) if (nome && !dono.has(nome)) dono.set(nome, s.contrato_id);
+  const ficou = [];
+  for (const a of await S.listar(velha)) {
+    const contratoId = dono.get(a.nome) || (seguros[0] && seguros[0].contrato_id);
+    if (!contratoId) { ficou.push(a.nome); continue; }
+    const h = await velha.getFileHandle(a.nome);
+    const arq = await S.lerConteudo(h);
+    const destino = await pastaDoEscopo('seguro', contratoId);
+    let la = null;
+    try { la = await (await destino.getFileHandle(a.nome)).getFile(); } catch { /* não existe no destino */ }
+    if (la && la.size && la.size !== arq.size) { ficou.push(a.nome); continue; } // outro arquivo com o mesmo nome: não mexe
+    if (!la || !la.size) await S.escreverTexto(destino, a.nome, arq);
+    await velha.removeEntry(a.nome);
+  }
+  await S.apagarPastaVazia(base, SUB_SEGURO);
+  return ficou.length ? [`${i.nome}: ${ficou.length} arquivo(s) ficaram em "${SUB_SEGURO}" do imóvel (${ficou.join(', ')})`] : [];
 }
 
 /** Erro do disco em palavras simples (o mais comum: OneDrive mexendo no arquivo enquanto ele é copiado). */

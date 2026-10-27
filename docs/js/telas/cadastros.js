@@ -373,9 +373,9 @@ export const CADASTROS = {
     },
   },
   seguros: {
-    titulo: (r, q) => `Seguro obrigatório - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
+    titulo: (r, q) => { const c = buscar('contratos', r ? r.contrato_id : q.contrato); return `Seguro obrigatório - ${c.inquilino_nome}${buscar('imoveis', c.imovel_id) ? ` (${buscar('imoveis', c.imovel_id).nome})` : ''}`; },
     campos: () => F.SEGURO,
-    fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato), imovel_id: buscar('contratos', q.contrato).imovel_id }),
     conferir: conferirSeguro,
     // arquivo da apólice obrigatório (na edição, só se ainda não tiver); outros arquivos opcionais
     extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
@@ -389,8 +389,7 @@ export const CADASTROS = {
       if (!arq && !(r && r.arquivo_apolice)) throw new Error('Anexe o arquivo da apólice para salvar o seguro obrigatório.');
     },
     async ajustarAsync(dados, erros, r, form, q) {
-      const imovelId = r ? r.imovel_id : Number(q.imovel);
-      const pasta = await pastaDoEscopo('seguro', imovelId);
+      const pasta = await pastaDoEscopo('seguro', r ? r.contrato_id : Number(q.contrato));
       const vig = `${dados.vigencia_inicio}-a-${dados.vigencia_fim}`;
       const arq = form.querySelector('[name=arquivo_apolice]').files[0];
       if (arq) dados.arquivo_apolice = await S.salvarArquivo(pasta, new File([arq], `apolice-${vig}${extensao(arq.name)}`));
@@ -404,8 +403,8 @@ export const CADASTROS = {
         dados.outros_arquivos = [...((r && r.outros_arquivos) || []), ...nomes];
       }
     },
-    recalcular: (salvo, db) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === salvo.imovel_id,
-    voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}`,
+    recalcular: (salvo) => (cb) => cb.contrato_id === salvo.contrato_id,
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=seguros`,
     descricao: (dados, r) => `Seguro obrigatório: ${[dados.seguradora, dados.apolice ? `apólice ${dados.apolice}` : ''].filter(Boolean).join(', ') || 'apólice'}, vigência ${dataBr(dados.vigencia_inicio)} a ${dataBr(dados.vigencia_fim)}`
       + `${dados.arquivo_apolice && dados.arquivo_apolice !== (r && r.arquivo_apolice) ? ` · arquivo ${dados.arquivo_apolice}` : ''}${dados.outros_arquivos && dados.outros_arquivos.length ? ` · ${dados.outros_arquivos.length - ((r && r.outros_arquivos) || []).length} outro(s) arquivo(s)` : ''}`,
   },
