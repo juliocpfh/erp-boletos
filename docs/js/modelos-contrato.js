@@ -85,6 +85,32 @@ const CONSERVACAO = `## UTILIZAÇÃO E CONSERVAÇÃO
 
 **CLÁUSULA #** – O LOCATÁRIO desde já faculta {l:à LOCADORA|às LOCADORAS} examinar ou vistoriar o imóvel locado quando entender conveniente, mediante agendamento prévio.`;
 
+/**
+ * FCI (fundo de conservação do imóvel): só entra no contrato com o FCI ativado em "O que está incluso no contrato".
+ * Redigido como antecipação dos reparos (Lei 8.245/91, art. 23, III e V), e não como garantia (art. 37) nem encargo:
+ * nunca paga aluguel ou contas, danos só pela vistoria de saída comparada com a de entrada, com orçamentos ou
+ * comprovantes, e o saldo volta corrigido. Os modelos já gravados recebem este bloco em normalizar() (regras.js).
+ */
+export const CLAUSULAS_FCI = `[se fci]## FUNDO DE CONSERVAÇÃO DO IMÓVEL (FCI)
+
+**CLÁUSULA #fci** – Além do aluguel, o LOCATÁRIO pagará mensalmente, no mesmo boleto e vencimento do aluguel, a contribuição ao Fundo de Conservação do Imóvel (FCI), correspondente a {fci_percentual} do valor do aluguel com bonificação do mês, calculada proporcionalmente aos dias de ocupação no primeiro e no último mês da locação. Nos meses sem cobrança de aluguel (carência), não há contribuição.
+
+**Parágrafo primeiro** – O FCI é uma antecipação, feita pelo LOCATÁRIO, dos recursos destinados aos reparos de sua responsabilidade e à restituição do imóvel no estado em que o recebeu, nos termos da cláusula {cl:vistoria} e do art. 23, incisos III e V, da Lei nº 8.245/1991. O FCI não é aluguel nem encargo da locação, não constitui garantia locatícia e não se confunde com a garantia prevista neste contrato.
+
+**Parágrafo segundo** – O FCI não poderá ser utilizado para pagar aluguéis, encargos, contas de consumo, tributos, multas ou quaisquer débitos que não sejam reparos de danos ao imóvel, nem poderá o LOCATÁRIO compensá-lo com aluguéis ou encargos vencidos ou a vencer.
+
+**Parágrafo terceiro** – Cada contribuição será corrigida mês a mês pela variação d{fci_indice}, a partir do mês seguinte ao de seu pagamento e até a data da devolução, e o saldo do FCI nunca será inferior à soma das contribuições pagas. O LOCATÁRIO poderá solicitar, a qualquer tempo, o extrato das contribuições e do saldo corrigido.
+
+**Parágrafo quarto** – A multa e os juros por atraso previstos neste contrato não incidem sobre a contribuição ao FCI, que não integra a base de cálculo da bonificação por pontualidade e acompanha automaticamente os reajustes do aluguel.
+
+**Parágrafo quinto** – Finda a locação, com a entrega das chaves e a vistoria de saída, que o LOCATÁRIO poderá acompanhar, {l:a LOCADORA poderá|as LOCADORAS poderão} utilizar o saldo corrigido do FCI exclusivamente para custear os reparos dos danos apurados em comparação com a vistoria de entrada, excluído o desgaste natural decorrente do uso normal do imóvel, mediante apresentação ao LOCATÁRIO do relatório da vistoria e dos orçamentos ou comprovantes dos serviços.
+
+**Parágrafo sexto** – O saldo remanescente do FCI, corrigido conforme o parágrafo terceiro, será devolvido ao LOCATÁRIO em até 30 (trinta) dias contados da vistoria de saída ou da conclusão dos reparos, o que ocorrer por último, por depósito na conta por ele indicada. Não havendo danos, o saldo integral corrigido será devolvido no mesmo prazo.
+
+**Parágrafo sétimo** – Se o custo dos reparos ultrapassar o saldo do FCI, a diferença continuará devida pelo LOCATÁRIO, nos termos deste contrato.
+
+**Parágrafo oitavo** – Havendo transferência do contrato a novo titular, com a anuência {l:da LOCADORA|das LOCADORAS}, o saldo do FCI acompanha a locação e será acertado com o titular que entregar as chaves, salvo ajuste diverso, por escrito, entre os titulares.[fim]`;
+
 const RESTITUICAO = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.
 
 **CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.
@@ -98,6 +124,8 @@ const RESTITUICAO = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da 
 **CLÁUSULA #** – No caso de o imóvel ser colocado à venda, obedecido o direito de preferência do LOCATÁRIO na compra, conforme valor e condições apresentadas, este se obriga a permitir a visita de possíveis interessados, em horário de no mínimo duas horas diárias, nunca antes das 8h nem após as 20h.
 
 **Parágrafo único** – Com o objetivo de defender o imóvel e acautelar sua integridade contra possíveis esbulhos e depredações, {l:fica a LOCADORA autorizada|ficam as LOCADORAS autorizadas} a tomar posse do imóvel independentemente de procedimento judicial prévio, se ficar comprovado o abandono do imóvel pelo LOCATÁRIO.
+
+${CLAUSULAS_FCI}
 
 ## RENOVAÇÃO DO CONTRATO
 

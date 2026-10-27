@@ -225,6 +225,7 @@ function caixaSaida(c) {
     const temVistoria = R.vistoriasDo(d(), c.id).some((v) => v.tipo === 'Saída');
     return `<div class="cartao" id="saida"><div class="cabecalho"><h2>Saída em ${dataBr(c.data_saida)}</h2>
         <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo.')}</div></div>
+      ${(() => { const s = R.saldoFci(d(), c); return s.depositos.length ? `<div class="alerta info">💰 Crédito do inquilino no FCI: <b>${reais(s.corrigido)}</b>${s.ate ? ` (corrigido até ${compBr(s.ate)})` : ' (sem correção: use "Calcular atualização" na caixa do FCI)'}. Paga só os reparos de danos da vistoria de saída; o que sobrar volta ao inquilino.</div>` : ''; })()}
       <div class="alerta aviso">Falta o cálculo final. ${temVistoria ? '' : `Faça antes a ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'vistoria de saída', '')} (com a leitura dos relógios). `}${link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno')}</div></div>`;
   }
   const lembrete = R.alertaTitularidade(d(), c);
@@ -232,11 +233,29 @@ function caixaSaida(c) {
     ${lembrete ? `<div class="alerta aviso"><b>Lembrete</b> ${esc(lembrete.texto)} ${opera() && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, 'Registrar protocolo') : ''}</div>` : ''}
     <div class="grade">
     ${item('Garantia a devolver', reais(e.garantia_valor))}${item('Correção (poupança)', `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}
-    ${item('Débitos descontados', reais(e.debitos))}${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
+    ${item('Débitos descontados', reais(e.debitos))}
+    ${e.fci_credito ? `${item('💰 FCI corrigido (crédito do inquilino)', reais(e.fci_credito))}${item('Reparos de danos pagos com o FCI', reais(e.fci_usado || 0))}${item('FCI a devolver', reais(e.fci_devolver || 0))}` : ''}
+    ${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
     ${item('Vistoria de saída', esc(e.vistoria_saida || '-'))}</div>
+    ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
     ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
     ${podeUsuario('admin') ? botao('excluir', 'Desfazer cálculo final', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo final da saída? A data de saída e a leitura dos relógios continuam.') : ''}</div>`;
+}
+
+/** FCI (fundo de conservação do imóvel): valor do mês, soma paga e saldo corrigido pelos índices do Banco Central. */
+function caixaFci(c) {
+  const s = R.saldoFci(d(), c);
+  if (!R.temFci(c) && !s.depositos.length) return '';
+  const aluguel = R.aluguelAtual(d(), c);
+  const bonificado = aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c));
+  return `<div class="cartao" id="fci"><div class="cabecalho"><h2>💰 FCI: fundo de conservação do imóvel</h2>${opera() && s.depositos.length ? botao('calcularFci', 'Calcular atualização', { id: c.id }, 'secundario') : ''}</div>
+    <div class="grade">${item('Cobrado por mês', R.temFci(c) ? `${reais(R.fciDoMes(c, bonificado, 0))} <span class="suave">(${pct(c.fci_percentual)} de ${reais(bonificado)})</span>` : 'não cobra mais')}
+      ${item('Pago até agora', `${reais(s.total)} <span class="suave">(${s.depositos.length} mês(es))</span>`)}
+      ${item(`Corrigido (${esc(c.fci_indice || 'índice não escolhido')})`, s.ate ? `<span class="maior">${reais(s.corrigido)}</span><br><span class="suave">índices até ${compBr(s.ate)} · calculado em ${dataBr(s.calculado_em)}</span>` : `${reais(s.corrigido)}<br><span class="suave">${s.depositos.length ? 'clique em "Calcular atualização"' : 'sem pagamentos ainda'}</span>`)}</div>
+    ${s.depositos.length ? `<details><summary>Pagamentos (${s.depositos.length})</summary><div class="rolagem"><table><tr><th>Aluguel de</th><th>Pago em</th><th class="n">Valor</th><th class="n">Corrigido</th></tr>
+      ${s.depositos.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td><td class="n">${reais(x.corrigido)}</td></tr>`).join('')}</table></div></details>` : ''}
+    <p class="suave">Entra no boleto todo mês, fora da NF, da multa e dos juros. Cada pagamento é corrigido a partir do mês seguinte (nunca fica abaixo do que foi pago). Na saída, paga só os reparos de danos da vistoria (nunca aluguel ou contas); o que sobrar volta corrigido ao inquilino.</p></div>`;
 }
 
 /** Histórico das leituras dos relógios de água, energia e gás. */
@@ -266,7 +285,9 @@ function linhaIncluso(c) {
     const l = itens.filter(([, , v]) => (sit ? v === sit : !R.SITUACOES.includes(v)));
     return l.length ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t]) => `<span class="ic ${cls}">${s} ${esc(t)}</span>`).join('')}` : '';
   }).filter(Boolean);
-  return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
+  // FCI: só aparece quando o contrato cobra (com o % do aluguel bonificado)
+  const fci = R.temFci(c) ? `<span class="sep"></span><a href="#/contrato/${c.id}?ir=fci" class="ic inq" title="Fundo de conservação do imóvel">💰 FCI ${pct(c.fci_percentual)}</a>` : '';
+  return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${fci}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
@@ -527,6 +548,7 @@ export function telaContrato(c) {
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaGarantia(c)}
+    ${caixaFci(c)}
     ${novo ? contas : ''}
     ${caixaBoletosInquilino(c, cobs, hoje)}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>

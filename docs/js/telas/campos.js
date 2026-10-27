@@ -175,7 +175,7 @@ export const CAMPOS_GARANTIA_HERDADA = ['garantia_tipo', 'caucao_meses', 'caucao
 
 /** Valores e boleto e reserva que vêm iguais do contrato anterior na troca de titular (travados no formulário). */
 export const CAMPOS_VALORES_HERDADOS = ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'bonificacao', 'dia_vencimento', 'cobranca_mes_seguinte',
-  'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
+  'taxa_boleto', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
 
 /** Trava campos do formulário (só leitura, em cinza); ``valores`` (já no formato da tela) troca o que estiver escrito. */
 function travarCampos(form, nomes, valores = {}) {
@@ -404,6 +404,32 @@ async function acumuladoNoBancoCentral(serie, mesRef) {
   const todos = Array.from({ length: 12 }, (_, k) => C.somarMeses(de, k));
   const falta = todos.filter((m) => !Number.isFinite(meses.get(m)));
   return falta.length ? { falta } : { percentual: C.acumuladoDosMeses(todos.map((m) => meses.get(m))), de };
+}
+
+/** Séries mensais para corrigir o FCI: as do reajuste mais a poupança (rendimento do mês) e a SELIC do mês. */
+const SERIES_FCI = { ...SERIES_BC, Poupança: 196, SELIC: 4390 };
+
+/**
+ * FCI: % de cada mês do índice, de ``de`` a ``ate`` ('AAAA-MM'), no Banco Central: { 'AAAA-MM': % }.
+ * Os meses que ainda não saíram ficam de fora (a correção para no último mês publicado).
+ */
+export async function indicesMensaisFci(indice, de, ate) {
+  const serie = SERIES_FCI[indice];
+  if (!serie) throw new Error(`O índice "${indice}" não está no Banco Central. Escolha outro índice do FCI em "Editar".`);
+  const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
+  // o Banco Central às vezes recusa consultas seguidas: tenta até 3 vezes, com uma pausa entre elas
+  let lista = null;
+  for (let n = 1; n <= 3 && !lista; n += 1) {
+    try {
+      const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`);
+      if (resp.ok) lista = await resp.json();
+    } catch { /* sem internet ou Banco Central ocupado */ }
+    if (!lista && n < 3) await new Promise((ok) => { setTimeout(ok, 2000 * n); });
+  }
+  if (!lista) throw new Error('Não deu para consultar o Banco Central agora (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.');
+  const out = {};
+  for (const x of Array.isArray(lista) ? lista : []) if (Number.isFinite(Number(x.valor))) out[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`] = Number(x.valor);
+  return out;
 }
 
 /** Tela Reajustes: ao escolher o índice ou o mês, traz o acumulado do Banco Central para o campo do % (sem salvar). */

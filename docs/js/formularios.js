@@ -65,7 +65,7 @@ const PREENCHE_CNPJ = (alvos) => ({ preencher: { fonte: 'cnpj', ...alvos } });
 const CEP_DA_PESSOA = (prefixo, extra = {}) => campo(`${prefixo}cep_busca`, 'CEP (preenche o endereço)', 'cep', { virtual: true, preencher: { fonte: 'cep', linha: 'endereco' },
   ajuda: 'Digite o CEP: rua, bairro, cidade e Estado vão para o endereço. Depois complete o número', ...extra });
 
-/** Mostra o campo só quando outro campo tem um destes valores (caixa de seleção marcada = '1'). */
+/** Mostra o campo só quando outro campo tem um destes valores (caixa de seleção marcada = '1'; '*' = qualquer valor preenchido). */
 const quando = (campoNome, ...valores) => ({ mostrarSe: { campo: campoNome, valores } });
 const GARANTIA_FIADOR = quando('garantia_tipo', 'Fiador', 'Fiador + depósito');
 /** Limites de texto para não estourar as linhas da NF (planilha). */
@@ -144,6 +144,9 @@ export const RESSARCIMENTO = [
 /** Contas do imóvel e quem paga cada uma, conforme o contrato. */
 export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_internet', 'Internet / TV'], ['conta_condominio', 'Condomínio']];
 export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+
+/** Índices para corrigir o FCI (séries mensais do Banco Central). */
+export const INDICES_FCI = ['Poupança', 'IPCA', 'IGP-M', 'INPC', 'IGP-DI', 'SELIC'];
 /** Relógios lidos na entrada e na saída do inquilino. */
 export const LEITURAS = [['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás']];
 
@@ -268,6 +271,8 @@ export const CONTRATO = [
   secao('O que está incluso no contrato'),
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
+  campo('fci_percentual', 'FCI: fundo de conservação (% do aluguel bonificado)', 'pct', { ajuda: 'Em branco: não cobra. Ex.: 5 → 5% de R$ 1.800,00 = R$ 90,00 por mês no boleto, guardados para os reparos na saída' }),
+  campo('fci_indice', 'Correção mensal do FCI', 'opcao', { opcoes: INDICES_FCI, ...quando('fci_percentual', '*'), ajuda: 'Índice do Banco Central usado para corrigir o saldo do FCI mês a mês' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais', 'area', { linha: true, ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Valores e boleto'),
@@ -427,6 +432,8 @@ export const ENCERRAMENTO = [
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct'),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
+  campo('fci_credito', 'FCI corrigido: crédito do inquilino', 'dinheiro', { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
+  campo('fci_danos', 'Reparos de danos pagos com o FCI', 'dinheiro', { ajuda: 'Só danos apurados na vistoria de saída (nunca aluguel ou contas). O que passar do FCI vira débito; o que sobrar do FCI volta ao inquilino' }),
   campo('vistoria_saida', 'Vistoria de saída', 'opcao', { opcoes: ['Sem pendências', 'Com pendências', 'Contestada', 'Não feita'] }),
   campo('observacoes', 'Observações', 'area'),
 ];
@@ -478,6 +485,7 @@ export const COBRANCA = [
   campo('iptu', 'IPTU', 'dinheiro'),
   campo('seguro', 'Seguro', 'dinheiro'),
   campo('taxa_boleto', 'Taxa do boleto', 'dinheiro'),
+  campo('fci', 'FCI (fundo de conservação do imóvel)', 'dinheiro', { ajuda: 'Fora da NF, da multa e dos juros' }),
   campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
   campo('outros_descricao', 'Motivo do ajuste', 'texto', { ajuda: 'Ex.: reforma do banheiro, acerto do mês anterior' }),
   campo('reserva_utilizada', 'Reserva utilizada', 'dinheiro'),
