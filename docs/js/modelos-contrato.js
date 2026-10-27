@@ -228,7 +228,70 @@ E por estarem de acordo, as partes assinam este Termo Aditivo em duas vias de ig
 
 [assinaturas]`;
 
-/** ``tipo``: "aditivo" para os termos aditivos (sem tipo: contrato). */
+/**
+ * Termo aditivo de troca de inquilino (herança do contrato): sai o titular anterior, entra o novo, com a anuência da
+ * locadora (Lei 8.245/91, art. 13). Campos e condições em dadosDoAditivo (contratos.js); {a:...|...} = saintes, {s:...|...} = entrantes.
+ * Débitos até a véspera ficam com quem sai (sem quitação); a garantia em dinheiro continua na locação e passa a ser devolvida a quem entra.
+ */
+const ADITIVO_TROCA = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
+
+## SUBSTITUIÇÃO DO LOCATÁRIO (TRANSFERÊNCIA DO CONTRATO)
+
+**#i. {l:LOCADORA|LOCADORAS}:** {locadoras}, doravante {l:denominada|denominadas} simplesmente {l:LOCADORA|LOCADORAS}.
+
+**#i. {a:LOCATÁRIO SAINTE|LOCATÁRIOS SAINTES}:** {saintes}, doravante {a:denominado simplesmente LOCATÁRIO SAINTE|denominados simplesmente LOCATÁRIOS SAINTES}.
+
+**#i. {s:LOCATÁRIO ENTRANTE|LOCATÁRIOS ENTRANTES}:** {entrantes}, doravante {s:denominado simplesmente LOCATÁRIO ENTRANTE|denominados simplesmente LOCATÁRIOS ENTRANTES}.
+
+[se fiador]**#i. {f:FIADOR|FIADORES}:** {fiadores}, doravante {f:denominado|denominados} simplesmente {f:FIADOR|FIADORES}.[fim]
+
+As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, para substituir o locatário, com o consentimento prévio e por escrito {l:da LOCADORA|das LOCADORAS} exigido pelo art. 13 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+
+## DA SUBSTITUIÇÃO DO LOCATÁRIO
+
+**CLÁUSULA #** – A partir de {data_troca}, {a:o LOCATÁRIO SAINTE retira-se|os LOCATÁRIOS SAINTES retiram-se} da locação e {a:transfere|transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} a sua posição no contrato, com todos os direitos e obrigações dele decorrentes. {s:O LOCATÁRIO ENTRANTE aceita e assume|Os LOCATÁRIOS ENTRANTES aceitam e assumem} a condição de {s:locatário|locatários} para todos os fins de direito, e {l:a LOCADORA consente|as LOCADORAS consentem} expressamente com esta transferência.
+
+[se varios_entrantes]**Parágrafo único** – Os LOCATÁRIOS ENTRANTES respondem solidariamente entre si por todas as obrigações da locação (art. 2º da Lei nº 8.245/91).[fim]
+
+**CLÁUSULA #** – Continuam as condições em vigor do contrato: aluguel mensal de **{aluguel_atual}**[se bonificacao], com bonificação de {bonificacao_percentual} para pagamento até o vencimento[fim], com vencimento todo dia {dia_vencimento} de cada mês e reajuste anual pela variação d{indice}, no aniversário do contrato original.
+
+## DOS DÉBITOS ATÉ A DATA DA TROCA
+
+**CLÁUSULA #** – {a:O LOCATÁRIO SAINTE responde|Os LOCATÁRIOS SAINTES respondem} pelos aluguéis, encargos, contas de consumo (água, energia elétrica e gás), taxas de condomínio, IPTU e demais obrigações da locação referentes ao período até {data_vespera}, ainda que cobrados ou apurados depois desta data. A partir de {data_troca}, essas obrigações passam a ser {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.
+
+**Parágrafo único** – Este termo não dá quitação dos valores do período {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}, que poderão ser cobrados a qualquer tempo. Eventual acerto entre quem sai e quem entra sobre esses valores vale só entre eles e não obriga {l:a LOCADORA|as LOCADORAS}.
+
+## DO ESTADO DO IMÓVEL
+
+**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE declara|Os LOCATÁRIOS ENTRANTES declaram} conhecer o estado de conservação do imóvel, conforme o relatório da vistoria de entrada que integra o contrato, e {s:assume|assumem} a obrigação de restituí-lo, ao fim da locação, no estado descrito nessa vistoria, ressalvado o desgaste natural pelo uso normal.
+
+## DA GARANTIA
+
+[se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
+
+**Parágrafo único** – A caução continua a ser atualizada a cada reajuste anual do aluguel, conforme o contrato, e será devolvida {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
+
+[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.[fim]
+
+[se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} conhecer e aceitar a substituição do locatário e {f:garante|garantem} as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, nas condições do contrato, até a entrega real e definitiva das chaves.[fim]
+
+[se seguro_fianca]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE apresentará|Os LOCATÁRIOS ENTRANTES apresentarão}, em até 30 (trinta) dias, o seguro fiança locatícia em seu nome, ou o endosso da apólice em vigor, sob pena de infração contratual.[fim]
+
+[se sem_garantia]**CLÁUSULA #** – A locação continua sem garantia, como no contrato.[fim]
+
+## DISPOSIÇÕES FINAIS
+
+**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE transferirá|Os LOCATÁRIOS ENTRANTES transferirão} para o seu nome, em até 30 (trinta) dias, a titularidade das contas de consumo que estejam a seu cargo no contrato, com a colaboração {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.[se seguro_inquilino] O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]
+
+**CLÁUSULA #** – Permanecem em vigor todas as demais cláusulas e condições do contrato de locação não alteradas por este Termo Aditivo, que passa a fazer parte integrante dele.
+
+E por estarem de acordo, as partes assinam este Termo Aditivo em vias de igual teor e forma, uma para cada parte[se testemunhas], na presença das testemunhas abaixo[fim].
+
+> {cidade}, {data_assinatura}.
+
+[assinaturas]`;
+
+/** ``tipo``: "aditivo" (troca do vencimento) e "aditivo_troca" (troca de inquilino) para os termos aditivos (sem tipo: contrato). */
 export const MODELOS_PADRAO = [
   {
     nome: 'Residencial',
@@ -282,5 +345,10 @@ ${FINAIS(`
     nome: 'Aditivo de vencimento (a pedido do inquilino)',
     tipo: 'aditivo',
     texto: ADITIVO_VENCIMENTO,
+  },
+  {
+    nome: 'Aditivo de troca de inquilino (herança do contrato)',
+    tipo: 'aditivo_troca',
+    texto: ADITIVO_TROCA,
   },
 ];

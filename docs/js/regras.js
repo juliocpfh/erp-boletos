@@ -2549,6 +2549,31 @@ export function salvarAditivoVencimento(d, contratoId, f, usuario, id = null) {
   return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de vencimento gerado (aguardando assinatura)`);
 }
 
+/**
+ * Gera (ou altera) o termo aditivo de troca de inquilino (herança do contrato), ainda sem assinatura. Só no contrato que
+ * continua o de outro titular. ``f``: data, testemunhas, modelo_id e texto. A troca vale a partir da entrada do novo
+ * titular; o aluguel gravado é o vigente nessa data (ex.: troca em 27/04/2026 → aluguel de 27/04/2026).
+ */
+export function salvarAditivoTroca(d, contratoId, f, usuario, id = null) {
+  const c = buscar(d, 'contratos', contratoId);
+  const ant = contratoHerdado(d, c);
+  const atual = id ? buscar(d, 'aditivos', id) : null;
+  if (atual && atual.arquivo) throw new Error('Este termo aditivo já foi assinado e não pode mais ser alterado.');
+  if (!ant) throw new Error('Este inquilino não continua o contrato de outro: o termo de troca de inquilino é gerado no contrato do novo titular.');
+  if (!f.data) throw new Error('Informe a data do termo aditivo.');
+  if (!String(f.texto || '').trim()) throw new Error('O texto do termo aditivo está vazio.');
+  const troca = c.data_entrada || c.vigencia_inicio || f.data;
+  const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: 'Troca de titular', data: f.data, aluguel: aluguelAtual(d, c, troca),
+    testemunhas: (f.testemunhas || []).filter((t) => t && t.nome), modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null), texto: String(f.texto),
+    assunto: `Troca de titular: ${ant.inquilino_nome} → ${c.inquilino_nome}, a partir de ${C.dataBr(troca)}`, arquivo: null };
+  if (atual) {
+    atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
+    return atual;
+  }
+  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de troca de inquilino gerado (aguardando assinatura)`);
+}
+
 /** Anexa o arquivo assinado ao termo gerado pelo sistema: passa a contar como termo aditivo registrado. */
 export function assinarAditivo(d, id, { data, arquivo }, usuario) {
   const a = buscar(d, 'aditivos', id);
