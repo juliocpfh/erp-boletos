@@ -139,7 +139,7 @@ export function cartaReajuste(c, comp) {
   let caucao = R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: R.valorGarantia(d(), c) } : null;
   if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
   return `<div class="carta">
-    ${d().logo ? `${K.marcaDagua(d().logo)}<p><img class="carta-logo" src="${esc(d().logo)}" alt="Logo"></p>` : ''}
+    ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
     <p class="carta-data">${esc((i && i.cidade) || 'Curitiba')}, ${dataExtenso(C.hojeIso())}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
     <p>Com o aluguel de <b>${MESES[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>

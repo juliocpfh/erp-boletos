@@ -416,20 +416,27 @@ const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/mai
   + 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
   + 'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
 const EMU_CM = 360000;
+/**
+ * Logo da 1ª folha, igual em todos os documentos (imprimir, PDF, Word, carta): até 6 × 6 cm, centralizada, a 1 cm da borda de cima,
+ * com 0,3 cm até o título. Os mesmos números estão em ``.ct-capa`` (estilo.css) e em ``pdfDoDocumento``.
+ */
+export const LOGO = { larguraCm: 6, topoCm: 1, espacoCm: 0.3 };
 
 const runX = (r, extra = '') => `<w:r><w:rPr>${r.b ? '<w:b/>' : ''}${extra}</w:rPr><w:t xml:space="preserve">${escX(r.t)}</w:t></w:r>`;
 const parX = (runs, { alinhar = 'both', antes = 0, depois = 120, recuo = 0, rPr = '' } = {}) => `<w:p><w:pPr><w:spacing w:before="${antes}" w:after="${depois}" w:line="300" w:lineRule="auto"/>${recuo ? `<w:ind w:firstLine="${recuo}"/>` : ''}<w:jc w:val="${alinhar}"/></w:pPr>${runs.map((r) => runX(r, rPr)).join('')}</w:p>`;
 
-function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, transparencia = 0 } = {}) {
+function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo = null, transparencia = 0 } = {}) {
   const cx = Math.round(larguraCm * EMU_CM);
   const cy = Math.round(alturaCm * EMU_CM);
   const pic = `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="logo${id}.png"/><pic:cNvPicPr/></pic:nvPicPr>`
     + `<pic:blipFill><a:blip r:embed="${rId}">${transparencia ? `<a:alphaModFix amt="${Math.round((1 - transparencia) * 100000)}"/>` : ''}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
     + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
-  if (!ancora) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
-  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1">`
-    + '<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>'
-    + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="Marca ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
+  if (!ancora && topo === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
+  // ``topo`` (cm): logo da capa presa a essa distância da borda de cima da folha, com o texto abaixo dela; sem ``topo``: marca-d'água no centro, atrás do texto
+  const capa = topo !== null;
+  return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}">`
+    + `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo * EMU_CM)}</wp:posOffset>` : '<wp:align>center</wp:align>'}</wp:positionV>`
+    + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? '<wp:wrapTopAndBottom/>' : '<wp:wrapNone/>'}<wp:docPr id="${id}" name="${capa ? 'Logo' : 'Marca'} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
 }
 
 /**
@@ -451,7 +458,11 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + `${borda ? '' : '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'}`
     + `${cab ? '<w:shd w:val="clear" w:color="auto" w:fill="E5E7EB"/>' : destaque ? '<w:shd w:val="clear" w:color="auto" w:fill="FEF3C7"/>' : ''}</w:tcPr>${conteudo}</w:tc>`;
   const parCel = (t, { b = false, centro = false, rPr = '' } = {}) => `<w:p><w:pPr><w:spacing w:before="20" w:after="20" w:line="260" w:lineRule="auto"/>${centro ? '<w:jc w:val="center"/>' : ''}</w:pPr>${runX({ t, b }, rPr)}</w:p>`;
-  if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${imagemX(1, 'rIdLogo', 4, 4 * prop)}</w:p>`);
+  if (logo) {
+    // logo da capa: no máximo 6 × 6 cm, mantendo a proporção; presa a 1 cm do topo da folha, o texto começa logo abaixo
+    const lado = prop > 1 ? LOGO.larguraCm / prop : LOGO.larguraCm;
+    corpo.push(`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${imagemX(1, 'rIdLogo', lado, lado * prop, { topo: LOGO.topoCm })}</w:p>`);
+  }
   for (const b of blocos) {
     if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));

@@ -98,12 +98,16 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   const largura = 210 - 2 * margemLado;
   const pxMm = el.offsetWidth / largura;
   const [margemTopo, margemPe] = [12, 24];
+  // 1ª folha: começa na logo (sem a margem branca da caixa), que fica a 1 cm da borda de cima, como na impressão e no Word
+  const capa = el.querySelector('.ct-capa');
+  const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo) : 0;
+  const topoDa = (n) => (n || !capa ? margemTopo : K.LOGO.topoCm * 10);
   const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
   const total = el.offsetHeight;
   const fatias = [];
-  for (let ini = 0; ini < total - 1;) {
+  for (let ini = inicio; ini < total - 1;) {
     if (fatias.length && !cortes.some((y) => y > ini + 2)) break; // depois do último bloco só há espaço em branco
-    let fim = ini + alturaFolha;
+    let fim = ini + alturaFolha + (fatias.length ? 0 : (margemTopo - topoDa(0)) * pxMm);
     if (fim >= total) fim = total;
     else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
     fatias.push([ini, fim]);
@@ -116,8 +120,8 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     pedaco.width = canvas.width;
     pedaco.height = Math.round((fim - ini) * escala);
     pedaco.getContext('2d').drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
-    pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', margemLado, margemTopo, largura, (fim - ini) / pxMm);
-    for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, margemTopo + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
+    pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', margemLado, topoDa(n), largura, (fim - ini) / pxMm);
+    for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
     pdf.setFontSize(8).setTextColor(102);
     pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: 'right' });
     pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
@@ -287,8 +291,8 @@ function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
   const anteriores = new Map(((v && v.itens) || (entrada ? [] : base.itens) || []).filter((x) => x.situacao !== K.NAO_SE_APLICA).map((x) => [chave(x), x]));
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [chave(x), x.situacao]));
   const comodos = K.lerModeloVistoria(i.modelo_vistoria);
-  // itens já marcados que saíram do modelo continuam aparecendo
-  for (const x of anteriores.values()) {
+  // vale o modelo do imóvel: item tirado do modelo sai também desta vistoria. Só sem modelo aparecem os itens já marcados
+  if (!comodos.length) for (const x of anteriores.values()) {
     let g = comodos.find((y) => y.comodo === x.comodo);
     if (!g) comodos.push((g = { comodo: x.comodo, itens: [] }));
     if (!g.itens.includes(x.item)) g.itens.push(x.item);
@@ -298,19 +302,20 @@ function gradeVistoria(i, v, base, entrada, linkModelo = () => '') {
   const opcoes = (sel) => `<option value=""></option>${[...K.SITUACOES_VISTORIA, ...(sel && !K.SITUACOES_VISTORIA.includes(sel) ? [sel] : [])].map((o) => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('')}`;
   return `<h2>Situação por cômodo</h2>
     <p class="suave">Marque a situação de cada item. Os botões do cômodo preenchem os itens ainda sem situação; depois mude só o que diverge e anote a observação e o nº da foto.
-      "Apagar tudo" limpa o cômodo. "Não se aplica" tira o item da tabela e, ao salvar, também do modelo do imóvel. Item sem situação não sai no documento. O que você marcar fica guardado mesmo se sair para editar o modelo.
+      "Apagar tudo" limpa o cômodo. "Não se aplica" tira o item da tabela e, ao salvar, também do modelo do imóvel. Todo item precisa de situação para salvar. Item tirado do modelo sai também desta vistoria. O que você marcar fica guardado mesmo se sair para editar o modelo.
       ${entrada ? 'Na saída, o que ficar pior que na entrada sai destacado.' : ''} ${linkModelo('Editar o modelo do imóvel')}</p>
     ${comodos.map((g, ci) => `<div class="vistoria-comodo"><div class="cabecalho"><h3>${esc(g.comodo)}</h3><div class="acoes">
       ${ESTADOS_COMODO.map(([valor, texto]) => botao('vistoriaTudo', texto, { comodo: ci, valor })).join('')}${entrada ? botao('vistoriaTudo', 'Igual à entrada', { comodo: ci, valor: 'entrada' }) : ''}
       ${botao('vistoriaApagar', 'Apagar tudo', { comodo: ci }, 'perigo pequeno')}</div></div>
-      <div class="rolagem"><table class="grade-vistoria"><tr><th>Item</th>${entrada ? '<th>Na entrada</th>' : ''}<th>Situação</th><th>Observação / nº da foto</th></tr>
+      <div class="rolagem"><table class="grade-vistoria"><colgroup><col class="g-item">${entrada ? '<col class="g-entrada">' : ''}<col class="g-situacao"><col></colgroup>
+      <tr><th>Item</th>${entrada ? '<th>Na entrada</th>' : ''}<th>Situação</th><th>Observação / nº da foto</th></tr>
       ${g.itens.map((item) => {
     const n = k++;
     const a = anteriores.get(`${g.comodo}|${item}`) || {};
     const ent = naEntrada.get(`${g.comodo}|${item}`) || '';
     return `<tr><td>${esc(item)}<input type="hidden" name="ic_${n}" value="${esc(g.comodo)}"><input type="hidden" name="ii_${n}" value="${esc(item)}"></td>
       ${entrada ? `<td class="suave">${esc(ent || '—')}</td>` : ''}
-      <td><select name="is_${n}" data-comodo="${ci}" data-entrada="${esc(ent)}" class="${K.piorou(ent, a.situacao) ? 'piorou' : ''}">${opcoes(a.situacao)}</select></td>
+      <td><select name="is_${n}" required data-comodo="${ci}" data-entrada="${esc(ent)}" class="${K.piorou(ent, a.situacao) ? 'piorou' : ''}">${opcoes(a.situacao)}</select></td>
       <td><input name="io_${n}" data-comodo="${ci}" value="${esc(a.obs || '')}"></td></tr>`;
   }).join('')}</table></div></div>`).join('')}`;
 }
