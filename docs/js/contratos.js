@@ -137,6 +137,8 @@ export function textoIndice(nome) {
     INPC: 'INPC (Índice Nacional de Preços ao Consumidor), do IBGE',
     'IGP-DI': 'IGP-DI (Índice Geral de Preços – Disponibilidade Interna), da Fundação Getulio Vargas',
     IVAR: 'IVAR (Índice de Variação de Aluguéis Residenciais), da Fundação Getulio Vargas',
+    Poupança: 'índice de rendimento mensal da caderneta de poupança, divulgado pelo Banco Central do Brasil',
+    SELIC: 'taxa SELIC acumulada no mês, divulgada pelo Banco Central do Brasil',
   };
   const n = String(nome || '');
   const partes = n.replace(/\(.*\)/, '').split('/').map((x) => x.trim()).filter(Boolean);
@@ -208,6 +210,8 @@ export function dadosDoContrato(d, c, extra = {}) {
     multa: percentualComExtenso(c.multa_percentual ?? 2),
     juros: percentualComExtenso(c.juros_mensal_percentual ?? 1),
     tarifa_boleto: '', // a tarifa de cobrança não sai no contrato (pedido do usuário)
+    fci_percentual: percentualComExtenso(c.fci_percentual || 0),
+    fci_indice: textoIndice(c.fci_indice),
     encargos_inquilino: lista([...inquilinoPaga, 'telefone', 'dedetização', 'limpeza de calhas']),
     encargos_inclusos: lista(inclusos),
     caucao_valor: valorComExtenso(caucaoValor),
@@ -222,7 +226,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     seguro_fianca: c.garantia_tipo === 'Seguro fiança', sem_garantia: !c.garantia_tipo || c.garantia_tipo === 'Sem garantia',
     solidario: !!c.solidario_nome, pj, residencial: c.finalidade !== 'Não residencial', nao_residencial: c.finalidade === 'Não residencial',
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
-    tem_incluso: inclusos.length > 0, tarifa_boleto: false, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
+    tem_incluso: inclusos.length > 0, tarifa_boleto: false, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
     indeterminado: c.prazo_tipo === 'Indeterminado', testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
   };

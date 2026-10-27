@@ -3,6 +3,7 @@
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
 import { locadorasDoContrato } from './contratos.js';
+import { CLAUSULAS_FCI } from './modelos-contrato.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
@@ -72,6 +73,11 @@ export function normalizar(d) {
     if (!s.contrato_id) s.contrato_id = contratoDoSeguro(d, s);
     const c = s.contrato_id && d.contratos.find((x) => x.id === s.contrato_id);
     if (c) s.imovel_id = c.imovel_id; // acompanha o imóvel do contrato (ex.: "Corrigir imóvel")
+  }
+  // cláusulas do FCI (só saem com o FCI ativado) entram nos modelos de contrato já gravados, antes da renovação
+  for (const m of d.modelos_contrato || []) {
+    if (m.tipo || !m.texto || m.texto.includes('[se fci]') || !m.texto.includes('## RENOVAÇÃO DO CONTRATO')) continue;
+    m.texto = m.texto.replace('## RENOVAÇÃO DO CONTRATO', `${CLAUSULAS_FCI}\n\n## RENOVAÇÃO DO CONTRATO`);
   }
   // o Estado (UF) do imóvel passou a ser guardado: vem do CEP
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
@@ -741,6 +747,46 @@ function parcelasDoMes(lista, comp, rotulo) {
 export const segurosDoContrato = (d, contratoId) => d.seguros.filter((s) => contratoId && s.contrato_id === contratoId);
 
 // --------------------------------------------------------------------------
+// FCI: fundo de conservação do imóvel
+// --------------------------------------------------------------------------
+/** O FCI só vale com o % preenchido no contrato (em branco: não cobra e não aparece). */
+export const temFci = (c) => !!c && c.fci_percentual > 0;
+
+/** FCI do mês: % sobre o aluguel bonificado do boleto (proporcional aos dias; zero na carência). Ex.: 5% de R$ 1.800,00 = R$ 90,00. */
+export const fciDoMes = (c, aluguel, desconto) => (temFci(c) ? C.arred(((aluguel - desconto) * c.fci_percentual) / 100) : 0);
+
+/** Pagamentos do FCI: boletos pagos com FCI deste contrato e dos anteriores da troca de titular (o fundo continua com a locação). */
+export function depositosFci(d, c) {
+  const ids = new Set([c.id, ...cadeiaDeContratos(d, c).antes.map((x) => x.id)]);
+  return d.cobrancas.filter((cb) => ids.has(cb.contrato_id) && cb.data_pagamento && cb.fci > 0)
+    .map((cb) => ({ cobranca_id: cb.id, competencia: cb.competencia, data: cb.data_pagamento, valor: cb.fci }))
+    .sort((a, b) => a.data.localeCompare(b.data) || a.competencia.localeCompare(b.competencia));
+}
+
+/**
+ * Saldo do FCI: soma do que foi pago e o valor corrigido mês a mês pelos índices guardados no contrato ({ 'AAAA-MM': % }).
+ * Cada pagamento recebe os índices a partir do mês seguinte ao do pagamento, até o último mês seguido com índice.
+ * O corrigido nunca fica abaixo do total pago (meses negativos, como no IGP-M, contam, mas não tiram do que foi pago).
+ * Ex.: R$ 90,00 pagos em 05/10/2026, poupança de nov 0,67% e dez 0,68% → 90 × 1,0067 × 1,0068 = R$ 91,22.
+ */
+export function saldoFci(d, c, indices = c.fci_indices || {}) {
+  let ate = null;
+  const depositos = depositosFci(d, c).map((x) => {
+    let fator = 1;
+    let mes = C.somarMeses(x.data.slice(0, 7), 1);
+    while (Number.isFinite(indices[mes])) {
+      fator *= 1 + indices[mes] / 100;
+      if (!ate || mes > ate) ate = mes;
+      mes = C.somarMeses(mes, 1);
+    }
+    return { ...x, corrigido: C.arred(x.valor * fator) };
+  });
+  const total = depositos.reduce((s, x) => s + x.valor, 0);
+  const corrigido = Math.max(depositos.reduce((s, x) => s + x.corrigido, 0), total);
+  return { depositos, total, corrigido, ate, calculado_em: c.fci_calculado_em || null };
+}
+
+// --------------------------------------------------------------------------
 // Carência de aluguel
 // --------------------------------------------------------------------------
 /** [primeira, última] competência da carência, ou null. */
@@ -930,7 +976,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     vencimento: C.vencimentoDaCompetencia(comp, contrato.dia_vencimento || 10, contrato.cobranca_mes_seguinte !== false),
     dias_cobrados: r.dias_cobrados, dias_mes: r.dias_mes, aluguel_mensal: r.aluguel_mensal,
     aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
-    seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, outros: 0, outros_descricao: '',
+    seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, fci: fciDoMes(contrato, r.aluguel, r.desconto), outros: 0, outros_descricao: '',
     reserva_utilizada: r.reserva_utilizada, carencia,
     ressarcimento: ressarc.valor, ressarcimento_descricao: ressarc.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && ressarc.valor > 0,
     multa_percentual: contrato.multa_percentual || 0, juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
@@ -962,7 +1008,7 @@ export function gerarCobrancas(d, comp, usuario) {
 
 /** Campos que o recálculo atualiza (o ajuste do mês, as observações e o vencimento alterado à mão ficam). */
 const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'aluguel', 'desconto', 'iptu', 'iptu_parcela', 'seguro',
-  'seguro_parcela', 'taxa_boleto', 'reserva_utilizada', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
+  'seguro_parcela', 'taxa_boleto', 'fci', 'reserva_utilizada', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
@@ -1423,10 +1469,17 @@ export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
 
 export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && !cb.data_pagamento);
 
-/** Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. */
-export function calcularEncerramento(garantia, indicePercentual, debitos) {
+/**
+ * Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. O FCI corrigido paga só
+ * os reparos de danos (nunca aluguel ou contas): o que sobra dele volta ao inquilino e o dano que passar do FCI vira débito.
+ * Ex.: FCI R$ 1.200,00 e danos R$ 800,00 → usa R$ 800,00 e devolve R$ 400,00; danos de R$ 1.500,00 → R$ 300,00 vão para os débitos.
+ */
+export function calcularEncerramento(garantia, indicePercentual, debitos, fci = 0, danos = 0) {
   const corrigida = C.arred((garantia || 0) * (1 + (indicePercentual || 0) / 100));
-  return { garantia_corrigida: corrigida, saldo: corrigida - (debitos || 0) };
+  const fciUsado = Math.min(fci || 0, danos || 0);
+  const fciDevolver = (fci || 0) - fciUsado;
+  const danosAlemDoFci = (danos || 0) - fciUsado;
+  return { garantia_corrigida: corrigida, fci_usado: fciUsado, fci_devolver: fciDevolver, saldo: corrigida + fciDevolver - (debitos || 0) - danosAlemDoFci };
 }
 
 // --------------------------------------------------------------------------
@@ -1463,7 +1516,7 @@ const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_apelido', 
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
-  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade'];
+  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'fci_percentual', 'fci_indice', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade'];
 
 /** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
 export const dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) => c[k] !== undefined && c[k] !== null).map((k) => [k, c[k]]));
@@ -1595,7 +1648,7 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
   if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
   // a leitura da saída é obrigatória e é a mesma da vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
-  const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
+  const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos, dados.fci_credito, dados.fci_danos);
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
     `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
   atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
@@ -2594,6 +2647,7 @@ export function dadosBoleto(d, cb) {
     const parc = /(\d+\/\d+)/.exec(cb.seguro_parcela || '');
     extras.push(`SEGURO${parc ? parc[1] : ''} ${rs(cb.seguro)}`);
   }
+  if (cb.fci) extras.push(`FCI ${rs(cb.fci)}`);
   const iTarifa = extras.length;
   if (cb.taxa_boleto) extras.push(`TARIFA COBRANÇA ${rs(cb.taxa_boleto)}`);
   if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
@@ -2612,7 +2666,9 @@ export function dadosBoleto(d, cb) {
     numero_documento: ((imovel && imovel.nome) || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
     vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
     valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
-    juros_ao_dia: C.jurosAoDia(valor, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
+    // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
+    multa_valor: cb.fci ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
+    juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
   };
 }
 

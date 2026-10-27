@@ -415,9 +415,9 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
   <ul>
     <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
       {finalidade} {atividade} {prazo_meses} {data_inicio} {data_fim} {aluguel_cheio} {aluguel_bonificado} {bonificacao_percentual} {dia_vencimento} {indice}
-      {multa} {juros} {tarifa_boleto} {encargos_inquilino} {encargos_inclusos} {caucao_valor} {caucao_meses} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>.</li>
+      {multa} {juros} {tarifa_boleto} {fci_percentual} {fci_indice} {encargos_inquilino} {encargos_inclusos} {caucao_valor} {caucao_meses} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>.</li>
     <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
-      <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto
+      <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto fci
       area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
     <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
       e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>

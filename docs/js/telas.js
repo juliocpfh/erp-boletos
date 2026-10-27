@@ -49,7 +49,7 @@ export const TELAS = {
     const aplicar = () => regras.forEach((el) => {
       const [campoNome, ...valores] = el.dataset.mostrarSe.split('|');
       const v = valorDe(el.closest('form'), campoNome);
-      if (v !== null) el.hidden = !valores.includes(v);
+      if (v !== null) el.hidden = !(valores.includes(v) || (valores.includes('*') && v.trim() !== ''));
     });
     const nomes = new Set(regras.map((el) => el.dataset.mostrarSe.split('|')[0]));
     for (const n of nomes) raiz.querySelectorAll(`[name="${n}"]`).forEach((el) => el.addEventListener('change', aplicar));

@@ -14,7 +14,7 @@ import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens } from './admin.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
-import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria } from './campos.js';
+import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, d, ehMatricula, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { siglaEmpresa } from './faturas.js';
@@ -655,6 +655,25 @@ export const ACOES = {
   async tirarAjuste({ id }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar.');
     await alterar((db) => R.ajustarBoleto(db, Number(id), 0, '', login()));
+    await mostrar();
+  },
+
+  /** FCI: traz do Banco Central os índices de cada mês desde o primeiro pagamento e guarda no contrato (o saldo corrigido sai deles). */
+  async calcularFci({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    const c = buscar('contratos', id);
+    if (!c.fci_indice) throw new Error('Escolha antes o índice de correção do FCI em "Editar" (O que está incluso no contrato).');
+    const deps = R.depositosFci(d(), c);
+    if (!deps.length) throw new Error('Ainda não há pagamento do FCI para corrigir.');
+    const de = C.somarMeses(deps[0].data.slice(0, 7), 1);
+    const ate = C.competenciaDe(C.hojeIso());
+    if (de > ate) { aviso('Os pagamentos são deste mês: a correção começa no mês que vem.', 'info'); return; }
+    const indices = await indicesMensaisFci(c.fci_indice, de, ate);
+    if (!Object.keys(indices).length) throw new Error(`O ${c.fci_indice} de ${compBr(de)} em diante ainda não saiu no Banco Central.`);
+    await alterar((db) => R.atualizar(db, 'contratos', c.id, { fci_indices: indices, fci_calculado_em: C.hojeIso() }, login(),
+      `FCI corrigido pelo ${c.fci_indice} (Banco Central): ${reais(R.saldoFci(db, R.buscar(db, 'contratos', c.id), indices).corrigido)}`));
+    const s = R.saldoFci(d(), buscar('contratos', id));
+    aviso(`FCI: pago ${reais(s.total)}, corrigido ${reais(s.corrigido)}${s.ate ? ` (índices até ${compBr(s.ate)})` : ''}.`, 'info');
     await mostrar();
   },
 

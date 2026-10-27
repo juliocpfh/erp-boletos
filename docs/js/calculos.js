@@ -225,8 +225,8 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // Composição da cobrança
 // --------------------------------------------------------------------------
-export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0 }, reservaDisponivel = 0) {
-  const encargos = iptu + seguro + taxa_boleto + outros;
+export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0 }, reservaDisponivel = 0) {
+  const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
   // ressarcimento ao inquilino (ex.: taxa extraordinária do condomínio que ele pagou e é do proprietário)
   const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
   const totalPontual = totalSemDesconto - desconto;
@@ -238,6 +238,8 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
     reserva_utilizada: reserva,
     a_pagar_pontual: totalPontual - reserva,
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
+    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel)
+    base_multa: Math.max(totalSemDesconto - reserva - (fci || 0), 0),
   };
 }
 
@@ -289,7 +291,7 @@ export function valorNotaFiscal(aluguel, desconto, multa = 0, juros = 0, pontual
  */
 export function liquidar(cobranca, pagamento) {
   const t = totaisCobranca(cobranca, cobranca.reserva_utilizada || 0);
-  const { dias, multa, juros } = multaEJuros(t.a_pagar_sem_desconto, cobranca.vencimento, pagamento,
+  const { dias, multa, juros } = multaEJuros(t.base_multa, cobranca.vencimento, pagamento,
     cobranca.multa_percentual, cobranca.juros_mensal_percentual);
   const pontual = dias === 0;
   return {

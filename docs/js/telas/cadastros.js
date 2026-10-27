@@ -234,6 +234,9 @@ export const CADASTROS = {
       }
       for (const k of ['desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'carencia_meses']) if (dados[k] === null) dados[k] = 0;
       if (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
+      // FCI: em branco (ou zero) não cobra; com o %, precisa do índice de correção
+      if (dados.fci_percentual !== null && (dados.fci_percentual < 0 || dados.fci_percentual > 100)) erros.fci_percentual = 'Informe um percentual entre 0 e 100, ou deixe em branco';
+      if (!(dados.fci_percentual > 0)) { dados.fci_percentual = null; dados.fci_indice = null; } else if (!dados.fci_indice) erros.fci_indice = 'Escolha o índice de correção do FCI';
       if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = 'Informe um dia entre 1 e 31';
       if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = 'A saída não pode ser antes da entrada';
       if (dados.prazo_tipo === 'Determinado') {
@@ -618,12 +621,14 @@ export const CADASTROS = {
   },
   encerramentos: {
     titulo: (r, q) => `Saída e cálculo final - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => F.ENCERRAMENTO,
+    // FCI: só aparece para quem tem (ou teve) o fundo de conservação
+    campos: (r, q) => { const c = buscar('contratos', q.contrato); return R.temFci(c) || R.depositosFci(d(), c).length ? F.ENCERRAMENTO : F.ENCERRAMENTO.filter((x) => !x.nome.startsWith('fci_')); },
     padrao: (q) => {
       const c = buscar('contratos', q.contrato);
       const aberto = R.cobrancasEmAberto(d(), c.id);
       const lt = R.leituraDo(d(), c.id, 'Saída do inquilino') || {};
       return {
+        fci_credito: R.saldoFci(d(), c).corrigido || null,
         leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.valorGarantia(d(), c),
         debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0),
         debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n'),
@@ -636,7 +641,7 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
       if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
-      for (const k of ['garantia_valor', 'indice_percentual', 'debitos']) if (dados[k] === null) dados[k] = 0;
+      for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos']) if (!dados[k]) dados[k] = 0;
       for (const k of R.relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
     },
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
@@ -707,7 +712,7 @@ export const CADASTROS = {
         if (R.faturasDe(d(), 'cobranca', r.id).length) erros.observacoes_nf = 'A NF já foi numerada. Cancele a NF (ou desfaça a numeração) antes de corrigir';
         return;
       }
-      for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
+      for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'fci', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
       dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
       if (dados.reserva_utilizada > disp) {
