@@ -251,11 +251,24 @@ function caixaFci(c) {
   const bonificado = aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c));
   return `<div class="cartao" id="fci"><div class="cabecalho"><h2>💰 FCI: fundo de conservação do imóvel</h2>${opera() && s.depositos.length ? botao('calcularFci', 'Calcular atualização', { id: c.id }, 'secundario') : ''}</div>
     <div class="grade">${item('Cobrado por mês', R.temFci(c) ? `${reais(R.fciDoMes(c, bonificado, 0))} <span class="suave">(${pct(c.fci_percentual)} de ${reais(bonificado)})</span>` : 'não cobra mais')}
-      ${item('Pago até agora', `${reais(s.total)} <span class="suave">(${s.depositos.length} mês(es))</span>`)}
+      ${item('Pago até agora', `${reais(s.total)} <span class="suave">(${s.depositos.length} depósito(s))</span>`)}
       ${item(`Corrigido (${esc(c.fci_indice || 'índice não escolhido')})`, s.ate ? `<span class="maior">${reais(s.corrigido)}</span><br><span class="suave">índices até ${compBr(s.ate)} · calculado em ${dataBr(s.calculado_em)}</span>` : `${reais(s.corrigido)}<br><span class="suave">${s.depositos.length ? 'clique em "Calcular atualização"' : 'sem pagamentos ainda'}</span>`)}</div>
-    ${s.depositos.length ? `<details><summary>Pagamentos (${s.depositos.length})</summary><div class="rolagem"><table><tr><th>Aluguel de</th><th>Pago em</th><th class="n">Valor</th><th class="n">Corrigido</th></tr>
-      ${s.depositos.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td><td class="n">${reais(x.corrigido)}</td></tr>`).join('')}</table></div></details>` : ''}
+    ${s.depositos.length ? `<details><summary>Pagamentos (${s.depositos.length})</summary><div class="rolagem"><table><tr><th>Origem</th><th>Pago em</th><th class="n">Valor</th><th class="n">Corrigido</th></tr>
+      ${s.depositos.map((x) => `<tr><td>${x.previo ? 'Lançado à mão' : `Boleto ${compBr(x.competencia)}`}</td><td>${dataBr(x.data)}</td><td class="n">${reais(x.valor)}</td><td class="n">${reais(x.corrigido)}</td></tr>`).join('')}</table></div></details>` : ''}
+    ${opera() ? editorFciPrevios(c) : ''}
     <p class="suave">Entra no boleto todo mês, fora da NF, da multa e dos juros. Cada pagamento é corrigido a partir do mês seguinte (nunca fica abaixo do que foi pago). Na saída, paga só os reparos de danos da vistoria (nunca aluguel ou contas); o que sobrar volta corrigido ao inquilino.</p></div>`;
+}
+
+/** Depósitos do FCI de antes do sistema: caixa que abre para lançar, editar e remover (a linha em branco do fim cresce ao preencher). */
+function editorFciPrevios(c) {
+  const lista = [...(c.fci_previos || []), { data: '', valor: 0 }];
+  const linha = (x) => `<tr><td><input type="date" name="fci_data" value="${esc(x.data)}"></td>
+    <td><input name="fci_valor" data-dinheiro inputmode="decimal" placeholder="0,00" value="${x.valor ? reais(x.valor, false) : ''}"></td>
+    <td><button type="button" class="link-botao" data-remover-linha title="Remover">🗑️</button></td></tr>`;
+  return `<details id="fci-previos"><summary>Depósitos anteriores ao sistema (${(c.fci_previos || []).length}): lançar, editar, remover</summary>
+    <p class="suave">Preencha a data e o valor de cada depósito. Ao preencher a última linha, aparece outra em branco. Remover só vale depois de salvar.</p>
+    <table><tr><th>Data do depósito</th><th>Valor (R$)</th><th></th></tr><tbody data-linhas-fci>${lista.map(linha).join('')}</tbody></table>
+    <p>${botao('salvarFciPrevios', 'Salvar depósitos', { id: c.id }, 'pequeno')}</p></details>`;
 }
 
 /** Histórico das leituras dos relógios de água, energia e gás. */
@@ -281,13 +294,14 @@ function linhaIncluso(c) {
   const itens = [['🏛️', 'IPTU', c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])],
     ['🛡️', 'Seguro', c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])],
     ...F.CONTAS.map(([k, t]) => [SIMBOLOS_CONTAS[k], t, c[k]])];
+  // FCI: só aparece quando o contrato cobra (com o % do aluguel bonificado), junto do que vem no boleto ("Incluso no aluguel")
+  const fci = R.temFci(c) ? `<a href="#/contrato/${c.id}?ir=fci" class="ic inc" title="Fundo de conservação do imóvel: vem no boleto">💰 FCI ${pct(c.fci_percentual)}</a>` : '';
   const grupos = [['Incluso no aluguel', 'inc'], ['Por conta do inquilino', 'inq'], ['Não tem', 'nao'], [null, 'ni']].map(([sit, cls]) => {
     const l = itens.filter(([, , v]) => (sit ? v === sit : !R.SITUACOES.includes(v)));
-    return l.length ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t]) => `<span class="ic ${cls}">${s} ${esc(t)}</span>`).join('')}` : '';
+    const extra = cls === 'inc' ? fci : '';
+    return l.length || extra ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t]) => `<span class="ic ${cls}">${s} ${esc(t)}</span>`).join('')}${extra}` : '';
   }).filter(Boolean);
-  // FCI: só aparece quando o contrato cobra (com o % do aluguel bonificado)
-  const fci = R.temFci(c) ? `<span class="sep"></span><a href="#/contrato/${c.id}?ir=fci" class="ic inq" title="Fundo de conservação do imóvel">💰 FCI ${pct(c.fci_percentual)}</a>` : '';
-  return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${fci}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
+  return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
