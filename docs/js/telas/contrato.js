@@ -291,15 +291,18 @@ export function caixaLeituras(lista, botaoNovo, comInquilino) {
 const SIMBOLOS_CONTAS = { conta_agua: '💧', conta_energia: '⚡', conta_gas: '🔥', conta_internet: '📶', conta_condominio: '🏢' };
 
 function linhaIncluso(c) {
-  const itens = [['🏛️', 'IPTU', c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1])],
-    ['🛡️', 'Seguro', c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0])],
+  // IPTU e seguro são atalhos para a caixa deles (IPTU na página do imóvel; seguro aqui, quando a caixa aparece)
+  const seguro = c.conta_seguro || (c.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]);
+  const temCaixaSeguro = c.imovel_id && (seguro !== R.SITUACOES[2] || R.segurosDoContrato(d(), c.id).length);
+  const itens = [['🏛️', 'IPTU', c.conta_iptu || (c.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), c.imovel_id ? `#/imovel/${c.imovel_id}?ir=iptu` : ''],
+    ['🛡️', 'Seguro', seguro, temCaixaSeguro ? `#/contrato/${c.id}?ir=seguros` : ''],
     ...F.CONTAS.map(([k, t]) => [SIMBOLOS_CONTAS[k], t, c[k]])];
   // FCI: só aparece quando o contrato cobra (com o % do aluguel bonificado); é sempre por conta do inquilino (azul)
   const fci = R.temFci(c) ? `<a href="#/contrato/${c.id}?ir=fci" class="ic inq" title="Fundo de conservação do imóvel: sempre por conta do inquilino (vem no boleto)">💰 FCI ${pct(c.fci_percentual)}</a>` : '';
   const grupos = [['Incluso no aluguel', 'inc'], ['Por conta do inquilino', 'inq'], ['Não tem', 'nao'], [null, 'ni']].map(([sit, cls]) => {
     const l = itens.filter(([, , v]) => (sit ? v === sit : !R.SITUACOES.includes(v)));
     const extra = cls === 'inq' ? fci : '';
-    return l.length || extra ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t]) => `<span class="ic ${cls}">${s} ${esc(t)}</span>`).join('')}${extra}` : '';
+    return l.length || extra ? `<span class="suave">${sit || 'Não informado'}:</span>${l.map(([s, t, , href]) => (href ? `<a href="${href}" class="ic ${cls}" title="Abrir a caixa do ${esc(t)}">${s} ${esc(t)}</a>` : `<span class="ic ${cls}">${s} ${esc(t)}</span>`)).join('')}${extra}` : '';
   }).filter(Boolean);
   return `<div class="incluso" title="O que está incluso no contrato">${grupos.join('<span class="sep"></span>')}${c.contas_adicionais ? `<span class="sep"></span><span class="suave">+ ${esc(c.contas_adicionais)}</span>` : ''}</div>`;
 }
