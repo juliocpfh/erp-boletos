@@ -8,7 +8,7 @@ import { compBr, dataBr, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
+import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
 import { botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
@@ -377,16 +377,16 @@ export const CADASTROS = {
     campos: () => F.SEGURO,
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato), imovel_id: buscar('contratos', q.contrato).imovel_id }),
     conferir: conferirSeguro,
-    // arquivo da apólice obrigatório (na edição, só se ainda não tiver); outros arquivos opcionais
+    // arquivo da apólice: pode salvar sem (confirma e fica o alerta para anexar depois); outros arquivos opcionais
     extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
-      <div><label>Arquivo da apólice${r && r.arquivo_apolice ? '' : ' *'}</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
-        ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">Obrigatório: PDF ou foto da apólice.</small>'}</div>
+      <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
+        ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple>
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
     ajustar(dados, erros, r, form) {
       const arq = form.querySelector('[name=arquivo_apolice]').files[0];
       if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = 'O fim da vigência precisa ser depois do início';
-      if (!arq && !(r && r.arquivo_apolice)) throw new Error('Anexe o arquivo da apólice para salvar o seguro obrigatório.');
+      if (!arq && !(r && r.arquivo_apolice) && !Object.keys(erros).length) confirmarAvisos(['Sem o arquivo da apólice. O seguro fica salvo, com o alerta "Falta o arquivo da apólice" na página do inquilino e no Painel até você anexar (em "Editar" da apólice).']);
     },
     async ajustarAsync(dados, erros, r, form, q) {
       const pasta = await pastaDoEscopo('seguro', r ? r.contrato_id : Number(q.contrato));

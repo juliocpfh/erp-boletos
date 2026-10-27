@@ -116,7 +116,9 @@ test('divisão da fatura entre as empresas', () => {
 
 test('alertas de seguro e reserva', () => {
   assert.match(A.alertaSeguro('2025-11-01', '2026-10-05', [{ vigencia_fim: '2026-10-31' }]).texto, /vence/);
-  assert.equal(A.alertaSeguro('2025-03-01', '2026-10-05', [{ vigencia_fim: '2027-03-01' }]), null);
+  assert.equal(A.alertaSeguro('2025-03-01', '2026-10-05', [{ vigencia_fim: '2027-03-01', arquivo_apolice: 'apolice.pdf' }]), null);
+  // apólice salva sem o arquivo: alerta para buscar o documento
+  assert.match(A.alertaSeguro('2025-03-01', '2026-10-05', [{ vigencia_inicio: '2026-03-01', vigencia_fim: '2027-03-01' }]).texto, /Falta o arquivo da apólice/);
   assert.match(A.alertaReserva(50000, 50000, '2026-11', '2026-10-05').texto, /500,00.*11\/2026/);
   assert.equal(A.alertaReserva(50000, 0, '2026-11', '2026-10-05'), null);
 });
