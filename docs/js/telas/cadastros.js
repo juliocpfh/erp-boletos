@@ -241,6 +241,10 @@ export const CADASTROS = {
       if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = 'A saída não pode ser antes da entrada';
       if (dados.prazo_tipo === 'Determinado') {
         if (!(dados.prazo_meses > 0)) erros.prazo_meses = 'Informe o prazo em meses, ou marque prazo indeterminado';
+        // troca de titular: o prazo continua o do contrato assumido (ao editar, fica o fim já gravado: muda pela renovação)
+        else if (herdado && (r ? r.vigencia_fim : R.fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id }))) {
+          dados.vigencia_fim = r ? r.vigencia_fim : R.fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id });
+        }
         // o prazo conta da data de vigência inicial (sem ela, da data do contrato)
         else if (dados.data_entrada || dados.vigencia_inicio) dados.vigencia_fim = C.fimDoPrazo(dados.data_entrada || dados.vigencia_inicio, dados.prazo_meses);
       }
