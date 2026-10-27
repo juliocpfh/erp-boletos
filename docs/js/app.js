@@ -448,7 +448,7 @@ document.addEventListener('focusin', (ev) => {
   if (el.type === 'month' && !el.max) el.max = '9999-12';
 });
 
-// Lista que cresce (depósitos anteriores do FCI): preencher a última linha cria outra em branco; 🗑️ tira a linha.
+// Lista que cresce (depósitos anteriores do FCI): preencher a última linha cria outra em branco; o × tira a linha.
 document.addEventListener('input', (ev) => {
   const corpo = ev.target.closest('[data-linhas-fci]');
   if (!corpo) return;

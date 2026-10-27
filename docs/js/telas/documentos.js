@@ -434,7 +434,7 @@ export function telaModelos() {
   const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
-      ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', 'Excluir', { id: m.id }, 'perigo pequeno', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
+      ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', '×', { id: m.id }, 'x-excluir', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
     <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? `<div class="acoes">${link('#/modelo-contrato/novo', 'Novo modelo de contrato', 'botao')} ${link('#/modelo-contrato/novo?tipo=aditivo', 'Novo modelo de aditivo', 'botao secundario')}</div>` : ''}</div>
     ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao"><h2>${titulo}</h2><table><tr><th>Modelo</th><th></th></tr>

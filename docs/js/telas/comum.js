@@ -13,7 +13,7 @@ export const memoria = { continuacao: null, pagamentoDivergente: null };
 // --------------------------------------------------------------------------
 // Pequenos componentes
 // --------------------------------------------------------------------------
-export const botao = (acao, texto, dados = {}, cls = 'secundario pequeno', confirmar = '') => `<button type="button" class="${cls}" data-acao="${acao}" ${Object.entries(dados).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ')} ${confirmar ? `data-confirmar="${esc(confirmar)}"` : ''}>${texto}</button>`;
+export const botao = (acao, texto, dados = {}, cls = 'secundario pequeno', confirmar = '') => `<button type="button" class="${cls}"${cls === 'x-excluir' ? ' title="Excluir" aria-label="Excluir"' : ''} data-acao="${acao}" ${Object.entries(dados).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ')} ${confirmar ? `data-confirmar="${esc(confirmar)}"` : ''}>${texto}</button>`;
 
 export const link = (hash, texto, cls = 'botao secundario pequeno') => `<a class="${cls}" href="${hash}">${texto}</a>`;
 
@@ -492,7 +492,7 @@ export async function listaArquivos(escopo, id, modo = '') {
   // guias do IPTU na página IPTU (ao lado do nome do imóvel): igual, com todos os arquivos da pasta do ano
   if (escopo === 'matricula' || modo === 'clipe') {
     const tipo = escopo === 'matricula' ? 'da matrícula' : 'da guia';
-    return todos.filter((a) => escopo !== 'matricula' || ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'link-botao excluir-mini', `Excluir o arquivo ${tipo} "${a.nome}"?`) : ''}</span>`).join(' ');
+    return todos.filter((a) => escopo !== 'matricula' || ehMatricula(a.nome)).map((a, n) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', `Excluir o arquivo ${tipo} "${a.nome}"?`) : ''}</span>`).join(' ');
   }
   const itens = todos;
   if (!itens.length && escopo !== 'contrato') return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
@@ -500,7 +500,7 @@ export async function listaArquivos(escopo, id, modo = '') {
     const figs = await Promise.all(itens.map(async (a) => {
       const u = URL.createObjectURL(await S.abrirArquivo(dir, a.nome));
       urls.push(u);
-      return `<figure><a href="${u}" target="_blank"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'perigo pequeno', 'Excluir esta foto?') : ''}</figcaption></figure>`;
+      return `<figure><a href="${u}" target="_blank"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
     }));
     return `<div class="fotos">${figs.join('')}</div>`;
   }
@@ -511,7 +511,7 @@ export async function listaArquivos(escopo, id, modo = '') {
     return `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${esc2}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${dono ? ` ${etiqueta(`🔗 ${dono}`, 'info')}` : ''}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
     <td class="n nw">${botao('baixarArquivo', 'Baixar', { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === 'imovel' ? '' : dono ? '<span class="suave" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">apague no lançamento</span>'
-    : botao('excluirArquivo', 'Excluir', { escopo: esc2, id, nome: a.nome }, 'perigo pequeno', 'Excluir este arquivo?')}</td></tr>`; }).join('')}</table>`;
+    : botao('excluirArquivo', '×', { escopo: esc2, id, nome: a.nome }, 'x-excluir', 'Excluir este arquivo?')}</td></tr>`; }).join('')}</table>`;
   let html = itens.length ? linhas(escopo, itens) : '<p class="suave">Nenhum arquivo ainda.</p>';
   // pasta do inquilino: também os documentos assinados e os termos aditivos (subpastas)
   if (escopo === 'contrato') {
