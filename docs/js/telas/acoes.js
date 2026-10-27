@@ -16,7 +16,7 @@ import { desfazerItens } from './admin.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, d, ehMatricula, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, vinculoDoEscopo } from './comum.js';
-import { documentoMontado, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { siglaEmpresa } from './faturas.js';
 
 // --------------------------------------------------------------------------
@@ -938,8 +938,23 @@ export const ACOES = {
     if (ok) ir(`#/editar/contratos/${id}`);
   },
 
+  /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */
   async cartaEnviada({ contrato, comp, enviada }) {
-    await alterar((db) => R.marcarCartaEnviada(db, Number(contrato), comp, enviada === '1', login()));
+    if (enviada !== '1') {
+      await alterarApagandoAnexos((db) => R.marcarCartaEnviada(db, Number(contrato), comp, false, login()));
+      await mostrar();
+      return;
+    }
+    await alterar((db) => R.marcarCartaEnviada(db, Number(contrato), comp, true, login()));
+    try {
+      const c = buscar('contratos', contrato);
+      const nome = await guardarCartaNaPasta(c, comp);
+      const carta = d().cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp);
+      if (nome && carta) await alterar((db) => R.atualizar(db, 'cartas_reajuste', carta.id, { arquivo: nome }, login(), 'Carta de reajuste guardada na pasta do inquilino'));
+      if (nome) aviso(`Carta guardada na pasta do inquilino: ${nome}.`);
+    } catch (e) {
+      aviso(`A carta foi marcada como enviada, mas não deu para guardar o PDF na pasta: ${e.message}`, 'aviso');
+    }
     await mostrar();
   },
 

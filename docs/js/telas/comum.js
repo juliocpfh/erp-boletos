@@ -113,7 +113,9 @@ function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(i
 /** Documentos de entrada assinados: subpasta dentro da pasta do inquilino. */
 const SUB_ASSINADOS = 'Documentos assinados';
 
-const SUB_ADITIVOS = 'Termos aditivos';
+/** Termos aditivos, cartas de reajuste e outras comunicações ao inquilino (antes: "Termos aditivos", renomeada em organizarPastas). */
+const SUB_ADITIVOS = 'Aditivos, correções e comunicação';
+const SUB_ADITIVOS_ANTIGA = 'Termos aditivos';
 
 const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos', 'seguro'].includes(escopo);
 
@@ -121,7 +123,7 @@ const SUB_DO_ESCOPO = { assinados: SUB_ASSINADOS, aditivos: SUB_ADITIVOS, seguro
 
 export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
-/** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Termos aditivos". */
+/** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Aditivos, correções e comunicação". */
 export function chavePasta(escopo, id) {
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
@@ -366,6 +368,14 @@ export async function organizarPastas(ids = null) {
       if (sobrou) avisos.push(`${c.inquilino_nome}: ${sobrou} arquivo(s) ficaram em "${[...pai, nome].join('/')}" (já existe um com o mesmo nome na pasta nova)`);
     }
     if (!falhou && c.pasta && c.pasta !== certo) novosNomes.push([c.id, certo]);
+    // pasta antiga "Termos aditivos" passa a "Aditivos, correções e comunicação" (o que já existir com o mesmo nome fica na antiga)
+    if (!falhou) {
+      try {
+        const dir = await abrir([...pastaPaiContrato(c), certo]);
+        const sobrou = dir ? await S.juntarPasta(dir, SUB_ADITIVOS_ANTIGA, dir, SUB_ADITIVOS) : 0;
+        if (sobrou) avisos.push(`${c.inquilino_nome}: ${sobrou} arquivo(s) ficaram em "${SUB_ADITIVOS_ANTIGA}" (já existe um com o mesmo nome em "${SUB_ADITIVOS}")`);
+      } catch (e) { avisos.push(`${c.inquilino_nome}, pasta "${SUB_ADITIVOS_ANTIGA}": ${motivoDisco(e)}`); }
+    }
   }
   if (novosNomes.length) await alterar((db) => novosNomes.forEach(([id, pasta]) => R.atualizar(db, 'contratos', id, { pasta }, login(), 'Pasta de arquivos (entrada e saída)')));
   return avisos;
@@ -513,7 +523,7 @@ export async function listaArquivos(escopo, id, modo = '') {
     <td class="n nw">${botao('baixarArquivo', 'Baixar', { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === 'imovel' ? '' : dono ? '<span class="suave" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">apague no lançamento</span>'
     : botao('excluirArquivo', '×', { escopo: esc2, id, nome: a.nome }, 'x-excluir', 'Excluir este arquivo?')}</td></tr>`; }).join('')}</table>`;
   let html = itens.length ? linhas(escopo, itens) : '<p class="suave">Nenhum arquivo ainda.</p>';
-  // pasta do inquilino: também os documentos assinados e os termos aditivos (subpastas)
+  // pasta do inquilino: também os documentos assinados e os aditivos, correções e comunicação (subpastas)
   if (escopo === 'contrato') {
     for (const [sub, titulo] of [['assinados', SUB_ASSINADOS], ['aditivos', SUB_ADITIVOS]]) {
       let pasta;

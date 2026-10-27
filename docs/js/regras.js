@@ -2370,6 +2370,7 @@ export function arquivosReferenciados(d) {
   }
   for (const t of ['depositos_garantia', 'correcoes_garantia', 'aplicacoes']) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
+  for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
   return out;
@@ -2418,6 +2419,7 @@ export function rotulosDosArquivos(d) {
     }
   }
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
+  for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const s of d.seguros) {
     poe('seguro', s.contrato_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);

@@ -18,7 +18,7 @@ import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
 import { acertarNomesUmaVez, botao, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
-import { telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
+import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { telaContas, telaImpostos, telaInadimplencia, telaResultados } from './telas/financeiro.js';
@@ -175,7 +175,9 @@ export const TELAS = {
   painel(rota) {
     // primeiro as pastas vão para "Imóvel/Inquilinos" com o nome certo; depois a limpeza de "Sem imóvel"
     organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, 'aviso'))
-      .then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, 'aviso'));
+      .then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, 'aviso'))
+      // cartas de reajuste marcadas como enviadas antes de o sistema guardar o PDF: vão para a pasta do inquilino
+      .then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, 'aviso'));
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));

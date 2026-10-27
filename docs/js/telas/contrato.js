@@ -526,11 +526,10 @@ export function telaContrato(c) {
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}</div>`;
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
-      ${opera() ? botao('editarContrato', 'Editar', { id: c.id }, 'botao') : ''}
+      ${opera() ? botao('editarContrato', 'Editar contrato', { id: c.id }, 'botao') : ''}
       ${opera() && c.imovel_id && !cobs.some((cb) => cb.data_pagamento) ? botao('corrigirImovel', 'Corrigir imóvel', { id: c.id }, 'secundario') : ''}
-      ${link(`#/contrato/${c.id}?ir=documentos`, 'Contrato, Vistoria, Termos e Aditivos', 'botao secundario')}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
-    ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
+    ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}

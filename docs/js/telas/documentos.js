@@ -1,6 +1,6 @@
 // Documentos gerados: impressão, contrato por modelo, vistoria (e o modelo de vistoria), recibo de chaves, termo aditivo,
 // modelos de contrato, PDF/Word e logo.
-import { bibliotecasPdf, login, podeUsuario } from '../app.js';
+import { alterar, bibliotecasPdf, login, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
@@ -124,6 +124,44 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     rodape.forEach((linha, k) => pdf.text(linha, 105, 297 - margemPe + 12 + k * 3.5, { align: 'center' }));
   });
   return pdf.output('blob');
+}
+
+/**
+ * Carta de reajuste enviada: PDF gravado na pasta "Aditivos, correções e comunicação" do inquilino (desenhada fora da tela).
+ * Devolve o nome do arquivo, ou null se a carta não sai (falta o índice). Ex.: "Carta reajuste Casa 01 - Maria - 2026-11.pdf".
+ */
+export async function guardarCartaNaPasta(c, comp) {
+  const html = cartaReajuste(c, comp);
+  if (!html.includes('class="carta"')) return null;
+  const caixa = document.createElement('div');
+  caixa.className = 'impressao';
+  caixa.style.cssText = 'position:absolute;left:-10000px;top:0;width:860px';
+  caixa.innerHTML = html;
+  document.body.append(caixa);
+  try {
+    const blob = await pdfDoDocumento(caixa.querySelector('.carta'), [], { margemLado: 15 });
+    const nome = `${nomeArquivoDoc('Carta reajuste', c, comp)}.pdf`;
+    await S.escreverTexto(await pastaDoEscopo('aditivos', c.id), nome, blob);
+    return nome;
+  } finally {
+    caixa.remove();
+  }
+}
+
+/** Cartas marcadas como enviadas antes de o sistema guardar o PDF: grava cada uma na pasta do inquilino (uma vez, ao abrir o Painel). */
+let cartasGuardadas = false;
+
+export async function guardarCartasAntigas() {
+  if (cartasGuardadas || !opera()) return;
+  cartasGuardadas = true;
+  const feitas = [];
+  for (const x of d().cartas_reajuste.filter((y) => !y.arquivo)) {
+    const c = buscar('contratos', x.contrato_id);
+    if (!c) continue;
+    const nome = await guardarCartaNaPasta(c, x.competencia);
+    if (nome) feitas.push([x.id, nome]);
+  }
+  if (feitas.length) await alterar((db) => feitas.forEach(([id, arquivo]) => R.atualizar(db, 'cartas_reajuste', id, { arquivo }, login(), 'Carta de reajuste guardada na pasta do inquilino')));
 }
 
 /** Nome dos arquivos baixados: "Documento Imóvel - Inquilino - ano de entrada" (ex.: "Contrato locação Loja 1 - Maria - 2026"). */
