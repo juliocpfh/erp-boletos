@@ -168,20 +168,21 @@ export async function trazerHeranca(id) {
   for (const nome of r.arquivosReserva || []) {
     try { await S.escreverTexto(await pastaDoEscopo('contrato', Number(id)), nome, await S.abrirArquivo(await pastaDoEscopo('contrato', r.anterior.id, false), nome)); } catch { /* sem o arquivo */ }
   }
+  await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosSeguro, true, 'seguro');
   await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
-  const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`,
+  const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`, r.arquivosSeguro && r.arquivosSeguro.length && 'o seguro (apólice e documentos)',
     r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
   aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}`, 'info');
   return r;
 }
 
-/** Muda (ou copia) arquivos da pasta do contrato anterior para a do novo titular. */
-async function arquivosParaHerdeiro(anteriorId, novoId, nomes, mover = true) {
-  if (!nomes.length) return;
+/** Muda (ou copia) arquivos da pasta do contrato anterior para a do novo titular (escopo 'seguro': as apólices). */
+async function arquivosParaHerdeiro(anteriorId, novoId, nomes, mover = true, escopo = 'contrato') {
+  if (!nomes || !nomes.length) return;
   let de;
-  try { de = await pastaDoEscopo('contrato', anteriorId, false); } catch { return; } // pasta do anterior não existe
-  const para = await pastaDoEscopo('contrato', Number(novoId));
+  try { de = await pastaDoEscopo(escopo, anteriorId, false); } catch { return; } // pasta do anterior não existe
+  const para = await pastaDoEscopo(escopo, Number(novoId));
   for (const nome of [...new Set(nomes)]) {
     try {
       await S.escreverTexto(para, nome, await S.abrirArquivo(de, nome));
@@ -201,9 +202,10 @@ async function completarHeranca(id) {
   if (!r) return null;
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivos, true);
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
+  await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosSeguro, true, 'seguro');
   await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
-  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.reserva && `reserva de ${reais(c.reserva_valor)}`].filter(Boolean).join(' e ')} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
+  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean).join(' e ')} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
   return r;
 }
 
@@ -318,6 +320,109 @@ export async function limparSemImovel() {
 }
 
 export let pastasComArquivos = [];
+
+/** Arquivos ligados a lançamentos que não estão na pasta (conferirArquivos): { contrato_id, nome, rotulo, ancora }. */
+export let arquivosFaltando = [];
+
+/** O arquivo deste lançamento sumiu da pasta (última conferência): no lugar do 📎 aparece o "anexar de novo". */
+export const arquivoSumiu = (escopo, id, nome) => arquivosFaltando.some((a) => a.escopo === escopo && a.contrato_id === Number(id) && a.nome === nome);
+
+/** Parte da página do inquilino onde se anexa de novo o arquivo que sumiu. */
+function ancoraDoArquivo(escopo, rotulo) {
+  if (escopo === 'seguro') return 'seguros';
+  if (escopo === 'aditivos') return 'aditivos';
+  if (escopo === 'assinados') return 'documentos';
+  if (/reserva/i.test(rotulo)) return 'reserva';
+  if (/vistoria/i.test(rotulo)) return 'vistoria';
+  return 'garantia';
+}
+
+/**
+ * Confere se cada arquivo ligado a um lançamento (comprovantes, assinados, aditivos, cartas, apólices, fotos da vistoria)
+ * está na pasta. O que sumiu é procurado pelo nome nas outras pastas (ex.: mudança de pasta que deu errado) e, se
+ * achado, volta copiado para o lugar certo; o que não for achado fica em ``arquivosFaltando`` (alerta no Painel e
+ * na página do inquilino, para anexar de novo). Ao abrir o Painel (uma vez) e pelo botão em Dados e backup.
+ */
+export async function conferirArquivos() {
+  if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };
+  const rotulos = R.rotulosDosArquivos(d());
+  const vistos = new Set();
+  const sumidos = [];
+  let conferidos = 0;
+  for (const a of R.arquivosReferenciados(d())) {
+    const chave = `${chavePasta(a.escopo, a.id)}|${a.nome}`;
+    if (vistos.has(chave) || !buscar('contratos', a.id)) continue;
+    vistos.add(chave);
+    conferidos += 1;
+    try { await (await pastaDoEscopo(a.escopo, Number(a.id), false)).getFileHandle(a.nome); } catch { sumidos.push(a); }
+  }
+  // procura os sumidos pelo nome em todas as pastas (só percorre o disco se faltar algum)
+  const achados = new Map();
+  if (sumidos.length) {
+    const nomes = new Set(sumidos.map((a) => a.nome));
+    const andar = async (dir) => {
+      for await (const [nome, h] of dir.entries()) {
+        if (h.kind === 'directory') await andar(h);
+        else if (nomes.has(nome) && !achados.has(nome)) achados.set(nome, h);
+      }
+    };
+    await andar(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }));
+  }
+  const devolvidos = [];
+  const faltando = [];
+  for (const a of sumidos) {
+    const rotulo = rotulos.get(`${a.escopo}:${a.id}|${a.nome}`) || 'arquivo';
+    const h = achados.get(a.nome);
+    if (h) {
+      try {
+        await S.escreverTexto(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome, await S.lerConteudo(h));
+        devolvidos.push({ ...a, rotulo });
+        continue;
+      } catch { /* não deu para copiar: fica como faltando */ }
+    }
+    faltando.push({ escopo: a.escopo, contrato_id: Number(a.id), nome: a.nome, rotulo, ancora: ancoraDoArquivo(a.escopo, rotulo) });
+  }
+  if (devolvidos.length) {
+    await alterar((db) => devolvidos.forEach((a) => R.registrar(db, login(), 'Alteração', 'arquivos', null, `Arquivo encontrado em outra pasta e devolvido ao lugar: ${a.nome} (${a.rotulo})`, null, vinculoDoEscopo(a.escopo, a.id))));
+  }
+  const mudou = JSON.stringify(faltando) !== JSON.stringify(arquivosFaltando);
+  arquivosFaltando = faltando;
+  if (mudou || devolvidos.length) await mostrar();
+  return { conferidos, devolvidos, faltando };
+}
+
+let arquivosConferidos = false;
+
+export async function conferirArquivosUmaVez() {
+  if (arquivosConferidos || !opera() || !E.pasta) return;
+  arquivosConferidos = true;
+  const r = await conferirArquivos();
+  if (r.devolvidos.length) aviso(`${r.devolvidos.length} arquivo(s) estavam em outra pasta e voltaram ao lugar: ${r.devolvidos.map((a) => a.nome).join(', ')}.`, 'info');
+}
+
+/** Tira do alerta os arquivos que voltaram à pasta (anexados de novo) ou que deixaram de ser do lançamento (× no lançamento). */
+async function reconferirFaltando() {
+  const emUso = anexosEmUso();
+  const ficam = [];
+  for (const a of arquivosFaltando) {
+    if (!buscar('contratos', a.contrato_id) || !emUso.has(`${chavePasta(a.escopo, a.contrato_id)}|${a.nome}`)) continue;
+    try { await (await pastaDoEscopo(a.escopo, a.contrato_id, false)).getFileHandle(a.nome); } catch { ficam.push(a); }
+  }
+  if (ficam.length !== arquivosFaltando.length) {
+    arquivosFaltando = ficam;
+    await mostrar();
+  }
+}
+
+/** Alerta dos arquivos que sumiram da pasta (de um inquilino, ou de todos no Painel), com o atalho para anexar de novo. */
+export function alertaArquivosFaltando(contratoId = null) {
+  const lista = arquivosFaltando.filter((a) => !contratoId || a.contrato_id === Number(contratoId));
+  if (!lista.length) return '';
+  reconferirFaltando().catch(() => { /* confere de novo na próxima vez */ });
+  const item = (a) => { const c = buscar('contratos', a.contrato_id); return `<li>${contratoId ? '' : `<b>${esc(c ? c.inquilino_nome : '?')}</b>: `}${esc(a.rotulo)} <span class="suave">(${esc(a.nome)})</span> ${link(`#/contrato/${a.contrato_id}?ir=${a.ancora}`, 'Anexar de novo', 'botao pequeno')}</li>`; };
+  return `<div class="alerta perigo"><b>${lista.length} arquivo(s) não encontrado(s) na pasta.</b> O lançamento continua, mas o arquivo sumiu (apagado ou movido fora do sistema).
+    Para anexar de novo: clique no × ao lado do arquivo no lançamento e anexe o arquivo outra vez.<ul>${lista.map(item).join('')}</ul></div>`;
+}
 
 /**
  * Organiza as pastas no disco (uma vez por sessão, ao abrir o Painel; e depois de uma troca de titular):
@@ -488,7 +593,20 @@ export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = f
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
     ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}
-    ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'A apólice: anexe em "Cadastrar apólice" (fica ligada à vigência). Aqui, só os documentos soltos.'}</p>` : ''}</div>`;
+    ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'Ao anexar aqui, o sistema pergunta se é a apólice ou outro documento e de qual vigência.'}</p>` : ''}</div>`;
+}
+
+/**
+ * Apagar na lista de documentos do seguro: a apólice vigente só pelo × ao lado dela (caixa do seguro); a apólice de uma
+ * vigência anterior, com a conferência do arquivo antes; os outros documentos e os soltos, com a pergunta de sempre.
+ */
+function acaoArquivoSeguro(contratoId, nome) {
+  const dono = R.donoArquivoSeguro(d(), Number(contratoId), nome);
+  if (!dono) return botao('excluirArquivo', '×', { escopo: 'seguro', id: contratoId, nome }, 'x-excluir', 'Excluir este arquivo?');
+  if (dono.tipo === 'apolice' && dono.vigente) return '<span class="suave" title="A apólice vigente se apaga pelo × ao lado dela, na tabela do seguro">apague na apólice</span>';
+  const dados = { contrato: contratoId, seguro: dono.seguro.id, nome };
+  return dono.tipo === 'apolice' ? botao('excluirArquivoSeguro', '×', { ...dados, conferir: '1' }, 'x-excluir')
+    : botao('excluirArquivoSeguro', '×', dados, 'x-excluir', `Apagar o documento "${nome}" do seguro?`);
 }
 
 export const urls = [];
@@ -520,7 +638,8 @@ export async function listaArquivos(escopo, id, modo = '') {
   const linhas = (esc2, lista) => `<table>${lista.map((a) => { const dono = rotulos.get(`${esc2}:${id}|${a.nome}`);
     return `<tr><td><a href="#" data-acao="abrirArquivo" data-escopo="${esc2}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${dono ? ` ${etiqueta(`🔗 ${dono}`, 'info')}` : ''}</td>
     <td class="n suave">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
-    <td class="n nw">${botao('baixarArquivo', 'Baixar', { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === 'imovel' ? '' : dono ? '<span class="suave" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">apague no lançamento</span>'
+    <td class="n nw">${botao('baixarArquivo', 'Baixar', { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === 'imovel' ? '' : esc2 === 'seguro' ? acaoArquivoSeguro(id, a.nome)
+    : dono ? '<span class="suave" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">apague no lançamento</span>'
     : botao('excluirArquivo', '×', { escopo: esc2, id, nome: a.nome }, 'x-excluir', 'Excluir este arquivo?')}</td></tr>`; }).join('')}</table>`;
   let html = itens.length ? linhas(escopo, itens) : '<p class="suave">Nenhum arquivo ainda.</p>';
   // pasta do inquilino: também os documentos assinados e os aditivos, correções e comunicação (subpastas)

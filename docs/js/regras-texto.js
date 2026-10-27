@@ -39,7 +39,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Garantia herdada na troca de titular é cuidada no contrato do titular anterior.
 
 6. BOLETOS
-- Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, tarifa, reserva e ressarcimentos.
+- Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, FCI, tarifa, reserva e ressarcimentos.
+- Gerados a partir do dia 20 do mês, já com o aluguel do próprio mês, vencendo no mês seguinte (ex.: a partir de 20/10, os de 10/2026, que vencem em 11/2026). A carta de reajuste vai junto com o boleto do aluguel corrigido.
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
 - Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco.
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
@@ -49,6 +50,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 7. PAGAMENTO E NOTAS FISCAIS (NF)
 - Cada pagamento tem a data contábil (data em que o dinheiro entrou).
 - A numeração das NFs é contínua, pela data em que o dinheiro entrou, e dividida entre as empresas.
+- As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro).
 - Valor da NF = aluguel com bonificação (pago em dia) ou com multa e juros (atrasado). Não inclui IPTU, seguro nem tarifa. O padrão é NF com o aluguel cheio e o ressarcimento de condomínio como gasto.
 - Valor recebido diferente do previsto para a data: pede justificativa e a NF é digitada à mão (a justificativa fica só no sistema).
 - Para corrigir erro de NF, usa-se "Voltar a última numeração" (NFs não se apagam, para não deixar buracos).
@@ -60,7 +62,9 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Imóvel vazio, contrato sem IPTU ou carência sem IPTU: a parcela toda é do proprietário, com alerta.
 
 9. SEGURO
-- O seguro obrigatório pertence ao imóvel e só é salvo com o arquivo da apólice. Deve ser de 1 ano e não pode se sobrepor ao anterior.
+- O seguro obrigatório é do inquilino: cada contrato tem a sua apólice; quem sai leva, quem entra precisa de outra. Na troca de titular, a apólice em vigência passa ao novo titular. Deve ser de 1 ano e não pode se sobrepor ao anterior.
+- Pode ser salvo sem o arquivo da apólice, com confirmação e alerta até anexar. O arquivo da apólice vigente se apaga pelo "x" ao lado dela; o de uma vigência anterior, só depois de abrir e conferir o arquivo.
+- FCI (fundo de conservação do imóvel): % do aluguel bonificado no boleto, fora da NF, da multa e dos juros; corrigido mês a mês (juros compostos) a partir do mês seguinte a cada depósito, nunca abaixo do pago. Na saída, paga só reparos de danos; a sobra volta ao inquilino. Não é garantia locatícia nem cobre aluguel.
 
 10. RESERVA
 - A reserva começa exatamente no aluguel marcado e segue nos seguintes só se sobrar. Pode ser marcada como já abatida em aluguel antigo.
@@ -78,6 +82,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 13. ARQUIVOS
 - Excluir ou desfazer um lançamento apaga também o arquivo anexado (se nenhum outro lançamento o usa). O "x" ao lado do clipe apaga só o arquivo e deixa o lançamento esperando novo anexo.
 - Nomes de arquivos gravados pelo sistema não têm acento.
+- Ao abrir o Painel, o sistema confere os arquivos dos lançamentos: o que estiver em outra pasta volta ao lugar; o que sumiu vira alerta para anexar de novo. Arquivo de lançamento não se apaga pela lista de arquivos.
+- Termos aditivos, cartas de reajuste enviadas (PDF) e outras comunicações ficam na pasta "Aditivos, correções e comunicação" do inquilino.
 
 14. ALERTAS E AVISOS
 - Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor e prioridade são editáveis pelo administrador.

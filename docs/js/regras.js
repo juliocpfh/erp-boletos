@@ -746,6 +746,43 @@ function parcelasDoMes(lista, comp, rotulo) {
 /** Apólices do inquilino: cada contrato tem a sua (a do anterior não passa para o próximo). */
 export const segurosDoContrato = (d, contratoId) => d.seguros.filter((s) => contratoId && s.contrato_id === contratoId);
 
+/** Apólice vigente do inquilino: a que cobre hoje; sem nenhuma, a de início mais recente (ou null). */
+export function seguroVigente(d, contratoId, hoje = C.hojeIso()) {
+  const lista = segurosDoContrato(d, contratoId).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  return lista.find((s) => s.vigencia_inicio <= hoje && s.vigencia_fim >= hoje) || lista[0] || null;
+}
+
+/**
+ * De qual apólice é um arquivo da pasta do seguro: { seguro, tipo: 'apolice' | 'outro', vigente } (ou null, arquivo solto).
+ * O arquivo da apólice vigente só sai pelo × da própria apólice; o das anteriores e os outros arquivos, na lista de documentos.
+ */
+export function donoArquivoSeguro(d, contratoId, nome, hoje = C.hojeIso()) {
+  const vig = seguroVigente(d, contratoId, hoje);
+  for (const s of segurosDoContrato(d, contratoId)) {
+    if (s.arquivo_apolice === nome) return { seguro: s, tipo: 'apolice', vigente: !!vig && vig.id === s.id };
+    if ((s.outros_arquivos || []).includes(nome)) return { seguro: s, tipo: 'outro', vigente: !!vig && vig.id === s.id };
+  }
+  return null;
+}
+
+/** Tira o arquivo da apólice (fica o alerta para anexar de novo) ou um dos outros arquivos dela. */
+export function tirarArquivoSeguro(d, seguroId, nome, usuario) {
+  const s = buscar(d, 'seguros', seguroId);
+  const vig = `vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}`;
+  if (s.arquivo_apolice === nome) atualizar(d, 'seguros', s.id, { arquivo_apolice: null }, usuario, `Seguro (${vig}): arquivo da apólice apagado (${nome})`);
+  else atualizar(d, 'seguros', s.id, { outros_arquivos: (s.outros_arquivos || []).filter((x) => x !== nome) }, usuario, `Seguro (${vig}): arquivo apagado (${nome})`);
+}
+
+/** Liga um arquivo anexado pela lista de documentos a uma apólice: como a apólice ou como outro documento dela. */
+export function ligarArquivoSeguro(d, seguroId, nome, tipo, usuario) {
+  const s = buscar(d, 'seguros', seguroId);
+  const vig = `vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}`;
+  if (tipo === 'apolice') {
+    if (s.arquivo_apolice) throw new Error(`A apólice da ${vig} já tem arquivo: apague o atual (×) antes de anexar outro.`);
+    atualizar(d, 'seguros', s.id, { arquivo_apolice: nome }, usuario, `Seguro (${vig}): arquivo da apólice anexado (${nome})`);
+  } else atualizar(d, 'seguros', s.id, { outros_arquivos: [...(s.outros_arquivos || []), nome] }, usuario, `Seguro (${vig}): documento anexado (${nome})`);
+}
+
 // --------------------------------------------------------------------------
 // FCI: fundo de conservação do imóvel
 // --------------------------------------------------------------------------
@@ -1941,8 +1978,17 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaAssinaturaFaltante(d, contrato),
     alertaPerdaAConfirmar(d, contrato),
     alertaAditivoHerdeiro(d, contrato),
+    alertaAditivoAguardando(d, contrato),
     alertaCondominio(contrato, hoje),
   ].filter(Boolean);
+}
+
+/** Termo aditivo gerado pelo sistema e ainda sem o arquivo assinado: alerta até anexar. Ex.: "aditivo de 20/10/2026 (troca do vencimento)". */
+function alertaAditivoAguardando(d, c) {
+  const l = aditivosAguardando(d, c.id);
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Aditivo aguardando assinatura', ancora: 'aditivos',
+    texto: `${l.length > 1 ? `${l.length} termos aditivos aguardando` : 'Termo aditivo aguardando'} assinatura: ${l.map((a) => `${C.dataBr(a.data)} (${a.assunto})`).join('; ')}. Colha as assinaturas e anexe o arquivo assinado.` };
 }
 
 // --------------------------------------------------------------------------
@@ -2047,6 +2093,7 @@ export function transferirHeranca(d, novoId, usuario) {
     }
   }
   out.arquivosReserva = herdarReserva(d, n, a, usuario);
+  out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
   recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
   desativarSeSaiu(d, a, usuario);
   out.arquivos = [...new Set(out.arquivos)];
@@ -2069,6 +2116,26 @@ export function herdarReserva(d, n, a, usuario, forcar = false) {
   return copiar;
 }
 
+/** Apólices do anterior ainda em vigência na troca de titular (fim da vigência na data da troca ou depois): vão ao herdeiro. */
+const segurosAHerdar = (d, n, a) => {
+  const data = n.data_entrada || n.vigencia_inicio;
+  return data ? segurosDoContrato(d, a.id).filter((s) => s.vigencia_fim >= data) : [];
+};
+
+/**
+ * Seguro na troca de titular: a locação continua, então a apólice em vigência (com a apólice e os outros arquivos) passa ao
+ * novo titular; as que já tinham vencido antes da troca ficam com o anterior. Ex.: troca em 01/10/2026, apólice de
+ * 16/10/2025 a 16/10/2026 → vai para o novo. Devolve os arquivos a mudar da pasta de seguro do anterior para a do novo.
+ */
+export function herdarSeguros(d, n, a, usuario) {
+  const arquivos = [];
+  for (const s of segurosAHerdar(d, n, a)) {
+    arquivos.push(...[s.arquivo_apolice, ...(s.outros_arquivos || [])].filter(Boolean));
+    atualizar(d, 'seguros', s.id, { contrato_id: n.id }, usuario, `Seguro (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}) passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+  }
+  return [...new Set(arquivos)];
+}
+
 /** O contrato anterior ainda guarda a garantia em dinheiro (comprovante, depósitos, correções, aplicações) que é do herdeiro. */
 const garantiaAHerdar = (d, a) => !!(a && (temCaucao(a) || temDeposito(a)) && !a.garantia_transferida_para
   && (a.comprovante_caucao || a.comprovante_deposito || a.caucao_por_depositos || a.deposito_por_depositos || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === a.id))));
@@ -2079,7 +2146,8 @@ export function herancaIncompleta(d, c) {
   if (!a) return null;
   const garantia = garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const reserva = a.reserva_valor > 0 && !(c.reserva_valor > 0);
-  return garantia || reserva ? { garantia, reserva } : null;
+  const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
+  return garantia || reserva || seguro ? { garantia, reserva, seguro } : null;
 }
 
 /**
@@ -2092,7 +2160,12 @@ export function completarHeranca(d, novoId, usuario) {
   const falta = n && herancaIncompleta(d, n);
   if (!falta) return null;
   const a = contratoHerdado(d, n);
-  const out = { anterior: a, arquivos: [], arquivosReserva: [], garantia: false, reserva: false };
+  const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false };
+  if (falta.seguro) {
+    out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
+    recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
+    out.seguro = true;
+  }
   if (falta.garantia) {
     // valores da garantia: os do contrato (o que o herdeiro tiver e o anterior não, fica)
     const mud = {};
@@ -2577,7 +2650,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
-  'Titularidade', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'A verificar'];
+  'Titularidade', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
@@ -2858,34 +2931,44 @@ export function marcarCondominioConferido(d, contratoId, mes, usuario) {
 // --------------------------------------------------------------------------
 // Fechamento do mês: as rotinas em ordem, com o que falta em cada uma
 // --------------------------------------------------------------------------
+/** Dia do mês a partir do qual se geram os boletos do próprio mês (vencem no mês seguinte). */
+export const DIA_GERAR_BOLETOS = 20;
+
 /**
- * Etapas do fechamento do mês ``mes`` (mês do calendário). Os boletos que vencem neste mês são os da competência
- * anterior (mês de uso). Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, manual, marcado }.
- * As automáticas ficam feitas quando não há pendência; as manuais, quando alguém marca.
+ * Etapas do fechamento do mês ``mes`` (mês do calendário). Ex.: outubro/2026:
+ * - a partir de 20/10: gerar os boletos do aluguel de 10/2026 (vencem em 11/2026), com a carta de quem reajusta em 10/2026;
+ * - no mês: conferir os pagamentos dos boletos que vencem em outubro (aluguel de 09/2026), condomínio e contas;
+ * - a partir de 01/11 (depois da virada): lançar as NFs avulsas e do Airbnb de outubro e numerar as NFs de outubro.
+ * Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, manual, marcado, aPartirDe, prevista }. As automáticas ficam
+ * feitas quando não há pendência; as manuais, quando alguém marca. Antes de ``aPartirDe``, a etapa pendente é só prevista.
  */
 export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
-  const comp = C.somarMeses(mes, -1);
+  const comp = C.somarMeses(mes, -1); // aluguel do mês anterior: boletos que vencem neste mês
+  const seguinte = C.somarMeses(mes, 1);
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
   const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
-  const semBoleto = ativos.filter((c) => C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, comp));
+  const semBoleto = ativos.filter((c) => C.diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, mes));
+  const gerados = d.cobrancas.filter((x) => x.competencia === mes).length;
   const doMes = d.cobrancas.filter((x) => x.competencia === comp);
   const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== 'Carência');
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
   // a carta vai junto com o boleto do próprio aluguel corrigido (o índice só sai no começo do mês do reajuste)
-  const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, comp)).filter((r) => r && r.faltaCarta);
-  const nfs = pendentesDeFatura(d).length;
+  const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, mes)).filter((r) => r && r.faltaCarta);
+  const nfs = pendentesDeFatura(d).filter((x) => String(x.data).slice(0, 7) <= mes).length;
+  const dia20 = `${mes}-${String(DIA_GERAR_BOLETOS).padStart(2, '0')}`;
   // basta uma conta lançada no imóvel (do mês, ou paga no mês): nem todo imóvel tem todas as contas
   const lancou = (i) => d.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || '').slice(0, 7) === mes));
   const comConta = d.imoveis.filter((i) => contasPermitidas(d, i.id, mes).tipos.length);
   const contas = comConta.filter((i) => !lancou(i));
   const etapas = [
-    { chave: 'boletos', titulo: `Gerar os boletos de ${C.compBr(comp)} (vencem em ${C.compBr(mes)})`, pendentes: semBoleto.length,
-      detalhe: semBoleto.length ? `sem boleto: ${semBoleto.map((c) => c.inquilino_nome).join(', ')}` : `${doMes.length} boleto(s) gerado(s)`, link: `#/cobrancas?comp=${comp}` },
-    { chave: 'cartas', titulo: `Corrigir os aluguéis de ${C.compBr(comp)} e enviar a carta de reajuste com o boleto`, pendentes: cartas.length,
+    { chave: 'boletos', titulo: `Gerar os boletos de ${C.compBr(mes)} (vencem em ${C.compBr(seguinte)}), a partir de ${C.dataBr(dia20)}`, pendentes: semBoleto.length, aPartirDe: dia20,
+      detalhe: semBoleto.length ? `sem boleto: ${semBoleto.map((c) => c.inquilino_nome).join(', ')}` : `${gerados} boleto(s) gerado(s)`, link: `#/cobrancas?comp=${mes}` },
+    { chave: 'cartas', titulo: `Corrigir os aluguéis de ${C.compBr(mes)} e enviar a carta de reajuste com o boleto`, pendentes: cartas.length, aPartirDe: dia20,
       detalhe: cartas.length ? `${cartas.length} carta(s) a enviar${cartas.some((r) => !r.corrigido) ? `, ${cartas.filter((r) => !r.corrigido).length} ainda sem correção` : ''}` : 'nenhuma carta pendente', link: '#/reajustes' },
     { chave: 'pagamentos', titulo: `Conferir os pagamentos dos boletos de ${C.compBr(comp)}`, pendentes: emAberto.length,
       detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
-    { chave: 'nfs', titulo: 'Numerar as NFs dos pagamentos', pendentes: nfs, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
+    { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
+      pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
     (() => {
       const conferir = ativos.filter((c) => { const m = condominioAConferir(c, hoje); return m && m <= comp; });
       return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
@@ -2896,7 +2979,8 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   ];
   for (const e of etapas) {
     e.marcado = marcado(e.chave);
-    e.feito = !!e.marcado || (!e.manual && !e.pendentes) || (e.manual && !e.pendentes);
+    e.feito = !!e.marcado || !e.pendentes;
+    e.prevista = !e.feito && !!e.aPartirDe && hoje < e.aPartirDe;
   }
   return etapas;
 }
@@ -2992,10 +3076,17 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       ev.push({ data: f.data_saida, tipo: 'Fiador', imovel_id: c.imovel_id, contrato_id: c.id, texto: `${c.inquilino_nome} · fim do vínculo do fiador ${f.nome}`, situacao: 'aviso', estado: 'providenciar' });
     }
   }
-  // fechamento do mês: no último dia, quantas etapas faltam
+  // fechamento do mês: no dia 20, gerar os boletos (vencem no mês seguinte); no dia 1º, as NFs do mês anterior (depois da
+  // virada); no último dia, quantas etapas faltam (as ainda previstas não contam)
   if (fim >= `${hoje.slice(0, 7)}-01`) {
     const etapas = etapasFechamento(d, mes, hoje);
-    const faltam = etapas.filter((e) => !e.feito).length;
+    const passo = (e, fech) => ({ situacao: e.feito ? 'ok' : e.prevista ? 'neutra' : 'aviso', estado: e.feito ? 'feito' : e.prevista ? 'previsto' : 'a fazer', fechamento: fech });
+    const bol = etapas.find((e) => e.chave === 'boletos');
+    ev.push({ data: bol.aPartirDe, tipo: 'Fechamento', texto: `gerar os boletos de ${C.compBr(mes)} (vencem em ${C.compBr(C.somarMeses(mes, 1))})`, ...passo(bol, mes) });
+    const anterior = C.somarMeses(mes, -1);
+    const nf = etapasFechamento(d, anterior, hoje).find((e) => e.chave === 'nfs');
+    ev.push({ data: `${mes}-01`, tipo: 'Fechamento', texto: `NFs avulsas/Airbnb e numerar as NFs de ${C.compBr(anterior)}`, ...passo(nf, anterior) });
+    const faltam = etapas.filter((e) => !e.feito && !e.prevista).length;
     ev.push({ data: fim, tipo: 'Fechamento', texto: faltam ? `faltam ${faltam} de ${etapas.length} etapas` : 'concluído',
       situacao: faltam ? (fim < hoje ? 'perigo' : 'aviso') : 'ok', estado: faltam ? 'a fazer' : 'feito', fechamento: mes });
   }

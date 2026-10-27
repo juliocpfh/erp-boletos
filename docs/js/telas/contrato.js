@@ -7,7 +7,7 @@ import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { caixaReservaAbatida, linkComprovante, xAnexo } from './cadastros.js';
-import { botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
+import { alertaArquivosFaltando, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Contrato / inquilino
@@ -344,13 +344,15 @@ export function caixaSeguros(c) {
   const seguros = R.segurosDoContrato(d(), c.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
   if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length)) return '';
   const alerta = [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
+  const vigente = R.seguroVigente(d(), c.id); // o × da apólice vigente apaga direto; o das anteriores pede para conferir o arquivo
   return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
-      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
+      ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? '' : vigente && vigente.id === s.id ? ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, 'x-excluir', `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}`
+        : ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: '1' }, 'x-excluir')}`}</span>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'seguros', id: s.id }, 'x-excluir', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
     <p class="suave">As parcelas entram nos boletos deste inquilino (se o contrato dele inclui o seguro). A apólice é dele: quando ele sai, ela vai junto, e quem entra precisa de uma apólice nova.</p>
-    ${caixaArquivos('seguro', c.id, 'Apólices', 'apolices', 'O arquivo da apólice é anexado ao cadastrar a apólice (botão "Cadastrar apólice"); aqui ficam todos, com a vigência ao lado.', true)}</div>`;
+    ${caixaArquivos('seguro', c.id, 'Documentos', 'apolices', 'Apólices e outros documentos do seguro (boleto, proposta, comprovante), com a vigência ao lado. A apólice vigente se apaga pelo × ao lado dela, acima.', true)}</div>`;
 }
 
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
@@ -534,6 +536,7 @@ export function telaContrato(c) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
+    ${alertaArquivosFaltando(c.id)}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
     ${linhaIncluso(c)}

@@ -15,7 +15,7 @@ import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens } from './admin.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, d, ehMatricula, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { siglaEmpresa } from './faturas.js';
 
@@ -233,6 +233,39 @@ async function perguntarCaucao(contratoId, comp = null) {
   const plano = (r.parcela_vencimento || []).map((v, k) => ({ vencimento: String(v), valor: C.centavos(String(r.parcela_valor[k] || '0')) }));
   const cbs = await alterar((db) => R.gerarBoletosCaucao(db, contratoId, login(), comp, plano.length ? { plano } : { vencimento }));
   aviso(`Boleto${cbs.length > 1 ? 's' : ''} do complemento da caução gerado${cbs.length > 1 ? 's' : ''}: ${cbs.map((cb) => `${reais(cb.caucao_complemento)} vence em ${dataBr(cb.vencimento)}`).join('; ')}.`, 'ok');
+}
+
+/**
+ * "Anexar arquivos" nos documentos do seguro: pergunta se é a apólice ou outro documento e de qual vigência, e liga o
+ * arquivo à apólice (nome "apolice-2026-10-16-a-2027-10-16.pdf" ou "seguro-2026-10-16-a-2027-10-16-boleto.pdf").
+ * Sem apólice cadastrada, ou "documento solto", fica só na pasta.
+ */
+async function enviarArquivosSeguro(contratoId, el) {
+  const arquivos = [...el.files];
+  const seguros = R.segurosDoContrato(d(), contratoId).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  const vigente = R.seguroVigente(d(), contratoId);
+  const r = seguros.length ? await janela({ titulo: `Anexar ${arquivos.length > 1 ? `${arquivos.length} arquivos` : `"${arquivos[0].name}"`} ao seguro`, sim: 'Anexar',
+    html: `<p><label>O que é</label><select name="tipo"><option value="outro">Outro documento (boleto, proposta, comprovante)</option>
+        <option value="apolice"${arquivos.length > 1 ? ' disabled' : ''}>Apólice${arquivos.length > 1 ? ' (anexe um arquivo por vez)' : ''}</option><option value="solto">Documento solto (sem vigência)</option></select></p>
+      <p><label>Vigência da apólice</label><select name="seguro">${seguros.map((s) => `<option value="${s.id}"${vigente && s.id === vigente.id ? ' selected' : ''}>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}${s.apolice ? ` · apólice ${esc(s.apolice)}` : ''}${s.arquivo_apolice ? '' : ' · sem arquivo da apólice'}</option>`).join('')}</select></p>` }) : { tipo: ['solto'] };
+  el.value = '';
+  if (!r) return;
+  const tipo = String(r.tipo[0]);
+  const s = tipo === 'solto' ? null : buscar('seguros', r.seguro[0]);
+  if (s && tipo === 'apolice' && s.arquivo_apolice) throw new Error(`A apólice da vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)} já tem arquivo: apague o atual (×) antes de anexar outro. Nada foi anexado.`);
+  const dir = await pastaDoEscopo('seguro', contratoId);
+  const vig = s ? `${s.vigencia_inicio}-a-${s.vigencia_fim}` : '';
+  const nomes = [];
+  for (const f of arquivos) {
+    const novo = !s ? f : new File([f], tipo === 'apolice' ? `apolice-${vig}${extensao(f.name)}` : `seguro-${vig}-${semAcentoArquivo(f.name)}`, { type: f.type });
+    nomes.push(await S.salvarArquivo(dir, novo));
+  }
+  await alterar((db) => {
+    if (s) for (const nome of nomes) R.ligarArquivoSeguro(db, s.id, nome, tipo, login());
+    else R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s) ao seguro`, { arquivos: nomes.join(', ') }, vinculoDoEscopo('seguro', contratoId));
+  });
+  aviso(s ? `${nomes.length} arquivo(s) ligado(s) à apólice de ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}${tipo === 'apolice' ? ' (como a apólice)' : ''}.` : `${nomes.length} arquivo(s) anexado(s).`);
+  await mostrar();
 }
 
 export const ACOES = {
@@ -1165,8 +1198,31 @@ export const ACOES = {
     await mostrar();
   },
 
+  /**
+   * Apaga um arquivo do seguro (a apólice ou outro documento). A apólice de uma vigência anterior pede para abrir e
+   * conferir o arquivo antes (marcar "conferi"); depois dá para anexar o certo em "Anexar arquivos" dos documentos.
+   */
+  async excluirArquivoSeguro({ contrato, seguro, nome, conferir }) {
+    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    const s = buscar('seguros', seguro);
+    if (!s) throw new Error('Apólice não encontrada.');
+    if (conferir) {
+      const resp = await janela({ titulo: 'Apagar a apólice de uma vigência anterior', forte: true, sim: 'Apagar o arquivo', nao: 'Cancelar',
+        html: `<p>Este arquivo é a apólice da vigência <b>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</b>. Abra e confira se é mesmo o arquivo errado antes de apagar:</p>
+          <p><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${esc(contrato)}" data-nome="${esc(nome)}">📎 ${esc(nome)}</a></p>
+          <p><label class="check"><input type="checkbox" name="conferi" value="1"> Abri o arquivo e confirmo que quero apagar</label></p>
+          <p class="suave">Depois, anexe o certo em "Anexar arquivos" dos documentos do seguro, escolhendo "Apólice" e esta vigência.</p>` });
+      if (!resp) return;
+      if (!resp.conferi) throw new Error('Marque "Abri o arquivo e confirmo" para apagar. Nada foi apagado.');
+    }
+    await alterarApagandoAnexos((db) => R.tirarArquivoSeguro(db, s.id, nome, login()));
+    aviso(`Arquivo apagado: ${nome}.`);
+    await mostrar();
+  },
+
   async enviarArquivos({ upload }, el) {
     const [escopo, id] = upload.split(':');
+    if (escopo === 'seguro') return enviarArquivosSeguro(Number(id), el);
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
     for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
@@ -1185,9 +1241,17 @@ export const ACOES = {
     baixar(await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
   },
 
+  /** Dados e backup: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
+  async conferirArquivos() {
+    aviso('Conferindo os arquivos…', 'info');
+    const r = await conferirArquivos();
+    aviso(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ''}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : ' Nenhum faltando.'}`, r.faltando.length ? 'aviso' : 'ok');
+  },
+
   async excluirArquivo({ escopo, id, nome }) {
     if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
-    const dono = R.rotulosDosArquivos(d()).get(`${escopo}:${id}|${nome}`);
+    // arquivo ligado a um lançamento (inclusive o herdado na troca de titular): só sai pelo × do lançamento
+    const dono = R.rotulosDosArquivos(d()).get(`${escopo}:${id}|${nome}`) || (anexosEmUso().has(`${chavePasta(escopo, id)}|${nome}`) ? 'arquivo de um lançamento' : '');
     if (dono) throw new Error(`Este arquivo é o ${dono}: para apagar, use o "×" ao lado do lançamento (volta o aviso para anexar).`);
     const dir = await pastaDoEscopo(escopo, Number(id));
     await dir.removeEntry(nome);

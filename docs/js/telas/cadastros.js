@@ -10,7 +10,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca } from './comum.js';
+import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -89,9 +89,9 @@ export const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_gara
  * etiqueta e, com ``anexo`` ({ tabela, id, campo, tipo, data }), o botão para anexar depois.
  */
 // sem comprovante: um só botão pequeno "⚠ anexar" (antes: etiqueta "sem comprovante: buscar no banco" + botão grande)
-export const linkComprovante = (contratoId, nome, anexo = null) => (nome ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo)
+export const linkComprovante = (contratoId, nome, anexo = null) => (nome && !(anexo && arquivoSumiu('contrato', contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo)
   ? xAnexo('removerAnexo', { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ''}</span>`
-  : anexo && opera() ? `<label class="anexar-falta" title="Sem comprovante: buscar no banco e anexar (PDF ou foto)">⚠ anexar comprovante<input type="file" accept="application/pdf,image/*"
+  : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : 'Sem comprovante: buscar no banco e anexar (PDF ou foto)'}">⚠ ${nome ? 'arquivo sumiu: anexar de novo' : 'anexar comprovante'}<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>`
     : etiqueta('sem comprovante', 'aviso'));
 
