@@ -92,6 +92,12 @@ export function normalizar(d) {
   for (const c of d.contratos) desativarSeSaiu(d, c);
   // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
   for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
+  // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
+  for (const c of d.contratos) {
+    const fim = fimDoPrazoHerdado(d, c);
+    if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== 'Indeterminado' && c.vigencia_fim === C.fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses)
+      && !d.renovacoes.some((x) => x.contrato_id === c.id)) c.vigencia_fim = fim;
+  }
   return d;
 }
 
@@ -2020,6 +2026,14 @@ export const documentoParcial = (d, c, campo) => (c[campoParcialDoc(campo)] && !
  */
 export const contratoHerdado = (d, c) => (d && c.contrato_anterior_id ? buscar(d, 'contratos', c.contrato_anterior_id) || null : null);
 /** Contrato que continua este (troca de titular): o mesmo contrato passou para outra pessoa. Null se não há. */
+/**
+ * Troca de titular: o prazo não recomeça, continua o do contrato que o novo titular assumiu (o fim da vigência do anterior).
+ * Ex.: contrato de 27/01/2026 a 27/07/2028, troca em 27/04/2026 → o novo titular fica até 27/07/2028. Sem anterior ou sem fim: null.
+ */
+export function fimDoPrazoHerdado(d, c) {
+  const a = contratoHerdado(d, c);
+  return a && a.prazo_tipo !== 'Indeterminado' && a.vigencia_fim ? a.vigencia_fim : null;
+}
 export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anterior_id === c.id) || null;
 /**
  * Fim do vínculo (e não saída): o contrato passou para outro titular, que continua com as mesmas regras e documentos.

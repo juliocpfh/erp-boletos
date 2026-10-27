@@ -93,6 +93,9 @@ test('recibo de entrega das chaves', () => {
   assert.match(t, /• 01 Chave tetra/);
   assert.match(t, /Data do recebimento: _____/);
   assert.match(t, /\[LOCADORA, LOCATÁRIO\]$/);
+  const ank = K.reciboChavesBlocos(d, c, '').blocos.at(-1).pessoas[0];
+  assert.equal(ank.extra, 'REPRESENTANTE DA ADMINISTRADORA', 'sem o nome de quem representa: a entrega é feita por quem estiver no dia');
+  assert.equal(K.dadosDoContrato(d, c).assinaturas[0].extra, 'MARIA – SÓCIA ADMINISTRADORA', 'no contrato continua o nome');
 });
 
 test('recibo das chaves de imóvel sem chave (terreno): registra a entrega da posse, sem a lista', () => {
@@ -188,7 +191,7 @@ test('termo aditivo de troca de inquilino: quem sai e quem entra, débitos até 
   const { d, c } = base();
   const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Lúcia Prado', inquilino_cpf: '529.982.247-25', inquilino_genero: 'Feminino',
     inquilino_estado_civil: 'Casado(a)', inquilino_profissao: 'cabeleireira', inquilino_endereco: 'Rua W, 5', solidario_nome: 'João Prado', solidario_cpf: '111', solidario_genero: 'Masculino',
-    data_entrada: '2027-04-27', vigencia_inicio: '2027-04-27', aluguel_inicial: 380000, desconto_pontualidade_percentual: 10, dia_vencimento: 10, indice_correcao: 'IPCA',
+    data_entrada: '2027-04-27', vigencia_inicio: '2027-04-27', vigencia_fim: '2029-03-05', prazo_meses: 30, aluguel_inicial: 380000, desconto_pontualidade_percentual: 10, dia_vencimento: 10, indice_correcao: 'IPCA',
     garantia_tipo: 'Caução', caucao_valor: 945000, caucao_meses: 3, finalidade: 'Não residencial', descricao_objeto: 'a loja nº 2' }, 'j');
   assert.throws(() => R.salvarAditivoTroca(d, c.id, { data: '2027-04-27', texto: 'x' }, 'j'), /não continua o contrato de outro/);
   const modelo = K.modelosDe(d, 'aditivo_troca')[0];
@@ -204,12 +207,20 @@ test('termo aditivo de troca de inquilino: quem sai e quem entra, débitos até 
   assert.match(t, /art\. 13 da Lei nº 8\.245\/91/);
   assert.match(t, /A partir de 27 de abril de 2027, o LOCATÁRIO SAINTE retira-se/);
   assert.match(t, /respondem solidariamente entre si/);
-  assert.match(t, /aluguel mensal de R\$ 3\.800,00/);
+  assert.match(t, /inclusive o prazo da locação, que não recomeça com esta transferência e termina em 05 de março de 2029: aluguel mensal de R\$ 3\.800,00/);
   assert.match(t, /referentes ao período até 26 de abril de 2027/);
   assert.match(t, /não dá quitação/);
   assert.match(t, /caução de R\$ 9\.450,00[^\n]*transfere aos LOCATÁRIOS ENTRANTES o direito à devolução/);
   assert.match(t, /\[LOCADORA, LOCATÁRIO SAINTE, LOCATÁRIO ENTRANTE, LOCATÁRIO ENTRANTE, TESTEMUNHA 1\]/);
   assert.doesNotMatch(t, /\[\w+\?\]/, 'nenhum campo desconhecido');
+  // prazo: o do contrato assumido (não recomeça na troca); dados antigos com o prazo recomeçado se ajustam
+  assert.equal(R.fimDoPrazoHerdado(d, n), '2029-03-05');
+  n.vigencia_fim = '2029-10-27';
+  R.normalizar(d);
+  assert.equal(n.vigencia_fim, '2029-03-05', 'fim recalculado da troca (27/04/2027 + 30 meses) volta ao do contrato');
+  n.vigencia_fim = '2030-01-10';
+  R.normalizar(d);
+  assert.equal(n.vigencia_fim, '2030-01-10', 'fim diferente (ex.: renovação) fica');
   R.assinarAditivo(d, a.id, { data: '2027-04-28', arquivo: 'termo.pdf' }, 'j');
   assert.equal(R.alertaAditivoHerdeiro(d, n), null, 'assinado: some o alerta da troca de titular');
 });

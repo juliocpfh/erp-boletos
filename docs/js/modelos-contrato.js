@@ -253,7 +253,7 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 [se varios_entrantes]**Parágrafo único** – Os LOCATÁRIOS ENTRANTES respondem solidariamente entre si por todas as obrigações da locação (art. 2º da Lei nº 8.245/91).[fim]
 
-**CLÁUSULA #** – Continuam as condições em vigor do contrato: aluguel mensal de **{aluguel_atual}**[se bonificacao], com bonificação de {bonificacao_percentual} para pagamento até o vencimento[fim], com vencimento todo dia {dia_vencimento} de cada mês e reajuste anual pela variação d{indice}, no aniversário do contrato original.
+**CLÁUSULA #** – Continuam as condições em vigor do contrato, inclusive o prazo da locação, que não recomeça com esta transferência[se indeterminado] (prazo indeterminado)[senão] e termina em {data_fim}[fim]: aluguel mensal de **{aluguel_atual}**[se bonificacao], com bonificação de {bonificacao_percentual} para pagamento até o vencimento[fim], com vencimento todo dia {dia_vencimento} de cada mês e reajuste anual pela variação d{indice}, no aniversário do contrato original.
 
 ## DOS DÉBITOS ATÉ A DATA DA TROCA
 

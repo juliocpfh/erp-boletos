@@ -765,6 +765,9 @@ export function reciboChavesBlocos(d, c, chaves, data = '') {
   blocos.push(p(`O LOCATÁRIO declara, para os devidos fins, que neste ato recebe ${semChaves ? 'a posse do imóvel acima descrito, que não possui chaves nem controles' : 'as chaves do imóvel acima descrito'}, locado conforme o contrato de locação assinado, e que, a partir deste momento, é responsável pela sua utilização e conservação, assumindo as obrigações civis que forem de sua responsabilidade.`));
   if (!semChaves) blocos.push({ tipo: 'secao', runs: negritos('RELAÇÃO DE CHAVES E CONTROLES ENTREGUES') }, ...(linhasDe(chaves).length ? linhasDe(chaves).map((l) => it(`• ${l}`)) : [it('• ______________________________________________'), it('• ______________________________________________')]));
   blocos.push(it(data ? `Data do recebimento: ${dataPorExtenso(data)}, às ____:____.` : 'Data do recebimento: _____/_____/_________, às ____:____.'));
-  blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => ['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO', 'LOCADORA'].includes(a.papel)) });
+  // a entrega é feita por quem estiver no dia: a locadora assina pelo representante, sem o nome
+  const pessoas = dados.assinaturas.filter((a) => ['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO', 'LOCADORA'].includes(a.papel))
+    .map((a) => (a.papel === 'LOCADORA' ? { ...a, extra: 'REPRESENTANTE DA ADMINISTRADORA' } : a));
+  blocos.push({ tipo: 'assinaturas', pessoas });
   return { blocos, rodape: dados.rodape };
 }
