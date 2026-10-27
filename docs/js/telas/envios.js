@@ -153,6 +153,9 @@ export const FORMULARIOS = {
     if (semEspacos(dados.texto_final) === semEspacos(K.vistoriaFinal(3))) dados.texto_final = '';
     dados.itens = [];
     for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
+    // todo item do modelo precisa de situação (o navegador já aponta o primeiro; aqui a lista completa)
+    const semSituacao = dados.itens.filter((x) => !x.situacao);
+    if (semSituacao.length) throw new Error(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join('; ')}${semSituacao.length > 8 ? '…' : ''}. Marque a situação (ou "Não se aplica") antes de salvar.`);
     const tirados = dados.itens.filter((x) => x.situacao === K.NAO_SE_APLICA);
     dados.itens = dados.itens.filter((x) => x.situacao !== K.NAO_SE_APLICA);
     // fotos: reduzidas e guardadas na pasta do inquilino (mesmo nome = substitui a anterior)

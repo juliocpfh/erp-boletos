@@ -167,6 +167,12 @@ test('vistoria: cada parte numa linha, link das fotos em linha própria (hiperli
   await K.contratoDocx(JSZip, blocos, { logo: null, rodape: [], titulo: 'v' });
   assert.match(arquivos['word/document.xml'], /<w:hyperlink r:id="rIdLink1"/);
   assert.match(arquivos['word/_rels/document.xml.rels'], /Id="rIdLink1"[^>]*Target="https:\/\/onedrive\.live\.com\/fotos" TargetMode="External"/);
+  // logo da 1ª folha igual à do PDF: 6 cm de largura (proporção mantida), a 1 cm da borda de cima, com o texto abaixo
+  await K.contratoDocx(JSZip, blocos, { logo: { bytes: new Uint8Array(), marca: new Uint8Array(), largura: 1200, altura: 600 }, rodape: [], titulo: 'v' });
+  const capa = arquivos['word/document.xml'].match(/<wp:anchor[^]*?<\/wp:anchor>/)[0];
+  assert.match(capa, /<wp:posOffset>360000<\/wp:posOffset>/);
+  assert.match(capa, /<wp:extent cx="2160000" cy="1080000"\/>/);
+  assert.match(capa, /<wp:wrapTopAndBottom\/>/);
 });
 
 test('modelo de vistoria: tira só os itens que não se aplicam, no cômodo certo', () => {
