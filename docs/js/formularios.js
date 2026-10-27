@@ -575,7 +575,7 @@ function editorLista(c) {
   const itens = c.opcoes.map((o) => (Array.isArray(o) ? o[0] : o));
   return `<button type="button" class="link-botao" data-acao="abrirLista" data-lista="${c.lista}">Editar lista</button>
     <div class="editor-lista" data-editor="${c.lista}" hidden>
-      <div class="chips">${itens.map((v) => `<span class="chip">${esc(v)}<button type="button" title="Remover da lista" data-acao="removerDaLista" data-lista="${c.lista}" data-valor="${esc(v)}">×</button></span>`).join('')}</div>
+      <div class="chips">${itens.map((v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${c.lista}" data-valor="${esc(v)}">×</button></span>`).join('')}</div>
       <div class="acoes"><input data-lista-novo="${c.lista}" placeholder="Nome para incluir" style="max-width:240px"><button type="button" class="pequeno" data-acao="incluirNaLista" data-lista="${c.lista}">OK</button></div>
       <div class="ajuda">Só dá para remover o que não estiver em uso.</div></div>`;
 }
@@ -589,7 +589,7 @@ export function arquivoGuardado(campo, nome, acao = 'excluirAnexoDoCampo', dados
   const extra = Object.entries({ campo, ...dados }).map(([k, x]) => `data-${k}="${esc(x)}"`).join(' ');
   const link = abrir ? `data-acao="abrirArquivo" data-escopo="${esc(abrir.escopo)}" data-id="${esc(abrir.id)}" data-nome="${esc(nome)}"` : `data-acao="abrirAnexoDoCampo" data-campo="${esc(campo)}"`;
   return `<div class="ajuda arquivo-guardado"><span class="etiqueta ok">✓ Já guardado</span> <span class="nw"><a href="#" ${link} title="Abrir o arquivo">📎 ${esc(nome)}</a>
-    <button type="button" class="link-botao excluir-mini" title="Apagar só o arquivo" data-acao="${acao}" ${extra} data-confirmar="${esc(`Apagar o arquivo "${nome}"? Ele sai da pasta e não dá para recuperar.`)}">×</button></span>
+    <button type="button" class="x-excluir" title="Apagar só o arquivo" data-acao="${acao}" ${extra} data-confirmar="${esc(`Apagar o arquivo "${nome}"? Ele sai da pasta e não dá para recuperar.`)}">×</button></span>
     <br>Para trocar, escolha outro arquivo.</div>`;
 }
 

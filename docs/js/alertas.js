@@ -29,6 +29,13 @@ export function alertaSeguro(inicio, hoje, seguros) {
     return { nivel: 'aviso', tipo: 'Seguro obrigatório',
       texto: `Seguro vence em ${dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação.` };
   }
+  // apólice em vigência (ou futura) salva sem o arquivo: lembra de buscar o documento
+  const semArquivo = seguros.filter((s) => s.vigencia_fim >= hoje && !s.arquivo_apolice).sort((a, b) => String(a.vigencia_inicio).localeCompare(String(b.vigencia_inicio)));
+  if (semArquivo.length) {
+    const s = semArquivo[0];
+    return { nivel: 'aviso', tipo: 'Seguro obrigatório',
+      texto: `Falta o arquivo da apólice${s.apolice ? ` ${s.apolice}` : ''} (vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}): busque o documento com a seguradora e anexe em "Editar" da apólice.` };
+  }
   if (inicio) {
     const [, proximo] = aniversarios(inicio, hoje);
     if (diasEntre(hoje, proximo) <= ANTECEDENCIA_SEGURO && fim <= somarDias(proximo, 15)) {

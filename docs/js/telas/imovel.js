@@ -23,7 +23,7 @@ function caixaEmpresas(i) {
   const emitentes = d().emitentes.filter((e) => e.ativo);
   return `<div class="cartao" id="empresas"><h2>Empresas que emitem a NF</h2>
     <table><tr><th>Empresa</th><th class="n">Percentual</th><th></th></tr>
-    ${partes.map((p) => { const e = buscar('emitentes', p.emitente_id); return `<tr><td>${esc(e.nome)} · ${esc(e.razao_social)}</td><td class="n">${pct(p.percentual)}</td><td class="n">${opera() ? botao('excluir', 'Remover', { tabela: 'participacoes', id: p.id }, 'perigo pequeno', 'Remover esta empresa do imóvel?') : ''}</td></tr>`; }).join('')
+    ${partes.map((p) => { const e = buscar('emitentes', p.emitente_id); return `<tr><td>${esc(e.nome)} · ${esc(e.razao_social)}</td><td class="n">${pct(p.percentual)}</td><td class="n">${opera() ? botao('excluir', '×', { tabela: 'participacoes', id: p.id }, 'x-excluir', 'Remover esta empresa do imóvel?') : ''}</td></tr>`; }).join('')
     || '<tr><td colspan="3" class="suave">Nenhuma empresa definida. Sem isso não é possível numerar as NFs.</td></tr>'}
     ${partes.length ? `<tr class="total"><td>Total</td><td class="n">${pct(soma)}</td><td></td></tr>` : ''}</table>
     ${partes.length && Math.abs(soma - 100) > 1e-9 ? '<div class="alerta perigo">Os percentuais precisam somar 100%.</div>' : ''}
@@ -57,7 +57,7 @@ function resumoIptu(p) {
 function caixaIptu(i) {
   const iptus = d().iptus.filter((p) => p.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
   const ano = (p, atual) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
-      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'iptus', id: p.id }, 'perigo pequeno', 'Excluir o IPTU deste ano?')}` : ''}</h3>
+      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'iptus', id: p.id }, 'x-excluir', 'Excluir o IPTU deste ano?')}` : ''}</h3>
       ${resumoIptu(p)}${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}
       ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Para anexar a guia, use o clipe ao lado do imóvel na página IPTU (botão "IPTU\'s" em Imóveis).' : '', true, false)}`;
   const [atual, ...anteriores] = iptus;
@@ -76,7 +76,7 @@ function caixaReformas(i) {
     <p class="suave">Guarde aqui o que foi investido no imóvel: serve para o imposto de renda (custo de aquisição) e para corrigir o valor do imóvel ao longo do tempo.</p>
     <div class="rolagem"><table><tr><th>Data</th><th>O que foi feito</th><th>Fornecedor</th><th>NF / recibo</th><th class="n">Valor</th><th></th></tr>
     ${lista.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.descricao)}${r.observacoes ? `<br><span class="suave">${esc(r.observacoes)}</span>` : ''}</td><td>${esc(r.fornecedor || '-')}</td><td>${esc(r.documento || '-')}</td><td class="n">${reais(r.valor)}</td>
-      <td class="n nw">${opera() ? `${link(`#/editar/reformas/${r.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'reformas', id: r.id }, 'perigo pequeno', 'Excluir esta reforma?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma reforma registrada.</td></tr>'}
+      <td class="n nw">${opera() ? `${link(`#/editar/reformas/${r.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'reformas', id: r.id }, 'x-excluir', 'Excluir esta reforma?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma reforma registrada.</td></tr>'}
     ${lista.length ? `<tr class="total"><td colspan="4">Total investido</td><td class="n">${reais(total)}</td><td></td></tr>` : ''}</table></div>
     ${i.valor_imovel ? `<p>Valor do imóvel ${reais(i.valor_imovel)}${i.valor_data ? ` (${dataBr(i.valor_data)})` : ''} + reformas ${reais(total)} = <b>${reais(i.valor_imovel + total)}</b></p>` : ''}
     ${caixaArquivos('reformas', i.id, 'Notas e recibos das reformas', 'arquivos-reformas', '', true)}</div>`;
@@ -119,7 +119,7 @@ export function telaImovel(i) {
       ${lembretes.map((a) => `<div class="alerta ${a.nivel}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
       <div class="rolagem"><table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Inquilino</th><th>Protocolo</th><th>Situação</th><th></th></tr>
       ${tits.map((t) => { const c = t.contrato_id ? buscar('contratos', t.contrato_id) : null; return `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td>${esc(c ? c.inquilino_nome : 'Proprietário')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td>
-        <td class="n">${opera() ? `${link(`#/editar/titularidades/${t.id}`, 'Editar')} ${botao('excluir', 'Excluir', { tabela: 'titularidades', id: t.id }, 'perigo pequeno', 'Excluir este registro?')}` : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div></div>
+        <td class="n">${opera() ? `${link(`#/editar/titularidades/${t.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'titularidades', id: t.id }, 'x-excluir', 'Excluir este registro?')}` : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div></div>
     ${caixaEmpresas(i)}
     ${caixaReformas(i)}
     <div class="cartao"><h2>Último anúncio</h2>${i.anuncio_descricao ? `<p class="pre">${esc(i.anuncio_descricao)}</p>` : '<p class="suave">Nenhuma descrição (use "Editar imóvel").</p>'}</div>
