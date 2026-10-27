@@ -13,18 +13,18 @@ import { botao, buscar, d, etiqueta, link, opera } from './comum.js';
 export function telaFechamento(mes) {
   const hoje = C.hojeIso();
   const etapas = R.etapasFechamento(d(), mes, hoje);
-  const faltam = etapas.filter((e) => !e.feito).length;
+  const faltam = etapas.filter((e) => !e.feito && !e.prevista).length;
   return `<div class="cabecalho"><h1>Fechamento de ${compBr(mes)}</h1>
       <div class="acoes">${link(`#/fechamento?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`, 'botao secundario')}
       ${link(`#/fechamento?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}</div></div>
-    <div class="alerta ${faltam ? 'aviso' : 'ok'}">${faltam ? `Faltam <b>${faltam}</b> de ${etapas.length} etapas.` : 'Fechamento concluído.'} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
+    <div class="alerta ${faltam ? 'aviso' : 'ok'}">${faltam ? `Faltam <b>${faltam}</b> de ${etapas.length} etapas.` : etapas.some((e) => e.prevista) ? 'O que já está liberado foi feito; falta o que é previsto para depois.' : 'Fechamento concluído.'} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? 'feito' : ''}">
-      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : etiqueta(`${e.pendentes} pendente(s)`, 'aviso')}
+      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : e.prevista ? etiqueta(`previsto a partir de ${dataBr(e.aPartirDe)}`, 'neutra') : etiqueta(`${e.pendentes} pendente(s)`, 'aviso')}
         <div class="suave">${esc(e.detalhe)}</div>
         ${e.chave === 'contas' && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${mes}`, `Lançar: ${esc(buscar('imoveis', id).nome)}`, 'botao secundario pequeno')).join(' ')}</div>` : ''}</div>
         <div class="acoes">${link(e.link, 'Abrir', 'botao pequeno')}
           ${opera() ? (e.marcado ? botao('etapaFechamento', 'Desmarcar', { mes, etapa: e.chave, feito: '' }, 'link-botao') : !e.feito ? botao('etapaFechamento', 'Marcar como feito', { mes, etapa: e.chave, feito: '1' }, 'secundario pequeno') : '') : ''}</div></div></li>`).join('')}</ol>
-    <p class="suave">Os boletos que vencem em ${compBr(mes)} são os da competência ${compBr(C.somarMeses(mes, -1))} (mês de uso). O último dia do mês aparece no calendário do Painel com o que falta.</p></div>`;
+    <p class="suave">A partir do dia ${R.DIA_GERAR_BOLETOS} geram-se os boletos de ${compBr(mes)} (mês de uso), que vencem em ${compBr(C.somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(C.somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${R.DIA_GERAR_BOLETOS} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
 }
 
 /** O que falta nos cadastros para o contrato, a vistoria e a NF saírem completos. */

@@ -165,6 +165,9 @@ export async function telaDados() {
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ''}
+    ${opera() ? `<div class="cartao"><h2>Conferir arquivos</h2><p>Ao abrir o Painel, o sistema confere se cada arquivo ligado a um lançamento (comprovantes, documentos assinados, aditivos, cartas, apólices, fotos da vistoria) está na pasta.
+      O que estiver em outra pasta volta sozinho para o lugar; o que sumiu aparece como alerta no Painel e na página do inquilino, para anexar de novo.</p>
+      ${botao('conferirArquivos', 'Conferir arquivos agora')}</div>` : ''}
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento')}</div>` : ''}

@@ -15,7 +15,7 @@ import { telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurar
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { acertarNomesUmaVez, botao, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -177,7 +177,9 @@ export const TELAS = {
     organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, 'aviso'))
       .then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, 'aviso'))
       // cartas de reajuste marcadas como enviadas antes de o sistema guardar o PDF: vão para a pasta do inquilino
-      .then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, 'aviso'));
+      .then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, 'aviso'))
+      // arquivos dos lançamentos: os que estão em outra pasta voltam; os que sumiram viram alerta
+      .then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, 'aviso'));
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
@@ -187,7 +189,11 @@ export const TELAS = {
     const abertas = d().cobrancas.filter((c) => c.situacao === 'Em aberto');
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
     const mesAtual = C.competenciaDe(hoje);
-    const faltamEtapas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito);
+    // etapas do mês já liberadas e não feitas, mais as NFs do mês anterior (numeradas depois da virada do mês)
+    const mesAnterior = C.somarMeses(mesAtual, -1);
+    const faltamEtapas = [...R.etapasFechamento(d(), mesAnterior, hoje).filter((e) => e.chave === 'nfs' && !e.feito).map((e) => ({ ...e, mes: mesAnterior })),
+      ...R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
+    const previstas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => e.prevista && e.chave !== 'cartas');
     const incompletos = cadastrosIncompletos();
     const vencidos = abertas.filter((c) => c.vencimento < hoje).length;
     // o tipo de alerta com mais avisos ativos (ex.: 4 de "Reajuste do aluguel")
@@ -208,9 +214,11 @@ export const TELAS = {
       </div>
       ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link('#/pendencias', 'Ver o que falta', 'botao pequeno')}</div>` : ''}
       ${d().contratos.filter((c) => R.dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join('')}
+      ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(', '))}. Confira e apague à mão se não precisar mais.</div>` : ''}
-      <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => e.titulo.split(' (')[0]).join('; '))}.` : 'todas as etapas feitas.'}
-        ${link(`#/fechamento?mes=${mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
+      <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
+        ${previstas.length ? `<span class="suave">Próximas: ${esc(previstas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]} a partir de ${dataBr(e.aPartirDe)}`).join('; '))}.</span>` : ''}
+        ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}

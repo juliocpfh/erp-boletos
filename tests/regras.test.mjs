@@ -620,9 +620,19 @@ test('fechamento: uma conta lançada (do mês ou paga no mês) já tira o imóve
 test('fechamento do mês, baixa em lote e condições do inquilino anterior', () => {
   const { d, loja, c } = base(); // entrada 07/06/2026, vencimento no mês seguinte
   R.gerarCobrancas(d, '2026-07', 'julio');
-  let et = R.etapasFechamento(d, '2026-08', '2026-08-20');
+  let et = R.etapasFechamento(d, '2026-08', '2026-08-19');
   const por = (k) => et.find((e) => e.chave === k);
+  // fechamento de 08/2026: boletos do aluguel de 08/2026 (vencem em 09/2026) a partir de 20/08; antes, só previsto
+  assert.equal(por('boletos').feito, false);
+  assert.equal(por('boletos').prevista, true);
+  assert.equal(por('boletos').aPartirDe, '2026-08-20');
+  et = R.etapasFechamento(d, '2026-08', '2026-08-20');
+  assert.equal(por('boletos').prevista, false, 'no dia 20 passa a pendente');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  et = R.etapasFechamento(d, '2026-08', '2026-08-20');
   assert.equal(por('boletos').feito, true);
+  // NFs de 08/2026: depois da virada do mês (a partir de 01/09)
+  assert.equal(por('nfs').aPartirDe, '2026-09-01');
   assert.equal(por('pagamentos').pendentes, 1);
   const cb = d.cobrancas.find((x) => x.competencia === '2026-07');
   const r = R.baixarEmLote(d, [cb.id, cb.id], '2026-08-10', 'julio');
@@ -633,8 +643,8 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(et.find((e) => e.chave === 'pagamentos').feito, true);
   R.marcarEtapaFechamento(d, '2026-08', 'contas', true, 'julio');
   assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
-  const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').find((e) => e.tipo === 'Fechamento');
-  assert.equal(ev.data, '2026-08-31');
+  const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').filter((e) => e.tipo === 'Fechamento').map((e) => e.data);
+  assert.deepEqual(ev, ['2026-08-01', '2026-08-20', '2026-08-31'], 'NFs de 07/2026 no dia 1º, boletos no dia 20, o que falta no último dia');
 });
 
 test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e muda de mês ao recalcular', () => {
@@ -776,11 +786,11 @@ test('carta de reajuste vai com o boleto do aluguel já corrigido (o índice sai
   assert.match(a.texto, /boleto do aluguel de 11\/2026 \(vence em 10\/12\/2026\)/);
   // novembro: corrigir antes de gerar o boleto de 11/2026
   assert.match(alerta('2026-11-06').texto, /^Corrija o aluguel de 11\/2026/);
-  // fechamento de 11/2026 (boletos de 10/2026) não pede a carta; o de 12/2026 (boletos de 11/2026) pede
+  // fechamento de 10/2026 (boletos de 10/2026) não pede a carta; o de 11/2026 (boletos de 11/2026, gerados a partir de 20/11) pede
   const cartas = (mes) => R.etapasFechamento(d, mes, '2026-11-06').find((e) => e.chave === 'cartas');
-  assert.equal(cartas('2026-11').pendentes, 0);
-  assert.equal(cartas('2026-12').pendentes, 1);
-  assert.match(cartas('2026-12').detalhe, /1 ainda sem correção/);
+  assert.equal(cartas('2026-10').pendentes, 0);
+  assert.equal(cartas('2026-11').pendentes, 1);
+  assert.match(cartas('2026-11').detalhe, /1 ainda sem correção/);
   // calendário: no vencimento do boleto corrigido (10/12/2026), não no de 10/11/2026
   const ev = (mes) => R.eventosDoMes(d, mes, '2026-11-06').filter((e) => e.tipo === 'Reajuste').map((e) => e.data);
   assert.deepEqual(ev('2026-11'), []);
@@ -792,7 +802,7 @@ test('carta de reajuste vai com o boleto do aluguel já corrigido (o índice sai
   assert.equal(alerta('2026-12-11').nivel, 'perigo', 'boleto já venceu sem a carta');
   R.marcarCartaEnviada(d, c.id, '2026-11', true, 'j');
   assert.equal(alerta('2026-11-20'), undefined);
-  assert.equal(cartas('2026-12').feito, true);
+  assert.equal(cartas('2026-11').feito, true);
 });
 
 test('imóveis do mesmo endereço ficam juntos, mesmo fora da ordem alfabética', () => {
@@ -1488,6 +1498,23 @@ test('herança: reserva do contrato passa ao novo titular sem abater de novo o q
   assert.equal(R.boletoDoMes(d, novo.id, '2026-08').reserva_utilizada, 0, 'não abate de novo');
 });
 
+test('herança do seguro: a apólice em vigência na troca (com os arquivos) passa ao herdeiro; a vencida fica com o anterior', () => {
+  const { d, c } = base();
+  const velha = R.inserir(d, 'seguros', { imovel_id: c.imovel_id, contrato_id: c.id, vigencia_inicio: '2024-10-16', vigencia_fim: '2025-10-16', arquivo_apolice: 'apolice-velha.pdf' }, 'julio');
+  const atual = R.inserir(d, 'seguros', { imovel_id: c.imovel_id, contrato_id: c.id, vigencia_inicio: '2025-10-16', vigencia_fim: '2026-10-16', arquivo_apolice: 'apolice-atual.pdf', outros_arquivos: ['seguro-boleto.pdf'] }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01' }, 'julio');
+  const r = R.transferirHeranca(d, novo.id, 'julio');
+  assert.deepEqual(r.arquivosSeguro, ['apolice-atual.pdf', 'seguro-boleto.pdf']);
+  assert.equal(R.buscar(d, 'seguros', atual.id).contrato_id, novo.id, 'troca em 01/10/2026: apólice até 16/10/2026 vai para a herdeira');
+  assert.equal(R.buscar(d, 'seguros', velha.id).contrato_id, c.id, 'a que venceu em 2025 fica com o anterior');
+  // herança antiga, feita antes desta regra: completa ao abrir o Painel
+  R.atualizar(d, 'seguros', atual.id, { contrato_id: c.id }, 'julio');
+  assert.equal(R.herancaIncompleta(d, R.buscar(d, 'contratos', novo.id)).seguro, true);
+  assert.deepEqual(R.completarHeranca(d, novo.id, 'julio').arquivosSeguro, ['apolice-atual.pdf', 'seguro-boleto.pdf']);
+  assert.equal(R.buscar(d, 'seguros', atual.id).contrato_id, novo.id);
+});
+
 test('herança já feita sem a garantia e a reserva do anterior: completa (comprovante, aplicação e reserva vêm para o herdeiro)', () => {
   const { d, c } = base(); // reserva R$ 500,00
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', caucao_pago_em: '2025-02-01', comprovante_caucao: 'caucao.pdf' });
@@ -1498,7 +1525,7 @@ test('herança já feita sem a garantia e a reserva do anterior: completa (compr
     data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01', reserva_usada_anterior: 0 }, 'julio');
   R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2026-10-02', valor: 1000 }, 'julio');
   c.data_saida = '2026-09-30';
-  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true });
+  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true, seguro: false });
   const r = R.completarHeranca(d, novo.id, 'julio');
   assert.deepEqual(r.arquivos.sort(), ['apl.pdf', 'caucao.pdf']);
   assert.equal(novo.comprovante_caucao, 'caucao.pdf');
@@ -1718,4 +1745,17 @@ test('saída em duas etapas, leitura obrigatória (a mesma da vistoria) e imóve
   assert.equal(d.leituras.filter((l) => l.momento === 'Saída do inquilino').length, 1, 'uma leitura de saída só');
   assert.throws(() => R.informarSaida(d, c.id, '2026-12-15', 'j'), /cálculo final/);
   assert.throws(() => R.desfazerSaida(d, c.id, 'j'), /cálculo final/);
+});
+
+test('aditivo gerado e ainda sem o arquivo assinado: alerta no Painel até anexar', () => {
+  const { d, c } = base();
+  const tipo = 'Aditivo aguardando assinatura';
+  assert.equal(R.alertasContrato(d, c, '2026-10-27').find((x) => x.tipo === tipo), undefined);
+  const a = R.inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id, data: '2026-10-20', assunto: 'troca do vencimento', texto: 'termo' }, 'julio');
+  const al = R.alertasContrato(d, c, '2026-10-27').find((x) => x.tipo === tipo);
+  assert.equal(al.ancora, 'aditivos');
+  assert.match(al.texto, /20\/10\/2026 \(troca do vencimento\)/);
+  assert.ok(R.todosAlertas(d, '2026-10-27').some((x) => x.tipo === tipo), 'aparece no Painel');
+  R.atualizar(d, 'aditivos', a.id, { arquivo: 'aditivo-assinado.pdf' }, 'julio');
+  assert.equal(R.alertasContrato(d, c, '2026-10-27').find((x) => x.tipo === tipo), undefined, 'assinado: some');
 });
