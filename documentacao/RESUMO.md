@@ -5,7 +5,7 @@
 - Cadastra imóveis (endereço pelo CEP), contratos (o contrato liga o inquilino ao imóvel), fiadores, garantias, IPTU, seguro e leituras de relógios.
 - Gera os boletos mensais (aluguel proporcional, bonificação, IPTU, seguro, tarifa, reserva, ressarcimentos).
 - Registra pagamentos (data contábil, multa e juros; valor recebido diferente do previsto pede justificativa e NF digitada à mão) e numera as NFs em sequência contínua, dividida entre as empresas.
-- Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste, demonstrativo do boleto e termo aditivo de troca do vencimento (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
+- Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste, demonstrativo do boleto e termos aditivos de troca do vencimento e de troca de inquilino (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
 - Mostra alertas, calendário, fechamento do mês, inadimplência, resultados financeiros por imóvel e a guia de impostos esperada por empresa.
 - O administrador muda a ordem das caixas de cada página (ícone ☰, todos veem); Dados e backup baixa todos os dados em planilha e PDF e as regras do sistema em TXT.
 - Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor.

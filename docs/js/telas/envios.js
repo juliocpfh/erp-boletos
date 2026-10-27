@@ -218,6 +218,20 @@ export const FORMULARIOS = {
     ir(`#/imprimir/aditivo?id=${a.id}`);
   },
 
+  async aditivoTroca(form) {
+    const f = Object.fromEntries(new FormData(form));
+    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const modelo = f.id ? null : K.modelosDe(d(), 'aditivo_troca').find((m) => String(m.id) === f.modelo);
+    if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
+    const dados = { data: f.data,
+      testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() })),
+      ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
+    let a;
+    await alterar((db) => { a = R.salvarAditivoTroca(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null); });
+    aviso(f.id ? 'Termo aditivo salvo.' : 'Termo aditivo gerado: imprima ou baixe o PDF para assinar.');
+    ir(`#/imprimir/aditivo?id=${a.id}`);
+  },
+
   async assinarAditivo(form) {
     const f = Object.fromEntries(new FormData(form));
     const arquivo = form.querySelector('[name=arquivo]').files[0];
@@ -226,7 +240,7 @@ export const FORMULARIOS = {
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
     await alterar((db) => R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
-    aviso('Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).');
+    aviso(a.tipo === K.TIPO_ADITIVO_TROCA ? 'Termo aditivo assinado e registrado.' : 'Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).');
     await mostrar();
   },
 
@@ -236,12 +250,12 @@ export const FORMULARIOS = {
     const texto = String(f.get('texto') || '');
     if (!nome || !texto.trim()) throw new Error('Preencha o nome e o texto do modelo.');
     const id = Number(f.get('id') || 0);
-    const tipo = f.get('tipo') === 'aditivo' ? 'aditivo' : 'contrato';
+    const tipo = ['aditivo', 'aditivo_troca'].includes(f.get('tipo')) ? f.get('tipo') : 'contrato';
     await alterar((db) => {
       // o modelo novo não esconde os padrões do mesmo tipo: eles vão para o banco antes
       const real = modelosNoBanco(db, id, tipo);
       if (real) R.atualizar(db, 'modelos_contrato', real, { nome, texto }, login(), `Modelo de contrato "${nome}"`);
-      else R.inserir(db, 'modelos_contrato', { nome, texto, ...(tipo === 'aditivo' ? { tipo } : {}) }, login(), `Modelo de contrato "${nome}"`);
+      else R.inserir(db, 'modelos_contrato', { nome, texto, ...(tipo !== 'contrato' ? { tipo } : {}) }, login(), `Modelo de contrato "${nome}"`);
     });
     aviso('Modelo salvo.');
     ir('#/modelos-contrato');

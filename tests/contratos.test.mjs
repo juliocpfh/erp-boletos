@@ -184,6 +184,36 @@ test('vistoria: textos de abertura e final podem ser trocados; em branco, vale o
   assert.doesNotMatch(t, /3 \(três\) dias|presente relatório/);
 });
 
+test('termo aditivo de troca de inquilino: quem sai e quem entra, débitos até a véspera, caução passa a quem entra e assinaturas', () => {
+  const { d, c } = base();
+  const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Lúcia Prado', inquilino_cpf: '529.982.247-25', inquilino_genero: 'Feminino',
+    inquilino_estado_civil: 'Casado(a)', inquilino_profissao: 'cabeleireira', inquilino_endereco: 'Rua W, 5', solidario_nome: 'João Prado', solidario_cpf: '111', solidario_genero: 'Masculino',
+    data_entrada: '2027-04-27', vigencia_inicio: '2027-04-27', aluguel_inicial: 380000, desconto_pontualidade_percentual: 10, dia_vencimento: 10, indice_correcao: 'IPCA',
+    garantia_tipo: 'Caução', caucao_valor: 945000, caucao_meses: 3, finalidade: 'Não residencial', descricao_objeto: 'a loja nº 2' }, 'j');
+  assert.throws(() => R.salvarAditivoTroca(d, c.id, { data: '2027-04-27', texto: 'x' }, 'j'), /não continua o contrato de outro/);
+  const modelo = K.modelosDe(d, 'aditivo_troca')[0];
+  assert.equal(K.modelosDe(d, 'aditivo').some((m) => m.tipo === 'aditivo_troca'), false, 'separado do aditivo de vencimento');
+  const a = R.salvarAditivoTroca(d, n.id, { data: '2027-04-27', texto: modelo.texto, testemunhas: [{ nome: 'Teste Um', cpf: '529.982.247-25' }] }, 'j');
+  assert.equal(a.tipo, K.TIPO_ADITIVO_TROCA);
+  assert.match(a.assunto, /Pedro Souza → Lúcia Prado, a partir de 27\/04\/2027/);
+  const t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.match(t, /1º TERMO ADITIVO/);
+  assert.match(t, /LOCATÁRIO SAINTE: PEDRO SOUZA, solteiro, engenheiro/);
+  assert.match(t, /LOCATÁRIOS ENTRANTES: LÚCIA PRADO, casada, cabeleireira[^\n]*; e JOÃO PRADO/);
+  assert.match(t, /firmado em 05 de setembro de 2026/, 'data do contrato original');
+  assert.match(t, /art\. 13 da Lei nº 8\.245\/91/);
+  assert.match(t, /A partir de 27 de abril de 2027, o LOCATÁRIO SAINTE retira-se/);
+  assert.match(t, /respondem solidariamente entre si/);
+  assert.match(t, /aluguel mensal de R\$ 3\.800,00/);
+  assert.match(t, /referentes ao período até 26 de abril de 2027/);
+  assert.match(t, /não dá quitação/);
+  assert.match(t, /caução de R\$ 9\.450,00[^\n]*transfere aos LOCATÁRIOS ENTRANTES o direito à devolução/);
+  assert.match(t, /\[LOCADORA, LOCATÁRIO SAINTE, LOCATÁRIO ENTRANTE, LOCATÁRIO ENTRANTE, TESTEMUNHA 1\]/);
+  assert.doesNotMatch(t, /\[\w+\?\]/, 'nenhum campo desconhecido');
+  R.assinarAditivo(d, a.id, { data: '2027-04-28', arquivo: 'termo.pdf' }, 'j');
+  assert.equal(R.alertaAditivoHerdeiro(d, n), null, 'assinado: some o alerta da troca de titular');
+});
+
 test('termo aditivo de vencimento (modelo C): só muda o dia, referência no mês anterior, fiador concorda e assinaturas', () => {
   const { d, c } = base({ garantia_tipo: 'Fiador' });
   R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Ana Lima', cpf: '529.982.247-25', genero: 'Feminino' }, 'j');

@@ -275,7 +275,8 @@ export function pendenciasDoContrato(d, c) {
 /**
  * Linguagem dos modelos:
  * - {campo}: texto do cadastro (ex.: {aluguel_bonificado}). {s:singular|plural} escolhe pela quantidade de locatários;
- *   {l:...|...} pela de locadoras; {f:...|...} pela de fiadores. {cl:nome} cita o número de uma cláusula marcada.
+ *   {l:...|...} pela de locadoras; {f:...|...} pela de fiadores; {a:...|...} pela de locatários que saem (aditivo de troca).
+ *   {cl:nome} cita o número de uma cláusula marcada.
  * - [se condição] ... [senão] ... [fim]: trecho que só entra quando a condição vale ("[se não fiador]" também).
  * - Linha "# Título", "## SEÇÃO", "> texto alinhado à direita". "CLÁUSULA #" numera sozinha ("CLÁUSULA #multa" guarda o nome);
  *   "#i." numera os itens do início. **negrito**. Linha [assinaturas]: quadro de assinaturas.
@@ -303,7 +304,8 @@ export function montarContrato(texto, dados) {
   t = t.replace(/(^|\n)(\s*\**)#i\./g, (x, a, b) => { item += 1; return `${a}${b}${item}.`; });
   // campos
   const q = dados.quantidades;
-  t = t.replace(/\{([slf]):([^|}]*)\|([^}]*)\}/g, (x, k, um, varios) => ((k === 's' ? q.locatarios : k === 'l' ? q.locadoras : q.fiadores) > 1 ? varios : um));
+  const qtd = { s: q.locatarios, l: q.locadoras, f: q.fiadores, a: q.saintes || 1 };
+  t = t.replace(/\{([slfa]):([^|}]*)\|([^}]*)\}/g, (x, k, um, varios) => (qtd[k] > 1 ? varios : um));
   t = t.replace(/\{cl:([a-z_]+)\}/gi, (x, nome) => (rotulos[nome] ? `${rotulos[nome]}ª (${ordinalPorExtenso(rotulos[nome])})` : `[cláusula ${nome}?]`));
   t = t.replace(/\{([a-z_]+)\}/g, (x, nome) => (nome in dados.campos ? dados.campos[nome] : `[${nome}?]`));
   // blocos
@@ -560,6 +562,7 @@ export function modelosDe(d, tipo = 'contrato') {
  * Mês de referência: o mês de uso que vence no 1º vencimento novo (o anterior, quando a cobrança é no mês seguinte).
  */
 export function dadosDoAditivo(d, c, a) {
+  if (a.tipo === TIPO_ADITIVO_TROCA) return dadosDoAditivoTroca(d, c, a);
   const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
   const ref = mesSeguinte ? C.somarMeses(a.primeiro_vencimento.slice(0, 7), -1) : a.primeiro_vencimento.slice(0, 7);
@@ -572,6 +575,48 @@ export function dadosDoAditivo(d, c, a) {
     mes_referencia: `${MESES[Number(ref.slice(5, 7)) - 1]} de ${ref.slice(0, 4)}`,
   });
   dados.condicoes.mes_seguinte = mesSeguinte;
+  return dados;
+}
+
+export const TIPO_ADITIVO_TROCA = 'Troca de titular';
+
+/**
+ * Termo aditivo de troca de inquilino (herança do contrato). ``c``: o contrato do novo titular (continua o anterior);
+ * ``a``: registro da tabela aditivos (data, aluguel na data da troca, testemunhas). Saem o titular anterior e o solidário dele;
+ * entram o novo titular e o solidário dele (no texto, todos como locatários: {a:...|...} e {s:...|...}).
+ * A troca vale a partir da entrada do novo titular; a data do contrato é a do contrato original (o primeiro da cadeia).
+ */
+function dadosDoAditivoTroca(d, c, a) {
+  const ant = d.contratos.find((x) => x.id === c.contrato_anterior_id) || {};
+  let original = ant.id ? ant : c;
+  for (const vistos = new Set([c.id]); original.contrato_anterior_id && !vistos.has(original.id);) {
+    vistos.add(original.id);
+    original = d.contratos.find((x) => x.id === original.contrato_anterior_id) || original;
+  }
+  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
+  const saiu = ant.id ? dadosDoContrato(d, ant, { data: a.data }) : { campos: { locatarios: '', solidario: '' }, assinaturas: [] };
+  const saintes = [saiu.campos.locatarios, saiu.campos.solidario].filter(Boolean);
+  const entrantes = [dados.campos.locatarios, dados.campos.solidario].filter(Boolean);
+  const troca = c.data_entrada || c.vigencia_inicio || a.data;
+  Object.assign(dados.campos, {
+    numero_aditivo: `${a.numero || 1}º`,
+    data_contrato: dataPorExtenso(original.vigencia_inicio || original.data_entrada),
+    data_troca: dataPorExtenso(troca),
+    data_vespera: dataPorExtenso(C.somarDias(troca, -1)),
+    saintes: saintes.join('; e '),
+    entrantes: entrantes.join('; e '),
+    aluguel_atual: valorComExtenso(a.aluguel || c.aluguel_inicial || 0),
+  });
+  dados.condicoes.varios_entrantes = entrantes.length > 1;
+  dados.quantidades.locatarios = Math.max(entrantes.length, 1);
+  dados.quantidades.saintes = Math.max(saintes.length, 1);
+  // assinam: locadora, quem sai, quem entra, fiadores e testemunhas
+  const papel = (x, quem) => (['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO'].includes(x.papel) ? { ...x, papel: `LOCATÁRIO ${quem}` } : x);
+  const sai = saiu.assinaturas.filter((x) => x.papel.startsWith('LOCATÁRIO')).map((x) => papel(x, 'SAINTE'));
+  const lista = dados.assinaturas.map((x) => papel(x, 'ENTRANTE'));
+  const pos = lista.findIndex((x) => x.papel === 'LOCATÁRIO ENTRANTE');
+  lista.splice(pos < 0 ? lista.length : pos, 0, ...sai);
+  dados.assinaturas = lista;
   return dados;
 }
 

@@ -194,7 +194,7 @@ export async function documentoMontado(tipo, q) {
     if (!c || !a.texto) return null;
     const dados = K.dadosDoAditivo(d(), c, a);
     return { c, a, blocos: K.montarContrato(a.texto, dados), rodape: dados.rodape, nome: 'Termo aditivo',
-      arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} vencimento`, c, String(a.data || '').slice(0, 4)) };
+      arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca de inquilino' : 'vencimento'}`, c, String(a.data || '').slice(0, 4)) };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
@@ -412,7 +412,10 @@ export function telaGerarContrato(rota) {
         Os textos ficam em ${link('#/modelos-contrato', 'Modelos de contrato', '')}.</p></div>`;
 }
 
-/** Termo aditivo de troca do dia do vencimento: gerar (escolhendo o modelo) ou alterar o que ainda não foi assinado (com o texto). */
+/**
+ * Termo aditivo: escolher o tipo (troca do dia do vencimento ou troca de inquilino), gerar (escolhendo o modelo) ou alterar
+ * o que ainda não foi assinado (com o texto).
+ */
 export function telaAditivo(rota) {
   const id = rota.partes[1];
   const a = id === 'novo' ? null : buscar('aditivos', id);
@@ -421,6 +424,9 @@ export function telaAditivo(rota) {
   if (!c) return '<h1>Inquilino não encontrado</h1>';
   if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
   if (!opera()) return '<h1>Sem permissão para gerar termos aditivos</h1>';
+  const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : 'vencimento') : rota.q.tipo;
+  if (tipo === 'troca') return telaAditivoTroca(c, a);
+  if (tipo !== 'vencimento') return escolherAditivo(c);
   const hoje = C.hojeIso();
   const modelos = K.modelosDe(d(), 'aditivo');
   const diaAtual = a ? a.dia_anterior : (c.dia_vencimento || 10);
@@ -449,6 +455,54 @@ export function telaAditivo(rota) {
     ${a ? AJUDA_MODELO : ''}`;
 }
 
+/** Qual termo aditivo gerar. O de troca de inquilino só no contrato que continua o de outro titular. */
+function escolherAditivo(c) {
+  const ant = R.contratoHerdado(d(), c);
+  const ir = (tipo) => `#/aditivo/novo?contrato=${c.id}&tipo=${tipo}`;
+  return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Gerar termo aditivo</h1>
+    <div class="cartao"><h2>Alteração do dia do vencimento</h2>
+      <p>O inquilino pede para pagar em outro dia do mês. Ex.: do dia 10 para o dia 20 a partir de novembro/2026, sem cobrança proporcional.</p>
+      ${link(ir('vencimento'), 'Gerar aditivo de vencimento', 'botao')}</div>
+    <div class="cartao"><h2>Troca de inquilino (herança do contrato)</h2>
+      <p>Sai o titular e entra outro, no mesmo contrato: mesmo aluguel, vencimento, reajuste e garantia.</p>
+      ${ant ? `<p>Sai <b>${esc(ant.inquilino_nome)}</b>, entra <b>${esc(c.inquilino_nome)}</b>, a partir de <b>${dataBr(c.data_entrada || c.vigencia_inicio)}</b>.</p>${link(ir('troca'), 'Gerar aditivo de troca de inquilino', 'botao')}`
+    : `<p class="suave">Este inquilino não continua o contrato de outro. O termo de troca é gerado no inquilino <b>novo</b>: cadastre-o em "Novo inquilino" escolhendo
+      o contrato que ele continua (o do titular que sai) e gere o termo na página dele.</p>`}</div>`;
+}
+
+/** Termo aditivo de troca de inquilino: data, modelo e testemunhas (as partes, o aluguel e a garantia vêm do cadastro). */
+function telaAditivoTroca(c, a) {
+  const ant = R.contratoHerdado(d(), c);
+  if (!ant) return escolherAditivo(c);
+  const modelos = K.modelosDe(d(), 'aditivo_troca');
+  const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
+  // de quem sai, só a qualificação das pessoas importa
+  const falta = [...K.pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
+    ...K.pendenciasDoContrato(d(), c)];
+  const troca = c.data_entrada || c.vigencia_inicio;
+  return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : 'Gerar termo aditivo: troca de inquilino'}</h1>
+    ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
+    <div class="alerta info">Sai <b>${esc(ant.inquilino_nome)}</b>${ant.solidario_nome ? ` (e o solidário ${esc(ant.solidario_nome)})` : ''}; entra <b>${esc(c.inquilino_nome)}</b>${c.solidario_nome ? ` com ${esc(c.solidario_nome)}` : ''}, a partir de <b>${dataBr(troca)}</b>.
+      O que for do período até ${dataBr(C.somarDias(troca, -1))} fica com quem sai. Garantia: <b>${esc(c.garantia_tipo || 'Sem garantia')}</b>${R.temCaucao(c) || R.temDeposito(c) ? ' (continua na locação e passa a ser devolvida a quem entra)' : ''}.
+      ${R.temFiador(c) ? '<br><b>Fiador:</b> ele precisa assinar o termo concordando em garantir quem entra; se não aceitar, troque a garantia antes.' : ''}</div>
+    <form class="cartao" data-form="aditivoTroca">
+      <input type="hidden" name="id" value="${a ? a.id : ''}"><input type="hidden" name="contrato" value="${c.id}">
+      <div class="formulario">
+        <div><label>Data do termo aditivo</label><input type="date" name="data" value="${esc(a ? a.data : (troca || C.hojeIso()))}" required></div>
+        ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
+        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
+        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+      </div>
+      <p class="suave">A data da troca é a entrada de ${esc(c.inquilino_nome)} no cadastro (${dataBr(troca)}); para mudar, use "Editar contrato".
+        Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
+      ${a ? `<p><label>Texto deste termo <span class="suave">(muda só este termo; o padrão fica em ${link('#/modelos-contrato', 'Modelos de contrato', '')})</span></label>
+        <textarea name="texto" class="texto-modelo" spellcheck="true">${esc(a.texto)}</textarea></p>` : ''}
+      <div class="acoes"><button>${a ? 'Salvar e ver o termo' : 'Gerar o termo'}</button><a class="botao secundario" href="#/contrato/${c.id}?ir=aditivos">Cancelar</a></div></form>
+    ${a ? AJUDA_MODELO : ''}`;
+}
+
 const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um modelo</b></summary>
   <ul>
     <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
@@ -459,6 +513,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
     <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
       e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>
+    <li>Só nos termos aditivos de troca de inquilino: <code>{numero_aditivo} {data_contrato} {data_troca} {data_vespera} {saintes} {entrantes} {aluguel_atual}</code>,
+      a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>
@@ -466,7 +522,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;
 
-const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)' };
+const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)', aditivo_troca: 'Termos aditivos (troca de inquilino)' };
+const NOVO_MODELO = { contrato: 'Novo modelo de contrato', aditivo: 'Novo modelo de aditivo de vencimento', aditivo_troca: 'Novo modelo de aditivo de troca' };
 
 export function telaModelos() {
   const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
@@ -474,24 +531,25 @@ export function telaModelos() {
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
       ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', '×', { id: m.id }, 'x-excluir', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
-    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? `<div class="acoes">${link('#/modelo-contrato/novo', 'Novo modelo de contrato', 'botao')} ${link('#/modelo-contrato/novo?tipo=aditivo', 'Novo modelo de aditivo', 'botao secundario')}</div>` : ''}</div>
-    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao"><h2>${titulo}</h2><table><tr><th>Modelo</th><th></th></tr>
-      ${K.modelosDe(d(), tipo).map((m) => linha(m, tipo)).join('')}</table></div>`).join('')}
-    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar aditivo de vencimento</b> (em "Termos aditivos").
+    <h1>Modelos de contrato</h1>
+    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao"><div class="cabecalho"><h2>${titulo}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === 'contrato' ? '' : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], 'botao secundario pequeno') : ''}</div>
+      <table><tr><th>Modelo</th><th></th></tr>${K.modelosDe(d(), tipo).map((m) => linha(m, tipo)).join('')}</table></div>`).join('')}
+    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>
     ${AJUDA_MODELO}`;
 }
 
 export function telaModelo(rota) {
   const id = rota.partes[1];
-  const m = id === 'novo' ? { id: '', nome: '', texto: '', tipo: rota.q.tipo === 'aditivo' ? 'aditivo' : 'contrato' }
+  const m = id === 'novo' ? { id: '', nome: '', texto: '', tipo: rota.q.tipo in TIPOS_MODELO ? rota.q.tipo : 'contrato' }
     : Object.keys(TIPOS_MODELO).flatMap((t) => K.modelosDe(d(), t)).find((x) => String(x.id) === id);
   if (!m) return '<h1>Modelo não encontrado</h1>';
-  const aditivo = K.tipoDoModelo(m) === 'aditivo';
+  const tipo = K.tipoDoModelo(m);
+  const aditivo = tipo !== 'contrato';
   return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
     <h1>${m.id === '' ? `Novo modelo de ${aditivo ? 'termo aditivo' : 'contrato'}` : `Modelo: ${esc(m.nome)}`}</h1>
     <form class="cartao" data-form="modeloContrato">
-      <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${aditivo ? 'aditivo' : 'contrato'}">
+      <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${esc(tipo)}">
       <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>
       <p><label>Texto</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
       <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-contrato">Cancelar</a></div></form>
