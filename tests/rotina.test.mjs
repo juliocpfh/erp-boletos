@@ -133,3 +133,19 @@ test('aluguel cheio a partir do bonificado digitado (no centavo)', () => {
     assert.ok(Math.abs(v - C.descontoPorPercentual(v, 7.5) - b) <= 1);
   }
 });
+
+test('rotina: documento registrado como perdido conta como concluído; com assinatura faltante continua faltando', () => {
+  const { d, c } = base();
+  R.marcarDocumentoPerdido(d, c.id, 'doc_contrato_em', '2026-06-20', 'julio');
+  const parte = R.partesDoContrato(d, c).map(R.textoParte)[0];
+  R.anexarDocumentoParcial(d, c.id, 'doc_vistoria_em', { data: '2026-06-08', arquivo: 'vist.pdf', falta: [parte] }, 'julio', true);
+  const rot = R.rotinaEntrada(d, c, '2026-07-01');
+  const e = (k) => rot.find((x) => x.chave === k);
+  assert.equal(e('contrato_assinado').situacao, 'feita');
+  assert.equal(e('contrato_assinado').texto, 'registrado como perdido');
+  assert.equal(e('contrato_gerado').situacao, 'feita', 'perdido: o contrato já foi gerado');
+  assert.equal(e('vistoria_assinada').situacao, 'andamento');
+  assert.match(e('vistoria_assinada').texto, /falta assinatura/);
+  assert.equal(e('vistoria_gerada').situacao, 'feita', 'anexada: a vistoria já foi gerada');
+  assert.equal(e('chaves_gerado').situacao, 'pendente');
+});
