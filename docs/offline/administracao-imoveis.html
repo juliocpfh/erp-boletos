@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="c5fee3996e91e32f">
+<meta name="fontes" content="08cb7fd07fe648b3">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -268,7 +268,6 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 /* Carta de reajuste */
 .carta { position: relative; overflow: hidden; background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
 .carta > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
-.carta-logo { max-height: 90px; max-width: 260px; }
 .carta-data { text-align: right; }
 .carta-tabela { margin: 14px 0; }
 .carta-tabela td, .carta-tabela th { padding: 6px 10px; }
@@ -287,8 +286,10 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .ct-marcas { position: absolute; inset: 0; background-repeat: repeat-y; background-size: 100% auto; background-position: center top; opacity: .05; pointer-events: none; z-index: 0; }
 .ct-marca { display: none; opacity: .05; pointer-events: none; z-index: 0; image-rendering: auto; }
 .contrato > *:not(:where(.ct-marca, .ct-marcas)) { position: relative; z-index: 1; }
-.contrato .ct-capa { text-align: center; margin: 0 0 .3cm; line-height: 0; }
-.contrato .ct-capa img { width: 6cm; height: 6cm; object-fit: contain; }
+/* logo da 1ª folha, igual em todos os documentos (contrato, vistoria, recibo, aditivo, carta): até 6 × 6 cm, sem sobra branca em volta
+   (mesmos números de LOGO em contratos.js) */
+.ct-capa { text-align: center; margin: 0 0 .3cm; line-height: 0; }
+.ct-capa img { width: 6cm; height: auto; max-height: 6cm; object-fit: contain; }
 .contrato .ct-titulo { text-align: center; font-size: 18px; text-decoration: underline; margin: 0 0 22px; }
 .contrato .ct-secao { text-align: center; font-size: 15px; text-decoration: underline; margin: 22px 0 10px; }
 .contrato .ct-par { text-align: justify; text-indent: 1cm; margin: 0 0 9px; }
@@ -311,8 +312,8 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 @media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-grupo-assina, .ct-grupo-assina.um { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
 @media print {
   @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
-  /* 1ª página: margem de cima menor (dentro da área que a impressora imprime) para a logo de 6 cm subir sem cortar */
-  @page :first { margin-top: .8cm; }
+  /* 1ª página: margem de cima menor (dentro da área que a impressora imprime): a logo fica a 1 cm da borda, como no PDF e no Word */
+  @page :first { margin-top: 1cm; }
   .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
@@ -326,7 +327,14 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
 /* Vistoria: grade por cômodo, tabelas e fotos no documento */
 .vistoria-comodo { border: 1px solid var(--borda); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
 .vistoria-comodo h3 { margin: 4px 0; }
-.grade-vistoria select { width: auto; min-width: 150px; }
+/* colunas de mesma largura em todos os cômodos (a situação fica alinhada de um cômodo para o outro) */
+.grade-vistoria { width: 100%; min-width: 560px; table-layout: fixed; }
+.grade-vistoria col.g-item { width: 34%; }
+.grade-vistoria col.g-entrada { width: 14%; }
+.grade-vistoria col.g-situacao { width: 170px; }
+.grade-vistoria td { overflow-wrap: anywhere; }
+.grade-vistoria select { width: 100%; min-width: 0; }
+.grade-vistoria select:invalid { border-color: var(--perigo); }
 .grade-vistoria select.piorou { border-color: #f59e0b; background: #fef3c7; }
 .contrato .ct-tabela { width: 100%; border-collapse: collapse; margin: 4px 0 10px; font-size: 13px; }
 .contrato .ct-tabela { table-layout: fixed; }
@@ -442,7 +450,7 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 <body>
 <div id="app"><main><p class="suave">Carregando…</p></main></div>
 <noscript>Ative o JavaScript para usar o sistema.</noscript>
-<!-- Versão para usar sem internet, gerada em 2026-10-27 por tools/gerar-offline.mjs. Não edite: gere de novo. -->
+<!-- Versão para usar sem internet, gerada em 2026-10-28 por tools/gerar-offline.mjs. Não edite: gere de novo. -->
 <script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -920,7 +928,7 @@ function(t){var e=function(){return void 0===this.internal.vFS&&(this.internal.v
 function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,o,s,c,u=e,l=[[0,3,0,1,0,0,0],[0,3,0,1,2,2,0],[0,3,0,17,2,0,1],[0,3,5,5,4,1,0],[0,3,21,21,4,0,1],[0,3,5,5,4,2,0]],h=[[2,0,1,1,0,1,0],[2,0,1,1,0,2,0],[2,0,2,1,3,2,0],[2,0,2,33,3,1,1]],f={L:0,R:1,EN:2,AN:3,N:4,B:5,S:6},d={0:0,5:1,6:2,7:3,32:4,251:5,254:6,255:7},p=["(",")","(","<",">","<","[","]","[","{","}","{","«","»","«","‹","›","‹","⁅","⁆","⁅","⁽","⁾","⁽","₍","₎","₍","≤","≥","≤","〈","〉","〈","﹙","﹚","﹙","﹛","﹜","﹛","﹝","﹞","﹝","﹤","﹥","﹤"],g=new RegExp(/^([1-4|9]|1[0-9]|2[0-9]|3[0168]|4[04589]|5[012]|7[78]|159|16[0-9]|17[0-2]|21[569]|22[03489]|250)$/),m=!1,v=0;this.__bidiEngine__={};var b=function(t){var e=t.charCodeAt(),r=e>>8,n=d[r];return void 0!==n?u[256*n+(255&e)]:252===r||253===r?"AL":g.test(r)?"L":8===r?"R":"N"},y=function(t){for(var e,r=0;r<t.length;r++){if("L"===(e=b(t.charAt(r))))return!1;if("R"===e)return!0}return!1},w=function(t,e,o,s){var c,u,l,h,f=e[s];switch(f){case"L":case"R":m=!1;break;case"N":case"AN":break;case"EN":m&&(f="AN");break;case"AL":m=!0,f="R";break;case"WS":f="N";break;case"CS":s<1||s+1>=e.length||"EN"!==(c=o[s-1])&&"AN"!==c||"EN"!==(u=e[s+1])&&"AN"!==u?f="N":m&&(u="AN"),f=u===c?u:"N";break;case"ES":f="EN"===(c=s>0?o[s-1]:"B")&&s+1<e.length&&"EN"===e[s+1]?"EN":"N";break;case"ET":if(s>0&&"EN"===o[s-1]){f="EN";break}if(m){f="N";break}for(l=s+1,h=e.length;l<h&&"ET"===e[l];)l++;f=l<h&&"EN"===e[l]?"EN":"N";break;case"NSM":if(i&&!a){for(h=e.length,l=s+1;l<h&&"NSM"===e[l];)l++;if(l<h){var d=t[s],p=d>=1425&&d<=2303||64286===d;if(c=e[l],p&&("R"===c||"AL"===c)){f="R";break}}}f=s<1||"B"===(c=e[s-1])?"N":o[s-1];break;case"B":m=!1,r=!0,f=v;break;case"S":n=!0,f="N";break;case"LRE":case"RLE":case"LRO":case"RLO":case"PDF":m=!1;break;case"BN":f="N"}return f},N=function(t,e,r){var n=t.split("");return r&&L(n,r,{hiLevel:v}),n.reverse(),e&&e.reverse(),n.join("")},L=function(t,e,i){var a,o,s,c,u,d=-1,p=t.length,g=0,y=[],N=v?h:l,L=[];for(m=!1,r=!1,n=!1,o=0;o<p;o++)L[o]=b(t[o]);for(s=0;s<p;s++){if(u=g,y[s]=w(t,L,y,s),a=240&(g=N[u][f[y[s]]]),g&=15,e[s]=c=N[g][5],a>0)if(16===a){for(o=d;o<s;o++)e[o]=1;d=-1}else d=-1;if(N[g][6])-1===d&&(d=s);else if(d>-1){for(o=d;o<s;o++)e[o]=c;d=-1}"B"===L[s]&&(e[s]=0),i.hiLevel|=c}n&&function(t,e,r){for(var n=0;n<r;n++)if("S"===t[n]){e[n]=v;for(var i=n-1;i>=0&&"WS"===t[i];i--)e[i]=v}}(L,e,p)},A=function(t,e,n,i,a){if(!(a.hiLevel<t)){if(1===t&&1===v&&!r)return e.reverse(),void(n&&n.reverse());for(var o,s,c,u,l=e.length,h=0;h<l;){if(i[h]>=t){for(c=h+1;c<l&&i[c]>=t;)c++;for(u=h,s=c-1;u<s;u++,s--)o=e[u],e[u]=e[s],e[s]=o,n&&(o=n[u],n[u]=n[s],n[s]=o);h=c}h++}}},x=function(t,e,r){var n=t.split(""),i={hiLevel:v};return r||(r=[]),L(n,r,i),function(t,e,r){if(0!==r.hiLevel&&c)for(var n,i=0;i<t.length;i++)1===e[i]&&(n=p.indexOf(t[i]))>=0&&(t[i]=p[n+1])}(n,r,i),A(2,n,e,r,i),A(1,n,e,r,i),n.join("")};return this.__bidiEngine__.doBidiReorder=function(t,e,r){if(function(t,e){if(e)for(var r=0;r<t.length;r++)e[r]=r;void 0===a&&(a=y(t)),void 0===s&&(s=y(t))}(t,e),i||!o||s)if(i&&o&&a^s)v=a?1:0,t=N(t,e,r);else if(!i&&o&&s)v=a?1:0,t=x(t,e,r),t=N(t,e);else if(!i||a||o||s){if(i&&!o&&a^s)t=N(t,e),a?(v=0,t=x(t,e,r)):(v=1,t=x(t,e,r),t=N(t,e));else if(i&&a&&!o&&s)v=1,t=x(t,e,r),t=N(t,e);else if(!i&&!o&&a^s){var n=c;a?(v=1,t=x(t,e,r),v=0,c=!1,t=x(t,e,r),c=n):(v=0,t=x(t,e,r),t=N(t,e),v=1,c=!1,t=x(t,e,r),c=n,t=N(t,e))}}else v=0,t=x(t,e,r);else v=a?1:0,t=x(t,e,r);return t},this.__bidiEngine__.setOptions=function(t){t&&(i=t.isInputVisual,o=t.isOutputVisual,a=t.isInputRtl,s=t.isOutputRtl,c=t.isSymmetricSwapping)},this.__bidiEngine__.setOptions(t),this.__bidiEngine__};var e=["BN","BN","BN","BN","BN","BN","BN","BN","BN","S","B","S","WS","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","B","B","B","S","WS","N","N","ET","ET","ET","N","N","N","N","N","ES","CS","ES","CS","CS","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","CS","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","BN","BN","BN","BN","BN","BN","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","CS","N","ET","ET","ET","ET","N","N","N","N","L","N","N","BN","N","N","ET","ET","EN","EN","N","L","N","N","N","EN","L","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","N","N","N","N","N","ET","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","R","NSM","R","NSM","NSM","R","NSM","NSM","R","NSM","N","N","N","N","N","N","N","N","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","N","N","N","N","N","R","R","R","R","R","N","N","N","N","N","N","N","N","N","N","N","AN","AN","AN","AN","AN","AN","N","N","AL","ET","ET","AL","CS","AL","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AN","AN","AN","AN","AN","AN","AN","AN","AN","AN","ET","AN","AN","AL","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AN","N","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","NSM","NSM","N","NSM","NSM","NSM","NSM","AL","AL","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","N","N","N","N","N","N","N","N","N","N","N","N","N","N","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","R","R","N","N","N","N","R","N","N","N","N","N","WS","WS","WS","WS","WS","WS","WS","WS","WS","WS","WS","BN","BN","BN","L","R","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","WS","B","LRE","RLE","PDF","LRO","RLO","CS","ET","ET","ET","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","CS","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","WS","BN","BN","BN","BN","BN","N","LRI","RLI","FSI","PDI","BN","BN","BN","BN","BN","BN","EN","L","N","N","EN","EN","EN","EN","EN","EN","ES","ES","N","N","N","L","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","ES","ES","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","L","L","N","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","N","N","N","N","N","R","NSM","R","R","R","R","R","R","R","R","R","R","ES","R","R","R","R","R","R","R","R","R","R","R","R","R","N","R","R","R","R","R","N","R","N","R","R","N","R","R","N","R","R","R","R","R","R","R","R","R","R","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","CS","N","CS","N","N","CS","N","N","N","N","N","N","N","N","N","ET","N","N","ES","ES","N","N","N","N","N","ET","ET","N","N","N","N","N","AL","AL","AL","AL","AL","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","N","BN","N","N","N","ET","ET","ET","N","N","N","N","N","ES","CS","ES","CS","CS","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","CS","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","L","L","L","L","L","L","N","N","L","L","L","L","L","L","N","N","L","L","L","L","L","L","N","N","L","L","L","N","N","N","ET","ET","N","N","N","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N"],r=new t.__bidiEngine__({isInputVisual:!0});t.API.events.push(["postProcessText",function(t){var e=t.text,n=(t.x,t.y,t.options||{}),i=(t.mutex,n.lang,[]);if(n.isInputVisual="boolean"!=typeof n.isInputVisual||n.isInputVisual,r.setOptions(n),"[object Array]"===Object.prototype.toString.call(e)){var a=0;for(i=[],a=0;a<e.length;a+=1)"[object Array]"===Object.prototype.toString.call(e[a])?i.push([r.doBidiReorder(e[a][0]),e[a][1],e[a][2]]):i.push([r.doBidiReorder(e[a])]);t.text=i}else t.text=r.doBidiReorder(e);r.setOptions({isInputVisual:!0})}])}(M),M.API.TTFFont=function(){function t(t){var e;if(this.rawData=t,e=this.contents=new Te(t),this.contents.pos=4,"ttcf"===e.readString(4))throw new Error("TTCF not supported.");e.pos=0,this.parse(),this.subset=new ar(this),this.registerTTF()}return t.open=function(e){return new t(e)},t.prototype.parse=function(){return this.directory=new Ue(this.contents),this.head=new We(this),this.name=new Ze(this),this.cmap=new Ge(this),this.toUnicode={},this.hhea=new Ye(this),this.maxp=new $e(this),this.hmtx=new Qe(this),this.post=new Xe(this),this.os2=new Je(this),this.loca=new ir(this),this.glyf=new er(this),this.ascender=this.os2.exists&&this.os2.ascender||this.hhea.ascender,this.decender=this.os2.exists&&this.os2.decender||this.hhea.decender,this.lineGap=this.os2.exists&&this.os2.lineGap||this.hhea.lineGap,this.bbox=[this.head.xMin,this.head.yMin,this.head.xMax,this.head.yMax]},t.prototype.registerTTF=function(){var t,e,r,n,i;if(this.scaleFactor=1e3/this.head.unitsPerEm,this.bbox=function(){var e,r,n,i;for(i=[],e=0,r=(n=this.bbox).length;e<r;e++)t=n[e],i.push(Math.round(t*this.scaleFactor));return i}.call(this),this.stemV=0,this.post.exists?(r=255&(n=this.post.italic_angle),0!=(32768&(e=n>>16))&&(e=-(1+(65535^e))),this.italicAngle=+(e+"."+r)):this.italicAngle=0,this.ascender=Math.round(this.ascender*this.scaleFactor),this.decender=Math.round(this.decender*this.scaleFactor),this.lineGap=Math.round(this.lineGap*this.scaleFactor),this.capHeight=this.os2.exists&&this.os2.capHeight||this.ascender,this.xHeight=this.os2.exists&&this.os2.xHeight||0,this.familyClass=(this.os2.exists&&this.os2.familyClass||0)>>8,this.isSerif=1===(i=this.familyClass)||2===i||3===i||4===i||5===i||7===i,this.isScript=10===this.familyClass,this.flags=0,this.post.isFixedPitch&&(this.flags|=1),this.isSerif&&(this.flags|=2),this.isScript&&(this.flags|=8),0!==this.italicAngle&&(this.flags|=64),this.flags|=32,!this.cmap.unicode)throw new Error("No unicode cmap for font")},t.prototype.characterToGlyph=function(t){var e;return(null!=(e=this.cmap.unicode)?e.codeMap[t]:void 0)||0},t.prototype.widthOfGlyph=function(t){var e;return e=1e3/this.head.unitsPerEm,this.hmtx.forGlyph(t).advance*e},t.prototype.widthOfString=function(t,e,r){var n,i,a,o;for(a=0,i=0,o=(t=""+t).length;0<=o?i<o:i>o;i=0<=o?++i:--i)n=t.charCodeAt(i),a+=this.widthOfGlyph(this.characterToGlyph(n))+r*(1e3/e)||0;return a*(e/1e3)},t.prototype.lineHeight=function(t,e){var r;return null==e&&(e=!1),r=e?this.lineGap:0,(this.ascender+r-this.decender)/1e3*t},t}();var Re,Te=function(){function t(t){this.data=null!=t?t:[],this.pos=0,this.length=this.data.length}return t.prototype.readByte=function(){return this.data[this.pos++]},t.prototype.writeByte=function(t){return this.data[this.pos++]=t},t.prototype.readUInt32=function(){return 16777216*this.readByte()+(this.readByte()<<16)+(this.readByte()<<8)+this.readByte()},t.prototype.writeUInt32=function(t){return this.writeByte(t>>>24&255),this.writeByte(t>>16&255),this.writeByte(t>>8&255),this.writeByte(255&t)},t.prototype.readInt32=function(){var t;return(t=this.readUInt32())>=2147483648?t-4294967296:t},t.prototype.writeInt32=function(t){return t<0&&(t+=4294967296),this.writeUInt32(t)},t.prototype.readUInt16=function(){return this.readByte()<<8|this.readByte()},t.prototype.writeUInt16=function(t){return this.writeByte(t>>8&255),this.writeByte(255&t)},t.prototype.readInt16=function(){var t;return(t=this.readUInt16())>=32768?t-65536:t},t.prototype.writeInt16=function(t){return t<0&&(t+=65536),this.writeUInt16(t)},t.prototype.readString=function(t){var e,r;for(r=[],e=0;0<=t?e<t:e>t;e=0<=t?++e:--e)r[e]=String.fromCharCode(this.readByte());return r.join("")},t.prototype.writeString=function(t){var e,r,n;for(n=[],e=0,r=t.length;0<=r?e<r:e>r;e=0<=r?++e:--e)n.push(this.writeByte(t.charCodeAt(e)));return n},t.prototype.readShort=function(){return this.readInt16()},t.prototype.writeShort=function(t){return this.writeInt16(t)},t.prototype.readLongLong=function(){var t,e,r,n,i,a,o,s;return t=this.readByte(),e=this.readByte(),r=this.readByte(),n=this.readByte(),i=this.readByte(),a=this.readByte(),o=this.readByte(),s=this.readByte(),128&t?-1*(72057594037927940*(255^t)+281474976710656*(255^e)+1099511627776*(255^r)+4294967296*(255^n)+16777216*(255^i)+65536*(255^a)+256*(255^o)+(255^s)+1):72057594037927940*t+281474976710656*e+1099511627776*r+4294967296*n+16777216*i+65536*a+256*o+s},t.prototype.writeLongLong=function(t){var e,r;return e=Math.floor(t/4294967296),r=4294967295&t,this.writeByte(e>>24&255),this.writeByte(e>>16&255),this.writeByte(e>>8&255),this.writeByte(255&e),this.writeByte(r>>24&255),this.writeByte(r>>16&255),this.writeByte(r>>8&255),this.writeByte(255&r)},t.prototype.readInt=function(){return this.readInt32()},t.prototype.writeInt=function(t){return this.writeInt32(t)},t.prototype.read=function(t){var e,r;for(e=[],r=0;0<=t?r<t:r>t;r=0<=t?++r:--r)e.push(this.readByte());return e},t.prototype.write=function(t){var e,r,n,i;for(i=[],r=0,n=t.length;r<n;r++)e=t[r],i.push(this.writeByte(e));return i},t}(),Ue=function(){var t;function e(t){var e,r,n;for(this.scalarType=t.readInt(),this.tableCount=t.readShort(),this.searchRange=t.readShort(),this.entrySelector=t.readShort(),this.rangeShift=t.readShort(),this.tables={},r=0,n=this.tableCount;0<=n?r<n:r>n;r=0<=n?++r:--r)e={tag:t.readString(4),checksum:t.readInt(),offset:t.readInt(),length:t.readInt()},this.tables[e.tag]=e}return e.prototype.encode=function(e){var r,n,i,a,o,s,c,u,l,h,f,d,p;for(p in f=Object.keys(e).length,s=Math.log(2),l=16*Math.floor(Math.log(f)/s),a=Math.floor(l/s),u=16*f-l,(n=new Te).writeInt(this.scalarType),n.writeShort(f),n.writeShort(l),n.writeShort(a),n.writeShort(u),i=16*f,c=n.pos+i,o=null,d=[],e)for(h=e[p],n.writeString(p),n.writeInt(t(h)),n.writeInt(c),n.writeInt(h.length),d=d.concat(h),"head"===p&&(o=c),c+=h.length;c%4;)d.push(0),c++;return n.write(d),r=2981146554-t(n.data),n.pos=o+8,n.writeUInt32(r),n.data},t=function(t){var e,r,n,i;for(t=tr.call(t);t.length%4;)t.push(0);for(n=new Te(t),r=0,e=0,i=t.length;e<i;e=e+=4)r+=n.readUInt32();return 4294967295&r},e}(),ze={}.hasOwnProperty,He=function(t,e){for(var r in e)ze.call(e,r)&&(t[r]=e[r]);function n(){this.constructor=t}return n.prototype=e.prototype,t.prototype=new n,t.__super__=e.prototype,t},We=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="head",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.revision=t.readInt(),this.checkSumAdjustment=t.readInt(),this.magicNumber=t.readInt(),this.flags=t.readShort(),this.unitsPerEm=t.readShort(),this.created=t.readLongLong(),this.modified=t.readLongLong(),this.xMin=t.readShort(),this.yMin=t.readShort(),this.xMax=t.readShort(),this.yMax=t.readShort(),this.macStyle=t.readShort(),this.lowestRecPPEM=t.readShort(),this.fontDirectionHint=t.readShort(),this.indexToLocFormat=t.readShort(),this.glyphDataFormat=t.readShort()},e.prototype.encode=function(t){var e;return(e=new Te).writeInt(this.version),e.writeInt(this.revision),e.writeInt(this.checkSumAdjustment),e.writeInt(this.magicNumber),e.writeShort(this.flags),e.writeShort(this.unitsPerEm),e.writeLongLong(this.created),e.writeLongLong(this.modified),e.writeShort(this.xMin),e.writeShort(this.yMin),e.writeShort(this.xMax),e.writeShort(this.yMax),e.writeShort(this.macStyle),e.writeShort(this.lowestRecPPEM),e.writeShort(this.fontDirectionHint),e.writeShort(t),e.writeShort(this.glyphDataFormat),e.data},e}(Re=function(){function t(t){var e;this.file=t,e=this.file.directory.tables[this.tag],this.exists=!!e,e&&(this.offset=e.offset,this.length=e.length,this.parse(this.file.contents))}return t.prototype.parse=function(){},t.prototype.encode=function(){},t.prototype.raw=function(){return this.exists?(this.file.contents.pos=this.offset,this.file.contents.read(this.length)):null},t}()),Ve=function(){function t(t,e){var r,n,i,a,o,s,c,u,l,h,f,d,p,g,m,v,b;switch(this.platformID=t.readUInt16(),this.encodingID=t.readShort(),this.offset=e+t.readInt(),l=t.pos,t.pos=this.offset,this.format=t.readUInt16(),this.length=t.readUInt16(),this.language=t.readUInt16(),this.isUnicode=3===this.platformID&&1===this.encodingID&&4===this.format||0===this.platformID&&4===this.format,this.codeMap={},this.format){case 0:for(s=0;s<256;++s)this.codeMap[s]=t.readByte();break;case 4:for(f=t.readUInt16(),h=f/2,t.pos+=6,i=function(){var e,r;for(r=[],s=e=0;0<=h?e<h:e>h;s=0<=h?++e:--e)r.push(t.readUInt16());return r}(),t.pos+=2,p=function(){var e,r;for(r=[],s=e=0;0<=h?e<h:e>h;s=0<=h?++e:--e)r.push(t.readUInt16());return r}(),c=function(){var e,r;for(r=[],s=e=0;0<=h?e<h:e>h;s=0<=h?++e:--e)r.push(t.readUInt16());return r}(),u=function(){var e,r;for(r=[],s=e=0;0<=h?e<h:e>h;s=0<=h?++e:--e)r.push(t.readUInt16());return r}(),n=(this.length-t.pos+this.offset)/2,o=function(){var e,r;for(r=[],s=e=0;0<=n?e<n:e>n;s=0<=n?++e:--e)r.push(t.readUInt16());return r}(),s=m=0,b=i.length;m<b;s=++m)for(g=i[s],r=v=d=p[s];d<=g?v<=g:v>=g;r=d<=g?++v:--v)0===u[s]?a=r+c[s]:0!==(a=o[u[s]/2+(r-d)-(h-s)]||0)&&(a+=c[s]),this.codeMap[r]=65535&a}t.pos=l}return t.encode=function(t,e){var r,n,i,a,o,s,c,u,l,h,f,d,p,g,m,v,b,y,w,N,L,A,x,S,_,P,k,F,I,C,j,O,B,M,E,q,D,R,T,U,z,H,W,V,G,Y;switch(F=new Te,a=Object.keys(t).sort((function(t,e){return t-e})),e){case"macroman":for(p=0,g=function(){var t=[];for(d=0;d<256;++d)t.push(0);return t}(),v={0:0},i={},I=0,B=a.length;I<B;I++)null==v[W=t[n=a[I]]]&&(v[W]=++p),i[n]={old:t[n],new:v[t[n]]},g[n]=v[t[n]];return F.writeUInt16(1),F.writeUInt16(0),F.writeUInt32(12),F.writeUInt16(0),F.writeUInt16(262),F.writeUInt16(0),F.write(g),{charMap:i,subtable:F.data,maxGlyphID:p+1};case"unicode":for(P=[],l=[],b=0,v={},r={},m=c=null,C=0,M=a.length;C<M;C++)null==v[w=t[n=a[C]]]&&(v[w]=++b),r[n]={old:w,new:v[w]},o=v[w]-n,null!=m&&o===c||(m&&l.push(m),P.push(n),c=o),m=n;for(m&&l.push(m),l.push(65535),P.push(65535),S=2*(x=P.length),A=2*Math.pow(Math.log(x)/Math.LN2,2),h=Math.log(A/2)/Math.LN2,L=2*x-A,s=[],N=[],f=[],d=j=0,E=P.length;j<E;d=++j){if(_=P[d],u=l[d],65535===_){s.push(0),N.push(0);break}if(_-(k=r[_].new)>=32768)for(s.push(0),N.push(2*(f.length+x-d)),n=O=_;_<=u?O<=u:O>=u;n=_<=u?++O:--O)f.push(r[n].new);else s.push(k-_),N.push(0)}for(F.writeUInt16(3),F.writeUInt16(1),F.writeUInt32(12),F.writeUInt16(4),F.writeUInt16(16+8*x+2*f.length),F.writeUInt16(0),F.writeUInt16(S),F.writeUInt16(A),F.writeUInt16(h),F.writeUInt16(L),z=0,q=l.length;z<q;z++)n=l[z],F.writeUInt16(n);for(F.writeUInt16(0),H=0,D=P.length;H<D;H++)n=P[H],F.writeUInt16(n);for(V=0,R=s.length;V<R;V++)o=s[V],F.writeUInt16(o);for(G=0,T=N.length;G<T;G++)y=N[G],F.writeUInt16(y);for(Y=0,U=f.length;Y<U;Y++)p=f[Y],F.writeUInt16(p);return{charMap:r,subtable:F.data,maxGlyphID:b+1}}},t}(),Ge=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="cmap",e.prototype.parse=function(t){var e,r,n;for(t.pos=this.offset,this.version=t.readUInt16(),n=t.readUInt16(),this.tables=[],this.unicode=null,r=0;0<=n?r<n:r>n;r=0<=n?++r:--r)e=new Ve(t,this.offset),this.tables.push(e),e.isUnicode&&null==this.unicode&&(this.unicode=e);return!0},e.encode=function(t,e){var r,n;return null==e&&(e="macroman"),r=Ve.encode(t,e),(n=new Te).writeUInt16(0),n.writeUInt16(1),r.table=n.data.concat(r.subtable),r},e}(Re),Ye=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="hhea",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.ascender=t.readShort(),this.decender=t.readShort(),this.lineGap=t.readShort(),this.advanceWidthMax=t.readShort(),this.minLeftSideBearing=t.readShort(),this.minRightSideBearing=t.readShort(),this.xMaxExtent=t.readShort(),this.caretSlopeRise=t.readShort(),this.caretSlopeRun=t.readShort(),this.caretOffset=t.readShort(),t.pos+=8,this.metricDataFormat=t.readShort(),this.numberOfMetrics=t.readUInt16()},e}(Re),Je=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="OS/2",e.prototype.parse=function(t){if(t.pos=this.offset,this.version=t.readUInt16(),this.averageCharWidth=t.readShort(),this.weightClass=t.readUInt16(),this.widthClass=t.readUInt16(),this.type=t.readShort(),this.ySubscriptXSize=t.readShort(),this.ySubscriptYSize=t.readShort(),this.ySubscriptXOffset=t.readShort(),this.ySubscriptYOffset=t.readShort(),this.ySuperscriptXSize=t.readShort(),this.ySuperscriptYSize=t.readShort(),this.ySuperscriptXOffset=t.readShort(),this.ySuperscriptYOffset=t.readShort(),this.yStrikeoutSize=t.readShort(),this.yStrikeoutPosition=t.readShort(),this.familyClass=t.readShort(),this.panose=function(){var e,r;for(r=[],e=0;e<10;++e)r.push(t.readByte());return r}(),this.charRange=function(){var e,r;for(r=[],e=0;e<4;++e)r.push(t.readInt());return r}(),this.vendorID=t.readString(4),this.selection=t.readShort(),this.firstCharIndex=t.readShort(),this.lastCharIndex=t.readShort(),this.version>0&&(this.ascent=t.readShort(),this.descent=t.readShort(),this.lineGap=t.readShort(),this.winAscent=t.readShort(),this.winDescent=t.readShort(),this.codePageRange=function(){var e,r;for(r=[],e=0;e<2;e=++e)r.push(t.readInt());return r}(),this.version>1))return this.xHeight=t.readShort(),this.capHeight=t.readShort(),this.defaultChar=t.readShort(),this.breakChar=t.readShort(),this.maxContext=t.readShort()},e}(Re),Xe=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="post",e.prototype.parse=function(t){var e,r,n;switch(t.pos=this.offset,this.format=t.readInt(),this.italicAngle=t.readInt(),this.underlinePosition=t.readShort(),this.underlineThickness=t.readShort(),this.isFixedPitch=t.readInt(),this.minMemType42=t.readInt(),this.maxMemType42=t.readInt(),this.minMemType1=t.readInt(),this.maxMemType1=t.readInt(),this.format){case 65536:break;case 131072:var i;for(r=t.readUInt16(),this.glyphNameIndex=[],i=0;0<=r?i<r:i>r;i=0<=r?++i:--i)this.glyphNameIndex.push(t.readUInt16());for(this.names=[],n=[];t.pos<this.offset+this.length;)e=t.readByte(),n.push(this.names.push(t.readString(e)));return n;case 151552:return r=t.readUInt16(),this.offsets=t.read(r);case 196608:break;case 262144:return this.map=function(){var e,r,n;for(n=[],i=e=0,r=this.file.maxp.numGlyphs;0<=r?e<r:e>r;i=0<=r?++e:--e)n.push(t.readUInt32());return n}.call(this)}},e}(Re),Ke=function(t,e){this.raw=t,this.length=t.length,this.platformID=e.platformID,this.encodingID=e.encodingID,this.languageID=e.languageID},Ze=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="name",e.prototype.parse=function(t){var e,r,n,i,a,o,s,c,u,l,h;for(t.pos=this.offset,t.readShort(),e=t.readShort(),o=t.readShort(),r=[],i=0;0<=e?i<e:i>e;i=0<=e?++i:--i)r.push({platformID:t.readShort(),encodingID:t.readShort(),languageID:t.readShort(),nameID:t.readShort(),length:t.readShort(),offset:this.offset+o+t.readShort()});for(s={},i=u=0,l=r.length;u<l;i=++u)n=r[i],t.pos=n.offset,c=t.readString(n.length),a=new Ke(c,n),null==s[h=n.nameID]&&(s[h]=[]),s[n.nameID].push(a);this.strings=s,this.copyright=s[0],this.fontFamily=s[1],this.fontSubfamily=s[2],this.uniqueSubfamily=s[3],this.fontName=s[4],this.version=s[5];try{this.postscriptName=s[6][0].raw.replace(/[\x00-\x19\x80-\xff]/g,"")}catch(t){this.postscriptName=s[4][0].raw.replace(/[\x00-\x19\x80-\xff]/g,"")}return this.trademark=s[7],this.manufacturer=s[8],this.designer=s[9],this.description=s[10],this.vendorUrl=s[11],this.designerUrl=s[12],this.license=s[13],this.licenseUrl=s[14],this.preferredFamily=s[15],this.preferredSubfamily=s[17],this.compatibleFull=s[18],this.sampleText=s[19]},e}(Re),$e=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="maxp",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.numGlyphs=t.readUInt16(),this.maxPoints=t.readUInt16(),this.maxContours=t.readUInt16(),this.maxCompositePoints=t.readUInt16(),this.maxComponentContours=t.readUInt16(),this.maxZones=t.readUInt16(),this.maxTwilightPoints=t.readUInt16(),this.maxStorage=t.readUInt16(),this.maxFunctionDefs=t.readUInt16(),this.maxInstructionDefs=t.readUInt16(),this.maxStackElements=t.readUInt16(),this.maxSizeOfInstructions=t.readUInt16(),this.maxComponentElements=t.readUInt16(),this.maxComponentDepth=t.readUInt16()},e}(Re),Qe=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="hmtx",e.prototype.parse=function(t){var e,r,n,i,a,o,s;for(t.pos=this.offset,this.metrics=[],e=0,o=this.file.hhea.numberOfMetrics;0<=o?e<o:e>o;e=0<=o?++e:--e)this.metrics.push({advance:t.readUInt16(),lsb:t.readInt16()});for(n=this.file.maxp.numGlyphs-this.file.hhea.numberOfMetrics,this.leftSideBearings=function(){var r,i;for(i=[],e=r=0;0<=n?r<n:r>n;e=0<=n?++r:--r)i.push(t.readInt16());return i}(),this.widths=function(){var t,e,r,n;for(n=[],t=0,e=(r=this.metrics).length;t<e;t++)i=r[t],n.push(i.advance);return n}.call(this),r=this.widths[this.widths.length-1],s=[],e=a=0;0<=n?a<n:a>n;e=0<=n?++a:--a)s.push(this.widths.push(r));return s},e.prototype.forGlyph=function(t){return t in this.metrics?this.metrics[t]:{advance:this.metrics[this.metrics.length-1].advance,lsb:this.leftSideBearings[t-this.metrics.length]}},e}(Re),tr=[].slice,er=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="glyf",e.prototype.parse=function(){return this.cache={}},e.prototype.glyphFor=function(t){var e,r,n,i,a,o,s,c,u,l;return t in this.cache?this.cache[t]:(i=this.file.loca,e=this.file.contents,r=i.indexOf(t),0===(n=i.lengthOf(t))?this.cache[t]=null:(e.pos=this.offset+r,a=(o=new Te(e.read(n))).readShort(),c=o.readShort(),l=o.readShort(),s=o.readShort(),u=o.readShort(),this.cache[t]=-1===a?new nr(o,c,l,s,u):new rr(o,a,c,l,s,u),this.cache[t]))},e.prototype.encode=function(t,e,r){var n,i,a,o,s;for(a=[],i=[],o=0,s=e.length;o<s;o++)n=t[e[o]],i.push(a.length),n&&(a=a.concat(n.encode(r)));return i.push(a.length),{table:a,offsets:i}},e}(Re),rr=function(){function t(t,e,r,n,i,a){this.raw=t,this.numberOfContours=e,this.xMin=r,this.yMin=n,this.xMax=i,this.yMax=a,this.compound=!1}return t.prototype.encode=function(){return this.raw.data},t}(),nr=function(){function t(t,e,r,n,i){var a,o;for(this.raw=t,this.xMin=e,this.yMin=r,this.xMax=n,this.yMax=i,this.compound=!0,this.glyphIDs=[],this.glyphOffsets=[],a=this.raw;o=a.readShort(),this.glyphOffsets.push(a.pos),this.glyphIDs.push(a.readUInt16()),32&o;)a.pos+=1&o?4:2,128&o?a.pos+=8:64&o?a.pos+=4:8&o&&(a.pos+=2)}return 1,8,32,64,128,t.prototype.encode=function(){var t,e,r;for(e=new Te(tr.call(this.raw.data)),t=0,r=this.glyphIDs.length;t<r;++t)e.pos=this.glyphOffsets[t];return e.data},t}(),ir=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return He(e,t),e.prototype.tag="loca",e.prototype.parse=function(t){var e,r;return t.pos=this.offset,e=this.file.head.indexToLocFormat,this.offsets=0===e?function(){var e,n;for(n=[],r=0,e=this.length;r<e;r+=2)n.push(2*t.readUInt16());return n}.call(this):function(){var e,n;for(n=[],r=0,e=this.length;r<e;r+=4)n.push(t.readUInt32());return n}.call(this)},e.prototype.indexOf=function(t){return this.offsets[t]},e.prototype.lengthOf=function(t){return this.offsets[t+1]-this.offsets[t]},e.prototype.encode=function(t,e){for(var r=new Uint32Array(this.offsets.length),n=0,i=0,a=0;a<r.length;++a)if(r[a]=n,i<e.length&&e[i]==a){++i,r[a]=n;var o=this.offsets[a],s=this.offsets[a+1]-o;s>0&&(n+=s)}for(var c=new Array(4*r.length),u=0;u<r.length;++u)c[4*u+3]=255&r[u],c[4*u+2]=(65280&r[u])>>8,c[4*u+1]=(16711680&r[u])>>16,c[4*u]=(4278190080&r[u])>>24;return c},e}(Re),ar=function(){function t(t){this.font=t,this.subset={},this.unicodes={},this.next=33}return t.prototype.generateCmap=function(){var t,e,r,n,i;for(e in n=this.font.cmap.tables[0].codeMap,t={},i=this.subset)r=i[e],t[e]=n[r];return t},t.prototype.glyphsFor=function(t){var e,r,n,i,a,o,s;for(n={},a=0,o=t.length;a<o;a++)n[i=t[a]]=this.font.glyf.glyphFor(i);for(i in e=[],n)(null!=(r=n[i])?r.compound:void 0)&&e.push.apply(e,r.glyphIDs);if(e.length>0)for(i in s=this.glyphsFor(e))r=s[i],n[i]=r;return n},t.prototype.encode=function(t,e){var r,n,i,a,o,s,c,u,l,h,f,d,p,g,m;for(n in r=Ge.encode(this.generateCmap(),"unicode"),a=this.glyphsFor(t),f={0:0},m=r.charMap)f[(s=m[n]).old]=s.new;for(d in h=r.maxGlyphID,a)d in f||(f[d]=h++);return u=function(t){var e,r;for(e in r={},t)r[t[e]]=e;return r}(f),l=Object.keys(u).sort((function(t,e){return t-e})),p=function(){var t,e,r;for(r=[],t=0,e=l.length;t<e;t++)o=l[t],r.push(u[o]);return r}(),i=this.font.glyf.encode(a,p,f),c=this.font.loca.encode(i.offsets,p),g={cmap:this.font.cmap.raw(),glyf:i.table,loca:c,hmtx:this.font.hmtx.raw(),hhea:this.font.hhea.raw(),maxp:this.font.maxp.raw(),post:this.font.post.raw(),name:this.font.name.raw(),head:this.font.head.encode(e)},this.font.os2.exists&&(g["OS/2"]=this.font.os2.raw()),this.font.directory.encode(g)},t}();M.API.PDFObject=function(){var t;function e(){}return t=function(t,e){return(Array(e+1).join("0")+t).slice(-e)},e.convert=function(r){var n,i,a,o;if(Array.isArray(r))return"["+function(){var t,i,a;for(a=[],t=0,i=r.length;t<i;t++)n=r[t],a.push(e.convert(n));return a}().join(" ")+"]";if("string"==typeof r)return"/"+r;if(null!=r?r.isString:void 0)return"("+r+")";if(r instanceof Date)return"(D:"+t(r.getUTCFullYear(),4)+t(r.getUTCMonth(),2)+t(r.getUTCDate(),2)+t(r.getUTCHours(),2)+t(r.getUTCMinutes(),2)+t(r.getUTCSeconds(),2)+"Z)";if("[object Object]"==={}.toString.call(r)){for(i in a=["<<"],r)o=r[i],a.push("/"+i+" "+e.convert(o));return a.push(">>"),a.join("\n")}return""+r},e}(),t.AcroForm=xt,t.AcroFormAppearance=Lt,t.AcroFormButton=gt,t.AcroFormCheckBox=yt,t.AcroFormChoiceField=ht,t.AcroFormComboBox=dt,t.AcroFormEditBox=pt,t.AcroFormListBox=ft,t.AcroFormPasswordField=Nt,t.AcroFormPushButton=mt,t.AcroFormRadioButton=vt,t.AcroFormTextField=wt,t.GState=C,t.ShadingPattern=O,t.TilingPattern=B,t.default=M,t.jsPDF=M,Object.defineProperty(t,"__esModule",{value:!0})}));
 //# sourceMappingURL=jspdf.umd.min.js.map
 </script>
-<script>window.VERSAO_OFFLINE = "2026-10-27"; window.MODELO_FATURA_BASE64 = "UEsDBAoAAAAIALWcSV2DkmySXgEAAHgFAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbMVUyW7CMBC99ysiX1FiqFRUVQQOpT22SKUfMI0nxMKxLY/Z/r6TQFFVsQiB1EuseN7mSTyD0bo2yRIDaWdz0cu6IkFbOKXtLBef09f0USQUwSowzmIuNkhiNLwbTDceKWGypVxUMfonKamosAbKnEfLldKFGiK/hpn0UMxhhvK+2+3LwtmINqax0RDDwRhLWJiYvKx5exskoCGRPG+BjVcuwHujC4hcl0ur/rikO4eMmS2GKu2pwwAhDzo0leMGO947dyZohckEQnyDmlFybeTKhfmXc/PstMiBlK4sdYHKFYuaKRn5gKCoQoy1ydo1q0Hbznn/FkyyXR5uHGSvf2GO/j/liPzf4fbZuzpCK3PGkOLGIN3687ei55wrCKg+YuALevMAv7VPXJ3lla7MHwdYscuxgzJ0EpwnHhUBLz/lzyxo2KlnIQxRn27t3pGlr24rNr1SqA54y3ZwDr8BUEsDBAoAAAAAALWcSV0AAAAAAAAAAAAAAAAGAAAAX3JlbHMvUEsDBAoAAAAIALWcSV3yn0na6QAAAEsCAAALAAAAX3JlbHMvLnJlbHOtksFOwzAMQO98ReT7mm5ICKGluyCk3SY0PsAkbhu1jaPEg+7viZBADI1pB45x7Odny+vNPI3qjVL2HAwsqxoUBcvOh87Ay/5pcQ8qCwaHIwcycKQMm+Zm/UwjSqnJvY9ZFUjIBnqR+KB1tj1NmCuOFMpPy2lCKc/U6Yh2wI70qq7vdPrJgOaEqbbOQNq6Jaj9MdI1bG5bb+mR7WGiIGda/MooZEwdiYF51O+chlfmoSpQ0OddVte7/D2nnkjQoaC2nGgRU6lO4stav3Uc210J58+MS0K3/7kcmoWCI3dZCWP8MtInN9B8AFBLAwQKAAAAAAC1nEldAAAAAAAAAAAAAAAAAwAAAHhsL1BLAwQKAAAAAAC1nEldAAAAAAAAAAAAAAAACQAAAHhsL19yZWxzL1BLAwQKAAAACAC1nEldUVj1v/IAAABGAwAAGgAAAHhsL19yZWxzL3dvcmtib29rLnhtbC5yZWxzvZLNTsMwEITvPIW1d+Kk0AqhOr0gpF4hPIAVb+KoiW15l5+8PYYKmkpVxCHiZM1YO/Np7e3uY+jFG0bqvFNQZDkIdLU3nWsVvFSP13cgiLUzuvcOFYxIsCuvtk/Ya04zZLtAIoU4UmCZw72UVFscNGU+oEs3jY+D5iRjK4OuD7pFucrzjYzTDCjPMsXeKIh7U4CoxoB/yfZN09X44OvXAR1fqJDEY5/4RaVji6zgqLOUA/Jy/WrJek6zeGr/lkezmGO4WXQFVkc0zxzTA083MbXnYG6XhHn38UAWkU8gv9YXajrWczDrf4bZ/MDIs+9ffgJQSwMECgAAAAAAtZxJXQAAAAAAAAAAAAAAAA4AAAB4bC93b3Jrc2hlZXRzL1BLAwQKAAAACAC1nEldPdPbRbcIAABKLwAAGAAAAHhsL3dvcmtzaGVldHMvc2hlZXQ1LnhtbK2a23KjSBKG7/cpFLofi+IgIYftibEkzjgmtmdnrrGMbKIloQVsd/fTTwFVUlI/lhVhbrqtj8ysrL/OUDe//9htR29pUWb5/nbMrrTxKN2v86ds/3w7/t9fzm/2eFRWyf4p2eb79Hb8My3Hv9/95+Y9L76XL2lajXiAfXk7fqmqw/VkUq5f0l1SXuWHdM+fbPJil1T8Z/E8KQ9Fmjw1TrvtRNe06WSXZPtxG+G6uCRGvtlk63SZr1936b5qgxTpNql4+uVLdihltN36knC7pPj+evhtne8OPMRjts2qn03Q8Wi3vvaf93mRPG55tX8wM1nL2M0PCL/L1kVe5pvqiocTiWKd55P5hEe6u3nKeA1q1UdFurkd/2FcPxjWeHJ30xj/naXvJfl7VOv9mOff6x/+0+2Yt9OvPN99Wyd1ekyjvx/qGm5bymOk23Rd6zNK+H9v6SLd8mcu43Us/9+UXf/NC54cS6N/yyycRrY/i9FTuklet9V/83cvzZ5fKl6OfjWzxqP8tdpm+zRK39Itf9rkSNki3zaske/66ecyLde8ETm70sej9WtZ5btjyDqhdb4tm39Hu6zunLxRkh/N/+/ZU/VyOz66/dP+ll6tvS7s9aO9fdbeEPbG0X56ZRu6ZjDdOutoCkeTOLKpqU0/8bOEn3VhglNhPz3aM3ZRQTPhODs6mlfTC/xs4WeTil3iNxd+86OfdZmSTJNtrJ2KPO9x7BWnbsGM8y6yYzD90kJk12CnvsGsq966TNpe24yZZVIldzdF/j4qmm5V92yL93YLu/uoPCT1NMqu6zL6hojFx/K6DvQHNyhlijW4bwGvDbcsudnbnXYzeatzERaL1sI4uixVsFKBowJXBZ4KfBUELTCPIFRTj1pgkdRZN/WYxJhwKY96mq2e7Itimk346UnMFsw+FjNoLexTrdQYUQvmH8eISYxOraxhamWptbI+rZWl1kqNEbWgHpofVsv6oFrTYao1bTMgXV+Qc31fmJDOD2QFxAHiAvGA+EACQcgYgEpE4BVTr46Qs1bI+dX8i1LO2hKsk5SCnBp8IcjspByQFRAHiAvEA+IDCYCEQCIgsSDYBe1huqCtTr4C0MGuKz3QVmdfFaxU4KjAVYGnAl8Fga3Ovi3QtZN+x+SP+hGnjnzzoTreXJ2aWqCfJA3m6lQkTPRT4oKQIUOcOonX81Wdpa5dsa9lXkfqpi6IbpLGN5TGlzankbZEtJJo+vFE5qCbi8hD5CMKJCKjSyKbpGB2U4ikzbmlrRO62xRssKZgao+4l4i2haW2BcO2ALSS6GxbgJuLyEPkIwokom3RIoMMVWlFxmrHsau0PpjSOqy5AhmM6DNVlRY2OlEa0Eoi45zS4OYi8hD5iAKJyJwokUWUFmhKlKaOXaWNoSZGZsCSLBFZkyUiizKiFSIHkYvIQ+QjChCFiCKBDLI6S6ueadocTEcTdTRRRxN1BLRC5CByEXmIfEQBohBRJFBHR/NDHa3BdGw384ZNdBRoTnRskakRHQGtEDmIXEQeIh9RgChEFCGKJWKooziy8Cn4ayq2W3mTrlQCGURFQEtEK4noEjdTp0thQxemHjdllvWkzZToDAkEiEJEEaJYop6VajaQzjPUeYb1ttV1aobCA1ohchC5iDxEPqIAUYgoQhRL1COrPZCs4jxAJwGB6B5wrsraY8OUPrc8GZ2EBuT0hlJeErm9Rrrax/uMlO26jxkEiMLeULBZbo0sOt8IRLdO7LRL7TbhfJgTK4PT071EGpmBWsTIOGgJHQYtMUnjQCAXkQexfYgdQOwQvCKwiTt166ina8Oop2ugHqKFrh4NV4Kcxo2Dbi4iDyIFECkEmwhs4k7orjJsIGXwDIZoIRBVhoEy4OYi8iBSAJFCsInAJu6E7iqjX6SM+akyOirTIkvve8e9kE/pOYgpR6qlNDKJlAJZRMtjQSSUsklwe43U6fKUVE/KPmYTYDahRNO+TUckn5KNrUQ2d9jccf+byabH9UHazbERjYG6t4GNCGghEO3eBnRvcHMReRApgEgh2ERgE3dCd5UZ6JOJbqIygBa6+lVkpasfThx0cxF5ECmASCHYRGATd0J3lRnos4suvploRBlAC4HIK5WlRGSxlYisthjLReRheB/DBxg+RMcIreJOiV0VB/rKo7eHhSl55SQQOdMvJCIHeEQrRA4iV5bYmQ9tdT4EPx9RgChEFElEe6fIwWhmvrhn5uuKPdC5SZ8pu6x7QcjpFMgSyAqIA8QF4gHxgQRAQiARkFgQfGGnD3Qy0m1lxokFwXcy+nygItVvJ7H+0VcPQxumSEPdasaG9lGRbKAimToN3UtE+iSiJaIVIgeRi8hD5CMKEIWIIkSxRNg9DbEHNZo7VV/Ssd0iTU2io0BkGpVoSnQEtELkIHIReYh8RAGiEFGEKJYIX4AYxuVfQOoIx6tX7UW3xugTfYXnmW9h98JmRlZ/icjqLxH5MoJWDlq5aOUh8hEFEtGOK5D58V2cSNpYpAUEmmILmBe2wKfnKUPcyaHXV9hclVoY2URqQEuJyDunvui6+hUKQ7kC2WTrhchHFEjEiPimsgpH0ujMzZZY2pxa8UGinolloD2uIe74kM8rEpHPK4iWEpHdGcZy0NFF5CHyEQVYYmjgHteAzXFs0G1vq+KE3OjbpcVzc4+2HK3z11qh+nx7pO2N3gWzr1ftBk954vEnQe+TkD+Jep8sdP161Z5c1Gj8SdD7hA/p63p81nU4pXx3c0ie0zgpnrN9Odqmm6aBLcZsxrT6iFS0vaLDqvxQk5k9MzVm1SvTY17xLqTAlzR5SosaGsycT7V6Q73J80phkzaHb2n1ehgdkkNafMt+pc0dk7zIeJdr7nPfjg95URVJVvHAnP/K+YPt8pDVb/nnPNRMrz9xvaVFla17HpTkbvQmq/7Kj9c025+k+2+yoqz+5Ck9vO4e62Q5ey1Tpwev80OWyqE6OV6Dv/sXUEsDBAoAAAAIALWcSV1fZPI61wgAABoxAAAYAAAAeGwvd29ya3NoZWV0cy9zaGVldDYueG1srZtbc6O4FoXfz69w+X1ixM2QSjI1sc3NMDV1es7MM3FwQrVtfIAk3f3rRxjJbFhKJq7mpWN/7L2Qli5IFn3z67f9bvKalVVeHG6n7EqbTrLDpnjMD0+30//96f3iTCdVnR4e011xyG6n37Nq+uvdf27eivJr9Zxl9YQLHKrb6XNdH69ns2rznO3T6qo4Zgd+ZVuU+7TmX8unWXUss/TxlLTfzXRNs2f7ND9MW4Xr8jMaxXabb7JlsXnZZ4e6FSmzXVrz4lfP+bGSavvNZ+T2afn15fjLptgfucRDvsvr7yfR6WS/uQ6fDkWZPux4tb8xM91I7dMXkN/nm7Koim19xeVEQbHO7sydcaW7m8ec16BxfVJm29vpb+w6Mazp7O7mFPxXnr1V5POk8fuhKL42X8LH2ylvpx9Fsf+ySZviMY1+/72p4a6lXCPbZZvGn0nK/7xmi2zHr8Umb9f/n27NP/Lbzs73op9lGbyTaX+Uk8dsm77s6v8Wb0GWPz3X/C761dyaToqXepcfsjh7zXb86qmElC2K3YmdzLt+/L7Mqg1vQs6u9Olk81LVxf4s2RRoU+yq07+Tfd50Td4k6bfT37f8sX6+nepNz/zeVN92pMLf7SUp0KbqIlU/pzqfTTVEqnFOta8cQ9cMpluf1TCFhkk0mG1q9uclLCFhXV4DW6Ta51TGLr39XGjMzxrmlX2ZhCMkHGLChRKukHDPEtbFbcE02Y00UpDPp597IaN2XlwK2SNZ1yXdK+NSFdk5Wdc7mXVBZWTHZLbhmJcXZNaO0NP8sEzr9O6mLN4m5WmIkolhOLSVM8Bp5hPp+s+lG226pV0xRXZ1TJunFbtuTFNLcYsand94AI90nJNpDblvCS8fD6143OuddjN7bZwQEQuR455zlkBWQDwgPpAASAgkaomrncka6hC3xCJ1YP06JFRlxk09O2uKhlG1ygW+mq0+63xtyfx9XyORo3c1A5VYkPdVEqrSq5k1Ts0sqJn1rzWzoGagErekmbLerZr1XtXscapmt/pGV7WWsI9Gg0gyu9EAZAXEA+IDCYCEQCJBrM5ZqEQMWQnN6hk5b410r9yftHLe3sHurGwJ68hCxMw754CsgHhAfCABkBBIBGQNJAaSCOKAc844XdCB+bgljA55fdAFHZiQgayAeEB8IAGQEEjkwIQsSBcTnytxNpJm9Yx0x+qCLkxULdE7ErkwMbliGuqqE4u0bkQlNK1X+Gb6akqq//SDuVEaFF8g3SRdwRh0BRnTTQhLRCuJ7PfnNQ/TfEQBohBRJBEZbBI5pAhmvwixjPnocdeT7rcFG60tGLYFw7awhm3BsC0ArST6sC0gzUcUIAoRRRLRtmiRQfq8jCIjtpfYd1ofzWldDD9qdcsMRgyyh1aLGJ1YDWglkfGR1ZDmIwoQhYgiiUxitUAWsVogm1hNE/tWG2NNj8yAR7RA9Bkto8hDGtEKkYfIRxQgChFFiNaIYoEM8rSWUfi4ZuZoPproo4k+mugjoBUiD5GPKEAUIooQrRHFAvV8NN/10RrNR7kB0ImRLTNcYqQMM4iTyFYK5imYr2CBgoUKFinYWsFiBUvOTDHGxXaGz8c/52i7zDepoQIZxFBAS0Qriejzbj6cOkUMfUop0gYzbiBjbGI2FCBCtEYUI0okUjy25iP5PEef51hvZ/jMmqPxgFaIPEQ+ogBRiChCtEYUI0okUtjqjGRru0UwyV5IIrogdIe2KmLYoM8tu6DOaECeUmrwS5KvDNKHfVwVNFi7h1iCCNFaKQUr5zbI0kiDCUSXUaxbsvab0B1nN8twN3UvmEvn9BaRXe9SItpAIlEjDQRaPqIA5UOUj1B+jYkxRiX9SvZ81LVxfNQ19FHBFjpsGlcSdZOTp8j0FSxAtQjV1hgVY1TS1++bxEYyiSlMQrbQYTe3koiahJm+ggWoFqHaGqNijEr6+n2T9JFM0hUmtczSVb+UL+RVumlig/3XUgaR3zwlsoin5xsRqcEqwlcGDefTrlCKIodYmghLs5bIVq1K4rNRFmkfkeHwjO0dF7iZbfu5/TYzRmozQ9FmyBaC9Tq2gR0bM30FC1AtQrU1RsUYlfT1+yaNdOCimwqTkC10OFNZ6XDw4ikyfQULUC1CtTVGxRiV9PX7Jo10dqPLTQf5eUXBFoKRQ4SlRHSEC0RHOIr5ChbgDUK8QYQ3WGNijFFJ/5Z9K0c6K9LF0ZBG9v2CkZ8CFhKRfT+iFSIPkS+Q3ZsZneHMCHkhogjRGlEskUOcFWUwTlNg8q9T4EhbLH0+XIndS0TWkYiWiFaIPEQ+ogBRiChCtEYUI0oEUhyJ6CPtqHRnOA8lEuFRhu6OdFM4h0n0d89PDG2cmxqwKE0M7d2bspFuyoZz071E3aS2QLREtELkIfIRBYhCRBGiNaIYUSIRHh0bYoVqqN9oucRHufSaEyNbZlvESBlGto0KtlIwT8F8BQsULFSwSMHWChYrWHJmLnpqjHWwYrQrMPuDo7R7ETMnqyWJGLFYIHKuglEeRvkYFSAKEUUSkd+oJDLff8UnljFkXSCRjU6bozktXvSh78Mwd2i1CHKI1YCWEtH3qhTq+vAMC6V8gRyydkUUIookYsR8c/gwjiX64EWZRMYYaP5Iy1ujXfY5XYvfS0SWZIiWEpElGWp5mOgjChCFiCK849rApa0Ba+LEoKvd1sUZeTtxn5VPp7efq8mmeGkcmk8Jbd/DXjDnuvm9cwZXAn4lUl5Z8yux8spC16+b3b5CjV+JlFf43vk6Vl8xjOtmnDa16ypzd3NMn7IkLZ/yQzXZZdtT01uMOYxpzcapbPtLj9XFsSFzZ25qzGqeSg9FzTvXAD5n6WNWNtBgpmtrzfp6WxT1gM3aMnzJ6pfj5Jges/JL/iM7va9SlDnvjKf382+nx6KsyzSvuTDnPwp+Ybc85s35gMul5npzUPaalXW+UVyoyLvu27z+szi/jNp+JQNjm5dV/Qcv0u8v+4emsJy9VJmnwJvimGfNIDrZev5vDXf/AFBLAwQKAAAACAC1nEldw0bL1oQBAAAoAwAAFAAAAHhsL3NoYXJlZFN0cmluZ3MueG1sdVLBToQwEL37FU3vyupBjQFMLUPSBOhayt7JbnVJlrJS1ujRePDkyU/ixxxczSawJm3Svpl58/o6/u1LvSHPpnVVYwN6fjajxNhls6rsY0ALHZ9eU+K60q7KTWNNQF+No7fhie9cR7DUuoCuu25743luuTZ16c6arbEYeWjauuzw2j56btuacuXWxnT1xruYzS69uqwsJctmZ7uAXmHXna2edobvgYtzGvquCv0u9L1hD+f9PWa6UIxEQBLJWf/Rv8txipYpi6QacnJQC9F/TFIymQKJJOGJgEzDhAESiGU2wfk8HkOQRaDgSIs5qP5TYg9c/8gYHLxx23KJxqJFzrTPhoYRis9JxA4PJGNuoSEdYxHkXImjhqRFJnj/OReTSJGNkfuCZVqgBvBSyCEfxxcsQWuRUPdvakrIi1xLoqVmyTh0eA5+jEj7rwVMcnihhBZ37HjXH9rBmf0QTBxgmg1uK+BwJ1L82Ik8ESEqYvGnBAjLc5H9ztRvKeDwHAo9HPXwG1BLAwQKAAAAAAC1nEldAAAAAAAAAAAAAAAACQAAAHhsL3RoZW1lL1BLAwQKAAAACAC1nEldwofb8scFAADXGwAAEwAAAHhsL3RoZW1lL3RoZW1lMS54bWztWU+PGzUUvyPxHay5t5NJZnazq2arTTZpod12tZsW9ejMODNuPOOR7ew2N9QekZAQBXFB4sYBAZVaiUv5NAtFUKR+Bd78SeJJnG2WLgLU5pCM7d/77/f8PLly9UHM0DERkvKkZTmXaxYiic8DmoQt606/d6lpIalwEmDGE9KyJkRaV3fef+8K3lYRiQkC+kRu45YVKZVu27b0YRrLyzwlCawNuYixgqEI7UDgE+AbM7teq23YMaaJhRIcA9vbwyH1CernLGF1E12CH6dm7UwFdRl8JUpmEz4TR34OrVAv0gUjJ/uRE9lhAh1j1rJAfsBP+uSBshDDUsFCy6rlH8veuWLPiJhaQavR9fJPSVcSBKN6TifCwYzQ6blbm3sz/vWC/zKu2+12us6MXw7Avg9WO0tYt9d02lOeGqh4XObdqXk1t4rX+DeW8FvtdtvbquAbc7y7hG/WNtzdegXvzvHesv7t3U5no4L35viNJXxvc2vDreJzUMRoMlpCZ/GcRWYGGXJ23QhvArw53QBzlK3ttII+Uevsuxjf56IH4DzQWNEEqUlKhtgHmg6OB4LiTBjeJlhbKaZ8uTSVyUXSFzRVLevDFEPWzCGvnn//6vlT9Or5k9OHz04f/nT66NHpwx8NhNdxEuqEL7/97M+vP0Z/PP3m5eMvzHip43/94ZNffv7cDFQ68MWXT3579uTFV5/+/t1jA3xX4IEO79OYSHSLnKBDHoNtBgFkIM5H0Y8wrVDgCJAGYFdFFeCtCWYmXJtUnXdXQDEwAa+N71d0PYrEWFED8EYUV4D7nLM2F0ZzbmSydHPGSWgWLsY67hDjY5PszkJou+MUdjU1sexEpKLmAYNo45AkRKFsjY8IMZDdo7Ti133qCy75UKF7FLUxNbqkTwfKTHSdxhCXiUlBCHXFN/t3UZszE/s9clxFQkJgZmJJWMWN1/BY4dioMY6ZjryJVWRS8mgi/IrDpYJIh4Rx1A2IlCaa22JSUfcGhqpkDPs+m8RVpFB0ZELexJzryD0+6kQ4To060yTSsR/IEWxRjA64MirBqxmSjSEOOFkZ7ruUqPOl9R0aRuYNkq2MhSklCK/m44QNMUnKWl+p1DFNzirbjELdfle2p/BdOMRMybNYrFfh/ocleg+PkwMCWfGuQr+r0G9jhV6Vyxdfl+el2Nb77pxNvFYTPqSMHakJIzdlXtAlmBr0YDIf5Axm/X8awWMpuoILBc6fkeDqI6qiowinINLJJYSyZB1KlHIJtw5rJe/8GkvB/nzOm943AY3VPg+K6YZ+D52xyUeh1AU1MgbrCmtsvpkwpwCuKc3xzNK8M6XZmjchhxDO3j44G/VCNGwazEiQ+b1gMA3LhYdIRjggZYwcoyFOY023NV/vNU3aVuPNpK0TJF2cu0KcdwFRqi1FyV5OR5ZUR+gEtPLqnoV8nLasIfRf8BinwE9mZQuzMGlZvipNeW0yLxps3pZObaXBFRGpkGoPy6igypemr2mSuf51z838cDEGGKrRelo0ms6/qIW9GFoyHBJfrZiZD8s1PlZEHEXBCRqwsTjEoLdb7K6ASjg26tOBgAx1y41XzfwyCxZfB5XZgVka4bImNbXYF/D8eaZDPtLUs1fo/jdNaVygKd7ba0q2c6HZbQT5NQxaAoFRtkdbFhcq4lCF0oj6PQFNRC4L9EKQFplKiGUvvTNdyfG8bhU8iiIXRuqQhkhQqHQqEoQcqNLO1zBz6vr5OmVU1pmZujItfgfkmLB+lr0bmf0WiqbVpHREjlsMmm3KrkHY+w93Pu6Kzufs9mAuyD1PL+JqRV87CrbeTIVzHrV1s8V1b+2jNoUrC8q+oHBT4TMy62/7/BCij2YdJYKNeKlZpt9scgA6NzXjMlb/bBs1D0FzRbwvsvnUnN1Y4eyzxf19Z3sGX3tnu9peTlFbu9Tko6U/vPjgPsjeg7vSmClZvIN6ABfUzvTvCeBjz0l3/gJQSwMECgAAAAgAtZxJXc0xUFSFBgAAPlsAAA0AAAB4bC9zdHlsZXMueG1s3Zxfj+I2EMDf+ymiXNWHqtn8WcLCHrA9dg/ppO2qut1KfTuFxIB1SUwTswdX9bvXTgKEcnOEkISh+5LE2DM/j2N7Mva6d7cMfOWVRDFlYV81rwxVIaHLPBpO++ofLyOtoyoxd0LP8VlI+uqKxOrd4IdezFc+eZ4RwhUhIYz76ozz+a2ux+6MBE58xeYkFL9MWBQ4XDxGUz2eR8TxYlko8HXLMNp64NBQTSXcBm4RIYETfV7MNZcFc4fTMfUpXyWyVCVwbz9MQxY5Y1+QLs2W4ypLsx1Zaw1J0p6SgLoRi9mEXwmhOptMqEv2Wbt6V3fcrSQhtpwk09YNK634oBcuglHAY8Vli5AL+2+SlPTywROJ7ZaqpCa4Z56o2Sftp78WjL/9+GN6VX5W3vzy5o1xZRiftLff/fEbRdObLP3uLsn06ydN1Qc9PcMb9CYszFHeCDNIU95+DtmXcCR/S9lltkHPZT6LFC5sQmSyEDRxAuqvlFfH76uWTEgsRtKEgIo2SxK/pglmUiZ01hnuHZ+OI5oQpRoyPTMnisULmIo1WjJDqjuajvvqaGQkfzuijV3RLzQgsfJEvigfWeCEeyoWsMj9OmU6rNaujqEzC0V9IzrhyjMJ6JD53p6icQlF/7VTIUVHK7GaUFLGZFXW5JFOZ1y5Z6FHwphUoKtM05R6B06oVEF95ikdqFSdjAYb6gRdVffZCup2UlsdW5dOc1Xp1luTbpmaJBc5N1Lf38yN12qaMOgJ94STKByJByW7f1nNxYwYCkcqFZPkO5B7Gjkr07KLF4iZTz1JMb3fm4fHWRoVtVkS4Vu0k4FXzwnbqEkuonpjFnnCP9xM/m11nTbo+WTCRflI2khcOZtLJYxz4f4Meh51pix0fKlhXSJfUkmcyL7KZ4kv5H4TTWbc0VColMh3BIjelIJCopOcdZGUs/kxrVqyrvW/OBsNhYqnWY99d+rVUdaklcI002trbCMUKDWPBGdt8csb5RCNVRfZx7G/zdmN8GZc4vvPUtqfk52oy3KSi7gYMt4Sbm6FH5TdpmLSByk/Ly2VnRcr/O8ygpXlZKMBKm0Cpc1tacWZz/2VDM4kycnTMMm4fX7n02kYkLURnPWjMmMR/SqKSm9YtrMqY4ScuvJZNExS+eUE5rOQ80H2s5DzXSPhu27Qfq5IIFGeMEspa8QWEiO2kPNB9rOR8NmHh9Bv8ZV86YoQtdERQW3YRtKGkMWw8EH2u0HO10HO10XCB71/5oEue3YD4gfE4uvdXKgvamJxRqF5FrufYmLxlqE3EIsBO2fkK+jLd2v0rEoiQVY7IxJkpSY89qIfZVDgo5HeWhAS+ry9gA6ByYxQD2nCuT/RjE349ydaEREiZMUmvkJO7S+I+jQ07CDqL6AzjfBzxDrC25dbH85BC+Ee8P3Phfu/oD0wQ56JFhqgsERKwAEUS8+H5slGAE+dhS6AEUvIE7QhloAOCIgloGOCy7O41u+aXEWugbKOr+7SmGCgu47vxcop63DSK4esIvBTOdT5X8Ls/5eObOCnRTAm0Sj5t6ecb4YSfs/GlcJXCLrf2bGS7vWlIqAnghVZUsASsgcBsWzOAL1xZANScc4zdJUCH7MHYkPY4hoHPiKQRQoui/ZAtPVctFBUs451skJA0L67JiItRXs7tOaOJRoEAqIJB5n4t/aANsQSyYAmxzrewtJfPo3G/aqnxBXMADtNRZQV9ZCq4lQV4VQVQ0FmndoGOCwbs6BOiSoMCkFW/9KdaeNTdd4Rml3jECCWNRQQEM2+ceirAYtrBAKiGXwhQCyDLwiIJsYGAWKJsYGAaMZBCBDNOAgBoh8H0QQCwIEazWc2SIh+LsGzYwAkRD+b4FmyyRFewtZECBfpZj8IF9FuPwSLydVEicC+htEzuoTlMggX6QIUhHveFSg9O4Ald8rLzhkvm1RFHvXXV59kl/JzyOMF9TkN06ed812ETG+5Pdol+ZXLc4Z3tQgZHpk4C5+/bH7sq9v734hHF4G1yfU7fWU8y7W9f5QH5ZhtqYMs+WPMk6uyiGhf/fv98Kb78H5kaR1j2NFa18TWuvbwQbNb98OHh1HXsIz7f3IHHp9w3HF2RrEQchv7IleUVTaDf96m9dXcQ4qf2E9g59m7Vtt4Z5uGNro2TK3Vdjpap31tayPbtB7areF7e2Tn2O2SBywbumlu4e1bTgPi05Ds4r/kU9MjJb9TCX3dEvr25OvBv1BLAwQKAAAAAAC1nEldAAAAAAAAAAAAAAAACQAAAGRvY1Byb3BzL1BLAwQKAAAACAC1nEld9MphcHwBAAAlAwAAEAAAAGRvY1Byb3BzL2FwcC54bWydUsFO6zAQvPMVke/UoSD0VDlGqIAQPKBSC5yNs2ksHNvyLlHL1+Okakgfhydxm50djce7Ky42jc1aiGi8K9jJJGcZOO1L49YFe17dHP9hGZJypbLeQcG2gOxCHolF9AEiGcAsOTgsWE0UZpyjrqFROEltlzqVj42iVMY191VlNFx5/dGAIz7N83MOGwJXQnkcBkO2c5y19FvT0usuH76stiH5SXEZgjVaUfqkfDA6evQVZdcbDVbwcVMkoyXoj2hoK3PBx6VYamVhnoxlpSyC4N+EuAXVzWyhTEQpWpq1oMnHDM1nmtqUZW8KoYtTsFZFoxyxnWxX9NgGpChffXzHGoBQ8IHs4Vg7xuZMTntBAodCPgRJ+DDiypAFfKoWKtL/EvcZ2Cjj5eP9ONyA7ub3P0Lvn//nwblvgnJpqnxAf417x+ew8leKYD/jQ1IsaxWhTGsZdjAQ4jaFjbbTz2vl1lDuNT8b3UW87K5enpxP8tM87w9hzwn+feDyC1BLAwQKAAAACAC1nEldzmfPQnwBAADQAgAAEQAAAGRvY1Byb3BzL2NvcmUueG1sfZJLTsMwFEXnrMLyPHXcD1ArTcVHSCCQkCgCMbPs12IR25H9oHQ9DFgAM6bdGEnahgIVw+iee3Tzkmz8agvyAiEa70aUd1JKwCmvjZuN6O3kLDmkJKJ0WhbewYguINJxvpepUigf4Dr4EgIaiKQSuShUOaKPiKVgLKpHsDJ2KsJV4dQHK7F6DDNWSvUkZ8C6abrPLKDUEiWrhUnZGulaqVWrLJ9D0Qi0YlCABYeR8Q5n3yxCsHFnoUm2SGtwUcJOdBO29Gs0LTifzzvzXoNW+zm7v7q8aV41Ma4+lQKaZ1oJFUCiD/mRtsaZiEEu35dvnmgg53b58QImZmyLqztosIB8KvE5SJIQ6zUUvqFWSX33Qka8qr7Q1IA+XuQXy8/CeHICUYaM/c03letgHILOu2l3P0mHCe9P+IHoHYi0/9D2NlC2PuRqHGhSHUCszrVJ7nonp5MzWvsGSdpLOJ/woRgMRP/woV78o/8ttOtl/xt3LPwtyJvRP3/C/AtQSwMECgAAAAgAtZxJXUD8gZmfAQAAFwMAAA8AAAB4bC93b3JrYm9vay54bWyNkstu2zAQRff9CoJ7W6JjO45hOUhfqFsgyCJN1jQ1sgbmCyRl2X/fkVSljwBBNiJnxDl37pCb27PR7AQhorMFF9OcM7DKlWgPBf/5+HWy4iwmaUupnYWCXyDy2+2HTevCce/ckVG9jQWvU/LrLIuqBiPj1Hmw9KdywchEYThk0QeQZawBktHZLM+XmZFo+UBYh/cwXFWhgs9ONQZsGiABtEzUfazRx5Fm1HtwRoZj4yfKGU+IPWpMlx7KmVHr3cG6IPeaXJ/FYiTT9hXaoAouuipNCfW7yVd+RZ4JMVjebirU8DRMnUnv76XpVDRnWsb0pcQEZcFJU7sW/kmExn9sUFNwc5Vf8Wz7chMPgZVQyUanR+pqpNOdLue5EJyRZILwEPAk1YXSXW1X94TQxj+YLmTnZ7Slaws+Wy1X9CQuYzwRMwrbPnrGMtV05Cafv+S+AR7qRPTFipKkkP0l0c9iXFn/3Q2ubO//7v5H/9gS7U8YkUZPhtdIZ8KunHe4/0qXY+n3T2+VLvpORnkltaJhdUvHENcin133J8YZbH8BUEsBAhQACgAAAAgAtZxJXYOSbJJeAQAAeAUAABMAAAAAAAAAAAAAAAAAAAAAAFtDb250ZW50X1R5cGVzXS54bWxQSwECFAAKAAAAAAC1nEldAAAAAAAAAAAAAAAABgAAAAAAAAAAABAAAACPAQAAX3JlbHMvUEsBAhQACgAAAAgAtZxJXfKfSdrpAAAASwIAAAsAAAAAAAAAAAAAAAAAswEAAF9yZWxzLy5yZWxzUEsBAhQACgAAAAAAtZxJXQAAAAAAAAAAAAAAAAMAAAAAAAAAAAAQAAAAxQIAAHhsL1BLAQIUAAoAAAAAALWcSV0AAAAAAAAAAAAAAAAJAAAAAAAAAAAAEAAAAOYCAAB4bC9fcmVscy9QSwECFAAKAAAACAC1nEldUVj1v/IAAABGAwAAGgAAAAAAAAAAAAAAAAANAwAAeGwvX3JlbHMvd29ya2Jvb2sueG1sLnJlbHNQSwECFAAKAAAAAAC1nEldAAAAAAAAAAAAAAAADgAAAAAAAAAAABAAAAA3BAAAeGwvd29ya3NoZWV0cy9QSwECFAAKAAAACAC1nEldPdPbRbcIAABKLwAAGAAAAAAAAAAAAAAAAABjBAAAeGwvd29ya3NoZWV0cy9zaGVldDUueG1sUEsBAhQACgAAAAgAtZxJXV9k8jrXCAAAGjEAABgAAAAAAAAAAAAAAAAAUA0AAHhsL3dvcmtzaGVldHMvc2hlZXQ2LnhtbFBLAQIUAAoAAAAIALWcSV3DRsvWhAEAACgDAAAUAAAAAAAAAAAAAAAAAF0WAAB4bC9zaGFyZWRTdHJpbmdzLnhtbFBLAQIUAAoAAAAAALWcSV0AAAAAAAAAAAAAAAAJAAAAAAAAAAAAEAAAABMYAAB4bC90aGVtZS9QSwECFAAKAAAACAC1nEldwofb8scFAADXGwAAEwAAAAAAAAAAAAAAAAA6GAAAeGwvdGhlbWUvdGhlbWUxLnhtbFBLAQIUAAoAAAAIALWcSV3NMVBUhQYAAD5bAAANAAAAAAAAAAAAAAAAADIeAAB4bC9zdHlsZXMueG1sUEsBAhQACgAAAAAAtZxJXQAAAAAAAAAAAAAAAAkAAAAAAAAAAAAQAAAA4iQAAGRvY1Byb3BzL1BLAQIUAAoAAAAIALWcSV30ymFwfAEAACUDAAAQAAAAAAAAAAAAAAAAAAklAABkb2NQcm9wcy9hcHAueG1sUEsBAhQACgAAAAgAtZxJXc5nz0J8AQAA0AIAABEAAAAAAAAAAAAAAAAAsyYAAGRvY1Byb3BzL2NvcmUueG1sUEsBAhQACgAAAAgAtZxJXUD8gZmfAQAAFwMAAA8AAAAAAAAAAAAAAAAAXigAAHhsL3dvcmtib29rLnhtbFBLBQYAAAAAEQARAAwEAAAqKgAAAAA=";</script>
+<script>window.VERSAO_OFFLINE = "2026-10-28"; window.MODELO_FATURA_BASE64 = "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";</script>
 <script>(() => {
   var __defProp = Object.defineProperty;
   var __export = (target, all) => {
@@ -977,6 +985,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     DOCUMENTOS_ENTRADA: () => DOCUMENTOS_ENTRADA,
     ENFASES_ALERTA: () => ENFASES_ALERTA,
     ESTILOS_ALERTA_PADRAO: () => ESTILOS_ALERTA_PADRAO,
+    ETAPAS_ENTRADA: () => ETAPAS_ENTRADA,
     GARANTIAS_DEPOSITADAS: () => GARANTIAS_DEPOSITADAS,
     IMPOSTOS: () => IMPOSTOS,
     INICIO_LC224: () => INICIO_LC224,
@@ -1102,6 +1111,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     fiadoresDo: () => fiadoresDo,
     fiadoresDoContrato: () => fiadoresDoContrato,
     fimDeVinculo: () => fimDeVinculo,
+    fimDoPrazoHerdado: () => fimDoPrazoHerdado,
     garantiaADepositar: () => garantiaADepositar,
     garantiaDepositada: () => garantiaDepositada,
     garantiaHerdada: () => garantiaHerdada,
@@ -1112,6 +1122,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     gerarCobrancas: () => gerarCobrancas,
     gravarLeitura: () => gravarLeitura,
     guiasIptuAPagar: () => guiasIptuAPagar,
+    herancaAgendada: () => herancaAgendada,
     herancaIncompleta: () => herancaIncompleta,
     herdarReserva: () => herdarReserva,
     herdarSeguros: () => herdarSeguros,
@@ -1138,7 +1149,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     marcarCondominioConferido: () => marcarCondominioConferido,
     marcarDocumento: () => marcarDocumento,
     marcarDocumentoPerdido: () => marcarDocumentoPerdido,
+    marcarEtapaEntrada: () => marcarEtapaEntrada,
     marcarEtapaFechamento: () => marcarEtapaFechamento,
+    marcarGeradoNaRotina: () => marcarGeradoNaRotina,
     marcarIptuPago: () => marcarIptuPago,
     marcarReservaAbatida: () => marcarReservaAbatida,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
@@ -1190,10 +1203,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     ressarcimentosDo: () => ressarcimentosDo,
     restaurarGarantiaHerdada: () => restaurarGarantiaHerdada,
     resultadosFinanceiros: () => resultadosFinanceiros,
+    resumoRotinaEntrada: () => resumoRotinaEntrada,
     resumoSolicitacoes: () => resumoSolicitacoes,
+    rotinaEntrada: () => rotinaEntrada,
+    rotinaRecente: () => rotinaRecente,
     rotulosDosArquivos: () => rotulosDosArquivos,
     saldoFci: () => saldoFci,
     saldoReserva: () => saldoReserva,
+    salvarAditivoTroca: () => salvarAditivoTroca,
     salvarAditivoVencimento: () => salvarAditivoVencimento,
     salvarEstilosAlertas: () => salvarEstilosAlertas,
     salvarGuiaImposto: () => salvarGuiaImposto,
@@ -1244,6 +1261,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     arred: () => arred,
     calcularCobranca: () => calcularCobranca,
     centavos: () => centavos,
+    cheioPorBonificado: () => cheioPorBonificado,
     compBr: () => compBr,
     competenciaDe: () => competenciaDe,
     dataBr: () => dataBr,
@@ -1423,6 +1441,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   }
   function aplicarCorrecao(valor, percentual) {
     return arred(valor * (1 + (percentual || 0) / 100));
+  }
+  function cheioPorBonificado(bonificado, percentual) {
+    if (!(percentual > 0) || percentual >= 100) return bonificado;
+    const base = arred(bonificado / (1 - percentual / 100));
+    for (const v of [base, base - 1, base + 1, base - 2, base + 2]) if (v - descontoPorPercentual(v, percentual) === bonificado) return v;
+    return base;
   }
   function aluguelVigente(inicial, correcoes, dataRef) {
     let valor = inicial;
@@ -1848,6 +1872,63 @@ E por estarem de acordo, as partes assinam este Termo Aditivo em duas vias de ig
 > {cidade}, {data_assinatura}.
 
 [assinaturas]`;
+  var ADITIVO_TROCA = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
+
+## SUBSTITUIÇÃO DO LOCATÁRIO (TRANSFERÊNCIA DO CONTRATO)
+
+**#i. {l:LOCADORA|LOCADORAS}:** {locadoras}, doravante {l:denominada|denominadas} simplesmente {l:LOCADORA|LOCADORAS}.
+
+**#i. {a:LOCATÁRIO SAINTE|LOCATÁRIOS SAINTES}:** {saintes}, doravante {a:denominado simplesmente LOCATÁRIO SAINTE|denominados simplesmente LOCATÁRIOS SAINTES}.
+
+**#i. {s:LOCATÁRIO ENTRANTE|LOCATÁRIOS ENTRANTES}:** {entrantes}, doravante {s:denominado simplesmente LOCATÁRIO ENTRANTE|denominados simplesmente LOCATÁRIOS ENTRANTES}.
+
+[se fiador]**#i. {f:FIADOR|FIADORES}:** {fiadores}, doravante {f:denominado|denominados} simplesmente {f:FIADOR|FIADORES}.[fim]
+
+As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, para substituir o locatário, com o consentimento prévio e por escrito {l:da LOCADORA|das LOCADORAS} exigido pelo art. 13 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+
+## DA SUBSTITUIÇÃO DO LOCATÁRIO
+
+**CLÁUSULA #** – A partir de {data_troca}, {a:o LOCATÁRIO SAINTE retira-se|os LOCATÁRIOS SAINTES retiram-se} da locação e {a:transfere|transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} a sua posição no contrato, com todos os direitos e obrigações dele decorrentes. {s:O LOCATÁRIO ENTRANTE aceita e assume|Os LOCATÁRIOS ENTRANTES aceitam e assumem} a condição de {s:locatário|locatários} para todos os fins de direito, e {l:a LOCADORA consente|as LOCADORAS consentem} expressamente com esta transferência.
+
+[se varios_entrantes]**Parágrafo único** – Os LOCATÁRIOS ENTRANTES respondem solidariamente entre si por todas as obrigações da locação (art. 2º da Lei nº 8.245/91).[fim]
+
+**CLÁUSULA #** – Continuam as condições em vigor do contrato, inclusive o prazo da locação, que não recomeça com esta transferência[se indeterminado] (prazo indeterminado)[senão] e termina em {data_fim}[fim]: aluguel mensal de **{aluguel_atual}**[se bonificacao], com bonificação de {bonificacao_percentual} para pagamento até o vencimento[fim], com vencimento todo dia {dia_vencimento} de cada mês e reajuste anual pela variação d{indice}, no aniversário do contrato original.
+
+## DOS DÉBITOS ATÉ A DATA DA TROCA
+
+**CLÁUSULA #** – {a:O LOCATÁRIO SAINTE responde|Os LOCATÁRIOS SAINTES respondem} pelos aluguéis, encargos, contas de consumo (água, energia elétrica e gás), taxas de condomínio, IPTU e demais obrigações da locação referentes ao período até {data_vespera}, ainda que cobrados ou apurados depois desta data. A partir de {data_troca}, essas obrigações passam a ser {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.
+
+**Parágrafo único** – Este termo não dá quitação dos valores do período {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}, que poderão ser cobrados a qualquer tempo. Eventual acerto entre quem sai e quem entra sobre esses valores vale só entre eles e não obriga {l:a LOCADORA|as LOCADORAS}.
+
+## DO ESTADO DO IMÓVEL
+
+**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE declara|Os LOCATÁRIOS ENTRANTES declaram} conhecer o estado de conservação do imóvel, conforme o relatório da vistoria de entrada que integra o contrato, e {s:assume|assumem} a obrigação de restituí-lo, ao fim da locação, no estado descrito nessa vistoria, ressalvado o desgaste natural pelo uso normal.
+
+## DA GARANTIA
+
+[se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
+
+**Parágrafo único** – A caução continua a ser atualizada a cada reajuste anual do aluguel, conforme o contrato, e será devolvida {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
+
+[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.[fim]
+
+[se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} conhecer e aceitar a substituição do locatário e {f:garante|garantem} as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, nas condições do contrato, até a entrega real e definitiva das chaves.[fim]
+
+[se seguro_fianca]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE apresentará|Os LOCATÁRIOS ENTRANTES apresentarão}, em até 30 (trinta) dias, o seguro fiança locatícia em seu nome, ou o endosso da apólice em vigor, sob pena de infração contratual.[fim]
+
+[se sem_garantia]**CLÁUSULA #** – A locação continua sem garantia, como no contrato.[fim]
+
+## DISPOSIÇÕES FINAIS
+
+**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE transferirá|Os LOCATÁRIOS ENTRANTES transferirão} para o seu nome, em até 30 (trinta) dias, a titularidade das contas de consumo que estejam a seu cargo no contrato, com a colaboração {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.[se seguro_inquilino] O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]
+
+**CLÁUSULA #** – Permanecem em vigor todas as demais cláusulas e condições do contrato de locação não alteradas por este Termo Aditivo, que passa a fazer parte integrante dele.
+
+E por estarem de acordo, as partes assinam este Termo Aditivo em vias de igual teor e forma, uma para cada parte[se testemunhas], na presença das testemunhas abaixo[fim].
+
+> {cidade}, {data_assinatura}.
+
+[assinaturas]`;
   var MODELOS_PADRAO = [
     {
       nome: "Residencial",
@@ -1901,6 +1982,11 @@ ${FINAIS(`
       nome: "Aditivo de vencimento (a pedido do inquilino)",
       tipo: "aditivo",
       texto: ADITIVO_VENCIMENTO
+    },
+    {
+      nome: "Aditivo de troca de inquilino (herança do contrato)",
+      tipo: "aditivo_troca",
+      texto: ADITIVO_TROCA
     }
   ];
 
@@ -2207,7 +2293,8 @@ ${FINAIS(`
       return `${a}${b}${item2}.`;
     });
     const q = dados.quantidades;
-    t = t.replace(/\{([slf]):([^|}]*)\|([^}]*)\}/g, (x, k, um, varios) => (k === "s" ? q.locatarios : k === "l" ? q.locadoras : q.fiadores) > 1 ? varios : um);
+    const qtd = { s: q.locatarios, l: q.locadoras, f: q.fiadores, a: q.saintes || 1 };
+    t = t.replace(/\{([slfa]):([^|}]*)\|([^}]*)\}/g, (x, k, um, varios) => qtd[k] > 1 ? varios : um);
     t = t.replace(/\{cl:([a-z_]+)\}/gi, (x, nome) => rotulos[nome] ? `${rotulos[nome]}ª (${ordinalPorExtenso(rotulos[nome])})` : `[cláusula ${nome}?]`);
     t = t.replace(/\{([a-z_]+)\}/g, (x, nome) => nome in dados.campos ? dados.campos[nome] : `[${nome}?]`);
     const blocos = [];
@@ -2284,14 +2371,16 @@ ${FINAIS(`
   var escX = (v) => String(v ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
   var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
   var EMU_CM = 36e4;
+  var LOGO = { larguraCm: 6, topoCm: 1, espacoCm: 0.3 };
   var runX = (r, extra = "") => `<w:r><w:rPr>${r.b ? "<w:b/>" : ""}${extra}</w:rPr><w:t xml:space="preserve">${escX(r.t)}</w:t></w:r>`;
   var parX = (runs, { alinhar = "both", antes = 0, depois = 120, recuo = 0, rPr = "" } = {}) => `<w:p><w:pPr><w:spacing w:before="${antes}" w:after="${depois}" w:line="300" w:lineRule="auto"/>${recuo ? `<w:ind w:firstLine="${recuo}"/>` : ""}<w:jc w:val="${alinhar}"/></w:pPr>${runs.map((r) => runX(r, rPr)).join("")}</w:p>`;
-  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, transparencia = 0 } = {}) {
+  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo = null, transparencia = 0 } = {}) {
     const cx = Math.round(larguraCm * EMU_CM);
     const cy = Math.round(alturaCm * EMU_CM);
     const pic = `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="logo${id}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}">${transparencia ? `<a:alphaModFix amt="${Math.round((1 - transparencia) * 1e5)}"/>` : ""}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
-    if (!ancora) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
-    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="1" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="Marca ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
+    if (!ancora && topo === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
+    const capa = topo !== null;
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo * EMU_CM)}</wp:posOffset>` : "<wp:align>center</wp:align>"}</wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? "<wp:wrapTopAndBottom/>" : "<wp:wrapNone/>"}<wp:docPr id="${id}" name="${capa ? "Logo" : "Marca"} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
   }
   async function contratoDocx(JSZip, blocos, { logo, rodape, titulo: titulo2 }) {
     const prop = logo ? logo.altura / logo.largura : 0;
@@ -2306,7 +2395,10 @@ ${FINAIS(`
     };
     const celula = (conteudo, largura, { cab = false, destaque = false, borda = true } = {}) => `<w:tc><w:tcPr><w:tcW w:w="${largura}" w:type="dxa"/>${borda ? "" : '<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'}${cab ? '<w:shd w:val="clear" w:color="auto" w:fill="E5E7EB"/>' : destaque ? '<w:shd w:val="clear" w:color="auto" w:fill="FEF3C7"/>' : ""}</w:tcPr>${conteudo}</w:tc>`;
     const parCel = (t, { b = false, centro = false, rPr = "" } = {}) => `<w:p><w:pPr><w:spacing w:before="20" w:after="20" w:line="260" w:lineRule="auto"/>${centro ? '<w:jc w:val="center"/>' : ""}</w:pPr>${runX({ t, b }, rPr)}</w:p>`;
-    if (logo) corpo.push(`<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr>${imagemX(1, "rIdLogo", 4, 4 * prop)}</w:p>`);
+    if (logo) {
+      const lado = prop > 1 ? LOGO.larguraCm / prop : LOGO.larguraCm;
+      corpo.push(`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${imagemX(1, "rIdLogo", lado, lado * prop, { topo: LOGO.topoCm })}</w:p>`);
+    }
     for (const b of blocos) {
       if (b.tipo === "titulo") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
       else if (b.tipo === "secao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
@@ -2385,6 +2477,7 @@ ${FINAIS(`
     return salvos.length ? salvos : MODELOS_PADRAO.map((m, i) => ({ id: -(i + 1), ...m })).filter((m) => tipoDoModelo(m) === tipo);
   }
   function dadosDoAditivo(d2, c, a) {
+    if (a.tipo === TIPO_ADITIVO_TROCA) return dadosDoAditivoTroca(d2, c, a);
     const dados = dadosDoContrato(d2, c, { data: a.data, testemunhas: a.testemunhas || [] });
     const mesSeguinte = c.cobranca_mes_seguinte !== false;
     const ref = mesSeguinte ? somarMeses(a.primeiro_vencimento.slice(0, 7), -1) : a.primeiro_vencimento.slice(0, 7);
@@ -2397,6 +2490,39 @@ ${FINAIS(`
       mes_referencia: `${MESES[Number(ref.slice(5, 7)) - 1]} de ${ref.slice(0, 4)}`
     });
     dados.condicoes.mes_seguinte = mesSeguinte;
+    return dados;
+  }
+  var TIPO_ADITIVO_TROCA = "Troca de titular";
+  function dadosDoAditivoTroca(d2, c, a) {
+    const ant = d2.contratos.find((x) => x.id === c.contrato_anterior_id) || {};
+    let original = ant.id ? ant : c;
+    for (const vistos = /* @__PURE__ */ new Set([c.id]); original.contrato_anterior_id && !vistos.has(original.id); ) {
+      vistos.add(original.id);
+      original = d2.contratos.find((x) => x.id === original.contrato_anterior_id) || original;
+    }
+    const dados = dadosDoContrato(d2, c, { data: a.data, testemunhas: a.testemunhas || [] });
+    const saiu = ant.id ? dadosDoContrato(d2, ant, { data: a.data }) : { campos: { locatarios: "", solidario: "" }, assinaturas: [] };
+    const saintes = [saiu.campos.locatarios, saiu.campos.solidario].filter(Boolean);
+    const entrantes = [dados.campos.locatarios, dados.campos.solidario].filter(Boolean);
+    const troca = c.data_entrada || c.vigencia_inicio || a.data;
+    Object.assign(dados.campos, {
+      numero_aditivo: `${a.numero || 1}º`,
+      data_contrato: dataPorExtenso(original.vigencia_inicio || original.data_entrada),
+      data_troca: dataPorExtenso(troca),
+      data_vespera: dataPorExtenso(somarDias(troca, -1)),
+      saintes: saintes.join("; e "),
+      entrantes: entrantes.join("; e "),
+      aluguel_atual: valorComExtenso(a.aluguel || c.aluguel_inicial || 0)
+    });
+    dados.condicoes.varios_entrantes = entrantes.length > 1;
+    dados.quantidades.locatarios = Math.max(entrantes.length, 1);
+    dados.quantidades.saintes = Math.max(saintes.length, 1);
+    const papel = (x, quem) => ["LOCATÁRIO", "LOCATÁRIO SOLIDÁRIO"].includes(x.papel) ? { ...x, papel: `LOCATÁRIO ${quem}` } : x;
+    const sai = saiu.assinaturas.filter((x) => x.papel.startsWith("LOCATÁRIO")).map((x) => papel(x, "SAINTE"));
+    const lista3 = dados.assinaturas.map((x) => papel(x, "ENTRANTE"));
+    const pos = lista3.findIndex((x) => x.papel === "LOCATÁRIO ENTRANTE");
+    lista3.splice(pos < 0 ? lista3.length : pos, 0, ...sai);
+    dados.assinaturas = lista3;
     return dados;
   }
   var VISTORIA_INTRO = "O presente relatório acusará as condições do imóvel; a ausência de qualquer observação indicará que está funcionando sem avarias.";
@@ -2517,7 +2643,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     blocos.push(p(`O LOCATÁRIO declara, para os devidos fins, que neste ato recebe ${semChaves ? "a posse do imóvel acima descrito, que não possui chaves nem controles" : "as chaves do imóvel acima descrito"}, locado conforme o contrato de locação assinado, e que, a partir deste momento, é responsável pela sua utilização e conservação, assumindo as obrigações civis que forem de sua responsabilidade.`));
     if (!semChaves) blocos.push({ tipo: "secao", runs: negritos("RELAÇÃO DE CHAVES E CONTROLES ENTREGUES") }, ...linhasDe(chaves).length ? linhasDe(chaves).map((l) => it(`• ${l}`)) : [it("• ______________________________________________"), it("• ______________________________________________")]);
     blocos.push(it(data ? `Data do recebimento: ${dataPorExtenso(data)}, às ____:____.` : "Data do recebimento: _____/_____/_________, às ____:____."));
-    blocos.push({ tipo: "assinaturas", pessoas: dados.assinaturas.filter((a) => ["LOCATÁRIO", "LOCATÁRIO SOLIDÁRIO", "LOCADORA"].includes(a.papel)) });
+    const pessoas = dados.assinaturas.filter((a) => ["LOCATÁRIO", "LOCATÁRIO SOLIDÁRIO", "LOCADORA"].includes(a.papel)).map((a) => a.papel === "LOCADORA" ? { ...a, extra: "REPRESENTANTE DA ADMINISTRADORA" } : a);
+    blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
 
@@ -2635,6 +2762,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const c of d2.contratos) c.possui_aditivos = d2.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
     for (const c of d2.contratos) desativarSeSaiu(d2, c);
     for (const c of d2.contratos) for (const qual of ["caucao", "deposito"]) if ((qual === "caucao" ? temCaucao(c) : temDeposito(c)) && (d2.depositos_garantia || []).length) completarPorDepositos(d2, c, qual, null);
+    for (const c of d2.contratos) {
+      const fim = fimDoPrazoHerdado(d2, c);
+      if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== "Indeterminado" && c.vigencia_fim === fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses) && !d2.renovacoes.some((x) => x.contrato_id === c.id)) c.vigencia_fim = fim;
+    }
     return d2;
   }
   function contratoDoSeguro(d2, s) {
@@ -4345,15 +4476,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   function alertasContrato(d2, contrato, hoje2 = hojeIso()) {
+    const ag = herancaAgendada(d2, contrato, hoje2);
     return [
       contrato.verificar ? { nivel: "aviso", tipo: "A verificar", texto: contrato.verificar } : null,
-      alertaReajuste(d2, contrato, hoje2),
-      alertaCaucao(d2, contrato),
-      alertaReservaParada(d2, contrato) || alertaReserva(contrato.reserva_valor, saldoReserva(d2, contrato), competenciaReserva(contrato), hoje2),
+      ag ? null : alertaReajuste(d2, contrato, hoje2),
+      ag ? null : alertaCaucao(d2, contrato),
+      ag ? null : alertaReservaParada(d2, contrato) || alertaReserva(contrato.reserva_valor, saldoReserva(d2, contrato), competenciaReserva(contrato), hoje2),
       contrato.prazo_tipo === "Indeterminado" ? null : alertaVigencia(contrato.vigencia_fim, hoje2),
-      alertaFiador(d2, contrato, hoje2),
-      alertaAplicacao(d2, contrato),
-      alertaComprovantes(d2, contrato),
+      ag ? null : alertaFiador(d2, contrato, hoje2),
+      ag ? null : alertaAplicacao(d2, contrato),
+      ag ? null : alertaComprovantes(d2, contrato),
+      alertaRotinaEntrada(d2, contrato, hoje2),
       alertaDocumentosEntrada(contrato, d2),
       alertaAssinaturaFaltante(d2, contrato),
       alertaPerdaAConfirmar(d2, contrato),
@@ -4384,18 +4517,32 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var documentoPerdido = (d2, c, campo2) => c[campoPerdidoDoc(campo2)] && !documentoEntrada(d2, c, campo2) ? c[campoPerdidoDoc(campo2)] : null;
   var documentoParcial = (d2, c, campo2) => c[campoParcialDoc(campo2)] && !documentoEntrada(d2, c, campo2) ? c[campoParcialDoc(campo2)] : null;
   var contratoHerdado = (d2, c) => d2 && c.contrato_anterior_id ? buscar(d2, "contratos", c.contrato_anterior_id) || null : null;
+  function fimDoPrazoHerdado(d2, c) {
+    const a = contratoHerdado(d2, c);
+    return a && a.prazo_tipo !== "Indeterminado" && a.vigencia_fim ? a.vigencia_fim : null;
+  }
   var continuadoPor = (d2, c) => d2.contratos.find((x) => x.contrato_anterior_id === c.id) || null;
   var fimDeVinculo = (d2, c) => !!(c.data_saida && continuadoPor(d2, c));
+  function herancaAgendada(d2, c, hoje2 = hojeIso()) {
+    const data = c.data_entrada || c.vigencia_inicio;
+    return c.contrato_anterior_id && !c.heranca_transferida && data && data > hoje2 && contratoHerdado(d2, c) ? data : null;
+  }
   var TABELAS_GARANTIA = ["depositos_garantia", "correcoes_garantia", "aplicacoes", "trocas_garantia"];
-  function transferirHeranca(d2, novoId, usuario) {
+  function transferirHeranca(d2, novoId, usuario, hoje2 = hojeIso()) {
     const n = buscar(d2, "contratos", novoId);
     const a = n && contratoHerdado(d2, n);
     const data = n && (n.data_entrada || n.vigencia_inicio);
     if (!a || !data || n.heranca_transferida) return null;
     const fim = somarDias(data, -1);
     const out = { anterior: a, data, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0 };
-    encerrarVinculoPorContinuacao(d2, a.id, data, n.inquilino_nome, usuario);
     const passa = (tabela, x, texto2) => atualizar(d2, tabela, x.id, { contrato_id: n.id }, usuario, `${texto2} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+    if (data > hoje2) {
+      if (a.data_saida !== fim) atualizar(d2, "contratos", a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${dataBr(data)})`);
+      if (!n.data_base_correcao) atualizar(d2, "contratos", n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
+      recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id, usuario);
+      return { ...out, agendada: true };
+    }
+    encerrarVinculoPorContinuacao(d2, a.id, data, n.inquilino_nome, usuario);
     const mud = { heranca_transferida: data };
     if (!n.data_base_correcao) mud.data_base_correcao = dataBaseCorrecao(a);
     const semCorrecoesProprias = !correcoesDo(d2, n.id).length;
@@ -4747,6 +4894,158 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const x = [...cadeiaDeContratos(d2, c).antes].reverse().find((a) => a[campo2]);
     return x ? { data: x[campo2], arquivo: x[arq] || null, contrato: x } : null;
   }
+  var CONTAS_ENTRADA = [
+    ["agua", "conta_agua", "Transferência da água", "Sanepar", /sanepar|[áa]gua/i, false],
+    ["energia", "conta_energia", "Transferência da energia", "Copel", /copel|energia|luz/i, false],
+    ["gas", "conta_gas", "Transferência do gás", "Supergasbras", /g[áa]s|ultragaz|liquig/i, true],
+    ["condominio", "conta_condominio", "Transferência do condomínio", "Condomínio", /condom/i, true]
+  ];
+  var ETAPAS_ENTRADA = [
+    ["reserva", "Depósito da reserva"],
+    ["contrato_gerado", "Gerar o contrato"],
+    ["contrato_assinado", "Contrato assinado", "doc_contrato_em"],
+    ["aditivo", "Termo aditivo da troca de titular assinado"],
+    ["garantia", "Garantia"],
+    ["vistoria_gerada", "Gerar a vistoria de entrada"],
+    ["chaves_gerado", "Gerar o termo de entrega das chaves"],
+    ["vistoria_assinada", "Vistoria de entrada assinada", "doc_vistoria_em"],
+    ["chaves_assinado", "Termo de entrega das chaves assinado", "doc_chaves_em"],
+    ...CONTAS_ENTRADA.map(([k, , t]) => [k, t]),
+    ["seguro", "Contratação do seguro"]
+  ];
+  var rotinaRecente = (c, hoje2 = hojeIso()) => !c.data_entrada || c.data_entrada >= somarMesesData(hoje2, -6);
+  function concessionariaDaConta(d2, c, re, padrao) {
+    const t = d2.titularidades.filter((x) => x.imovel_id === c.imovel_id && re.test(x.concessionaria || "")).sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))[0];
+    return t && t.concessionaria || lista2(d2, "concessionarias").find((x) => re.test(x)) || padrao;
+  }
+  function rotinaEntrada(d2, c, hoje2 = hojeIso()) {
+    const marcas = c.rotina_entrada || {};
+    const anterior = contratoHerdado(d2, c);
+    const herdou = anterior ? `herdado de ${anterior.inquilino_nome}` : "";
+    const feita = (data, texto2 = "") => ({ situacao: "feita", data: data || null, texto: texto2 });
+    const andamento = (texto2) => ({ situacao: "andamento", texto: texto2 });
+    const docAssinado = (k) => {
+      const doc = documentoEntrada(d2, c, k);
+      if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : doc.arquivo ? "" : "sem arquivo");
+      if (documentoPerdido(d2, c, k)) return feita(documentoPerdido(d2, c, k), "registrado como perdido");
+      const p2 = documentoParcial(d2, c, k);
+      if (p2) return andamento(`falta assinatura: ${p2.falta.join(", ")}`);
+      return anterior ? andamento(`herdado de ${anterior.inquilino_nome}: marque no contrato anterior`) : null;
+    };
+    const jaGerado = (k, texto2) => documentoEntrada(d2, c, k) ? feita(null, texto2) : documentoPerdido(d2, c, k) ? feita(null, "registrado como perdido") : documentoParcial(d2, c, k) ? feita(null, "anexado, falta assinatura") : void 0;
+    const avaliar = {
+      reserva: () => {
+        if (anterior) return null;
+        if (c.reserva_valor > 0) return c.comprovante_reserva ? feita(c.reserva_data, reais(c.reserva_valor)) : andamento(`${reais(c.reserva_valor)} sem comprovante`);
+        return void 0;
+      },
+      contrato_gerado: () => anterior ? feita(null, herdou) : jaGerado("doc_contrato_em", "contrato já assinado"),
+      contrato_assinado: () => docAssinado("doc_contrato_em"),
+      aditivo: () => {
+        const l = aditivosDo(d2, c.id);
+        if (l.length) return feita(l[0].data, l[0].assunto);
+        return aditivosAguardando(d2, c.id).length ? andamento("gerado, aguardando assinatura") : void 0;
+      },
+      garantia: () => {
+        if (anterior && (garantiaHerdada(d2, c) || herancaAgendada(d2, c, hoje2))) return feita(null, `herdada de ${anterior.inquilino_nome}`);
+        if (temCaucao(c) || temDeposito(c)) {
+          const qual = temCaucao(c) ? "caucao" : "deposito";
+          if (garantiaDepositada(c)) return feita(c[GARANTIAS_DEPOSITADAS[qual].pago] || null, `${GARANTIAS_DEPOSITADAS[qual].nome} depositada`);
+          const s = garantiaADepositar(d2, c, qual);
+          if (s.depositado) return andamento(`depositado ${reais(s.depositado)} de ${reais(s.combinado)}`);
+        }
+        return void 0;
+      },
+      vistoria_gerada: () => {
+        const v = vistoriasDo(d2, c.id).find((x) => x.tipo === "Entrada");
+        if (v) return feita(v.data);
+        return anterior ? feita(null, herdou) : jaGerado("doc_vistoria_em", "vistoria já assinada");
+      },
+      chaves_gerado: () => anterior ? feita(null, herdou) : jaGerado("doc_chaves_em", "termo já assinado"),
+      vistoria_assinada: () => docAssinado("doc_vistoria_em"),
+      chaves_assinado: () => docAssinado("doc_chaves_em"),
+      seguro: () => {
+        const data = c.data_entrada || c.vigencia_inicio || "";
+        const s = segurosDoContrato(d2, c.id).filter((x) => !data || x.vigencia_fim >= data).sort((a, b) => String(a.vigencia_inicio).localeCompare(String(b.vigencia_inicio)))[0];
+        if (s) return feita(s.data_contratacao || s.vigencia_inicio, [s.seguradora, s.apolice].filter(Boolean).join(" · "));
+        if (anterior && herancaAgendada(d2, c, hoje2) && segurosDoContrato(d2, anterior.id).some((x) => x.vigencia_fim >= data)) return feita(null, `apólice de ${anterior.inquilino_nome} passa na troca`);
+        return void 0;
+      }
+    };
+    for (const [k, campo2, , padrao, re, soInquilino] of CONTAS_ENTRADA) {
+      avaliar[k] = () => {
+        const sit = c[campo2];
+        if (soInquilino ? sit !== SITUACOES[0] : [SITUACOES[1], SITUACOES[2]].includes(sit)) return null;
+        const t = d2.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== "Volta para o proprietário" && re.test(x.concessionaria || "")).sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))[0];
+        if (!t) return void 0;
+        const prot = t.protocolo ? `protocolo ${t.protocolo}` : "sem protocolo";
+        const e = t.situacao === "Concluído" ? feita(t.data, prot) : andamento(`${(t.situacao || "solicitado").toLocaleLowerCase("pt-BR")}${t.data ? ` em ${dataBr(t.data)}` : ""} · ${prot}`);
+        return { ...e, titularidade: t.id };
+      };
+    }
+    const out = [];
+    for (const [chave, titulo2, doc] of ETAPAS_ENTRADA) {
+      if (chave === "aditivo" && !anterior) continue;
+      if (chave === "garantia" && c.garantia_tipo === "Sem garantia") continue;
+      if (chave === "seguro" && c.conta_seguro === SITUACOES[2]) continue;
+      const auto = avaliar[chave]();
+      if (auto === null && !doc) continue;
+      const conta = CONTAS_ENTRADA.find(([k]) => k === chave);
+      const concessionaria = conta ? concessionariaDaConta(d2, c, conta[4], conta[3]) : null;
+      const nome = chave === "garantia" ? {
+        "Caução": "Depósito da caução",
+        "Depósito garantia": "Depósito de garantia",
+        Fiador: "Assinatura do fiador",
+        "Fiador + depósito": "Depósito de garantia e assinatura do fiador",
+        "Seguro fiança": "Apólice do seguro fiança"
+      }[c.garantia_tipo] || "Garantia (tipo não informado)" : concessionaria ? `${titulo2} (${concessionaria})` : titulo2;
+      const m = marcas[chave];
+      const e = auto && auto.situacao === "feita" ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) } : m && m.pulada ? { situacao: "pulada", data: m.data, texto: "não se aplica", manual: true } : m && m.data && !doc ? { situacao: "feita", data: m.data, texto: `marcada por ${m.por || "-"}`, manual: true } : auto || { situacao: "pendente", texto: "" };
+      out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
+    }
+    return out;
+  }
+  function resumoRotinaEntrada(d2, c, hoje2 = hojeIso()) {
+    const etapas = rotinaEntrada(d2, c, hoje2);
+    const feitas = etapas.filter((e) => ["feita", "pulada"].includes(e.situacao)).length;
+    return { etapas, feitas, total: etapas.length, concluida: feitas === etapas.length };
+  }
+  function marcarEtapaEntrada(d2, contratoId, chave, { data = null, pular = false } = {}, usuario) {
+    const etapa = ETAPAS_ENTRADA.find(([k]) => k === chave);
+    if (!etapa) throw new Error("Etapa desconhecida.");
+    if (etapa[2] && !pular) throw new Error("Documento assinado: anexe o arquivo assinado para marcar.");
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new Error("Inquilino não encontrado.");
+    const marcas = { ...c.rotina_entrada || {} };
+    if (pular) marcas[chave] = { data: data || hojeIso(), por: usuario, pulada: true };
+    else if (data) marcas[chave] = { data, por: usuario };
+    else delete marcas[chave];
+    atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { rotina_entrada: Object.keys(marcas).length ? marcas : null },
+      usuario,
+      `${c.inquilino_nome}: rotina de entrada · ${etapa[1].toLocaleLowerCase("pt-BR")} ${pular ? "não se aplica" : data ? `feita em ${dataBr(data)}` : "voltou a pendente"}`
+    );
+  }
+  function marcarGeradoNaRotina(d2, contratoId, chave, usuario, hoje2 = hojeIso()) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c || !["contrato_gerado", "chaves_gerado"].includes(chave) || (c.rotina_entrada || {})[chave]) return false;
+    marcarEtapaEntrada(d2, c.id, chave, { data: hoje2 }, usuario);
+    return true;
+  }
+  function alertaRotinaEntrada(d2, c, hoje2) {
+    if (c.ativo === false || c.data_saida || !c.imovel_id || !rotinaRecente(c, hoje2)) return null;
+    const l = rotinaEntrada(d2, c, hoje2).filter((e) => CONTAS_ENTRADA.some(([k]) => k === e.chave) && ["pendente", "andamento"].includes(e.situacao));
+    if (!l.length) return null;
+    return {
+      nivel: "aviso",
+      tipo: "Rotina de entrada",
+      ancora: "rotina",
+      texto: `Falta efetivar a troca de titularidade: ${l.map((e) => `${e.titulo.replace(/^Transferência d[aoe] /, "")}${e.situacao === "andamento" ? ` (${e.texto})` : ""}`).join("; ")}.`
+    };
+  }
   function arquivosReferenciados(d2) {
     const out = [];
     const usa = (escopo, id, nome) => {
@@ -4855,6 +5154,34 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     dados.numero = d2.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
     return inserir(d2, "aditivos", dados, usuario, `${c.inquilino_nome}: termo aditivo de vencimento gerado (aguardando assinatura)`);
   }
+  function salvarAditivoTroca(d2, contratoId, f, usuario, id = null) {
+    const c = buscar(d2, "contratos", contratoId);
+    const ant = contratoHerdado(d2, c);
+    const atual = id ? buscar(d2, "aditivos", id) : null;
+    if (atual && atual.arquivo) throw new Error("Este termo aditivo já foi assinado e não pode mais ser alterado.");
+    if (!ant) throw new Error("Este inquilino não continua o contrato de outro: o termo de troca de inquilino é gerado no contrato do novo titular.");
+    if (!f.data) throw new Error("Informe a data do termo aditivo.");
+    if (!String(f.texto || "").trim()) throw new Error("O texto do termo aditivo está vazio.");
+    const troca = c.data_entrada || c.vigencia_inicio || f.data;
+    const dados = {
+      contrato_id: c.id,
+      imovel_id: c.imovel_id || null,
+      tipo: "Troca de titular",
+      data: f.data,
+      aluguel: aluguelAtual(d2, c, troca),
+      testemunhas: (f.testemunhas || []).filter((t) => t && t.nome),
+      modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null),
+      texto: String(f.texto),
+      assunto: `Troca de titular: ${ant.inquilino_nome} → ${c.inquilino_nome}, a partir de ${dataBr(troca)}`,
+      arquivo: null
+    };
+    if (atual) {
+      atualizar(d2, "aditivos", atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${dataBr(f.data)} alterado`);
+      return atual;
+    }
+    dados.numero = d2.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+    return inserir(d2, "aditivos", dados, usuario, `${c.inquilino_nome}: termo aditivo de troca de inquilino gerado (aguardando assinatura)`);
+  }
   function assinarAditivo(d2, id, { data, arquivo }, usuario) {
     const a = buscar(d2, "aditivos", id);
     const c = buscar(d2, "contratos", a.contrato_id);
@@ -4889,7 +5216,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var vistoriasDo = (d2, contratoId) => d2.vistorias.filter((v) => v.contrato_id === contratoId).sort(porDataVistoria);
   var ultimaVistoriaDoImovel = (d2, imovelId) => d2.vistorias.filter((v) => v.imovel_id === imovelId).sort(porDataVistoria)[0] || null;
   function alertaSeguroImovel(d2, i, hoje2 = hojeIso()) {
-    const atual = d2.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje2)).sort((a2, b) => b.data_entrada.localeCompare(a2.data_entrada))[0];
+    const atual = d2.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje2) && !herancaAgendada(d2, c, hoje2)).sort((a2, b) => b.data_entrada.localeCompare(a2.data_entrada))[0];
     if (!atual || atual.conta_seguro === SITUACOES[2]) return null;
     const a = alertaSeguro(dataBaseCorrecao(atual), hoje2, segurosDoContrato(d2, atual.id));
     return a && { ...a, contrato_id: atual.id, ancora: "seguros" };
@@ -4969,6 +5296,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     "Aplicação da garantia",
     "Correção da caução",
     "Titularidade",
+    "Rotina de entrada",
     "Comprovante a buscar no banco",
     "Assinatura faltante",
     "Documento perdido a confirmar",
@@ -5527,13 +5855,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       novo = manual.valor_novo > 0 ? manual.valor_novo : aplicarCorrecao(r.atual, manual.percentual);
       percentual = manual.valor_novo > 0 ? r.atual ? percentualPorDesconto(r.atual, novo - r.atual) : 0 : manual.percentual;
     }
-    const indice = digitado ? r.indiceContrato || "Informado" : r.escolhido.indice;
+    const indice = r.escolhido ? r.escolhido.indice : r.indiceContrato || "Informado";
     return inserir(d2, "correcoes", {
       contrato_id: c.id,
       data_vigencia: `${comp}-01`,
       indice,
       indice_contrato: r.indiceContrato,
-      data_indice: digitado ? null : r.escolhido.registro.mes_ref,
+      data_indice: r.escolhido ? r.escolhido.registro.mes_ref : null,
+      percentual_indice: digitado && r.escolhido ? r.percentual : null,
+      digitado: digitado || null,
       percentual,
       valor_anterior: r.atual,
       valor_novo: novo,
@@ -7164,6 +7494,11 @@ ${JSON.stringify(cabecalho)}
       r = transferirHeranca(db, Number(id), login());
     });
     if (!r) return null;
+    if (r.agendada) {
+      const n = buscar2("contratos", id);
+      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, "info");
+      return r;
+    }
     if (r.arquivos.length) {
       try {
         const de = await pastaDoEscopo("contrato", r.anterior.id, false);
@@ -7234,7 +7569,7 @@ ${JSON.stringify(cabecalho)}
   async function trazerHerancasPendentes() {
     if (herancasFeitas || !opera() || !E.pasta) return;
     herancasFeitas = true;
-    const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d(), c));
+    const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d(), c) && !herancaAgendada(d(), c));
     for (const c of pendentes) await trazerHeranca(c.id);
     const incompletas = d().contratos.filter((c) => herancaIncompleta(d(), c));
     for (const c of incompletas) await completarHeranca2(c.id);
@@ -7884,7 +8219,9 @@ Salvar assim mesmo?`)) {
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${hojeIso()}" required></p>
         <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
-        <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).</p>`
+        <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
+        Os boletos continuam no nome de ${esc(anterior.inquilino_nome)} até a véspera (o último sai proporcional aos dias); a partir da data, saem no nome do novo inquilino.
+        Data futura: garantia, seguro e reserva passam no dia.</p>`
       });
       if (!r) {
         sel.value = "";
@@ -8123,19 +8460,40 @@ Salvar assim mesmo?`)) {
   function ligarReajusteManual(raiz) {
     for (const form of raiz.querySelectorAll("form[data-form=aplicarReajusteManual]")) {
       const atual = Number(form.dataset.atual);
+      const pctB = Number(form.dataset.bonif) || 0;
       const pctEl = form.querySelector("[name=percentual]");
       const valEl = form.querySelector("[name=valor_novo]");
-      const bonifEl = form.querySelector("[data-bonificado]");
-      const mostrarBonif = () => {
-        const v = centavos(valEl.value);
-        const b = Number(form.dataset.bonif);
-        bonifEl.textContent = v > 0 ? b ? `cheio · bonificado ${reais(v - descontoPorPercentual(v, b))}` : "cheio" : "";
+      const bonEl = form.querySelector("[name=bonificado]");
+      const ler2 = (el) => {
+        try {
+          return el && el.value.trim() !== "" ? centavos(el.value) : null;
+        } catch {
+          return null;
+        }
+      };
+      const escrever = (cheio, exceto) => {
+        if (exceto !== "valor_novo") valEl.value = cheio > 0 ? reais(cheio, false) : "";
+        if (bonEl && exceto !== "bonificado") bonEl.value = cheio > 0 ? reais(cheio - descontoPorPercentual(cheio, pctB), false) : "";
+        if (exceto !== "percentual") pctEl.value = cheio > 0 && atual ? percentualPorDesconto(atual, cheio - atual).toLocaleString("pt-BR", { maximumFractionDigits: 4 }) : "";
       };
       pctEl.addEventListener("input", () => {
-        valEl.value = pctEl.value.trim() === "" ? "" : reais(aplicarCorrecao(atual, numero(pctEl.value)), false);
-        mostrarBonif();
+        form.dataset.origem = "percentual";
+        let p2 = null;
+        try {
+          p2 = pctEl.value.trim() === "" ? null : numero(pctEl.value);
+        } catch {
+        }
+        escrever(p2 === null ? 0 : aplicarCorrecao(atual, p2), "percentual");
       });
-      valEl.addEventListener("input", mostrarBonif);
+      valEl.addEventListener("input", () => {
+        form.dataset.origem = "valor_novo";
+        escrever(ler2(valEl) || 0, "valor_novo");
+      });
+      if (bonEl) bonEl.addEventListener("input", () => {
+        form.dataset.origem = "bonificado";
+        const b = ler2(bonEl);
+        escrever(b > 0 ? cheioPorBonificado(b, pctB) : 0, "bonificado");
+      });
     }
   }
   var SERIES_BC = { "IGP-M": 189, IPCA: 433, INPC: 188, "IGP-DI": 190 };
@@ -8327,6 +8685,12 @@ Salvar assim mesmo?`)) {
     const anteriores = fiadoresAnterioresDo(d(), c.id);
     const herdeiro = c.garantia_transferida_para && buscar2("contratos", c.garantia_transferida_para);
     const anteriorDaGarantia = garantiaHerdada(d(), c) ? contratoHerdado(d(), c) : null;
+    const agendada = herancaAgendada(d(), c);
+    if (agendada && c.garantia_tipo && c.garantia_tipo !== "Sem garantia") {
+      const a = contratoHerdado(d(), c);
+      return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || "não informada")}</h2>
+      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá em ${dataBr(agendada)} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
+    }
     let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || "não informada")}</h2>${opera() && !herdeiro ? link(`#/novo/trocas_garantia?contrato=${c.id}`, "Trocar garantia ou fiador") : ""}</div>`;
     if (herdeiro) {
       html += `<div class="alerta info">Esta garantia também vale para <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a> (troca de titular em ${dataBr(herdeiro.data_entrada)}).
@@ -8549,8 +8913,10 @@ Salvar assim mesmo?`)) {
     if (!i || c.conta_seguro === SITUACOES[2] && !seguros.length) return "";
     const alerta = [alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
     const vigente = seguroVigente(d(), c.id);
+    const agendada = herancaAgendada(d(), c);
     return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, "Cadastrar apólice") : ""}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ""}
+    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(contratoHerdado(d(), c).inquilino_nome)} passa para cá nesse dia.</div>` : ""}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || "-")}<br><span class="suave">${esc(s.apolice || "")}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ""}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? "" : vigente && vigente.id === s.id ? ` ${botao("excluirArquivoSeguro", "×", { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, "x-excluir", `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}` : ` ${botao("excluirArquivoSeguro", "×", { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: "1" }, "x-excluir")}`}</span>` : `<br>${etiqueta("sem arquivo da apólice", "aviso")}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, "Editar")} ${botao("excluir", "×", { tabela: "seguros", id: s.id }, "x-excluir", "Excluir esta apólice?")}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
@@ -8610,6 +8976,61 @@ Salvar assim mesmo?`)) {
     return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase("pt-BR")).join(", "))}.
     <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(" ")} ${link(`#/contrato/${c.id}?ir=documentos`, "Marcar como assinado", "botao secundario pequeno")}</div></div>`;
   }
+  function formMarcarDocumento(c, k, feito, comParcial = true) {
+    return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${hojeIso()}" style="width:auto">
+        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <button class="secundario pequeno">Marcar ${feito}</button>
+        ${comParcial ? botao("documentoParcial", "Falta assinatura", { contrato: c.id, campo: k }, "secundario pequeno") : ""}</form>`;
+  }
+  function caixaRotinaEntrada(c, hoje2 = hojeIso()) {
+    const { etapas, feitas, total, concluida } = resumoRotinaEntrada(d(), c, hoje2);
+    if (!total) return "";
+    const aberta = contratoAtivo(c, hoje2) && !concluida && rotinaRecente(c, hoje2);
+    const anterior = contratoHerdado(d(), c);
+    const ir2 = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
+    const mini = "botao secundario mini";
+    const vistoria = vistoriasDo(d(), c.id).find((v) => v.tipo === "Entrada");
+    const doc = { contrato_assinado: "assinado", vistoria_assinada: "assinada", chaves_assinado: "assinado" };
+    const atalhos = {
+      reserva: () => c.reserva_valor > 0 ? link(ir2("reserva"), "Anexar o comprovante", mini) : link(`#/editar/contratos/${c.id}`, "Informar a reserva", mini),
+      contrato_gerado: () => link(`#/contrato-gerar/${c.id}`, "Gerar contrato", mini),
+      aditivo: () => `${link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, "Gerar termo aditivo", mini)} ${link(ir2("aditivos"), "Anexar assinado", mini)}`,
+      garantia: () => link(ir2("garantia"), temCaucao(c) || temDeposito(c) ? "Registrar o depósito" : "Ver a garantia", mini),
+      vistoria_gerada: () => link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, "Fazer vistoria de entrada", mini),
+      chaves_gerado: () => link(`#/imprimir/chaves?contrato=${c.id}`, "Gerar termo das chaves", mini),
+      seguro: () => link(`#/novo/seguros?contrato=${c.id}`, "Cadastrar apólice", mini)
+    };
+    const conta = (e) => e.titularidade ? link(`#/editar/titularidades/${e.titularidade}`, "Atualizar protocolo", mini) : link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&concessionaria=${encodeURIComponent(e.concessionaria || "")}`, "Registrar protocolo", mini);
+    const situacaoDe = (e) => {
+      const data = e.data ? ` em ${dataBr(e.data)}` : "";
+      const texto2 = e.texto ? ` <span class="suave">${esc(e.texto)}</span>` : "";
+      if (e.situacao === "feita") return `${etiqueta(`✓ feita${data}`, "ok")}${texto2}`;
+      if (e.situacao === "pulada") return `${etiqueta(`${e.texto === "não se aplica" ? "não se aplica" : esc(e.texto)}${data}`, "neutra")}`;
+      if (e.situacao === "andamento") return etiqueta(e.texto, "aviso");
+      return etiqueta("pendente", "perigo");
+    };
+    const acoes = (e) => {
+      if (!opera()) return "";
+      if (["feita", "pulada"].includes(e.situacao)) return e.manual ? botao("desfazerEtapaEntrada", "Desfazer", { contrato: c.id, chave: e.chave }, "link-botao") : "";
+      const pular = botao("pularEtapaEntrada", "Não se aplica", { contrato: c.id, chave: e.chave }, "link-botao");
+      if (e.doc) {
+        if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
+        if (e.situacao === "andamento") return link(ir2("documentos"), "Anexar o arquivo completo", mini);
+        const ver = e.chave === "vistoria_assinada" && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, "Ver vistoria", mini)} ` : "";
+        return `${ver}${formMarcarDocumento(c, e.doc, doc[e.chave], false)}`;
+      }
+      const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ""))();
+      return `<div class="acoes" style="justify-content:flex-end">${atalho}
+      <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
+        <input type="date" name="data" value="${hoje2}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
+    };
+    const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b></td>
+    <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join("")}</table></div>`;
+    const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
+    const titulo2 = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? "✓ concluída" : `${feitas} de ${total} feitas`}</span>`;
+    return `<details class="cartao" id="rotina"${aberta ? " open" : ""}><summary><b>${titulo2}</b> <span class="suave">· clique para abrir ou fechar</span></summary>${ajuda}${tabela}</details>`;
+  }
   function caixaDocumentos(c) {
     const hoje2 = hojeIso();
     const vistorias = vistoriasDo(d(), c.id);
@@ -8642,11 +9063,7 @@ Salvar assim mesmo?`)) {
     <td>${situacaoDoc(k, feito)}</td>
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? "" : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
-      ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ""}` : !opera() || perdido(k) || original ? "" : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${hoje2}" style="width:auto">
-        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-        <button class="secundario pequeno">Marcar ${feito}</button>
-        ${parcial(k) ? "" : botao("documentoParcial", "Falta assinatura", { contrato: c.id, campo: k }, "secundario pequeno")}</form>`}
+      ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ""}` : !opera() || perdido(k) || original ? "" : formMarcarDocumento(c, k, feito, !parcial(k))}
       ${opera() && !doc(k) && !original ? perdido(k) ? botao("desmarcarPerdido", 'Desfazer "perdido"', { contrato: c.id, campo: k }, "link-botao") : parcial(k) ? botao("desfazerParcial", 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, "link-botao", "Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.") : botao("documentoPerdido", "Documento perdido", { contrato: c.id, campo: k }, "perigo pequeno", `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? "" : " O administrador vai analisar."}`) : ""}</td></tr>`).join("");
     return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() && !fimDeVinculo(d(), c) ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, "Fazer vistoria de saída") : ""}</div>
@@ -8665,8 +9082,8 @@ Salvar assim mesmo?`)) {
     const ant = contratoHerdado(d(), c);
     const aguardando = aditivosAguardando(d(), c.id);
     const ver = (a) => a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, "Ver / PDF") : "";
-    return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, "Gerar aditivo de vencimento") : ""}</div>
-    ${ant && !lista3.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). Registre-o com o arquivo assinado.</div>` : ""}
+    return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, "Gerar termo aditivo") : ""}</div>
+    ${ant && !lista3.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? "Colha as assinaturas e anexe o arquivo assinado." : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', "") : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ""}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
       <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ""}
@@ -8690,7 +9107,10 @@ Salvar assim mesmo?`)) {
     const aluguel = aluguelAtual(d(), c);
     const pctBonif = percentualBonificacao(c);
     const desconto = descontoPorPercentual(aluguel, pctBonif);
-    const alertas = contratoAtivo(c, hoje2) ? alertasContrato(d(), c, hoje2).filter((a) => !["A verificar", "Documentos de entrada"].includes(a.tipo)) : [];
+    const alertas = contratoAtivo(c, hoje2) ? alertasContrato(d(), c, hoje2).filter((a) => !["A verificar", "Documentos de entrada", "Rotina de entrada"].includes(a.tipo)) : [];
+    const rotina = caixaRotinaEntrada(c, hoje2);
+    const agendada = herancaAgendada(d(), c, hoje2);
+    const anteriorAgendado = agendada && contratoHerdado(d(), c);
     const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
     const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
     const cadeia = cadeiaDeContratos(d(), c);
@@ -8718,7 +9138,9 @@ Salvar assim mesmo?`)) {
     ${selosContrato(c)}
     ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
-    ${faixaDocumentosEntrada(c)}
+    ${anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ""}
+    ${rotina.startsWith("<div") ? "" : faixaDocumentosEntrada(c)}
+    ${rotina}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar2("imoveis", x.imovel_id) || {}).nome || "sem imóvel")}</a>`).join(", ")}.</div>` : ""}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(" → ")}. ` : ""}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(" → ")}.` : ""}</div>` : ""}
@@ -8977,7 +9399,9 @@ Salvar assim mesmo?`)) {
         if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = "A saída não pode ser antes da entrada";
         if (dados.prazo_tipo === "Determinado") {
           if (!(dados.prazo_meses > 0)) erros.prazo_meses = "Informe o prazo em meses, ou marque prazo indeterminado";
-          else if (dados.data_entrada || dados.vigencia_inicio) dados.vigencia_fim = fimDoPrazo(dados.data_entrada || dados.vigencia_inicio, dados.prazo_meses);
+          else if (herdado && (r ? r.vigencia_fim : fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id }))) {
+            dados.vigencia_fim = r ? r.vigencia_fim : fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id });
+          } else if (dados.data_entrada || dados.vigencia_inicio) dados.vigencia_fim = fimDoPrazo(dados.data_entrada || dados.vigencia_inicio, dados.prazo_meses);
         }
         if (dados.carencia_meses < 0) erros.carencia_meses = "Valor inválido";
         if (dados.inquilino_tipo === "Pessoa jurídica (empresa)" && !dados.representante_nome) erros.representante_nome = "Empresa precisa do representante (pessoa física)";
@@ -9048,7 +9472,7 @@ Salvar assim mesmo?`)) {
         avisoAditivo = "";
         const cont = memoria.continuacao;
         memoria.continuacao = null;
-        if (!antigo && salvo.contrato_anterior_id) await trazerHeranca(salvo.id);
+        if (salvo.contrato_anterior_id && (!antigo || !salvo.heranca_transferida && antigo.data_entrada !== salvo.data_entrada)) await trazerHeranca(salvo.id);
         if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
           const anterior = buscar2("contratos", cont.anteriorId);
           const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : "inquilino anterior"} → ${salvo.inquilino_nome}`;
@@ -9192,7 +9616,7 @@ Salvar assim mesmo?`)) {
         return comListas(TITULARIDADE.map((c) => c.nome === "contrato_id" ? { ...c, opcoes: ops } : c));
       },
       fixos: (r, q) => r ? {} : { imovel_id: Number(q.imovel) },
-      padrao: (q) => ({ contrato_id: q.contrato || "", situacao: "Solicitado", data: hojeIso(), tipo: q.tipo === "volta" ? "Volta para o proprietário" : "Para o inquilino" }),
+      padrao: (q) => ({ contrato_id: q.contrato || "", situacao: "Solicitado", ...q.concessionaria ? { concessionaria: q.concessionaria } : {}, data: hojeIso(), tipo: q.tipo === "volta" ? "Volta para o proprietário" : "Para o inquilino" }),
       voltar: (r, q) => q.contrato ? `#/contrato/${q.contrato}` : `#/imovel/${r ? r.imovel_id : q.imovel}`,
       descricao: (dados) => `${dados.concessionaria} ${dados.protocolo || ""}`.trim()
     },
@@ -9654,7 +10078,7 @@ Salvar assim mesmo?`)) {
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento")}</div>` : ""}
-    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
+    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK)."}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>
@@ -9812,8 +10236,15 @@ Salvar assim mesmo?`)) {
     if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, "ok") };
     if (!opera()) return { carta, correcao: "" };
     const k = r.calculo || calcularReajuste(d(), c, r.competencia);
-    return { carta, correcao: k.percentual !== null ? botao("aplicarReajuste", "Aplicar correção", { contrato: c.id, comp: r.competencia }, "secundario pequeno", `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`) : `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${percentualBonificacao(c)}" class="acoes"><input name="percentual" placeholder="%" inputmode="decimal" style="width:70px" title="Percentual da correção: calcula o novo valor ao lado">
-      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>` };
+    const pctBonif = percentualBonificacao(c);
+    const num = (n) => n === null ? "" : n.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+    const valor = (v) => v === null ? "" : reais(v, false);
+    return { carta, correcao: `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${pctBonif}"
+      data-pct-indice="${k.percentual === null ? "" : k.percentual}" class="acoes form-reajuste">
+      <label class="nw" title="Percentual da correção (pode arredondar): recalcula os aluguéis">Índice <input name="percentual" value="${num(k.percentual)}" placeholder="%" inputmode="decimal" style="width:72px">%</label>
+      <label class="nw" title="Novo aluguel cheio (pode arredondar): recalcula o índice e o bonificado">Cheio <input name="valor_novo" value="${valor(k.novo)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>
+      ${pctBonif > 0 ? `<label class="nw" title="Novo aluguel com bonificação (pode arredondar): recalcula o cheio e o índice">Bonificado <input name="bonificado" value="${valor(k.novoBonificado)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>` : ""}
+      <button class="secundario pequeno">Aplicar correção</button></form>` };
   }
   function botoesReajuste(c, r, naCarta = false) {
     const p2 = partesReajuste(c, r, naCarta);
@@ -9872,7 +10303,7 @@ Salvar assim mesmo?`)) {
       ${meses.length ? `<table class="indices-compacta"><tr><th>Acumulado até</th>${colunas.map((n) => `<th class="n">${esc(n)}</th>`).join("")}</tr>
       ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join("")}</tr>`).join("")}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista3.length})</h2>
-      <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). De anos anteriores não há carta; sem o índice daquele mês cadastrado, digite o % ou o novo valor. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
+      <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
       ${lista3.map((r) => {
       const k = r.calculo;
@@ -9887,7 +10318,7 @@ Salvar assim mesmo?`)) {
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : "-"}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : "-"})</div>` : ""}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
-        <div class="reajuste-botoes"><div class="acoes">${p2.carta}</div>${p2.correcao ? `<div class="acoes">${p2.correcao}</div>` : ""}</div></div></div>`;
+        <div class="reajuste-botoes">${p2.correcao ? `<div class="acoes">${p2.correcao}</div>` : ""}<div class="acoes">${p2.carta}</div></div></div></div>`;
     }).join("") || '<p class="suave">Nenhum reajuste em aberto.</p>'}
       </div>
       <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
@@ -9916,21 +10347,34 @@ Salvar assim mesmo?`)) {
   function cartaReajuste(c, comp) {
     const i = buscar2("imoveis", c.imovel_id);
     const r = reajusteNaCompetencia(d(), c, comp);
-    const k = calcularReajuste(d(), c, comp);
+    const calc = calcularReajuste(d(), c, comp);
+    const x = r && r.corrigido && r.corrigido.indice !== "Negociado" ? r.corrigido : null;
+    const bonifDe = (v) => v - descontoPorPercentual(v, percentualBonificacao(c));
+    const k = x ? {
+      ...calc,
+      percentual: x.percentual,
+      atual: x.valor_anterior,
+      novo: x.valor_novo,
+      atualBonificado: bonifDe(x.valor_anterior),
+      novoBonificado: bonifDe(x.valor_novo),
+      escolhido: { indice: x.indice },
+      doIndice: x.percentual_indice ?? null
+    } : calc;
     const empresa = locadorasDoContrato(d(), c)[0] || { nome: "" };
     const anterior = somarMeses(comp, -1);
     const vencNovo = vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
     if (k.percentual === null) {
-      return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(" e ") || "o índice do contrato")} até ${compBr(anterior)}. ${link("#/reajustes", "Informar em Reajustes")}</div>`;
+      return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(" e ") || "o índice do contrato")} até ${compBr(anterior)}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, "Ir para Reajustes")}</div>`;
     }
+    const indiceTexto = x && x.digitado ? `o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ""}` : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
     let caucao = temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: valorGarantia(d(), c) } : null;
     if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
-    return `<div class="carta">
-    ${d().logo ? `${marcaDagua(d().logo)}<p><img class="carta-logo" src="${esc(d().logo)}" alt="Logo"></p>` : ""}
+    return `${x ? "" : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
+    ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
     <p class="carta-data">${esc(i && i.cidade || "Curitiba")}, ${dataExtenso(hojeIso())}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${enderecoCompleto(i)}` : "")}</b></p>
     <p>Com o aluguel de <b>${MESES3[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ""} ano${r && r.anos > 1 ? "s" : ""}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
-    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>.</p>
+    <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
       ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ""}</table>
@@ -10023,12 +10467,15 @@ Salvar assim mesmo?`)) {
     const largura = 210 - 2 * margemLado;
     const pxMm = el.offsetWidth / largura;
     const [margemTopo, margemPe] = [12, 24];
+    const capa = el.querySelector(".ct-capa");
+    const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo) : 0;
+    const topoDa = (n) => n || !capa ? margemTopo : LOGO.topoCm * 10;
     const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
     const total = el.offsetHeight;
     const fatias = [];
-    for (let ini = 0; ini < total - 1; ) {
+    for (let ini = inicio; ini < total - 1; ) {
       if (fatias.length && !cortes.some((y) => y > ini + 2)) break;
-      let fim = ini + alturaFolha;
+      let fim = ini + alturaFolha + (fatias.length ? 0 : (margemTopo - topoDa(0)) * pxMm);
       if (fim >= total) fim = total;
       else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
       fatias.push([ini, fim]);
@@ -10041,8 +10488,8 @@ Salvar assim mesmo?`)) {
       pedaco.width = canvas.width;
       pedaco.height = Math.round((fim - ini) * escala);
       pedaco.getContext("2d").drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
-      pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, margemTopo, largura, (fim - ini) / pxMm);
-      for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, margemTopo + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
+      pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, topoDa(n), largura, (fim - ini) / pxMm);
+      for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
       pdf.setFontSize(8).setTextColor(102);
       pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: "right" });
       pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
@@ -10112,7 +10559,7 @@ Salvar assim mesmo?`)) {
         blocos: montarContrato(a.texto, dados),
         rodape: dados.rodape,
         nome: "Termo aditivo",
-        arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} vencimento`, c2, String(a.data || "").slice(0, 4))
+        arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === TIPO_ADITIVO_TROCA ? "troca de inquilino" : "vencimento"}`, c2, String(a.data || "").slice(0, 4))
       };
     }
     const c = buscar2("contratos", q.contrato);
@@ -10214,7 +10661,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const anteriores = new Map((v && v.itens || (entrada ? [] : base.itens) || []).filter((x) => x.situacao !== NAO_SE_APLICA).map((x) => [chave(x), x]));
     const naEntrada = new Map((entrada && entrada.itens || []).map((x) => [chave(x), x.situacao]));
     const comodos = lerModeloVistoria(i.modelo_vistoria);
-    for (const x of anteriores.values()) {
+    if (!comodos.length) for (const x of anteriores.values()) {
       let g = comodos.find((y) => y.comodo === x.comodo);
       if (!g) comodos.push(g = { comodo: x.comodo, itens: [] });
       if (!g.itens.includes(x.item)) g.itens.push(x.item);
@@ -10224,19 +10671,20 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const opcoes = (sel) => `<option value=""></option>${[...SITUACOES_VISTORIA, ...sel && !SITUACOES_VISTORIA.includes(sel) ? [sel] : []].map((o) => `<option ${o === sel ? "selected" : ""}>${esc(o)}</option>`).join("")}`;
     return `<h2>Situação por cômodo</h2>
     <p class="suave">Marque a situação de cada item. Os botões do cômodo preenchem os itens ainda sem situação; depois mude só o que diverge e anote a observação e o nº da foto.
-      "Apagar tudo" limpa o cômodo. "Não se aplica" tira o item da tabela e, ao salvar, também do modelo do imóvel. Item sem situação não sai no documento. O que você marcar fica guardado mesmo se sair para editar o modelo.
+      "Apagar tudo" limpa o cômodo. "Não se aplica" tira o item da tabela e, ao salvar, também do modelo do imóvel. Todo item precisa de situação para salvar. Item tirado do modelo sai também desta vistoria. O que você marcar fica guardado mesmo se sair para editar o modelo.
       ${entrada ? "Na saída, o que ficar pior que na entrada sai destacado." : ""} ${linkModelo("Editar o modelo do imóvel")}</p>
     ${comodos.map((g, ci) => `<div class="vistoria-comodo"><div class="cabecalho"><h3>${esc(g.comodo)}</h3><div class="acoes">
       ${ESTADOS_COMODO.map(([valor, texto2]) => botao("vistoriaTudo", texto2, { comodo: ci, valor })).join("")}${entrada ? botao("vistoriaTudo", "Igual à entrada", { comodo: ci, valor: "entrada" }) : ""}
       ${botao("vistoriaApagar", "Apagar tudo", { comodo: ci }, "perigo pequeno")}</div></div>
-      <div class="rolagem"><table class="grade-vistoria"><tr><th>Item</th>${entrada ? "<th>Na entrada</th>" : ""}<th>Situação</th><th>Observação / nº da foto</th></tr>
+      <div class="rolagem"><table class="grade-vistoria"><colgroup><col class="g-item">${entrada ? '<col class="g-entrada">' : ""}<col class="g-situacao"><col></colgroup>
+      <tr><th>Item</th>${entrada ? "<th>Na entrada</th>" : ""}<th>Situação</th><th>Observação / nº da foto</th></tr>
       ${g.itens.map((item2) => {
       const n = k++;
       const a = anteriores.get(`${g.comodo}|${item2}`) || {};
       const ent = naEntrada.get(`${g.comodo}|${item2}`) || "";
       return `<tr><td>${esc(item2)}<input type="hidden" name="ic_${n}" value="${esc(g.comodo)}"><input type="hidden" name="ii_${n}" value="${esc(item2)}"></td>
       ${entrada ? `<td class="suave">${esc(ent || "—")}</td>` : ""}
-      <td><select name="is_${n}" data-comodo="${ci}" data-entrada="${esc(ent)}" class="${piorou(ent, a.situacao) ? "piorou" : ""}">${opcoes(a.situacao)}</select></td>
+      <td><select name="is_${n}" required data-comodo="${ci}" data-entrada="${esc(ent)}" class="${piorou(ent, a.situacao) ? "piorou" : ""}">${opcoes(a.situacao)}</select></td>
       <td><input name="io_${n}" data-comodo="${ci}" value="${esc(a.obs || "")}"></td></tr>`;
     }).join("")}</table></div></div>`).join("")}`;
   }
@@ -10338,6 +10786,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (!c) return "<h1>Inquilino não encontrado</h1>";
     if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
     if (!opera()) return "<h1>Sem permissão para gerar termos aditivos</h1>";
+    const tipo = a ? a.tipo === TIPO_ADITIVO_TROCA ? "troca" : "vencimento" : rota.q.tipo;
+    if (tipo === "troca") return telaAditivoTroca(c, a);
+    if (tipo !== "vencimento") return escolherAditivo(c);
     const hoje2 = hojeIso();
     const modelos = modelosDe(d(), "aditivo");
     const diaAtual = a ? a.dia_anterior : c.dia_vencimento || 10;
@@ -10365,6 +10816,50 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <div class="acoes"><button>${a ? "Salvar e ver o termo" : "Gerar o termo"}</button><a class="botao secundario" href="#/contrato/${c.id}?ir=aditivos">Cancelar</a></div></form>
     ${a ? AJUDA_MODELO : ""}`;
   }
+  function escolherAditivo(c) {
+    const ant = contratoHerdado(d(), c);
+    const ir2 = (tipo) => `#/aditivo/novo?contrato=${c.id}&tipo=${tipo}`;
+    return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>Gerar termo aditivo</h1>
+    <div class="cartao"><h2>Alteração do dia do vencimento</h2>
+      <p>O inquilino pede para pagar em outro dia do mês. Ex.: do dia 10 para o dia 20 a partir de novembro/2026, sem cobrança proporcional.</p>
+      ${link(ir2("vencimento"), "Gerar aditivo de vencimento", "botao")}</div>
+    <div class="cartao"><h2>Troca de inquilino (herança do contrato)</h2>
+      <p>Sai o titular e entra outro, no mesmo contrato: mesmo aluguel, vencimento, reajuste e garantia.</p>
+      ${ant ? `<p>Sai <b>${esc(ant.inquilino_nome)}</b>, entra <b>${esc(c.inquilino_nome)}</b>, a partir de <b>${dataBr(c.data_entrada || c.vigencia_inicio)}</b>.</p>${link(ir2("troca"), "Gerar aditivo de troca de inquilino", "botao")}` : `<p class="suave">Este inquilino não continua o contrato de outro. O termo de troca é gerado no inquilino <b>novo</b>: cadastre-o em "Novo inquilino" escolhendo
+      o contrato que ele continua (o do titular que sai) e gere o termo na página dele.</p>`}</div>`;
+  }
+  function telaAditivoTroca(c, a) {
+    const ant = contratoHerdado(d(), c);
+    if (!ant) return escolherAditivo(c);
+    const modelos = modelosDe(d(), "aditivo_troca");
+    const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
+    const falta = [
+      ...pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
+      ...pendenciasDoContrato(d(), c)
+    ];
+    const troca = c.data_entrada || c.vigencia_inicio;
+    return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
+    <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : "Gerar termo aditivo: troca de inquilino"}</h1>
+    ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join("; ")}.</div>` : ""}
+    <div class="alerta info">Sai <b>${esc(ant.inquilino_nome)}</b>${ant.solidario_nome ? ` (e o solidário ${esc(ant.solidario_nome)})` : ""}; entra <b>${esc(c.inquilino_nome)}</b>${c.solidario_nome ? ` com ${esc(c.solidario_nome)}` : ""}, a partir de <b>${dataBr(troca)}</b>.
+      O que for do período até ${dataBr(somarDias(troca, -1))} fica com quem sai. Garantia: <b>${esc(c.garantia_tipo || "Sem garantia")}</b>${temCaucao(c) || temDeposito(c) ? " (continua na locação e passa a ser devolvida a quem entra)" : ""}.
+      ${temFiador(c) ? "<br><b>Fiador:</b> ele precisa assinar o termo concordando em garantir quem entra; se não aceitar, troque a garantia antes." : ""}</div>
+    <form class="cartao" data-form="aditivoTroca">
+      <input type="hidden" name="id" value="${a ? a.id : ""}"><input type="hidden" name="contrato" value="${c.id}">
+      <div class="formulario">
+        <div><label>Data do termo aditivo</label><input type="date" name="data" value="${esc(a ? a.data : troca || hojeIso())}" required></div>
+        ${a ? "" : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join("")}</select></div>`}
+        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || "")}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || "")}"></div>
+        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || "")}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || "")}"></div>
+      </div>
+      <p class="suave">A data da troca é a entrada de ${esc(c.inquilino_nome)} no cadastro (${dataBr(troca)}); para mudar, use "Editar contrato".
+        Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
+      ${a ? `<p><label>Texto deste termo <span class="suave">(muda só este termo; o padrão fica em ${link("#/modelos-contrato", "Modelos de contrato", "")})</span></label>
+        <textarea name="texto" class="texto-modelo" spellcheck="true">${esc(a.texto)}</textarea></p>` : ""}
+      <div class="acoes"><button>${a ? "Salvar e ver o termo" : "Gerar o termo"}</button><a class="botao secundario" href="#/contrato/${c.id}?ir=aditivos">Cancelar</a></div></form>
+    ${a ? AJUDA_MODELO : ""}`;
+  }
   var AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um modelo</b></summary>
   <ul>
     <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
@@ -10375,35 +10870,39 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
     <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
       e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>
+    <li>Só nos termos aditivos de troca de inquilino: <code>{numero_aditivo} {data_contrato} {data_troca} {data_vespera} {saintes} {entrantes} {aluguel_atual}</code>,
+      a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>
     <li>Linha começando com <code># </code>: título; <code>## </code>: seção; <code>&gt; </code>: alinhado à direita. <code>**texto**</code>: negrito.
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;
-  var TIPOS_MODELO = { contrato: "Contratos", aditivo: "Termos aditivos (troca do vencimento)" };
+  var TIPOS_MODELO = { contrato: "Contratos", aditivo: "Termos aditivos (troca do vencimento)", aditivo_troca: "Termos aditivos (troca de inquilino)" };
+  var NOVO_MODELO = { contrato: "Novo modelo de contrato", aditivo: "Novo modelo de aditivo de vencimento", aditivo_troca: "Novo modelo de aditivo de troca" };
   function telaModelos() {
     const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ""}</td><td class="n nw">
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, "Editar")} ${botao("copiarModelo", "Copiar", { id: m.id })}` : ""}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao("restaurarModelo", "Voltar ao texto padrão", { id: m.id }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ""}
       ${podeUsuario("admin") && m.id > 0 && modelosDe(d(), tipo).length > 1 ? botao("excluirModelo", "×", { id: m.id }, "x-excluir", `Excluir o modelo "${m.nome}"?`) : ""}</td></tr>`;
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
-    <div class="cabecalho"><h1>Modelos de contrato</h1>${opera() ? `<div class="acoes">${link("#/modelo-contrato/novo", "Novo modelo de contrato", "botao")} ${link("#/modelo-contrato/novo?tipo=aditivo", "Novo modelo de aditivo", "botao secundario")}</div>` : ""}</div>
-    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo2]) => `<div class="cartao"><h2>${titulo2}</h2><table><tr><th>Modelo</th><th></th></tr>
-      ${modelosDe(d(), tipo).map((m) => linha(m, tipo)).join("")}</table></div>`).join("")}
-    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar aditivo de vencimento</b> (em "Termos aditivos").
+    <h1>Modelos de contrato</h1>
+    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo2]) => `<div class="cartao"><div class="cabecalho"><h2>${titulo2}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === "contrato" ? "" : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], "botao secundario pequeno") : ""}</div>
+      <table><tr><th>Modelo</th><th></th></tr>${modelosDe(d(), tipo).map((m) => linha(m, tipo)).join("")}</table></div>`).join("")}
+    <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>
     ${AJUDA_MODELO}`;
   }
   function telaModelo(rota) {
     const id = rota.partes[1];
-    const m = id === "novo" ? { id: "", nome: "", texto: "", tipo: rota.q.tipo === "aditivo" ? "aditivo" : "contrato" } : Object.keys(TIPOS_MODELO).flatMap((t) => modelosDe(d(), t)).find((x) => String(x.id) === id);
+    const m = id === "novo" ? { id: "", nome: "", texto: "", tipo: rota.q.tipo in TIPOS_MODELO ? rota.q.tipo : "contrato" } : Object.keys(TIPOS_MODELO).flatMap((t) => modelosDe(d(), t)).find((x) => String(x.id) === id);
     if (!m) return "<h1>Modelo não encontrado</h1>";
-    const aditivo = tipoDoModelo(m) === "aditivo";
+    const tipo = tipoDoModelo(m);
+    const aditivo = tipo !== "contrato";
     return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
     <h1>${m.id === "" ? `Novo modelo de ${aditivo ? "termo aditivo" : "contrato"}` : `Modelo: ${esc(m.nome)}`}</h1>
     <form class="cartao" data-form="modeloContrato">
-      <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${aditivo ? "aditivo" : "contrato"}">
+      <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${esc(tipo)}">
       <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>
       <p><label>Texto</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
       <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-contrato">Cancelar</a></div></form>
@@ -11360,7 +11859,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - O contrato liga o inquilino ao imóvel (a mesma pessoa pode ter vários contratos). O imóvel é escolhido só no "Novo contrato" e é obrigatório.
 - O prazo conta da "Data de vigência inicial": término = mesma data, X meses depois (ex.: 05/01/2026 + 30 meses = 05/07/2028).
 - A "Data do contrato" é a das assinaturas. Contrato novo não herda condições do inquilino anterior do imóvel: tudo é escolhido de novo.
-- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório.
+- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório. Os boletos continuam com o anterior até a véspera da troca; com data futura, garantia, seguro e reserva passam só no dia.
+- Rotina de entrada na página do inquilino: reserva, contrato (gerar e assinar), garantia, vistoria e termo das chaves (gerar e assinar), troca de titularidade da água, energia, gás e condomínio (quando por conta do inquilino) e seguro. O que já está registrado marca sozinho (documento registrado como perdido conta como feito; com assinatura faltante, continua faltando); o resto se marca com a data ou "não se aplica".
 - Contrato sem imóvel há 7 dias (e sem boleto) é apagado sozinho.
 - Contrato gerado por modelo editável. Documentos de entrada (contrato, vistoria, termo das chaves) só são marcados como assinados com o arquivo assinado anexado. Podem ser anexados com assinatura faltante ou registrados como perdidos (os de operador aguardam o administrador).
 - Termo aditivo: sempre com o arquivo assinado. Trocar o dia do vencimento muda só o dia, sem cobrança proporcional.
@@ -11374,7 +11874,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - O mês de entrada conta como 1º mês, qualquer que seja o dia. O aluguel do 13º mês já vem corrigido.
 - Usa o índice acumulado dos últimos 12 meses até o mês anterior ao corrigido (IGP-M, IPCA, INPC e IGP-DI vêm do Banco Central para conferir; outros, como o IVAR, são digitados).
 - Reajustes são aplicados e desfeitos só na tela Reajustes, na ordem (o de ano anterior primeiro).
-- A carta de reajuste vai junto com o boleto do aluguel já corrigido e só no reajuste do ano corrente. Cita só o índice aplicado.
+- Antes de aplicar, dá para mudar o índice (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o índice e o outro aluguel), por exemplo para arredondar.
+- A carta de reajuste vai junto com o boleto do aluguel já corrigido e só no reajuste do ano corrente, com os valores aplicados. Cita o índice aplicado (e, se foi digitado, também o acumulado do índice).
 - Corrigir o aluguel inicial refaz os reajustes já lançados em cadeia (mesmo percentual).
 - O percentual de bonificação sai do aluguel inicial e vale também para o aluguel corrigido.
 
@@ -11690,15 +12191,30 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     aviso(s ? `${nomes.length} arquivo(s) ligado(s) à apólice de ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}${tipo === "apolice" ? " (como a apólice)" : ""}.` : `${nomes.length} arquivo(s) anexado(s).`);
     await mostrar();
   }
+  function documentoDaTela() {
+    const [caminho, consulta] = location.hash.replace(/^#\/?/, "").split("?");
+    return [caminho.split("/")[1], Object.fromEntries(new URLSearchParams(consulta || ""))];
+  }
+  async function marcarGeradoNaRotina2(tipo, m) {
+    const chave = { contrato: "contrato_gerado", chaves: "chaves_gerado" }[tipo];
+    if (!chave || !m || !m.c || !opera() || (m.c.rotina_entrada || {})[chave]) return;
+    await alterar((db) => marcarGeradoNaRotina(db, m.c.id, chave, login()));
+  }
   var ACOES = {
     escolherPasta: () => escolherPasta2(),
     reabrir: () => reabrirPastaLembrada(),
     sair: () => sair(),
-    imprimir: () => window.print(),
+    async imprimir() {
+      window.print();
+      if (!/^#\/imprimir\/(contrato|chaves)\b/.test(location.hash)) return;
+      const [tipo, q] = documentoDaTela();
+      await marcarGeradoNaRotina2(tipo, await documentoMontado(tipo, q));
+    },
     async documentoWord() {
-      const [caminho, consulta] = location.hash.replace(/^#\/?/, "").split("?");
-      const m = await documentoMontado(caminho.split("/")[1], Object.fromEntries(new URLSearchParams(consulta || "")));
+      const [tipo, q] = documentoDaTela();
+      const m = await documentoMontado(tipo, q);
       if (!m) throw new Error("Registro não encontrado.");
+      await marcarGeradoNaRotina2(tipo, m);
       const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
       const i = buscar2("imoveis", m.c.imovel_id);
       const blob = await contratoDocx(JSZip, m.blocos, { logo, rodape: m.rodape, titulo: `${m.nome} - ${m.c.inquilino_nome}` });
@@ -11713,10 +12229,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     },
     /** PDF do documento que está na tela (contrato, vistoria, recibo das chaves), com o rodapé e "Página X de Y" em todas as folhas. */
     async documentoPdf() {
-      const [caminho, consulta] = location.hash.replace(/^#\/?/, "").split("?");
-      const m = await documentoMontado(caminho.split("/")[1], Object.fromEntries(new URLSearchParams(consulta || "")));
+      const [tipo, q] = documentoDaTela();
+      const m = await documentoMontado(tipo, q);
       const el = document.querySelector(".impressao .contrato");
       if (!m || !el) throw new Error("Documento não encontrado.");
+      await marcarGeradoNaRotina2(tipo, m);
       const blob = await pdfDoDocumento(el, m.rodape);
       baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
     },
@@ -11961,6 +12478,15 @@ ${MODELO_COMODOS[comodo].join("\n")}
     async removerArquivoAditivo({ id }) {
       await alterarApagandoAnexos((db) => removerArquivoAditivo(db, Number(id), login()));
       aviso('Arquivo apagado: o termo aditivo voltou a "aguardando assinatura".');
+      await mostrar();
+    },
+    /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
+    async pularEtapaEntrada({ contrato, chave }) {
+      await alterar((db) => marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));
+      await mostrar();
+    },
+    async desfazerEtapaEntrada({ contrato, chave }) {
+      await alterar((db) => marcarEtapaEntrada(db, Number(contrato), chave, {}, login()));
       await mostrar();
     },
     async desmarcarDocumento({ contrato, campo: campo2 }) {
@@ -12773,6 +13299,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
       await mostrar();
     },
+    /** Rotina de entrada: marca a etapa como feita na data escolhida. */
+    async etapaEntrada(form) {
+      const f = Object.fromEntries(new FormData(form));
+      if (!f.data) throw new Error("Informe a data.");
+      await alterar((db) => marcarEtapaEntrada(db, Number(f.contrato), f.chave, { data: f.data }, login()));
+      await mostrar();
+    },
     /** Um depósito da caução ou do depósito de garantia (pode ser parcelado): data, valor e comprovante, gravado na pasta do inquilino. */
     async garantiaPaga(form) {
       const f = Object.fromEntries(new FormData(form));
@@ -12825,6 +13358,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (semEspacos(dados.texto_final) === semEspacos(vistoriaFinal(3))) dados.texto_final = "";
       dados.itens = [];
       for (let n = 0; f[`ic_${n}`] !== void 0; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || "", obs: String(f[`io_${n}`] || "").trim() });
+      const semSituacao = dados.itens.filter((x) => !x.situacao);
+      if (semSituacao.length) throw new Error(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join("; ")}${semSituacao.length > 8 ? "…" : ""}. Marque a situação (ou "Não se aplica") antes de salvar.`);
       const tirados = dados.itens.filter((x) => x.situacao === NAO_SE_APLICA);
       dados.itens = dados.itens.filter((x) => x.situacao !== NAO_SE_APLICA);
       const anterior = Number(f.id) ? buscar2("vistorias", f.id) : null;
@@ -12897,6 +13432,26 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       aviso(f.id ? "Termo aditivo salvo." : "Termo aditivo gerado: imprima ou baixe o PDF para assinar.");
       ir(`#/imprimir/aditivo?id=${a.id}`);
     },
+    async aditivoTroca(form) {
+      const f = Object.fromEntries(new FormData(form));
+      try {
+        localStorage.setItem("testemunhas_contrato", JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 }));
+      } catch {
+      }
+      const modelo = f.id ? null : modelosDe(d(), "aditivo_troca").find((m) => String(m.id) === f.modelo);
+      if (!f.id && !modelo) throw new Error("Escolha o modelo do termo aditivo.");
+      const dados = {
+        data: f.data,
+        testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || "").trim(), cpf: String(cpf || "").trim() })),
+        ...modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }
+      };
+      let a;
+      await alterar((db) => {
+        a = salvarAditivoTroca(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null);
+      });
+      aviso(f.id ? "Termo aditivo salvo." : "Termo aditivo gerado: imprima ou baixe o PDF para assinar.");
+      ir(`#/imprimir/aditivo?id=${a.id}`);
+    },
     async assinarAditivo(form) {
       const f = Object.fromEntries(new FormData(form));
       const arquivo = form.querySelector("[name=arquivo]").files[0];
@@ -12905,7 +13460,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
       const nome = await salvarAssinado("aditivos", a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
       await alterar((db) => assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
-      aviso("Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).");
+      aviso(a.tipo === TIPO_ADITIVO_TROCA ? "Termo aditivo assinado e registrado." : "Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).");
       await mostrar();
     },
     async modeloContrato(form) {
@@ -12914,11 +13469,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const texto2 = String(f.get("texto") || "");
       if (!nome || !texto2.trim()) throw new Error("Preencha o nome e o texto do modelo.");
       const id = Number(f.get("id") || 0);
-      const tipo = f.get("tipo") === "aditivo" ? "aditivo" : "contrato";
+      const tipo = ["aditivo", "aditivo_troca"].includes(f.get("tipo")) ? f.get("tipo") : "contrato";
       await alterar((db) => {
         const real = modelosNoBanco(db, id, tipo);
         if (real) atualizar(db, "modelos_contrato", real, { nome, texto: texto2 }, login(), `Modelo de contrato "${nome}"`);
-        else inserir(db, "modelos_contrato", { nome, texto: texto2, ...tipo === "aditivo" ? { tipo } : {} }, login(), `Modelo de contrato "${nome}"`);
+        else inserir(db, "modelos_contrato", { nome, texto: texto2, ...tipo !== "contrato" ? { tipo } : {} }, login(), `Modelo de contrato "${nome}"`);
       });
       aviso("Modelo salvo.");
       ir("#/modelos-contrato");
@@ -13116,15 +13671,24 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       aviso("Índice salvo.");
       await mostrar();
     },
-    /** Reajuste sem o índice cadastrado (ex.: de ano anterior): aplica com o % ou o novo valor digitado. */
+    /**
+     * Reajuste (tela Reajustes): sem mexer, vale o índice cadastrado; com o % mudado, vale o %; com o aluguel cheio ou o
+     * bonificado mudado, vale o aluguel cheio (o % é recalculado). Sem índice cadastrado, é preciso digitar um deles.
+     */
     async aplicarReajusteManual(form) {
       const f = new FormData(form);
+      const origem = form.dataset.origem || "";
+      const pctIndice = form.dataset.pctIndice === "" || form.dataset.pctIndice === void 0 ? null : Number(form.dataset.pctIndice);
       const temPct = String(f.get("percentual") || "").trim() !== "";
-      const valor = centavos(f.get("valor_novo"));
-      if (!temPct && !(valor > 0)) throw new Error("Digite o % da correção ou o novo valor do aluguel.");
       const pctDigitado = temPct ? numero(f.get("percentual")) : null;
-      const manual = valor > 0 && !(temPct && valor === aplicarCorrecao(Number(form.dataset.atual), pctDigitado)) ? { valor_novo: valor } : { percentual: pctDigitado };
-      if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${valor > 0 ? `o novo valor de ${reais(valor)}` : `${pct(manual.percentual)}`}? Os boletos em aberto são recalculados.`)) return;
+      const valor = String(f.get("valor_novo") || "").trim() ? centavos(f.get("valor_novo")) : 0;
+      if (!temPct && !(valor > 0)) throw new Error("Digite o % da correção ou o novo valor do aluguel.");
+      let manual = null;
+      if (["valor_novo", "bonificado"].includes(origem) && valor > 0) manual = valor === aplicarCorrecao(Number(form.dataset.atual), pctIndice ?? NaN) ? null : { valor_novo: valor };
+      else if (pctIndice === null || temPct && pctDigitado !== pctIndice) manual = temPct ? { percentual: pctDigitado } : { valor_novo: valor };
+      const bon = String(f.get("bonificado") || "").trim();
+      const texto2 = manual === null ? `${pct(pctIndice)} (índice cadastrado)` : manual.valor_novo ? `o novo aluguel de ${reais(manual.valor_novo)}` : pct(manual.percentual);
+      if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${texto2}?${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ""}.` : ""} Os boletos em aberto são recalculados.`)) return;
       await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
     },
     irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get("mes")}`),
@@ -13860,6 +14424,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     <div class="faixa nao-imprimir" id="faixa"></div>
     <main><div id="mensagens" class="nao-imprimir"></div>${conteudo}</main>`;
   }
+  var paginaDesenhada = null;
   async function mostrar(estadoForm = null) {
     const app = document.getElementById("app");
     const rota = rotaAtual();
@@ -13877,7 +14442,19 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         const conteudo = tela ? await tela(rota, estadoForm) : "<h1>Página não encontrada</h1>";
         html = rota.partes[0] === "imprimir" ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
       }
+      const endereco2 = location.hash.split("?")[0];
+      const abertos = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id][open]")].map((el) => el.id) : [];
+      const fechados = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id]:not([open])")].map((el) => el.id) : [];
       app.innerHTML = html;
+      paginaDesenhada = endereco2;
+      for (const id of abertos) {
+        const el = document.getElementById(id);
+        if (el?.tagName === "DETAILS") el.open = true;
+      }
+      for (const id of fechados) {
+        const el = document.getElementById(id);
+        if (el?.tagName === "DETAILS") el.open = false;
+      }
       if (E.usuario && E.d) {
         const pagina = rota.partes[0] || "painel";
         arrumarCaixas(
