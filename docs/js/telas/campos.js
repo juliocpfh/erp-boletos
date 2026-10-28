@@ -147,7 +147,9 @@ function ligarContinuacaoDeContrato(raiz) {
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${C.hojeIso()}" required></p>
         <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
-        <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).</p>` });
+        <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
+        Os boletos continuam no nome de ${esc(anterior.inquilino_nome)} até a véspera (o último sai proporcional aos dias); a partir da data, saem no nome do novo inquilino.
+        Data futura: garantia, seguro e reserva passam no dia.</p>` });
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
@@ -367,23 +369,33 @@ function ligarNaoSeAplica(raiz) {
   }
 }
 
-/** Reajuste sem índice (tela Reajustes): o % digitado sugere o novo aluguel cheio (pode arredondar) e mostra o bonificado. */
+/**
+ * Reajuste (tela Reajustes): índice, aluguel cheio e bonificado ligados. Mudar o % recalcula os dois aluguéis; mudar o
+ * cheio recalcula o % e o bonificado; mudar o bonificado recalcula o cheio e o %. Ex.: aluguel R$ 1.500,00, 10% de
+ * bonificação, índice 4,37% → cheio R$ 1.565,55; digitar o bonificado R$ 1.400,00 → cheio R$ 1.555,56 e índice 3,704%.
+ * ``data-origem`` guarda o último campo mexido (é o que vale ao aplicar).
+ */
 function ligarReajusteManual(raiz) {
   for (const form of raiz.querySelectorAll('form[data-form=aplicarReajusteManual]')) {
     const atual = Number(form.dataset.atual);
+    const pctB = Number(form.dataset.bonif) || 0;
     const pctEl = form.querySelector('[name=percentual]');
     const valEl = form.querySelector('[name=valor_novo]');
-    const bonifEl = form.querySelector('[data-bonificado]');
-    const mostrarBonif = () => {
-      const v = C.centavos(valEl.value);
-      const b = Number(form.dataset.bonif);
-      bonifEl.textContent = v > 0 ? (b ? `cheio · bonificado ${reais(v - C.descontoPorPercentual(v, b))}` : 'cheio') : '';
+    const bonEl = form.querySelector('[name=bonificado]');
+    const ler = (el) => { try { return el && el.value.trim() !== '' ? C.centavos(el.value) : null; } catch { return null; } };
+    const escrever = (cheio, exceto) => {
+      if (exceto !== 'valor_novo') valEl.value = cheio > 0 ? reais(cheio, false) : '';
+      if (bonEl && exceto !== 'bonificado') bonEl.value = cheio > 0 ? reais(cheio - C.descontoPorPercentual(cheio, pctB), false) : '';
+      if (exceto !== 'percentual') pctEl.value = cheio > 0 && atual ? C.percentualPorDesconto(atual, cheio - atual).toLocaleString('pt-BR', { maximumFractionDigits: 4 }) : '';
     };
     pctEl.addEventListener('input', () => {
-      valEl.value = pctEl.value.trim() === '' ? '' : reais(C.aplicarCorrecao(atual, C.numero(pctEl.value)), false);
-      mostrarBonif();
+      form.dataset.origem = 'percentual';
+      let p = null;
+      try { p = pctEl.value.trim() === '' ? null : C.numero(pctEl.value); } catch { /* digitando */ }
+      escrever(p === null ? 0 : C.aplicarCorrecao(atual, p), 'percentual');
     });
-    valEl.addEventListener('input', mostrarBonif);
+    valEl.addEventListener('input', () => { form.dataset.origem = 'valor_novo'; escrever(ler(valEl) || 0, 'valor_novo'); });
+    if (bonEl) bonEl.addEventListener('input', () => { form.dataset.origem = 'bonificado'; const b = ler(bonEl); escrever(b > 0 ? C.cheioPorBonificado(b, pctB) : 0, 'bonificado'); });
   }
 }
 

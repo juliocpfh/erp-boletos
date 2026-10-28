@@ -213,6 +213,17 @@ export function aplicarCorrecao(valor, percentual) {
   return arred(valor * (1 + (percentual || 0) / 100));
 }
 
+/**
+ * Aluguel cheio que, com a bonificação de ``percentual``, dá o bonificado digitado (no centavo, quando existe).
+ * Ex.: bonificado R$ 1.500,00 com 10% → cheio R$ 1.666,67 (desconto R$ 166,67).
+ */
+export function cheioPorBonificado(bonificado, percentual) {
+  if (!(percentual > 0) || percentual >= 100) return bonificado;
+  const base = arred(bonificado / (1 - percentual / 100));
+  for (const v of [base, base - 1, base + 1, base - 2, base + 2]) if (v - descontoPorPercentual(v, percentual) === bonificado) return v;
+  return base;
+}
+
 /** Aluguel numa data, aplicando as correções com data_vigencia até essa data. */
 export function aluguelVigente(inicial, correcoes, dataRef) {
   let valor = inicial;

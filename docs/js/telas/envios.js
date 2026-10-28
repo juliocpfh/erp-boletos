@@ -105,6 +105,14 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  /** Rotina de entrada: marca a etapa como feita na data escolhida. */
+  async etapaEntrada(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new Error('Informe a data.');
+    await alterar((db) => R.marcarEtapaEntrada(db, Number(f.contrato), f.chave, { data: f.data }, login()));
+    await mostrar();
+  },
+
   /** Um depósito da caução ou do depósito de garantia (pode ser parcelado): data, valor e comprovante, gravado na pasta do inquilino. */
   async garantiaPaga(form) {
     const f = Object.fromEntries(new FormData(form));
@@ -462,16 +470,25 @@ export const FORMULARIOS = {
     aviso('Índice salvo.');
     await mostrar();
   },
-  /** Reajuste sem o índice cadastrado (ex.: de ano anterior): aplica com o % ou o novo valor digitado. */
+  /**
+   * Reajuste (tela Reajustes): sem mexer, vale o índice cadastrado; com o % mudado, vale o %; com o aluguel cheio ou o
+   * bonificado mudado, vale o aluguel cheio (o % é recalculado). Sem índice cadastrado, é preciso digitar um deles.
+   */
   async aplicarReajusteManual(form) {
     const f = new FormData(form);
+    const origem = form.dataset.origem || '';
+    const pctIndice = form.dataset.pctIndice === '' || form.dataset.pctIndice === undefined ? null : Number(form.dataset.pctIndice);
     const temPct = String(f.get('percentual') || '').trim() !== '';
-    const valor = C.centavos(f.get('valor_novo'));
-    if (!temPct && !(valor > 0)) throw new Error('Digite o % da correção ou o novo valor do aluguel.');
-    // valor sugerido pelo % e não mexido: guarda o % exato; arredondado à mão: vale o valor
     const pctDigitado = temPct ? C.numero(f.get('percentual')) : null;
-    const manual = valor > 0 && !(temPct && valor === C.aplicarCorrecao(Number(form.dataset.atual), pctDigitado)) ? { valor_novo: valor } : { percentual: pctDigitado };
-    if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${valor > 0 ? `o novo valor de ${reais(valor)}` : `${pct(manual.percentual)}`}? Os boletos em aberto são recalculados.`)) return;
+    const valor = String(f.get('valor_novo') || '').trim() ? C.centavos(f.get('valor_novo')) : 0;
+    if (!temPct && !(valor > 0)) throw new Error('Digite o % da correção ou o novo valor do aluguel.');
+    // não mexeu (ou voltou ao % do índice): correção pelo índice cadastrado
+    let manual = null;
+    if (['valor_novo', 'bonificado'].includes(origem) && valor > 0) manual = valor === C.aplicarCorrecao(Number(form.dataset.atual), pctIndice ?? NaN) ? null : { valor_novo: valor };
+    else if (pctIndice === null || (temPct && pctDigitado !== pctIndice)) manual = temPct ? { percentual: pctDigitado } : { valor_novo: valor };
+    const bon = String(f.get('bonificado') || '').trim();
+    const texto = manual === null ? `${pct(pctIndice)} (índice cadastrado)` : manual.valor_novo ? `o novo aluguel de ${reais(manual.valor_novo)}` : pct(manual.percentual);
+    if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${texto}?${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ''}.` : ''} Os boletos em aberto são recalculados.`)) return;
     await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
   },
   irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get('mes')}`),
