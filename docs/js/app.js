@@ -370,6 +370,7 @@ function layout(conteudo, rota) {
     <main><div id="mensagens" class="nao-imprimir"></div>${conteudo}</main>`;
 }
 
+let paginaDesenhada = null;
 export async function mostrar(estadoForm = null) {
   const app = document.getElementById('app');
   const rota = rotaAtual();
@@ -387,7 +388,14 @@ export async function mostrar(estadoForm = null) {
       const conteudo = tela ? await tela(rota, estadoForm) : '<h1>Página não encontrada</h1>';
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
     }
+    // na mesma página, as caixas recolhíveis (<details id>) que estavam abertas continuam abertas depois de uma ação
+    const endereco = location.hash.split('?')[0];
+    const abertos = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id][open]')].map((el) => el.id) : [];
+    const fechados = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id]:not([open])')].map((el) => el.id) : [];
     app.innerHTML = html;
+    paginaDesenhada = endereco;
+    for (const id of abertos) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = true; }
+    for (const id of fechados) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = false; }
     if (E.usuario && E.d) {
       // ordem das caixas escolhida pelo administrador (só ele vê o ícone ☰ para arrastar)
       const pagina = rota.partes[0] || 'painel';
