@@ -11,7 +11,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - O contrato liga o inquilino ao imóvel (a mesma pessoa pode ter vários contratos). O imóvel é escolhido só no "Novo contrato" e é obrigatório.
 - O prazo conta da "Data de vigência inicial": término = mesma data, X meses depois (ex.: 05/01/2026 + 30 meses = 05/07/2028).
 - A "Data do contrato" é a das assinaturas. Contrato novo não herda condições do inquilino anterior do imóvel: tudo é escolhido de novo.
-- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório.
+- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório. Os boletos continuam com o anterior até a véspera da troca; com data futura, garantia, seguro e reserva passam só no dia.
+- Rotina de entrada na página do inquilino: reserva, contrato (gerar e assinar), garantia, vistoria e termo das chaves (gerar e assinar), troca de titularidade da água, energia, gás e condomínio (quando por conta do inquilino) e seguro. O que já está registrado marca sozinho; o resto se marca com a data ou "não se aplica".
 - Contrato sem imóvel há 7 dias (e sem boleto) é apagado sozinho.
 - Contrato gerado por modelo editável. Documentos de entrada (contrato, vistoria, termo das chaves) só são marcados como assinados com o arquivo assinado anexado. Podem ser anexados com assinatura faltante ou registrados como perdidos (os de operador aguardam o administrador).
 - Termo aditivo: sempre com o arquivo assinado. Trocar o dia do vencimento muda só o dia, sem cobrança proporcional.
@@ -25,7 +26,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - O mês de entrada conta como 1º mês, qualquer que seja o dia. O aluguel do 13º mês já vem corrigido.
 - Usa o índice acumulado dos últimos 12 meses até o mês anterior ao corrigido (IGP-M, IPCA, INPC e IGP-DI vêm do Banco Central para conferir; outros, como o IVAR, são digitados).
 - Reajustes são aplicados e desfeitos só na tela Reajustes, na ordem (o de ano anterior primeiro).
-- A carta de reajuste vai junto com o boleto do aluguel já corrigido e só no reajuste do ano corrente. Cita só o índice aplicado.
+- Antes de aplicar, dá para mudar o índice (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o índice e o outro aluguel), por exemplo para arredondar.
+- A carta de reajuste vai junto com o boleto do aluguel já corrigido e só no reajuste do ano corrente, com os valores aplicados. Cita o índice aplicado (e, se foi digitado, também o acumulado do índice).
 - Corrigir o aluguel inicial refaz os reajustes já lançados em cadeia (mesmo percentual).
 - O percentual de bonificação sai do aluguel inicial e vale também para o aluguel corrigido.
 

@@ -1971,15 +1971,18 @@ export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
 }
 
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
+  // troca de titular agendada: reajuste, garantia e reserva continuam no contrato anterior até a data
+  const ag = herancaAgendada(d, contrato, hoje);
   return [
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
-    alertaReajuste(d, contrato, hoje),
-    alertaCaucao(d, contrato),
-    alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
+    ag ? null : alertaReajuste(d, contrato, hoje),
+    ag ? null : alertaCaucao(d, contrato),
+    ag ? null : alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
     contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
-    alertaFiador(d, contrato, hoje),
-    alertaAplicacao(d, contrato),
-    alertaComprovantes(d, contrato),
+    ag ? null : alertaFiador(d, contrato, hoje),
+    ag ? null : alertaAplicacao(d, contrato),
+    ag ? null : alertaComprovantes(d, contrato),
+    alertaRotinaEntrada(d, contrato, hoje),
     alertaDocumentosEntrada(contrato, d),
     alertaAssinaturaFaltante(d, contrato),
     alertaPerdaAConfirmar(d, contrato),
@@ -2042,6 +2045,16 @@ export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anteri
 export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
 
 /**
+ * Troca de titular com data futura, ainda não feita: devolve a data em que o novo titular assume (ou null).
+ * Até a véspera, boletos, garantia, seguro e reserva continuam com o anterior. Ex.: hoje 28/10/2026, troca em
+ * 01/12/2026 → o anterior paga até 30/11/2026 e o primeiro boleto do novo é o de 12/2026.
+ */
+export function herancaAgendada(d, c, hoje = C.hojeIso()) {
+  const data = c.data_entrada || c.vigencia_inicio;
+  return c.contrato_anterior_id && !c.heranca_transferida && data && data > hoje && contratoHerdado(d, c) ? data : null;
+}
+
+/**
  * Troca de titular: termina o vínculo do inquilino anterior na véspera da data da alteração (ex.: troca em 01/10/2026 →
  * vínculo até 30/09/2026). Os boletos dele vão até essa data e os do novo titular começam na data da troca.
  */
@@ -2061,15 +2074,23 @@ const TABELAS_GARANTIA = ['depositos_garantia', 'correcoes_garantia', 'aplicacoe
  *   fica com o anterior (``comNf``).
  * Uma vez por contrato (marca ``heranca_transferida``).
  */
-export function transferirHeranca(d, novoId, usuario) {
+export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   const n = buscar(d, 'contratos', novoId);
   const a = n && contratoHerdado(d, n);
   const data = n && (n.data_entrada || n.vigencia_inicio);
   if (!a || !data || n.heranca_transferida) return null;
   const fim = C.somarDias(data, -1);
   const out = { anterior: a, data, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0 };
-  encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
   const passa = (tabela, x, texto) => atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+  // troca numa data futura: até a véspera, o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
+  // agora só o fim do vínculo dele (o último boleto sai proporcional) e a data-base do reajuste. O resto passa no dia.
+  if (data > hoje) {
+    if (a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
+    if (!n.data_base_correcao) atualizar(d, 'contratos', n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
+    recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
+    return { ...out, agendada: true };
+  }
+  encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
   // aluguel e reajuste
   const mud = { heranca_transferida: data };
   if (!n.data_base_correcao) mud.data_base_correcao = dataBaseCorrecao(a);
@@ -2440,6 +2461,185 @@ export function documentoEntrada(d, c, campo) {
   return x ? { data: x[campo], arquivo: x[arq] || null, contrato: x } : null;
 }
 
+// --------------------------------------------------------------------------
+// Rotina de entrada do inquilino novo: o passo a passo (reserva, contrato, garantia, vistoria, chaves, contas, seguro)
+// --------------------------------------------------------------------------
+/**
+ * Contas que passam para o nome do inquilino: [etapa, campo do contrato, título, concessionária padrão, como reconhecer
+ * o protocolo, só quando é "por conta do inquilino"]. Água e energia valem salvo "incluso no aluguel" ou "não tem".
+ */
+const CONTAS_ENTRADA = [
+  ['agua', 'conta_agua', 'Transferência da água', 'Sanepar', /sanepar|[áa]gua/i, false],
+  ['energia', 'conta_energia', 'Transferência da energia', 'Copel', /copel|energia|luz/i, false],
+  ['gas', 'conta_gas', 'Transferência do gás', 'Supergasbras', /g[áa]s|ultragaz|liquig/i, true],
+  ['condominio', 'conta_condominio', 'Transferência do condomínio', 'Condomínio', /condom/i, true],
+];
+
+/** Etapas da rotina de entrada, na ordem. ``doc``: documento assinado (marca-se anexando o arquivo, na caixa de documentos). */
+export const ETAPAS_ENTRADA = [
+  ['reserva', 'Depósito da reserva'],
+  ['contrato_gerado', 'Gerar o contrato'],
+  ['contrato_assinado', 'Contrato assinado', 'doc_contrato_em'],
+  ['aditivo', 'Termo aditivo da troca de titular assinado'],
+  ['garantia', 'Garantia'],
+  ['vistoria_gerada', 'Gerar a vistoria de entrada'],
+  ['chaves_gerado', 'Gerar o termo de entrega das chaves'],
+  ['vistoria_assinada', 'Vistoria de entrada assinada', 'doc_vistoria_em'],
+  ['chaves_assinado', 'Termo de entrega das chaves assinado', 'doc_chaves_em'],
+  ...CONTAS_ENTRADA.map(([k, , t]) => [k, t]),
+  ['seguro', 'Contratação do seguro'],
+];
+
+/** Inquilino novo para a rotina: entrou há até 6 meses (ou ainda vai entrar). */
+export const rotinaRecente = (c, hoje = C.hojeIso()) => !c.data_entrada || c.data_entrada >= C.somarMesesData(hoje, -6);
+
+/** Nome da concessionária da conta no imóvel: a dos protocolos já registrados, a da lista ou a padrão (ex.: Sanepar). */
+function concessionariaDaConta(d, c, re, padrao) {
+  const t = d.titularidades.filter((x) => x.imovel_id === c.imovel_id && re.test(x.concessionaria || '')).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
+  return (t && t.concessionaria) || lista(d, 'concessionarias').find((x) => re.test(x)) || padrao;
+}
+
+/**
+ * Situação de cada etapa da rotina de entrada: [{ chave, titulo, situacao ('feita', 'pulada', 'andamento' ou 'pendente'),
+ * data, texto, manual (marcada à mão, pode desfazer), doc (campo do documento assinado), concessionaria }].
+ * O que já está registrado nas caixas da página (comprovante, documento assinado, protocolo, apólice) conta sozinho;
+ * o resto é marcado à mão com a data (``rotina_entrada``). Etapas que não se aplicam ao contrato ficam de fora.
+ * Ex.: contrato com água "por conta do inquilino" e protocolo da Sanepar "Concluído" em 05/11/2026 → feita em 05/11/2026.
+ */
+export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
+  const marcas = c.rotina_entrada || {};
+  const anterior = contratoHerdado(d, c);
+  const herdou = anterior ? `herdado de ${anterior.inquilino_nome}` : '';
+  const feita = (data, texto = '') => ({ situacao: 'feita', data: data || null, texto });
+  const andamento = (texto) => ({ situacao: 'andamento', texto });
+  const docAssinado = (k) => {
+    const doc = documentoEntrada(d, c, k);
+    if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : (doc.arquivo ? '' : 'sem arquivo'));
+    if (documentoPerdido(d, c, k)) return { situacao: 'pulada', data: documentoPerdido(d, c, k), texto: 'registrado como perdido' };
+    const p = documentoParcial(d, c, k);
+    if (p) return andamento(`falta assinatura: ${p.falta.join(', ')}`);
+    return anterior ? andamento(`herdado de ${anterior.inquilino_nome}: marque no contrato anterior`) : null;
+  };
+  const avaliar = {
+    reserva: () => {
+      if (anterior) return null;
+      if (c.reserva_valor > 0) return c.comprovante_reserva ? feita(c.reserva_data, C.reais(c.reserva_valor)) : andamento(`${C.reais(c.reserva_valor)} sem comprovante`);
+      return undefined;
+    },
+    contrato_gerado: () => (anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_contrato_em') ? feita(null, 'contrato já assinado') : undefined),
+    contrato_assinado: () => docAssinado('doc_contrato_em'),
+    aditivo: () => {
+      const l = aditivosDo(d, c.id);
+      if (l.length) return feita(l[0].data, l[0].assunto);
+      return aditivosAguardando(d, c.id).length ? andamento('gerado, aguardando assinatura') : undefined;
+    },
+    garantia: () => {
+      if (anterior && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) return feita(null, `herdada de ${anterior.inquilino_nome}`);
+      if (temCaucao(c) || temDeposito(c)) {
+        const qual = temCaucao(c) ? 'caucao' : 'deposito';
+        if (garantiaDepositada(c)) return feita(c[GARANTIAS_DEPOSITADAS[qual].pago] || null, `${GARANTIAS_DEPOSITADAS[qual].nome} depositada`);
+        const s = garantiaADepositar(d, c, qual);
+        if (s.depositado) return andamento(`depositado ${C.reais(s.depositado)} de ${C.reais(s.combinado)}`);
+      }
+      return undefined;
+    },
+    vistoria_gerada: () => {
+      const v = vistoriasDo(d, c.id).find((x) => x.tipo === 'Entrada');
+      if (v) return feita(v.data);
+      return anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_vistoria_em') ? feita(null, 'vistoria já assinada') : undefined;
+    },
+    chaves_gerado: () => (anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_chaves_em') ? feita(null, 'termo já assinado') : undefined),
+    vistoria_assinada: () => docAssinado('doc_vistoria_em'),
+    chaves_assinado: () => docAssinado('doc_chaves_em'),
+    seguro: () => {
+      const data = c.data_entrada || c.vigencia_inicio || '';
+      const s = segurosDoContrato(d, c.id).filter((x) => !data || x.vigencia_fim >= data).sort((a, b) => String(a.vigencia_inicio).localeCompare(String(b.vigencia_inicio)))[0];
+      if (s) return feita(s.data_contratacao || s.vigencia_inicio, [s.seguradora, s.apolice].filter(Boolean).join(' · '));
+      // troca de titular ainda não feita: a apólice em vigência do anterior passa ao novo no dia
+      if (anterior && herancaAgendada(d, c, hoje) && segurosDoContrato(d, anterior.id).some((x) => x.vigencia_fim >= data)) return feita(null, `apólice de ${anterior.inquilino_nome} passa na troca`);
+      return undefined;
+    },
+  };
+  for (const [k, campo, , padrao, re, soInquilino] of CONTAS_ENTRADA) {
+    avaliar[k] = () => {
+      const sit = c[campo];
+      if (soInquilino ? sit !== SITUACOES[0] : [SITUACOES[1], SITUACOES[2]].includes(sit)) return null;
+      const t = d.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== 'Volta para o proprietário' && re.test(x.concessionaria || ''))
+        .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
+      if (!t) return undefined;
+      const prot = t.protocolo ? `protocolo ${t.protocolo}` : 'sem protocolo';
+      const e = t.situacao === 'Concluído' ? feita(t.data, prot) : andamento(`${(t.situacao || 'solicitado').toLocaleLowerCase('pt-BR')}${t.data ? ` em ${C.dataBr(t.data)}` : ''} · ${prot}`);
+      return { ...e, titularidade: t.id };
+    };
+  }
+  const out = [];
+  for (const [chave, titulo, doc] of ETAPAS_ENTRADA) {
+    if (chave === 'aditivo' && !anterior) continue;
+    if (chave === 'garantia' && c.garantia_tipo === 'Sem garantia') continue;
+    if (chave === 'seguro' && c.conta_seguro === SITUACOES[2]) continue;
+    const auto = avaliar[chave]();
+    if (auto === null && !doc) continue; // não se aplica
+    const conta = CONTAS_ENTRADA.find(([k]) => k === chave);
+    const concessionaria = conta ? concessionariaDaConta(d, c, conta[4], conta[3]) : null;
+    const nome = chave === 'garantia' ? ({ 'Caução': 'Depósito da caução', 'Depósito garantia': 'Depósito de garantia', Fiador: 'Assinatura do fiador',
+      'Fiador + depósito': 'Depósito de garantia e assinatura do fiador', 'Seguro fiança': 'Apólice do seguro fiança' })[c.garantia_tipo] || 'Garantia (tipo não informado)'
+      : concessionaria ? `${titulo} (${concessionaria})` : titulo;
+    const m = marcas[chave];
+    // o registrado na página vale mais que a marca à mão; a data de "gerado" sem data própria vem da marca
+    const e = auto && auto.situacao === 'feita' ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) }
+      : m && m.pulada ? { situacao: 'pulada', data: m.data, texto: 'não se aplica', manual: true }
+        : m && m.data && !doc ? { situacao: 'feita', data: m.data, texto: `marcada por ${m.por || '-'}`, manual: true }
+          : auto || { situacao: 'pendente', texto: '' };
+    out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
+  }
+  return out;
+}
+
+/** Resumo da rotina: { etapas, feitas, total, concluida } (pulada conta como resolvida). */
+export function resumoRotinaEntrada(d, c, hoje = C.hojeIso()) {
+  const etapas = rotinaEntrada(d, c, hoje);
+  const feitas = etapas.filter((e) => ['feita', 'pulada'].includes(e.situacao)).length;
+  return { etapas, feitas, total: etapas.length, concluida: feitas === etapas.length };
+}
+
+/**
+ * Marca à mão uma etapa da rotina de entrada: feita na ``data``, ``pular`` (não se aplica) ou, sem os dois, volta a
+ * pendente. Documento assinado não se marca aqui: precisa do arquivo (caixa "Contrato, Vistoria, Termos e Aditivos").
+ */
+export function marcarEtapaEntrada(d, contratoId, chave, { data = null, pular = false } = {}, usuario) {
+  const etapa = ETAPAS_ENTRADA.find(([k]) => k === chave);
+  if (!etapa) throw new Error('Etapa desconhecida.');
+  if (etapa[2] && !pular) throw new Error('Documento assinado: anexe o arquivo assinado para marcar.');
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  const marcas = { ...(c.rotina_entrada || {}) };
+  if (pular) marcas[chave] = { data: data || C.hojeIso(), por: usuario, pulada: true };
+  else if (data) marcas[chave] = { data, por: usuario };
+  else delete marcas[chave];
+  atualizar(d, 'contratos', c.id, { rotina_entrada: Object.keys(marcas).length ? marcas : null }, usuario,
+    `${c.inquilino_nome}: rotina de entrada · ${etapa[1].toLocaleLowerCase('pt-BR')} ${pular ? 'não se aplica' : data ? `feita em ${C.dataBr(data)}` : 'voltou a pendente'}`);
+}
+
+/** Documento de entrada gerado (contrato ou termo das chaves, ao baixar ou imprimir): marca a etapa uma vez, com a data de hoje. */
+export function marcarGeradoNaRotina(d, contratoId, chave, usuario, hoje = C.hojeIso()) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c || !['contrato_gerado', 'chaves_gerado'].includes(chave) || (c.rotina_entrada || {})[chave]) return false;
+  marcarEtapaEntrada(d, c.id, chave, { data: hoje }, usuario);
+  return true;
+}
+
+/**
+ * Inquilino novo (até 6 meses da entrada) com troca de titularidade das contas ainda por fazer (água, energia, gás,
+ * condomínio): alerta até o protocolo "Concluído" (ou a etapa marcada) na rotina de entrada.
+ */
+function alertaRotinaEntrada(d, c, hoje) {
+  if (c.ativo === false || c.data_saida || !c.imovel_id || !rotinaRecente(c, hoje)) return null;
+  const l = rotinaEntrada(d, c, hoje).filter((e) => CONTAS_ENTRADA.some(([k]) => k === e.chave) && ['pendente', 'andamento'].includes(e.situacao));
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Rotina de entrada', ancora: 'rotina',
+    texto: `Falta efetivar a troca de titularidade: ${l.map((e) => `${e.titulo.replace(/^Transferência d[aoe] /, '')}${e.situacao === 'andamento' ? ` (${e.texto})` : ''}`).join('; ')}.` };
+}
+
 /**
  * Arquivos anexados que algum lançamento usa: [{ escopo, id, nome }] (escopo e id da pasta, como nas caixas de arquivos:
  * "contrato", "assinados", "aditivos" e "seguro" pelo contrato). O que sair desta lista ao excluir ou desfazer
@@ -2626,7 +2826,7 @@ export const ultimaVistoriaDoImovel = (d, imovelId) => d.vistorias.filter((v) =>
 
 /** Seguro obrigatório é do inquilino: cobra a apólice do inquilino atual do imóvel (o anterior leva a dele). */
 export function alertaSeguroImovel(d, i, hoje = C.hojeIso()) {
-  const atual = d.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))[0];
+  const atual = d.contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje) && !herancaAgendada(d, c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))[0];
   if (!atual || atual.conta_seguro === SITUACOES[2]) return null; // contrato sem seguro ("não tem"): nada a cobrar
   const a = alertas.alertaSeguro(dataBaseCorrecao(atual), hoje, segurosDoContrato(d, atual.id));
   return a && { ...a, contrato_id: atual.id, ancora: 'seguros' };
@@ -2689,7 +2889,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
-  'Titularidade', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'A verificar'];
+  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
@@ -3287,9 +3487,11 @@ export function aplicarReajuste(d, contratoId, comp, usuario, manual = null) {
     novo = manual.valor_novo > 0 ? manual.valor_novo : C.aplicarCorrecao(r.atual, manual.percentual);
     percentual = manual.valor_novo > 0 ? (r.atual ? C.percentualPorDesconto(r.atual, novo - r.atual) : 0) : manual.percentual;
   }
-  const indice = digitado ? (r.indiceContrato || 'Informado') : r.escolhido.indice;
+  // digitado com o índice cadastrado (ex.: IGP-M 4,37% arredondado para 4,5%): guarda também o % do índice, para a carta
+  const indice = r.escolhido ? r.escolhido.indice : (r.indiceContrato || 'Informado');
   return inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: `${comp}-01`, indice, indice_contrato: r.indiceContrato,
-    data_indice: digitado ? null : r.escolhido.registro.mes_ref, percentual, valor_anterior: r.atual, valor_novo: novo,
+    data_indice: r.escolhido ? r.escolhido.registro.mes_ref : null, percentual_indice: digitado && r.escolhido ? r.percentual : null,
+    digitado: digitado || null, percentual, valor_anterior: r.atual, valor_novo: novo,
     observacoes: `Reajuste do 13º mês (${C.compBr(comp)})${digitado ? ', % ou valor digitado' : ''}` }, usuario, `Reajuste ${C.compBr(comp)}: ${C.reais(r.atual)} → ${C.reais(novo)} (${indice} ${C.pct(percentual)})`);
 }
 

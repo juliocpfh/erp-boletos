@@ -17,11 +17,18 @@ export function partesReajuste(c, r, naCarta = false) {
     ${opera() ? botao('cartaEnviada', r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : 'Marcar carta enviada', { contrato: c.id, comp: r.competencia, enviada: r.carta ? '' : '1' }, r.carta ? 'link-botao' : 'secundario pequeno', r.carta ? 'Desfazer o envio da carta?' : '') : ''}`;
   if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok') };
   if (!opera()) return { carta, correcao: '' };
-  // sem o índice cadastrado (ex.: reajuste de ano anterior): digita o % ou o novo valor
+  // índice, aluguel cheio e bonificado vêm preenchidos pelo índice cadastrado; mudar um recalcula os outros
+  // (ex.: arredondar o índice ou o aluguel). Sem o índice (ex.: reajuste de ano anterior), digita o % ou um dos valores.
   const k = r.calculo || R.calcularReajuste(d(), c, r.competencia);
-  return { carta, correcao: k.percentual !== null ? botao('aplicarReajuste', 'Aplicar correção', { contrato: c.id, comp: r.competencia }, 'secundario pequeno', `Registrar a correção do aluguel de ${compBr(r.competencia)} no contrato? Os boletos em aberto são recalculados.`)
-    : `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${R.percentualBonificacao(c)}" class="acoes"><input name="percentual" placeholder="%" inputmode="decimal" style="width:70px" title="Percentual da correção: calcula o novo valor ao lado">
-      <span class="suave">→</span> <input name="valor_novo" placeholder="novo valor" inputmode="decimal" style="width:110px" title="Novo aluguel cheio (calculado pelo %; pode arredondar)"><span class="suave nw" data-bonificado></span><button class="secundario pequeno">Aplicar correção</button></form>` };
+  const pctBonif = R.percentualBonificacao(c);
+  const num = (n) => (n === null ? '' : n.toLocaleString('pt-BR', { maximumFractionDigits: 4 }));
+  const valor = (v) => (v === null ? '' : reais(v, false));
+  return { carta, correcao: `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${pctBonif}"
+      data-pct-indice="${k.percentual === null ? '' : k.percentual}" class="acoes form-reajuste">
+      <label class="nw" title="Percentual da correção (pode arredondar): recalcula os aluguéis">Índice <input name="percentual" value="${num(k.percentual)}" placeholder="%" inputmode="decimal" style="width:72px">%</label>
+      <label class="nw" title="Novo aluguel cheio (pode arredondar): recalcula o índice e o bonificado">Cheio <input name="valor_novo" value="${valor(k.novo)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>
+      ${pctBonif > 0 ? `<label class="nw" title="Novo aluguel com bonificação (pode arredondar): recalcula o cheio e o índice">Bonificado <input name="bonificado" value="${valor(k.novoBonificado)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>` : ''}
+      <button class="secundario pequeno">Aplicar correção</button></form>` };
 }
 
 /** Botões do reajuste de um contrato numa competência (gerar carta, marcar enviada, aplicar correção). */
@@ -87,7 +94,7 @@ export function telaReajustes(q) {
       ${meses.length ? `<table class="indices-compacta"><tr><th>Acumulado até</th>${colunas.map((n) => `<th class="n">${esc(n)}</th>`).join('')}</tr>
       ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista.length})</h2>
-      <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). De anos anteriores não há carta; sem o índice daquele mês cadastrado, digite o % ou o novo valor. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
+      <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
       ${lista.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
     const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novoBonificado !== null
@@ -99,7 +106,7 @@ export function telaReajustes(q) {
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : '-'}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : '-'})</div>` : ''}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
-        <div class="reajuste-botoes"><div class="acoes">${p.carta}</div>${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}</div></div></div>`; }).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+        <div class="reajuste-botoes">${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}<div class="acoes">${p.carta}</div></div></div></div>`; }).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
       </div>
       <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
@@ -128,22 +135,31 @@ export function telaReajustes(q) {
 export function cartaReajuste(c, comp) {
   const i = buscar('imoveis', c.imovel_id);
   const r = R.reajusteNaCompetencia(d(), c, comp);
-  const k = R.calcularReajuste(d(), c, comp);
+  const calc = R.calcularReajuste(d(), c, comp);
+  // correção já aplicada: a carta sai com os valores dela (índice arredondado ou aluguel digitado na tela Reajustes)
+  const x = r && r.corrigido && r.corrigido.indice !== 'Negociado' ? r.corrigido : null;
+  const bonifDe = (v) => v - C.descontoPorPercentual(v, R.percentualBonificacao(c));
+  const k = x ? { ...calc, percentual: x.percentual, atual: x.valor_anterior, novo: x.valor_novo, atualBonificado: bonifDe(x.valor_anterior), novoBonificado: bonifDe(x.valor_novo),
+    escolhido: { indice: x.indice }, doIndice: x.percentual_indice ?? null } : calc;
   const empresa = K.locadorasDoContrato(d(), c)[0] || { nome: '' };
   const anterior = C.somarMeses(comp, -1);
   const vencNovo = C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
   if (k.percentual === null) {
-    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}. ${link('#/reajustes', 'Informar em Reajustes')}</div>`;
+    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>`;
   }
+  // texto do índice: digitado à mão (arredondado ou outro %) mostra também o acumulado do índice, quando cadastrado
+  const indiceTexto = x && x.digitado
+    ? `o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ''}`
+    : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
   // caução: acompanha o aluguel corrigido (aluguéis × aluguel com bonificação); só aparece quando falta depositar
   let caucao = R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: R.valorGarantia(d(), c) } : null;
   if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
-  return `<div class="carta">
+  return `${x ? '' : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
     <p class="carta-data">${esc((i && i.cidade) || 'Curitiba')}, ${dataExtenso(C.hojeIso())}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
     <p>Com o aluguel de <b>${MESES[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
-    <p>Conforme a cláusula de reajuste anual do contrato, o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>.</p>
+    <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
       ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ''}</table>

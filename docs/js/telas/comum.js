@@ -153,6 +153,11 @@ export async function trazerHeranca(id) {
     r = R.transferirHeranca(db, Number(id), login());
   });
   if (!r) return null;
+  if (r.agendada) {
+    const n = buscar('contratos', id);
+    aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
+    return r;
+  }
   if (r.arquivos.length) {
     try {
       const de = await pastaDoEscopo('contrato', r.anterior.id, false);
@@ -215,7 +220,8 @@ let herancasFeitas = false;
 export async function trazerHerancasPendentes() {
   if (herancasFeitas || !opera() || !E.pasta) return;
   herancasFeitas = true;
-  const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c));
+  // troca agendada (data futura): passa só no dia
+  const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c) && !R.herancaAgendada(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
   // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações) ou a reserva do anterior
   const incompletas = d().contratos.filter((c) => R.herancaIncompleta(d(), c));

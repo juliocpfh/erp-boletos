@@ -268,16 +268,35 @@ async function enviarArquivosSeguro(contratoId, el) {
   await mostrar();
 }
 
+/** Tipo e consulta da tela de impressão (ex.: #/imprimir/chaves?contrato=3 → ['chaves', { contrato: '3' }]). */
+function documentoDaTela() {
+  const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
+  return [caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || ''))];
+}
+
+/** Contrato ou termo das chaves baixado ou impresso: marca "gerar" na rotina de entrada do inquilino (uma vez, com a data de hoje). */
+async function marcarGeradoNaRotina(tipo, m) {
+  const chave = { contrato: 'contrato_gerado', chaves: 'chaves_gerado' }[tipo];
+  if (!chave || !m || !m.c || !opera() || (m.c.rotina_entrada || {})[chave]) return;
+  await alterar((db) => R.marcarGeradoNaRotina(db, m.c.id, chave, login()));
+}
+
 export const ACOES = {
   escolherPasta: () => escolherPasta(),
   reabrir: () => reabrirPastaLembrada(),
   sair: () => sair(),
-  imprimir: () => window.print(),
+  async imprimir() {
+    window.print();
+    if (!/^#\/imprimir\/(contrato|chaves)\b/.test(location.hash)) return;
+    const [tipo, q] = documentoDaTela();
+    await marcarGeradoNaRotina(tipo, await documentoMontado(tipo, q));
+  },
 
   async documentoWord() {
-    const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
-    const m = await documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    const [tipo, q] = documentoDaTela();
+    const m = await documentoMontado(tipo, q);
     if (!m) throw new Error('Registro não encontrado.');
+    await marcarGeradoNaRotina(tipo, m);
     const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
     const i = buscar('imoveis', m.c.imovel_id);
     const blob = await K.contratoDocx(JSZip, m.blocos, { logo, rodape: m.rodape, titulo: `${m.nome} - ${m.c.inquilino_nome}` });
@@ -294,10 +313,11 @@ export const ACOES = {
 
   /** PDF do documento que está na tela (contrato, vistoria, recibo das chaves), com o rodapé e "Página X de Y" em todas as folhas. */
   async documentoPdf() {
-    const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
-    const m = await documentoMontado(caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || '')));
+    const [tipo, q] = documentoDaTela();
+    const m = await documentoMontado(tipo, q);
     const el = document.querySelector('.impressao .contrato');
     if (!m || !el) throw new Error('Documento não encontrado.');
+    await marcarGeradoNaRotina(tipo, m);
     const blob = await pdfDoDocumento(el, m.rodape);
     baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
   },
@@ -565,6 +585,17 @@ export const ACOES = {
   async removerArquivoAditivo({ id }) {
     await alterarApagandoAnexos((db) => R.removerArquivoAditivo(db, Number(id), login()));
     aviso('Arquivo apagado: o termo aditivo voltou a "aguardando assinatura".');
+    await mostrar();
+  },
+
+  /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
+  async pularEtapaEntrada({ contrato, chave }) {
+    await alterar((db) => R.marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));
+    await mostrar();
+  },
+
+  async desfazerEtapaEntrada({ contrato, chave }) {
+    await alterar((db) => R.marcarEtapaEntrada(db, Number(contrato), chave, {}, login()));
     await mostrar();
   },
 

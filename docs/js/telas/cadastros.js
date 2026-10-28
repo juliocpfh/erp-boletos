@@ -327,7 +327,8 @@ export const CADASTROS = {
       // troca de titular com o termo aditivo já assinado: vai para "Termos aditivos" do novo contrato
       const cont = memoria.continuacao;
       memoria.continuacao = null;
-      if (!antigo && salvo.contrato_anterior_id) await trazerHeranca(salvo.id);
+      // troca agendada (data futura) com a data mudada: o fim do vínculo do anterior acompanha (ou a troca já é feita)
+      if (salvo.contrato_anterior_id && (!antigo || (!salvo.heranca_transferida && antigo.data_entrada !== salvo.data_entrada))) await trazerHeranca(salvo.id);
       if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
         const anterior = buscar('contratos', cont.anteriorId);
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
@@ -460,7 +461,7 @@ export const CADASTROS = {
       return comListas(F.TITULARIDADE.map((c) => (c.nome === 'contrato_id' ? { ...c, opcoes: ops } : c)));
     },
     fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
-    padrao: (q) => ({ contrato_id: q.contrato || '', situacao: 'Solicitado', data: C.hojeIso(), tipo: q.tipo === 'volta' ? 'Volta para o proprietário' : 'Para o inquilino' }),
+    padrao: (q) => ({ contrato_id: q.contrato || '', situacao: 'Solicitado', ...(q.concessionaria ? { concessionaria: q.concessionaria } : {}), data: C.hojeIso(), tipo: q.tipo === 'volta' ? 'Volta para o proprietário' : 'Para o inquilino' }),
     voltar: (r, q) => (q.contrato ? `#/contrato/${q.contrato}` : `#/imovel/${r ? r.imovel_id : q.imovel}`),
     descricao: (dados) => `${dados.concessionaria} ${dados.protocolo || ''}`.trim(),
   },

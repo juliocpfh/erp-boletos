@@ -95,6 +95,13 @@ function caixaGarantia(c) {
   const anteriores = R.fiadoresAnterioresDo(d(), c.id);
   const herdeiro = c.garantia_transferida_para && buscar('contratos', c.garantia_transferida_para);
   const anteriorDaGarantia = R.garantiaHerdada(d(), c) ? R.contratoHerdado(d(), c) : null;
+  // troca de titular agendada: até a data, a garantia é cuidada no contrato anterior
+  const agendada = R.herancaAgendada(d(), c);
+  if (agendada && c.garantia_tipo && c.garantia_tipo !== 'Sem garantia') {
+    const a = R.contratoHerdado(d(), c);
+    return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>
+      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá em ${dataBr(agendada)} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
+  }
   let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() && !herdeiro ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
   // troca de titular: a garantia é cuidada aqui, no contrato anterior, e aparece no novo titular
   if (herdeiro) {
@@ -345,8 +352,10 @@ export function caixaSeguros(c) {
   if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length)) return '';
   const alerta = [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
   const vigente = R.seguroVigente(d(), c.id); // o × da apólice vigente apaga direto; o das anteriores pede para conferir o arquivo
+  const agendada = R.herancaAgendada(d(), c);
   return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
+    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(R.contratoHerdado(d(), c).inquilino_nome)} passa para cá nesse dia.</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? '' : vigente && vigente.id === s.id ? ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, 'x-excluir', `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}`
         : ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: '1' }, 'x-excluir')}`}</span>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
@@ -419,6 +428,72 @@ function faixaDocumentosEntrada(c) {
     <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(' ')} ${link(`#/contrato/${c.id}?ir=documentos`, 'Marcar como assinado', 'botao secundario pequeno')}</div></div>`;
 }
 
+/** Marcar um documento de entrada como assinado: data, arquivo assinado e "Marcar" (com "Falta assinatura", se pedido). */
+function formMarcarDocumento(c, k, feito, comParcial = true) {
+  return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
+        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">
+        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <button class="secundario pequeno">Marcar ${feito}</button>
+        ${comParcial ? botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno') : ''}</form>`;
+}
+
+/**
+ * Rotina de entrada do inquilino novo, no topo da página: o passo a passo (reserva, contrato, garantia, vistoria, chaves,
+ * contas e seguro), cada etapa com a situação, a data em que foi feita e o atalho para fazer (a caixa de baixo, que
+ * continua com o histórico). Aberta enquanto falta algo para quem entrou há até 6 meses; depois, recolhida.
+ */
+function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
+  const { etapas, feitas, total, concluida } = R.resumoRotinaEntrada(d(), c, hoje);
+  if (!total) return '';
+  const aberta = R.contratoAtivo(c, hoje) && !concluida && R.rotinaRecente(c, hoje);
+  const anterior = R.contratoHerdado(d(), c);
+  const ir = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
+  const mini = 'botao secundario mini';
+  const vistoria = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  const doc = { contrato_assinado: 'assinado', vistoria_assinada: 'assinada', chaves_assinado: 'assinado' };
+  const atalhos = {
+    reserva: () => (c.reserva_valor > 0 ? link(ir('reserva'), 'Anexar o comprovante', mini) : link(`#/editar/contratos/${c.id}`, 'Informar a reserva', mini)),
+    contrato_gerado: () => link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', mini),
+    aditivo: () => `${link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, 'Gerar termo aditivo', mini)} ${link(ir('aditivos'), 'Anexar assinado', mini)}`,
+    garantia: () => link(ir('garantia'), R.temCaucao(c) || R.temDeposito(c) ? 'Registrar o depósito' : 'Ver a garantia', mini),
+    vistoria_gerada: () => link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada', mini),
+    chaves_gerado: () => link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar termo das chaves', mini),
+    seguro: () => link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice', mini),
+  };
+  const conta = (e) => (e.titularidade ? link(`#/editar/titularidades/${e.titularidade}`, 'Atualizar protocolo', mini)
+    : link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&concessionaria=${encodeURIComponent(e.concessionaria || '')}`, 'Registrar protocolo', mini));
+  const situacaoDe = (e) => {
+    const data = e.data ? ` em ${dataBr(e.data)}` : '';
+    const texto = e.texto ? ` <span class="suave">${esc(e.texto)}</span>` : '';
+    if (e.situacao === 'feita') return `${etiqueta(`✓ feita${data}`, 'ok')}${texto}`;
+    if (e.situacao === 'pulada') return `${etiqueta(`${e.texto === 'não se aplica' ? 'não se aplica' : esc(e.texto)}${data}`, 'neutra')}`;
+    if (e.situacao === 'andamento') return etiqueta(e.texto, 'aviso');
+    return etiqueta('pendente', 'perigo');
+  };
+  const acoes = (e) => {
+    if (!opera()) return '';
+    if (['feita', 'pulada'].includes(e.situacao)) return e.manual ? botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao') : '';
+    const pular = botao('pularEtapaEntrada', 'Não se aplica', { contrato: c.id, chave: e.chave }, 'link-botao');
+    // documento assinado: anexa aqui mesmo (igual à caixa "Contrato, Vistoria, Termos e Aditivos")
+    if (e.doc) {
+      if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
+      if (e.situacao === 'andamento') return link(ir('documentos'), 'Anexar o arquivo completo', mini);
+      const ver = e.chave === 'vistoria_assinada' && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, 'Ver vistoria', mini)} ` : '';
+      return `${ver}${formMarcarDocumento(c, e.doc, doc[e.chave], false)}`;
+    }
+    const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ''))();
+    return `<div class="acoes" style="justify-content:flex-end">${atalho}
+      <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
+        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
+  };
+  const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b></td>
+    <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join('')}</table></div>`;
+  const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
+  const titulo = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? '✓ concluída' : `${feitas} de ${total} feitas`}</span>`;
+  return aberta ? `<div class="cartao" id="rotina"><h2>${titulo}</h2>${ajuda}${tabela}</div>`
+    : `<details class="cartao" id="rotina"><summary><b>${titulo}</b> <span class="suave">· clique para ver</span></summary>${ajuda}${tabela}</details>`;
+}
+
 function caixaDocumentos(c) {
   const hoje = C.hojeIso();
   const vistorias = R.vistoriasDo(d(), c.id);
@@ -455,11 +530,7 @@ function caixaDocumentos(c) {
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
       ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ''}`
-    : !opera() || perdido(k) || original ? '' : `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${hoje}" style="width:auto">
-        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-        <button class="secundario pequeno">Marcar ${feito}</button>
-        ${parcial(k) ? '' : botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno')}</form>`}
+    : !opera() || perdido(k) || original ? '' : formMarcarDocumento(c, k, feito, !parcial(k))}
       ${opera() && !doc(k) && !original ? (perdido(k) ? botao('desmarcarPerdido', 'Desfazer "perdido"', { contrato: c.id, campo: k }, 'link-botao')
         : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.')
         : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</td></tr>`).join('');
@@ -510,7 +581,11 @@ export function telaContrato(c) {
   const aluguel = R.aluguelAtual(d(), c);
   const pctBonif = R.percentualBonificacao(c);
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Documentos de entrada'].includes(a.tipo)) : [];
+  // documentos de entrada e contas a transferir aparecem na rotina de entrada (e na faixa dos documentos)
+  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Documentos de entrada', 'Rotina de entrada'].includes(a.tipo)) : [];
+  const rotina = caixaRotinaEntrada(c, hoje);
+  const agendada = R.herancaAgendada(d(), c, hoje);
+  const anteriorAgendado = agendada && R.contratoHerdado(d(), c);
   const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
   const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
   const cadeia = R.cadeiaDeContratos(d(), c);
@@ -541,7 +616,9 @@ export function telaContrato(c) {
     ${selosContrato(c)}
     ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
-    ${faixaDocumentosEntrada(c)}
+    ${anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(C.somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ''}
+    ${rotina.startsWith('<div') ? '' : faixaDocumentosEntrada(c)}
+    ${rotina}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
