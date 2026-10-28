@@ -27,7 +27,7 @@
 1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`.
 3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`). Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`). Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
-4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`).
+4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`); com `id`, fica aberta ou fechada como estava depois de uma ação na mesma página (`mostrar` em `app.js`).
 5. Telas de impressão: um tipo novo em `telaImprimir` (`#/imprimir/<tipo>`), que desenha sem o menu.
 
 ## Adicionar uma regra de negócio

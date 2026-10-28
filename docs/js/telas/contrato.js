@@ -490,8 +490,8 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join('')}</table></div>`;
   const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
   const titulo = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? '✓ concluída' : `${feitas} de ${total} feitas`}</span>`;
-  return aberta ? `<div class="cartao" id="rotina"><h2>${titulo}</h2>${ajuda}${tabela}</div>`
-    : `<details class="cartao" id="rotina"><summary><b>${titulo}</b> <span class="suave">· clique para ver</span></summary>${ajuda}${tabela}</details>`;
+  // sempre recolhível: aberta ou fechada, fica como estava depois de marcar uma etapa
+  return `<details class="cartao" id="rotina"${aberta ? ' open' : ''}><summary><b>${titulo}</b> <span class="suave">· clique para abrir ou fechar</span></summary>${ajuda}${tabela}</details>`;
 }
 
 function caixaDocumentos(c) {
