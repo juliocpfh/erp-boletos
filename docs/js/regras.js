@@ -2515,18 +2515,21 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
   const docAssinado = (k) => {
     const doc = documentoEntrada(d, c, k);
     if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : (doc.arquivo ? '' : 'sem arquivo'));
-    if (documentoPerdido(d, c, k)) return { situacao: 'pulada', data: documentoPerdido(d, c, k), texto: 'registrado como perdido' };
+    if (documentoPerdido(d, c, k)) return feita(documentoPerdido(d, c, k), 'registrado como perdido');
     const p = documentoParcial(d, c, k);
     if (p) return andamento(`falta assinatura: ${p.falta.join(', ')}`);
     return anterior ? andamento(`herdado de ${anterior.inquilino_nome}: marque no contrato anterior`) : null;
   };
+  // documento já baixado na caixa "Contrato, Vistoria, Termos e Aditivos" (assinado, perdido ou com assinatura faltante): já foi gerado
+  const jaGerado = (k, texto) => (documentoEntrada(d, c, k) ? feita(null, texto)
+    : documentoPerdido(d, c, k) ? feita(null, 'registrado como perdido') : documentoParcial(d, c, k) ? feita(null, 'anexado, falta assinatura') : undefined);
   const avaliar = {
     reserva: () => {
       if (anterior) return null;
       if (c.reserva_valor > 0) return c.comprovante_reserva ? feita(c.reserva_data, C.reais(c.reserva_valor)) : andamento(`${C.reais(c.reserva_valor)} sem comprovante`);
       return undefined;
     },
-    contrato_gerado: () => (anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_contrato_em') ? feita(null, 'contrato já assinado') : undefined),
+    contrato_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_contrato_em', 'contrato já assinado')),
     contrato_assinado: () => docAssinado('doc_contrato_em'),
     aditivo: () => {
       const l = aditivosDo(d, c.id);
@@ -2546,9 +2549,9 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     vistoria_gerada: () => {
       const v = vistoriasDo(d, c.id).find((x) => x.tipo === 'Entrada');
       if (v) return feita(v.data);
-      return anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_vistoria_em') ? feita(null, 'vistoria já assinada') : undefined;
+      return anterior ? feita(null, herdou) : jaGerado('doc_vistoria_em', 'vistoria já assinada');
     },
-    chaves_gerado: () => (anterior ? feita(null, herdou) : documentoEntrada(d, c, 'doc_chaves_em') ? feita(null, 'termo já assinado') : undefined),
+    chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),
     vistoria_assinada: () => docAssinado('doc_vistoria_em'),
     chaves_assinado: () => docAssinado('doc_chaves_em'),
     seguro: () => {
