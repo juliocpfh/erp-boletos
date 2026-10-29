@@ -56,6 +56,7 @@ const COMPROVANTE_APLICACAO = [{ campo: 'comprovante', valor: 'valor', data: 'da
 const comprovanteDoDeposito = (r) => [{ campo: 'comprovante', valor: 'valor', data: 'data', nome: r.qual === 'caucao' ? 'caucao' : 'deposito-garantia', texto: 'do depósito', vale: () => true }];
 
 const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
+const COMPROVANTE_DEVOLUCAO = [{ campo: 'comprovante', valor: 'garantia_valor', data: 'data', nome: 'devolucao-garantia', texto: 'da devolução da garantia', vale: () => true }];
 
 const arquivoEscolhido = (form, campo) => { const el = form.querySelector(`[name="${campo}"]`); return (el && el.files && el.files[0]) || null; };
 
@@ -82,7 +83,7 @@ async function guardarComprovantes(lista, dados, form, pasta) {
 export const xAnexo = (acao, dados, confirmar) => (opera() ? botao(acao, '×', dados, 'x-excluir', confirmar).replace('<button ', '<button title="Apagar só o arquivo" ') : '');
 
 /** Campos de comprovante que o "×" apaga sozinho (caução e depósito pagos de uma vez têm o próprio: removerComprovanteGarantia). */
-export const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'] };
+export const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'], devolucoes_garantia: ['comprovante'] };
 
 /**
  * Link para abrir o comprovante guardado na pasta do inquilino, com o "×" que apaga só o arquivo. Sem comprovante:
@@ -214,7 +215,9 @@ export const CADASTROS = {
       // troca de titular: garantia, aluguel, bonificação, boleto e reserva são os do contrato (travados no formulário)
       const anteriorHerdado = r ? R.contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar('contratos', dados.contrato_anterior_id);
       const herdado = !!anteriorHerdado;
-      if (r && herdado) for (const k of CAMPOS_GARANTIA_HERDADA) dados[k] = r[k] ?? null;
+      // garantia nova na troca (escolha na janela "Continuar o contrato"): o novo titular presta a sua, livre
+      if (!r && herdado) dados.garantia_na_troca = (memoria.continuacao && memoria.continuacao.garantia) || 'continua';
+      if (r && herdado && !R.garantiaNova(r)) for (const k of CAMPOS_GARANTIA_HERDADA) dados[k] = r[k] ?? null;
       if (herdado) {
         const fonte = r || { ...anteriorHerdado, ...R.condicoesDoContrato(d(), anteriorHerdado, dados.data_entrada) };
         for (const k of CAMPOS_VALORES_HERDADOS) {
@@ -545,6 +548,30 @@ export const CADASTROS = {
       conferirComprovantes(COMPROVANTE_COMPLEMENTO, dados, r, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
+  },
+  devolucoes_garantia: {
+    titulo: (r, q) => `Devolução da garantia (troca de titular) - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: () => F.DEVOLUCAO_GARANTIA,
+    // como no cálculo final da saída: a garantia atual e os boletos em aberto como débitos
+    padrao: (q) => {
+      const c = buscar('contratos', q.contrato);
+      const aberto = R.cobrancasEmAberto(d(), c.id);
+      return { data: C.hojeIso(), garantia_valor: R.valorGarantia(d(), c), debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0) || null,
+        debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n') };
+    },
+    aviso: (r, q) => {
+      const c = buscar('contratos', r ? r.contrato_id : q.contrato);
+      const n = R.continuadoPor(d(), c);
+      return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pelo índice da poupança que você informar, descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
+    },
+    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
+    descricao: (dados) => `Garantia devolvida: ${reais(dados.garantia_valor)}`,
+    ajustar(dados, erros, r, form) {
+      for (const k of ['indice_percentual', 'debitos']) if (!dados[k]) dados[k] = 0;
+      return conferirComprovantes(COMPROVANTE_DEVOLUCAO, dados, r, form);
+    },
+    ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_DEVOLUCAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
+    salvar: (db, dados, q, r) => R.salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), dados, login(), r ? r.id : null),
   },
   trocas_garantia: {
     titulo: (r, q) => `Trocar garantia ou fiador - ${buscar('contratos', q.contrato).inquilino_nome}`,

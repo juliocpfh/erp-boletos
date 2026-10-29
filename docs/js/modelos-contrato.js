@@ -229,9 +229,32 @@ E por estarem de acordo, as partes assinam este Termo Aditivo em duas vias de ig
 [assinaturas]`;
 
 /**
+ * Garantia no termo de troca quando quem entra presta garantia nova (escolha na troca de titular): a caução ou o depósito
+ * de quem sai é devolvido a ele (corrigido, descontados os débitos até a véspera); fiança ou seguro fiança de quem sai vale
+ * só até a véspera; a garantia de quem entra é a do cadastro dele (caução, depósito, fiador, seguro fiança ou nenhuma).
+ * Também entra nos modelos de troca já gravados (normalizar, em regras.js).
+ */
+export const GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #** – A garantia prestada no contrato {a:pelo LOCATÁRIO SAINTE|pelos LOCATÁRIOS SAINTES}, {garantia_anterior}, não passa {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}: será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato, descontados os débitos do período até {data_vespera} de sua responsabilidade.[fim]
+
+[se garantia_anterior_fianca]**CLÁUSULA #** – A garantia prestada no contrato ({garantia_anterior}) responde só pelas obrigações do período até {data_vespera} e não se estende {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}.[fim]
+
+[se caucao]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE presta|Os LOCATÁRIOS ENTRANTES prestam}, como garantia da locação, caução em dinheiro de {caucao_valor}, correspondente a {caucao_meses} aluguéis, que será atualizada a cada reajuste anual do aluguel, conforme o contrato, e devolvida ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
+
+[se deposito]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE presta|Os LOCATÁRIOS ENTRANTES prestam}, como garantia da locação, depósito de garantia de {deposito_valor}, nas condições do contrato.[fim]
+
+[se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} conhecer e aceitar as condições do contrato e {f:garante|garantem} as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, nas condições do contrato, até a entrega real e definitiva das chaves.[fim]
+
+[se seguro_fianca]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE apresentará|Os LOCATÁRIOS ENTRANTES apresentarão}, em até 30 (trinta) dias, o seguro fiança locatícia em seu nome, sob pena de infração contratual.[fim]
+
+[se sem_garantia]**CLÁUSULA #** – A partir de {data_troca}, a locação fica sem garantia.[fim]
+
+**CLÁUSULA #** – {a:O LOCATÁRIO SAINTE|Os LOCATÁRIOS SAINTES} e {s:o LOCATÁRIO ENTRANTE|os LOCATÁRIOS ENTRANTES} declaram ciência de que a garantia prestada no contrato não continua na locação[se não sem_garantia] e é substituída pela garantia descrita acima[fim].`;
+
+/**
  * Termo aditivo de troca de inquilino (herança do contrato): sai o titular anterior, entra o novo, com a anuência da
  * locadora (Lei 8.245/91, art. 13). Campos e condições em dadosDoAditivo (contratos.js); {a:...|...} = saintes, {s:...|...} = entrantes.
- * Débitos até a véspera ficam com quem sai (sem quitação); a garantia em dinheiro continua na locação e passa a ser devolvida a quem entra.
+ * Débitos até a véspera ficam com quem sai (sem quitação). Garantia, conforme a escolha na troca: continua na locação e passa
+ * a ser devolvida a quem entra, ou (garantia_nova) a de quem sai é devolvida a ele e quem entra presta a sua (GARANTIA_NOVA_TROCA).
  */
 const ADITIVO_TROCA = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
 
@@ -267,7 +290,7 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 ## DA GARANTIA
 
-[se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
+[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão][se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
 
 **Parágrafo único** – A caução continua a ser atualizada a cada reajuste anual do aluguel, conforme o contrato, e será devolvida {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
 
@@ -277,7 +300,7 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 [se seguro_fianca]**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE apresentará|Os LOCATÁRIOS ENTRANTES apresentarão}, em até 30 (trinta) dias, o seguro fiança locatícia em seu nome, ou o endosso da apólice em vigor, sob pena de infração contratual.[fim]
 
-[se sem_garantia]**CLÁUSULA #** – A locação continua sem garantia, como no contrato.[fim]
+[se sem_garantia]**CLÁUSULA #** – A locação continua sem garantia, como no contrato.[fim][fim]
 
 ## DISPOSIÇÕES FINAIS
 

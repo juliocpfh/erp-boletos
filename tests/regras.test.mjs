@@ -1466,6 +1466,43 @@ test('herança do contrato: correções, data-base do reajuste, caução com dep
   assert.equal(R.transferirHeranca(d, novo.id, 'julio'), null, 'só uma vez');
 });
 
+test('troca de titular com garantia nova: a caução fica com o anterior para devolver (corrigida, menos débitos) e o novo presta a sua', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07' });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-08', valor: 243000, arquivo: 'cau.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
+    garantia_tipo: 'Fiador', caucao_valor: null, comprovante_caucao: null, caucao_por_depositos: null, garantia_na_troca: 'nova' }, 'julio');
+  const r = R.transferirHeranca(d, novo.id, 'julio');
+  assert.equal(r.garantia, false, 'a garantia não passa');
+  assert.equal(c.garantia_transferida_para, undefined);
+  assert.equal(R.garantiaHerdada(d, novo), false);
+  assert.equal(R.valorGarantia(d, c), 243000, 'depósito e comprovante ficam com o anterior');
+  assert.equal(R.herancaIncompleta(d, novo), null, 'não é herança incompleta');
+  assert.equal(R.devolucaoGarantiaPendente(d, c).valor, 243000);
+  assert.equal(R.alertaDevolucaoGarantia(d, c, '2026-09-20'), null, 'antes da troca, nada');
+  assert.equal(R.alertaDevolucaoGarantia(d, c, '2026-10-05').tipo, 'Devolver garantia');
+  assert.ok(R.todosAlertas(d, '2026-10-05').some((a) => a.tipo === 'Devolver garantia' && a.contrato_id === c.id), 'no Painel, mesmo sem vínculo');
+  // R$ 2.430,00 + 1,5% = R$ 2.466,45; débito R$ 100,00 → devolve R$ 2.366,45
+  const dev = R.salvarDevolucaoGarantia(d, c.id, { data: '2026-10-10', garantia_valor: 243000, indice_percentual: 1.5, debitos: 10000, comprovante: null }, 'julio');
+  assert.equal(dev.garantia_corrigida, 246645);
+  assert.equal(dev.saldo, 236645);
+  assert.equal(R.devolucaoGarantiaPendente(d, c), null);
+  assert.equal(R.alertaDevolucaoGarantia(d, c, '2026-10-12').tipo, 'Comprovante a buscar no banco');
+  assert.ok(R.comprovantesPendentes(d, c).some((x) => x.tabela === 'devolucoes_garantia' && x.valor === 236645));
+  assert.throws(() => R.salvarDevolucaoGarantia(d, c.id, { data: '2026-10-10', garantia_valor: 1 }, 'julio'), /já foi registrada/);
+  R.anexarComprovante(d, 'devolucoes_garantia', dev.id, 'comprovante', 'comprovante-devolucao-garantia-2026-10-10.pdf', 'julio');
+  assert.equal(R.alertaDevolucaoGarantia(d, c, '2026-10-12'), null);
+  assert.ok(R.arquivosReferenciados(d).some((a) => a.nome === 'comprovante-devolucao-garantia-2026-10-10.pdf' && a.id === c.id));
+  // edição recalcula
+  assert.equal(R.salvarDevolucaoGarantia(d, c.id, { ...dev, debitos: 0 }, 'julio', dev.id).saldo, 246645);
+  // garantia que continua (padrão, também nas trocas antigas): não há devolução
+  const { d: d2, c: c2 } = base();
+  const { id: id2, ...resto2 } = c2;
+  R.inserir(d2, 'contratos', { ...resto2, contrato_anterior_id: c2.id, data_entrada: '2026-10-01' }, 'julio');
+  assert.throws(() => R.salvarDevolucaoGarantia(d2, c2.id, { data: '2026-10-10', garantia_valor: 1 }, 'julio'), /continua com o novo titular/);
+});
+
 test('quem saiu fica inativo quando o boleto do último mês já existe; herdeiro não vê reajuste de antes da entrada', () => {
   const { d, c } = base();
   R.gerarCobrancas(d, '2026-06', 'julio');

@@ -38,7 +38,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Quando o aluguel é corrigido, a caução acompanha: a diferença (complemento) é tratada só na tela Reajustes ("Caução a completar"), em boleto separado (sem tarifa, sem IPTU, sem seguro, sem NF; à vista por padrão ou parcelado, cada parcela com a sua data e o seu valor) ou por depósito do inquilino. Cada parcela paga soma na caução.
 - A garantia pode ser aplicada na empresa ou na conta de outra pessoa; na saída, a devolução sai de onde foi depositado, na proporção do aplicado.
 - Fiador é incluído, trocado ou tirado pela troca de garantia, que pode ser cancelada (só a mais recente).
-- Garantia herdada na troca de titular é cuidada no contrato do titular anterior.
+- Garantia na troca de titular: escolhida na janela da troca. "Continua a mesma": passa ao novo e é cuidada no contrato do titular anterior. "Garantia nova": a caução ou o depósito do anterior é devolvido a ele (corrigido pela poupança, descontados os débitos até a véspera; registrado na página dele, com comprovante) e o novo presta a sua, de qualquer tipo, com depósito e comprovante próprios. A escolha entra no termo aditivo da troca. Trocas antigas: a garantia continua.
 
 6. BOLETOS
 - Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, FCI, tarifa, reserva e ressarcimentos.

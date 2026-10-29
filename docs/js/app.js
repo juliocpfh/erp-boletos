@@ -356,7 +356,7 @@ const MENU = [
 
 function layout(conteudo, rota) {
   // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
-  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'solicitacoes'].includes(rota.partes[1]);
+  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'solicitacoes'].includes(rota.partes[1]);
   const deIptu = ['novo', 'editar'].includes(rota.partes[0]) && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
   const form = ['novo', 'editar'].includes(rota.partes[0]) ? { emitentes: 'empresas', usuarios: 'usuarios' }[rota.partes[1]] : null;
   const atual = deInquilino ? 'inquilino' : deIptu ? 'iptu' : form || rota.partes[0] || '';

@@ -3,13 +3,14 @@
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
 import { locadorasDoContrato } from './contratos.js';
-import { CLAUSULAS_FCI } from './modelos-contrato.js';
+import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA } from './modelos-contrato.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Boleto', recebimentos: 'Recebimento Airbnb',
   faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução', depositos_garantia: 'Depósito da caução / garantia',
+  devolucoes_garantia: 'Devolução da garantia (troca de titular)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
@@ -78,6 +79,17 @@ export function normalizar(d) {
   for (const m of d.modelos_contrato || []) {
     if (m.tipo || !m.texto || m.texto.includes('[se fci]') || !m.texto.includes('## RENOVAÇÃO DO CONTRATO')) continue;
     m.texto = m.texto.replace('## RENOVAÇÃO DO CONTRATO', `${CLAUSULAS_FCI}\n\n## RENOVAÇÃO DO CONTRATO`);
+  }
+  // termo de troca de inquilino: a garantia nova (a de quem sai é devolvida) entra nos modelos já gravados; o texto da
+  // garantia que continua fica como estava, no [senão]
+  for (const m of d.modelos_contrato || []) {
+    if (m.tipo !== 'aditivo_troca' || !m.texto || m.texto.includes('[se garantia_nova]')) continue;
+    const t = m.texto.replace(/\r\n/g, '\n');
+    const ini = t.indexOf('## DA GARANTIA\n');
+    const fim = t.indexOf('\n\n## ', ini + 1);
+    if (ini < 0 || fim < 0) continue;
+    const corpo = ini + '## DA GARANTIA\n'.length;
+    m.texto = `${t.slice(0, corpo)}\n[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
   }
   // o Estado (UF) do imóvel passou a ser guardado: vem do CEP
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
@@ -403,6 +415,8 @@ export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filte
   .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
 export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
+/** Lançamentos ligados ao contrato que têm o campo ``comprovante`` (arquivo na pasta do inquilino). */
+const TABELAS_COMPROVANTE = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia'];
 
 /** Valor atual da garantia em dinheiro (caução corrigida ou depósito). */
 /** Caução ou depósito já depositado, com o comprovante anexado: só então conta (caução atual, aplicação, complemento). */
@@ -1629,7 +1643,7 @@ export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
-  for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
+  for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
     d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
   }
   excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
@@ -1800,12 +1814,13 @@ export function comprovantesPendentes(d, c) {
   }
   for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
+  for (const x of devolucoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'devolução da garantia', x.saldo, x.data, 'devolucoes_garantia', x.id, 'comprovante', 'devolucao-garantia');
   return out;
 }
 
 /** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
 export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
-  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'] };
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])) };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
   if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
   const r = buscar(d, tabela, id);
@@ -1882,7 +1897,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
  * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
  */
 export function removerAnexo(d, tabela, id, campo, usuario) {
-  const ok = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'] };
+  const ok = { contratos: ['comprovante_reserva'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])) };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
   const r = buscar(d, tabela, id);
   if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
@@ -2100,7 +2115,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   // garantia em dinheiro (e fiadores atuais)
   const garantiaPropria = n.comprovante_caucao || n.comprovante_deposito || n.caucao_por_depositos || n.deposito_por_depositos
     || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === n.id));
-  if (!garantiaPropria && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
+  // garantia nova (a do anterior é devolvida a ele): nada da garantia passa; o anterior registra a devolução
+  if (!garantiaPropria && !garantiaNova(n) && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
     for (const k of CAMPOS_GARANTIA) mud[k] = a[k] ?? null;
     for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k]) out.arquivos.push(a[k]);
     for (const t of TABELAS_GARANTIA) {
@@ -2179,7 +2195,7 @@ const garantiaAHerdar = (d, a) => !!(a && (temCaucao(a) || temDeposito(a)) && !a
 export function herancaIncompleta(d, c) {
   const a = c.heranca_transferida && contratoHerdado(d, c);
   if (!a) return null;
-  const garantia = garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
+  const garantia = !garantiaNova(c) && garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const reserva = a.reserva_valor > 0 && !(c.reserva_valor > 0);
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   return garantia || reserva || seguro ? { garantia, reserva, seguro } : null;
@@ -2235,6 +2251,57 @@ export function completarHeranca(d, novoId, usuario) {
   }
   out.arquivos = [...new Set(out.arquivos)];
   return out;
+}
+
+/**
+ * Troca de titular: a garantia continua a mesma (passa ao novo titular; padrão, também nas trocas antigas) ou é nova
+ * (``garantia_na_troca`` = 'nova'): a do anterior é devolvida a ele e o novo presta a sua, de qualquer tipo.
+ */
+export const garantiaNova = (c) => !!(c && c.garantia_na_troca === 'nova');
+export const devolucoesGarantiaDo = (d, contratoId) => (d.devolucoes_garantia || []).filter((x) => x.contrato_id === contratoId);
+
+/**
+ * Contrato anterior (troca de titular com garantia nova) com caução ou depósito ainda não devolvido: { herdeiro, valor } ou null.
+ * Ex.: caução de Ana corrigida para R$ 5.670,00; Bruno assume em 15/11/2026 com garantia nova → devolver R$ 5.670,00 a Ana.
+ */
+export function devolucaoGarantiaPendente(d, a) {
+  const n = continuadoPor(d, a);
+  if (!garantiaNova(n) || !(temCaucao(a) || temDeposito(a)) || devolucoesGarantiaDo(d, a.id).length) return null;
+  const depositado = garantiaDepositada(a) || somaDepositos(d, a, temCaucao(a) ? 'caucao' : 'deposito') > 0;
+  const valor = valorGarantia(d, a);
+  return depositado && valor > 0 ? { herdeiro: n, valor } : null;
+}
+
+/**
+ * Devolução da garantia ao titular anterior (troca com garantia nova): como no cálculo final da saída, a garantia corrigida
+ * pela poupança menos os débitos dele. Ex.: R$ 5.670,00 + 1,20% = R$ 5.738,04; débitos R$ 300,00 → devolve R$ 5.438,04.
+ * ``id``: edita a devolução já registrada.
+ */
+export function salvarDevolucaoGarantia(d, contratoId, dados, usuario, id = null) {
+  const a = buscar(d, 'contratos', contratoId);
+  if (!garantiaNova(continuadoPor(d, a))) throw new Error('A garantia deste contrato continua com o novo titular: não há devolução na troca.');
+  if (!id && devolucoesGarantiaDo(d, a.id).length) throw new Error('A devolução da garantia já foi registrada.');
+  const { garantia_corrigida, saldo } = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
+  const reg = { ...dados, contrato_id: a.id, garantia_corrigida, saldo };
+  const texto = `${a.inquilino_nome}: garantia devolvida em ${C.dataBr(dados.data)}, ${C.reais(saldo)} (troca de titular com garantia nova)`;
+  if (!id) return inserir(d, 'devolucoes_garantia', reg, usuario, texto);
+  atualizar(d, 'devolucoes_garantia', id, reg, usuario, texto);
+  return buscar(d, 'devolucoes_garantia', id);
+}
+
+/**
+ * Troca de titular com garantia nova, a partir da data da troca: devolver a garantia ao anterior e anexar o comprovante.
+ * Fica no contrato anterior (já sem vínculo, por isso fora dos alertas dos contratos ativos).
+ */
+export function alertaDevolucaoGarantia(d, a, hoje = C.hojeIso()) {
+  const p = devolucaoGarantiaPendente(d, a);
+  if (p && (p.herdeiro.data_entrada || p.herdeiro.vigencia_inicio || hoje) <= hoje) {
+    return { nivel: 'aviso', tipo: 'Devolver garantia', ancora: 'garantia',
+      texto: `${p.herdeiro.inquilino_nome} assumiu o contrato com garantia nova: devolva ${temCaucao(a) ? 'a caução' : 'o depósito de garantia'} de ${C.reais(p.valor)} a ${a.inquilino_nome} (com a correção, descontados os débitos) e registre a devolução.` };
+  }
+  const x = devolucoesGarantiaDo(d, a.id).find((y) => !y.comprovante && y.saldo > 0);
+  return x ? { nivel: 'aviso', tipo: 'Comprovante a buscar no banco', ancora: 'garantia',
+    texto: `Anexe o comprovante: devolução da garantia a ${a.inquilino_nome} de ${C.reais(x.saldo)} (${C.dataBr(x.data)}).` } : null;
 }
 
 /** Garantia do herdeiro que veio do contrato anterior (não se remove nem se desfaz: muda só por "Corrigir caução"). */
@@ -2537,7 +2604,7 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       return aditivosAguardando(d, c.id).length ? andamento('gerado, aguardando assinatura') : undefined;
     },
     garantia: () => {
-      if (anterior && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) return feita(null, `herdada de ${anterior.inquilino_nome}`);
+      if (anterior && !garantiaNova(c) && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) return feita(null, `herdada de ${anterior.inquilino_nome}`);
       if (temCaucao(c) || temDeposito(c)) {
         const qual = temCaucao(c) ? 'caucao' : 'deposito';
         if (garantiaDepositada(c)) return feita(c[GARANTIAS_DEPOSITADAS[qual].pago] || null, `${GARANTIAS_DEPOSITADAS[qual].nome} depositada`);
@@ -2658,7 +2725,7 @@ export function arquivosReferenciados(d) {
       usa('assinados', c.id, (c[campoParcialDoc(campo)] || {}).arquivo);
     }
   }
-  for (const t of ['depositos_garantia', 'correcoes_garantia', 'aplicacoes']) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
+  for (const t of TABELAS_COMPROVANTE) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
@@ -2684,6 +2751,7 @@ export function comprovantesComNome(d) {
   for (const x of d.depositos_garantia || []) usa(x.contrato_id, x.comprovante, x.qual === 'caucao' ? 'caucao' : 'deposito-garantia', x.data, `comprovante do depósito ${x.qual === 'caucao' ? 'da caução' : 'de garantia'} de ${C.reais(x.valor)} (${C.dataBr(x.data)})`);
   for (const x of d.correcoes_garantia) usa(x.contrato_id, x.comprovante, 'complemento-caucao', x.data, `comprovante do complemento da caução (${C.dataBr(x.data)})`);
   for (const x of d.aplicacoes) usa(x.contrato_id, x.comprovante, 'aplicacao-garantia', x.data, `comprovante da aplicação da garantia (${C.dataBr(x.data)})`);
+  for (const x of d.devolucoes_garantia || []) usa(x.contrato_id, x.comprovante, 'devolucao-garantia', x.data, `comprovante da devolução da garantia (${C.dataBr(x.data)})`);
   return out;
 }
 
@@ -2726,7 +2794,7 @@ export function renomearReferencias(d, contratoId, antigo, novo, usuario) {
       if (c[campo] === antigo && (c[`${campo}_contrato`] || c.id) === contratoId) atualizar(d, 'contratos', c.id, { [campo]: novo }, usuario, texto);
     }
   }
-  for (const t of ['depositos_garantia', 'correcoes_garantia', 'aplicacoes']) {
+  for (const t of TABELAS_COMPROVANTE) {
     for (const x of (d[t] || []).filter((y) => y.contrato_id === contratoId && y.comprovante === antigo)) atualizar(d, t, x.id, { comprovante: novo }, usuario, texto);
   }
 }
@@ -2780,7 +2848,9 @@ export function salvarAditivoTroca(d, contratoId, f, usuario, id = null) {
   if (!f.data) throw new Error('Informe a data do termo aditivo.');
   if (!String(f.texto || '').trim()) throw new Error('O texto do termo aditivo está vazio.');
   const troca = c.data_entrada || c.vigencia_inicio || f.data;
+  // garantia nova: o valor da garantia do anterior (a devolver a ele) entra no termo
   const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: 'Troca de titular', data: f.data, aluguel: aluguelAtual(d, c, troca),
+    garantia_anterior: garantiaNova(c) ? valorGarantia(d, ant) : null,
     testemunhas: (f.testemunhas || []).filter((t) => t && t.nome), modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null), texto: String(f.texto),
     assunto: `Troca de titular: ${ant.inquilino_nome} → ${c.inquilino_nome}, a partir de ${C.dataBr(troca)}`, arquivo: null };
   if (atual) {
@@ -2872,6 +2942,9 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     const a = alertaTitularidade(d, c, hoje);
     const imovel = buscar(d, 'imoveis', c.imovel_id);
     if (a && imovel) lista.push({ ...a, imovel_id: imovel.id, imovel: imovel.nome, inquilino: c.inquilino_nome });
+    // troca de titular com garantia nova: devolver a do anterior (o contrato dele já está sem vínculo)
+    const dev = alertaDevolucaoGarantia(d, c, hoje);
+    if (dev) lista.push({ ...dev, contrato_id: c.id, imovel: imovel ? imovel.nome : '', inquilino: c.inquilino_nome });
   }
   for (const i of d.imoveis) {
     const a = alertaSeguroImovel(d, i, hoje);

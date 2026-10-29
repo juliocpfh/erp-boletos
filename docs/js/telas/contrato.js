@@ -97,7 +97,7 @@ function caixaGarantia(c) {
   const anteriorDaGarantia = R.garantiaHerdada(d(), c) ? R.contratoHerdado(d(), c) : null;
   // troca de titular agendada: até a data, a garantia é cuidada no contrato anterior
   const agendada = R.herancaAgendada(d(), c);
-  if (agendada && c.garantia_tipo && c.garantia_tipo !== 'Sem garantia') {
+  if (agendada && !R.garantiaNova(c) && c.garantia_tipo && c.garantia_tipo !== 'Sem garantia') {
     const a = R.contratoHerdado(d(), c);
     return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>
       <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá em ${dataBr(agendada)} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
@@ -152,6 +152,28 @@ function caixaGarantia(c) {
   const correcoesHtml = () => `${subtitulo('Correções da caução', link(`#/reajustes?contrato=${c.id}`, 'Corrigir em Reajustes'))}
     ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th></tr>
       ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data }) : ''} ${esc(x.observacoes || '')}</td></tr>`).join('')}</table>` : ''}`;
+  // troca de titular com garantia nova: a garantia daqui não passou ao novo titular; a caução ou o depósito volta a este inquilino
+  const seguinte = R.continuadoPor(d(), c);
+  if (R.garantiaNova(seguinte)) {
+    const dev = R.devolucoesGarantiaDo(d(), c.id)[0];
+    const pend = R.devolucaoGarantiaPendente(d(), c);
+    const quem = `<a href="#/contrato/${seguinte.id}?ir=garantia">${esc(seguinte.inquilino_nome)}</a>`;
+    if (dev) {
+      const contas = R.devolucaoPorRecebedor(d(), c, dev.garantia_corrigida);
+      html += `${subtitulo('Devolução da garantia (troca de titular)', '', `${seguinte.inquilino_nome} assumiu o contrato com garantia própria`)}
+        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}</td>
+          <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
+          <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
+          <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${contas.length > 1 ? `<p class="suave">Sai de onde foi aplicada: ${contas.map((x) => `${esc(x.nome)} ${reais(x.valor)}`).join('; ')}.</p>` : ''}
+        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
+    } else if (pend) {
+      html += `<div class="alerta aviso"><b>Devolver a garantia:</b> ${quem} assumiu o contrato em ${dataBr(seguinte.data_entrada)} com garantia nova. Devolva ${R.temCaucao(c) ? 'a caução' : 'o depósito'} de ${reais(pend.valor)} a ${esc(c.inquilino_nome)}
+        (com a correção da poupança, descontados os débitos até ${dataBr(C.somarDias(seguinte.data_entrada, -1))}) e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}`, 'Registrar devolução', 'botao mini') : ''}</div>`;
+    } else {
+      html += `<div class="alerta info">${quem} assumiu o contrato em ${dataBr(seguinte.data_entrada)} com garantia própria: esta garantia não passou para lá${R.temFiador(c) ? ` (a fiança vale até ${dataBr(C.somarDias(seguinte.data_entrada, -1))})` : ''}.</div>`;
+    }
+  }
   if (anteriorDaGarantia && (R.temCaucao(c) || R.temDeposito(c)) && !R.garantiaDepositada(c)) {
     // herdada e ainda sem comprovante: o depósito e o comprovante são anexados no contrato anterior
     const qual = R.temCaucao(c) ? 'caucao' : 'deposito';
