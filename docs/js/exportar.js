@@ -21,7 +21,7 @@ export const ehDinheiro = (nome) => (CAMPOS.has(nome) ? CAMPOS.get(nome).tipo ==
 
 // Formulário de cada cadastro: o rótulo da coluna vem dele (o mesmo campo pode ter outro nome em outro cadastro)
 const FORM_DA_TABELA = { imoveis: F.IMOVEL, contratos: F.CONTRATO, correcoes: F.CORRECAO, seguros: F.SEGURO, iptus: F.IPTU,
-  titularidades: F.TITULARIDADE, cobrancas: F.COBRANCA, fiadores: F.FIADOR, aplicacoes: F.APLICACAO, correcoes_garantia: F.CORRECAO_GARANTIA,
+  titularidades: F.TITULARIDADE, cobrancas: F.COBRANCA, fiadores: F.FIADOR, aplicacoes: F.APLICACAO, correcoes_garantia: F.CORRECAO_GARANTIA, devolucoes_garantia: F.DEVOLUCAO_GARANTIA,
   renovacoes: F.RENOVACAO, encerramentos: F.ENCERRAMENTO, avulsas: F.AVULSA, emitentes: F.EMITENTE, usuarios: F.USUARIO,
   reformas: F.REFORMA, solicitacoes: F.SOLICITACAO, ressarcimentos: F.RESSARCIMENTO, leituras: F.LEITURA };
 

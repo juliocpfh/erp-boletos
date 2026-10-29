@@ -54,6 +54,7 @@ const TABELAS_EXCLUSAO = {
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
+  devolucoes_garantia: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   depositos_garantia: { depois: (db, r) => (r.complementar ? null : R.acertarGarantiaDepositada(db, r.contrato_id, r.qual, login())), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   despesas: {},
   ressarcimentos: {

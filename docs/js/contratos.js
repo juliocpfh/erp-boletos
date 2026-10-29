@@ -619,6 +619,16 @@ function dadosDoAditivoTroca(d, c, a) {
     aluguel_atual: valorComExtenso(a.aluguel || c.aluguel_inicial || 0),
   });
   dados.condicoes.varios_entrantes = entrantes.length > 1;
+  // garantia nova na troca: a de quem sai (valor guardado no termo, ou o do contrato dele) é devolvida ou deixa de valer
+  const nova = c.garantia_na_troca === 'nova';
+  const tipoAnt = ant.garantia_tipo || '';
+  const dinheiroAnt = ['Caução', 'Depósito garantia', 'Fiador + depósito'].includes(tipoAnt);
+  const valorAnt = a.garantia_anterior || (tipoAnt === 'Caução' ? ant.caucao_valor : ant.deposito_valor) || 0;
+  dados.condicoes.garantia_nova = nova;
+  dados.condicoes.garantia_anterior_dinheiro = nova && dinheiroAnt;
+  dados.condicoes.garantia_anterior_fianca = nova && !dinheiroAnt && ['Fiador', 'Seguro fiança'].includes(tipoAnt);
+  dados.campos.garantia_anterior = !nova ? '' : dinheiroAnt ? `${tipoAnt === 'Caução' ? 'caução' : 'depósito de garantia'} de ${valorComExtenso(valorAnt)}`
+    : tipoAnt === 'Fiador' ? 'fiança' : tipoAnt.toLocaleLowerCase('pt-BR');
   dados.quantidades.locatarios = Math.max(entrantes.length, 1);
   dados.quantidades.saintes = Math.max(saintes.length, 1);
   // assinam: locadora, quem sai, quem entra, fiadores e testemunhas

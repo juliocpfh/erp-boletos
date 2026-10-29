@@ -416,6 +416,17 @@ export const CORRECAO_GARANTIA = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+// troca de titular com garantia nova: a garantia do anterior é devolvida a ele (como no cálculo final da saída)
+export const DEVOLUCAO_GARANTIA = [
+  campo('data', 'Data da devolução', 'data', { obrig: true }),
+  campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro', { obrig: true }),
+  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { ajuda: 'Em branco: sem correção' }),
+  campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos até a véspera da troca em aberto, reparos etc.' }),
+  campo('debitos_descricao', 'Descrição dos débitos', 'area'),
+  comprovante('comprovante', 'Comprovante da devolução', { ajuda: `PDF ou foto da transferência. ${SEM_COMPROVANTE}` }),
+  campo('observacoes', 'Observações', 'area'),
+];
+
 export const RENOVACAO = [
   campo('data', 'Data', 'data', { obrig: true, ajuda: 'O novo valor (se houver) vale a partir desta data' }),
   campo('tipo', 'O que aconteceu', 'opcao', { obrig: true, opcoes: ['Renovado com nova data de término', 'Passou a prazo indeterminado', 'Novo valor negociado'] }),

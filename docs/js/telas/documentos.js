@@ -490,8 +490,10 @@ function telaAditivoTroca(c, a) {
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : 'Gerar termo aditivo: troca de inquilino'}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
     <div class="alerta info">Sai <b>${esc(ant.inquilino_nome)}</b>${ant.solidario_nome ? ` (e o solidário ${esc(ant.solidario_nome)})` : ''}; entra <b>${esc(c.inquilino_nome)}</b>${c.solidario_nome ? ` com ${esc(c.solidario_nome)}` : ''}, a partir de <b>${dataBr(troca)}</b>.
-      O que for do período até ${dataBr(C.somarDias(troca, -1))} fica com quem sai. Garantia: <b>${esc(c.garantia_tipo || 'Sem garantia')}</b>${R.temCaucao(c) || R.temDeposito(c) ? ' (continua na locação e passa a ser devolvida a quem entra)' : ''}.
-      ${R.temFiador(c) ? '<br><b>Fiador:</b> ele precisa assinar o termo concordando em garantir quem entra; se não aceitar, troque a garantia antes.' : ''}</div>
+      O que for do período até ${dataBr(C.somarDias(troca, -1))} fica com quem sai.
+      ${R.garantiaNova(c) ? `Garantia nova: a de quem sai (<b>${esc(ant.garantia_tipo || 'Sem garantia')}</b>${R.temCaucao(ant) || R.temDeposito(ant) ? `, ${C.reais(R.valorGarantia(d(), ant))}, devolvida a ${esc(ant.inquilino_nome)}` : ', só até a véspera'}); a de quem entra: <b>${esc(c.garantia_tipo || 'Sem garantia')}</b>. O termo dá ciência disso aos dois.`
+    : `Garantia: <b>${esc(c.garantia_tipo || 'Sem garantia')}</b>${R.temCaucao(c) || R.temDeposito(c) ? ' (continua na locação e passa a ser devolvida a quem entra)' : ''}.`}
+      ${R.temFiador(c) ? `<br><b>Fiador:</b> ele precisa assinar o termo concordando em garantir quem entra${R.garantiaNova(c) ? '' : '; se não aceitar, troque a garantia antes'}.` : ''}</div>
     <form class="cartao" data-form="aditivoTroca">
       <input type="hidden" name="id" value="${a ? a.id : ''}"><input type="hidden" name="contrato" value="${c.id}">
       <div class="formulario">
@@ -519,7 +521,10 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
     <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
       e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>
     <li>Só nos termos aditivos de troca de inquilino: <code>{numero_aditivo} {data_contrato} {data_troca} {data_vespera} {saintes} {entrantes} {aluguel_atual}</code>,
-      a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.</li>
+      a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.
+      Garantia escolhida na troca: a condição <code>garantia_nova</code> (quem entra presta a sua; sem ela, a garantia continua),
+      <code>garantia_anterior_dinheiro</code> (caução ou depósito de quem sai, a devolver), <code>garantia_anterior_fianca</code> (fiança ou seguro fiança de quem sai)
+      e o campo <code>{garantia_anterior}</code> (ex.: "caução de R$ 5.670,00 (...)"). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>

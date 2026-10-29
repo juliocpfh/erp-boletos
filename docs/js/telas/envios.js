@@ -347,7 +347,7 @@ export const FORMULARIOS = {
     });
     if (cfg.depois) await cfg.depois(salvo, antigo);
     // data do lançamento editada: o nome do comprovante acompanha (comprovante-caucao-AAAA-MM-DD)
-    if (['contratos', 'depositos_garantia', 'correcoes_garantia', 'aplicacoes'].includes(tabela)) await acertarNomesDosComprovantes(tabela === 'contratos' ? salvo.id : salvo.contrato_id);
+    if (['contratos', 'depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia'].includes(tabela)) await acertarNomesDosComprovantes(tabela === 'contratos' ? salvo.id : salvo.contrato_id);
     if (tabela === 'usuarios') renovarUsuario();
     aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : 'Salvo.');
     const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : cfg.destino ? cfg.destino(salvo, rota.q) : cfg.voltar(salvo, rota.q);

@@ -231,6 +231,40 @@ test('termo aditivo de troca de inquilino: quem sai e quem entra, débitos até 
   assert.equal(R.alertaAditivoHerdeiro(d, n), null, 'assinado: some o alerta da troca de titular');
 });
 
+test('termo aditivo de troca com garantia nova: caução de quem sai devolvida a ele, fiador de quem entra e ciência dos dois', () => {
+  const { d, c } = base();
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-09-05', valor: 945000, arquivo: 'cau.pdf' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Lúcia Prado', inquilino_cpf: '529.982.247-25', inquilino_genero: 'Feminino',
+    data_entrada: '2027-04-27', vigencia_inicio: '2027-04-27', vigencia_fim: '2029-03-05', aluguel_inicial: 380000, dia_vencimento: 10, indice_correcao: 'IPCA',
+    garantia_tipo: 'Fiador', garantia_na_troca: 'nova', finalidade: 'Residencial', descricao_objeto: 'a casa nº 3' }, 'j');
+  R.inserir(d, 'fiadores', { contrato_id: n.id, nome: 'Ana Lima', cpf: '529.982.247-25', genero: 'Feminino' }, 'j');
+  const modelo = K.modelosDe(d, 'aditivo_troca')[0];
+  const a = R.salvarAditivoTroca(d, n.id, { data: '2027-04-27', texto: modelo.texto }, 'j');
+  assert.equal(a.garantia_anterior, 945000);
+  const t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.match(t, /A garantia prestada no contrato pelo LOCATÁRIO SAINTE, caução de R\$ 9\.450,00 \(nove mil[^)]*\), não passa ao LOCATÁRIO ENTRANTE: será devolvida ao LOCATÁRIO SAINTE/);
+  assert.match(t, /descontados os débitos do período até 26 de abril de 2027/);
+  assert.match(t, /O FIADOR declara conhecer e aceitar as condições do contrato e garante as obrigações do LOCATÁRIO ENTRANTE/);
+  assert.match(t, /O LOCATÁRIO SAINTE e o LOCATÁRIO ENTRANTE declaram ciência de que a garantia prestada no contrato não continua na locação e é substituída pela garantia descrita acima\./);
+  assert.doesNotMatch(t, /continua depositada|transfere ao LOCATÁRIO ENTRANTE o direito/, 'sem o texto da garantia que continua');
+  assert.doesNotMatch(t, /\[\w+\?\]/, 'nenhum campo desconhecido');
+  // quem entra sem garantia
+  n.garantia_tipo = 'Sem garantia';
+  const t2 = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.match(t2, /A partir de 27 de abril de 2027, a locação fica sem garantia\./);
+  assert.match(t2, /não continua na locação\./);
+  // modelo de troca já gravado (antes desta regra): ganha a garantia nova e mantém o texto da que continua
+  d.modelos_contrato.push({ id: 9, nome: 'Meu aditivo', tipo: 'aditivo_troca', texto: '# T\n\n## DA GARANTIA\n\n[se caucao]**CLÁUSULA #** – Caução continua.[fim]\n\n## DISPOSIÇÕES FINAIS\n\nFim.' });
+  R.normalizar(d);
+  const salvo = d.modelos_contrato.find((m) => m.id === 9).texto;
+  assert.match(salvo, /\[se garantia_nova\]/);
+  n.garantia_tipo = 'Caução';
+  n.garantia_na_troca = null;
+  assert.match(texto(K.montarContrato(salvo, K.dadosDoAditivo(d, n, { ...a, garantia_anterior: null }))), /CLÁUSULA 1ª – Caução continua\.\nDISPOSIÇÕES FINAIS/);
+  R.normalizar(d);
+  assert.equal(d.modelos_contrato.find((m) => m.id === 9).texto, salvo, 'só uma vez');
+});
+
 test('termo aditivo de vencimento (modelo C): só muda o dia, referência no mês anterior, fiador concorda e assinaturas', () => {
   const { d, c } = base({ garantia_tipo: 'Fiador' });
   R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Ana Lima', cpf: '529.982.247-25', genero: 'Feminino' }, 'j');

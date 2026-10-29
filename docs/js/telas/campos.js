@@ -127,7 +127,7 @@ function procurarPessoa(el) {
     <button type="button" class="secundario pequeno" data-acao="usarPessoa" data-fonte="${esc(a.fonte)}" data-alvo="${esc(alvo)}">Usar os dados cadastrados</button>`);
 }
 
-/** Troca de titular escolhida no novo contrato: { anteriorId, data, arquivo } (o termo aditivo é gravado depois de salvar). */
+/** Troca de titular escolhida no novo contrato: { anteriorId, data, arquivo, garantia } (o termo aditivo é gravado depois de salvar). */
 
 /**
  * Inquilino novo que continua o contrato de outro (troca de titular): confirma numa janela a data da alteração (novo início
@@ -142,9 +142,19 @@ function ligarContinuacaoDeContrato(raiz) {
     const anterior = sel.value && buscar('contratos', sel.value);
     memoria.continuacao = null;
     if (!anterior) return mensagemAuto(sel, '');
+    // garantia: continua a mesma (passa ao novo) ou é nova (a do anterior é devolvida a ele; o novo presta a sua)
+    const temGarantia = anterior.garantia_tipo && anterior.garantia_tipo !== 'Sem garantia';
+    const dinheiro = R.temCaucao(anterior) || R.temDeposito(anterior);
+    const valorAnt = R.valorGarantia(d(), anterior);
+    const nomeAnt = esc(anterior.inquilino_nome);
     const r = await janela({ titulo: `Continuar o contrato de ${anterior.inquilino_nome}`, sim: 'Continuar o contrato',
-      html: `<p>O novo inquilino assume o contrato de <b>${esc(anterior.inquilino_nome)}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
+      html: `<p>O novo inquilino assume o contrato de <b>${nomeAnt}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${C.hojeIso()}" required></p>
+        ${temGarantia ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ''}</label></p>
+        <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="continua" checked> Continua a mesma: passa para o novo inquilino${dinheiro ? ', com o comprovante do depósito, as correções e a aplicação' : ''}</label></p>
+        <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="nova"> Garantia nova: ${dinheiro ? `a de ${nomeAnt} é devolvida a ${nomeAnt} (corrigida, descontados os débitos)` : `a de ${nomeAnt} vale só até a véspera`}
+          e o novo inquilino presta a sua, com depósito e comprovante próprios (pode ser de outro tipo)</label></p>
+        <p class="suave">A escolha entra no termo aditivo da troca, para quem sai e quem entra darem ciência.</p>` : ''}
         <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
         <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
@@ -153,21 +163,24 @@ function ligarContinuacaoDeContrato(raiz) {
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
-    memoria.continuacao = { anteriorId: anterior.id, data, arquivo: arq && arq.size ? arq : null };
+    const garantia = temGarantia && (r.garantia || [])[0] === 'nova' ? 'nova' : 'continua';
+    memoria.continuacao = { anteriorId: anterior.id, data, arquivo: arq && arq.size ? arq : null, garantia };
     const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
     const cond = R.condicoesDoContrato(d(), anterior, data);
     const feitos = preencherVazios(sel.form, F.paraFormulario(campos, cond), F.paraFormulario(campos, null));
     // aluguel, bonificado, boleto e reserva: iguais aos do anterior (sobrescreve o que estiver digitado) e travados
     travarValoresHerdados(sel.form, F.paraFormulario(F.CONTRATO.filter((c) => c.nome), { bonificacao: anterior.bonificacao !== false,
       cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false, ...cond }));
-    if (anterior.garantia_tipo && anterior.garantia_tipo !== 'Sem garantia') travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
+    if (temGarantia && garantia === 'continua') travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
+    if (garantia === 'nova') liberarGarantiaNova(sel.form, anterior.inquilino_nome, dinheiro);
     // a data da alteração é o novo início do contrato e da vigência (mesmo se já havia outra data no formulário)
     for (const nome of ['vigencia_inicio', 'data_entrada']) {
       const el = sel.form.querySelector(`[name=${nome}]`);
       if (el) { el.value = data; el.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     mensagemAuto(sel, `Continuação do contrato de ${esc(anterior.inquilino_nome)} a partir de ${dataBr(data)}${feitos.length ? `: ${esc(feitos.join(', '))} vieram do contrato anterior` : ''}.
-      <b>Aluguel (${reais(cond.aluguel_inicial)}), bonificação, boleto, reserva e garantia são os do contrato e ficam travados</b>: mudanças depois, pelos botões da página do inquilino (correção, renovação, corrigir caução).
+      <b>Aluguel (${reais(cond.aluguel_inicial)}), bonificação, boleto, reserva${garantia === 'nova' ? '' : ' e garantia'} são os do contrato e ficam travados</b>: mudanças depois, pelos botões da página do inquilino (correção, renovação${garantia === 'nova' ? '' : ', corrigir caução'}).
+      ${garantia === 'nova' ? `<br><b>Garantia nova:</b> escolha abaixo a garantia do novo inquilino; ${dinheiro ? `a de ${nomeAnt} fica no contrato dele para registrar a devolução` : `a de ${nomeAnt} vale só até a véspera`}.` : ''}
       ${memoria.continuacao.arquivo ? `Termo aditivo: ${esc(memoria.continuacao.arquivo.name)} (anexado ao salvar).` : 'Sem termo aditivo: fica o alerta para anexar.'}`);
   });
 }
@@ -232,7 +245,25 @@ function travarGarantiaHerdada(form, origem, nomeAnterior) {
   }
 }
 
-/** Editar o contrato de quem continuou o de outro: a garantia fica travada (é a do contrato). */
+/**
+ * Troca de titular com garantia nova: os campos da garantia ficam livres (vêm com o tipo do anterior, que pode mudar) e a
+ * caução é recalculada (aluguéis × aluguel atual com bonificação), com a data prevista na data da troca.
+ */
+function liberarGarantiaNova(form, nomeAnterior, dinheiro) {
+  for (const nome of CAMPOS_GARANTIA_HERDADA) {
+    const el = form.querySelector(`[name=${nome}]`);
+    if (!el) continue;
+    if (['caucao_valor', 'caucao_data', 'deposito_valor', 'deposito_data'].includes(nome)) el.value = '';
+    el.readOnly = false;
+    el.classList.remove('travado');
+    el.removeAttribute('tabindex');
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const alvo = form.querySelector('[name=garantia_tipo]');
+  if (alvo) mensagemAuto(alvo, `<b>Garantia nova</b> do novo inquilino (pode ser de outro tipo). ${dinheiro ? `A de ${esc(nomeAnterior)} é devolvida a ${esc(nomeAnterior)}: registre a devolução na página dele.` : `A de ${esc(nomeAnterior)} vale só até a véspera da troca.`}`);
+}
+
+/** Editar o contrato de quem continuou o de outro: a garantia fica travada (é a do contrato), salvo se é garantia nova. */
 function ligarGarantiaHerdada(raiz) {
   const form = raiz.querySelector('form[data-form=cadastro]');
   const [, id] = location.hash.match(/^#\/editar\/contratos\/(\d+)/) || [];
@@ -240,7 +271,7 @@ function ligarGarantiaHerdada(raiz) {
   const ant = c && R.contratoHerdado(d(), c);
   if (!ant) return;
   travarValoresHerdados(form);
-  travarGarantiaHerdada(form, c, ant.inquilino_nome);
+  if (!R.garantiaNova(c)) travarGarantiaHerdada(form, c, ant.inquilino_nome);
 }
 
 /** Caixas "Usar o endereço do imóvel" do contrato: [caixa, campo de endereço que recebe] (inquilino, representante e solidário). */
