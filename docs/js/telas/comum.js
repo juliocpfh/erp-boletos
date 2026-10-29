@@ -210,7 +210,8 @@ async function completarHeranca(id) {
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosSeguro, true, 'seguro');
   await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
-  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean).join(' e ')} trazida(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
+  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
+    r.correcoes && `${r.correcoes} correção(ões) da caução`, r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean).join(', ')} trazido(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
   return r;
 }
 
@@ -223,10 +224,21 @@ export async function trazerHerancasPendentes() {
   // troca agendada (data futura): passa só no dia
   const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c) && !R.herancaAgendada(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
-  // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações) ou a reserva do anterior
+  // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações), a reserva ou o seguro do anterior
+  const completadas = await conferirHerancas();
+  if (pendentes.length || completadas) await mostrar();
+}
+
+/**
+ * Confere as trocas de titular já feitas: o que ainda está no contrato anterior e é do novo (garantia, aplicações e correções
+ * da caução lançadas lá depois, reserva, seguro) passa ao novo, com os arquivos (R.herancaIncompleta / R.completarHeranca).
+ * Roda ao abrir o Painel e no botão "Conferir arquivos agora". Devolve quantos contratos foram completados.
+ */
+export async function conferirHerancas() {
+  if (!opera() || !E.pasta) return 0;
   const incompletas = d().contratos.filter((c) => R.herancaIncompleta(d(), c));
   for (const c of incompletas) await completarHeranca(c.id);
-  if (pendentes.length || incompletas.length) await mostrar();
+  return incompletas.length;
 }
 
 /**
