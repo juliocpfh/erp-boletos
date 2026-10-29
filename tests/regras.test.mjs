@@ -1503,6 +1503,27 @@ test('troca de titular com garantia nova: a caução fica com o anterior para de
   assert.throws(() => R.salvarDevolucaoGarantia(d2, c2.id, { data: '2026-10-10', garantia_valor: 1 }, 'julio'), /continua com o novo titular/);
 });
 
+test('garantia herdada: aplicação lançada depois no contrato anterior passa ao novo titular, com o comprovante', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07' });
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2026-06-08', valor: 243000, arquivo: 'cau.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
+    comprovante_caucao: null, caucao_por_depositos: null }, 'julio');
+  assert.equal(R.transferirHeranca(d, novo.id, 'julio').garantia, true);
+  assert.equal(R.herancaIncompleta(d, novo), null, 'herança completa');
+  // aplicação lançada pela página do titular anterior, depois da troca
+  const apl = R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: d.emitentes[0].id, data: '2026-10-20', valor: 243000, comprovante: 'comprovante-aplicacao-garantia-2026-10-20.pdf' }, 'julio');
+  assert.equal(R.situacaoAplicacao(d, novo).ok, false, 'o novo não vê a aplicação');
+  assert.equal(R.herancaIncompleta(d, novo).lancamentos, 1);
+  const r = R.completarHeranca(d, novo.id, 'julio');
+  assert.equal(r.aplicacoes, 1);
+  assert.deepEqual(r.arquivos, ['comprovante-aplicacao-garantia-2026-10-20.pdf'], 'o comprovante muda para a pasta do novo');
+  assert.equal(R.buscar(d, 'aplicacoes', apl.id).contrato_id, novo.id);
+  assert.equal(R.situacaoAplicacao(d, novo).ok, true, '100% aplicado no novo');
+  assert.equal(R.herancaIncompleta(d, novo), null, 'só uma vez');
+});
+
 test('quem saiu fica inativo quando o boleto do último mês já existe; herdeiro não vê reajuste de antes da entrada', () => {
   const { d, c } = base();
   R.gerarCobrancas(d, '2026-06', 'julio');
@@ -1562,7 +1583,7 @@ test('herança já feita sem a garantia e a reserva do anterior: completa (compr
     data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01', reserva_usada_anterior: 0 }, 'julio');
   R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2026-10-02', valor: 1000 }, 'julio');
   c.data_saida = '2026-09-30';
-  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true, seguro: false });
+  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true, seguro: false, lancamentos: 0 });
   const r = R.completarHeranca(d, novo.id, 'julio');
   assert.deepEqual(r.arquivos.sort(), ['apl.pdf', 'caucao.pdf']);
   assert.equal(novo.comprovante_caucao, 'caucao.pdf');

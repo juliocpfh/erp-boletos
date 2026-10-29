@@ -225,7 +225,11 @@ function caixaGarantia(c) {
         <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo mini', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
   }
   // caução ou depósito em dinheiro: a aplicação aparece também enquanto não foi depositado tudo (aplica o que já entrou)
-  if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
+  // troca de titular: a garantia passou ao novo titular; as aplicações são dele (lançadas e mostradas lá)
+  if (herdeiro && (R.temCaucao(c) || R.temDeposito(c))) {
+    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : '')}
+      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Dados e backup).` : ''}</p>`;
+  } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
     const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
       <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>

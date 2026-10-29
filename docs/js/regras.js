@@ -2191,14 +2191,24 @@ export function herdarSeguros(d, n, a, usuario) {
 const garantiaAHerdar = (d, a) => !!(a && (temCaucao(a) || temDeposito(a)) && !a.garantia_transferida_para
   && (a.comprovante_caucao || a.comprovante_deposito || a.caucao_por_depositos || a.deposito_por_depositos || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === a.id))));
 
-/** Herança já feita em que ficou faltando a garantia ou a reserva do contrato anterior (dados cadastrados antes). */
+/**
+ * Garantia já passada ao herdeiro (``garantia_transferida_para``) com lançamentos que ainda ficaram no contrato anterior:
+ * aplicações e correções da caução registradas lá depois da troca (ex.: aplicação lançada pela página do titular anterior).
+ * Os depósitos não entram: o comprovante deles aparece no herdeiro por sincronizarGarantiaHerdeiro.
+ */
+const LANCAMENTOS_GARANTIA_HERDADA = ['aplicacoes', 'correcoes_garantia'];
+const lancamentosNoAnterior = (d, n, a) => (a && a.garantia_transferida_para === n.id
+  ? LANCAMENTOS_GARANTIA_HERDADA.flatMap((t) => (d[t] || []).filter((x) => x.contrato_id === a.id).map((x) => ({ tabela: t, registro: x }))) : []);
+
+/** Herança já feita em que ficou faltando a garantia (ou lançamentos dela), a reserva ou o seguro do contrato anterior. */
 export function herancaIncompleta(d, c) {
   const a = c.heranca_transferida && contratoHerdado(d, c);
   if (!a) return null;
   const garantia = !garantiaNova(c) && garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const reserva = a.reserva_valor > 0 && !(c.reserva_valor > 0);
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
-  return garantia || reserva || seguro ? { garantia, reserva, seguro } : null;
+  const lancamentos = lancamentosNoAnterior(d, c, a).length;
+  return garantia || reserva || seguro || lancamentos ? { garantia, reserva, seguro, lancamentos } : null;
 }
 
 /**
@@ -2211,7 +2221,13 @@ export function completarHeranca(d, novoId, usuario) {
   const falta = n && herancaIncompleta(d, n);
   if (!falta) return null;
   const a = contratoHerdado(d, n);
-  const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false };
+  const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0 };
+  // lançamentos da garantia já herdada feitos depois no anterior (aplicação, correção da caução): passam, com o comprovante
+  for (const { tabela, registro: x } of lancamentosNoAnterior(d, n, a)) {
+    if (x.comprovante) out.arquivos.push(x.comprovante);
+    atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${TABELAS[tabela]} de ${C.dataBr(x.data)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (garantia herdada)`);
+    if (tabela === 'aplicacoes') out.aplicacoes += 1; else out.correcoes += 1;
+  }
   if (falta.seguro) {
     out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
     recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
