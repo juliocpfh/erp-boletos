@@ -28,7 +28,7 @@ export function caixaReservaAbatida(c) {
   const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
   const ant = c.reserva_usada_anterior > 0 && R.contratoHerdado(d(), c);
   const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
-    ant ? `Já usada no contrato de ${esc(ant.inquilino_nome)}: ${reais(c.reserva_usada_anterior)}.` : ''].filter(Boolean).join(' ');
+    ant ? `Já usada no contrato de ${esc(ant.inquilino_nome)}: ${reais(c.reserva_usada_anterior)}${R.mesesUsoReserva(d(), ant).length ? `, em ${R.mesesUsoReserva(d(), ant).map(compBr).join(', ')}` : ''}.` : ''].filter(Boolean).join(' ');
   if (c.reserva_abatida_valor > 0) {
     return `<div class="alerta ok"><b>Reserva já abatida</b> em ${compBr(c.reserva_abatida_comp)}: ${reais(c.reserva_abatida_valor)} (aluguel antigo, fora dos boletos do sistema).
       ${nosBoletos ? `<br>${nosBoletos}` : ''}

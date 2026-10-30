@@ -38,6 +38,8 @@ export function normalizar(d) {
   const vazio = bancoVazio();
   for (const [k, v] of Object.entries(vazio)) if (d[k] === undefined) d[k] = v;
   for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d.listas[k])) d.listas[k] = [...l.padrao];
+  // garantia marcada como passada a um contrato que foi excluído: volta a ser deste (senão não passa ao novo titular)
+  for (const c of d.contratos) if (c.garantia_transferida_para && !d.contratos.some((x) => x.id === c.garantia_transferida_para)) c.garantia_transferida_para = null;
   // o anúncio passou a ser só uma descrição (o link antigo vira o texto)
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -503,12 +505,15 @@ export const boletoDoMes = (d, contratoId, comp) => d.cobrancas.find((x) => x.co
  * o complemento a depositar e o boleto do complemento ainda não pago. Null quando não há correção pendente.
  */
 export function complementoCaucao(d, c) {
-  if (!temCaucao(c) || !c.caucao_valor || !garantiaDepositada(c)) return null;
+  // troca de titular com data futura: até o dia, a caução depositada está no contrato anterior (a correção do aluguel já é do novo)
+  const g = herancaAgendada(d, c) && !garantiaNova(c) ? contratoHerdado(d, c) : c;
+  if (!temCaucao(g) || !g.caucao_valor || !garantiaDepositada(g)) return null;
+  const proprias = g === c ? [] : correcoesCaucaoAtual(d, c);
   // caução paga por boleto vale para o reajuste do boleto (``referente``), mesmo paga depois de um reajuste mais novo
-  const ultimaCaucao = correcoesCaucaoAtual(d, c).map((x) => x.referente || x.data).sort().pop() || c.caucao_data || '';
+  const ultimaCaucao = [...correcoesCaucaoAtual(d, g), ...proprias].map((x) => x.referente || x.data).sort().pop() || g.caucao_data || '';
   const correcao = correcoesDo(d, c.id).filter((x) => x.data_vigencia > ultimaCaucao).pop();
   if (!correcao) return null;
-  const atual = valorGarantia(d, c);
+  const atual = proprias.length ? proprias[proprias.length - 1].valor_novo : valorGarantia(d, g);
   const necessaria = caucaoSugerida(d, c, correcao.data_vigencia);
   const boleto = d.cobrancas.find((x) => x.contrato_id === c.id && ehComplementoCaucao(x) && !x.data_pagamento) || null;
   return { correcao, competencia: correcao.data_vigencia.slice(0, 7), atual, necessaria,
@@ -1646,6 +1651,8 @@ export function excluirContrato(d, contratoId, usuario, descricao) {
   for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
     d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
   }
+  // a garantia que tinha passado a este contrato volta a ser do anterior (senão não passa a um novo titular)
+  for (const a of d.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d, 'contratos', a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
   excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
 }
 
@@ -2112,7 +2119,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
     if (a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
     if (!n.data_base_correcao) atualizar(d, 'contratos', n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
     recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
-    return { ...out, agendada: true };
+    // a reserva já aparece no novo (valor, comprovante e o que foi usado), para não abater de novo; no dia, confere o uso outra vez
+    return { ...out, agendada: true, arquivosReserva: herdarReserva(d, n, a, usuario) };
   }
   encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
   // aluguel e reajuste
@@ -2123,7 +2131,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   for (const x of correcoesDo(d, a.id).filter((y) => y.data_vigencia >= data)) { passa('correcoes', x, `Correção do aluguel de ${C.dataBr(x.data_vigencia)}`); out.correcoes += 1; }
   // garantia em dinheiro (e fiadores atuais)
   const garantiaPropria = n.comprovante_caucao || n.comprovante_deposito || n.caucao_por_depositos || n.deposito_por_depositos
-    || TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === n.id));
+    // a correção da caução feita antes do dia da troca completa a garantia herdada: não é garantia própria
+    || TABELAS_GARANTIA.some((t) => t !== 'correcoes_garantia' && (d[t] || []).some((x) => x.contrato_id === n.id));
   // garantia nova (a do anterior é devolvida a ele): nada da garantia passa; o anterior registra a devolução
   if (!garantiaPropria && !garantiaNova(n) && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
     for (const k of CAMPOS_GARANTIA) mud[k] = a[k] ?? null;
@@ -2152,7 +2161,7 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
       out.boletosMovidos += 1;
     }
   }
-  out.arquivosReserva = herdarReserva(d, n, a, usuario);
+  out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
   out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
   recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
   desativarSeSaiu(d, a, usuario);
@@ -2167,13 +2176,21 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
  */
 export function herdarReserva(d, n, a, usuario, forcar = false) {
   if (!(a.reserva_valor > 0) || (n.reserva_usada_anterior !== undefined && !forcar)) return [];
-  const usada = d.cobrancas.filter((cb) => cb.contrato_id === a.id).reduce((t, cb) => t + (cb.reserva_utilizada || 0), 0) + (a.reserva_abatida_valor || 0);
+  const usada = d.cobrancas.filter((cb) => cb.contrato_id === a.id).reduce((t, cb) => t + (cb.reserva_utilizada || 0), 0) + (a.reserva_abatida_valor || 0) + (a.reserva_usada_anterior || 0);
   const res = { reserva_valor: a.reserva_valor, reserva_data: a.reserva_data || null, reserva_competencia: a.reserva_competencia || null,
     reserva_usada_anterior: Math.min(usada, a.reserva_valor), reserva_abatida_comp: null, reserva_abatida_valor: null };
   const copiar = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
   if (copiar.length) res.comprovante_reserva = a.comprovante_reserva;
   atualizar(d, 'contratos', n.id, res, usuario, `${n.inquilino_nome}: reserva de ${C.reais(a.reserva_valor)} do contrato (já usada ${C.reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
   return copiar;
+}
+
+/** Meses em que a reserva foi usada nos contratos anteriores até ``a`` (boletos ou abatida fora do sistema). Ex.: ['2026-06']. */
+export function mesesUsoReserva(d, a) {
+  const meses = [...cadeiaDeContratos(d, a).antes, a].flatMap((x) => [
+    ...d.cobrancas.filter((cb) => cb.contrato_id === x.id && cb.reserva_utilizada > 0).map((cb) => cb.competencia),
+    ...(x.reserva_abatida_valor > 0 && x.reserva_abatida_comp ? [x.reserva_abatida_comp] : [])]);
+  return [...new Set(meses)].sort();
 }
 
 /** Apólices do anterior ainda em vigência na troca de titular (fim da vigência na data da troca ou depois): vão ao herdeiro. */
@@ -2209,12 +2226,17 @@ const LANCAMENTOS_GARANTIA_HERDADA = ['aplicacoes', 'correcoes_garantia'];
 const lancamentosNoAnterior = (d, n, a) => (a && a.garantia_transferida_para === n.id
   ? LANCAMENTOS_GARANTIA_HERDADA.flatMap((t) => (d[t] || []).filter((x) => x.contrato_id === a.id).map((x) => ({ tabela: t, registro: x }))) : []);
 
-/** Herança já feita em que ficou faltando a garantia (ou lançamentos dela), a reserva ou o seguro do contrato anterior. */
+/**
+ * Herança já feita em que ficou faltando a garantia (ou lançamentos dela), a reserva (valor, comprovante ou o já usado) ou o
+ * seguro do contrato anterior. Troca com data futura: só a reserva; o resto passa no dia.
+ */
 export function herancaIncompleta(d, c) {
-  const a = c.heranca_transferida && contratoHerdado(d, c);
+  const feita = !!c.heranca_transferida;
+  const a = (feita || herancaAgendada(d, c)) && contratoHerdado(d, c);
   if (!a) return null;
+  const reserva = a.reserva_valor > 0 && (!(c.reserva_valor > 0) || (a.comprovante_reserva && !c.comprovante_reserva) || c.reserva_usada_anterior === undefined);
+  if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0 } : null;
   const garantia = !garantiaNova(c) && garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
-  const reserva = a.reserva_valor > 0 && !(c.reserva_valor > 0);
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const lancamentos = lancamentosNoAnterior(d, c, a).length;
   return garantia || reserva || seguro || lancamentos ? { garantia, reserva, seguro, lancamentos } : null;
