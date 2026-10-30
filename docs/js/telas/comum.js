@@ -38,7 +38,7 @@ export const endereco = (i, sep = ' · ') => [R.enderecoCompleto(i), i.bairro, i
 
 export function multaJurosTexto(cb) {
   if (!cb.data_pagamento) return '';
-  if (!cb.dias_atraso) return '<span class="suave">sem multa e juros</span>';
+  if (!cb.dias_atraso || !(cb.multa || cb.juros)) return '<span class="suave">sem multa e juros</span>';
   return `Multa ${pct(cb.multa_percentual)} = <b>${reais(cb.multa)}</b><br>Juros ${pct(cb.juros_mensal_percentual)} a.m. × ${cb.dias_atraso} dias = <b>${reais(cb.juros)}</b>`;
 }
 
@@ -156,6 +156,10 @@ export async function trazerHeranca(id) {
   if (r.agendada) {
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
     const n = buscar('contratos', id);
+    if (r.aguardaAditivo) {
+      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.`, 'info');
+      return r;
+    }
     aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
     return r;
   }
@@ -218,6 +222,12 @@ async function completarHeranca(id) {
 
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
+
+/** Termo aditivo assinado: a troca de titular anda (fim do vínculo do anterior ou, passada a data, o contrato passa ao novo). */
+export async function trazerHerancaAssinada(id) {
+  const c = buscar('contratos', id);
+  if (c && c.contrato_anterior_id && !c.heranca_transferida) await trazerHeranca(c.id);
+}
 
 export async function trazerHerancasPendentes() {
   if (herancasFeitas || !opera() || !E.pasta) return;

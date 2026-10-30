@@ -24,6 +24,7 @@ test('troca de titular com data futura: o anterior paga até a véspera; garanti
   const { id, ...resto } = c;
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-12-15', vigencia_inicio: '2026-12-15',
     comprovante_caucao: null, caucao_por_depositos: null }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   const r = R.transferirHeranca(d, novo.id, 'julio', '2026-10-28');
   assert.equal(r.agendada, true);
   assert.equal(c.data_saida, '2026-12-14', 'fim do vínculo na véspera');
@@ -176,6 +177,7 @@ test('troca com data futura: reserva já aparece no novo; reajuste calcula o com
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2099-01-01', vigencia_inicio: '2099-01-01',
     comprovante_caucao: null, comprovante_reserva: null, reserva_abatida_comp: null, reserva_abatida_valor: null }, 'julio');
   assert.equal(R.herancaIncompleta(d, novo).reserva, true, 'contrato já salvo sem a reserva completa');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   const r = R.transferirHeranca(d, novo.id, 'julio', '2098-12-20');
   assert.deepEqual(r.arquivosReserva, ['res.pdf']);
   assert.deepEqual([novo.comprovante_reserva, novo.reserva_data, novo.reserva_usada_anterior, R.saldoReserva(d, novo)], ['res.pdf', '2026-06-01', 50000, 0]);

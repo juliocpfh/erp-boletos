@@ -10,7 +10,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca } from './comum.js';
+import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -125,21 +125,19 @@ export const CADASTROS = {
   },
   ressarcimentos: {
     titulo: (r, q) => `Ressarcimento de condomínio - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.RESSARCIMENTO,
+    campos: () => F.RESSARCIMENTO.map((c) => (c.nome === 'descricao' ? { ...c, sugestoes: R.taxasCondominioUsadas(d()) } : c)),
     conferir: conferirRessarcimento,
-    padrao: () => ({ competencia_condominio: C.somarMeses(C.competenciaDe(C.hojeIso()), -1) }),
+    padrao: () => ({ competencia_condominio: C.competenciaDe(C.hojeIso()) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
     aviso: () => 'Taxas extraordinárias do condomínio são do proprietário (Lei 8.245/91, art. 22, X): fundo de obras, constituição do fundo de reserva, obras na estrutura, pintura de fachada, equipamentos de segurança, paisagismo das áreas comuns, indenizações trabalhistas de antes da locação. Se o inquilino pagou no boleto do condomínio, o valor volta para ele no boleto do aluguel.',
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
-      if (dados.descricao === 'Outra' && !dados.detalhe) erros.detalhe = 'Diga qual é a taxa';
       if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
         erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
       }
-      if (dados.detalhe) dados.descricao = `${dados.descricao === 'Outra' ? '' : `${dados.descricao}: `}${dados.detalhe}`;
     },
     salvar(db, dados, q, r) {
       const anterior = r ? r.competencia_abatimento : null;
@@ -235,6 +233,7 @@ export const CADASTROS = {
         if (!Number.isFinite(bonificado) || bonificado < 0 || bonificado > base) erros.aluguel_bonificado = `Informe um valor entre R$ 0,00 e ${reais(base)} (aluguel cheio)`;
         else dados.desconto_pontualidade_percentual = C.percentualPorBonificado(base, bonificado);
       }
+      if (r && R.trocaAguardaAditivo(d(), r) && dados.aluguel_inicial !== r.aluguel_inicial) erros.aluguel_inicial = `O contrato ainda é de ${R.contratoHerdado(d(), r).inquilino_nome}: o aluguel só muda depois do termo aditivo assinado`;
       for (const k of ['desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'carencia_meses']) if (dados[k] === null) dados[k] = 0;
       if (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
       // FCI: em branco (ou zero) não cobra; com o %, precisa do índice de correção
@@ -337,6 +336,7 @@ export const CADASTROS = {
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
         const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
         await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome }, login()));
+        await trazerHerancaAssinada(salvo.id);
         aviso('Termo aditivo da troca de titular registrado.');
       }
       if (!antigo || !antigo.pasta) return;

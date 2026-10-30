@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 
 function base() {
@@ -1449,6 +1450,7 @@ test('herança do contrato: correções, data-base do reajuste, caução com dep
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
     garantia_tipo: 'Caução', comprovante_caucao: null, caucao_por_depositos: null, aluguel_inicial: 135000 }, 'julio');
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2026-10-07', indice: 'Negociado', valor_anterior: 135000, valor_novo: 140000, percentual: 0 }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   const r = R.transferirHeranca(d, novo.id, 'julio');
   assert.equal(c.data_saida, '2026-09-30', 'fim do vínculo');
   assert.equal(novo.data_base_correcao, '2026-06-07', 'reajuste no aniversário do contrato original');
@@ -1473,6 +1475,7 @@ test('troca de titular com garantia nova: a caução fica com o anterior para de
   const { id, ...resto } = c;
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
     garantia_tipo: 'Fiador', caucao_valor: null, comprovante_caucao: null, caucao_por_depositos: null, garantia_na_troca: 'nova' }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   const r = R.transferirHeranca(d, novo.id, 'julio');
   assert.equal(r.garantia, false, 'a garantia não passa');
   assert.equal(c.garantia_transferida_para, undefined);
@@ -1510,6 +1513,7 @@ test('garantia herdada: aplicação lançada depois no contrato anterior passa a
   const { id, ...resto } = c;
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01',
     comprovante_caucao: null, caucao_por_depositos: null }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   assert.equal(R.transferirHeranca(d, novo.id, 'julio').garantia, true);
   assert.equal(R.herancaIncompleta(d, novo), null, 'herança completa');
   // aplicação lançada pela página do titular anterior, depois da troca
@@ -1549,6 +1553,7 @@ test('herança: reserva do contrato passa ao novo titular sem abater de novo o q
   assert.equal(cond.reserva_valor, 50000);
   const { id, ...resto } = c;
   const novo = R.inserir(d, 'contratos', { ...resto, reserva_valor: 50000, inquilino_nome: 'Novo', contrato_anterior_id: c.id, data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01' }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   R.transferirHeranca(d, novo.id, 'julio');
   assert.equal(novo.reserva_usada_anterior, 50000);
   assert.equal(R.saldoReserva(d, novo), 0);
@@ -1562,6 +1567,7 @@ test('herança do seguro: a apólice em vigência na troca (com os arquivos) pas
   const atual = R.inserir(d, 'seguros', { imovel_id: c.imovel_id, contrato_id: c.id, vigencia_inicio: '2025-10-16', vigencia_fim: '2026-10-16', arquivo_apolice: 'apolice-atual.pdf', outros_arquivos: ['seguro-boleto.pdf'] }, 'julio');
   const { id, ...resto } = c;
   const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01' }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   const r = R.transferirHeranca(d, novo.id, 'julio');
   assert.deepEqual(r.arquivosSeguro, ['apolice-atual.pdf', 'seguro-boleto.pdf']);
   assert.equal(R.buscar(d, 'seguros', atual.id).contrato_id, novo.id, 'troca em 01/10/2026: apólice até 16/10/2026 vai para a herdeira');
@@ -1816,4 +1822,66 @@ test('aditivo gerado e ainda sem o arquivo assinado: alerta no Painel até anexa
   assert.ok(R.todosAlertas(d, '2026-10-27').some((x) => x.tipo === tipo), 'aparece no Painel');
   R.atualizar(d, 'aditivos', a.id, { arquivo: 'aditivo-assinado.pdf' }, 'julio');
   assert.equal(R.alertasContrato(d, c, '2026-10-27').find((x) => x.tipo === tipo), undefined, 'assinado: some');
+});
+
+test('complemento da caução: nunca tem multa nem juros, também nos boletos já gerados', () => {
+  const { d, c } = base();
+  const cb = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-10', vencimento: '2026-11-05', aluguel: 0, desconto: 0, outros: 38262, caucao_complemento: 38262, multa_percentual: 2, juros_mensal_percentual: 1, situacao: 'Em aberto' }, 'j');
+  const pago = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-09', vencimento: '2026-10-05', aluguel: 0, desconto: 0, outros: 10000, caucao_complemento: 10000, multa_percentual: 2, juros_mensal_percentual: 1, data_pagamento: '2026-10-15', valor_pago: 10232, dias_atraso: 10, multa: 200, juros: 32, situacao: 'Paga com atraso' }, 'j');
+  const aluguel = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-08', vencimento: '2026-09-05', aluguel: 100000, desconto: 0, multa_percentual: 2, juros_mensal_percentual: 1, situacao: 'Em aberto' }, 'j');
+  R.normalizar(d);
+  assert.equal(cb.multa_percentual, 0);
+  assert.equal(cb.juros_mensal_percentual, 0);
+  assert.equal(C.liquidar(cb, '2026-12-05').valor_devido, 38262, 'atrasado: o mesmo valor');
+  assert.equal(pago.valor_pago, 10000);
+  assert.equal(pago.multa, 0);
+  assert.equal(aluguel.multa_percentual, 2, 'boleto do aluguel continua com multa');
+});
+
+test('troca de titular agendada: vigência só no contrato ativo e um aviso só do termo', () => {
+  const { d, c } = base();
+  R.atualizar(d, 'contratos', c.id, { vigencia_fim: '2026-12-01', prazo_tipo: 'Determinado' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Ana Herdeira', data_entrada: '2026-11-01', vigencia_fim: '2026-12-01', prazo_tipo: 'Determinado', ativo: true }, 'j');
+  const tipos = (x, hoje) => R.alertasContrato(d, x, hoje).map((a) => a.tipo);
+  assert.ok(tipos(c, '2026-10-30').includes('Vigência do contrato'), 'o anterior avisa');
+  assert.ok(!tipos(n, '2026-10-30').includes('Vigência do contrato'), 'o novo não avisa até a troca');
+  assert.ok(!tipos(n, '2026-11-01').includes('Vigência do contrato'), 'passada a data, sem assinatura, continua no anterior');
+  assert.match(R.alertasContrato(d, n, '2026-10-30').find((a) => a.tipo === 'Aditivo da troca de titular').texto, /registre o termo/);
+  const a = R.inserir(d, 'aditivos', { contrato_id: n.id, imovel_id: n.imovel_id, tipo: 'Troca de titular', data: '2026-10-28', assunto: 'Troca', texto: 'termo' }, 'j');
+  assert.ok(!tipos(n, '2026-10-30').includes('Aditivo aguardando assinatura'), 'sem aviso duplicado');
+  assert.match(R.alertasContrato(d, n, '2026-10-30').find((x) => x.tipo === 'Aditivo da troca de titular').texto, /aguardando assinatura/);
+  R.atualizar(d, 'aditivos', a.id, { arquivo: 'termo.pdf' }, 'j');
+  assert.ok(!tipos(n, '2026-10-30').some((x) => /Aditivo/.test(x)), 'assinado: some');
+  assert.ok(tipos(n, '2026-11-01').includes('Vigência do contrato'), 'assinado e na data: passa ao novo');
+});
+
+test('ressarcimento de condomínio: o nome da taxa escrito antes aparece para escolher', () => {
+  const { d, c } = base();
+  assert.ok(R.taxasCondominioUsadas(d).includes('Fundo de obras'));
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-10', descricao: 'Taxa de elevador novo', valor: 15000, data_pagamento: '2026-10-05', competencia_abatimento: '2026-10' }, 'j');
+  assert.equal(R.taxasCondominioUsadas(d)[0], 'Taxa de elevador novo');
+});
+
+test('troca de titular sem o termo assinado: o contrato continua no anterior, mesmo passada a data', () => {
+  const { d, c } = base();
+  const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Ana Herdeira', data_entrada: '2026-11-01', aluguel_inicial: 150000, dia_vencimento: 10, ativo: true }, 'j');
+  R.transferirHeranca(d, n.id, 'j', '2026-11-05');
+  assert.equal(n.heranca_transferida, undefined, 'não passa sem assinatura');
+  assert.equal(R.buscar(d, 'contratos', c.id).data_saida || null, null, 'o anterior continua ativo');
+  assert.equal(R.herancaAgendada(d, n, '2026-11-05'), '2026-11-01');
+  assert.equal(R.montarCobranca(d, n, '2026-11'), null, 'novo sem boleto');
+  assert.ok(R.montarCobranca(d, R.buscar(d, 'contratos', c.id), '2026-11'), 'boleto no anterior');
+  assert.throws(() => R.aplicarReajuste(d, n.id, '2026-11', 'j', { valor_novo: 160000 }), /ainda é de/);
+  assert.throws(() => R.registrarRenovacao(d, n.id, { tipo: 'Novo valor', data: '2026-11-01', novo_valor: 160000 }, 'j'), /ainda é de/);
+  assert.ok(!R.reajustesAbertos(d, '2026-11-05').some((x) => x.contrato.id === n.id));
+  // dado antigo: fim de vínculo já gravado sem o termo é desfeito
+  R.buscar(d, 'contratos', c.id).data_saida = '2026-10-31';
+  R.normalizar(d);
+  assert.equal(R.buscar(d, 'contratos', c.id).data_saida, null);
+  // assinou depois da data: passa na hora
+  R.inserir(d, 'aditivos', { contrato_id: n.id, imovel_id: n.imovel_id, tipo: 'Troca de titular', data: '2026-11-10', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
+  assert.equal(R.herancaAgendada(d, n, '2026-11-10'), null);
+  R.transferirHeranca(d, n.id, 'j', '2026-11-10');
+  assert.equal(R.buscar(d, 'contratos', n.id).heranca_transferida, '2026-11-01');
+  assert.equal(R.buscar(d, 'contratos', c.id).data_saida, '2026-10-31');
 });

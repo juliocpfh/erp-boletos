@@ -100,7 +100,7 @@ function caixaGarantia(c) {
   if (agendada && !R.garantiaNova(c) && c.garantia_tipo && c.garantia_tipo !== 'Sem garantia') {
     const a = R.contratoHerdado(d(), c);
     return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>
-      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá em ${dataBr(agendada)} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
+      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá ${R.trocaAguardaAditivo(d(), c) ? 'com o termo aditivo assinado' : `em ${dataBr(agendada)}`} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
   }
   let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || 'não informada')}</h2>${opera() && !herdeiro ? link(`#/novo/trocas_garantia?contrato=${c.id}`, 'Trocar garantia ou fiador') : ''}</div>`;
   // troca de titular: a garantia é cuidada aqui, no contrato anterior, e aparece no novo titular
@@ -381,7 +381,7 @@ export function caixaSeguros(c) {
   const agendada = R.herancaAgendada(d(), c);
   return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
-    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(R.contratoHerdado(d(), c).inquilino_nome)} passa para cá nesse dia.</div>` : ''}
+    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(R.contratoHerdado(d(), c).inquilino_nome)} passa para cá ${R.trocaAguardaAditivo(d(), c) ? 'com o termo aditivo assinado' : 'nesse dia'}.</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? '' : vigente && vigente.id === s.id ? ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, 'x-excluir', `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}`
         : ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: '1' }, 'x-excluir')}`}</span>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
@@ -647,7 +647,7 @@ export function telaContrato(c) {
     ${selosContrato(c)}
     ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
-    ${anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(C.somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ''}
+    ${anteriorAgendado && R.trocaAguardaAditivo(d(), c) ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}, aguardando o termo aditivo assinado.</b> Até assinar, os boletos, as correções do aluguel, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>, mesmo depois dessa data.</div>` : anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(C.somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ''}
     ${rotina.startsWith('<div') ? '' : faixaDocumentosEntrada(c)}
     ${rotina}
     ${caixaVerificar(c.verificar)}

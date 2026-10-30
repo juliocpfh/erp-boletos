@@ -44,7 +44,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, FCI, tarifa, reserva e ressarcimentos.
 - Gerados a partir do dia 20 do mês, já com o aluguel do próprio mês, vencendo no mês seguinte (ex.: a partir de 20/10, os de 10/2026, que vencem em 11/2026). A carta de reajuste vai junto com o boleto do aluguel corrigido.
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
-- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco.
+- Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo assinado; até lá, boletos e correções continuam no anterior.
+- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros.
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
 - Boleto de controle (inquilino sem NF) fica fora das somas e dos resultados.
