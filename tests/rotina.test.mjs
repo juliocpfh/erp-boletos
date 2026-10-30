@@ -149,3 +149,21 @@ test('rotina: documento registrado como perdido conta como concluído; com assin
   assert.equal(e('vistoria_gerada').situacao, 'feita', 'anexada: a vistoria já foi gerada');
   assert.equal(e('chaves_gerado').situacao, 'pendente');
 });
+
+test('rotina: documento perdido no titular anterior fecha a etapa do novo; assinado depois vale mais; recusa da perda volta a cobrar', () => {
+  const { d, c } = base();
+  const { id, ...resto } = c;
+  const meio = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Titular Meio', contrato_anterior_id: c.id, data_entrada: '2026-07-07' }, 'julio');
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: meio.id, data_entrada: '2026-08-07' }, 'julio');
+  const etapa = (k) => R.rotinaEntrada(d, novo, '2026-08-10').find((x) => x.chave === k);
+  assert.equal(etapa('contrato_assinado').situacao, 'andamento', 'sem perda: continua pedindo para marcar no anterior');
+  R.marcarDocumentoPerdido(d, c.id, 'doc_contrato_em', '2026-06-20', 'ana', false);
+  assert.deepEqual([etapa('contrato_assinado').situacao, etapa('contrato_assinado').data, etapa('contrato_assinado').texto], ['feita', '2026-06-20', 'registrado como perdido em Maria Exemplo']);
+  assert.equal(R.perdaHerdada(d, c, 'doc_contrato_em'), null, 'no próprio contrato não é herdada');
+  R.analisarDocumento(d, c.id, 'doc_contrato_em', 'perdido', false, 'julio');
+  assert.equal(etapa('contrato_assinado').situacao, 'andamento', 'perda recusada');
+  R.marcarDocumentoPerdido(d, c.id, 'doc_contrato_em', '2026-06-20', 'julio');
+  c.doc_contrato_em = '2026-06-25';
+  assert.equal(R.perdaHerdada(d, novo, 'doc_contrato_em'), null);
+  assert.equal(etapa('contrato_assinado').data, '2026-06-25');
+});

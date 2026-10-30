@@ -147,6 +147,8 @@ test('caução pelas condições do contrato (sem valor gravado nem data) e sem 
 test('assinaturas em conjuntos: locatários, fiadores, locadora, testemunhas', () => {
   const g = K.gruposAssinatura([{ papel: 'LOCADORA' }, { papel: 'LOCATÁRIO' }, { papel: 'LOCATÁRIO SOLIDÁRIO' }, { papel: 'FIADOR 1' }, { papel: 'FIADOR 2' }, { papel: 'TESTEMUNHA 1' }]);
   assert.deepEqual(g.map((x) => x.map((p) => p.papel)), [['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO'], ['FIADOR 1', 'FIADOR 2'], ['LOCADORA'], ['TESTEMUNHA 1']]);
+  const troca = K.gruposAssinatura([{ papel: 'LOCADORA' }, { papel: 'LOCATÁRIO SAINTE' }, { papel: 'LOCATÁRIO ENTRANTE' }, { papel: 'LOCATÁRIO ENTRANTE' }, { papel: 'TESTEMUNHA 1' }]);
+  assert.deepEqual(troca.map((x) => x.map((p) => p.papel)), [['LOCATÁRIO SAINTE'], ['LOCATÁRIO ENTRANTE', 'LOCATÁRIO ENTRANTE'], ['LOCADORA'], ['TESTEMUNHA 1']], 'termo de troca: quem sai e quem entra em conjuntos separados');
   const html = K.contratoHtml([{ tipo: 'assinaturas', pessoas: [{ nome: 'A', papel: 'LOCADORA' }, { nome: 'B', papel: 'LOCATÁRIO' }] }], { logo: null, rodape: ['ANK – CNPJ 1'] });
   assert.match(html, /ct-grupo-assina um/, 'conjunto de uma pessoa fica centralizado');
   assert.match(html, /counter\(page\) " de " counter\(pages\)/, 'contagem de páginas no rodapé da impressão');

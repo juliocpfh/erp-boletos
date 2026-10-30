@@ -2035,6 +2035,15 @@ export const campoParcialDoc = (campo) => campo.replace(/_em$/, '_parcial');
 
 /** Data em que o documento foi registrado como perdido (null se não foi, ou se já existe assinado, próprio ou herdado). */
 export const documentoPerdido = (d, c, campo) => (c[campoPerdidoDoc(campo)] && !documentoEntrada(d, c, campo) ? c[campoPerdidoDoc(campo)] : null);
+/**
+ * Troca de titular: documento já registrado como perdido num contrato anterior da cadeia (o mais recente), para o novo não
+ * ficar cobrando o que não há mais como marcar. Devolve { data, contrato } ou null (também se há assinado ou perda própria).
+ */
+export function perdaHerdada(d, c, campo) {
+  if (!d || c[campoPerdidoDoc(campo)] || documentoEntrada(d, c, campo)) return null;
+  const x = [...cadeiaDeContratos(d, c).antes].reverse().find((a) => a[campoPerdidoDoc(campo)]);
+  return x ? { data: x[campoPerdidoDoc(campo)], contrato: x } : null;
+}
 /** Anexo com assinatura faltante (null se não há, ou se o documento já está assinado). */
 export const documentoParcial = (d, c, campo) => (c[campoParcialDoc(campo)] && !documentoEntrada(d, c, campo) ? c[campoParcialDoc(campo)] : null);
 /** Documento que ainda falta: nem assinado, nem perdido, nem anexado com assinatura faltante. */
@@ -2599,6 +2608,8 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     const doc = documentoEntrada(d, c, k);
     if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : (doc.arquivo ? '' : 'sem arquivo'));
     if (documentoPerdido(d, c, k)) return feita(documentoPerdido(d, c, k), 'registrado como perdido');
+    const ph = perdaHerdada(d, c, k);
+    if (ph) return feita(ph.data, `registrado como perdido em ${ph.contrato.inquilino_nome}`);
     const p = documentoParcial(d, c, k);
     if (p) return andamento(`falta assinatura: ${p.falta.join(', ')}`);
     return anterior ? andamento(`herdado de ${anterior.inquilino_nome}: marque no contrato anterior`) : null;
