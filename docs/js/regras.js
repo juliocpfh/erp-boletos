@@ -56,6 +56,15 @@ export function normalizar(d) {
     if (c.conta_iptu === undefined) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
     if (c.conta_seguro === undefined) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
   }
+  // boleto do complemento da caução nunca tem multa nem juros: acerta os já gerados (e o recebido, se foi calculado com eles)
+  for (const cb of d.cobrancas) {
+    if (!ehComplementoCaucao(cb) || (!cb.multa_percentual && !cb.juros_mensal_percentual && !cb.multa && !cb.juros)) continue;
+    const cobrado = (cb.multa || 0) + (cb.juros || 0);
+    if (cobrado && cb.valor_pago === cb.caucao_complemento + cobrado) cb.valor_pago = cb.caucao_complemento;
+    cb.multa_percentual = 0;
+    cb.juros_mensal_percentual = 0;
+    if (cb.data_pagamento) { cb.multa = 0; cb.juros = 0; }
+  }
   migrarAirbnb(d);
   // versão 1 guardava um único fiador dentro do contrato
   for (const c of d.contratos) {
@@ -494,7 +503,7 @@ export function caucaoSugerida(d, c, dataRef = C.hojeIso()) {
   return c.caucao_meses * (aluguel - C.descontoPorPercentual(aluguel, percentualBonificacao(c)));
 }
 
-/** Boleto à parte só com o complemento da caução: sem tarifa, sem NF, não é o boleto do aluguel do mês. */
+/** Boleto à parte só com o complemento da caução: sem tarifa, sem NF, sem multa e juros, não é o boleto do aluguel do mês. */
 export const ehComplementoCaucao = (cb) => cb.caucao_complemento > 0;
 /** Boleto do aluguel do contrato na competência (o do complemento da caução não conta). */
 export const boletoDoMes = (d, contratoId, comp) => d.cobrancas.find((x) => x.contrato_id === contratoId && x.competencia === comp && !ehComplementoCaucao(x)) || null;
@@ -573,7 +582,7 @@ export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencim
       iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, outros: valor, outros_descricao: `Complemento da caução${parcela ? ` (${parcela})` : ''}`,
       reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
       caucao_complemento: valor, caucao_anterior: anterior, caucao_nova: anterior + valor, caucao_vigencia: x.correcao.data_vigencia, caucao_parcela: parcela,
-      multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0,
+      multa_percentual: 0, juros_mensal_percentual: 0, // garantia nunca tem multa nem juros
       situacao: 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null, valor_nf: null,
     }, usuario, `Boleto do complemento da caução${parcela ? ` (${parcela})` : ''} gerado para ${c.inquilino_nome}: ${C.reais(valor)} (caução de ${C.reais(x.atual)} para ${C.reais(x.necessaria)})`);
     anterior += valor;
@@ -1993,14 +2002,14 @@ export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
 }
 
 export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
-  // troca de titular agendada: reajuste, garantia e reserva continuam no contrato anterior até a data
+  // troca de titular agendada: reajuste, garantia, reserva e o alerta da vigência continuam no contrato anterior até a data
   const ag = herancaAgendada(d, contrato, hoje);
   return [
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     ag ? null : alertaReajuste(d, contrato, hoje),
     ag ? null : alertaCaucao(d, contrato),
     ag ? null : alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
-    contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
+    ag || contrato.prazo_tipo === 'Indeterminado' ? null : alertas.alertaVigencia(contrato.vigencia_fim, hoje),
     ag ? null : alertaFiador(d, contrato, hoje),
     ag ? null : alertaAplicacao(d, contrato),
     ag ? null : alertaComprovantes(d, contrato),
@@ -2014,9 +2023,13 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
   ].filter(Boolean);
 }
 
-/** Termo aditivo gerado pelo sistema e ainda sem o arquivo assinado: alerta até anexar. Ex.: "aditivo de 20/10/2026 (troca do vencimento)". */
+/**
+ * Termo aditivo gerado pelo sistema e ainda sem o arquivo assinado: alerta até anexar. Ex.: "aditivo de 20/10/2026 (troca do vencimento)".
+ * O termo da troca de titular já está no alerta "Aditivo da troca de titular" (um aviso só).
+ */
 function alertaAditivoAguardando(d, c) {
-  const l = aditivosAguardando(d, c.id);
+  const naTroca = !!alertaAditivoHerdeiro(d, c);
+  const l = aditivosAguardando(d, c.id).filter((a) => !(naTroca && a.tipo === 'Troca de titular'));
   if (!l.length) return null;
   return { nivel: 'aviso', tipo: 'Aditivo aguardando assinatura', ancora: 'aditivos',
     texto: `${l.length > 1 ? `${l.length} termos aditivos aguardando` : 'Termo aditivo aguardando'} assinatura: ${l.map((a) => `${C.dataBr(a.data)} (${a.assunto})`).join('; ')}. Colha as assinaturas e anexe o arquivo assinado.` };
@@ -2456,8 +2469,10 @@ export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !docume
 export function alertaAditivoHerdeiro(d, c) {
   const ant = contratoHerdado(d, c);
   if (!ant || c.ativo === false || c.data_saida || aditivosDo(d, c.id).length) return null;
+  const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === 'Troca de titular');
   return { nivel: 'perigo', tipo: 'Aditivo da troca de titular', ancora: 'aditivos',
-    texto: `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
+    texto: gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${C.dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").`
+      : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
 }
 
 /**
@@ -3245,6 +3260,11 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
 export const inquilinoPagaCondominio = (c) => c.conta_condominio === SITUACOES[0];
 export const ressarcimentosDo = (d, contratoId) => d.ressarcimentos.filter((r) => r.contrato_id === contratoId)
   .sort((a, b) => String(b.competencia_condominio).localeCompare(String(a.competencia_condominio)) || b.id - a.id);
+
+/** Nomes para o campo Taxa do ressarcimento: os já escritos antes e, depois, as taxas mais comuns. */
+const TAXAS_CONDOMINIO = ['Fundo de obras', 'Constituição do fundo de reserva', 'Chamada extra (obra)', 'Obra na estrutura / reforma',
+  'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação'];
+export const taxasCondominioUsadas = (d) => [...new Set([...d.ressarcimentos.map((r) => r.descricao).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')), ...TAXAS_CONDOMINIO])];
 
 /** Competência do boleto que vence no mês seguinte ao pagamento da taxa pelo inquilino. */
 export function competenciaDoAbatimento(c, dataPagamento) {

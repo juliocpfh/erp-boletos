@@ -38,7 +38,7 @@ export const endereco = (i, sep = ' · ') => [R.enderecoCompleto(i), i.bairro, i
 
 export function multaJurosTexto(cb) {
   if (!cb.data_pagamento) return '';
-  if (!cb.dias_atraso) return '<span class="suave">sem multa e juros</span>';
+  if (!cb.dias_atraso || !(cb.multa || cb.juros)) return '<span class="suave">sem multa e juros</span>';
   return `Multa ${pct(cb.multa_percentual)} = <b>${reais(cb.multa)}</b><br>Juros ${pct(cb.juros_mensal_percentual)} a.m. × ${cb.dias_atraso} dias = <b>${reais(cb.juros)}</b>`;
 }
 

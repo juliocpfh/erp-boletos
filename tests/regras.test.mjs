@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 
 function base() {
@@ -1816,4 +1817,41 @@ test('aditivo gerado e ainda sem o arquivo assinado: alerta no Painel até anexa
   assert.ok(R.todosAlertas(d, '2026-10-27').some((x) => x.tipo === tipo), 'aparece no Painel');
   R.atualizar(d, 'aditivos', a.id, { arquivo: 'aditivo-assinado.pdf' }, 'julio');
   assert.equal(R.alertasContrato(d, c, '2026-10-27').find((x) => x.tipo === tipo), undefined, 'assinado: some');
+});
+
+test('complemento da caução: nunca tem multa nem juros, também nos boletos já gerados', () => {
+  const { d, c } = base();
+  const cb = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-10', vencimento: '2026-11-05', aluguel: 0, desconto: 0, outros: 38262, caucao_complemento: 38262, multa_percentual: 2, juros_mensal_percentual: 1, situacao: 'Em aberto' }, 'j');
+  const pago = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-09', vencimento: '2026-10-05', aluguel: 0, desconto: 0, outros: 10000, caucao_complemento: 10000, multa_percentual: 2, juros_mensal_percentual: 1, data_pagamento: '2026-10-15', valor_pago: 10232, dias_atraso: 10, multa: 200, juros: 32, situacao: 'Paga com atraso' }, 'j');
+  const aluguel = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-08', vencimento: '2026-09-05', aluguel: 100000, desconto: 0, multa_percentual: 2, juros_mensal_percentual: 1, situacao: 'Em aberto' }, 'j');
+  R.normalizar(d);
+  assert.equal(cb.multa_percentual, 0);
+  assert.equal(cb.juros_mensal_percentual, 0);
+  assert.equal(C.liquidar(cb, '2026-12-05').valor_devido, 38262, 'atrasado: o mesmo valor');
+  assert.equal(pago.valor_pago, 10000);
+  assert.equal(pago.multa, 0);
+  assert.equal(aluguel.multa_percentual, 2, 'boleto do aluguel continua com multa');
+});
+
+test('troca de titular agendada: vigência só no contrato ativo e um aviso só do termo', () => {
+  const { d, c } = base();
+  R.atualizar(d, 'contratos', c.id, { vigencia_fim: '2026-12-01', prazo_tipo: 'Determinado' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, contrato_anterior_id: c.id, inquilino_nome: 'Ana Herdeira', data_entrada: '2026-11-01', vigencia_fim: '2026-12-01', prazo_tipo: 'Determinado', ativo: true }, 'j');
+  const tipos = (x, hoje) => R.alertasContrato(d, x, hoje).map((a) => a.tipo);
+  assert.ok(tipos(c, '2026-10-30').includes('Vigência do contrato'), 'o anterior avisa');
+  assert.ok(!tipos(n, '2026-10-30').includes('Vigência do contrato'), 'o novo não avisa até a troca');
+  assert.ok(tipos(n, '2026-11-01').includes('Vigência do contrato'), 'no dia da troca passa ao novo');
+  assert.match(R.alertasContrato(d, n, '2026-10-30').find((a) => a.tipo === 'Aditivo da troca de titular').texto, /registre o termo/);
+  const a = R.inserir(d, 'aditivos', { contrato_id: n.id, imovel_id: n.imovel_id, tipo: 'Troca de titular', data: '2026-10-28', assunto: 'Troca', texto: 'termo' }, 'j');
+  assert.ok(!tipos(n, '2026-10-30').includes('Aditivo aguardando assinatura'), 'sem aviso duplicado');
+  assert.match(R.alertasContrato(d, n, '2026-10-30').find((x) => x.tipo === 'Aditivo da troca de titular').texto, /aguardando assinatura/);
+  R.atualizar(d, 'aditivos', a.id, { arquivo: 'termo.pdf' }, 'j');
+  assert.ok(!tipos(n, '2026-10-30').some((x) => /Aditivo/.test(x)), 'assinado: some');
+});
+
+test('ressarcimento de condomínio: o nome da taxa escrito antes aparece para escolher', () => {
+  const { d, c } = base();
+  assert.ok(R.taxasCondominioUsadas(d).includes('Fundo de obras'));
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-10', descricao: 'Taxa de elevador novo', valor: 15000, data_pagamento: '2026-10-05', competencia_abatimento: '2026-10' }, 'j');
+  assert.equal(R.taxasCondominioUsadas(d)[0], 'Taxa de elevador novo');
 });

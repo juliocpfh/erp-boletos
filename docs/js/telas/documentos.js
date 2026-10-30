@@ -78,9 +78,33 @@ function contratoMontado(q) {
   return { c, modelo, dados, blocos: K.montarContrato(modelo.texto, dados) };
 }
 
+/** Fim de cada linha de um parágrafo do documento, na ordem. */
+function linhasDoParagrafo(p) {
+  const r = document.createRange();
+  r.selectNodeContents(p);
+  const fins = [];
+  let inicioLinha = -Infinity;
+  for (const x of [...r.getClientRects()].filter((q) => q.height > 0).sort((a, b) => a.top - b.top)) {
+    if (!fins.length || x.top >= fins[fins.length - 1] - 2) { fins.push(x.bottom); inicioLinha = x.top; }
+    else if (x.top - inicioLinha < 2) fins[fins.length - 1] = Math.max(fins[fins.length - 1], x.bottom);
+  }
+  return fins;
+}
+
 /**
- * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas, sempre entre um bloco e outro
- * (parágrafo, linha de tabela, foto, assinatura), com o rodapé das empresas e "Página X de Y" embaixo.
+ * Onde a folha pode terminar (distância do topo do documento). Como no Word: nunca logo depois de um título (ele vai com o
+ * texto) e o parágrafo pode continuar na folha seguinte, com pelo menos 2 linhas em cada folha.
+ */
+export function cortesDoDocumento(el, topo = el.getBoundingClientRect().top) {
+  const blocos = [...el.querySelectorAll('.ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina, .demonstrativo, tr, p, li, h2, h3')]
+    .filter((x) => !x.matches('h1, h2, h3')).map((x) => x.getBoundingClientRect().bottom);
+  const linhas = [...el.querySelectorAll('.ct-par')].flatMap((p) => linhasDoParagrafo(p).slice(1, -2));
+  return [...blocos, ...linhas].map((y) => y - topo).sort((a, b) => a - b);
+}
+
+/**
+ * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas entre um bloco e outro
+ * (parágrafo, linha de tabela, foto, assinatura) ou entre as linhas de um parágrafo, com o rodapé das empresas e "Página X de Y" embaixo.
  */
 export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
@@ -88,8 +112,7 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   const topo = caixa.top;
   // o link das fotos continua clicável no PDF (área do link na folha certa)
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
-  const cortes = [...el.querySelectorAll('.ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina, .demonstrativo, tr, p, li, h2, h3')]
-    .map((x) => x.getBoundingClientRect().bottom - topo).sort((a, b) => a - b);
+  const cortes = cortesDoDocumento(el, topo);
   const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', onclone: (doc) => {
     doc.querySelectorAll('.ct-rodape').forEach((x) => x.remove());
     doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
