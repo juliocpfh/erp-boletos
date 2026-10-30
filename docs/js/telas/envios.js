@@ -13,7 +13,7 @@ import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
-import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado } from './comum.js';
+import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 export const FORMULARIOS = {
@@ -139,6 +139,7 @@ export const FORMULARIOS = {
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
     const nome = await salvarAssinado('aditivos', Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
     await alterar((db) => R.registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome }, login()));
+    await trazerHerancaAssinada(Number(f.contrato));
     aviso('Termo aditivo registrado.');
     await mostrar();
   },
@@ -251,6 +252,7 @@ export const FORMULARIOS = {
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
     await alterar((db) => R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
+    await trazerHerancaAssinada(a.contrato_id);
     aviso(a.tipo === K.TIPO_ADITIVO_TROCA ? 'Termo aditivo assinado e registrado.' : 'Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).');
     await mostrar();
   },

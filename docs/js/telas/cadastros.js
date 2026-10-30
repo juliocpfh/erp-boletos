@@ -10,7 +10,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca } from './comum.js';
+import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -233,6 +233,7 @@ export const CADASTROS = {
         if (!Number.isFinite(bonificado) || bonificado < 0 || bonificado > base) erros.aluguel_bonificado = `Informe um valor entre R$ 0,00 e ${reais(base)} (aluguel cheio)`;
         else dados.desconto_pontualidade_percentual = C.percentualPorBonificado(base, bonificado);
       }
+      if (r && R.trocaAguardaAditivo(d(), r) && dados.aluguel_inicial !== r.aluguel_inicial) erros.aluguel_inicial = `O contrato ainda é de ${R.contratoHerdado(d(), r).inquilino_nome}: o aluguel só muda depois do termo aditivo assinado`;
       for (const k of ['desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'carencia_meses']) if (dados[k] === null) dados[k] = 0;
       if (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
       // FCI: em branco (ou zero) não cobra; com o %, precisa do índice de correção
@@ -335,6 +336,7 @@ export const CADASTROS = {
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
         const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
         await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome }, login()));
+        await trazerHerancaAssinada(salvo.id);
         aviso('Termo aditivo da troca de titular registrado.');
       }
       if (!antigo || !antigo.pasta) return;

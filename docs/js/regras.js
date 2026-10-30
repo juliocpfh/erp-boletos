@@ -56,6 +56,11 @@ export function normalizar(d) {
     if (c.conta_iptu === undefined) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
     if (c.conta_seguro === undefined) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
   }
+  // troca de titular sem o termo assinado: o anterior não tem fim de vínculo (o contrato só passa com o termo)
+  for (const n of d.contratos) {
+    const a = trocaAguardaAditivo(d, n) && contratoHerdado(d, n);
+    if (a && n.data_entrada && a.data_saida === C.somarDias(n.data_entrada, -1)) a.data_saida = null;
+  }
   // boleto do complemento da caução nunca tem multa nem juros: acerta os já gerados (e o recebido, se foi calculado com eles)
   for (const cb of d.cobrancas) {
     if (!ehComplementoCaucao(cb) || (!cb.multa_percentual && !cb.juros_mensal_percentual && !cb.multa && !cb.juros)) continue;
@@ -1031,7 +1036,7 @@ export function marcarIptuPago(d, iptuId, n, data, usuario) {
 /** Calcula (sem gravar) a cobrança de um contrato numa competência. */
 export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
-  if (dias === 0) return null;
+  if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
   const diasMes = C.diasNoMes(comp);
   const carencia = emCarencia(contrato, comp);
   const cobra = (item) => !carencia || contrato[`carencia_cobrar_${item}`];
@@ -1454,6 +1459,7 @@ export function desfazerNumeracao(d, aPartirDe, usuario) {
 /** Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). */
 export function registrarRenovacao(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
+  exigirAditivoDaTroca(d, c);
   const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados }, usuario, dados.tipo);
   const mud = {};
   if (dados.tipo === 'Passou a prazo indeterminado') mud.prazo_tipo = 'Indeterminado';
@@ -2089,13 +2095,23 @@ export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anteri
 export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
 
 /**
- * Troca de titular com data futura, ainda não feita: devolve a data em que o novo titular assume (ou null).
- * Até a véspera, boletos, garantia, seguro e reserva continuam com o anterior. Ex.: hoje 28/10/2026, troca em
+ * Troca de titular ainda não feita (data futura ou termo aditivo sem assinatura): devolve a data da troca (ou null).
+ * Até lá, boletos, garantia, seguro e reserva continuam com o anterior. Ex.: hoje 28/10/2026, troca em
  * 01/12/2026 → o anterior paga até 30/11/2026 e o primeiro boleto do novo é o de 12/2026.
  */
 export function herancaAgendada(d, c, hoje = C.hojeIso()) {
   const data = c.data_entrada || c.vigencia_inicio;
-  return c.contrato_anterior_id && !c.heranca_transferida && data && data > hoje && contratoHerdado(d, c) ? data : null;
+  return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje || !aditivosDo(d, c.id).length) && contratoHerdado(d, c) ? data : null;
+}
+
+/**
+ * Troca de titular sem o termo aditivo assinado: o contrato ainda é do anterior, mesmo passada a data da troca. O novo não tem
+ * boleto nem correção do aluguel e o anterior continua ativo. Ex.: troca em 01/11/2026, assinado em 10/11/2026 → só então passa.
+ */
+export const trocaAguardaAditivo = (d, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d, c) && !aditivosDo(d, c.id).length);
+/** Barra correção do aluguel no novo titular enquanto o termo não está assinado. */
+function exigirAditivoDaTroca(d, c) {
+  if (trocaAguardaAditivo(d, c)) throw new Error(`O contrato ainda é de ${contratoHerdado(d, c).inquilino_nome}: lance a correção lá. Passa para ${c.inquilino_nome} com o termo aditivo assinado.`);
 }
 
 /**
@@ -2126,14 +2142,16 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   const fim = C.somarDias(data, -1);
   const out = { anterior: a, data, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0 };
   const passa = (tabela, x, texto) => atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
-  // troca numa data futura: até a véspera, o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
-  // agora só o fim do vínculo dele (o último boleto sai proporcional) e a data-base do reajuste. O resto passa no dia.
-  if (data > hoje) {
-    if (a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
+  // troca numa data futura ou sem o termo assinado: o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
+  // agora só a data-base do reajuste e, com o termo assinado, o fim do vínculo dele (o último boleto sai proporcional). O resto passa depois.
+  const assinado = aditivosDo(d, n.id).length > 0;
+  if (data > hoje || !assinado) {
+    if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
+    if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
     if (!n.data_base_correcao) atualizar(d, 'contratos', n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
     recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
     // a reserva já aparece no novo (valor, comprovante e o que foi usado), para não abater de novo; no dia, confere o uso outra vez
-    return { ...out, agendada: true, arquivosReserva: herdarReserva(d, n, a, usuario) };
+    return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: herdarReserva(d, n, a, usuario) };
   }
   encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
   // aluguel e reajuste
@@ -2981,7 +2999,7 @@ export function totaisImoveis(d, hoje = C.hojeIso()) {
   let qtdVagos = 0;
   let vagosSemValor = 0;
   for (const i of d.imoveis) {
-    const atuais = d.contratos.filter((c) => c.imovel_id === i.id && c.ativo !== false && contratoAtivo(c, hoje));
+    const atuais = d.contratos.filter((c) => c.imovel_id === i.id && c.ativo !== false && contratoAtivo(c, hoje) && !herancaAgendada(d, c, hoje));
     if (atuais.length) {
       for (const c of atuais.filter(geraNf)) { esperado += bonificado(c, hoje); cheio += aluguelAtual(d, c, hoje); }
       continue;
@@ -3616,6 +3634,7 @@ export function calcularReajuste(d, c, comp) {
  */
 export function aplicarReajuste(d, contratoId, comp, usuario, manual = null) {
   const c = buscar(d, 'contratos', contratoId);
+  exigirAditivoDaTroca(d, c);
   const r = calcularReajuste(d, c, comp);
   if (correcaoDoReajuste(d, c, comp)) throw new Error('Este reajuste já foi registrado.');
   const depois = correcoesDo(d, c.id).find((x) => x.data_vigencia > `${comp}-01`);
@@ -3665,7 +3684,7 @@ export function desfazerReajuste(d, correcaoId, usuario) {
 export function reajustesAbertos(d, hoje = C.hojeIso()) {
   const ate = C.somarMeses(C.competenciaDe(hoje), 3);
   const lista = [];
-  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id)) {
+  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d, x))) {
     const herdado = contratoHerdado(d, c) && c.data_entrada ? c.data_entrada.slice(0, 7) : '';
     for (let n = 1, comp = competenciaDoReajuste(c, 1); comp && comp <= ate; n += 1, comp = competenciaDoReajuste(c, n)) {
       // troca de titular: reajuste de antes da entrada do novo titular é do contrato anterior

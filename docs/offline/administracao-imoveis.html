@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="3f8ca50088d5d19c">
+<meta name="fontes" content="440dd97f735c1df8">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1243,6 +1243,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     totaisIptu: () => totaisIptu,
     transferirHeranca: () => transferirHeranca,
     trimestreDe: () => trimestreDe,
+    trocaAguardaAditivo: () => trocaAguardaAditivo,
     trocarFiador: () => trocarFiador,
     trocarGarantia: () => trocarGarantia,
     trocasGarantiaDo: () => trocasGarantiaDo,
@@ -2757,6 +2758,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (c.conta_iptu === void 0) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
       if (c.conta_seguro === void 0) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
     }
+    for (const n of d2.contratos) {
+      const a = trocaAguardaAditivo(d2, n) && contratoHerdado(d2, n);
+      if (a && n.data_entrada && a.data_saida === somarDias(n.data_entrada, -1)) a.data_saida = null;
+    }
     for (const cb of d2.cobrancas) {
       if (!ehComplementoCaucao(cb) || !cb.multa_percentual && !cb.juros_mensal_percentual && !cb.multa && !cb.juros) continue;
       const cobrado = (cb.multa || 0) + (cb.juros || 0);
@@ -3583,7 +3588,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function montarCobranca(d2, contrato, comp, ignorarCobranca = null) {
     const dias = diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
-    if (dias === 0) return null;
+    if (dias === 0 || trocaAguardaAditivo(d2, contrato)) return null;
     const diasMes = diasNoMes(comp);
     const carencia = emCarencia(contrato, comp);
     const cobra = (item2) => !carencia || contrato[`carencia_cobrar_${item2}`];
@@ -4025,6 +4030,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function registrarRenovacao(d2, contratoId, dados, usuario) {
     const c = buscar(d2, "contratos", contratoId);
+    exigirAditivoDaTroca(d2, c);
     const r = inserir(d2, "renovacoes", { contrato_id: c.id, ...dados }, usuario, dados.tipo);
     const mud = {};
     if (dados.tipo === "Passou a prazo indeterminado") mud.prazo_tipo = "Indeterminado";
@@ -4591,7 +4597,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var fimDeVinculo = (d2, c) => !!(c.data_saida && continuadoPor(d2, c));
   function herancaAgendada(d2, c, hoje2 = hojeIso()) {
     const data = c.data_entrada || c.vigencia_inicio;
-    return c.contrato_anterior_id && !c.heranca_transferida && data && data > hoje2 && contratoHerdado(d2, c) ? data : null;
+    return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje2 || !aditivosDo(d2, c.id).length) && contratoHerdado(d2, c) ? data : null;
+  }
+  var trocaAguardaAditivo = (d2, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d2, c) && !aditivosDo(d2, c.id).length);
+  function exigirAditivoDaTroca(d2, c) {
+    if (trocaAguardaAditivo(d2, c)) throw new Error(`O contrato ainda é de ${contratoHerdado(d2, c).inquilino_nome}: lance a correção lá. Passa para ${c.inquilino_nome} com o termo aditivo assinado.`);
   }
   var TABELAS_GARANTIA = ["depositos_garantia", "correcoes_garantia", "aplicacoes", "trocas_garantia"];
   function transferirHeranca(d2, novoId, usuario, hoje2 = hojeIso()) {
@@ -4602,11 +4612,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const fim = somarDias(data, -1);
     const out = { anterior: a, data, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0 };
     const passa = (tabela, x, texto2) => atualizar(d2, tabela, x.id, { contrato_id: n.id }, usuario, `${texto2} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
-    if (data > hoje2) {
-      if (a.data_saida !== fim) atualizar(d2, "contratos", a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${dataBr(data)})`);
+    const assinado = aditivosDo(d2, n.id).length > 0;
+    if (data > hoje2 || !assinado) {
+      if (!assinado && a.data_saida === fim) atualizar(d2, "contratos", a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
+      if (assinado && a.data_saida !== fim) atualizar(d2, "contratos", a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${dataBr(data)})`);
       if (!n.data_base_correcao) atualizar(d2, "contratos", n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
       recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id, usuario);
-      return { ...out, agendada: true, arquivosReserva: herdarReserva(d2, n, a, usuario) };
+      return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: herdarReserva(d2, n, a, usuario) };
     }
     encerrarVinculoPorContinuacao(d2, a.id, data, n.inquilino_nome, usuario);
     const mud = { heranca_transferida: data };
@@ -5359,7 +5371,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     let qtdVagos = 0;
     let vagosSemValor = 0;
     for (const i of d2.imoveis) {
-      const atuais = d2.contratos.filter((c) => c.imovel_id === i.id && c.ativo !== false && contratoAtivo(c, hoje2));
+      const atuais = d2.contratos.filter((c) => c.imovel_id === i.id && c.ativo !== false && contratoAtivo(c, hoje2) && !herancaAgendada(d2, c, hoje2));
       if (atuais.length) {
         for (const c of atuais.filter(geraNf)) {
           esperado += bonificado(c, hoje2);
@@ -5980,6 +5992,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function aplicarReajuste(d2, contratoId, comp, usuario, manual = null) {
     const c = buscar(d2, "contratos", contratoId);
+    exigirAditivoDaTroca(d2, c);
     const r = calcularReajuste(d2, c, comp);
     if (correcaoDoReajuste(d2, c, comp)) throw new Error("Este reajuste já foi registrado.");
     const depois = correcoesDo(d2, c.id).find((x) => x.data_vigencia > `${comp}-01`);
@@ -6026,7 +6039,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function reajustesAbertos(d2, hoje2 = hojeIso()) {
     const ate = somarMeses(competenciaDe(hoje2), 3);
     const lista3 = [];
-    for (const c of d2.contratos.filter((x) => x.ativo !== false && x.imovel_id)) {
+    for (const c of d2.contratos.filter((x) => x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d2, x))) {
       const herdado = contratoHerdado(d2, c) && c.data_entrada ? c.data_entrada.slice(0, 7) : "";
       for (let n = 1, comp = competenciaDoReajuste(c, 1); comp && comp <= ate; n += 1, comp = competenciaDoReajuste(c, n)) {
         if (comp < herdado || !contratoAtivo(c, `${comp}-01`)) continue;
@@ -7636,6 +7649,10 @@ ${JSON.stringify(cabecalho)}
     if (r.agendada) {
       await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
       const n = buscar2("contratos", id);
+      if (r.aguardaAditivo) {
+        aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.`, "info");
+        return r;
+      }
       aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, "info");
       return r;
     }
@@ -7712,6 +7729,10 @@ ${JSON.stringify(cabecalho)}
     return r;
   }
   var herancasFeitas = false;
+  async function trazerHerancaAssinada(id) {
+    const c = buscar2("contratos", id);
+    if (c && c.contrato_anterior_id && !c.heranca_transferida) await trazerHeranca(c.id);
+  }
   async function trazerHerancasPendentes() {
     if (herancasFeitas || !opera() || !E.pasta) return;
     herancasFeitas = true;
@@ -8865,7 +8886,7 @@ Salvar assim mesmo?`)) {
     if (agendada && !garantiaNova(c) && c.garantia_tipo && c.garantia_tipo !== "Sem garantia") {
       const a = contratoHerdado(d(), c);
       return `<div class="cartao garantia-compacta" id="garantia"><h2>Garantia: ${esc(c.garantia_tipo || "não informada")}</h2>
-      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá em ${dataBr(agendada)} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
+      <div class="alerta info">A garantia é a do contrato de <a href="#/contrato/${a.id}?ir=garantia">${esc(a.inquilino_nome)}</a> e passa para cá ${trocaAguardaAditivo(d(), c) ? "com o termo aditivo assinado" : `em ${dataBr(agendada)}`} (troca de titular). Até lá, registre depósitos e comprovantes lá.</div></div>`;
     }
     let html = `<div class="cartao garantia-compacta" id="garantia"><div class="cabecalho"><h2>Garantia: ${esc(c.garantia_tipo || "não informada")}</h2>${opera() && !herdeiro ? link(`#/novo/trocas_garantia?contrato=${c.id}`, "Trocar garantia ou fiador") : ""}</div>`;
     if (herdeiro) {
@@ -9116,7 +9137,7 @@ Salvar assim mesmo?`)) {
     const agendada = herancaAgendada(d(), c);
     return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, "Cadastrar apólice") : ""}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ""}
-    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(contratoHerdado(d(), c).inquilino_nome)} passa para cá nesse dia.</div>` : ""}
+    ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(contratoHerdado(d(), c).inquilino_nome)} passa para cá ${trocaAguardaAditivo(d(), c) ? "com o termo aditivo assinado" : "nesse dia"}.</div>` : ""}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || "-")}<br><span class="suave">${esc(s.apolice || "")}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ""}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? "" : vigente && vigente.id === s.id ? ` ${botao("excluirArquivoSeguro", "×", { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, "x-excluir", `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}` : ` ${botao("excluirArquivoSeguro", "×", { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: "1" }, "x-excluir")}`}</span>` : `<br>${etiqueta("sem arquivo da apólice", "aviso")}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
         <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, "Editar")} ${botao("excluir", "×", { tabela: "seguros", id: s.id }, "x-excluir", "Excluir esta apólice?")}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
@@ -9343,7 +9364,7 @@ Salvar assim mesmo?`)) {
     ${selosContrato(c)}
     ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
-    ${anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ""}
+    ${anteriorAgendado && trocaAguardaAditivo(d(), c) ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}, aguardando o termo aditivo assinado.</b> Até assinar, os boletos, as correções do aluguel, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>, mesmo depois dessa data.</div>` : anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ""}
     ${rotina.startsWith("<div") ? "" : faixaDocumentosEntrada(c)}
     ${rotina}
     ${caixaVerificar(c.verificar)}
@@ -9593,6 +9614,7 @@ Salvar assim mesmo?`)) {
           if (!Number.isFinite(bonificado) || bonificado < 0 || bonificado > base) erros.aluguel_bonificado = `Informe um valor entre R$ 0,00 e ${reais(base)} (aluguel cheio)`;
           else dados.desconto_pontualidade_percentual = percentualPorBonificado(base, bonificado);
         }
+        if (r && trocaAguardaAditivo(d(), r) && dados.aluguel_inicial !== r.aluguel_inicial) erros.aluguel_inicial = `O contrato ainda é de ${contratoHerdado(d(), r).inquilino_nome}: o aluguel só muda depois do termo aditivo assinado`;
         for (const k of ["desconto_pontualidade_percentual", "taxa_boleto", "multa_percentual", "juros_mensal_percentual", "reserva_valor", "carencia_meses"]) if (dados[k] === null) dados[k] = 0;
         if (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100) erros.desconto_pontualidade_percentual = "Informe um percentual entre 0 e 100";
         if (dados.fci_percentual !== null && (dados.fci_percentual < 0 || dados.fci_percentual > 100)) erros.fci_percentual = "Informe um percentual entre 0 e 100, ou deixe em branco";
@@ -9683,6 +9705,7 @@ Salvar assim mesmo?`)) {
           const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : "inquilino anterior"} → ${salvo.inquilino_nome}`;
           const nome = await salvarAssinado("aditivos", salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
           await alterar((db) => registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome }, login()));
+          await trazerHerancaAssinada(salvo.id);
           aviso("Termo aditivo da troca de titular registrado.");
         }
         if (!antigo || !antigo.pasta) return;
@@ -12148,6 +12171,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, FCI, tarifa, reserva e ressarcimentos.
 - Gerados a partir do dia 20 do mês, já com o aluguel do próprio mês, vencendo no mês seguinte (ex.: a partir de 20/10, os de 10/2026, que vencem em 11/2026). A carta de reajuste vai junto com o boleto do aluguel corrigido.
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
+- Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo assinado; até lá, boletos e correções continuam no anterior.
 - Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros.
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
@@ -13589,6 +13613,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
       const nome = await salvarAssinado("aditivos", Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
       await alterar((db) => registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome }, login()));
+      await trazerHerancaAssinada(Number(f.contrato));
       aviso("Termo aditivo registrado.");
       await mostrar();
     },
@@ -13719,6 +13744,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
       const nome = await salvarAssinado("aditivos", a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
       await alterar((db) => assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
+      await trazerHerancaAssinada(a.contrato_id);
       aviso(a.tipo === TIPO_ADITIVO_TROCA ? "Termo aditivo assinado e registrado." : "Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).");
       await mostrar();
     },
@@ -14266,7 +14292,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ""}</span>`;
       const hoje2 = hojeIso();
       const linhas2 = imoveisPorEndereco(d().imoveis).map((i) => {
-        const atuais = d().contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje2)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
+        const atuais = d().contratos.filter((c) => c.imovel_id === i.id && contratoAtivo(c, hoje2) && !herancaAgendada(d(), c, hoje2)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
         const aluguel = atuais.length ? atuais.map((c) => `${geraNf(c) ? "" : `${etiqueta("boleto de controle", "controle")}<br>`}<span class="nw">${reais(aluguelAtual(d(), c))}</span>${c.bonificacao === false ? "" : ` <span class="suave nw">(${reais(valorBonificado(c))})</span>`}`).join("<br>") : etiqueta("Vago", "aviso");
         return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a> ${numeroMatricula(i)}</td>
         <td colspan="${CONTAS2.length + 1}" class="end-imovel">${esc(enderecoCompleto(i))}${i.sublote ? ` <span class="sublote">${esc(/^sublote/i.test(i.sublote) ? i.sublote : `Sublote ${i.sublote}`)}</span>` : ""}</td><td class="n" rowspan="2">${aluguel}</td><td class="n nw" rowspan="2">${i.valor_imovel ? reais(i.valor_imovel) : "-"}</td></tr>
