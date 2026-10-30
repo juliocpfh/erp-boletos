@@ -534,6 +534,7 @@ function caixaDocumentos(c) {
   const original = R.contratoHerdado(d(), c);
   const perdido = (k) => R.documentoPerdido(d(), c, k);
   const aguardaPerda = (k) => perdido(k) && c[R.campoPerdidoPendente(k)];
+  const perdaAnterior = (k) => R.perdaHerdada(d(), c, k);
   const parcial = (k) => R.documentoParcial(d(), c, k);
   const adm = podeUsuario('admin');
   const analise = (k, tipo) => (adm ? ` ${botao('analisarDocumento', tipo === 'perdido' ? 'Confirmar perda' : 'Conferido', { contrato: c.id, campo: k, tipo, aceitar: 1 }, 'pequeno')}
@@ -548,10 +549,14 @@ function caixaDocumentos(c) {
         ${p.pendente ? `<br>${etiqueta('aguardando análise do administrador', 'info')}${analise(k, 'parcial')}` : ''}`;
     }
     if (doc(k)) return `${etiqueta(`${feito} em ${dataBr(doc(k).data)}`, 'ok')}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc(doc(k).contrato.inquilino_nome)}</a></span>` : ''}`;
+    if (perdaAnterior(k)) {
+      const { data, contrato: a } = perdaAnterior(k);
+      return `${etiqueta(`perdido (registrado em ${dataBr(data)})`, 'perigo')}<br><span class="suave">registrado em <a href="#/contrato/${a.id}?ir=documentos">${esc(a.inquilino_nome)}</a>${a[R.campoPerdidoPendente(k)] ? ', aguardando o administrador' : ''}</span>`;
+    }
     if (original) return `${etiqueta(`herdado de ${original.inquilino_nome}`, 'info')}<br><span class="suave">ainda não marcado no contrato anterior: marque lá, em <a href="#/contrato/${original.id}?ir=documentos">${esc(original.inquilino_nome)}</a></span>`;
     return etiqueta('pendente', 'perigo');
   };
-  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) && !aguardaPerda(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ''}><td><b>${esc(nome)}</b></td>
+  const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${(perdido(k) && !aguardaPerda(k)) || perdaAnterior(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ''}><td><b>${esc(nome)}</b></td>
     <td>${situacaoDoc(k, feito)}</td>
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}

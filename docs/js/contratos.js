@@ -346,11 +346,12 @@ export function marcaDagua(logo) {
 }
 
 /**
- * Assinaturas em conjuntos, cada um em suas linhas: locatário com o solidário, fiadores, locadora e por último as testemunhas.
+ * Assinaturas em conjuntos, cada um em suas linhas: locatário com o solidário (no termo de troca, quem sai e depois quem entra),
+ * fiadores, locadora e por último as testemunhas.
  * Conjunto de uma pessoa só fica centralizado. Devolve [[pessoas], ...] sem os conjuntos vazios.
  */
 export function gruposAssinatura(pessoas) {
-  const ordem = [/^LOCAT/, /^FIADOR/, /^LOCADORA/, /^TESTEMUNHA/];
+  const ordem = [/^LOCAT.*SAINTE/, /^LOCAT/, /^FIADOR/, /^LOCADORA/, /^TESTEMUNHA/];
   const grupos = ordem.map(() => []);
   const outros = [];
   for (const p of pessoas) {
