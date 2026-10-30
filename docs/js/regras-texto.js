@@ -69,6 +69,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - FCI (fundo de conservação do imóvel): % do aluguel bonificado no boleto, fora da NF, da multa e dos juros; corrigido mês a mês (juros compostos) a partir do mês seguinte a cada depósito, nunca abaixo do pago. Na saída, paga só reparos de danos; a sobra volta ao inquilino. Não é garantia locatícia nem cobre aluguel.
 
 10. RESERVA
+- Na troca de titular, a reserva vai para o novo com o comprovante e mostra o que já foi usado no anterior e em que mês; não abate de novo.
 - A reserva começa exatamente no aluguel marcado e segue nos seguintes só se sobrar. Pode ser marcada como já abatida em aluguel antigo.
 
 11. CONTAS (ÁGUA, ENERGIA, GÁS, CONDOMÍNIO, INTERNET)

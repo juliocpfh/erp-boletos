@@ -154,6 +154,7 @@ export async function trazerHeranca(id) {
   });
   if (!r) return null;
   if (r.agendada) {
+    await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
     const n = buscar('contratos', id);
     aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
     return r;

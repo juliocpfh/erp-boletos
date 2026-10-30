@@ -167,3 +167,41 @@ test('rotina: documento perdido no titular anterior fecha a etapa do novo; assin
   assert.equal(R.perdaHerdada(d, novo, 'doc_contrato_em'), null);
   assert.equal(etapa('contrato_assinado').data, '2026-06-25');
 });
+
+test('troca com data futura: reserva já aparece no novo; reajuste calcula o complemento pela caução do anterior e a garantia passa no dia', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07', caucao_pago_em: '2026-06-08', comprovante_caucao: 'cau.pdf',
+    comprovante_reserva: 'res.pdf', reserva_data: '2026-06-01', reserva_abatida_comp: '2026-06', reserva_abatida_valor: 50000 });
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2099-01-01', vigencia_inicio: '2099-01-01',
+    comprovante_caucao: null, comprovante_reserva: null, reserva_abatida_comp: null, reserva_abatida_valor: null }, 'julio');
+  assert.equal(R.herancaIncompleta(d, novo).reserva, true, 'contrato já salvo sem a reserva completa');
+  const r = R.transferirHeranca(d, novo.id, 'julio', '2098-12-20');
+  assert.deepEqual(r.arquivosReserva, ['res.pdf']);
+  assert.deepEqual([novo.comprovante_reserva, novo.reserva_data, novo.reserva_usada_anterior, R.saldoReserva(d, novo)], ['res.pdf', '2026-06-01', 50000, 0]);
+  assert.deepEqual(R.mesesUsoReserva(d, c), ['2026-06']);
+  assert.equal(R.herancaIncompleta(d, novo), null);
+  // reajuste no novo: 2 × (R$ 1.500,00 − 10%) = R$ 2.700,00; depositados R$ 2.430,00 no anterior
+  R.inserir(d, 'correcoes', { contrato_id: novo.id, data_vigencia: '2099-01-01', indice: 'IPCA', percentual: 1, valor_anterior: 135000, valor_novo: 150000 }, 'julio');
+  const x = R.complementoCaucao(d, novo);
+  assert.deepEqual([x.atual, x.necessaria, x.complemento], [243000, 270000, 27000]);
+  assert.equal(R.caucoesACompletar(d).some((y) => y.contrato.id === novo.id), true);
+  R.registrarComplementoDepositado(d, novo.id, { data: '2098-12-25' }, 'julio');
+  assert.equal(R.complementoCaucao(d, novo), null, 'complemento registrado');
+  const r2 = R.transferirHeranca(d, novo.id, 'julio', '2099-01-01');
+  assert.equal(r2.garantia, true, 'a correção da caução não impede a garantia de passar');
+  assert.equal(R.valorGarantia(d, novo), 270000);
+  assert.equal(novo.comprovante_reserva, 'res.pdf');
+});
+
+test('contrato excluído: a garantia marcada como passada a ele volta ao anterior e pode passar ao próximo titular', () => {
+  const { d, c } = base();
+  const { id, ...resto } = c;
+  const n = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Excluida', contrato_anterior_id: c.id }, 'julio');
+  c.garantia_transferida_para = n.id;
+  R.excluirContrato(d, n.id, 'julio');
+  assert.equal(c.garantia_transferida_para, null);
+  c.garantia_transferida_para = 999;
+  R.normalizar(d);
+  assert.equal(c.garantia_transferida_para, null, 'dados antigos');
+});

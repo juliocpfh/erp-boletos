@@ -64,7 +64,7 @@ function caixaCaucaoACompletar(q) {
     ${lista.map((y) => { const c = y.contrato; const i = buscar('imoveis', c.imovel_id); const x = y.x;
     const motivo = x ? (x.correcao.indice === 'Negociado' ? `novo valor negociado (${dataBr(x.correcao.data_vigencia)})` : `reajuste de ${compBr(x.competencia)}`) : 'boleto em aberto';
     return `<tr class="${String(c.id) === q.contrato ? 'amarelo' : ''}"><td><a href="#/contrato/${c.id}"><b>${esc(i ? i.nome : '')}</b></a><br>${esc(c.inquilino_nome)}</td><td>${motivo}</td>
-      <td class="n">${reais(R.valorGarantia(d(), c))}</td><td class="n">${x && x.necessaria !== null ? reais(x.necessaria) : '-'}</td><td class="n"><b>${x && x.complemento > 0 ? reais(x.complemento) : y.abertos.length ? reais(y.abertos.reduce((t, cb) => t + cb.caucao_complemento, 0)) : '-'}</b></td>
+      <td class="n">${reais(x ? x.atual : R.valorGarantia(d(), c))}</td><td class="n">${x && x.necessaria !== null ? reais(x.necessaria) : '-'}</td><td class="n"><b>${x && x.complemento > 0 ? reais(x.complemento) : y.abertos.length ? reais(y.abertos.reduce((t, cb) => t + cb.caucao_complemento, 0)) : '-'}</b></td>
       <td class="nw">${acao(y)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="suave">Nenhuma caução a completar.</td></tr>'}</table></div>`;
 }
 
