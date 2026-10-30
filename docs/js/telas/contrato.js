@@ -444,15 +444,17 @@ function atalhosDocumentos(c) {
   return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(' ')}</div>` : '';
 }
 
-/** Topo da página do inquilino: o que falta dos documentos de entrada, com os botões para gerar. */
+/** Topo da página do inquilino, com a rotina de entrada recolhida: o que falta dos documentos, com os botões para gerar. */
 function faixaDocumentosEntrada(c) {
   if (!R.contratoAtivo(c)) return '';
   const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => R.documentoFalta(d(), c, k));
   if (!falta.length) return '';
   const g = geradoresDocumentos(c, 'botao pequeno');
-  return `<div class="alerta aviso"><b>Documentos de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase('pt-BR')).join(', '))}.
+  return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase('pt-BR')).join(', '))}.
     <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(' ')} ${link(`#/contrato/${c.id}?ir=documentos`, 'Marcar como assinado', 'botao secundario pequeno')}</div></div>`;
 }
+
+const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEntrada(d(), c, hoje).concluida && R.rotinaRecente(c, hoje);
 
 /** Marcar um documento de entrada como assinado: data, arquivo assinado e "Marcar" (com "Falta assinatura", se pedido). */
 function formMarcarDocumento(c, k, feito, comParcial = true) {
@@ -471,7 +473,7 @@ function formMarcarDocumento(c, k, feito, comParcial = true) {
 function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
   const { etapas, feitas, total, concluida } = R.resumoRotinaEntrada(d(), c, hoje);
   if (!total) return '';
-  const aberta = R.contratoAtivo(c, hoje) && !concluida && R.rotinaRecente(c, hoje);
+  const aberta = rotinaAberta(c, hoje);
   const anterior = R.contratoHerdado(d(), c);
   const ir = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
   const mini = 'botao secundario mini';
@@ -612,8 +614,8 @@ export function telaContrato(c) {
   const aluguel = R.aluguelAtual(d(), c);
   const pctBonif = R.percentualBonificacao(c);
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
-  // documentos de entrada e contas a transferir aparecem na rotina de entrada (e na faixa dos documentos)
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Documentos de entrada', 'Rotina de entrada'].includes(a.tipo)) : [];
+  // documentos de entrada e contas a transferir aparecem na rotina de entrada (recolhida: também na faixa dos documentos)
+  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo)) : [];
   const rotina = caixaRotinaEntrada(c, hoje);
   const agendada = R.herancaAgendada(d(), c, hoje);
   const anteriorAgendado = agendada && R.contratoHerdado(d(), c);
@@ -648,7 +650,7 @@ export function telaContrato(c) {
     ${linhaIncluso(c)}
     ${atalhosDocumentos(c)}
     ${anteriorAgendado && R.trocaAguardaAditivo(d(), c) ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}, aguardando o termo aditivo assinado.</b> Até assinar, os boletos, as correções do aluguel, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>, mesmo depois dessa data.</div>` : anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(C.somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ''}
-    ${rotina.startsWith('<div') ? '' : faixaDocumentosEntrada(c)}
+    ${rotinaAberta(c, hoje) ? '' : faixaDocumentosEntrada(c)}
     ${rotina}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}

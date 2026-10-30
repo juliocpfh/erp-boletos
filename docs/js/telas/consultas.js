@@ -164,13 +164,17 @@ export function calendarioDoPainel(mes, hoje) {
       ${evs.slice(0, 7).map((e) => `<div class="cal-ev ${e.situacao}" title="${esc(`${e.tipo}: ${e.texto} (${e.estado})`)}">${esc(curto(e))}</div>`).join('')}
       ${evs.length > 7 ? `<div class="cal-mais">+${evs.length - 7}</div>` : ''}</div>`);
   }
+  // cada coluna (dia da semana) na largura do dia mais cheio dela; coluna sem nada no mês fica estreita
+  const maisCheio = Array(7).fill(0);
+  for (const [dia, evs] of porDia) { const s = C.paraData(dia).getUTCDay(); maisCheio[s] = Math.max(maisCheio[s], evs.length); }
+  const colunas = maisCheio.map((q) => `minmax(0, ${q ? 2 + Math.min(q, 7) : 1}fr)`).join(' ');
   const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje ? '' : 'hidden'}>
       <h3>${dataBr(dia)} · ${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</h3>
       ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div>`).join('');
   return `<div class="cartao" id="calendario"><div class="cabecalho"><h2 style="margin:0">Calendário de ${compBr(mes)}</h2>
       <div class="acoes">${link(`#/?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`)} ${link('#/', 'Mês atual')} ${link(`#/?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`)}</div></div>
-    <div class="cal-grade">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
+    <div class="cal-grade" style="--cal-colunas:${colunas}">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
     ${agendas || ''}
-    <p class="suave">Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+    <p class="suave">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
 }

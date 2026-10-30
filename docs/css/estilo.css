@@ -237,15 +237,18 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .alerta.mensagem .fechar { position: absolute; right: 6px; top: 4px; background: none; color: var(--suave); font-size: 18px; padding: 0 6px; line-height: 1.4; }
 
 /* Calendário do mês (Painel) */
-.cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-grade { display: grid; grid-template-columns: var(--cal-colunas, repeat(7, minmax(0, 1fr))); gap: 4px; align-items: start; }
 .cal-sem { font-size: 12px; color: var(--suave); text-transform: uppercase; text-align: center; padding: 2px 0; }
-.cal-dia { min-height: 84px; border: 1px solid var(--borda); border-radius: 6px; padding: 4px; background: #fff; overflow: hidden; }
+.cal-dia { border: 1px solid var(--borda); border-radius: 6px; padding: 1px 4px; background: #fff; overflow: hidden; }
+.cal-dia.com-eventos { padding: 4px; }
 .cal-dia.vazio { border: 0; background: none; }
 .cal-dia.com-eventos { cursor: pointer; }
 .cal-dia.com-eventos:hover, .cal-dia.selecionado { border-color: var(--primaria); box-shadow: 0 0 0 1px var(--primaria); }
 .cal-dia.hoje { background: #eff6ff; }
 .cal-dia.hoje .cal-num { background: var(--primaria); color: #fff; border-radius: 999px; display: inline-block; min-width: 22px; text-align: center; }
-.cal-num { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.cal-num { font-size: 11px; color: var(--suave); }
+.cal-dia.com-eventos .cal-num { font-weight: 700; font-size: 13px; color: var(--texto); margin-bottom: 2px; }
+.cal-dia.hoje .cal-num { font-weight: 700; color: #fff; }
 .cal-ev { font-size: 11px; line-height: 1.25; padding: 1px 4px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-ev.ok { background: #dcfce7; color: var(--ok); }
 .cal-ev.aviso { background: #fef3c7; color: var(--aviso); }
@@ -255,7 +258,7 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .agenda-dia { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--primaria); border-radius: 8px; background: #f8fafc; }
 .agenda-dia h3 { margin-top: 0; }
 .evento-cal { margin-bottom: 6px; }
-@media (max-width: 700px) { .cal-dia { min-height: 48px; } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
+@media (max-width: 700px) { .cal-grade { grid-template-columns: repeat(7, minmax(0, 1fr)); } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
 
 /* Carta de reajuste */
 .carta { position: relative; overflow: hidden; background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
@@ -385,6 +388,7 @@ table.lista-imoveis tr.imovel-l1 td:not([rowspan]) { border-bottom: 0; padding-b
 table.lista-imoveis tr.imovel-l2 td { padding-top: 2px; }
 /* tela estreita: o aluguel bonificado desce para a linha de baixo em vez de sair da caixa (se ainda não couber, a tabela rola dentro da caixa) */
 table.lista-imoveis td.n { white-space: normal; }
+table.lista-imoveis td.valor-imovel { white-space: nowrap; font-size: 12px; color: var(--suave); }
 table.lista-imoveis .sublote { color: var(--primaria); }
 table.lista-imoveis .vazio { color: var(--suave); font-style: italic; }
 
