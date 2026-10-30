@@ -40,6 +40,11 @@ export function normalizar(d) {
   for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d.listas[k])) d.listas[k] = [...l.padrao];
   // garantia marcada como passada a um contrato que foi excluído: volta a ser deste (senão não passa ao novo titular)
   for (const c of d.contratos) if (c.garantia_transferida_para && !d.contratos.some((x) => x.id === c.garantia_transferida_para)) c.garantia_transferida_para = null;
+  // o alerta "Documentos de entrada" passou a fazer parte do "Rotina de entrada": a aparência escolhida vai junto
+  if (d.estilos_alertas && d.estilos_alertas['Documentos de entrada']) {
+    d.estilos_alertas['Rotina de entrada'] = d.estilos_alertas['Rotina de entrada'] || d.estilos_alertas['Documentos de entrada'];
+    delete d.estilos_alertas['Documentos de entrada'];
+  }
   // o anúncio passou a ser só uma descrição (o link antigo vira o texto)
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -2020,9 +2025,8 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     ag ? null : alertaAplicacao(d, contrato),
     ag ? null : alertaComprovantes(d, contrato),
     alertaRotinaEntrada(d, contrato, hoje),
-    alertaDocumentosEntrada(contrato, d),
-    alertaAssinaturaFaltante(d, contrato),
-    alertaPerdaAConfirmar(d, contrato),
+    alertaAssinaturaFaltante(d, contrato, hoje),
+    alertaPerdaAConfirmar(d, contrato, hoje),
     alertaAditivoHerdeiro(d, contrato),
     alertaAditivoAguardando(d, contrato),
     alertaCondominio(contrato, hoje),
@@ -2481,7 +2485,9 @@ export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usu
   return a;
 }
 /** Documento que ainda falta: nem assinado, nem perdido, nem anexado com assinatura faltante, nem herdado do contrato original. */
-export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !documentoEntrada(d, c, campo) && !documentoPerdido(d, c, campo) && !documentoParcial(d, c, campo);
+export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !documentoEntrada(d, c, campo) && !documentoPerdido(d, c, campo) && !documentoParcial(d, c, campo)
+  // "não se aplica" na rotina de entrada: não fica cobrando
+  && !((c.rotina_entrada || {})[(ETAPAS_ENTRADA.find((e) => e[2] === campo) || [])[0]] || {}).pulada;
 
 /** Troca de titular: o termo aditivo que coloca o novo titular no contrato é obrigatório (alerta até registrar um aditivo neste contrato). */
 export function alertaAditivoHerdeiro(d, c) {
@@ -2510,28 +2516,39 @@ export function partesDoContrato(d, c) {
 /** Texto gravado para cada parte: "Pedro Souza (fiador)". */
 export const textoParte = (p) => `${p.nome} (${p.papel})`;
 
-/** Todo inquilino ativo (antigo ou novo): avisa enquanto faltar algum dos três documentos assinados (próprio ou herdado). */
+/**
+ * Todo inquilino ativo (antigo ou novo): o que falta dos três documentos assinados (próprio ou herdado).
+ * Faz parte do alerta único "Rotina de entrada" (alertaRotinaEntrada).
+ */
 export function alertaDocumentosEntrada(c, d = null) {
   if (c.ativo === false || c.data_saida) return null;
   const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
-  return falta.length ? { nivel: 'aviso', tipo: 'Documentos de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'documentos' } : null;
+  return falta.length ? { nivel: 'aviso', tipo: 'Rotina de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'rotina' } : null;
 }
 
+/**
+ * Troca de titular: contratos anteriores da cadeia que já não estão ativos. As pendências dos documentos deles (assinatura
+ * faltante, perda a confirmar) aparecem no novo titular, senão sumiriam do painel. Com o anterior ativo, o aviso fica só nele.
+ */
+const anterioresEncerrados = (d, c, hoje) => (c.contrato_anterior_id ? cadeiaDeContratos(d, c).antes.filter((a) => !contratoAtivo(a, hoje)) : []);
+
 /** Documento anexado com assinatura faltante: alerta até alguém anexar o arquivo com todas as assinaturas. */
-function alertaAssinaturaFaltante(d, c) {
+function alertaAssinaturaFaltante(d, c, hoje = C.hojeIso()) {
   if (c.ativo === false || c.data_saida) return null;
-  const l = DOCUMENTOS_ENTRADA.map(([k, t]) => [t, documentoParcial(d, c, k)]).filter(([, p]) => p);
+  const doContrato = (x, onde) => DOCUMENTOS_ENTRADA.filter(([k]) => !c[k]).map(([k, t]) => [t, documentoParcial(d, x, k), onde]).filter(([, p]) => p);
+  const l = [...doContrato(c, ''), ...anterioresEncerrados(d, c, hoje).flatMap((a) => doContrato(a, ` (no contrato de ${a.inquilino_nome})`))];
   if (!l.length) return null;
   return { nivel: 'aviso', tipo: 'Assinatura faltante', ancora: 'documentos',
-    texto: `${l.map(([t, p]) => `${t.toLocaleLowerCase('pt-BR')} anexado sem a assinatura de ${p.falta.join(', ')}${p.pendente ? ' (aguardando análise do administrador)' : ''}`).join('; ')}. Anexe o arquivo com todas as assinaturas.` };
+    texto: `${l.map(([t, p, onde]) => `${t.toLocaleLowerCase('pt-BR')} anexado sem a assinatura de ${p.falta.join(', ')}${onde}${p.pendente ? ' (aguardando análise do administrador)' : ''}`).join('; ')}. Anexe o arquivo com todas as assinaturas.` };
 }
 
 /** Perda registrada por quem não é administrador: aguarda o administrador confirmar ou recusar. */
-function alertaPerdaAConfirmar(d, c) {
-  const l = DOCUMENTOS_ENTRADA.filter(([k]) => documentoPerdido(d, c, k) && c[campoPerdidoPendente(k)]);
+function alertaPerdaAConfirmar(d, c, hoje = C.hojeIso()) {
+  const doContrato = (x, onde) => DOCUMENTOS_ENTRADA.filter(([k]) => !c[k] && documentoPerdido(d, x, k) && x[campoPerdidoPendente(k)])
+    .map(([k, t]) => `${t.toLocaleLowerCase('pt-BR')} registrado como perdido por ${x[campoPerdidoPendente(k)]} em ${C.dataBr(x[campoPerdidoDoc(k)])}${onde}`);
+  const l = [...doContrato(c, ''), ...anterioresEncerrados(d, c, hoje).flatMap((a) => doContrato(a, ` (no contrato de ${a.inquilino_nome})`))];
   if (!l.length) return null;
-  return { nivel: 'aviso', tipo: 'Documento perdido a confirmar', ancora: 'documentos',
-    texto: `${l.map(([k, t]) => `${t.toLocaleLowerCase('pt-BR')} registrado como perdido por ${c[campoPerdidoPendente(k)]} em ${C.dataBr(c[campoPerdidoDoc(k)])}`).join('; ')}. O administrador confirma ou recusa.` };
+  return { nivel: 'aviso', tipo: 'Documento perdido a confirmar', ancora: 'documentos', texto: `${l.join('; ')}. O administrador confirma ou recusa.` };
 }
 
 /** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
@@ -2657,9 +2674,17 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
   const marcas = c.rotina_entrada || {};
   const anterior = contratoHerdado(d, c);
   const herdou = anterior ? `herdado de ${anterior.inquilino_nome}` : '';
+  const antes = anterior ? [...cadeiaDeContratos(d, c).antes].reverse() : [];
+  // marca à mão no contrato anterior (o mais recente da cadeia) de etapa que é do contrato e não da pessoa: vale para o novo
+  const marcaAnterior = (chave) => {
+    const a = antes.find((x) => (x.rotina_entrada || {})[chave]);
+    if (!a) return null;
+    const m = a.rotina_entrada[chave];
+    return m.pulada ? { situacao: 'pulada', data: m.data, texto: `não se aplica (marcado em ${a.inquilino_nome})` } : { situacao: 'feita', data: m.data, texto: `marcada em ${a.inquilino_nome}` };
+  };
   const feita = (data, texto = '') => ({ situacao: 'feita', data: data || null, texto });
   const andamento = (texto) => ({ situacao: 'andamento', texto });
-  const docAssinado = (k) => {
+  const docAssinado = (k, chave) => {
     const doc = documentoEntrada(d, c, k);
     if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : (doc.arquivo ? '' : 'sem arquivo'));
     if (documentoPerdido(d, c, k)) return feita(documentoPerdido(d, c, k), 'registrado como perdido');
@@ -2667,6 +2692,10 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     if (ph) return feita(ph.data, `registrado como perdido em ${ph.contrato.inquilino_nome}`);
     const p = documentoParcial(d, c, k);
     if (p) return andamento(`falta assinatura: ${p.falta.join(', ')}`);
+    const pa = antes.find((a) => documentoParcial(d, a, k));
+    if (pa) return andamento(`falta assinatura no contrato de ${pa.inquilino_nome}: ${documentoParcial(d, pa, k).falta.join(', ')}`);
+    const m = marcaAnterior(chave);
+    if (m && m.situacao === 'pulada') return m;
     return anterior ? andamento(`herdado de ${anterior.inquilino_nome}: marque no contrato anterior`) : null;
   };
   // documento já baixado na caixa "Contrato, Vistoria, Termos e Aditivos" (assinado, perdido ou com assinatura faltante): já foi gerado
@@ -2679,14 +2708,19 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       return undefined;
     },
     contrato_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_contrato_em', 'contrato já assinado')),
-    contrato_assinado: () => docAssinado('doc_contrato_em'),
+    contrato_assinado: () => docAssinado('doc_contrato_em', 'contrato_assinado'),
     aditivo: () => {
       const l = aditivosDo(d, c.id);
       if (l.length) return feita(l[0].data, l[0].assunto);
       return aditivosAguardando(d, c.id).length ? andamento('gerado, aguardando assinatura') : undefined;
     },
     garantia: () => {
-      if (anterior && !garantiaNova(c) && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) return feita(null, `herdada de ${anterior.inquilino_nome}`);
+      if (anterior && !garantiaNova(c) && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) {
+        const m = marcaAnterior('garantia');
+        if (m) return m;
+        const semDeposito = (temCaucao(c) || temDeposito(c)) && ![c, ...antes].some((x) => garantiaDepositada(x) || somaDepositos(d, x, temCaucao(c) ? 'caucao' : 'deposito') > 0);
+        return semDeposito ? andamento(`herdada de ${anterior.inquilino_nome}: falta o depósito`) : feita(null, `herdada de ${anterior.inquilino_nome}`);
+      }
       if (temCaucao(c) || temDeposito(c)) {
         const qual = temCaucao(c) ? 'caucao' : 'deposito';
         if (garantiaDepositada(c)) return feita(c[GARANTIAS_DEPOSITADAS[qual].pago] || null, `${GARANTIAS_DEPOSITADAS[qual].nome} depositada`);
@@ -2701,15 +2735,15 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       return anterior ? feita(null, herdou) : jaGerado('doc_vistoria_em', 'vistoria já assinada');
     },
     chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),
-    vistoria_assinada: () => docAssinado('doc_vistoria_em'),
-    chaves_assinado: () => docAssinado('doc_chaves_em'),
+    vistoria_assinada: () => docAssinado('doc_vistoria_em', 'vistoria_assinada'),
+    chaves_assinado: () => docAssinado('doc_chaves_em', 'chaves_assinado'),
     seguro: () => {
       const data = c.data_entrada || c.vigencia_inicio || '';
       const s = segurosDoContrato(d, c.id).filter((x) => !data || x.vigencia_fim >= data).sort((a, b) => String(a.vigencia_inicio).localeCompare(String(b.vigencia_inicio)))[0];
       if (s) return feita(s.data_contratacao || s.vigencia_inicio, [s.seguradora, s.apolice].filter(Boolean).join(' · '));
       // troca de titular ainda não feita: a apólice em vigência do anterior passa ao novo no dia
       if (anterior && herancaAgendada(d, c, hoje) && segurosDoContrato(d, anterior.id).some((x) => x.vigencia_fim >= data)) return feita(null, `apólice de ${anterior.inquilino_nome} passa na troca`);
-      return undefined;
+      return marcaAnterior('seguro') || undefined;
     },
   };
   for (const [k, campo, , padrao, re, soInquilino] of CONTAS_ENTRADA) {
@@ -2781,15 +2815,20 @@ export function marcarGeradoNaRotina(d, contratoId, chave, usuario, hoje = C.hoj
 }
 
 /**
- * Inquilino novo (até 6 meses da entrada) com troca de titularidade das contas ainda por fazer (água, energia, gás,
- * condomínio): alerta até o protocolo "Concluído" (ou a etapa marcada) na rotina de entrada.
+ * Alerta único da rotina de entrada: documentos que faltam (todo inquilino ativo) e, para o inquilino novo (até 6 meses da
+ * entrada), a troca de titularidade das contas (água, energia, gás, condomínio) até o protocolo "Concluído" ou a etapa marcada.
+ * Troca de titular: quem está passando o contrato adiante não transfere mais contas para o próprio nome; os documentos
+ * pendentes ficam no anterior, onde se marcam, e o novo titular só herda (documentoFalta).
  */
 function alertaRotinaEntrada(d, c, hoje) {
-  if (c.ativo === false || c.data_saida || !c.imovel_id || !rotinaRecente(c, hoje)) return null;
-  const l = rotinaEntrada(d, c, hoje).filter((e) => CONTAS_ENTRADA.some(([k]) => k === e.chave) && ['pendente', 'andamento'].includes(e.situacao));
-  if (!l.length) return null;
+  if (c.ativo === false || c.data_saida) return null;
+  const docs = alertaDocumentosEntrada(c, d);
+  const contas = c.imovel_id && rotinaRecente(c, hoje) && !continuadoPor(d, c)
+    ? rotinaEntrada(d, c, hoje).filter((e) => CONTAS_ENTRADA.some(([k]) => k === e.chave) && ['pendente', 'andamento'].includes(e.situacao)) : [];
+  if (!docs && !contas.length) return null;
   return { nivel: 'aviso', tipo: 'Rotina de entrada', ancora: 'rotina',
-    texto: `Falta efetivar a troca de titularidade: ${l.map((e) => `${e.titulo.replace(/^Transferência d[aoe] /, '')}${e.situacao === 'andamento' ? ` (${e.texto})` : ''}`).join('; ')}.` };
+    texto: [docs && `Documentos: ${docs.texto}`,
+      contas.length && `Falta efetivar a troca de titularidade: ${contas.map((e) => `${e.titulo.replace(/^Transferência d[aoe] /, '')}${e.situacao === 'andamento' ? ` (${e.texto})` : ''}`).join('; ')}.`].filter(Boolean).join(' ') };
 }
 
 /**
@@ -3045,7 +3084,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 // Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
 // --------------------------------------------------------------------------
-export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência', 'Documentos de entrada',
+export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
   'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */

@@ -14,7 +14,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório. Os boletos continuam com o anterior até a véspera da troca; com data futura, garantia, seguro e reserva passam só no dia.
 - Rotina de entrada na página do inquilino: reserva, contrato (gerar e assinar), garantia, vistoria e termo das chaves (gerar e assinar), troca de titularidade da água, energia, gás e condomínio (quando por conta do inquilino) e seguro. O que já está registrado marca sozinho (documento registrado como perdido conta como feito, também quando a perda foi registrada no titular anterior; com assinatura faltante, continua faltando); o resto se marca com a data ou "não se aplica".
 - Contrato sem imóvel há 7 dias (e sem boleto) é apagado sozinho.
-- Contrato gerado por modelo editável. Documentos de entrada (contrato, vistoria, termo das chaves) só são marcados como assinados com o arquivo assinado anexado. Podem ser anexados com assinatura faltante ou registrados como perdidos (os de operador aguardam o administrador).
+- Contrato gerado por modelo editável. Documentos de entrada (contrato, vistoria, termo das chaves; o que falta aparece no alerta "Rotina de entrada") só são marcados como assinados com o arquivo assinado anexado. Podem ser anexados com assinatura faltante ou registrados como perdidos (os de operador aguardam o administrador).
 - Termo aditivo: sempre com o arquivo assinado. Trocar o dia do vencimento muda só o dia, sem cobrança proporcional.
 
 3. SAÍDA DO INQUILINO

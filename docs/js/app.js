@@ -409,6 +409,7 @@ export async function mostrar(estadoForm = null) {
     // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel).
     // Depois tira o ?ir= do endereço: assim o mesmo atalho funciona de novo e outras ações na página não pulam para a caixa.
     const alvo = rota.q.ir && document.getElementById(rota.q.ir);
+    if (alvo?.tagName === 'DETAILS') alvo.open = true;
     if (alvo) alvo.scrollIntoView({ block: 'start' });
     if (rota.q.ir) history.replaceState(null, '', location.href.replace(/([?&])ir=[^&]*&?/, '$1').replace(/[?&]$/, ''));
   } catch (e) {

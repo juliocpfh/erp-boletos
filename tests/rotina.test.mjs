@@ -89,8 +89,8 @@ test('rotina de entrada: etapas pelo que já está registrado, marca à mão com
   assert.equal(R.rotinaEntrada(d, c, hoje).find((x) => x.chave === 'chaves_gerado').data, '2026-06-01');
   R.marcarEtapaEntrada(d, c.id, 'garantia', {}, 'julio');
   assert.equal(R.rotinaEntrada(d, c, hoje).find((x) => x.chave === 'garantia').situacao, 'pendente', 'desfeita');
-  // depois de 6 meses da entrada, sem alerta
-  assert.equal(R.alertasContrato(d, c, '2027-03-01').find((a) => a.tipo === 'Rotina de entrada'), undefined);
+  // depois de 6 meses da entrada, sem cobrar as contas (os documentos continuam)
+  assert.doesNotMatch(R.alertasContrato(d, c, '2027-03-01').find((a) => a.tipo === 'Rotina de entrada').texto, /titularidade/);
 });
 
 test('rotina do novo titular: documentos, garantia e vistoria herdados; termo aditivo da troca como etapa', () => {
@@ -206,4 +206,55 @@ test('contrato excluído: a garantia marcada como passada a ele volta ao anterio
   c.garantia_transferida_para = 999;
   R.normalizar(d);
   assert.equal(c.garantia_transferida_para, null, 'dados antigos');
+});
+
+test('alerta único da rotina de entrada: documentos e contas juntos; cor do alerta antigo passa a valer', () => {
+  const { d, c } = base();
+  Object.assign(c, { conta_agua: 'Por conta do inquilino' });
+  const l = R.alertasContrato(d, c, '2026-07-01');
+  assert.equal(l.filter((a) => a.tipo === 'Documentos de entrada').length, 0);
+  const a = l.filter((x) => x.tipo === 'Rotina de entrada');
+  assert.equal(a.length, 1);
+  assert.match(a[0].texto, /^Documentos: falta contrato de locação.*Falta efetivar a troca de titularidade: água/);
+  const antigo = R.alertasContrato(d, c, '2027-03-01').find((x) => x.tipo === 'Rotina de entrada');
+  assert.equal(antigo.texto, 'Documentos: falta contrato de locação, vistoria de entrada, recibo de entrega das chaves.', 'inquilino antigo: só os documentos');
+  d.estilos_alertas = { 'Documentos de entrada': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } };
+  R.normalizar(d);
+  assert.deepEqual(d.estilos_alertas, { 'Rotina de entrada': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } });
+});
+
+test('troca de titular: pendências e marcas do anterior chegam ao novo, sem alerta repetido', () => {
+  const { d, c } = base();
+  Object.assign(c, { conta_agua: 'Por conta do inquilino', garantia_tipo: 'Caução', caucao_valor: 243000, caucao_meses: 2, caucao_data: '2026-06-07' });
+  const parte = R.partesDoContrato(d, c).map(R.textoParte)[0];
+  R.marcarDocumentoPerdido(d, c.id, 'doc_contrato_em', '2026-06-20', 'ana', false);
+  R.anexarDocumentoParcial(d, c.id, 'doc_vistoria_em', { data: '2026-06-08', arquivo: 'vist.pdf', falta: [parte] }, 'julio', true);
+  R.marcarEtapaEntrada(d, c.id, 'chaves_assinado', { pular: true }, 'julio');
+  R.marcarEtapaEntrada(d, c.id, 'seguro', { pular: true }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-09-01', vigencia_inicio: '2026-09-01', rotina_entrada: null,
+    doc_contrato_perdido_em: null, doc_contrato_perdido_pendente: null, doc_vistoria_parcial: null }, 'julio');
+  // antes do termo assinado: o aviso dos documentos fica só no anterior, que já não é cobrado de transferir contas
+  const tipos = (x) => R.alertasContrato(d, x, '2026-08-01').map((a) => a.tipo);
+  assert.ok(tipos(c).includes('Documento perdido a confirmar'));
+  assert.ok(!tipos(novo).includes('Documento perdido a confirmar'));
+  assert.equal(R.alertasContrato(d, c, '2026-08-01').find((a) => a.tipo === 'Rotina de entrada'), undefined, 'anterior não transfere conta');
+  assert.match(R.alertasContrato(d, novo, '2026-08-01').find((a) => a.tipo === 'Rotina de entrada').texto, /água/, 'o novo transfere');
+  // termo assinado e data passada: o anterior encerra e as pendências passam a aparecer no novo
+  R.registrarAditivo(d, novo.id, { data: '2026-09-01', assunto: 'Troca de titular', arquivo: 'termo.pdf' }, 'julio');
+  R.transferirHeranca(d, novo.id, 'julio', '2026-09-02');
+  const hoje = '2026-09-10';
+  const alerta = (t) => R.alertasContrato(d, novo, hoje).find((a) => a.tipo === t);
+  assert.match(alerta('Documento perdido a confirmar').texto, /no contrato de Maria Exemplo/);
+  assert.match(alerta('Assinatura faltante').texto, /vistoria de entrada.*no contrato de Maria Exemplo/);
+  const rot = R.rotinaEntrada(d, novo, hoje);
+  const e = (k) => rot.find((x) => x.chave === k);
+  assert.equal(e('contrato_assinado').situacao, 'feita', 'perda do anterior fecha a etapa');
+  assert.match(e('vistoria_assinada').texto, /falta assinatura no contrato de Maria Exemplo/);
+  assert.equal(e('chaves_assinado').situacao, 'pulada', '"não se aplica" do anterior vale');
+  assert.equal(e('seguro').situacao, 'pulada');
+  assert.match(e('garantia').texto, /falta o depósito/);
+  // anexado o assinado no novo, o aviso some
+  R.marcarDocumento(d, novo.id, 'doc_vistoria_em', hoje, 'julio', 'vistoria.pdf');
+  assert.equal(alerta('Assinatura faltante'), undefined);
 });
