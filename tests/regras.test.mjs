@@ -1209,7 +1209,7 @@ test('pagamento com valor diferente do previsto: NF digitada (diferente da calcu
   assert.equal(cb.divergencia, null);
 });
 
-test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"; altera, assina e não muda o vencimento do contrato', () => {
+test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"; altera e assina', () => {
   const { d, c } = base();
   const dia = c.dia_vencimento;
   assert.throws(() => R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: String(dia || 10), mes: '2026-12', texto: 'x' }, 'julio'), /já é no dia/);
@@ -1226,10 +1226,30 @@ test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"
   R.assinarAditivo(d, a.id, { data: '2026-11-10', arquivo: 'termo.pdf' }, 'julio');
   assert.equal(c.possui_aditivos, true);
   assert.equal(R.aditivosDo(d, c.id).length, 1);
-  assert.equal(c.dia_vencimento, dia, 'o cadastro só muda pelo "Editar"');
+  assert.equal(c.dia_vencimento, 15, 'assinado: o cadastro passa ao dia novo');
   assert.throws(() => R.salvarAditivoVencimento(d, c.id, { data: '2026-11-06', dia_novo: '16', mes: '2026-12', texto: 't' }, 'julio', a.id), /já foi assinado/);
   R.normalizar(d);
   assert.equal(c.possui_aditivos, true);
+});
+
+test('termo aditivo de vencimento assinado: boletos em aberto a partir do 1º vencimento mudam de dia; pagos e anteriores ficam', () => {
+  const { d, c } = base();
+  c.dia_vencimento = 10;
+  c.cobranca_mes_seguinte = true;
+  for (const m of ['2026-09', '2026-10', '2026-11', '2026-12']) R.gerarCobrancas(d, m, 'julio');
+  const doMes = (m) => R.boletoDoMes(d, c.id, m);
+  R.registrarPagamento(d, doMes('2026-09').id, '2026-10-10', R.previstoNoPagamento(doMes('2026-09'), '2026-10-10').valor_devido, 'julio');
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '15', mes: '2026-12', texto: 'texto' }, 'julio');
+  assert.equal(doMes('2026-11').vencimento, '2026-12-10', 'antes de assinar nada muda');
+  R.assinarAditivo(d, a.id, { data: '2026-11-10', arquivo: 'termo.pdf' }, 'julio');
+  assert.equal(c.dia_vencimento, 15);
+  assert.equal(doMes('2026-09').vencimento, '2026-10-10', 'pago fica');
+  assert.equal(doMes('2026-10').vencimento, '2026-11-10', 'vence antes do 1º vencimento: fica');
+  assert.equal(doMes('2026-11').vencimento, '2026-12-15');
+  assert.equal(doMes('2026-12').vencimento, '2027-01-15');
+  R.gerarCobrancas(d, '2027-01', 'julio');
+  assert.equal(doMes('2027-01').vencimento, '2027-02-15', 'boleto novo já no dia novo');
+  assert.equal(R.vencimentoDoContrato(d, c, '2026-10'), '2026-11-10', 'mês antes do termo continua no dia antigo');
 });
 
 test('reserva já abatida em aluguel antigo (fora do sistema): sai dos boletos em aberto; excluir o registro devolve', () => {

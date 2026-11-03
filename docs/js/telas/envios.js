@@ -253,7 +253,7 @@ export const FORMULARIOS = {
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
     await alterar((db) => R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
     await trazerHerancaAssinada(a.contrato_id);
-    aviso(a.tipo === K.TIPO_ADITIVO_TROCA ? 'Termo aditivo assinado e registrado.' : 'Termo aditivo assinado e registrado. Lembre de mudar o dia do vencimento no cadastro do inquilino (Editar).');
+    aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${C.dataBr(a.primeiro_vencimento)} já saem no dia novo.` : 'Termo aditivo assinado e registrado.');
     await mostrar();
   },
 
