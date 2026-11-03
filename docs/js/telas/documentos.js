@@ -464,7 +464,7 @@ export function telaAditivo(rota) {
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca do dia do vencimento` : 'Gerar termo aditivo: troca do dia do vencimento'}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
     <div class="alerta info">Hoje o vencimento é no <b>dia ${diaAtual}</b>. Muda só o dia: o boleto continua se referindo ao mês ${c.cobranca_mes_seguinte !== false ? 'anterior' : 'do vencimento'}, sem cobrança proporcional.
-      Este termo não muda o cadastro: depois de assinado, mude o dia do vencimento em "Editar" no inquilino.</div>
+      Ao anexar o termo assinado, o sistema muda sozinho o dia no cadastro e nos boletos em aberto a partir do 1º vencimento no dia novo (os pagos ficam como estão).</div>
     <form class="cartao" data-form="aditivoVencimento">
       <input type="hidden" name="id" value="${a ? a.id : ''}"><input type="hidden" name="contrato" value="${c.id}">
       <div class="formulario">

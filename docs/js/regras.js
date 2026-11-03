@@ -1071,7 +1071,7 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
   });
   return {
     contrato_id: contrato.id, competencia: comp,
-    vencimento: C.vencimentoDaCompetencia(comp, contrato.dia_vencimento || 10, contrato.cobranca_mes_seguinte !== false),
+    vencimento: vencimentoDoContrato(d, contrato, comp),
     dias_cobrados: r.dias_cobrados, dias_mes: r.dias_mes, aluguel_mensal: r.aluguel_mensal,
     aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
     seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, fci: fciDoMes(contrato, r.aluguel, r.desconto), outros: 0, outros_descricao: '',
@@ -2926,10 +2926,44 @@ export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato
 /** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo). */
 export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo).sort(porDataAditivo);
 
+const aditivosDeVencimento = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo && a.dia_novo && a.primeiro_vencimento)
+  .sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
+
+/**
+ * Vencimento do boleto do aluguel de uma competência, pelo dia do cadastro. Antes do 1º vencimento de um termo aditivo
+ * de troca do dia já assinado, vale o dia anterior. Ex.: dia 10 → 15 a partir de 15/12/2026: o boleto que vence em
+ * novembro continua no dia 10; o de dezembro em diante, dia 15.
+ */
+export function vencimentoDoContrato(d, c, comp) {
+  const mesSeguinte = c.cobranca_mes_seguinte !== false;
+  const mesVenc = mesSeguinte ? C.somarMeses(comp, 1) : comp;
+  const depois = aditivosDeVencimento(d, c.id).find((a) => a.primeiro_vencimento.slice(0, 7) > mesVenc);
+  return C.vencimentoDaCompetencia(comp, depois ? depois.dia_anterior : c.dia_vencimento || 10, mesSeguinte);
+}
+
+/**
+ * Termo aditivo de troca do dia assinado: o cadastro passa ao dia novo e os boletos em aberto que vencem a partir do
+ * 1º vencimento do termo mudam de dia (os pagos ficam). Devolve quantos boletos mudaram.
+ */
+function aplicarAditivoVencimento(d, a, c, usuario) {
+  if (c.dia_vencimento !== a.dia_novo) {
+    atualizar(d, 'contratos', c.id, { dia_vencimento: a.dia_novo }, usuario, `${c.inquilino_nome}: vencimento passa ao dia ${a.dia_novo} (termo aditivo assinado)`);
+  }
+  const mes = a.primeiro_vencimento.slice(0, 7);
+  let n = 0;
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && !ehComplementoCaucao(x) && x.vencimento && x.vencimento.slice(0, 7) >= mes)) {
+    const venc = `${cb.vencimento.slice(0, 7)}-${String(Math.min(a.dia_novo, C.diasNoMes(cb.vencimento.slice(0, 7)))).padStart(2, '0')}`;
+    if (venc === cb.vencimento) continue;
+    atualizar(d, 'cobrancas', cb.id, { vencimento: venc }, usuario, `Boleto ${C.compBr(cb.competencia)}: vencimento ${C.dataBr(cb.vencimento)} → ${C.dataBr(venc)} (termo aditivo)`);
+    n += 1;
+  }
+  return n;
+}
+
 /**
  * Gera (ou altera) o termo aditivo de troca do dia do vencimento, ainda sem assinatura. ``f``: data, dia_novo,
  * mes (AAAA-MM do 1º vencimento no dia novo), testemunhas, modelo_id e texto (o texto do modelo, que pode ser ajustado só neste termo).
- * Só muda o dia: não há cobrança nem desconto proporcional. Não muda o vencimento do contrato: isso continua no cadastro.
+ * Só muda o dia: não há cobrança nem desconto proporcional. Ao anexar o assinado, o cadastro e os boletos em aberto mudam (`aplicarAditivoVencimento`).
  */
 export function salvarAditivoVencimento(d, contratoId, f, usuario, id = null) {
   const c = buscar(d, 'contratos', contratoId);
@@ -2990,6 +3024,7 @@ export function assinarAditivo(d, id, { data, arquivo }, usuario) {
   if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
   atualizar(d, 'aditivos', a.id, { arquivo, assinado_em: data }, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} assinado em ${C.dataBr(data)}`);
   marcarAditivos(d, c.id, usuario);
+  if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario);
   return a;
 }
 
@@ -3465,7 +3500,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
     for (const comp of [C.somarMeses(mes, -1), mes]) {
       if (C.diasOcupados(comp, c.data_entrada, c.data_saida) === 0) continue;
       const cb = boletoDoMes(d, c.id, comp);
-      const venc = cb ? cb.vencimento : C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+      const venc = cb ? cb.vencimento : vencimentoDoContrato(d, c, comp);
       if (!no(venc)) continue;
       const pago = cb && cb.data_pagamento;
       ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null,
@@ -3583,7 +3618,7 @@ export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso()) {
 /** Vencimento do boleto do aluguel corrigido (é com ele que vai a carta). */
 export function vencimentoDoReajuste(d, c, comp) {
   const cb = boletoDoMes(d, c.id, comp);
-  return cb ? cb.vencimento : C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+  return cb ? cb.vencimento : vencimentoDoContrato(d, c, comp);
 }
 
 /** Próximo reajuste a tratar: o último que já devia ter acontecido (ou acontece no mês seguinte), sem correção ou sem carta. */
