@@ -3,11 +3,13 @@ import { alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanc
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
+import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
+import * as Z from '../conciliacao.js';
 import { aplicarReajusteNaTela } from './acoes.js';
 import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
@@ -429,7 +431,12 @@ export const FORMULARIOS = {
     const texto = String(f.get('valor_nf') || '').trim();
     const valorNf = texto ? C.centavos(texto) : null;
     const justificativa = String(f.get('justificativa') || '').trim();
-    const r = await alterar((db) => R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa }));
+    const r = await alterar((db) => {
+      const res = R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa });
+      // veio da tela Banco (entrada do extrato com valor diferente do previsto): a movimentação fica ligada ao boleto
+      if (p.movimentacao_id) Z.ligarMovimentacaoAoBoleto(db, p.movimentacao_id, p.id, login());
+      return res;
+    });
     memoria.pagamentoDivergente = null;
     aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
     await mostrar();
@@ -579,6 +586,35 @@ export const FORMULARIOS = {
     renovarUsuario();
     aviso('Dados importados. Uma cópia do banco anterior ficou na pasta backups.');
     ir('#/');
+  },
+
+  /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
+  async configBanco(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = new FormData(form);
+    // endereço e senha da ponte: só neste navegador (IndexedDB); o que é compartilhado vai para o JSON
+    await BANCO.salvarPonteLocal({ ponte_url: f.get('ponte_url'), senha_ponte: f.get('senha_ponte') });
+    await alterar((db) => R.salvarConfigBanco(db, { ativo: f.get('ativo') === '1' }, login()));
+    aviso(E.d.config_banco.ativo ? 'Integração com o C6 ativa: os botões "Emitir no C6" estão ligados neste computador.' : 'Configuração salva (integração desligada). A senha da ponte ficou só neste computador.');
+    await mostrar();
+  },
+
+  /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
+  async modoContaBoleto(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = new FormData(form);
+    await alterar((db) => R.salvarConfigBanco(db, { modo_conta_boleto: f.get('modo'), conta_padrao_id: f.get('conta_padrao_id') || undefined }, login()));
+    aviso(f.get('modo') === 'escolher' ? 'Ao emitir, o sistema vai perguntar a empresa de cada boleto.' : 'Os boletos saem sempre pela empresa padrão.');
+    await mostrar();
+  },
+
+  /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
+  async contaBanco(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = Object.fromEntries(new FormData(form));
+    const conta = await alterar((db) => R.salvarContaBanco(db, f, login()));
+    aviso(`Conta ${conta.apelido} salva. Lembre de configurar a mesma conta ("${conta.id}") no .env da ponte.`);
+    await mostrar();
   },
 
   async modeloExcel(form) {

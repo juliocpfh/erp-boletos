@@ -56,6 +56,10 @@ Em **Dados e backup** é possível baixar tudo (banco e anexos) em um ZIP e impo
 - **Resultados:** retorno de cada imóvel sobre o valor do imóvel + reformas, a partir dos pagamentos registrados.
 - **Alertas:** correção, seguro, reserva, fim da vigência, fiador com vínculo terminando, garantia não aplicada integralmente, IPTU do proprietário e pedido de volta da titularidade depois da saída do inquilino.
 
+## Boleto com Pix pelo C6 (em preparação)
+
+O sistema já está preparado para emitir os boletos (com QR Code Pix) direto na conta do C6 Bank, pela API do banco. Como o C6 exige um certificado digital, o site fala com uma **ponte**: um programinha (`ponte-c6/`, só Node.js) que roda no computador de quem emite e guarda as chaves de cada conta (ANK e JCK). Enquanto as chaves da API não chegam, os botões "Emitir no C6" aparecem desabilitados com a explicação, e a ponte pode rodar em **modo simulado** para treinar. O passo a passo para ligar está em `documentacao/GUIA_DE_MODIFICACAO.md` ("Ligar o boleto com Pix do C6") e em `ponte-c6/README.md`. O pagamento confirmado pelo banco nunca é registrado sozinho: o sistema propõe e você confirma.
+
 ## Publicar o endereço (uma vez)
 
 No GitHub: **Settings → Pages → Build and deployment → Deploy from a branch**, branch `main`, pasta `/docs`, e salvar. Em alguns minutos o endereço acima passa a funcionar. Cada alteração enviada para `main` atualiza o sistema.

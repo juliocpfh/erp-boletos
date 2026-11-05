@@ -472,7 +472,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   R.normalizar(d);
   assert.deepEqual([d.config_banco.pasta_contador, d.config_banco.modelo_nome_comprovante, d.config_banco.tolerancia_dias, d.config_banco.permitir_pagamentos, d.config_banco.limite_pagamento, d.config_banco.ultima_importacao, d.config_banco.copiar_para_contador],
     ['_Contador', '{data} {empresa} {imovel} {tipo} {valor}', 5, false, 0, {}, true]);
-  assert.deepEqual([d.config_banco.ativo, d.config_banco.ponte_url, d.config_banco.contas.length], [true, 'http://x', 1]);
+  assert.deepEqual([d.config_banco.ativo, d.config_banco.ponte_url, d.config_banco.contas.length], [true, undefined, 1], 'endereço e senha da ponte não ficam no banco compartilhado');
   assert.deepEqual([d.movimentacoes_banco[0].valor, d.movimentacoes_banco[0].tipo, d.movimentacoes_banco[0].classificacao, d.movimentacoes_banco[0].comprovante], [1000, 'saida', null, null]);
   assert.equal(d.pagamentos_banco[0].referencia, 'erp-1');
   assert.equal(d.despesas[0].movimentacao_id, null, 'movimentação que sumiu: a conta perde o vínculo');
@@ -480,7 +480,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   assert.equal(d.movimentacoes_banco[0].valor, 1000);
   // sem config_banco nenhum: cria só os campos novos
   const d2 = R.normalizar(R.bancoVazio());
-  assert.deepEqual([d2.config_banco.ativo, d2.config_banco.pasta_contador, d2.movimentacoes_banco, d2.pagamentos_banco], [undefined, '_Contador', [], []]);
+  assert.deepEqual([d2.config_banco.ativo, d2.config_banco.pasta_contador, d2.movimentacoes_banco, d2.pagamentos_banco], [false, '_Contador', [], []] /* a base cria config_banco com ativo:false */);
   // histórico: alteração em movimentação não aparece em "desfazer"
   const { d: d3 } = base();
   const [m] = importar(d3, 'ank', [saida('r1', '2026-11-05', '10.00', 'A')]).novas;
@@ -493,7 +493,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   assert.equal(R.idPastaAno(3, 2026), 32026);
   // configuração da fase 2 gravada com histórico, sem a senha
   Z.salvarConfigBanco2(d3, { pasta_contador: 'Contador Ébano', tolerancia_dias: '4', permitir_pagamentos: true, limite_pagamento: 500000, senha_ponte: 'nova' }, 'julio');
-  assert.deepEqual([d3.config_banco.pasta_contador, d3.config_banco.tolerancia_dias, d3.config_banco.permitir_pagamentos, d3.config_banco.limite_pagamento, d3.config_banco.senha_ponte], ['Contador Ebano', 4, true, 500000, 'x']);
+  assert.deepEqual([d3.config_banco.pasta_contador, d3.config_banco.tolerancia_dias, d3.config_banco.permitir_pagamentos, d3.config_banco.limite_pagamento, d3.config_banco.senha_ponte], ['Contador Ebano', 4, true, 500000, undefined] /* senha da ponte nunca fica no banco */);
   assert.equal(JSON.stringify(d3.historico.at(-1).detalhes).includes('nova'), false);
   assert.throws(() => Z.salvarConfigBanco2(d3, { modelo_nome_comprovante: 'sem campos' }, 'julio'), /entre chaves/);
 });
