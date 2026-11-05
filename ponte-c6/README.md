@@ -54,9 +54,10 @@ Todas respondem JSON e exigem o cabeçalho `X-Senha-Ponte` (a senha do `.env`), 
 | `GET /contas/:conta/boletos/:id/pdf` | PDF do boleto | BP_04 `GET /v2/bank_slips/{id}/pdf` (application/pdf) |
 | `POST /contas/:conta/boletos/:id/negativar` | Agenda a negativação do pagador (`{ deadline: dias de atraso }`) | `POST /v2/bank_slips/{id}/denial` → 201 |
 | `POST /contas/:conta/boletos/:id/negativar/cancelar` | Cancela a negativação (só com `can_cancel`) | `DELETE /v2/bank_slips/{id}/denial` → 204 |
-| `POST /webhook/c6/:conta` | Recebe os avisos do banco e guarda em `notificacoes/<conta>.jsonl` (sem senha: quem chama é o C6; o aviso não tem assinatura, então o site sempre reconsulta o boleto) | cadastro: `POST /v1/webhooks { url, service: "BANK_SLIP_PIX" }` |
+| `POST /webhook/c6/:conta/<segredo>` | Recebe os avisos do banco (sem senha: quem chama é o C6). O `<segredo>` é `C6_<ID>_WEBHOOK_TOKEN` (32 hex; sem ele a rota não existe); corpo até 64 KB; guarda só `{ external_reference_id, status, reconsultar: true }` em `notificacoes/<conta>-AAAA-MM-DD.jsonl`. O aviso não tem assinatura, então o site sempre reconsulta o boleto | cadastro: `POST /v1/webhooks { url: "https://<ponte>/webhook/c6/ank/<segredo>", service: "BANK_SLIP_PIX" }` |
 | `GET /contas/:conta/notificacoes?desde=…` | Avisos guardados | — |
-| `GET /roteiro` | Último registro de cada teste do roteiro de homologação | — |
+| `GET /roteiro` | Último registro de cada teste do roteiro de homologação (só com a senha) | — |
+| Fase 2 (`rotas-fase2.mjs`, montadas aqui): `GET /contas/:conta/extrato`, `/saldo`, `/boletos/pagos`, `/dda`, `/comprovante/:reference`; com `PAGAMENTOS=1`: `POST /pagamentos/decodificar`, `GET|DELETE /pagamentos/:grupo/itens`, `DELETE …/itens/:item`, `POST /pagamentos/:grupo/enviar` | Extrato, saldo, boletos pagos, DDA, lotes de pagamento para aprovação no app, comprovante em PDF gerado pela ponte (`README-fase2.md`) | `/v1/statement`, `/v1/schedule_payments` |
 | `POST /contas/:conta/simulado/pagar/:id` | **Só no modo simulado:** marca um boleto fictício como pago (`payments[]` como na listagem), para testar "Consultar situação" | — |
 
 Autenticação no C6: `POST /v1/auth/` com `grant_type=client_credentials`, `client_id` e `client_secret` (formulário), apresentando o certificado; resposta `{ access_token, expires_in, token_type, scope }`. O token é guardado e renovado sozinho um minuto antes de vencer. Cabeçalhos enviados: `Authorization: Bearer …`, `partner-software-name`, `partner-software-version`. Erros do banco vêm no formato RFC 7807 e o `detail` é repassado ao site.
@@ -81,7 +82,11 @@ extrato: { descricao: 'Extrato da conta', rotas: [
 
 - A ponte escuta **só neste computador** (`127.0.0.1`). Para ouvir em outro endereço é preciso `EXPOR=1`, e ela avisa em letras grandes no console e em `/saude` (`exposta: true`): nesse caso proteja o acesso com **Cloudflare Access ou Tailscale** e use HTTPS. Sem senha (`PONTE_SENHA`) a ponte exposta não sobe.
 - Só aceita chamadas das origens da lista fixa `ORIGENS` (CORS); `*` nunca é aceito. No preflight responde `Access-Control-Allow-Private-Network: true` (o Chrome exige para o site público chamar `localhost`).
-- A senha é comparada em tempo constante (`crypto.timingSafeEqual`); **5 senhas erradas seguidas do mesmo IP bloqueiam por 15 minutos**.
+- `PONTE_SENHA` é obrigatória, com **pelo menos 20 caracteres**: sem ela a ponte não sobe. A senha é comparada em tempo constante (`crypto.timingSafeEqual`); cada senha errada do mesmo IP (o `CF-Connecting-IP` do Cloudflare, senão o do socket) demora mais para responder (1 s, 2 s, 4 s, 8 s) e **10 erros seguidos bloqueiam o IP por 15 minutos**.
+- O pedido de emissão vindo do site é **remontado pela ponte** só com os campos conhecidos (`mapa-c6.mjs`): CPF/CNPJ com dígito verificador, valor até `C6_<ID>_VALOR_MAXIMO` (padrão R$ 50.000), chave Pix sempre a da conta (`C6_<ID>_CHAVE_PIX`; a do navegador é ignorada), avisos só para o e-mail/telefone do próprio pagador, textos cortados nos limites da API. Campos desconhecidos são descartados.
+- Webhook só no endereço com o segredo da conta (`C6_<ID>_WEBHOOK_TOKEN`), corpo até 64 KB, um arquivo por dia; o aviso guarda só a referência a reconsultar.
+- Registros do roteiro (`registros/`): só data, conta, método, caminho, status, id, referência e erro resumido (CPF/CNPJ/e-mail mascarados; token nunca); apagados após `RETENCAO_REGISTROS_DIAS` (30). `PASTA_REGISTROS=` (vazio) desliga; `/roteiro` só com a senha.
+- Erros internos (500) voltam com mensagem genérica; caminhos de disco nunca saem da ponte (nem em `/saude`: certificado `ok`/`faltando`).
 - `/saude` sem a senha diz só `{ configurado, simulado, exposta }`; contas, escopos e validade do certificado só com a senha.
 - `SIMULADO=1` com uma conta em produção: a ponte **se recusa a subir**.
 - No site, o endereço e a senha da ponte ficam **só no navegador** de cada computador (IndexedDB), nunca no arquivo de dados compartilhado na pasta/OneDrive.
@@ -91,4 +96,4 @@ extrato: { descricao: 'Extrato da conta', rotas: [
 
 ## Testes
 
-`node --test tests/ponte-c6.test.mjs` (na raiz do repositório) sobe a ponte em modo simulado numa porta livre e confere `/saude`, senha, CORS, emissão (idempotente), consulta, listagem, alteração, pagamento simulado, negativação, cancelamento, webhook e roteiro.
+`node --test tests/ponte-c6.test.mjs` (na raiz do repositório) sobe a ponte em modo simulado numa porta livre e confere `/saude`, senha, CORS, a remontagem segura do pedido, emissão (idempotente), consulta, listagem, alteração, pagamento simulado, negativação, cancelamento, webhook com segredo, rotas da fase 2 e roteiro. Os módulos da fase 2 têm os próprios testes: `node --test "ponte-c6/testes/*.test.mjs"`.

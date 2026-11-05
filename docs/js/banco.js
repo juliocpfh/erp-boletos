@@ -39,7 +39,7 @@ export async function salvarPonteLocal({ ponte_url, senha_ponte }) {
 }
 
 /** Endereço e senha da ponte deste navegador (a senha não sai daqui, exceto no cabeçalho da chamada). */
-export const ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url || PONTE_PADRAO.ponte_url, configurada: !!local.ponte_url });
+export const ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url, configurada: !!local.ponte_url });
 
 /** Configuração da integração: a compartilhada (``d.config_banco``) mais a ponte deste navegador. */
 export const configuracaoBanco = (d) => ({ ...R.configBanco(d), ...(local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: '', senha_ponte: '' }) });
@@ -52,7 +52,7 @@ export const motivoIndisponivel = (d) => R.motivoBancoInativo(d) || (!local.pont
 
 function urlDaPonte(cfg, caminho) {
   const base = String(cfg.ponte_url || '').trim().replace(/\/+$/, '');
-  if (!base) throw new Error('Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).');
+  if (!base) throw new Error('Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).');
   return `${base}${caminho.startsWith('/') ? '' : '/'}${caminho}`;
 }
 
@@ -70,7 +70,8 @@ export class ErroPonte extends Error {
  * Chamada crua à ponte (qualquer caminho). Devolve o JSON da resposta; erro vira ``ErroPonte`` com mensagem em português.
  * ``cfg`` é a configuração do banco (``configuracaoBanco(d)``); ``opcoes.fetch`` permite trocar o fetch nos testes.
  */
-export async function chamarPonteCrua(cfg, metodo, caminho, corpo = null, opcoes = {}) {
+export async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes = {}) {
+  const cfg = ponteLocal();
   const url = urlDaPonte(cfg, caminho);
   const f = opcoes.fetch || fetch;
   const controlador = typeof AbortController === 'function' ? new AbortController() : null;
@@ -99,20 +100,20 @@ export async function chamarPonteCrua(cfg, metodo, caminho, corpo = null, opcoes
   return dados;
 }
 
-/** Chamada a um serviço de uma conta: ``chamarPonte(d, 'ank', 'POST', '/boletos', pedido)`` → ``POST <ponte>/contas/ank/boletos``. */
-export function chamarPonte(d, contaId, metodo, caminho, corpo = null, opcoes = {}) {
+/** Chamada a um serviço de uma conta: ``chamarPonte('ank', 'POST', '/boletos', pedido)`` → ``POST <ponte>/contas/ank/boletos``. */
+export function chamarPonte(contaId, metodo, caminho, corpo = null, opcoes = {}) {
   if (!contaId) throw new Error('Conta bancária não informada.');
-  return chamarPonteCrua(configuracaoBanco(d), metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith('/') ? '' : '/'}${caminho}`, corpo, opcoes);
+  return chamarPonteCrua(metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith('/') ? '' : '/'}${caminho}`, corpo, opcoes);
 }
 
 /**
  * Saúde da ponte e das contas: ``{ ponte: true, versao, simulado, contas: { ank: { configurado, faltam: [...], ambiente, certificado, token }, ... } }``.
  * Enquanto não houver chaves, cada conta vem com ``configurado: false`` e a lista do que falta.
  */
-export const saudePonte = (d, opcoes = {}) => chamarPonteCrua(configuracaoBanco(d), 'GET', '/saude', null, opcoes);
+export const saudePonte = (d, opcoes = {}) => { void d; return chamarPonteCrua('GET', '/saude', null, opcoes); };
 
 /** Saúde de uma conta só (``GET /contas/:conta/saude``). */
-export const saudeConta = (d, contaId, opcoes = {}) => chamarPonte(d, contaId, 'GET', '/saude', null, opcoes);
+export const saudeConta = (d, contaId, opcoes = {}) => { void d; return chamarPonte(contaId, 'GET', '/saude', null, opcoes); };
 
 /**
  * Emite o boleto com Pix no banco pela conta escolhida. Devolve ``{ pedido, resposta, conta }``: a resposta crua do banco (a tela
@@ -122,7 +123,7 @@ export async function emitirBoleto(d, cb, conta, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
   if (R.emitidoNoBanco(cb)) throw new Error('Este boleto já foi emitido no banco. Cancele no banco antes de emitir de novo.');
   const pedido = R.pedidoBoletoC6(d, cb, conta);
-  const resposta = await chamarPonte(d, conta.id, 'POST', '/boletos', pedido, opcoes);
+  const resposta = await chamarPonte(conta.id, 'POST', '/boletos', pedido, opcoes);
   return { pedido, resposta, conta };
 }
 
@@ -135,13 +136,13 @@ const idNoBanco = (cb) => {
 /** Consulta a situação no banco (``GET /contas/:conta/boletos/:id``). Devolve a resposta crua. */
 export function consultarBoleto(d, cb, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
-  return chamarPonte(d, cb.banco && cb.banco.conta_id, 'GET', `/boletos/${idNoBanco(cb)}`, null, opcoes);
+  return chamarPonte(cb.banco && cb.banco.conta_id, 'GET', `/boletos/${idNoBanco(cb)}`, null, opcoes);
 }
 
 /** Cancela no banco (``POST /contas/:conta/boletos/:id/cancelar``). A tela pede confirmação antes. */
 export function cancelarBoleto(d, cb, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
-  return chamarPonte(d, cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/cancelar`, {}, opcoes);
+  return chamarPonte(cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/cancelar`, {}, opcoes);
 }
 
 /**
@@ -150,7 +151,7 @@ export function cancelarBoleto(d, cb, opcoes = {}) {
  */
 export function alterarBoleto(d, cb, mudancas = R.alteracaoBoletoC6(d, cb), opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
-  return chamarPonte(d, cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/alterar`, mudancas, opcoes);
+  return chamarPonte(cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/alterar`, mudancas, opcoes);
 }
 
 /** Agenda a negativação do pagador no birô (``POST /contas/:conta/boletos/:id/negativar`` → POST …/denial). Só administrador, com confirmação dupla na tela. */
@@ -158,19 +159,19 @@ export function negativarBoleto(d, cb, dias, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
   const conta = R.contaBanco(d, cb.banco && cb.banco.conta_id);
   if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
-  return chamarPonte(d, cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/negativar`, R.pedidoNegativacaoC6(dias), opcoes);
+  return chamarPonte(cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/negativar`, R.pedidoNegativacaoC6(dias), opcoes);
 }
 
 /** Cancela a negativação agendada (``POST /contas/:conta/boletos/:id/negativar/cancelar`` → DELETE …/denial). */
 export function cancelarNegativacao(d, cb, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
-  return chamarPonte(d, cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/negativar/cancelar`, {}, opcoes);
+  return chamarPonte(cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/negativar/cancelar`, {}, opcoes);
 }
 
 /** Lista boletos da conta no banco por intervalo de datas (``GET /contas/:conta/boletos?due_date_from=…&due_date_to=…``, até 60 dias). */
 export function listarBoletos(d, contaId, filtros, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
-  return chamarPonte(d, contaId, 'GET', `/boletos?${new URLSearchParams(filtros)}`, null, opcoes);
+  return chamarPonte(contaId, 'GET', `/boletos?${new URLSearchParams(filtros)}`, null, opcoes);
 }
 
 /** Todas as páginas da listagem (``content[]``; ``total_pages``), até 10 páginas de 100. */

@@ -36,6 +36,8 @@ import https from 'node:https';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as M from './mapa-c6.mjs';
+import { c6SimuladoDaConta } from './c6-simulado.mjs';
+import { rotasFase2 } from './rotas-fase2.mjs';
 
 export const VERSAO = '0.1.0';
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +80,9 @@ export function configDaConta(id, env, pastaContas) {
     client_secret: env[`${P}CLIENT_SECRET`] || lerArquivoSeExiste(arq('client_secret.txt')),
     certificado: caminhoCert, chave: caminhoChave, senha_chave: env[`${P}SENHA_CHAVE`] || '',
     url_base: env[`${P}URL_BASE`] || URLS_C6[ambiente],
+    webhook_token: env[`${P}WEBHOOK_TOKEN`] || lerArquivoSeExiste(arq('webhook_token.txt')), // 32 hex: sem ele o webhook da conta fica desligado
+    valor_maximo: Number(env[`${P}VALOR_MAXIMO`] || lerArquivoSeExiste(arq('valor_maximo.txt')) || 50000), // reais, por boleto
+    empresa: env[`${P}EMPRESA`] || lerArquivoSeExiste(arq('empresa.txt')) || id.toUpperCase(),
     versao_boleto: (env[`${P}VERSAO_BOLETO`] || lerArquivoSeExiste(arq('versao_boleto.txt')) || 'v2').toLowerCase() === 'v1' ? 'v1' : 'v2', // v1: campos diferentes, só para contas antigas
     chave_pix: env[`${P}CHAVE_PIX`] || lerArquivoSeExiste(arq('chave_pix.txt')), // só informativo: a chave usada vem do pedido do site
   };
@@ -97,6 +102,8 @@ export function carregarConfig(env = process.env) {
     origens: String(env.ORIGENS || env.PONTE_ORIGEM || 'http://localhost:8000,http://127.0.0.1:8000,https://juliocpfh.github.io').split(',').map((x) => x.trim()).filter((x) => x && x !== '*'),
     senha: env.PONTE_SENHA || '',
     simulado: ['1', 'true', 'sim'].includes(String(env.SIMULADO || '').toLowerCase()),
+    pagamentos: ['1', 'true', 'sim'].includes(String(env.PAGAMENTOS || '').toLowerCase()), // libera as rotas de pagamento (fase 2)
+    retencao_registros_dias: Number(env.RETENCAO_REGISTROS_DIAS || 30),
     https: env.PONTE_HTTPS_CERT && env.PONTE_HTTPS_CHAVE ? { cert: env.PONTE_HTTPS_CERT, key: env.PONTE_HTTPS_CHAVE } : null,
     software: { nome: env.PONTE_NOME_SOFTWARE || 'administracao-imoveis', versao: env.PONTE_VERSAO_SOFTWARE || VERSAO },
     pastaNotificacoes: path.resolve(PASTA, env.PASTA_NOTIFICACOES || 'notificacoes'),
@@ -113,7 +120,11 @@ export function validarConfig(cfg) {
     throw new Error('SIMULADO=1 não pode valer com uma conta em produção: ou tire SIMULADO, ou deixe as contas em sandbox (C6_<ID>_AMBIENTE=sandbox / contas/<id>/ambiente.txt).');
   }
   if (cfg.exposta && !cfg.expor) throw new Error(`PONTE_HOST=${cfg.host} expõe a ponte fora deste computador. Se for isso mesmo, defina EXPOR=1 e proteja o acesso (Cloudflare Access ou Tailscale); senão use 127.0.0.1.`);
-  if (cfg.exposta && !cfg.senha) throw new Error('Ponte exposta sem PONTE_SENHA: defina uma senha antes.');
+  if (String(cfg.senha).length < 20) throw new Error('PONTE_SENHA precisa ter pelo menos 20 caracteres (uma frase): defina no .env. A mesma senha vai no site, em Dados e backup → Banco (C6).');
+  for (const c of Object.values(cfg.contas)) {
+    if (c.webhook_token && !/^[0-9a-f]{32}$/i.test(c.webhook_token)) throw new Error(`C6_${c.id.toUpperCase()}_WEBHOOK_TOKEN precisa ter 32 caracteres hexadecimais (gere com: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))").`);
+    if (!(c.valor_maximo > 0)) throw new Error(`C6_${c.id.toUpperCase()}_VALOR_MAXIMO precisa ser um valor em reais maior que zero.`);
+  }
 }
 
 /** Permissão dos arquivos de credencial (Linux/macOS): avisa quando outros usuários do computador conseguem ler. */
@@ -140,9 +151,9 @@ export function faltamNaConta(conta) {
   if (!conta.client_id) faltam.push('client_id');
   if (!conta.client_secret) faltam.push('client_secret');
   if (!conta.certificado) faltam.push('certificado (arquivo .crt/.pem)');
-  else if (!fs.existsSync(conta.certificado)) faltam.push(`certificado não encontrado em ${conta.certificado}`);
+  else if (!fs.existsSync(conta.certificado)) faltam.push('certificado: arquivo não encontrado');
   if (!conta.chave) faltam.push('chave privada (arquivo .key/.pem)');
-  else if (!fs.existsSync(conta.chave)) faltam.push(`chave privada não encontrada em ${conta.chave}`);
+  else if (!fs.existsSync(conta.chave)) faltam.push('chave privada: arquivo não encontrado');
   const v = validadeCertificado(conta);
   if (v && v.dias < 0) faltam.push(`certificado vencido em ${v.valido_ate}: gere outro no Web Banking do C6 (Integrações via API)`);
   return faltam;
@@ -224,17 +235,35 @@ export function mascarar(texto) {
     .replace(/"(access_token|client_secret|refresh_token|private_key|senha|password)"\s*:\s*"[^"]*"/gi, '"$1":"(oculto)"')
     .replace(/Bearer [A-Za-z0-9._~+/=-]+/g, 'Bearer (oculto)')
     .replace(/\b(\d{3})\d{5}(\d{3})\b/g, '$1*****$2') // CPF: 529*****725
-    .replace(/\b(\d{2})\d{9}(\d{3})\b/g, '$1*********$2'); // CNPJ: 11*********181
+    .replace(/\b(\d{2})\d{9}(\d{3})\b/g, '$1*********$2') // CNPJ: 11*********181
+    .replace(/\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g, '$1***@$2'); // e-mail: m***@exemplo.com.br
 }
 
 function registrarChamada(cfg, conta, metodo, caminho, status, corpo) {
   if (!cfg || !cfg.pastaRegistros) return;
   try {
     fs.mkdirSync(cfg.pastaRegistros, { recursive: true });
-    const texto = mascarar(typeof corpo === 'string' ? corpo : JSON.stringify(corpo ?? null));
-    const linha = { quando: new Date().toISOString(), conta: conta.id, ambiente: conta.ambiente, teste: testeDoRoteiro(metodo, caminho), metodo, caminho, status, resposta: texto.length > 4000 ? `${texto.slice(0, 4000)}…` : texto };
+    // só o essencial (o roteiro pede status e corpo; o corpo guardado é o resumo sem dados pessoais): id, referência e erro resumido
+    const o = corpo && typeof corpo === 'object' ? corpo : null;
+    const erroResumido = status >= 300 ? mascarar(typeof corpo === 'string' ? corpo : resumo(corpo)).slice(0, 300) : null;
+    const linha = { quando: new Date().toISOString(), conta: conta.id, ambiente: conta.ambiente, teste: testeDoRoteiro(metodo, caminho), metodo, caminho: caminho.split('?')[0], status,
+      id: o && o.id ? String(o.id) : null, external_reference_id: o && o.external_reference_id ? String(o.external_reference_id) : null, status_banco: o && o.status ? String(o.status) : null, erro: erroResumido };
     fs.appendFileSync(path.join(cfg.pastaRegistros, `${linha.quando.slice(0, 10)}.jsonl`), `${JSON.stringify(linha)}\n`);
   } catch (e) { console.error(`Não deu para gravar o registro da chamada: ${e.message}`); }
+}
+
+/** Apaga arquivos .jsonl de registros e notificações com mais de ``dias`` dias (chamado ao subir a ponte). */
+export function apagarAntigos(cfg, dias = cfg.retencao_registros_dias || 30) {
+  const limite = new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
+  let apagados = 0;
+  for (const pasta of [cfg.pastaRegistros, cfg.pastaNotificacoes]) {
+    if (!pasta || !fs.existsSync(pasta)) continue;
+    for (const a of fs.readdirSync(pasta)) {
+      const data = (/(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(a) || [])[1];
+      if (data && data < limite) { fs.unlinkSync(path.join(pasta, a)); apagados += 1; }
+    }
+  }
+  return apagados;
 }
 
 /** Últimos registros por teste do roteiro (e os últimos ``n`` de cada), lendo os arquivos de registros/. */
@@ -256,7 +285,7 @@ export function textoRoteiro(cfg) {
   for (const [codigo, nome] of Object.entries(NOMES_TESTES)) {
     const u = (r[codigo] || [])[0];
     linhas.push(`${codigo} – ${nome}`);
-    linhas.push(u ? `  ${u.quando} · conta ${u.conta} (${u.ambiente}) · ${u.metodo} ${u.caminho}\n  Status Code: ${u.status}\n  Response Body: ${u.resposta}` : '  (ainda não executado pela ponte)');
+    linhas.push(u ? `  ${u.quando} · conta ${u.conta} (${u.ambiente}) · ${u.metodo} ${u.caminho}\n  Status Code: ${u.status}\n  Response Body (resumo): ${JSON.stringify({ id: u.id, external_reference_id: u.external_reference_id, status: u.status_banco, erro: u.erro })}` : '  (ainda não executado pela ponte)');
     linhas.push('');
   }
   return linhas.join('\n');
@@ -332,20 +361,107 @@ const chaveSim = (conta, id) => `${conta.id}|${id}`;
 
 const versao = (conta) => conta.versao_boleto || 'v2';
 
-/** Carteira: a que o site mandou, senão a do ambiente (15 produção / 21 sandbox); é obrigatória na API. */
-const comCarteira = (pedido, conta) => {
-  const pm = pedido[M.CAMPOS.forma] || {};
-  const bs = pm[M.CAMPOS.boleto] || {};
-  return bs[M.CAMPOS.carteira] ? pedido : { ...pedido, [M.CAMPOS.forma]: { ...pm, [M.CAMPOS.boleto]: { ...bs, [M.CAMPOS.carteira]: M.CARTEIRAS[conta.ambiente] || M.CARTEIRAS.sandbox } } };
-};
+// --------------------------------------------------------------------------
+// Pedido de emissão: a ponte é o lugar de confiança. Monta o corpo final SÓ com campos conhecidos (mapa-c6), nos limites da API,
+// com a chave Pix da conta (nunca a do navegador), valor até C6_<ID>_VALOR_MAXIMO e avisos só para o e-mail/telefone do pagador.
+// --------------------------------------------------------------------------
+/** CPF (11 dígitos) ou CNPJ (14) com dígitos verificadores válidos. */
+export function documentoValido(digitos) {
+  const d = String(digitos || '');
+  if (/^(\d)\1+$/.test(d)) return false;
+  const dv = (base, pesos) => { const s = base.split('').reduce((t, c, i) => t + Number(c) * pesos[i], 0); const r = s % 11; return r < 2 ? 0 : 11 - r; };
+  if (d.length === 11) {
+    const p1 = dv(d.slice(0, 9), [10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    const p2 = dv(d.slice(0, 10), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    return Number(d[9]) === p1 && Number(d[10]) === p2;
+  }
+  if (d.length === 14) {
+    const p1 = dv(d.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+    const p2 = dv(d.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+    return Number(d[12]) === p1 && Number(d[13]) === p2;
+  }
+  return false;
+}
 
-const validarPedido = (pedido) => {
+const texto = (v, max) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));
+const numero2 = (v) => { const n = Number(v); if (!Number.isFinite(n)) return null; return Number(n.toFixed(2)); };
+const inteiro = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 ? n : null; };
+const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+/**
+ * Corpo final para POST /v2/bank_slips a partir do pedido do site: allowlist estrita (o resto é descartado) + validações.
+ * Lança ErroHttp 400 com a explicação. ``conta`` dá a carteira, a chave Pix e o valor máximo.
+ */
+export function montarPedidoSeguro(pedido, conta) {
   if (!pedido || typeof pedido !== 'object') throw new ErroHttp(400, 'Pedido vazio.');
-  for (const k of [M.CAMPOS.valor, M.CAMPOS.vencimento, M.CAMPOS.descricao, M.CAMPOS.pagador, M.CAMPOS.forma]) if (pedido[k] === undefined || pedido[k] === null || pedido[k] === '') throw new ErroHttp(400, `Falta o campo "${k}" no pedido.`);
-  const ref = pedido[M.CAMPOS.referencia];
-  if (ref !== undefined && !/^[A-Z0-9]{26}$/.test(String(ref))) throw new ErroHttp(400, `${M.CAMPOS.referencia} precisa ter 26 caracteres (A-Z, 0-9).`);
-  if (!(Number(pedido[M.CAMPOS.valor]) > 0)) throw new ErroHttp(400, `O valor (${M.CAMPOS.valor}) precisa ser maior que zero.`);
-};
+  const K = M.CAMPOS;
+  const L = M.LIMITES;
+  const ref = texto(pedido[K.referencia], 26);
+  if (!/^[A-Z0-9]{26}$/.test(ref)) throw new ErroHttp(400, `${K.referencia} precisa ter 26 caracteres (A-Z, 0-9).`);
+  const valor = numero2(pedido[K.valor]);
+  if (!(valor > 0)) throw new ErroHttp(400, `O valor (${K.valor}) precisa ser maior que zero.`);
+  if (valor > conta.valor_maximo) throw new ErroHttp(400, `O valor R$ ${valor.toFixed(2)} passa do máximo da conta ${conta.id} (R$ ${Number(conta.valor_maximo).toFixed(2)}, C6_${conta.id.toUpperCase()}_VALOR_MAXIMO).`);
+  if (valor > L.valor_maximo_reais) throw new ErroHttp(400, 'Valor acima do máximo da API.');
+  const vencimento = texto(pedido[K.vencimento], 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento) || Number.isNaN(Date.parse(vencimento))) throw new ErroHttp(400, `${K.vencimento} precisa ser AAAA-MM-DD.`);
+  const descricao = texto(pedido[K.descricao], L.descricao);
+  if (!descricao) throw new ErroHttp(400, `Falta o campo "${K.descricao}" no pedido.`);
+  const pg = pedido[K.pagador];
+  if (!pg || typeof pg !== 'object') throw new ErroHttp(400, `Falta o campo "${K.pagador}" no pedido.`);
+  const nome = texto(pg[K.pagador_nome], L.nome);
+  if (!nome) throw new ErroHttp(400, 'Falta o nome do pagador.');
+  const doc = String(pg[K.pagador_documento] || '').replace(/\D/g, '');
+  if (!documentoValido(doc)) throw new ErroHttp(400, 'CPF/CNPJ do pagador inválido (confira os dígitos no cadastro do inquilino).');
+  const end = pg[K.pagador_endereco] && typeof pg[K.pagador_endereco] === 'object' ? pg[K.pagador_endereco] : {};
+  const endereco = { [K.endereco_rua]: texto(end[K.endereco_rua], L.endereco), [K.endereco_bairro]: texto(end[K.endereco_bairro], L.bairro), [K.endereco_cidade]: texto(end[K.endereco_cidade], L.cidade),
+    [K.endereco_uf]: texto(end[K.endereco_uf], 2).toUpperCase(), [K.endereco_cep]: String(end[K.endereco_cep] || '').replace(/\D/g, '').slice(0, 8) };
+  for (const [k, v] of Object.entries(endereco)) if (!v) throw new ErroHttp(400, `Falta o campo "${k}" no endereço do pagador.`);
+  if (endereco[K.endereco_cep].length !== 8) throw new ErroHttp(400, 'CEP do pagador precisa ter 8 dígitos.');
+  if (!/^[A-Z]{2}$/.test(endereco[K.endereco_uf])) throw new ErroHttp(400, 'UF do pagador precisa ter 2 letras.');
+  const email = texto(pg[K.pagador_email], L.email);
+  if (email && !RE_EMAIL.test(email)) throw new ErroHttp(400, 'E-mail do pagador inválido.');
+  const telefone = String(pg.phone || '').replace(/\D/g, '').slice(0, 13); // não vai ao banco: só confere o destino dos SMS
+  const pagador = { [K.pagador_nome]: nome, [K.pagador_documento]: doc, [K.pagador_endereco]: endereco, ...(email ? { [K.pagador_email]: email } : {}) };
+  // forma de pagamento: carteira da conta (ou a do ambiente), nosso controle, instruções cortadas; Pix SEMPRE com a chave da conta
+  const pmIn = pedido[K.forma] && typeof pedido[K.forma] === 'object' ? pedido[K.forma] : {};
+  const bsIn = pmIn[K.boleto] && typeof pmIn[K.boleto] === 'object' ? pmIn[K.boleto] : {};
+  const seuNumero = String(bsIn[K.seu_numero] || '').replace(/\D/g, '').slice(0, L.seu_numero);
+  const instrucoes = Array.isArray(bsIn[K.instrucoes]) ? bsIn[K.instrucoes].map((x) => texto(x, L.instrucao)).filter(Boolean).slice(0, L.instrucoes) : [];
+  const boleto = { [K.carteira]: String(bsIn[K.carteira] || '').replace(/\D/g, '') || M.CARTEIRAS[conta.ambiente] || M.CARTEIRAS.sandbox, ...(seuNumero ? { [K.seu_numero]: seuNumero } : {}), ...(instrucoes.length ? { [K.instrucoes]: instrucoes } : {}) };
+  const forma = { [K.boleto]: boleto };
+  if (pmIn[K.pix] && conta.chave_pix) forma[K.pix] = { [K.pix_chave]: conta.chave_pix, [K.pix_tipo]: 'EVP' };
+  // encargos: só os campos conhecidos, com os tipos permitidos
+  const fIn = pedido[K.encargos] && typeof pedido[K.encargos] === 'object' ? pedido[K.encargos] : null;
+  let fees = null;
+  if (fIn) {
+    fees = {};
+    const tipos = { [K.multa_tipo]: Object.values(M.TIPOS_ENCARGO.multa), [K.juros_tipo]: Object.values(M.TIPOS_ENCARGO.juros), [K.desconto_tipo]: Object.values(M.TIPOS_ENCARGO.desconto) };
+    for (const [k, permitidos] of Object.entries(tipos)) if (fIn[k] !== undefined) { if (!permitidos.includes(fIn[k])) throw new ErroHttp(400, `${k} inválido.`); fees[k] = fIn[k]; }
+    for (const k of [K.multa_valor, K.juros_valor, K.desconto_valor]) if (fIn[k] !== undefined) { const n = numero2(fIn[k]); if (!(n >= 0)) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
+    for (const k of [K.multa_prazo, K.juros_prazo, K.desconto_prazo]) if (fIn[k] !== undefined) { const n = inteiro(fIn[k]); if (n === null) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
+    if (!Object.keys(fees).length) fees = null;
+  }
+  // avisos ao pagador: só EMAIL para o e-mail do pagador e SMS para o telefone do pagador; momentos conhecidos
+  const N = M.NOTIFICACAO;
+  const nIn = Array.isArray(pedido[N.campo]) ? pedido[N.campo] : [];
+  const avisos = [];
+  for (const n of nIn.slice(0, 8)) {
+    if (!n || typeof n !== 'object') continue;
+    const canal = n[N.canal]; const destino = texto(n[N.destino], 70); const momento = n[N.momento];
+    if (!Object.values(N.canais).includes(canal) || !Object.values(N.momentos).includes(momento)) throw new ErroHttp(400, 'Aviso ao pagador com canal ou momento inválido.');
+    if (canal === N.canais.email && (!email || destino !== email)) throw new ErroHttp(400, 'Aviso por e-mail só para o e-mail do próprio pagador.');
+    if (canal === N.canais.sms && (!telefone || destino.replace(/\D/g, '') !== telefone)) throw new ErroHttp(400, 'Aviso por SMS só para o telefone do próprio pagador.');
+    avisos.push({ [N.canal]: canal, [N.destino]: canal === N.canais.sms ? telefone : email, [N.momento]: momento });
+  }
+  const final = { [K.referencia]: ref, [K.valor]: valor, [K.vencimento]: vencimento, [K.descricao]: descricao, [K.pagador]: pagador, [K.forma]: forma };
+  const diasBaixa = pedido[K.dias_baixa] === undefined ? null : inteiro(pedido[K.dias_baixa]);
+  if (diasBaixa !== null) final[K.dias_baixa] = diasBaixa;
+  if (fees) final[K.encargos] = fees;
+  if (avisos.length) final[N.campo] = avisos;
+  const origem = texto(pedido[K.origem], L.origem).replace(/[^A-Za-z0-9 _-]/g, '');
+  if (origem) final[K.origem] = origem;
+  return final;
+}
 
 /** Itens de uma listagem do C6 (``content[]``). */
 const itensDaLista = (dados) => (Array.isArray(dados) ? dados : (dados && (dados[M.RESPOSTA.lista] || dados.bank_slips || dados.items)) || []);
@@ -378,8 +494,7 @@ export const SERVICOS = {
     rotas: [
       // BP_01 emitir
       { metodo: 'POST', padrao: /^\/boletos\/?$/, async executar({ cfg, conta, corpo }) {
-        validarPedido(corpo);
-        const pedido = comCarteira(corpo, conta);
+        const pedido = montarPedidoSeguro(corpo, conta);
         if (cfg.simulado) {
           // o mesmo external_reference_id devolve a cobrança já feita
           const existente = simulados.get(chaveSim(conta, pedido[M.CAMPOS.referencia]));
@@ -531,17 +646,22 @@ function exigirConfigurada(conta) {
 // Aviso: { service, status: 'CREATED'|'WAITING_CONFIRMATION'|'PAID'|'CANCELED', information: '<JSON em texto> { id, external_reference_id,
 //   amount, status, emission_date, due_date, … }' }. Para o C6 chamar esta rota a ponte precisa de um endereço público (túnel ou
 // servidor); sem isso, os botões "Consultar situação" e "Conferir pagamentos no banco" resolvem.
+/** Guarda só o que importa do aviso (a referência a reconsultar e a situação), num arquivo por dia. */
 function guardarNotificacao(cfg, contaId, corpo) {
   fs.mkdirSync(cfg.pastaNotificacoes, { recursive: true });
-  const n = { recebida_em: new Date().toISOString(), conta: contaId, aviso: corpo };
-  fs.appendFileSync(path.join(cfg.pastaNotificacoes, `${contaId}.jsonl`), `${JSON.stringify(n)}\n`);
+  let info = null;
+  try { info = corpo && typeof corpo[M.AVISO_WEBHOOK.dados] === 'string' ? JSON.parse(corpo[M.AVISO_WEBHOOK.dados]) : (corpo && corpo[M.AVISO_WEBHOOK.dados]) || null; } catch { info = null; }
+  const ref = (info && info[M.AVISO_WEBHOOK.dados_referencia]) || (corpo && corpo.external_reference_id) || null;
+  if (!ref || !/^[A-Z0-9]{1,40}$/.test(String(ref))) throw new ErroHttp(400, 'Aviso sem external_reference_id reconhecível.');
+  const n = { recebida_em: new Date().toISOString(), conta: contaId, external_reference_id: String(ref), status: corpo && corpo[M.AVISO_WEBHOOK.situacao] ? String(corpo[M.AVISO_WEBHOOK.situacao]).slice(0, 40) : null, reconsultar: true };
+  fs.appendFileSync(path.join(cfg.pastaNotificacoes, `${contaId}-${n.recebida_em.slice(0, 10)}.jsonl`), `${JSON.stringify(n)}\n`);
   return n;
 }
 
 export function lerNotificacoes(cfg, contaId) {
-  const arq = path.join(cfg.pastaNotificacoes, `${contaId}.jsonl`);
-  if (!fs.existsSync(arq)) return [];
-  return fs.readFileSync(arq, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  if (!fs.existsSync(cfg.pastaNotificacoes)) return [];
+  return fs.readdirSync(cfg.pastaNotificacoes).filter((a) => a === `${contaId}.jsonl` || (a.startsWith(`${contaId}-`) && a.endsWith('.jsonl'))).sort()
+    .flatMap((a) => fs.readFileSync(path.join(cfg.pastaNotificacoes, a), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean));
 }
 
 // --------------------------------------------------------------------------
@@ -550,10 +670,10 @@ export function lerNotificacoes(cfg, contaId) {
 export async function saudeDaConta(cfg, conta, testarToken = true) {
   const faltam = faltamNaConta(conta);
   const v = validadeCertificado(conta);
-  const r = { id: conta.id, ambiente: conta.ambiente, url_base: conta.url_base, versao_boleto: conta.versao_boleto, configurado: faltam.length === 0, faltam,
-    certificado: !faltam.some((f) => /certificado|chave/.test(f)), certificado_valido_ate: v ? v.valido_ate : null, certificado_dias: v ? v.dias : null,
+  const r = { id: conta.id, ambiente: conta.ambiente, versao_boleto: conta.versao_boleto, configurado: faltam.length === 0, faltam, webhook: !!conta.webhook_token, valor_maximo: conta.valor_maximo,
+    certificado: faltam.some((f) => /certificado|chave/.test(f)) ? 'faltando' : 'ok', certificado_valido_ate: v ? v.valido_ate : null, certificado_dias: v ? v.dias : null,
     avisos: v && v.dias >= 0 && v.dias <= 30 ? [`O certificado vence em ${v.dias} dia(s) (${v.valido_ate}): gere outro no Web Banking do C6 antes disso.`] : [], token: null, simulado: cfg.simulado };
-  for (const arq of [conta.certificado, conta.chave]) if (permissaoAberta(arq)) r.avisos.push(`O arquivo ${path.basename(arq)} pode ser lido por outros usuários deste computador: rode chmod 600 nele.`);
+  if ([conta.certificado, conta.chave].some(permissaoAberta)) r.avisos.push('O certificado ou a chave privada podem ser lidos por outros usuários deste computador: rode chmod 600 neles.');
   if (cfg.simulado) { r.token = 'simulado'; return r; }
   if (!r.configurado || !testarToken) return r;
   try {
@@ -577,7 +697,7 @@ export async function saude(cfg, testarToken = true) {
   const faltam = [];
   if (!lista.length) faltam.push('nenhuma conta configurada (CONTAS=ank,jck no .env ou subpastas em contas/)');
   for (const c of lista) if (!c.configurado && !cfg.simulado) faltam.push(`conta ${c.id}: ${c.faltam.join(', ')}`);
-  return { ponte: true, versao: VERSAO, simulado: cfg.simulado, exposta: cfg.exposta, aviso: cfg.exposta ? 'PONTE EXPOSTA fora deste computador: proteja com Cloudflare Access ou Tailscale.' : null,
+  return { ponte: true, versao: VERSAO, simulado: cfg.simulado, faixa: cfg.simulado ? 'MODO SIMULADO: boletos e extratos fictícios, nada vai ao banco' : null, exposta: cfg.exposta, pagamentos: cfg.pagamentos, aviso: cfg.exposta ? 'PONTE EXPOSTA fora deste computador: proteja com Cloudflare Access ou Tailscale.' : null,
     senha_exigida: !!cfg.senha, configurado: lista.length > 0 && faltam.length === 0, faltam, contas, servicos: Object.keys(SERVICOS), registros: !!cfg.pastaRegistros };
 }
 
@@ -598,18 +718,22 @@ function cors(cfg, req, res) {
     res.setHeader('Access-Control-Allow-Origin', origem);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', `Content-Type, Accept, ${CABECALHO_SENHA}`);
   res.setHeader('Access-Control-Max-Age', '600');
   // o Chrome exige isto para um site público (GitHub Pages) chamar um endereço local
   if (req.method === 'OPTIONS') res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
-// Bloqueio por tentativas de senha: 5 erros seguidos do mesmo IP → 15 minutos sem atender
-const TENTATIVAS_MAX = 5;
+// Tentativas de senha: atraso progressivo (1 s, 2 s, 4 s… até 8 s) e, após 10 erros seguidos do mesmo IP, 15 minutos sem atender
+const TENTATIVAS_MAX = 10;
 const BLOQUEIO_MS = 15 * 60000;
 const tentativas = new Map(); // ip → { erros, bloqueadoAte }
-const ipDe = (req) => (req.socket && req.socket.remoteAddress) || 'desconhecido';
+/** IP de quem chama: o que o Cloudflare informa (CF-Connecting-IP), senão o do socket. */
+const ipDe = (req) => String(req.headers['cf-connecting-ip'] || (req.socket && req.socket.remoteAddress) || 'desconhecido').slice(0, 64);
+/** Segundos de espera antes de responder a mais uma senha errada deste IP (0 no primeiro erro). */
+export const atrasoDe = (ip) => { const t = tentativas.get(ip); return t && t.erros ? Math.min(8, 2 ** (t.erros - 1)) : 0; };
+const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 export function bloqueado(ip, agora = Date.now()) {
   const t = tentativas.get(ip);
   if (t && t.bloqueadoAte && t.bloqueadoAte > agora) return Math.ceil((t.bloqueadoAte - agora) / 60000);
@@ -621,6 +745,7 @@ export function registrarTentativa(ip, acertou, agora = Date.now()) {
   const t = tentativas.get(ip) || { erros: 0, bloqueadoAte: 0 };
   t.erros += 1;
   if (t.erros >= TENTATIVAS_MAX) { t.bloqueadoAte = agora + BLOQUEIO_MS; t.erros = 0; console.error(`${new Date(agora).toISOString()} ${ip}: ${TENTATIVAS_MAX} senhas erradas, bloqueado por 15 minutos`); }
+  else console.error(`${new Date(agora).toISOString()} ${ip}: senha errada (${t.erros})`);
   tentativas.set(ip, t);
 }
 
@@ -630,11 +755,11 @@ const responderJson = (res, status, dados) => {
   res.end(corpo);
 };
 
-function lerCorpo(req) {
+function lerCorpo(req, maximo = 256 * 1024) {
   return new Promise((resolver, falhar) => {
     const partes = [];
     let tamanho = 0;
-    req.on('data', (p) => { tamanho += p.length; if (tamanho > 2 * 1024 * 1024) { req.destroy(); falhar(new ErroHttp(413, 'Pedido grande demais.')); } partes.push(p); });
+    req.on('data', (p) => { tamanho += p.length; if (tamanho > maximo) { req.destroy(); falhar(new ErroHttp(413, 'Pedido grande demais.')); } partes.push(p); });
     req.on('end', () => {
       const texto = Buffer.concat(partes).toString('utf8');
       if (!texto.trim()) return resolver(null);
@@ -645,12 +770,67 @@ function lerCorpo(req) {
 }
 
 const senhaConfere = (cfg, req) => {
-  if (!cfg.senha) return true;
+  if (!cfg.senha) return false;
   const dada = String(req.headers[CABECALHO_SENHA] || '');
   const a = Buffer.from(dada);
   const b = Buffer.from(cfg.senha);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
+
+// --------------------------------------------------------------------------
+// Fase 2 (extrato, saldo, boletos pagos, DDA, pagamentos, comprovante): rotas de rotas-fase2.mjs montadas sobre um cliente
+// autenticado por conta ({ conta, chamar(metodo, caminho, { query, corpo, aceitar }) → { status, corpo } }); no modo simulado,
+// o C6 de mentira de c6-simulado.mjs. As rotas de pagamento só existem com PAGAMENTOS=1 no .env.
+// --------------------------------------------------------------------------
+const clientesC6 = new Map();
+
+/** Cliente real de uma conta no formato que a fase 2 espera (não lança em 4xx/5xx: devolve { status, corpo }). */
+function c6RealDaConta(cfg, conta) {
+  const chave = `${conta.id}|${conta.url_base}`;
+  if (clientesC6.has(chave)) return clientesC6.get(chave);
+  const cliente = {
+    conta: conta.id,
+    async chamar(metodo, caminho, { query = {}, corpo = null, aceitar = 'application/json' } = {}) {
+      exigirConfigurada(conta);
+      const q = new URLSearchParams(Object.entries(query || {}).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]));
+      const binario = /pdf/i.test(aceitar);
+      const token = await obterToken(conta, false, cfg);
+      const cabecalhos = { Authorization: `Bearer ${token}`, Accept: aceitar, 'partner-software-name': cfg.software.nome, 'partner-software-version': cfg.software.versao };
+      if (corpo !== null) cabecalhos['Content-Type'] = 'application/json';
+      const r = await pedir(`${conta.url_base}${caminho}${q.toString() ? `?${q}` : ''}`, { metodo, cabecalhos, corpo: corpo !== null ? JSON.stringify(corpo) : null, conta, binario });
+      registrarChamada(cfg, conta, metodo, caminho, r.status, binario ? `(${r.corpo ? r.corpo.length : 0} bytes)` : r.dados);
+      return { status: r.status, corpo: binario ? r.corpo : r.dados };
+    },
+  };
+  clientesC6.set(chave, cliente);
+  return cliente;
+}
+
+function montarFase2(cfg) {
+  return rotasFase2({
+    c6DaConta: (id) => { const conta = cfg.contas[id]; if (!conta) return null; return cfg.simulado ? c6SimuladoDaConta(id) : c6RealDaConta(cfg, conta); },
+    registrar: (t) => console.log(`${new Date().toISOString()} ${t}`),
+    empresas: Object.fromEntries(Object.values(cfg.contas).map((c) => [c.id, c.empresa])),
+  });
+}
+
+/** Atende uma rota da fase 2 se o caminho for dela; devolve false se não for. */
+async function atenderFase2(cfg, req, res, caminho, url) {
+  if (!cfg.rotasFase2) cfg.rotasFase2 = montarFase2(cfg);
+  const rota = cfg.rotasFase2.find((r) => r.metodo === req.method && r.caminho.test(caminho));
+  if (!rota) return false;
+  if (/\/pagamentos\//.test(rota.padrao) && !cfg.pagamentos) throw new ErroHttp(403, 'As rotas de pagamento estão desligadas nesta ponte (PAGAMENTOS=1 no .env liga).');
+  const params = rota.caminho.exec(caminho).groups || {};
+  const corpo = req.method === 'POST' || req.method === 'DELETE' ? await lerCorpo(req) : null;
+  const r = await rota.handler(req, { conta: params.conta, params, query: Object.fromEntries(url.searchParams), corpo });
+  if (r.pdf) {
+    res.writeHead(r.status, { 'Content-Type': 'application/pdf', 'Content-Length': r.pdf.length, ...(r.cabecalhos || {}) });
+    res.end(r.pdf);
+    return true;
+  }
+  responderJson(res, r.status, r.corpo);
+  return true;
+}
 
 /** Trata um pedido HTTP. Exportado para os testes. */
 export async function tratar(cfg, req, res) {
@@ -660,13 +840,16 @@ export async function tratar(cfg, req, res) {
   const caminho = url.pathname.replace(/\/+$/, '') || '/';
   try {
     // webhook do banco: sem a senha da ponte (quem chama é o C6), sem CORS
-    let m = /^\/webhook\/c6\/([a-z0-9_-]+)$/.exec(caminho);
-    if (m) {
+    // o endereço do webhook leva um segredo (C6_<ID>_WEBHOOK_TOKEN); sem o segredo configurado, a rota nem existe
+    let m = /^\/webhook\/c6\/([a-z0-9_-]+)\/([0-9a-f]{32})$/i.exec(caminho);
+    if (m || caminho.startsWith('/webhook/')) {
+      const conta = m && cfg.contas[m[1]];
+      const ok = conta && conta.webhook_token && Buffer.from(m[2].toLowerCase()).length === Buffer.from(conta.webhook_token.toLowerCase()).length && crypto.timingSafeEqual(Buffer.from(m[2].toLowerCase()), Buffer.from(conta.webhook_token.toLowerCase()));
+      if (!ok) throw new ErroHttp(404, 'Rota não existe.');
       if (req.method !== 'POST') throw new ErroHttp(405, 'Use POST.');
-      if (!cfg.contas[m[1]]) throw new ErroHttp(404, `Conta "${m[1]}" não configurada na ponte.`);
-      const corpo = await lerCorpo(req);
-      guardarNotificacao(cfg, m[1], corpo);
-      console.log(`${new Date().toISOString()} webhook ${m[1]}: ${resumo(corpo)}`);
+      const corpo = await lerCorpo(req, 64 * 1024);
+      const n = guardarNotificacao(cfg, m[1], corpo);
+      console.log(`${new Date().toISOString()} webhook ${m[1]}: ${n.external_reference_id} ${n.status || ''} (reconsultar)`);
       res.writeHead(204);
       return res.end();
     }
@@ -675,8 +858,8 @@ export async function tratar(cfg, req, res) {
     if (minutos) throw new ErroHttp(429, `Muitas senhas erradas: tente de novo em ${minutos} minuto(s).`);
     const comSenha = senhaConfere(cfg, req);
     const semSenhaNoPedido = !req.headers[CABECALHO_SENHA];
-    if (!comSenha && !semSenhaNoPedido) registrarTentativa(ip, false);
-    if (comSenha && cfg.senha) registrarTentativa(ip, true);
+    if (!comSenha && !semSenhaNoPedido) { const atraso = atrasoDe(ip); registrarTentativa(ip, false); if (atraso && !cfg.sem_atraso) await esperar(atraso * 1000); }
+    if (comSenha) registrarTentativa(ip, true);
     if ((caminho === '/saude' || caminho === '/') && req.method === 'GET') {
       // sem a senha: só o essencial (configurada? simulada? exposta?); com a senha: contas, escopos, validade do certificado
       return responderJson(res, 200, comSenha ? await saude(cfg, url.searchParams.get('token') !== '0') : await saudeMinima(cfg));
@@ -689,12 +872,13 @@ export async function tratar(cfg, req, res) {
     const conta = cfg.contas[m[1]];
     if (!conta) throw new ErroHttp(404, `Conta "${m[1]}" não configurada na ponte (CONTAS=${Object.keys(cfg.contas).join(',') || 'vazio'}).`);
     const resto = m[2] || '/';
+    if (await atenderFase2(cfg, req, res, caminho, url)) return undefined;
     if (resto === '/saude' || resto === '/') { if (req.method !== 'GET') throw new ErroHttp(405, 'Use GET.'); return responderJson(res, 200, await saudeDaConta(cfg, conta)); }
     for (const servico of Object.values(SERVICOS)) {
       for (const rota of servico.rotas) {
         const mr = rota.padrao.exec(resto);
         if (!mr || rota.metodo !== req.method) continue;
-        const corpo = req.method === 'POST' ? await lerCorpo(req) : null;
+        const corpo = req.method === 'POST' || req.method === 'DELETE' ? await lerCorpo(req) : null;
         const r = await rota.executar({ cfg, conta, params: mr.slice(1), corpo, query: url.searchParams });
         if (r.binario) { res.writeHead(r.status, { 'Content-Type': r.tipo, 'Content-Length': r.binario.length }); return res.end(r.binario); }
         return responderJson(res, r.status, r.dados);
@@ -703,8 +887,9 @@ export async function tratar(cfg, req, res) {
     throw new ErroHttp(404, `Rota não existe: ${req.method} ${caminho}`);
   } catch (e) {
     const status = e instanceof ErroHttp ? e.status : 500;
-    if (status >= 500) console.error(`${new Date().toISOString()} ${req.method} ${caminho}: ${e.message}`);
-    return responderJson(res, status, { erro: e.message, detalhes: e.detalhes || null });
+    if (status >= 500) console.error(`${new Date().toISOString()} ${req.method} ${caminho}: ${e.stack || e.message}`);
+    // 500: nada do que aconteceu dentro da ponte vai para fora (caminhos de disco, pilha); o detalhe fica no console
+    return responderJson(res, status, status >= 500 && !(e instanceof ErroHttp) ? { erro: 'A ponte teve um erro interno. Veja o console da ponte.' } : { erro: e.message, detalhes: e.detalhes || null });
   }
 }
 
@@ -719,13 +904,16 @@ async function principal() {
   let cfg;
   try { cfg = carregarConfig(); } catch (e) { console.error(`A ponte não subiu: ${e.message}`); process.exitCode = 1; return null; }
   if (process.argv.includes('--roteiro')) { console.log(textoRoteiro(cfg)); return null; }
+  const apagados = apagarAntigos(cfg);
+  if (apagados) console.log(`${apagados} arquivo(s) de registro com mais de ${cfg.retencao_registros_dias} dias apagado(s).`);
   const servidor = criarServidor(cfg);
   servidor.listen(cfg.porta, cfg.host, async () => {
     const s = await saude(cfg, false);
     console.log(`Ponte C6 v${VERSAO} em ${cfg.https ? 'https' : 'http'}://${cfg.host}:${cfg.porta}${cfg.simulado ? ' · MODO SIMULADO (sem falar com o banco)' : ''}`);
     if (cfg.exposta) console.log('\n' + '!'.repeat(78) + '\n!!  PONTE EXPOSTA FORA DESTE COMPUTADOR (EXPOR=1). Qualquer um que alcance esta porta pode tentar a senha.\n!!  Proteja o acesso com Cloudflare Access ou Tailscale e use HTTPS (PONTE_HTTPS_CERT/CHAVE).\n' + '!'.repeat(78) + '\n');
     console.log(`Origens aceitas: ${cfg.origens.join(', ')} · senha da ponte: ${cfg.senha ? 'exigida' : 'NÃO definida (defina PONTE_SENHA no .env)'}`);
-    if (cfg.pastaRegistros) console.log(`Cada chamada ao banco fica registrada em ${cfg.pastaRegistros} (node servidor.mjs --roteiro mostra o resumo para a homologação).`);
+    if (cfg.pastaRegistros) console.log(`Cada chamada ao banco fica registrada em ${cfg.pastaRegistros} (status, id e erro; sem dados pessoais; ${cfg.retencao_registros_dias} dias). node servidor.mjs --roteiro mostra o resumo para a homologação.`);
+    if (cfg.pagamentos) console.log('Rotas de pagamento (fase 2) LIGADAS (PAGAMENTOS=1): a ponte monta lotes para aprovação no app do C6.');
     if (!Object.keys(cfg.contas).length) console.log('Nenhuma conta configurada: defina CONTAS=ank,jck no .env e as chaves de cada uma (veja README.md).');
     for (const c of Object.values(s.contas)) console.log(`Conta ${c.id} (${c.ambiente}): ${c.configurado ? 'chaves ok' : `faltam ${c.faltam.join(', ')}`}`);
   });

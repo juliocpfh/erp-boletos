@@ -3523,7 +3523,9 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
     [K.pagador]: { [K.pagador_nome]: corta(c.inquilino_nome, L.nome), [K.pagador_documento]: taxId,
       [K.pagador_endereco]: { [K.endereco_rua]: corta(endereco.address, L.endereco), [K.endereco_bairro]: corta(endereco.neighborhood, L.bairro) || corta(imovel && imovel.bairro, L.bairro) || 'Centro',
         [K.endereco_cidade]: corta(endereco.city, L.cidade), [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
-      ...(c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {}) },
+      ...(c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {}),
+      // "phone" não é campo da API: a ponte usa só para conferir o destino dos SMS e o descarta antes de mandar ao banco
+      ...(String(c.inquilino_telefone || '').replace(/\D/g, '') ? { phone: String(c.inquilino_telefone || '').replace(/\D/g, '') } : {}) },
     [K.forma]: { [K.boleto]: boleto },
     [K.dias_baixa]: Number(conta.dias_baixa) || 0,
     [K.origem]: 'ADM-IMOVEIS',

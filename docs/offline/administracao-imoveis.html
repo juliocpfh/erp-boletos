@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="a97625a3adfa5cf8">
+<meta name="fontes" content="d3884f5ccabccf39">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5974,7 +5974,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           [K.endereco_uf]: corta(endereco2.state, 2).toUpperCase(),
           [K.endereco_cep]: endereco2.zip_code.slice(0, 8)
         },
-        ...c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {}
+        ...c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {},
+        // "phone" não é campo da API: a ponte usa só para conferir o destino dos SMS e o descarta antes de mandar ao banco
+        ...String(c.inquilino_telefone || "").replace(/\D/g, "") ? { phone: String(c.inquilino_telefone || "").replace(/\D/g, "") } : {}
       },
       [K.forma]: { [K.boleto]: boleto },
       [K.dias_baixa]: Number(conta.dias_baixa) || 0,
@@ -7167,13 +7169,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (typeof indexedDB !== "undefined") await lembrarPonte({ ...local });
     return { ...local };
   }
-  var ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url || PONTE_PADRAO.ponte_url, configurada: !!local.ponte_url });
+  var ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url, configurada: !!local.ponte_url });
   var configuracaoBanco = (d2) => ({ ...configBanco(d2), ...local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: "", senha_ponte: "" } });
   var pontePronta = (d2) => bancoAtivo(d2) && !!local.ponte_url;
   var motivoIndisponivel = (d2) => motivoBancoInativo(d2) || (!local.ponte_url ? "Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6)" : "");
   function urlDaPonte(cfg, caminho) {
     const base = String(cfg.ponte_url || "").trim().replace(/\/+$/, "");
-    if (!base) throw new Error("Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).");
+    if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).");
     return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
   }
   var ErroPonte = class extends Error {
@@ -7184,7 +7186,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       this.detalhes = detalhes;
     }
   };
-  async function chamarPonteCrua(cfg, metodo, caminho, corpo = null, opcoes = {}) {
+  async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes = {}) {
+    const cfg = ponteLocal();
     const url = urlDaPonte(cfg, caminho);
     const f = opcoes.fetch || fetch;
     const controlador = typeof AbortController === "function" ? new AbortController() : null;
@@ -7218,17 +7221,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return dados;
   }
-  function chamarPonte(d2, contaId, metodo, caminho, corpo = null, opcoes = {}) {
+  function chamarPonte(contaId, metodo, caminho, corpo = null, opcoes = {}) {
     if (!contaId) throw new Error("Conta bancária não informada.");
-    return chamarPonteCrua(configuracaoBanco(d2), metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith("/") ? "" : "/"}${caminho}`, corpo, opcoes);
+    return chamarPonteCrua(metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith("/") ? "" : "/"}${caminho}`, corpo, opcoes);
   }
-  var saudePonte = (d2, opcoes = {}) => chamarPonteCrua(configuracaoBanco(d2), "GET", "/saude", null, opcoes);
-  var saudeConta = (d2, contaId, opcoes = {}) => chamarPonte(d2, contaId, "GET", "/saude", null, opcoes);
+  var saudePonte = (d2, opcoes = {}) => {
+    return chamarPonteCrua("GET", "/saude", null, opcoes);
+  };
+  var saudeConta = (d2, contaId, opcoes = {}) => {
+    return chamarPonte(contaId, "GET", "/saude", null, opcoes);
+  };
   async function emitirBoleto(d2, cb, conta, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
     if (emitidoNoBanco(cb)) throw new Error("Este boleto já foi emitido no banco. Cancele no banco antes de emitir de novo.");
     const pedido = pedidoBoletoC6(d2, cb, conta);
-    const resposta = await chamarPonte(d2, conta.id, "POST", "/boletos", pedido, opcoes);
+    const resposta = await chamarPonte(conta.id, "POST", "/boletos", pedido, opcoes);
     return { pedido, resposta, conta };
   }
   var idNoBanco = (cb) => {
@@ -7238,29 +7245,29 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   };
   function consultarBoleto(d2, cb, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(d2, cb.banco && cb.banco.conta_id, "GET", `/boletos/${idNoBanco(cb)}`, null, opcoes);
+    return chamarPonte(cb.banco && cb.banco.conta_id, "GET", `/boletos/${idNoBanco(cb)}`, null, opcoes);
   }
   function cancelarBoleto(d2, cb, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(d2, cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/cancelar`, {}, opcoes);
+    return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/cancelar`, {}, opcoes);
   }
   function alterarBoleto(d2, cb, mudancas = alteracaoBoletoC6(d2, cb), opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(d2, cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/alterar`, mudancas, opcoes);
+    return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/alterar`, mudancas, opcoes);
   }
   function negativarBoleto(d2, cb, dias, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
     const conta = contaBanco(d2, cb.banco && cb.banco.conta_id);
     if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Dados e backup → Banco C6).");
-    return chamarPonte(d2, cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar`, pedidoNegativacaoC6(dias), opcoes);
+    return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar`, pedidoNegativacaoC6(dias), opcoes);
   }
   function cancelarNegativacao(d2, cb, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(d2, cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar/cancelar`, {}, opcoes);
+    return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar/cancelar`, {}, opcoes);
   }
   function listarBoletos(d2, contaId, filtros, opcoes = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(d2, contaId, "GET", `/boletos?${new URLSearchParams(filtros)}`, null, opcoes);
+    return chamarPonte(contaId, "GET", `/boletos?${new URLSearchParams(filtros)}`, null, opcoes);
   }
   async function listarTodosBoletos(d2, contaId, filtros, opcoes = {}) {
     const itens = [];
@@ -14651,13 +14658,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const cb = buscar2("cobrancas", id);
       if (!cb.banco || !cb.banco.simulado) throw new Error("Este boleto não é fictício.");
       const previsto = previstoNoPagamento(cb, hojeIso(), {});
-      await chamarPonte(d(), cb.banco.conta_id, "POST", `/simulado/pagar/${encodeURIComponent(cb.banco.id_externo)}`, { payment_date: hojeIso(), amount: centavosParaReais(previsto.valor_devido) });
+      await chamarPonte(cb.banco.conta_id, "POST", `/simulado/pagar/${encodeURIComponent(cb.banco.id_externo)}`, { payment_date: hojeIso(), amount: centavosParaReais(previsto.valor_devido) });
       aviso('Pagamento fictício registrado na ponte. Agora clique em "Consultar situação no banco".', "info");
     },
     abrirPdfC6({ id }) {
       const cb = buscar2("cobrancas", id);
-      const cfg = configuracaoBanco(d());
-      return chamarPonteCrua(cfg, "GET", `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+      return chamarPonteCrua("GET", `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
         const r = await fetch(url, o);
         if (!r.ok) return r;
         const blob = await r.blob();

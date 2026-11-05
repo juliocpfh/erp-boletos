@@ -1,0 +1,29 @@
+{
+  "_comentario": "Saldo fictício no formato EXATO de GET /v1/statement/balance (saldo-extrato.yaml, BalanceResponse), por conta.",
+  "ank": {
+    "date": "2026-11-05",
+    "currency_code": "BRL",
+    "available": 15430.25,
+    "locked": 0,
+    "future": 1219.5,
+    "charges": 0,
+    "exceeds_limit": { "total": 0, "used": 0, "available": 0 },
+    "limit": { "total": 5000, "used": 0, "available": 5000 },
+    "total_available": 20430.25,
+    "total_available_with_exceed_limit": 20430.25,
+    "limit_used_type": "NONE"
+  },
+  "jck": {
+    "date": "2026-11-05",
+    "currency_code": "BRL",
+    "available": 3870.1,
+    "locked": 0,
+    "future": 0,
+    "charges": 0,
+    "exceeds_limit": { "total": 0, "used": 0, "available": 0 },
+    "limit": { "total": 0, "used": 0, "available": 0 },
+    "total_available": 3870.1,
+    "total_available_with_exceed_limit": 3870.1,
+    "limit_used_type": "NONE"
+  }
+}

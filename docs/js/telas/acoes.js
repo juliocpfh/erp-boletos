@@ -1540,15 +1540,14 @@ export const ACOES = {
     const cb = buscar('cobrancas', id);
     if (!cb.banco || !cb.banco.simulado) throw new Error('Este boleto não é fictício.');
     const previsto = R.previstoNoPagamento(cb, C.hojeIso(), {});
-    await BANCO.chamarPonte(d(), cb.banco.conta_id, 'POST', `/simulado/pagar/${encodeURIComponent(cb.banco.id_externo)}`, { payment_date: C.hojeIso(), amount: R.centavosParaReais(previsto.valor_devido) });
+    await BANCO.chamarPonte(cb.banco.conta_id, 'POST', `/simulado/pagar/${encodeURIComponent(cb.banco.id_externo)}`, { payment_date: C.hojeIso(), amount: R.centavosParaReais(previsto.valor_devido) });
     aviso('Pagamento fictício registrado na ponte. Agora clique em "Consultar situação no banco".', 'info');
   },
 
   abrirPdfC6({ id }) {
     const cb = buscar('cobrancas', id);
-    const cfg = BANCO.configuracaoBanco(d());
     // a ponte exige a senha num cabeçalho, que uma aba nova não manda: baixa pelo fetch e abre o arquivo
-    return BANCO.chamarPonteCrua(cfg, 'GET', `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+    return BANCO.chamarPonteCrua('GET', `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
