@@ -9,7 +9,7 @@
      campo('valor', 'Valor investido', 'dinheiro', { obrig: true }),
    ];
    ```
-   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`; seção que começa recolhida (abre sozinha se tiver algo preenchido): `{ secao, recolher: 'texto do botão' }`; caixa de uma linha que cresce: `area` com `linha: true`; texto com sugestões do que já foi digitado: `sugestoes: [...]`.
+   Tipos usados: `texto`, `area`, `data`, `mes`, `dinheiro` (centavos), `pct`, `inteiro`, `opcao`, `simnao`, `tel`, `email`, `url`, `cpf`, `cnpj`, `cpfcnpj`, `cep`, `arquivo` (não entra em `ler`; grave em `ajustarAsync`; `<input type="file">` escrito à mão leva `accept="${ACEITA_DOCUMENTOS}"` de `telas/comum.js`, e `S.salvarArquivo` recusa página/script). Mostrar/esconder campo: `quando('campo', 'valor')`; só no novo / só na edição: `soNovo` / `soEditar`; seção que começa recolhida (abre sozinha se tiver algo preenchido): `{ secao, recolher: 'texto do botão' }`; caixa de uma linha que cresce: `area` com `linha: true`; texto com sugestões do que já foi digitado: `sugestoes: [...]`.
 3. `docs/js/telas/cadastros.js` → entrada em `CADASTROS` (modelo: `reformas`):
    ```js
    reformas: {
@@ -24,7 +24,7 @@
 5. Exclusão: entrada em `TABELAS_EXCLUSAO` (`telas/acoes.js`) com `admin`, `checar`, `voltar`, `recalcular` ou `depois`. Campo com nome de arquivo: inclua-o em `arquivosReferenciados` (`regras.js`), para o anexo ser apagado junto com o lançamento. Se a tabela pertence a um contrato, inclua-a na cascata de `R.excluirContrato` (`regras.js`); se pertence a um imóvel, na de `ACOES.excluir`. Atenção: a exclusão chama `voltar(r)` sem `q`; não use `q.<campo>` sem conferir se `q` existe.
 
 ## Adicionar uma tela
-1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros. `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
+1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros, já passados por `C.sanearParametros`: parâmetro novo ganha uma entrada em `FORMATOS_PARAMETRO` (`calculos.js`), e mês/data usam `C.competenciaValida(rota.q.mes, padrão)`/`C.dataValida` (ver `TELAS.cobrancas`). `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`. Registro que não existe: `naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos')` (`telas/comum.js`). Tabela larga: dentro de `<div class="cartao rolagem">`; com a classe `responsiva` (1ª linha com `th`) vira cartões no celular.
 3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`); o botão fica desabilitado enquanto a ação roda (`data-ocupado`), e `alterar` grava uma de cada vez. Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`). Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
 4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`); com `id`, fica aberta ou fechada como estava depois de uma ação na mesma página (`mostrar` em `app.js`).
@@ -40,7 +40,7 @@
    ```
 2. Grave só por `inserir`/`atualizar`/`excluir` (eles registram o histórico). Na tela, chame dentro de `alterar((db) => ...)`.
 3. Se a regra muda valores de boleto, inclua o campo em `CAMPOS_RECALCULO` e em `montarCobranca`.
-4. Teste em `tests/regras.test.mjs` usando `base()` (banco de exemplo do próprio arquivo).
+4. Teste em `tests/regras.test.mjs` usando `base()` (banco de exemplo do próprio arquivo). Regra do banco (extrato, destino, comprovante, pagamento): em `docs/js/conciliacao.js`, com os dados no formato exato do C6 (`documentacao/c6-openapi/`), e teste em `tests/conciliacao.test.mjs`; o que o site pede à ponte vai em `banco-fase2.js` (e a resposta simulada em `?teste`, com dados de `simulado-banco.js`).
 
 ## Adicionar um relatório
 | Tipo | Como fazer (exemplo existente) |
@@ -61,7 +61,7 @@ Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilit
 7. **Produção**: com as chaves de produção, crie `contas/<id>/ambiente.txt` = `producao` (ou edite a conta no site para "Produção"), teste a conexão e emita o primeiro boleto real num valor pequeno. A carteira é automática (15 produção / 21 sandbox).
 8. **Rotina**: "Emitir no C6 todos em aberto do mês" depois de gerar os boletos; "Conferir pagamentos no banco" alguns dias depois do vencimento (lista os pagos no banco e propõe registrar cada um, com a data de crédito como data contábil). O webhook do banco é opcional: precisa de endereço público e de um segredo na URL (`C6_ANK_WEBHOOK_TOKEN`, 32 hex; cadastrar no C6 `https://<ponte>/webhook/c6/ank/<segredo>`); o aviso só marca o boleto para reconsulta. Sem ele, a conferência resolve.
 9. **Segurança da ponte** (resumo; detalhes em `ponte-c6/README.md`): só escuta neste computador (expor exige `EXPOR=1` e Cloudflare Access/Tailscale); lista fixa de origens; 10 senhas erradas bloqueiam o IP por 15 min; a ponte remonta o pedido de emissão só com campos conhecidos (CPF/CNPJ com dígito, valor até `C6_<ID>_VALOR_MAXIMO`, Pix da conta); registros sem dados pessoais e apagados em 30 dias; `SIMULADO=1` não sobe com conta em produção.
-Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-c6.mjs`). Formato oficial resumido em `documentacao/C6_CAMPOS_CONFIRMADOS.md`.
+10. **Fase 2 (extrato, comprovantes, pagamentos)**: a ponte precisa das APIs "Saldo & Extrato" e, para pagar, "Agendamento de pagamentos" liberadas pelo C6; ligue `PAGAMENTOS=1` no `.env` só quando for pagar pelo sistema, e no site marque "Permitir preparar pagamentos pelo banco" com o limite por pagamento (caixa "Banco: conciliação e pagamentos" em Dados e backup; `caixaConfigBanco2`). Rotina do mês em `documentacao/MANUAL_BANCO.md`; cada passo pode ser treinado em `?teste` (ponte simulada dentro do site). Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-c6.mjs`); formato oficial em `documentacao/C6_CAMPOS_CONFIRMADOS.md` e `documentacao/c6-openapi/`.
 
 ## Checklist antes de alterar
 - [ ] Ler a função e os testes da área (`tests/*.test.mjs`).
@@ -69,7 +69,8 @@ Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-
 - [ ] Rodar `node tools/checar.mjs` (sintaxe do app inteiro + testes; `node --check` não pega tudo nos módulos do navegador).
 - [ ] Testar no navegador: `cd docs && python3 -m http.server 8000` e `http://localhost:8000/?teste`.
 - [ ] Mudou `docs/js`, `docs/vendor`, `docs/css/estilo.css` ou o modelo xlsx: rodar `node tools/checar.mjs --offline` (senão `tests/offline.test.mjs` falha).
-- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele.
+- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele. Nunca um segredo no JSON (senha/endereço da ponte: `lembrarPonte`; senha de usuário: `camposDeSenha`).
+- [ ] Chamou um site novo (API externa)? Entra na `connect-src` da CSP em `docs/index.html` e em `tools/gerar-offline.mjs`, senão o navegador bloqueia. Mexeu na ponte? `node --test tests/ponte-c6.test.mjs` e `node --test "ponte-c6/testes/*.test.mjs"`.
 - [ ] Não usar dados reais de inquilinos em testes.
 
 ## Arquivos que costumam mudar juntos
@@ -79,7 +80,7 @@ Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-
 | Regra de boleto | `regras.js` (`montarCobranca`, `CAMPOS_RECALCULO`) + `calculos.js` + `tests/regras.test.mjs` |
 | Tela nova | arquivo do assunto em `telas/` + `telas.js` (`TELAS`) + `app.js` (`MENU`) + `estilo.css` |
 | Qualquer mudança em `docs/js` | `docs/offline/administracao-imoveis.html` (gerado) |
-| Campo ou caminho da API do C6 | `docs/js/mapa-c6.js` + cópia idêntica `ponte-c6/mapa-c6.mjs` + `tests/banco.test.mjs`/`tests/ponte-c6.test.mjs` |
+| Campo ou caminho da API do C6 | `docs/js/mapa-c6.js` + cópia idêntica `ponte-c6/mapa-c6.mjs` + `tests/banco.test.mjs`/`tests/ponte-c6.test.mjs`; rota nova da ponte: `ponte-c6/rotas-fase2.mjs` + `docs/js/banco-fase2.js` + dados fictícios em `ponte-c6/simulado/` copiados para `docs/js/simulado-banco.js` |
 
 ## Convenções
 | Item | Padrão observado no código |
@@ -89,5 +90,4 @@ Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-
 | Valores | Dinheiro em centavos inteiros; datas `'AAAA-MM-DD'`; competência `'AAAA-MM'` |
 | Estilo | ES modules, 2 espaços, aspas simples, ponto e vírgula, HTML em template strings. Não há linter no repositório: siga o estilo do arquivo que estiver alterando |
 | Atributos de evento | `data-acao`, `data-form`, `data-mostrar-se`, `data-mascara` |
-| Commits | Título em português descrevendo o que mudou; corpo com tópicos `- `; trailers `Co-Authored-By:` e `Claude-Session:` nos commits feitos com Claude |
-| Branches/PRs | Trabalho em branch e merge por PR no GitHub. Branches feitas pelo Claude: `claude/<nome>`; um branch cujo PR já foi mergeado é recriado a partir de `main` |
+| Commits, branches e PRs | Título em português descrevendo o que mudou; corpo com tópicos `- `; trailers `Co-Authored-By:` e `Claude-Session:` nos commits feitos com Claude. Trabalho em branch e merge por PR no GitHub; branches feitas pelo Claude: `claude/<nome>`; um branch cujo PR já foi mergeado é recriado a partir de `main` |
