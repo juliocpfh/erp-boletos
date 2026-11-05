@@ -342,3 +342,43 @@ export function ufDoCep(cep) {
   const f = FAIXAS_CEP.find(([de, ate]) => p >= de && p <= ate);
   return f ? f[2] : '';
 }
+
+// --------------------------------------------------------------------------
+// Parâmetros do endereço (#/tela?comp=…&ordem=…): só valem no formato esperado
+// Quem monta o endereço pode ser qualquer pessoa (um link mandado por WhatsApp): o que não estiver
+// no formato é descartado e a tela usa o padrão. Isso impede texto estranho de chegar ao HTML.
+// --------------------------------------------------------------------------
+const COMPETENCIA_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATA_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/** 'AAAA-MM' válido, senão o padrão. */
+export function competenciaValida(texto, padrao) {
+  return COMPETENCIA_RE.test(String(texto || '')) ? String(texto) : padrao;
+}
+
+/** 'AAAA-MM-DD' válido, senão o padrão. */
+export function dataValida(texto, padrao = '') {
+  return DATA_RE.test(String(texto || '')) ? String(texto) : padrao;
+}
+
+/** Formato aceito de cada parâmetro conhecido do endereço; os demais passam como estão (as telas escapam o texto). */
+const FORMATOS_PARAMETRO = {
+  comp: COMPETENCIA_RE, mes: COMPETENCIA_RE, competencia: COMPETENCIA_RE, mes_ref: COMPETENCIA_RE,
+  data: DATA_RE,
+  de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/, ate: DATA_RE, // "de" também é a tela de origem (de=iptu, de=inquilinos)
+  imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
+  vincular: /^\d+$/, seguro: /^\d+$/, empresa: /^\d+$/, vistoria: /^\d+$/, id: /^\d+$/,
+  ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
+  ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
+  ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,
+};
+
+/** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */
+export function sanearParametros(q) {
+  const limpo = {};
+  for (const [k, v] of Object.entries(q || {})) {
+    const re = FORMATOS_PARAMETRO[k];
+    if (!re || re.test(String(v))) limpo[k] = String(v);
+  }
+  return limpo;
+}

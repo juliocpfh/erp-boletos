@@ -652,10 +652,14 @@ export const gruposDeAlertas = (alertas) => {
 /** Caixa de últimas alterações: começa recolhida e só abre quando o usuário clica nela. */
 export const caixaHistorico = (titulo, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
 
+/** Tipos aceitos ao anexar: documentos (PDF e fotos) e, nas pastas gerais, também planilha, Word e ZIP. Página e script nunca (ver S.nomeAnexavel). */
+export const ACEITA_DOCUMENTOS = '.pdf,.jpg,.jpeg,.png,.webp,.gif';
+export const ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
+
 export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
     ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'Ao anexar aqui, o sistema pergunta se é a apólice ou outro documento e de qual vigência.'}</p>` : ''}</div>`;
 }
 
@@ -689,9 +693,10 @@ export async function listaArquivos(escopo, id, modo = '') {
   if (!itens.length && escopo !== 'contrato') return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
   if (escopo === 'anuncio') {
     const figs = await Promise.all(itens.map(async (a) => {
-      const u = URL.createObjectURL(await S.abrirArquivo(dir, a.nome));
+      // tipo forçado pela extensão conhecida: um arquivo estranho na pasta não abre como página
+      const u = URL.createObjectURL(new Blob([await S.abrirArquivo(dir, a.nome)], { type: S.tipoParaAbrir(a.nome) || 'application/octet-stream' }));
       urls.push(u);
-      return `<figure><a href="${u}" target="_blank"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
+      return `<figure><a href="${u}" target="_blank" rel="noopener noreferrer"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
     }));
     return `<div class="fotos">${figs.join('')}</div>`;
   }

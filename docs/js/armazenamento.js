@@ -137,7 +137,29 @@ export async function listar(dir) {
   return itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+/**
+ * Tipos que o navegador executaria como página (com script e acesso aos dados do sistema) se fossem abertos:
+ * não podem ser anexados. O anexo é de quem o inquilino ou o fornecedor entregou: não dá para confiar nele.
+ */
+const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
+export const ERRO_TIPO_ARQUIVO = 'Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.';
+
+/** O arquivo pode ser anexado (não é página nem script)? */
+export function nomeAnexavel(nome) {
+  return !EXTENSOES_PROIBIDAS.test(String(nome || '').trim());
+}
+
+/** Tipos que abrem numa aba nova (PDF e fotos); os outros só se baixam. */
+const TIPOS_ABRIR = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+
+/** Tipo seguro para abrir o anexo numa aba nova ('application/pdf', 'image/png'…), ou '' se ele deve ser só baixado. */
+export function tipoParaAbrir(nome) {
+  const ext = (String(nome || '').match(/\.([a-z0-9]+)$/i) || [])[1];
+  return (ext && TIPOS_ABRIR[ext.toLowerCase()]) || '';
+}
+
 export async function salvarArquivo(dir, arquivo) {
+  if (!nomeAnexavel(arquivo.name)) throw new Error(ERRO_TIPO_ARQUIVO);
   const nome = limparNome(arquivo.name);
   const ponto = nome.lastIndexOf('.');
   const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ''];
@@ -308,11 +330,19 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
   const banco = zip.file(ARQUIVO_BANCO);
   if (!banco) throw new Error(`O ZIP não contém o arquivo ${ARQUIVO_BANCO}.`);
   const nomes = Object.keys(zip.files);
+  // Confere todos os caminhos antes de gravar qualquer coisa: um nome inválido no meio deixaria a pasta
+  // com metade dos anexos novos e o banco antigo. Cada parte do caminho passa por limparNome (igual ao anexar).
+  const entradas = [];
   for (const n of nomes) {
     const partes = n.split('/');
     if (n.startsWith('/') || partes.includes('..') || (n !== ARQUIVO_BANCO && ![PASTA_ARQUIVOS, PASTA_MODELOS].includes(partes[0]))) {
       throw new Error(`Arquivo inesperado dentro do ZIP: ${n}`);
     }
+    const entrada = zip.files[n];
+    if (entrada.dir || n === ARQUIVO_BANCO) continue;
+    const pastas = partes.slice(0, -1).map(limparNome);
+    if (pastas.some((p) => !p) || partes.length < 2) throw new Error(`Arquivo inesperado dentro do ZIP: ${n}`);
+    entradas.push({ entrada, pastas, nome: limparNome(partes.at(-1)) });
   }
   const novos = normalizar(JSON.parse(await banco.async('string')));
   if (novos.formato !== 'imoveis-v1') throw new Error('O ZIP não é uma exportação deste sistema.');
@@ -326,12 +356,9 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
     const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
     await escreverTexto(dir, `antes-da-importacao-${carimbo}.json`, JSON.stringify(dadosAtuais));
   }
-  for (const n of nomes) {
-    const entrada = zip.files[n];
-    if (entrada.dir || n === ARQUIVO_BANCO) continue;
-    const partes = n.split('/');
-    const dir = await subpasta(pasta, partes.slice(0, -1));
-    await escreverTexto(dir, partes.at(-1), await entrada.async('blob'));
+  for (const { entrada, pastas, nome } of entradas) {
+    const dir = await subpasta(pasta, pastas);
+    await escreverTexto(dir, nome, await entrada.async('blob'));
   }
   await gravarBanco(pasta, novos);
   return novos;

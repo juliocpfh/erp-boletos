@@ -278,7 +278,7 @@ export function registrar(d, usuario, acao, tabela, registroId, descricao, detal
   }
 }
 
-const OCULTOS = new Set(['senha_hash', 'senha_sal', 'sessoes']);
+const OCULTOS = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes']);
 const visivel = (obj) => Object.fromEntries(Object.entries(obj)
   .filter(([k, v]) => !OCULTOS.has(k) && v !== null && v !== '' && v !== undefined));
 

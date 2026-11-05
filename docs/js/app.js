@@ -1,6 +1,6 @@
 // Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
-import { conferirSenha, novoSal, pode, resumoSenha } from './auth.js';
+import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
@@ -22,19 +22,26 @@ export const E = {
 export const login = () => (E.usuario ? E.usuario.login : 'sistema');
 
 // --------------------------------------------------------------------------
-// Sessão: o login fica lembrado neste navegador (todas as abas) por 12 horas sem uso, até clicar em Sair.
+// Sessão: o login fica lembrado neste navegador (todas as abas) por 12 horas sem uso, até clicar em Sair,
+// e no máximo 7 dias desde o login (depois pede a senha de novo, mesmo em uso).
 // Antes ficava só na aba (sessionStorage): cada aba nova (impressão, Ctrl+clique) pedia login de novo.
+// Na versão sem internet (arquivo aberto do disco, file://) todos os arquivos HTML do computador compartilham o mesmo
+// localStorage: ali a sessão fica só na aba (sessionStorage), para outro arquivo aberto no navegador não a ler.
 // --------------------------------------------------------------------------
 const SESSAO = 'imoveis-sessao';
 const DURACAO_SESSAO = 12 * 3600 * 1000;
+const LIMITE_SESSAO = 7 * 24 * 3600 * 1000;
 
 const MAX_SESSOES = 10; // por usuário (vários navegadores/computadores)
 
-/** Sessão lembrada: { login, token } ou null. O token é um número aleatório criado no login e guardado também no usuário do banco. */
+const deposito = () => (location.protocol === 'file:' ? sessionStorage : localStorage);
+
+/** Sessão lembrada: { login, token, criada_em } ou null. O token é um número aleatório criado no login e guardado também no usuário do banco. */
 function lerSessao() {
   try {
-    const s = JSON.parse(localStorage.getItem(SESSAO) || 'null');
-    return s && s.ate > Date.now() && s.login && s.token ? s : null;
+    const s = JSON.parse(deposito().getItem(SESSAO) || 'null');
+    const valida = s && s.ate > Date.now() && s.login && s.token && s.criada_em && Date.now() - s.criada_em < LIMITE_SESSAO;
+    return valida ? s : null;
   } catch {
     return null;
   }
@@ -43,9 +50,11 @@ function lerSessao() {
 function gravarSessao(loginTexto, token = null) {
   try {
     const atual = lerSessao();
-    const t = token || (atual && atual.login === loginTexto ? atual.token : null);
-    if (loginTexto && t) localStorage.setItem(SESSAO, JSON.stringify({ login: loginTexto, token: t, ate: Date.now() + DURACAO_SESSAO }));
-    else localStorage.removeItem(SESSAO);
+    const mesma = atual && atual.login === loginTexto;
+    const t = token || (mesma ? atual.token : null);
+    if (loginTexto && t) {
+      deposito().setItem(SESSAO, JSON.stringify({ login: loginTexto, token: t, ate: Date.now() + DURACAO_SESSAO, criada_em: token ? Date.now() : atual.criada_em }));
+    } else deposito().removeItem(SESSAO);
   } catch { /* navegador sem armazenamento: pede login de novo */ }
 }
 
@@ -334,11 +343,9 @@ export async function reabrirPastaLembrada() {
 }
 
 export async function criarBanco(nome, loginTexto, senha) {
-  const sal = novoSal();
-  const hash = await resumoSenha(senha, sal);
   const novo = E.d || R.bancoVazio();
-  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, senha_sal: sal,
-    senha_hash: hash, criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
+  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
+    criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
   await S.gravarBanco(E.pasta, novo);
   E.d = novo;
@@ -353,6 +360,9 @@ export async function entrar(loginTexto, senha) {
   if (!(await conferirSenha(u, senha))) throw new Error('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
+  // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
+  const reforco = await reforcarSenha(u, senha);
+  if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
   await abrirSessao(u);
 }
 
@@ -380,7 +390,8 @@ export async function sair() {
 function rotaAtual() {
   const [caminho, consulta] = (location.hash.slice(1) || '/').split('?');
   const partes = caminho.split('/').filter(Boolean);
-  return { partes, q: Object.fromEntries(new URLSearchParams(consulta || '')) };
+  // parâmetros fora do formato esperado (ex.: comp=2026-01"><img…) são descartados: a tela usa o padrão
+  return { partes, q: C.sanearParametros(Object.fromEntries(new URLSearchParams(consulta || ''))) };
 }
 
 function atualizarFaixa() {

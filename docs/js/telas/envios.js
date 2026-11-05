@@ -1,7 +1,7 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
 import { alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
-import { conferirSenha, novoSal, resumoSenha } from '../auth.js';
+import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
@@ -289,7 +289,8 @@ export const FORMULARIOS = {
     const lg = String(f.get('login')).trim().toLowerCase();
     const senha = String(f.get('senha'));
     if (!nome || !lg) throw new Error('Preencha nome e login.');
-    if (senha.length < 6 || senha !== f.get('senha2')) throw new Error('A senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
+    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
     await criarBanco(nome, lg, senha);
     ir('#/');
   },
@@ -306,11 +307,11 @@ export const FORMULARIOS = {
     const lg = String(f.get('login') || '').trim().toLowerCase();
     const senha = String(f.get('senha') || '');
     if (!nome || !lg || /\s/.test(lg)) throw new Error('Preencha o nome e um login sem espaços.');
-    if (senha.length < 6 || senha !== f.get('senha2')) throw new Error('A senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
+    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
     if (E.d.usuarios.some((u) => u.login === lg)) throw new Error('Já existe um usuário (ou pedido) com este login.');
-    const sal = novoSal();
-    const hash = await resumoSenha(senha, sal);
-    await alterar((db) => R.inserir(db, 'usuarios', { login: lg, nome, papel: 'consulta', ativo: false, pendente: true, senha_sal: sal, senha_hash: hash,
+    const campos = await camposDeSenha(senha);
+    await alterar((db) => R.inserir(db, 'usuarios', { login: lg, nome, papel: 'consulta', ativo: false, pendente: true, ...campos,
       criado_em: new Date().toISOString() }, lg, `Pedido de acesso de ${nome}`));
     aviso('Pedido enviado. Assim que o administrador aprovar, entre com o seu login e senha.');
     ir('#/');
@@ -320,10 +321,10 @@ export const FORMULARIOS = {
     const f = new FormData(form);
     if (!(await conferirSenha(E.usuario, String(f.get('atual'))))) throw new Error('Senha atual incorreta.');
     const nova = String(f.get('nova'));
-    if (nova.length < 6 || nova !== f.get('nova2')) throw new Error('A nova senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
-    const sal = novoSal();
-    const hash = await resumoSenha(nova, sal);
-    await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, { senha_sal: sal, senha_hash: hash }, login(), 'Trocou a própria senha'));
+    if (senhaCurta(nova)) throw new Error(ERRO_SENHA_CURTA);
+    if (nova !== f.get('nova2')) throw new Error('As duas senhas precisam ser iguais.');
+    const campos = await camposDeSenha(nova);
+    await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, campos, login(), 'Trocou a própria senha'));
     E.usuario = R.buscar(E.d, 'usuarios', E.usuario.id);
     aviso('Senha alterada.');
     ir('#/');

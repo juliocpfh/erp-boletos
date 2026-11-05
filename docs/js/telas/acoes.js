@@ -1265,9 +1265,13 @@ export const ACOES = {
     await mostrar();
   },
 
+  // Só PDF e fotos abrem na aba nova, com o tipo forçado (o tipo do arquivo em disco vem da extensão e não é confiável):
+  // um .html/.svg anexado abriria como página na origem do sistema, com acesso à sessão e à pasta. Os outros tipos são baixados.
   async abrirArquivo({ escopo, id, nome }) {
     const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
-    window.open(URL.createObjectURL(arq), '_blank');
+    const tipo = S.tipoParaAbrir(nome);
+    if (!tipo) return baixar(arq, nome);
+    window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
   async baixarArquivo({ escopo, id, nome }) {

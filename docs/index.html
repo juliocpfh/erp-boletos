@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Só o próprio código roda e só os sites usados (CEP, CNPJ, Banco Central e a ponte do banco) são chamados: um texto estranho injetado na página não executa nem manda dados para fora. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta name="referrer" content="no-referrer">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <link rel="stylesheet" href="css/estilo.css">

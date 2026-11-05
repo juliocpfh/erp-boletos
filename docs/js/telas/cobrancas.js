@@ -68,7 +68,8 @@ function caixaBaixaLote(lista, hoje) {
     <p class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha da tabela.</p></details>`;
 }
 
-export function telaCobrancas(comp, ordem = 'vencimento') {
+export function telaCobrancas(comp, ordemPedida = 'vencimento') {
+  const ordem = ORDENS_BOLETO[ordemPedida] ? ordemPedida : 'vencimento'; // a ordem vem do endereço: só as conhecidas
   const hoje = C.hojeIso();
   const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
     const c = buscar('contratos', cb.contrato_id);
@@ -85,12 +86,12 @@ export function telaCobrancas(comp, ordem = 'vencimento') {
   const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
   // botões de impressão em cima e embaixo da lista
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
-      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${comp}">Imprimir todos os demonstrativos do mês</a>
+      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>
       ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
-      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, -1)}&ordem=${ordem}">← ${compBr(C.somarMeses(comp, -1))}</a>
-      <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
-      <a class="botao secundario" href="#/cobrancas?comp=${C.somarMeses(comp, 1)}&ordem=${ordem}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
+      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${esc(C.somarMeses(comp, -1))}&ordem=${esc(ordem)}">← ${compBr(C.somarMeses(comp, -1))}</a>
+      <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <a class="botao secundario" href="#/cobrancas?comp=${esc(C.somarMeses(comp, 1))}&ordem=${esc(ordem)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ''} ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
@@ -101,8 +102,8 @@ export function telaCobrancas(comp, ordem = 'vencimento') {
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
-      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${comp}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
-    .map(([k, t]) => `<option value="${k}" ${(ORDENS_BOLETO[ordem] ? ordem : 'vencimento') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
+      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(comp)}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
+    .map(([k, t]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
@@ -112,7 +113,7 @@ export function telaCobrancas(comp, ordem = 'vencimento') {
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
           ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
           ${R.ehComplementoCaucao(cb) ? `<br>${etiqueta('complemento da caução · sem NF', 'info')}` : ''}
-          ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${comp}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
+          ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(comp)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>

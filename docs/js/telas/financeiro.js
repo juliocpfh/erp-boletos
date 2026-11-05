@@ -54,7 +54,7 @@ function bancoDaDespesa(x) {
 export function telaContas(rota) {
   const i = buscar('imoveis', rota.partes[1]);
   if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
-  const comp = rota.q.comp || mesComContas(i.id);
+  const comp = C.competenciaValida(rota.q.comp, mesComContas(i.id));
   const ultimos = R.ultimosValores(d(), i.id);
   const permitidas = R.contasPermitidas(d(), i.id, comp);
   const doMes = R.despesasDo(d(), i.id).filter((x) => x.competencia === comp);
@@ -81,7 +81,7 @@ export function telaContas(rota) {
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
-      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${comp}" style="width:auto" data-trocar-mes="${i.id}">
+      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
         ${permitidas.tipos.length ? '<button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button>' : ''}</div>
       <div class="rolagem"><table><tr><th>Conta</th><th>Valor pago</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
@@ -129,7 +129,7 @@ export function telaImpostos(comp) {
   return `<h1>Resultados financeiros</h1>${abasResultados('impostos')}
     <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
-      <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${comp}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Guia esperada, calculada pelo faturamento das NFs emitidas (data de emissão; NFs canceladas não entram). Atualiza sozinha a cada NF emitida.
       PIS/COFINS (${pct(3.65)}): guia mensal, vence no dia 25 do mês seguinte. IRPJ (${pct(4.8)}) e CSLL (${pct(2.88)}): 15% e 9% sobre o lucro presumido (32% do faturamento), guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre; vence no último dia útil do mês seguinte ao trimestre.
@@ -147,8 +147,9 @@ export function telaImpostos(comp) {
 
 export function telaResultados(q) {
   const hoje = C.hojeIso();
-  const ate = q.ate || hoje;
-  const de = q.de || C.somarDias(C.somarMesesData(ate, -12), 1);
+  // as datas vêm do endereço (#/resultados?de=…&ate=…): só valem no formato AAAA-MM-DD
+  const ate = C.dataValida(q.ate, hoje);
+  const de = C.dataValida(q.de, C.somarDias(C.somarMesesData(ate, -12), 1));
   // imóveis só com boleto de controle vão para o fim, sem posição no ranking
   const lista = R.resultadosFinanceiros(d(), de, ate).sort((a, b) => a.controle - b.controle);
   const ano = Number(hoje.slice(0, 4));
@@ -162,7 +163,7 @@ export function telaResultados(q) {
   const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
   return `<h1>Resultados financeiros</h1>${abasResultados('resultados')}
-    <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${de}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${ate}" style="width:160px"><button class="secundario">Ver</button>
+    <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>
     <div class="cartao rolagem"><table class="compacta"><tr><th>#</th><th>Imóvel</th><th class="n" title="Valor do imóvel + reformas até a data">Imóvel + reformas</th><th class="n" title="Aluguel recebido (valor das NFs) + NFs avulsas">Receita</th><th class="n" title="IPTU pago pelo proprietário + contas pagas por nós">Despesas</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th></tr>
       ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td>
