@@ -1,0 +1,146 @@
+{
+  "_comentario": "Extrato fictício no formato EXATO de GET /v1/statement/ (saldo-extrato.yaml, StatementResponse). Uma lista por conta. Dados inventados: CPF de teste 529.982.247-25, CNPJ 11.222.333/0001-81. A TED de 10/11 sai da ANK e entra na JCK (transferência entre as nossas contas).",
+  "ank": {
+    "entries": [
+      {
+        "local_reference": "01JGHAMYWRSAW41GAMFKEG17VA",
+        "created_at": "2026-11-03T09:12:41",
+        "entry_date": "2026-11-03",
+        "amount": "1219.50",
+        "title": "Pix Recebido C6 QR Code",
+        "description": "Pix QR Code do boleto 0000003048 - MARIA EXEMPLO",
+        "reference": "019aeec0-a61a-8043-4a46-2f191aebdf9a",
+        "operation_type": "INCOMING",
+        "transaction_type": "CREDIT_QRCODE_PIX_PAYMENT_RECEIVED",
+        "end_to_end_id": "E33600000202611030912ANKEXEMPLO01"
+      },
+      {
+        "local_reference": "01JGHAN2K3P7Q9R1S5T7V9W1X3",
+        "created_at": "2026-11-05T10:03:15",
+        "entry_date": "2026-11-05",
+        "amount": "123.45",
+        "title": "Pagamento de Boleto",
+        "description": "PAGAMENTO BOLETO SANEPAR MATR 123456",
+        "reference": "019aeec1-0b2c-7d3e-8f40-1a2b3c4d5e6f",
+        "operation_type": "OUTGOING",
+        "transaction_type": "PAYMENT"
+      },
+      {
+        "local_reference": "01JGHAN8M4N6P8Q0R2S4T6V8W0",
+        "created_at": "2026-11-05T10:04:02",
+        "entry_date": "2026-11-05",
+        "amount": "210.80",
+        "title": "Pagamento de Boleto",
+        "description": "PAGAMENTO BOLETO COPEL UC 7654321",
+        "reference": "019aeec1-1c3d-7e4f-9051-2b3c4d5e6f70",
+        "operation_type": "OUTGOING",
+        "transaction_type": "PAYMENT"
+      },
+      {
+        "local_reference": "01JGHANF5P7Q9R1S3T5V7W9X1Y",
+        "created_at": "2026-11-06T06:00:00",
+        "entry_date": "2026-11-06",
+        "amount": "29.90",
+        "title": "Tarifa",
+        "description": "TARIFA PACOTE DE SERVICOS PJ",
+        "reference": "019aeec2-2d4e-7f50-a162-3c4d5e6f7081",
+        "operation_type": "OUTGOING",
+        "transaction_type": "OTHER"
+      },
+      {
+        "local_reference": "01JGHANM6Q8R0S2T4V6W8X0Y2Z",
+        "created_at": "2026-11-10T14:30:00",
+        "entry_date": "2026-11-10",
+        "amount": "1500.00",
+        "title": "Pix Recebido",
+        "description": "PIX RECEBIDO JOAO EXEMPLO CPF 529.982.247-25",
+        "reference": "019aeec3-3e5f-7061-b273-4d5e6f708192",
+        "operation_type": "INCOMING",
+        "transaction_type": "CREDIT_PIX_PAYMENT_RECEIVED",
+        "end_to_end_id": "E33600000202611101430ANKEXEMPLO02"
+      },
+      {
+        "local_reference": "01JGHANT7R9S1T3V5W7X9Y1Z3A",
+        "created_at": "2026-11-10T16:45:10",
+        "entry_date": "2026-11-10",
+        "amount": "2000.00",
+        "title": "TED Enviada",
+        "description": "TED PARA JCK ADMINISTRADORA LTDA CNPJ 11.222.333/0001-81",
+        "reference": "019aeec3-4f60-7172-c384-5e6f708192a3",
+        "operation_type": "OUTGOING",
+        "transaction_type": "TRANSFER"
+      },
+      {
+        "local_reference": "01JGHAP08S0T2V4W6X8Y0Z2A4B",
+        "created_at": "2026-11-12T11:20:33",
+        "entry_date": "2026-11-12",
+        "amount": "310.00",
+        "title": "Pagamento de Boleto",
+        "description": "IPTU PREFEITURA CURITIBA PARCELA 3/10",
+        "reference": "019aeec4-5071-7283-d495-6f708192a3b4",
+        "operation_type": "OUTGOING",
+        "transaction_type": "PAYMENT"
+      },
+      {
+        "local_reference": "01JGHAP69T1V3W5X7Y9Z1A3B5C",
+        "created_at": "2026-11-16T08:05:00",
+        "entry_date": "2026-11-16",
+        "amount": "1800.00",
+        "title": "Boleto Liquidado",
+        "description": "LIQUIDACAO BOLETO 0000003049 - PEDRO EXEMPLO",
+        "reference": "019aeec5-6182-7394-e5a6-708192a3b4c5",
+        "operation_type": "INCOMING",
+        "transaction_type": "PAYMENT"
+      }
+    ]
+  },
+  "jck": {
+    "entries": [
+      {
+        "local_reference": "01JGHB00AV2W4X6Y8Z0A2B4C6D",
+        "created_at": "2026-11-06T06:00:00",
+        "entry_date": "2026-11-06",
+        "amount": "29.90",
+        "title": "Tarifa",
+        "description": "TARIFA PACOTE DE SERVICOS PJ",
+        "reference": "019aeec6-7293-74a5-f6b7-8192a3b4c5d6",
+        "operation_type": "OUTGOING",
+        "transaction_type": "OTHER"
+      },
+      {
+        "local_reference": "01JGHB06BW3X5Y7Z9A1B3C5D7E",
+        "created_at": "2026-11-10T16:45:12",
+        "entry_date": "2026-11-10",
+        "amount": "2000.00",
+        "title": "TED Recebida",
+        "description": "TED DE ANK ADMINISTRADORA LTDA CNPJ 11.222.333/0001-81",
+        "reference": "019aeec7-83a4-75b6-07c8-92a3b4c5d6e7",
+        "operation_type": "INCOMING",
+        "transaction_type": "TRANSFER"
+      },
+      {
+        "local_reference": "01JGHB0CCX4Y6Z8A0B2C4D6E8F",
+        "created_at": "2026-11-11T09:30:00",
+        "entry_date": "2026-11-11",
+        "amount": "450.00",
+        "title": "Pix Enviado",
+        "description": "PIX CONDOMINIO EDIFICIO EXEMPLO",
+        "reference": "019aeec8-94b5-76c7-18d9-a3b4c5d6e7f8",
+        "operation_type": "OUTGOING",
+        "transaction_type": "DEBIT_PIX_PAYMENT_REALIZED",
+        "end_to_end_id": "E33600000202611110930JCKEXEMPLO03"
+      },
+      {
+        "local_reference": "01JGHB0JDY5Z7A9B1C3D5E7F9G",
+        "created_at": "2026-11-20T07:00:00",
+        "entry_date": "2026-11-20",
+        "amount": "99.90",
+        "title": "Débito Automático",
+        "description": "DEBITO AUTOMATICO INTERNET FIBRA EXEMPLO",
+        "reference": "019aeec9-a5c6-77d8-29ea-b4c5d6e7f809",
+        "operation_type": "OUTGOING",
+        "transaction_type": "DIRECT_DEBIT_AGREEMENT"
+      }
+    ]
+  }
+}
