@@ -1,0 +1,47 @@
+{
+  "_comentario": "Itens fictícios de um grupo de pagamentos já lido pelo banco, no formato EXATO de GET /v1/schedule_payments/{group_id}/items (payment). O simulado devolve esta lista para o grupo 01J3NCKY6Q99QC4D7T733D35QD; grupos criados por POST /decode ficam em memória.",
+  "group_id": "01J3NCKY6Q99QC4D7T733D35QD",
+  "items": [
+    {
+      "id": "01J3NCKY6Q99QC4D7T733D35QE",
+      "group_id": "01J3NCKY6Q99QC4D7T733D35QD",
+      "content": "34191123450000012345000003048720009224128213",
+      "amount": 123.45,
+      "description": "Agua Loja 1 11/2026",
+      "bank_code": "341",
+      "bank_name": "Itaú Unibanco",
+      "beneficiary_name": "Companhia de Saneamento do Paraná - SANEPAR",
+      "payer_name": "ANK Administradora Ltda",
+      "due_date": "2026-11-15",
+      "overdue": false,
+      "product_type": "BOLETO",
+      "status": "READ_DATA",
+      "transaction_date": "2026-11-12"
+    },
+    {
+      "id": "01J3NCKY6Q99QC4D7T733D35QF",
+      "group_id": "01J3NCKY6Q99QC4D7T733D35QD",
+      "content": "11222333000181",
+      "amount": 450,
+      "description": "Condominio Sala 2 11/2026",
+      "bank_code": "336",
+      "bank_name": "Banco C6",
+      "beneficiary_name": "Condomínio Edifício Exemplo",
+      "payer_name": "ANK Administradora Ltda",
+      "product_type": "PIX",
+      "status": "READ_DATA",
+      "transaction_date": "2026-11-12"
+    },
+    {
+      "id": "01J3NCKY6Q99QC4D7T733D35QG",
+      "group_id": "01J3NCKY6Q99QC4D7T733D35QD",
+      "content": "erro@exemplo.com.br",
+      "amount": 10,
+      "description": "Teste de chave inexistente",
+      "product_type": "PIX",
+      "status": "DECODE_ERROR",
+      "error_message": "It was not possible to find key: erro@exemplo.com.br",
+      "transaction_date": "2026-11-12"
+    }
+  ]
+}

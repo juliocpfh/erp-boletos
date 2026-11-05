@@ -1,0 +1,128 @@
+{
+  "_comentario": "Boletos fictícios no formato EXATO de GET /v2/bank_slips (bolepix.yaml, bank_slip_pix_list_response), por conta. Só a ANK emite boletos. O simulado pagina `content` sozinho conforme page/size e filtra pelas datas de payments[].",
+  "ank": {
+    "content": [
+      {
+        "id": "01HVSBSTN8CCTCTEQT6MC7TD4B",
+        "external_reference_id": "ANK0000000000000000000001A",
+        "amount": 1219.5,
+        "due_date": "2026-11-10",
+        "emission_date": "2026-10-25",
+        "description": "Aluguel 11/2026 - Loja 1",
+        "days_after_due_date": 30,
+        "status": "PAID",
+        "origin": "ERP",
+        "payment_method": {
+          "bank_slip": {
+            "originator_id": "000000304872",
+            "billing_scheme": "21",
+            "billing_type": "3",
+            "digitable_line": "33690.00009   03048.720001   92241.282133   5   96900000121950",
+            "bar_code": "33695969000000121950000003048720009224128213",
+            "our_number": "0000003048",
+            "number": "1"
+          },
+          "pix": {
+            "qr_code": "00020126580014BR.GOV.BCB.PIX0114123e4567-e89b-12d3-a456-4266141740005204000053039865404121.955802BR5909ANK ADMIN6008CURITIBA61088000000062070503***6304B14F",
+            "image_content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+            "mime_type": "image/png",
+            "reference": "123e4567-e89b-12d3-a456-426614174000"
+          }
+        },
+        "payer": {
+          "name": "Maria Exemplo",
+          "tax_id": "52998224725",
+          "email": "maria.exemplo@exemplo.com.br",
+          "address": { "address": "Rua das Flores, 100", "neighborhood": "Centro", "city": "Curitiba", "state": "PR", "zip_code": "80010000" }
+        },
+        "fees": { "fine_type": "PERCENTAGE", "fine_value": 2, "fine_deadline": 1, "interest_type": "MONTHLY_PERCENTAGE", "interest_value": 1, "interest_deadline": 1 },
+        "payments": [
+          { "amount": "1219.50", "external_payment_id": "01KVG41MYPFJRCJE4AVK9NCFQ1", "payment_date": "2026-11-03", "credit_date": "2026-11-03", "payment_type": "PIX" }
+        ]
+      },
+      {
+        "id": "01HVSBSTN8CCTCTEQT6MC7TD4C",
+        "external_reference_id": "ANK0000000000000000000002B",
+        "amount": 1800,
+        "due_date": "2026-11-10",
+        "emission_date": "2026-10-25",
+        "description": "Aluguel 11/2026 - Sala 2",
+        "days_after_due_date": 30,
+        "status": "PAID",
+        "origin": "ERP",
+        "payment_method": {
+          "bank_slip": {
+            "originator_id": "000000304872",
+            "billing_scheme": "21",
+            "billing_type": "3",
+            "digitable_line": "33690.00009   03048.720001   92241.282133   6   96900000180000",
+            "bar_code": "33696969000000180000000003048720009224128213",
+            "our_number": "0000003049",
+            "number": "2"
+          },
+          "pix": {
+            "qr_code": "00020126580014BR.GOV.BCB.PIX0114123e4567-e89b-12d3-a456-4266141740005204000053039865404180.005802BR5909ANK ADMIN6008CURITIBA61088000000062070503***6304C25A",
+            "image_content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+            "mime_type": "image/png",
+            "reference": "223e4567-e89b-12d3-a456-426614174001"
+          }
+        },
+        "payer": {
+          "name": "Pedro Exemplo",
+          "tax_id": "52998224725",
+          "address": { "address": "Av. Brasil, 200", "neighborhood": "Batel", "city": "Curitiba", "state": "PR", "zip_code": "80420000" }
+        },
+        "payments": [
+          { "amount": "1800.00", "external_payment_id": "01KVG41MYPFJRCJE4AVK9NCFQ2", "payment_date": "2026-11-13", "credit_date": "2026-11-16", "payment_type": "BANK_SLIP" }
+        ]
+      },
+      {
+        "id": "01HVSBSTN8CCTCTEQT6MC7TD4D",
+        "external_reference_id": "ANK0000000000000000000003C",
+        "amount": 950,
+        "due_date": "2026-11-10",
+        "emission_date": "2026-10-25",
+        "description": "Aluguel 11/2026 - Kitnet 3",
+        "days_after_due_date": 30,
+        "status": "WAITING_CONFIRMATION",
+        "origin": "ERP",
+        "payment_method": {
+          "bank_slip": {
+            "originator_id": "000000304872",
+            "billing_scheme": "21",
+            "billing_type": "3",
+            "digitable_line": "33690.00009   03048.720001   92241.282133   7   96900000095000",
+            "bar_code": "33697969000000095000000003048720009224128213",
+            "our_number": "0000003050",
+            "number": "3"
+          },
+          "pix": {
+            "qr_code": "00020126580014BR.GOV.BCB.PIX0114123e4567-e89b-12d3-a456-4266141740005204000053039865404950.005802BR5909ANK ADMIN6008CURITIBA61088000000062070503***6304D36B",
+            "image_content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+            "mime_type": "image/png",
+            "reference": "323e4567-e89b-12d3-a456-426614174002"
+          }
+        },
+        "payer": {
+          "name": "Empresa Exemplo Ltda",
+          "tax_id": "11222333000181",
+          "address": { "address": "Rua XV de Novembro, 300", "neighborhood": "Centro", "city": "Curitiba", "state": "PR", "zip_code": "80020000" }
+        },
+        "payments": [
+          { "amount": "950.00", "external_payment_id": "01KVG41MYPFJRCJE4AVK9NCFQ3", "payment_date": "2026-11-18", "payment_type": "BANK_SLIP" }
+        ]
+      }
+    ],
+    "total_elements": 3,
+    "total_pages": 1,
+    "page": 0,
+    "size": 20
+  },
+  "jck": {
+    "content": [],
+    "total_elements": 0,
+    "total_pages": 0,
+    "page": 0,
+    "size": 20
+  }
+}
