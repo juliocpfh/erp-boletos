@@ -13,6 +13,7 @@ import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens } from './admin.js';
+import { ACOES_BANCO } from './banco.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
@@ -1294,3 +1295,6 @@ export const ACOES = {
     await mostrar();
   },
 };
+
+// Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
+Object.assign(ACOES, ACOES_BANCO);

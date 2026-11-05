@@ -12,6 +12,7 @@ import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
 import { telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
+import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
@@ -291,6 +292,7 @@ export const TELAS = {
   resultados: (rota) => telaResultados(rota.q),
   impostos: (rota) => telaImpostos(rota.q.mes || C.competenciaDe(C.hojeIso())),
   contas: (rota) => telaContas(rota),
+  banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
   reajustes: (rota) => telaReajustes(rota.q),
   calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
