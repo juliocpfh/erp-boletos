@@ -13,7 +13,8 @@ export const TABELAS = {
   devolucoes_garantia: 'Devolução da garantia (troca de titular)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -131,6 +132,19 @@ export function normalizar(d) {
     if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== 'Indeterminado' && c.vigencia_fim === C.fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses)
       && !d.renovacoes.some((x) => x.contrato_id === c.id)) c.vigencia_fim = fim;
   }
+  // Banco (C6), fase 2: extrato, conciliação e pagamentos. Só acrescenta os campos novos da configuração (os da base ficam como estão).
+  d.config_banco = d.config_banco || {};
+  for (const [k, v] of Object.entries(CONFIG_BANCO_FASE2)) if (d.config_banco[k] === undefined) d.config_banco[k] = typeof v === 'object' && v ? { ...v } : v;
+  if (!d.config_banco.ultima_importacao || typeof d.config_banco.ultima_importacao !== 'object') d.config_banco.ultima_importacao = {};
+  for (const m of d.movimentacoes_banco) {
+    if (m.classificacao === undefined) m.classificacao = null;
+    if (m.valor < 0) { m.valor = -m.valor; m.tipo = 'saida'; }
+    for (const k of ['imovel_id', 'despesa_id', 'cobranca_id', 'iptu_id', 'iptu_parcela', 'guia_imposto_id', 'pagamento_banco_id', 'par_movimentacao_id', 'nome_arquivo', 'comprovante', 'comprovante_contador', 'comprovante_origem']) if (m[k] === undefined) m[k] = null;
+  }
+  for (const p of d.pagamentos_banco) if (!p.referencia) p.referencia = `erp-${p.id}`;
+  // despesa ou boleto ligado a uma movimentação que sumiu (ex.: importação refeita) perde o vínculo
+  for (const x of d.despesas) if (x.movimentacao_id && !d.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
+  for (const x of d.cobrancas) if (x.movimentacao_id && !d.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
   return d;
 }
 
@@ -298,7 +312,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos']);
+const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 const textoComparar = (x) => (x === undefined || x === null ? '' : typeof x === 'object' ? JSON.stringify(x) : String(x));
 
@@ -1197,7 +1211,11 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
-    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null }, usuario, 'Pagamento desfeito');
+    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null }, usuario, 'Pagamento desfeito');
+  // confirmado pelo extrato: a movimentação volta a "sem destino"
+  for (const m of (d.movimentacoes_banco || []).filter((x) => x.cobranca_id === Number(cobrancaId))) {
+    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -2851,6 +2869,15 @@ export function arquivosReferenciados(d) {
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
+  // comprovantes do banco: na pasta do imóvel (Contas pagas/<ano> ou IPTU (guias)/<ano>) e na pasta do contador
+  for (const t of ['movimentacoes_banco', 'pagamentos_banco']) {
+    for (const m of d[t] || []) {
+      const p = pastaDoComprovante(d, m);
+      if (p) usa(p.escopo, p.id, m.comprovante);
+      const c = pastaContador(d, m);
+      if (c) usa(c.escopo, c.id, m.comprovante_contador);
+    }
+  }
   return out;
 }
 
@@ -2903,6 +2930,15 @@ export function rotulosDosArquivos(d) {
   for (const s of d.seguros) {
     poe('seguro', s.contrato_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
     for (const nome of s.outros_arquivos || []) poe('seguro', s.contrato_id, nome, `outro arquivo da apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
+  }
+  for (const t of ['movimentacoes_banco', 'pagamentos_banco']) {
+    for (const x of d[t] || []) {
+      const p = pastaDoComprovante(d, x);
+      const c = pastaContador(d, x);
+      const rotulo = rotuloDoComprovante(d, x);
+      if (p) poe(p.escopo, p.id, x.comprovante, rotulo);
+      if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d, x.conta_id)} ${C.compBr(competenciaDoComprovante(x))}) · ${rotulo}`);
+    }
   }
   return m;
 }
@@ -3108,6 +3144,8 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     if (i.verificar) lista.push({ nivel: 'aviso', tipo: 'A verificar', texto: i.verificar, imovel_id: i.id, imovel: i.nome, inquilino: '' });
   }
   lista.push(...alertasIptu(d, hoje));
+  const banco = alertaBanco(d, hoje);
+  if (banco) lista.push(banco);
   for (const x of inadimplencia(d, hoje).devedores) {
     const i = buscar(d, 'imoveis', x.contrato.imovel_id);
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
@@ -3121,7 +3159,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
-  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'A verificar'];
+  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
@@ -3443,6 +3481,12 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
       detalhe: cartas.length ? `${cartas.length} carta(s) a enviar${cartas.some((r) => !r.corrigido) ? `, ${cartas.filter((r) => !r.corrigido).length} ainda sem correção` : ''}` : 'nenhuma carta pendente', link: '#/reajustes' },
     { chave: 'pagamentos', titulo: `Conferir os pagamentos dos boletos de ${C.compBr(comp)}`, pendentes: emAberto.length,
       detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
+    ...(d.config_banco && d.config_banco.ativo ? [(() => {
+      const b = pendenciasBancoDoMes(d, mes, hoje);
+      return { chave: 'banco', titulo: `Conferir o extrato de ${C.compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(' e ') || 'banco'}) e dar destino às movimentações`,
+        pendentes: b.semDestino + b.contasSemImportar.length, link: `#/banco?mes=${mes}`, contas: b.porConta,
+        detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? 'extrato ainda não buscado' : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ') : 'nenhuma conta configurada' };
+    })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
     (() => {
@@ -3976,4 +4020,111 @@ export function salvarGuiaImposto(d, emitenteId, imposto, periodo, valor, usuari
   if (valor === null) { if (atual) excluir(d, 'guias_impostos', atual.id, usuario, `${texto}: valor do contador apagado`); return; }
   if (atual) atualizar(d, 'guias_impostos', atual.id, { valor }, usuario, `${texto}: ${C.reais(valor)}`);
   else inserir(d, 'guias_impostos', { emitente_id: emitenteId, imposto, periodo, valor }, usuario, `${texto}: ${C.reais(valor)}`);
+}
+
+// --------------------------------------------------------------------------
+// Banco (C6), fase 2: extrato, comprovantes e pagamentos. Aqui fica só o que normalizar, arquivosReferenciados,
+// etapasFechamento e todosAlertas precisam; as regras de conciliação estão em conciliacao.js (que importa este arquivo).
+// --------------------------------------------------------------------------
+/** Campos novos de config_banco (os da base — ativo, provedor, ponte_url, senha_ponte, conta_padrao_id, contas — ficam como estão). */
+export const CONFIG_BANCO_FASE2 = {
+  pasta_contador: '_Contador', modelo_nome_comprovante: '{data} {empresa} {imovel} {tipo} {valor}', tolerancia_dias: 3,
+  permitir_pagamentos: false, limite_pagamento: 0, ultima_importacao: {}, copiar_para_contador: true,
+};
+/** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
+export const DIAS_ALERTA_BANCO = 7;
+
+/** Id da pasta "<Imóvel>/Contas pagas/<ano>" (escopo contasano) e "<Imóvel>/IPTU (guias)/<ano>" (iptuano): igual a idGuiasDoAno. */
+export const idPastaAno = (imovelId, ano) => Number(imovelId) * 10000 + Number(ano);
+/** Id da pasta "_Contador/<Empresa>/<AAAA-MM>" (escopo contador). Ex.: empresa 1, '2026-11' → 1202611. */
+export const idContador = (emitenteId, comp) => Number(emitenteId) * 1000000 + Number(String(comp).replace('-', ''));
+export const decodificarIdContador = (id) => {
+  const resto = String(Number(id) % 1000000).padStart(6, '0');
+  return { emitenteId: Math.floor(Number(id) / 1000000), comp: `${resto.slice(0, 4)}-${resto.slice(4)}` };
+};
+
+export const contaBancaria = (d, contaId) => ((d.config_banco || {}).contas || []).find((c) => c.id === contaId) || null;
+export const apelidoDaConta = (d, contaId) => {
+  const c = contaBancaria(d, contaId);
+  if (!c) return String(contaId || '').toUpperCase();
+  const e = c.emitente_id ? buscar(d, 'emitentes', c.emitente_id) : null;
+  return c.apelido || (e ? e.nome.split(' ')[0] : String(contaId).toUpperCase());
+};
+/** Mês do comprovante para a pasta do contador: competência da conta ou mês da data. */
+export const competenciaDoComprovante = (x) => (x.competencia && /^\d{4}-\d{2}$/.test(x.competencia) ? x.competencia : String(x.data || x.pago_em || x.data_pagamento || '').slice(0, 7)) || C.hojeIso().slice(0, 7);
+
+/**
+ * Onde fica o PDF do comprovante no imóvel: IPTU → "IPTU (guias)/<ano do IPTU>" (iptuano); com imóvel → "Contas pagas/<ano da data>"
+ * (contasano); sem imóvel → null (só na pasta do contador). Vale para movimentações e pagamentos pelo banco.
+ */
+export function pastaDoComprovante(d, x) {
+  const iptuId = x.iptu_id || (x.origem && x.origem.tipo === 'iptu' ? x.origem.id : null);
+  if (iptuId) {
+    const p = buscar(d, 'iptus', iptuId);
+    if (p) return { escopo: 'iptuano', id: idPastaAno(p.imovel_id, p.ano) };
+  }
+  if (!x.imovel_id) return null;
+  const data = x.data || x.pago_em || x.data_pagamento || C.hojeIso();
+  return { escopo: 'contasano', id: idPastaAno(x.imovel_id, String(data).slice(0, 4)) };
+}
+
+/** Pasta do contador ("_Contador/<Empresa>/<AAAA-MM>") da conta bancária da movimentação, ou null se a conta não tem empresa. */
+export function pastaContador(d, x) {
+  const c = contaBancaria(d, x.conta_id);
+  if (!c || !c.emitente_id) return null;
+  return { escopo: 'contador', id: idContador(c.emitente_id, competenciaDoComprovante(x)) };
+}
+
+/** Etiqueta do comprovante na caixa de arquivos: "comprovante do banco ANK: Água 11/2026 (05/11/2026, R$ 123,45)". */
+export function rotuloDoComprovante(d, x) {
+  const conta = apelidoDaConta(d, x.conta_id);
+  const data = x.data || x.pago_em || x.data_pagamento;
+  const valor = C.reais(x.valor);
+  if (x.origem) return `comprovante do pagamento pelo banco ${conta}: ${x.tipo_conta || 'conta'} ${C.compBr(x.competencia || competenciaDoComprovante(x))} (${data ? C.dataBr(data) : 'a pagar'}, ${valor})`;
+  let oque = x.descricao || '';
+  if (x.classificacao === 'conta_imovel') { const de = x.despesa_id ? buscar(d, 'despesas', x.despesa_id) : null; oque = de ? `${de.tipo} ${C.compBr(de.competencia)}` : 'conta do imóvel'; }
+  else if (x.classificacao === 'boleto') { const cb = x.cobranca_id ? buscar(d, 'cobrancas', x.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; oque = `aluguel${c ? ` de ${c.inquilino_nome}` : ''}${cb ? ` (${C.compBr(cb.competencia)})` : ''}`; }
+  else if (x.classificacao === 'iptu') { const p = x.iptu_id ? buscar(d, 'iptus', x.iptu_id) : null; oque = `IPTU${p ? ` ${p.ano}` : ''} ${x.iptu_parcela ? `${x.iptu_parcela}ª parcela` : 'cota única'}`; }
+  else if (x.classificacao === 'imposto') oque = 'imposto da empresa';
+  else if (x.classificacao === 'tarifa') oque = 'tarifa do banco';
+  else if (x.classificacao === 'transferencia') oque = 'transferência entre as contas';
+  return `comprovante do banco ${conta}: ${oque} (${data ? `${C.dataBr(data)}, ` : ''}${valor})`;
+}
+
+/**
+ * Pendências do banco no mês (para o fechamento e os alertas): movimentações sem destino, sem comprovante, contas cujo extrato
+ * ainda não foi buscado até o fim do mês (ou até hoje) e pagamentos enviados sem confirmação.
+ */
+export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
+  const cfg = d.config_banco || {};
+  const contas = cfg.contas || [];
+  const fim = C.limitesCompetencia(mes)[1];
+  const ate = fim < hoje ? fim : hoje;
+  const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
+  const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
+  const porConta = contas.map((c) => {
+    const importadoAte = (cfg.ultima_importacao || {})[c.id] || null;
+    return { id: c.id, apelido: apelidoDaConta(d, c.id), semDestino: semDestinoDe(c.id), importadoAte, semImportar: !importadoAte || importadoAte < ate };
+  });
+  const semComprovante = movs.filter((m) => m.classificacao && !['ignorar', 'transferencia'].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador).length;
+  const pagamentosPendentes = (d.pagamentos_banco || []).filter((p) => ['aguardando_aprovacao', 'agendado', 'erro'].includes(p.situacao)).length;
+  return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
+}
+
+/** Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias e pagamentos enviados sem confirmação. Só com o banco ligado. */
+export function alertaBanco(d, hoje = C.hojeIso()) {
+  const cfg = d.config_banco || {};
+  if (!cfg.ativo) return null;
+  const limite = C.somarDias(hoje, -DIAS_ALERTA_BANCO);
+  const semDestino = (d.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
+  const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && !['ignorar', 'transferencia'].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador && m.data <= limite);
+  const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
+  const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
+  if (!semDestino.length && !semComprovante.length && !enviados.length && !erros.length) return null;
+  const partes = [];
+  if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
+  if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
+  if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago`);
+  if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
+  return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
 }
