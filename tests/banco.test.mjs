@@ -30,7 +30,7 @@ test('o mapa da API é o mesmo no site e na ponte', () => {
 test('normalizar cria config_banco com contas e o campo banco nos boletos antigos', () => {
   const d = { formato: 'imoveis-v1', cobrancas: [{ id: 1, contrato_id: 1, competencia: '2026-02', vencimento: '2026-03-10', aluguel: 1000, desconto: 0 }], contratos: [], imoveis: [] };
   R.normalizar(d);
-  assert.deepEqual(d.config_banco, { ...R.CONFIG_BANCO_PADRAO, contas: [] });
+  assert.deepEqual(d.config_banco, { ...R.CONFIG_BANCO_PADRAO, ...R.CONFIG_BANCO_FASE2, contas: [] }); // base + campos da fase 2
   assert.equal(d.cobrancas[0].banco, null);
   // senha e endereço da ponte gravados por uma versão anterior saem do JSON compartilhado
   d.config_banco.senha_ponte = 'segredo'; d.config_banco.ponte_url = 'http://x';

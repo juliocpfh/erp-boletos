@@ -472,7 +472,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   R.normalizar(d);
   assert.deepEqual([d.config_banco.pasta_contador, d.config_banco.modelo_nome_comprovante, d.config_banco.tolerancia_dias, d.config_banco.permitir_pagamentos, d.config_banco.limite_pagamento, d.config_banco.ultima_importacao, d.config_banco.copiar_para_contador],
     ['_Contador', '{data} {empresa} {imovel} {tipo} {valor}', 5, false, 0, {}, true]);
-  assert.deepEqual([d.config_banco.ativo, d.config_banco.ponte_url, d.config_banco.contas.length], [true, 'http://x', 1]);
+  assert.deepEqual([d.config_banco.ativo, d.config_banco.ponte_url, d.config_banco.contas.length], [true, undefined, 1], 'endereço e senha da ponte não ficam no banco compartilhado');
   assert.deepEqual([d.movimentacoes_banco[0].valor, d.movimentacoes_banco[0].tipo, d.movimentacoes_banco[0].classificacao, d.movimentacoes_banco[0].comprovante], [1000, 'saida', null, null]);
   assert.equal(d.pagamentos_banco[0].referencia, 'erp-1');
   assert.equal(d.despesas[0].movimentacao_id, null, 'movimentação que sumiu: a conta perde o vínculo');
