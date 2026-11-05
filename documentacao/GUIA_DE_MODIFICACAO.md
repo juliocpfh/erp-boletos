@@ -50,6 +50,18 @@
 | PDF/impressão | Tipo novo em `telaImprimir` + CSS de `@media print` em `docs/css/estilo.css`; botão "Baixar PDF": `ACOES.baixarPdfTela` (seletor + nome de `nomeArquivoDoc`) |
 | Documento Word | Blocos de `contratos.js` + `contratoDocx` (ex.: `documentoMontado` em `telas/documentos.js`) |
 
+## Ligar o boleto com Pix do C6 (quando as chaves chegarem)
+Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilitados com a explicação até a configuração ficar completa. Passo a passo, em ordem:
+1. **Pedir ao C6**: o titular de cada conta (ANK e JCK) gera no Web Banking → perfil → "Integrações via API" → "Nova chave" o `client_id`, o `client_secret` e o par certificado/chave (`.crt` + `.key`), com permissão de boleto (escopos `v2.bankslip.read`, `v2.bankslip.write`, `v2.bankslip.pix.write`). Primeiro vêm as chaves de **sandbox** (teste: boletos sem valor, só seg–sex 7h–22h); as de produção vêm depois da homologação. A chave Pix usada no QR Code é uma **chave aleatória** cadastrada na conta.
+2. **Instalar a ponte**: copie a pasta `ponte-c6` para o computador que emite (precisa do Node.js 20+). Copie `.env.exemplo` para `.env`, defina `PONTE_SENHA`, `CONTAS=ank,jck` e deixe `SIMULADO=1` por enquanto. Rode `node servidor.mjs`.
+3. **No site**, como administrador: Dados e backup → "Banco (C6) — boleto com Pix": endereço `http://localhost:8765` e a mesma senha (os dois ficam **só neste computador**, no navegador; repita em cada computador que vai emitir), **Testar conexão** (deve responder "modo simulado"). Cadastre as contas (uma por empresa, identificador igual ao do `.env`; ambiente sandbox; chave Pix; avisos ao inquilino; negativação se quiser) e marque **Integração ativa**. Em Empresas, confira "Emissão de boletos no banco" (padrão: sempre pela ANK; ou escolher boleto a boleto).
+4. **Treinar em modo simulado**: tela Boletos → "Emitir no C6" num boleto → aparecem linha digitável, Pix copia-e-cola e QR Code fictícios; "Simular pagamento (teste)" e depois "Consultar situação no banco" propõem registrar o pagamento. Nada vai ao banco.
+5. **Colocar as chaves**: na ponte, pasta `contas/ank/` (e `contas/jck/`): `client_id.txt`, `client_secret.txt`, `certificado.crt`, `chave.key`, `ambiente.txt` = `sandbox`. Troque `SIMULADO=0` no `.env` e reinicie a ponte. "Testar conexão" deve mostrar "chaves ok · token ok" e os escopos; se faltar escopo, o aviso aparece ali.
+6. **Primeiro boleto de teste no sandbox**: emita um boleto de um contrato de teste e confira: valor cheio, desconto até o vencimento (`first_discount_value`; se o banco recusar o `discount_type`, troque o "Tipo do desconto na API" da conta), multa e juros em %, avisos ao pagador. Cada chamada fica registrada em `ponte-c6/registros/`; `node servidor.mjs --roteiro` imprime o status e a resposta de cada teste do "Roteiro de Testes – C6 Developers v3.0" (AT_01, BP_01…BP_06) para enviar a `homologacaoapi@c6bank.com`.
+7. **Produção**: com as chaves de produção, crie `contas/<id>/ambiente.txt` = `producao` (ou edite a conta no site para "Produção"), teste a conexão e emita o primeiro boleto real num valor pequeno. A carteira é automática (15 produção / 21 sandbox).
+8. **Rotina**: "Emitir no C6 todos em aberto do mês" depois de gerar os boletos; "Conferir pagamentos no banco" alguns dias depois do vencimento (lista os pagos no banco e propõe registrar cada um, com a data de crédito como data contábil). O webhook do banco é opcional (precisa de endereço público; sem ele a conferência resolve).
+Onde ajustar se a API mudar: `docs/js/mapa-c6.js` (e copiar para `ponte-c6/mapa-c6.mjs`). Formato oficial resumido em `documentacao/C6_CAMPOS_CONFIRMADOS.md`.
+
 ## Checklist antes de alterar
 - [ ] Ler a função e os testes da área (`tests/*.test.mjs`).
 - [ ] Achar o trecho com `node tools/mapa.mjs <trecho>` e ler só ele.
@@ -66,6 +78,7 @@
 | Regra de boleto | `regras.js` (`montarCobranca`, `CAMPOS_RECALCULO`) + `calculos.js` + `tests/regras.test.mjs` |
 | Tela nova | arquivo do assunto em `telas/` + `telas.js` (`TELAS`) + `app.js` (`MENU`) + `estilo.css` |
 | Qualquer mudança em `docs/js` | `docs/offline/administracao-imoveis.html` (gerado) |
+| Campo ou caminho da API do C6 | `docs/js/mapa-c6.js` + cópia idêntica `ponte-c6/mapa-c6.mjs` + `tests/banco.test.mjs`/`tests/ponte-c6.test.mjs` |
 
 ## Convenções
 | Item | Padrão observado no código |

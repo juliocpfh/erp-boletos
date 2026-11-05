@@ -8,7 +8,8 @@
 - Emite documentos: contrato por modelo, vistoria, recibo de chaves, carta de reajuste, demonstrativo do boleto e termos aditivos de troca do vencimento e de troca de inquilino (tela, "Baixar PDF" e Word, com nome "Documento Imóvel - Inquilino - ano").
 - Mostra alertas, calendário, fechamento do mês, inadimplência, resultados financeiros por imóvel e a guia de impostos esperada por empresa.
 - O administrador muda a ordem das caixas de cada página (ícone ☰, todos veem); Dados e backup baixa todos os dados em planilha e PDF e as regras do sistema em TXT.
-- Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor.
+- Emite boletos com QR Code Pix direto no C6 pela API (em preparação: aguardando as chaves), por meio da ponte `ponte-c6/` que roda no computador do usuário; a consulta ao banco propõe registrar o pagamento, sempre com confirmação.
+- Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive). Não há servidor (a ponte do C6 é um programinha local, opcional).
 
 ## Módulos (`docs/js/`)
 | Arquivo | Função |
@@ -23,6 +24,8 @@
 | `modelos-contrato.js` | Textos padrão dos contratos (residencial e não residencial) e do aditivo de vencimento (`tipo: 'aditivo'`) |
 | `fatura.js` | Desenho da NF (HTML) e preenchimento do Excel a partir do modelo |
 | `alertas.js` | Alertas de seguro, reserva e vigência (o do reajuste é de `regras.js`) |
+| `banco.js` | Cliente da ponte do C6 (`chamarPonte(d, contaId, método, caminho, corpo)`, `emitirBoleto`, `consultarBoleto`, `cancelarBoleto`, `alterarBoleto`, `listarBoletos`, `negativarBoleto`, `saudePonte`); não grava nada |
+| `mapa-c6.js` | Caminhos, nomes dos campos e situações da API Bolepix v2 do C6 (igual a `ponte-c6/mapa-c6.mjs`) |
 | `caixas.js` | Ordem das caixas e setores de cada página (arrastar pelo ícone ☰, só administrador) |
 | `exportar.js` | Todos os dados numa planilha Excel e num PDF (sem senhas e anexos) |
 | `regras-texto.js` | `REGRAS_TEXTO`: as regras de negócio em texto objetivo, baixado em Dados e backup (TXT) |
