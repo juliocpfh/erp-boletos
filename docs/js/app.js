@@ -63,14 +63,16 @@ async function abrirSessao(u) {
   await alterar((db) => {
     const x = db.usuarios.find((y) => y.id === u.id);
     if (x) x.sessoes = [...(x.sessoes || []), token].slice(-MAX_SESSOES);
-  });
+  }, { soSessao: true });
   E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
   gravarSessao(u.login, token);
 }
 
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
-window.addEventListener('storage', (ev) => {
+window.addEventListener('storage', async (ev) => {
   if (ev.key !== SESSAO || !E.d) return;
+  // a outra aba acabou de gravar o token novo no banco: relê o disco antes de conferir
+  try { E.d = (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
   const u = usuarioDaSessao();
   if ((u && u.login) !== (E.usuario && E.usuario.login)) {
     E.usuario = u;
@@ -84,24 +86,29 @@ export const podeUsuario = (papel) => pode(E.usuario, papel);
 // --------------------------------------------------------------------------
 let filaGravacao = Promise.resolve();
 /** Uma gravação de cada vez: duas ao mesmo tempo (duplo clique, arrumações do Painel) sobrescreveriam uma à outra. */
-export function alterar(fn) {
-  const minha = filaGravacao.then(() => alterarAgora(fn));
+export function alterar(fn, opcoes = {}) {
+  const minha = filaGravacao.then(() => alterarAgora(fn, opcoes));
   filaGravacao = minha.catch(() => {});
   return minha;
 }
 
 export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${S.ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
 
-async function alterarAgora(fn) {
+/** A última gravação do arquivo foi só de entrada/saída de usuário (token de sessão): não é uma alteração dos dados. */
+const soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
+
+async function alterarAgora(fn, { soSessao = false } = {}) {
   const disco = await S.lerBanco(E.pasta);
   if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
+    const avisar = !soSessaoNoDisco(disco);
     E.d = disco;
-    aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
+    if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
   const copia = structuredClone(E.d || disco);
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
+  copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
   if (E.seguro && E.seguro.chave) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, copia));
@@ -175,9 +182,11 @@ async function verificarMudancasExternas() {
   try {
     const disco = await S.lerBanco(E.pasta);
     if (disco && disco.revisao !== E.d.revisao) {
+      const soSessao = soSessaoNoDisco(disco);
       E.d = disco;
       renovarUsuario();
       atualizarFaixa();
+      if (soSessao) return; // alguém só entrou ou saiu: nada mudou nos dados
       const editando = document.querySelector('main form[data-form]');
       if (editando) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
       else await mostrar();
@@ -362,7 +371,7 @@ export async function sair() {
   gravarSessao(null);
   ir('#/');
   // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
-  if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }).catch(() => {});
+  if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }, { soSessao: true }).catch(() => {});
 }
 
 // --------------------------------------------------------------------------
@@ -464,7 +473,11 @@ async function montarExtras(raiz) {
   for (const tabela of raiz.querySelectorAll('table.responsiva')) {
     const cabecalho = [...tabela.querySelectorAll('tr:first-child th')].map((th) => th.textContent.trim());
     for (const tr of tabela.querySelectorAll('tr')) {
-      [...tr.children].forEach((td, k) => { if (td.tagName === 'TD' && cabecalho[k] && !td.dataset.rotulo) td.dataset.rotulo = cabecalho[k]; });
+      let k = 0;
+      for (const td of tr.children) {
+        if (td.tagName === 'TD' && cabecalho[k] && !td.dataset.rotulo && (td.colSpan || 1) === 1) td.dataset.rotulo = cabecalho[k];
+        k += td.colSpan || 1;
+      }
     }
   }
   for (const caixa of raiz.querySelectorAll('.rolagem')) caixa.classList.toggle('tem-rolagem', caixa.scrollWidth > caixa.clientWidth + 2);

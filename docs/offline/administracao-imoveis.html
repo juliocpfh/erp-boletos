@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="fontes" content="dd741f61f0996ef6">
+<meta name="fontes" content="cb9a106c796ebf64">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -7877,7 +7877,7 @@ ${JSON.stringify(cabecalho)}
       }
     }
     if (apagados.length) await alterar((db) => apagados.forEach((a) => registrar(db, login(), "Exclusão", "arquivos", null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
-    if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(", ")}. O arquivo pode estar aberto ou sendo sincronizado; apague depois em Dados e backup ("Limpar anexos soltos").`, "aviso");
+    if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(", ")}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, "aviso");
     return apagados.length;
   }
   async function alterarApagandoAnexos(fn) {
@@ -12084,7 +12084,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (!Array.isArray(v)) continue;
     for (const c of v) if (c && c.nome && c.rotulo && !CAMPOS.has(c.nome)) CAMPOS.set(c.nome, { tipo: c.tipo });
   }
-  var SECRETO = /senha|hash|(^|_)sal$/;
+  var SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
   var DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia)(_|$)/;
   var NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs)$/;
   var ehDinheiro = (nome) => CAMPOS.has(nome) ? CAMPOS.get(nome).tipo === "dinheiro" : DINHEIRO.test(nome) && !NAO_DINHEIRO.test(nome);
@@ -14553,12 +14553,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     await alterar((db) => {
       const x = db.usuarios.find((y) => y.id === u.id);
       if (x) x.sessoes = [...x.sessoes || [], token].slice(-MAX_SESSOES);
-    });
+    }, { soSessao: true });
     E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
     gravarSessao(u.login, token);
   }
-  window.addEventListener("storage", (ev) => {
+  window.addEventListener("storage", async (ev) => {
     if (ev.key !== SESSAO || !E.d) return;
+    try {
+      E.d = await lerBanco(E.pasta) || E.d;
+    } catch {
+    }
     const u = usuarioDaSessao();
     if ((u && u.login) !== (E.usuario && E.usuario.login)) {
       E.usuario = u;
@@ -14567,23 +14571,26 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   });
   var podeUsuario = (papel) => pode(E.usuario, papel);
   var filaGravacao = Promise.resolve();
-  function alterar(fn) {
-    const minha = filaGravacao.then(() => alterarAgora(fn));
+  function alterar(fn, opcoes = {}) {
+    const minha = filaGravacao.then(() => alterarAgora(fn, opcoes));
     filaGravacao = minha.catch(() => {
     });
     return minha;
   }
   var ERRO_ARQUIVO_SUMIU = `O arquivo ${ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
-  async function alterarAgora(fn) {
+  var soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
+  async function alterarAgora(fn, { soSessao = false } = {}) {
     const disco = await lerBanco(E.pasta);
     if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
     if (disco && E.d && disco.revisao !== E.d.revisao) {
+      const avisar = !soSessaoNoDisco(disco);
       E.d = disco;
-      aviso(`Os dados foram atualizados por ${disco.atualizado_por || "outra pessoa"} e recarregados antes de gravar.`, "info");
+      if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || "outra pessoa"} e recarregados antes de gravar.`, "info");
     }
     const copia = structuredClone(E.d || disco);
     const resultado = fn(copia);
     copia.revisao = (copia.revisao || 0) + 1;
+    copia.revisao_so_sessao = soSessao ? copia.revisao : null;
     await gravarBanco(E.pasta, copia);
     E.d = copia;
     if (E.seguro && E.seguro.chave) naFilaSegura(() => espelhar(E.seguro.dir, E.seguro.chave, copia));
@@ -14648,9 +14655,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     try {
       const disco = await lerBanco(E.pasta);
       if (disco && disco.revisao !== E.d.revisao) {
+        const soSessao = soSessaoNoDisco(disco);
         E.d = disco;
         renovarUsuario();
         atualizarFaixa();
+        if (soSessao) return;
         const editando = document.querySelector("main form[data-form]");
         if (editando) aviso(`${disco.atualizado_por || "Outra pessoa"} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, "info");
         else await mostrar();
@@ -14819,7 +14828,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (s && u) await alterar((db) => {
       const x = db.usuarios.find((y) => y.id === u.id);
       if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token);
-    }).catch(() => {
+    }, { soSessao: true }).catch(() => {
     });
   }
   function rotaAtual() {
@@ -14919,9 +14928,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     for (const tabela of raiz.querySelectorAll("table.responsiva")) {
       const cabecalho = [...tabela.querySelectorAll("tr:first-child th")].map((th) => th.textContent.trim());
       for (const tr of tabela.querySelectorAll("tr")) {
-        [...tr.children].forEach((td, k) => {
-          if (td.tagName === "TD" && cabecalho[k] && !td.dataset.rotulo) td.dataset.rotulo = cabecalho[k];
-        });
+        let k = 0;
+        for (const td of tr.children) {
+          if (td.tagName === "TD" && cabecalho[k] && !td.dataset.rotulo && (td.colSpan || 1) === 1) td.dataset.rotulo = cabecalho[k];
+          k += td.colSpan || 1;
+        }
       }
     }
     for (const caixa of raiz.querySelectorAll(".rolagem")) caixa.classList.toggle("tem-rolagem", caixa.scrollWidth > caixa.clientWidth + 2);

@@ -302,7 +302,7 @@ export async function apagarAnexos(lista, motivo) {
     }
   }
   if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
-  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; apague depois em Dados e backup ("Limpar anexos soltos").`, 'aviso');
+  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, 'aviso');
   return apagados.length;
 }
 
