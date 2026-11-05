@@ -2,6 +2,14 @@
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
 
+/**
+ * Erro "do usuário": o que ele digitou ou pediu não serve (senha errada, valor acima do limite, código de barras curto).
+ * A tela mostra a mensagem como qualquer erro, mas não registra no console (não é defeito do programa).
+ */
+export class ErroUsuario extends Error {
+  constructor(mensagem) { super(mensagem); this.name = 'ErroUsuario'; this.esperado = true; }
+}
+
 /** Arredonda para o inteiro mais próximo, meio para cima (também para negativos). */
 export function arred(x) {
   const s = x < 0 ? -1 : 1;

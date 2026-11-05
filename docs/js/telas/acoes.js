@@ -100,6 +100,10 @@ async function escolherContaC6(cb, lote = '') {
   return R.contaBanco(d(), String((resp.conta || [])[0] || ''));
 }
 
+/** A conta tem chave Pix no site, mas o boleto veio sem o Pix: a ponte não tem a chave (C6_<CONTA>_CHAVE_PIX). Texto do aviso ou ''. */
+const avisoSemPix = (conta, banco) => (conta && conta.chave_pix && !banco.pix_copia_cola && banco.situacao !== 'erro'
+  ? `O boleto saiu sem o Pix: a ponte não tem a chave Pix desta conta (C6_${String(conta.id).toUpperCase()}_CHAVE_PIX). O inquilino paga só pela linha digitável.` : '');
+
 /** Chama a ponte e grava a resposta no boleto; em falha do banco, grava o erro no boleto e repassa a mensagem. */
 async function emitirNoC6(cb, conta) {
   let r;
@@ -1409,6 +1413,7 @@ export const ACOES = {
     if (!conta) return;
     const banco = await emitirNoC6(cb, conta);
     aviso(`Boleto emitido no C6 pela conta ${conta.apelido}${banco.ambiente === 'sandbox' ? ' (sandbox: teste, não vale como cobrança)' : ''}. Linha digitável: ${banco.linha_digitavel || '-'}`, banco.ambiente === 'sandbox' ? 'aviso' : 'ok');
+    if (avisoSemPix(conta, banco)) aviso(avisoSemPix(conta, banco), 'aviso');
     await mostrar();
   },
 
@@ -1421,20 +1426,23 @@ export const ACOES = {
     let emitidos = 0;
     // modo "escolher": os boletos de imóvel com uma só empresa usam a conta dela; para os outros, pergunta uma vez
     const semConta = lista.filter((cb) => !R.contaSugerida(d(), cb));
-    const contaDoLote = semConta.length ? await escolherContaC6(null, `${semConta.length} boleto(s) sem empresa definida pelo imóvel.`) : null;
+    const contaDoLote = semConta.length ? await escolherContaC6(null, `${semConta.length} boleto(s) em aberto do mês: escolha a empresa que emite o lote.`) : null;
     if (semConta.length && !contaDoLote) return;
     const usadas = new Set();
+    const semPix = [];
     for (const cb of lista) {
       try {
         const conta = R.contaSugerida(d(), cb) || contaDoLote;
         usadas.add(conta.apelido);
-        await emitirNoC6(buscar('cobrancas', cb.id), conta);
+        const banco = await emitirNoC6(buscar('cobrancas', cb.id), conta);
+        if (avisoSemPix(conta, banco)) semPix.push(conta);
         emitidos += 1;
       } catch (e) {
         falhas.push(`${buscar('contratos', cb.contrato_id).inquilino_nome}: ${e.message}`);
       }
     }
     aviso(`${emitidos} boleto(s) emitido(s) no C6${usadas.size ? ` pela(s) conta(s) ${[...usadas].join(', ')}` : ''}.${falhas.length ? ` ${falhas.length} falharam: ${falhas.join(' · ')}` : ''}`, falhas.length ? 'aviso' : 'ok');
+    if (semPix.length) aviso(`${semPix.length} boleto(s) saiu(íram) sem o Pix: a ponte não tem a chave Pix da(s) conta(s) ${[...new Set(semPix.map((c) => `C6_${String(c.id).toUpperCase()}_CHAVE_PIX`))].join(', ')}.`, 'aviso');
     await mostrar();
   },
 

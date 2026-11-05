@@ -28,8 +28,8 @@ const pastaContador = () => config().pasta_contador || PASTA_CONTADOR;
 const rotuloDe = (lista, id) => lista[id] || id;
 /** Nome curto da classificação para as etiquetas da tabela (o nome completo fica na janela "Dar destino"). */
 const ROTULO_CURTO = { boleto: 'Boleto nosso', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', outro: 'Outro', ignorar: 'Ignorada' };
-/** Destinos que não precisam de comprovante (igual a conciliacao.js: ignorada e transferência entre as nossas contas). */
-const SEM_COMPROVANTE = ['ignorar', 'transferencia'];
+/** Destinos que não precisam de comprovante (igual a conciliacao.js: só a ignorada; a transferência entre as nossas contas tem um PDF só, na pasta do contador da conta de origem). */
+const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
 const SEM_IMOVEL = ['tarifa', 'transferencia', 'ignorar', 'imposto'];
 const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -148,24 +148,19 @@ function destinoHtml(m, sugestao) {
 // Comprovantes (movimentações do extrato e pagamentos pelo banco)
 // --------------------------------------------------------------------------
 /**
- * O registro irmão: a movimentação do extrato que confirmou o pagamento pelo banco, ou o pagamento confirmado por ela.
- * É o mesmo dinheiro, então os dois dividem um comprovante só (quando as pastas são as mesmas).
+ * O registro irmão: a movimentação do extrato que confirmou o pagamento pelo banco (ou o pagamento confirmado por ela) e a outra ponta
+ * da transferência. É o mesmo dinheiro, então os dois dividem UM comprovante só, nas mesmas pastas (a do contador é a do mês do dinheiro).
  */
-function irmaoDe(db, x, tabela) {
-  if (tabela === 'pagamentos_banco') return x.movimentacao_id ? { tabela: 'movimentacoes_banco', x: R.buscar(db, 'movimentacoes_banco', x.movimentacao_id) } : null;
-  return x.pagamento_banco_id ? { tabela: 'pagamentos_banco', x: R.buscar(db, 'pagamentos_banco', x.pagamento_banco_id) } : null;
-}
-const mesmasPastas = (db, a, b) => JSON.stringify([R.pastaDoComprovante(db, a), R.pastaContador(db, a)]) === JSON.stringify([R.pastaDoComprovante(db, b), R.pastaContador(db, b)]);
-const irmaoComMesmasPastas = (db, x, tabela) => { const i = irmaoDe(db, x, tabela); return i && i.x && mesmasPastas(db, x, i.x) ? i : null; };
+const irmaoDe = (db, x, tabela) => Z.irmaoDoComprovante(db, x, tabela);
 
 /** Onde está o comprovante: na pasta do imóvel (Contas pagas/ano ou IPTU (guias)/ano) ou, sem imóvel, só na do contador. Sem o seu, vale o do irmão. */
-function ondeEstaComprovante(x, tabela = 'movimentacoes_banco') {
+function ondeEstaComprovante(x, tabela = 'movimentacoes_banco', semIrmao = false) {
   const p = Z.escopoDoComprovante(d(), x);
   if (p && x.comprovante) return { ...p, nome: x.comprovante, origem: x.comprovante_origem };
   const c = Z.escopoContador(d(), x);
   if (c && x.comprovante_contador) return { ...c, nome: x.comprovante_contador, origem: x.comprovante_origem };
-  const irmao = irmaoComMesmasPastas(d(), x, tabela);
-  return irmao && temComprovante(irmao.x) ? ondeEstaComprovante(irmao.x, irmao.tabela) : null;
+  const irmao = semIrmao ? null : irmaoDe(d(), x, tabela);
+  return irmao && temComprovante(irmao.x) ? ondeEstaComprovante(irmao.x, irmao.tabela, true) : null;
 }
 const comComprovante = (x, tabela = 'movimentacoes_banco') => temComprovante(x) || !!ondeEstaComprovante(x, tabela);
 
@@ -209,12 +204,8 @@ async function guardarComprovante(x, tabela, nomeBase, blob, origem, { avisar = 
   if (!p && !c) throw new Error('Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).');
   const comprovante = p ? await S.salvarArquivo(await pastaDoEscopo(p.escopo, p.id), arquivo()) : null;
   const contador = c ? await S.salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
-  await alterar((db) => {
-    const dados = { nome_arquivo: base, comprovante, comprovante_contador: contador, origem };
-    Z.registrarComprovante(db, x.id, dados, login(), tabela);
-    const irmao = irmaoComMesmasPastas(db, R.buscar(db, tabela, x.id), tabela);
-    if (irmao && !temComprovante(irmao.x)) Z.registrarComprovante(db, irmao.x.id, dados, login(), irmao.tabela);
-  });
+  // registrarComprovante copia o nome para a conta lançada e para o irmão (pagamento ↔ movimentação; as duas pontas da transferência)
+  await alterar((db) => Z.registrarComprovante(db, x.id, { nome_arquivo: base, comprovante, comprovante_contador: contador, origem }, login(), tabela));
   const pastas = [p ? descreverPasta(p) : '', c ? descreverPasta(c) : ''].filter(Boolean);
   if (avisar) aviso(`Comprovante guardado em ${pastas.join(' e em ')}.`);
   return { comprovante, contador, pastas };
@@ -345,6 +336,40 @@ function telaPagamentosBanco() {
 // --------------------------------------------------------------------------
 // Caixa "Pagar pelo banco" (tela de contas do imóvel) e caixa "Banco" (página do imóvel)
 // --------------------------------------------------------------------------
+/**
+ * Lê o que foi digitado no campo do código, sem ir ao banco. Só dígitos (com espaços, pontos e traços): boleto com 44, 47 ou 48
+ * dígitos; CPF (11) ou CNPJ (14) é chave Pix; qualquer outro tamanho é erro ("Código de barras com 20 dígitos: esperava 44, 47 ou 48").
+ * Telefone +55 é chave Pix; texto que começa por 000201 é Pix copia e cola; o resto é chave Pix (e-mail ou aleatória).
+ * Devolve { forma, codigo_barras | pix_copia_cola | chave_pix, dica } ou { erro } ou { vazio }.
+ */
+export function lerCodigoPagamento(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return { vazio: true };
+  const dig = t.replace(/\D/g, '');
+  if (/^[\d .-]+$/.test(t)) {
+    if ([44, 47, 48].includes(dig.length)) return { forma: 'boleto', codigo_barras: dig, dica: `${dig.length} dígitos ✓` };
+    if ([11, 14].includes(dig.length)) return { forma: 'pix', chave_pix: dig, dica: `chave Pix (${dig.length === 11 ? 'CPF' : 'CNPJ'}) ✓` };
+    return { erro: `Código de barras com ${dig.length} dígitos: esperava 44, 47 ou 48.` };
+  }
+  const tel = t.replace(/[ ()-]/g, '');
+  if (/^\+55\d{10,11}$/.test(tel)) return { forma: 'pix', chave_pix: tel, dica: 'chave Pix (telefone) ✓' };
+  if (/^000201/.test(t)) return { forma: 'pix', pix_copia_cola: t, dica: 'Pix copia e cola ✓' };
+  return { forma: 'pix', chave_pix: t, dica: 'chave Pix ✓' };
+}
+
+/** Dica ao lado do campo do código enquanto digita: "47 dígitos ✓" ou o erro (sem esperar o botão). */
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', (ev) => {
+    const el = ev.target;
+    if (!(el instanceof HTMLInputElement) || !el.classList.contains('codigo-barras')) return;
+    const dica = el.parentElement && el.parentElement.querySelector('[data-dica-codigo]');
+    if (!dica) return;
+    const r = lerCodigoPagamento(el.value);
+    dica.textContent = r.vazio ? '' : r.erro || r.dica;
+    dica.classList.toggle('texto-aviso', !!r.erro);
+    dica.classList.toggle('texto-ok', !r.erro && !r.vazio);
+  });
+}
 export function caixaPagarPeloBanco(i, comp) {
   const permitidas = R.contasPermitidas(d(), i.id, comp);
   const hoje = C.hojeIso();
@@ -355,7 +380,7 @@ export function caixaPagarPeloBanco(i, comp) {
   const lotes = [...new Set(pendentes.map((p) => p.grupo_id || ''))].map((g) => [g, pendentes.filter((p) => (p.grupo_id || '') === g)]);
   const outros = doImovel.filter((p) => !PENDENTES.includes(p.situacao)).slice(0, 10);
   const linha = (tipo, n) => `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
-    <td><input name="codigo_${n}" class="codigo-barras" placeholder="código de barras, linha digitável, Pix copia e cola ou chave Pix" autocomplete="off"></td>
+    <td><input name="codigo_${n}" class="codigo-barras" placeholder="código de barras, linha digitável, Pix copia e cola ou chave Pix" autocomplete="off"><div class="suave dica-codigo" data-dica-codigo></div></td>
     <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="0,00" style="width:120px"></td>
     <td><input type="date" name="data_${n}" value="${hoje}" min="${hoje}" style="width:auto"></td></tr>`;
   const itemLote = (p) => `<tr><td><b>${esc(p.tipo_conta)}</b> ${compBr(p.competencia)}</td><td>${esc((p.beneficiario && p.beneficiario.nome) || '-')}</td>
@@ -745,12 +770,24 @@ export const ACOES_BANCO = {
     if (!prontos.length) throw new Error('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
     const total = prontos.reduce((t, p) => t + p.valor, 0);
     const comErro = (items || []).filter((it) => it.status !== 'READ_DATA' && it.status !== 'SCHEDULED' && it.status !== 'PROCESSING' && it.status !== 'PROCESSED');
-    const r = await janela({ titulo: 'Enviar para aprovação no app do C6', sim: 'Aprovar e enviar', forte: true,
-      html: `<p>Conta que paga: <b>${esc(nomeConta(conta))}</b></p><ul>${prontos.map((p) => { const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null; return `<li>${i ? `${esc(i.nome)} · ` : ''}${esc(p.tipo_conta)} ${compBr(p.competencia)} · ${esc((p.beneficiario && p.beneficiario.nome) || '')} · <b>${reais(p.valor)}</b>${p.vencimento ? ` · vence ${dataBr(p.vencimento)}` : ''}</li>`; }).join('')}</ul>
+    // 1ª janela: o resumo completo; 2ª janela: digitar o valor total (qualquer diferença cancela)
+    const r = await janela({ titulo: 'Aprovar e enviar: confira o pagamento (1 de 2)', sim: 'Conferi, continuar', forte: false,
+      html: `<p>Conta que paga: <b>${esc(nomeConta(conta))}</b></p><ul>${prontos.map((p) => { const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null; const codigo = CODIGO_PAG(p); return `<li>${i ? `${esc(i.nome)} · ` : ''}${esc(p.tipo_conta)} ${compBr(p.competencia)} · ${esc((p.beneficiario && p.beneficiario.nome) || '')} · <b>${reais(p.valor)}</b>${p.vencimento ? ` · vence ${dataBr(p.vencimento)}` : ''} · pagar em ${dataBr(p.data_pagamento)}${codigo ? `<br><span class="codigo-barras suave">${esc(codigo)}</span>` : ''}</li>`; }).join('')}</ul>
         <p>Total: <b>${reais(total)}</b> em ${prontos.length} pagamento(s).</p>
         ${comErro.length ? `<p class="texto-aviso">${comErro.length} item(ns) com erro de leitura ficam de fora (são tirados do lote no banco).</p>` : ''}
-        <p class="suave">Você está aprovando como administrador. Depois de enviado, o pagamento só acontece quando alguém autorizado aprovar no aplicativo do C6.</p>` });
+        <p class="suave">Você está aprovando como administrador. Na próxima janela, digite o valor total para confirmar. Depois de enviado, o pagamento só acontece quando alguém autorizado aprovar no aplicativo do C6.</p>` });
     if (!r) return;
+    const r2 = await janela({ titulo: 'Confirmação final (2 de 2)', sim: 'PAGAR', forte: true,
+      html: `<p>Para enviar ${prontos.length} pagamento(s) pela conta <b>${esc(nomeConta(conta))}</b>, digite o valor total exatamente como aparece: <b>${esc(reais(total, false))}</b></p>
+        <p><input name="total" inputmode="decimal" placeholder="0,00" autocomplete="off" style="width:100%"></p>
+        <p class="suave">Qualquer diferença cancela o envio; nada vai ao banco.</p>`,
+      ligar(dlg) { const el = dlg.querySelector('[name="total"]'); if (el) el.focus(); } });
+    if (!r2) return;
+    const digitado = String((r2.total || [''])[0] || '').trim();
+    if (!digitado || C.centavos(digitado) !== total) {
+      aviso(`Envio cancelado: o valor digitado (${digitado || 'em branco'}) é diferente do total ${reais(total)}. Nada foi enviado ao banco.`, 'aviso');
+      return;
+    }
     await alterar((db) => prontos.forEach((p) => { if (R.buscar(db, 'pagamentos_banco', p.id).situacao === 'rascunho') Z.aprovarPagamento(db, p.id, login()); }));
     if (comErro.length) await P.removerItensDoGrupo(conta, grupo, comErro.map((it) => it.id));
     await P.enviarGrupoParaAprovacao(conta, grupo, E.usuario ? E.usuario.nome || login() : login());
@@ -842,12 +879,12 @@ export const FORMULARIOS_BANCO = {
       if (!(x.valor > 0)) throw new Error(`${x.tipo_conta}: informe o valor.`);
       if (x.data_pagamento < C.hojeIso()) throw new Error(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
     }
-    // boleto = só dígitos (44, 47 ou 48, com espaços e pontos); o resto é Pix: copia e cola (começa por 000201) ou chave
+    // o código é conferido aqui, antes de ir ao banco: número só vira boleto com 44, 47 ou 48 dígitos (nunca chave Pix, salvo CPF/CNPJ)
     const prontos = itens.map((x) => {
-      const dig = x.codigo.replace(/\D/g, '');
-      const boleto = /^[\d .-]+$/.test(x.codigo) && [44, 47, 48].includes(dig.length);
+      const r = lerCodigoPagamento(x.codigo);
+      if (r.erro) throw new C.ErroUsuario(`${x.tipo_conta}: ${r.erro}`);
       return { conta_id: f.conta, imovel_id: i.id, origem: { tipo: 'avulso', id: null, n: null }, tipo_conta: x.tipo_conta, competencia: f.competencia, valor: x.valor, data_pagamento: x.data_pagamento,
-        forma: boleto ? 'boleto' : 'pix', codigo_barras: boleto ? dig : null, pix_copia_cola: !boleto && /^000201/.test(x.codigo) ? x.codigo : null, chave_pix: !boleto && !/^000201/.test(x.codigo) ? x.codigo : null, descricao: '' };
+        forma: r.forma, codigo_barras: r.codigo_barras || null, pix_copia_cola: r.pix_copia_cola || null, chave_pix: r.chave_pix || null, descricao: '' };
     });
     const pags = await alterar((db) => Z.prepararPagamentos(db, prontos, login()));
     await lerNoBanco(f.conta, pags);

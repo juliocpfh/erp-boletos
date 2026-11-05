@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LyIQOCjbFfyqZNQuODSjUiHuSzrr1eTxtnObjzoWSAs=' 'sha256-UbtFT0ZbQgZ5WDfEvjaGaxA8WL2d4eHQfNPPy6ZL0IQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LyIQOCjbFfyqZNQuODSjUiHuSzrr1eTxtnObjzoWSAs=' 'sha256-9bwL0m3VORtM2HzmBRdqIpEQFsoImR0386BXvvCeysM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3cfe1e271c00b8a6">
+<meta name="fontes" content="67ab08c495ac013e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -397,6 +397,7 @@ th.centro, td.centro { text-align: center; }
 .abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
 .abas a.ativo { border-bottom-color: var(--info, #0891b2); font-weight: 700; }
 .texto-aviso { color: #b45309; font-weight: 700; }
+.texto-ok { color: #15803d; }
 /* Lista de Imóveis: contas (Sanepar, Copel, gás, condomínio) numa linha fina embaixo do endereço */
 .contas { font-size: 12px; color: var(--suave); white-space: nowrap; }
 .contas b { color: var(--texto); font-weight: 600; }
@@ -498,8 +499,17 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 
 /* Banco (C6): boleto emitido, QR Code do Pix e botões que ainda não funcionam */
 button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
-.boleto-banco td { padding: 4px 8px; vertical-align: top; }
+.boleto-banco { width: 100%; max-width: 100%; table-layout: fixed; }
+.boleto-banco td, .boleto-banco th { padding: 4px 8px; vertical-align: top; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .boleto-banco td.copia-cola { word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.boleto-banco.codigos td:first-child { width: 26%; }
+.boleto-banco.codigos td.n { width: 84px; }
+@media (max-width: 760px) {
+  /* no celular, cada código vira um bloco: rótulo, valor quebrado em linhas e o botão Copiar embaixo (sem rolagem lateral) */
+  table.boleto-banco.codigos, table.boleto-banco.codigos tbody, table.boleto-banco.codigos tr, table.boleto-banco.codigos td { display: block; width: auto; max-width: 100%; }
+  table.boleto-banco.codigos tr { border-bottom: 1px dashed var(--borda); padding: 6px 0; }
+  table.boleto-banco.codigos td { padding: 2px 0; text-align: left; }
+}
 .qr-pix { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
 .qr-pix img { width: 180px; height: 180px; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
 #saude-ponte ul { padding-left: 18px; }
@@ -1014,6 +1024,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // docs/js/calculos.js
   var calculos_exports = {};
   __export(calculos_exports, {
+    ErroUsuario: () => ErroUsuario,
     acumuladoDosMeses: () => acumuladoDosMeses,
     aluguelProporcional: () => aluguelProporcional,
     aluguelVigente: () => aluguelVigente,
@@ -1060,6 +1071,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     valorNotaFiscal: () => valorNotaFiscal,
     vencimentoDaCompetencia: () => vencimentoDaCompetencia
   });
+  var ErroUsuario = class extends Error {
+    constructor(mensagem) {
+      super(mensagem);
+      this.name = "ErroUsuario";
+      this.esperado = true;
+    }
+  };
   function arred(x) {
     const s = x < 0 ? -1 : 1;
     return s * Math.round(Math.abs(x) + 1e-7);
@@ -1501,6 +1519,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     confirmarCaucaoSemComplemento: () => confirmarCaucaoSemComplemento,
     contaBancaria: () => contaBancaria,
     contaBanco: () => contaBanco,
+    contaDeOrigem: () => contaDeOrigem,
     contaEmissora: () => contaEmissora,
     contaPreMarcada: () => contaPreMarcada,
     contaSugerida: () => contaSugerida,
@@ -1612,6 +1631,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     marcarReservaAbatida: () => marcarReservaAbatida,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
     mesDeAniversario: () => mesDeAniversario,
+    mesDoDinheiro: () => mesDoDinheiro,
     mesesDoTrimestre: () => mesesDoTrimestre,
     mesesUsoReserva: () => mesesUsoReserva,
     modeloAirbnb: () => modeloAirbnb,
@@ -5515,8 +5535,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function arquivosReferenciados(d2) {
     const out = [];
+    const vistos = /* @__PURE__ */ new Set();
     const usa = (escopo, id, nome) => {
-      if (nome && id) out.push({ escopo, id, nome });
+      const k = `${escopo}:${id}|${nome}`;
+      if (nome && id && !vistos.has(k)) {
+        vistos.add(k);
+        out.push({ escopo, id, nome });
+      }
     };
     for (const c of d2.contratos) {
       for (const k of ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva"]) usa("contrato", c[`${k}_contrato`] || c.id, c[k]);
@@ -5587,7 +5612,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const c = pastaContador(d2, x);
         const rotulo = rotuloDoComprovante(d2, x);
         if (p2) poe(p2.escopo, p2.id, x.comprovante, rotulo);
-        if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d2, x.conta_id)} ${compBr(competenciaDoComprovante(x))}) · ${rotulo}`);
+        if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d2, contaDeOrigem(d2, x))} ${compBr(mesDoDinheiro(d2, x))}) · ${rotulo}`);
       }
     }
     return m;
@@ -6008,8 +6033,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function contaSugerida(d2, cb) {
     if (configBanco(d2).modo_conta_boleto !== "escolher") return contaEmissora(d2);
-    const doImovel = contasDoImovel(d2, cb);
-    return doImovel.length === 1 ? doImovel[0] : null;
+    return null;
   }
   var contaPreMarcada = (d2, cb) => contasDoImovel(d2, cb).length === 1 ? contasDoImovel(d2, cb)[0] : contaEmissora(d2);
   function referenciaExterna(cb, agora = Date.now()) {
@@ -6169,6 +6193,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!cb) throw new Error("Boleto não encontrado.");
     const n = normalizarRespostaC6(resposta);
     const antes = cb.banco || {};
+    const reemissao = !!antes.emitido_em && (antes.situacao === "cancelado" && n.situacao !== "cancelado" || !!n.id_externo && !!antes.id_externo && n.id_externo !== antes.id_externo);
+    const emissoesAnteriores = reemissao ? [...antes.emissoes_anteriores || [], { emitido_em: antes.emitido_em, cancelado_em: antes.cancelado_em || null, id_externo: antes.id_externo || null, nosso_numero: antes.nosso_numero || null, linha_digitavel: antes.linha_digitavel || null }] : antes.emissoes_anteriores || null;
     const banco = {
       provedor: "c6",
       conta_id: extra.conta_id || antes.conta_id || null,
@@ -6185,8 +6211,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       situacao_banco: n.situacao_banco,
       valor: n.valor ?? antes.valor ?? valorNoBanco(d2, cb),
       vencimento: n.vencimento || antes.vencimento || cb.vencimento,
-      emitido_em: antes.emitido_em || (/* @__PURE__ */ new Date()).toISOString(),
-      consultado_em: antes.emitido_em ? (/* @__PURE__ */ new Date()).toISOString() : null,
+      emitido_em: antes.emitido_em && !reemissao ? antes.emitido_em : (/* @__PURE__ */ new Date()).toISOString(),
+      consultado_em: antes.emitido_em && !reemissao ? (/* @__PURE__ */ new Date()).toISOString() : null,
+      ...emissoesAnteriores ? { emissoes_anteriores: emissoesAnteriores } : {},
       pago_em: n.pago_em || antes.pago_em || null,
       credito_em: n.credito_em || antes.credito_em || null,
       valor_pago: n.valor_pago ?? antes.valor_pago ?? null,
@@ -6985,7 +7012,20 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const e = c.emitente_id ? buscar(d2, "emitentes", c.emitente_id) : null;
     return c.apelido || (e ? e.nome.split(" ")[0] : String(contaId).toUpperCase());
   };
-  var competenciaDoComprovante = (x) => (x.competencia && /^\d{4}-\d{2}$/.test(x.competencia) ? x.competencia : String(x.data || x.pago_em || x.data_pagamento || "").slice(0, 7)) || hojeIso().slice(0, 7);
+  function mesDoDinheiro(d2, x) {
+    const mov2 = d2 && x.movimentacao_id ? buscar(d2, "movimentacoes_banco", x.movimentacao_id) : null;
+    const par = d2 && x.classificacao === "transferencia" && x.tipo === "entrada" && x.par_movimentacao_id ? buscar(d2, "movimentacoes_banco", x.par_movimentacao_id) : null;
+    const data2 = par && par.data || mov2 && mov2.data || x.data || x.pago_em || x.data_pagamento || "";
+    return String(data2).slice(0, 7) || hojeIso().slice(0, 7);
+  }
+  var competenciaDoComprovante = (x, d2 = null) => mesDoDinheiro(d2, x);
+  function contaDeOrigem(d2, x) {
+    if (x.classificacao === "transferencia" && x.tipo === "entrada" && x.par_movimentacao_id) {
+      const par = buscar(d2, "movimentacoes_banco", x.par_movimentacao_id);
+      if (par) return par.conta_id;
+    }
+    return x.conta_id;
+  }
   function pastaDoComprovante(d2, x) {
     const iptuId = x.iptu_id || (x.origem && x.origem.tipo === "iptu" ? x.origem.id : null);
     if (iptuId) {
@@ -6997,9 +7037,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return { escopo: "contasano", id: idPastaAno(x.imovel_id, String(data2).slice(0, 4)) };
   }
   function pastaContador(d2, x) {
-    const c = contaBancaria(d2, x.conta_id);
+    const c = contaBancaria(d2, contaDeOrigem(d2, x));
     if (!c || !c.emitente_id) return null;
-    return { escopo: "contador", id: idContador(c.emitente_id, competenciaDoComprovante(x)) };
+    return { escopo: "contador", id: idContador(c.emitente_id, mesDoDinheiro(d2, x)) };
   }
   function rotuloDoComprovante(d2, x) {
     const conta = apelidoDaConta(d2, x.conta_id);
@@ -7033,7 +7073,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const importadoAte = (cfg2.ultima_importacao || {})[c.id] || null;
       return { id: c.id, apelido: apelidoDaConta(d2, c.id), semDestino: semDestinoDe(c.id), importadoAte, semImportar: !importadoAte || importadoAte < ate };
     });
-    const semComprovante = movs2.filter((m) => m.classificacao && !["ignorar", "transferencia"].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador).length;
+    const semComprovante = movs2.filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador).length;
     const pagamentosPendentes = (d2.pagamentos_banco || []).filter((p2) => ["aguardando_aprovacao", "agendado", "erro"].includes(p2.situacao)).length;
     return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
   }
@@ -7042,7 +7082,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!cfg2.ativo) return null;
     const limite = somarDias(hoje3, -DIAS_ALERTA_BANCO);
     const semDestino = (d2.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
-    const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && !["ignorar", "transferencia"].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador && m.data <= limite);
+    const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador && m.data <= limite);
     const enviados = (d2.pagamentos_banco || []).filter((p2) => p2.situacao === "agendado" && (p2.data_pagamento || hoje3) < hoje3);
     const erros = (d2.pagamentos_banco || []).filter((p2) => p2.situacao === "erro");
     if (!semDestino.length && !semComprovante.length && !enviados.length && !erros.length) return null;
@@ -7206,6 +7246,25 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       else await copiarPasta(h, await destino.getDirectoryHandle(nome, { create: true }));
     }
   }
+  async function destinoPerigoso(origem, paiNovo, novo) {
+    try {
+      if (await origem.isSameEntry(paiNovo) || await origem.resolve(paiNovo) !== null) return "o destino fica dentro da própria pasta de origem";
+      let destino = null;
+      try {
+        destino = await paiNovo.getDirectoryHandle(novo);
+      } catch {
+      }
+      if (destino && await origem.isSameEntry(destino)) return "origem e destino são a mesma pasta";
+    } catch (e) {
+      return `não deu para conferir origem e destino (${e.message})`;
+    }
+    return null;
+  }
+  async function contarArquivos(dir) {
+    let n = 0;
+    for await (const [, h] of dir.entries()) n += h.kind === "file" ? 1 : await contarArquivos(h);
+    return n;
+  }
   async function renomearPasta(pai, antigo, novo) {
     antigo = limparNome(antigo);
     novo = limparNome(novo);
@@ -7215,6 +7274,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       origem = await pai.getDirectoryHandle(antigo);
     } catch {
       await pai.getDirectoryHandle(novo, { create: true });
+      return;
+    }
+    const perigo = await destinoPerigoso(origem, pai, novo);
+    if (perigo) {
+      console.warn(`Pasta "${antigo}" não renomeada para "${novo}": ${perigo}.`);
       return;
     }
     try {
@@ -7247,6 +7311,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       await paiNovo.getDirectoryHandle(novo, { create: true });
       return;
     }
+    const perigo = await destinoPerigoso(origem, paiNovo, novo);
+    if (perigo) {
+      console.warn(`Pasta "${antigo}" não movida para "${novo}": ${perigo}.`);
+      return;
+    }
     try {
       await paiNovo.getDirectoryHandle(novo);
       return;
@@ -7277,6 +7346,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return 0;
     }
     if (antigo === novo && await paiAntigo.isSameEntry(paiNovo)) return 0;
+    const perigo = await destinoPerigoso(origem, paiNovo, novo);
+    if (perigo) {
+      console.warn(`Pasta "${antigo}" não juntada em "${novo}": ${perigo}.`);
+      return contarArquivos(origem);
+    }
     let existe = true;
     try {
       await paiNovo.getDirectoryHandle(novo);
@@ -9121,7 +9195,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var SEM_ACENTO = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   var classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === "Padrão" ? "" : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
   var classeAlerta = (a) => classeEstilo(a.nivel, estiloAlerta(d(), a.tipo));
-  var linkAlerta = (a) => a.tipo === "Reajuste do aluguel" ? `#/reajustes?contrato=${a.contrato_id}` : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}`;
+  var linkAlerta = (a) => a.link ? a.link : a.tipo === "Reajuste do aluguel" ? `#/reajustes?contrato=${a.contrato_id}` : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}`;
   var gruposDeAlertas = (alertas) => {
     const grupos = /* @__PURE__ */ new Map();
     for (const a of alertas) grupos.set(a.tipo, [...grupos.get(a.tipo) || [], a]);
@@ -9279,7 +9353,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const div = divergenciaBancaria(cb);
     const linha = (rotulo, valor) => valor ? `<tr><td class="suave">${rotulo}</td><td class="copia-cola"><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: valor })}</td></tr>` : "";
     const qr = imagemQrPix(cb);
-    return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo2}<div>${etiquetaBanco(cb)}</div></div>
+    const semPix = b.situacao === "emitido" && !b.pix_copia_cola;
+    return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo2}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta("sem Pix", "aviso")}` : ""}</div></div>
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? `: a ponte não tem a chave Pix desta conta (C6_${esc(String(conta.id).toUpperCase())}_CHAVE_PIX). O inquilino paga só pela linha digitável; para ter o QR Code, configure a chave na ponte e emita de novo.` : ": a conta não tem chave Pix cadastrada (Dados e backup → Banco C6)."}</div>` : ""}
     ${aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ""}
     ${b.situacao === "pago" && !cb.data_pagamento ? `<div class="alerta aviso"><b>O banco informou o pagamento</b>${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ""}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ""}, mas ele ainda não está registrado aqui. ${opera() ? botao("consultarBoletoC6", "Registrar o pagamento", { id: cb.id }, "pequeno") : "Peça a um operador para registrar."}</div>` : ""}
     ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ""}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ""}.${opera() ? ` ${botao("alterarBoletoC6", "Atualizar o boleto no banco com os valores do sistema", { id: cb.id }, "pequeno", "Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?")}` : ""} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ""}
@@ -9287,7 +9363,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ${item("Emitido em", b.emitido_em ? new Date(b.emitido_em).toLocaleString("pt-BR") : "-")}${b.pago_em ? item("Pago em (banco)", `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ""}`) : ""}
       ${item("Valor no banco", reais(b.valor))}${item("Vencimento no banco", b.vencimento ? dataBr(b.vencimento) : "-")}
       ${item("Situação no banco", `${esc(b.situacao_banco || b.situacao)}${b.consultado_em ? `<br><span class="suave">consultado em ${new Date(b.consultado_em).toLocaleString("pt-BR")}</span>` : ""}`)}</div>
-    <table class="boleto-banco">${linha("Linha digitável", b.linha_digitavel)}${linha("Código de barras", b.codigo_barras)}${linha("Nosso número", b.nosso_numero)}${linha("Pix copia e cola", b.pix_copia_cola)}${linha("Referência", b.id_externo)}</table>
+    <table class="boleto-banco codigos">${linha("Linha digitável", b.linha_digitavel)}${linha("Código de barras", b.codigo_barras)}${linha("Nosso número", b.nosso_numero)}${linha("Pix copia e cola", b.pix_copia_cola)}${linha("Referência", b.id_externo)}</table>
     ${qr ? `<div class="qr-pix"><img src="${qr}" alt="QR Code do Pix" width="180" height="180"><div class="suave">QR Code do Pix: o inquilino lê com o app do banco.</div></div>` : ""}
     ${tabelaNotificacoes(b)}
     ${blocoNegativacao(cb, conta)}
@@ -9307,7 +9383,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg2.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
         <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg2.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg2.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
-        <div class="ajuda">Ao emitir, o sistema pergunta a conta (já marcada a da empresa do imóvel, quando ele tem uma só). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
+        <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
   }
@@ -10200,7 +10276,7 @@ ${xref}
     const data2 = mov2.data || mov2.pago_em || mov2.data_pagamento || hoje2();
     const tokens = {
       data: data2,
-      empresa: apelidoDaConta(d2, mov2.conta_id),
+      empresa: apelidoDaConta(d2, contaDeOrigem(d2, mov2)),
       imovel: i ? i.nome : "Geral",
       tipo: tipoDoComprovante(d2, mov2),
       valor: reais(mov2.valor, false),
@@ -10343,6 +10419,12 @@ ${xref}
     [/\bDARF\b|RECEITA FEDERAL|\bPIS\b|COFINS|\bIRPJ\b|\bCSLL\b|SIMPLES NACIONAL/, "imposto", null],
     [/TARIFA|\bTAR\b|PACOTE DE SERVICOS|MENSALIDADE|MANUTENCAO DE CONTA/, "tarifa", null]
   ];
+  function parcelaCitada(texto2) {
+    const t = String(texto2 || "").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (/COTA\s*UNICA|PARCELA\s*UNICA/.test(t)) return 0;
+    const m = /PARC(?:ELA)?\.?\s*0?(\d{1,2})\b/.exec(t) || /\b0?(\d{1,2})\s*[ªA°º]?\s*PARC(?:ELA)?/.exec(t);
+    return m ? Number(m[1]) : null;
+  }
   var textoDaMov = (m) => `${m.descricao || ""} ${m.titulo || ""} ${m.contrapartida && `${m.contrapartida.nome || ""} ${m.contrapartida.documento || ""}` || ""}`.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   function imovelNoTexto(d2, texto2) {
     for (const i of d2.imoveis) {
@@ -10390,8 +10472,11 @@ ${xref}
       if (!re.test(texto2) || mov2.tipo !== "saida") continue;
       if (classificacao === "iptu") {
         const p2 = imv ? d2.iptus.filter((x) => x.imovel_id === imv.imovel.id).sort((a, b) => b.ano - a.ano)[0] : null;
-        const parcela = p2 ? parcelasIptu(d2, p2).find((pc) => pc.proprietario && !pc.paga && (pc.valor === mov2.valor || pc.valorProprietario === mov2.valor)) : null;
-        porPalavra = { classificacao: "iptu", imovel_id: imv ? imv.imovel.id : null, iptu: p2 ? { id: p2.id, n: parcela ? parcela.n : null } : null, motivo: "descrição de IPTU", confianca: parcela ? "alta" : "media" };
+        const pcs = p2 ? parcelasIptu(d2, p2).filter((pc) => pc.proprietario) : [];
+        const nCitado = parcelaCitada(texto2);
+        const citada = nCitado !== null ? pcs.find((pc) => pc.n === nCitado && !pc.paga) || null : null;
+        const parcela = citada || pcs.find((pc) => !pc.paga && (pc.valor === mov2.valor || pc.valorProprietario === mov2.valor)) || null;
+        porPalavra = { classificacao: "iptu", imovel_id: imv ? imv.imovel.id : null, iptu: p2 ? { id: p2.id, n: parcela ? parcela.n : null } : null, motivo: citada ? `descrição de IPTU (${citada.rotulo} parcela citada)` : "descrição de IPTU", confianca: parcela ? "alta" : "media" };
       } else if (classificacao === "imposto") porPalavra = { classificacao: "imposto", motivo: "descrição de imposto", confianca: "media" };
       else if (classificacao === "tarifa") porPalavra = { classificacao: "tarifa", motivo: "descrição de tarifa", confianca: "media" };
       else porPalavra = { classificacao: "conta_imovel", imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== "IPTU" ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === "nome" ? "descrição" : "matrícula/UC cadastrada"}` : `descrição de ${tipo}`, confianca: imv ? "media" : "baixa" };
@@ -10517,10 +10602,16 @@ ${xref}
     if (mov2.guia_imposto_id && buscar(d2, "guias_impostos", mov2.guia_imposto_id)) atualizar(d2, "guias_impostos", mov2.guia_imposto_id, { paga_em: null, movimentacao_id: null }, usuario, "Guia solta da movimentação do extrato");
     if (mov2.par_movimentacao_id) {
       const par = buscar(d2, "movimentacoes_banco", mov2.par_movimentacao_id);
-      if (par) atualizar(d2, "movimentacoes_banco", par.id, { classificacao: null, par_movimentacao_id: null, classificada_em: null, classificada_por: null }, usuario, "Transferência desfeita (outra ponta)");
+      if (par) atualizar(d2, "movimentacoes_banco", par.id, { classificacao: null, par_movimentacao_id: null, classificada_em: null, classificada_por: null, comprovante: null, comprovante_contador: null, comprovante_origem: null }, usuario, "Transferência desfeita (outra ponta)");
     }
     atualizar(d2, "movimentacoes_banco", mov2.id, { ...CAMPOS_DESTINO, observacoes: mov2.observacoes || "" }, usuario, "Destino da movimentação desfeito");
     return { arquivos };
+  }
+  function irmaoDoComprovante(d2, x, tabela = "movimentacoes_banco") {
+    if (tabela === "pagamentos_banco") return x.movimentacao_id && buscar(d2, "movimentacoes_banco", x.movimentacao_id) ? { tabela: "movimentacoes_banco", x: buscar(d2, "movimentacoes_banco", x.movimentacao_id) } : null;
+    if (x.pagamento_banco_id && buscar(d2, "pagamentos_banco", x.pagamento_banco_id)) return { tabela: "pagamentos_banco", x: buscar(d2, "pagamentos_banco", x.pagamento_banco_id) };
+    if (x.classificacao === "transferencia" && x.par_movimentacao_id && buscar(d2, "movimentacoes_banco", x.par_movimentacao_id)) return { tabela: "movimentacoes_banco", x: buscar(d2, "movimentacoes_banco", x.par_movimentacao_id) };
+    return null;
   }
   function registrarComprovante(d2, movId, { nome_arquivo = null, comprovante: comprovante2 = null, comprovante_contador = null, origem = "banco" } = {}, usuario, tabela = "movimentacoes_banco") {
     const x = buscar(d2, tabela, movId);
@@ -10528,8 +10619,12 @@ ${xref}
     if (!comprovante2 && !comprovante_contador) throw new Error("Informe o nome do arquivo do comprovante.");
     const dados = { comprovante: comprovante2 || x.comprovante || null, comprovante_contador: comprovante_contador || x.comprovante_contador || null, comprovante_origem: origem, nome_arquivo: nome_arquivo || x.nome_arquivo || null };
     atualizar(d2, tabela, x.id, dados, usuario, `Comprovante guardado: ${comprovante2 || comprovante_contador}`);
-    if (tabela === "movimentacoes_banco" && x.despesa_id && buscar(d2, "despesas", x.despesa_id)) atualizar(d2, "despesas", x.despesa_id, { comprovante: dados.comprovante }, usuario, "Comprovante da conta (extrato)");
-    if (tabela === "pagamentos_banco" && x.despesa_id && buscar(d2, "despesas", x.despesa_id)) atualizar(d2, "despesas", x.despesa_id, { comprovante: dados.comprovante }, usuario, "Comprovante da conta (pagamento pelo banco)");
+    if (x.despesa_id && buscar(d2, "despesas", x.despesa_id)) atualizar(d2, "despesas", x.despesa_id, { comprovante: dados.comprovante || dados.comprovante_contador }, usuario, tabela === "pagamentos_banco" ? "Comprovante da conta (pagamento pelo banco)" : "Comprovante da conta (extrato)");
+    const irmao = irmaoDoComprovante(d2, x, tabela);
+    if (irmao && (irmao.x.comprovante !== dados.comprovante || irmao.x.comprovante_contador !== dados.comprovante_contador)) {
+      atualizar(d2, irmao.tabela, irmao.x.id, dados, usuario, `Comprovante guardado: ${comprovante2 || comprovante_contador} (o mesmo do ${tabela === "pagamentos_banco" ? "pagamento pelo banco" : irmao.tabela === "pagamentos_banco" ? "extrato" : "outra ponta da transferência"})`);
+      if (irmao.x.despesa_id && irmao.x.despesa_id !== x.despesa_id && buscar(d2, "despesas", irmao.x.despesa_id)) atualizar(d2, "despesas", irmao.x.despesa_id, { comprovante: dados.comprovante || dados.comprovante_contador }, usuario, "Comprovante da conta");
+    }
     return x;
   }
   function removerComprovante(d2, movId, usuario, tabela = "movimentacoes_banco") {
@@ -10542,8 +10637,8 @@ ${xref}
   }
   function validarCodigoBarras(texto2) {
     const dig = String(texto2 || "").replace(/\D/g, "");
-    if (!dig) throw new Error("Informe o código de barras ou a linha digitável.");
-    if (![44, 47, 48].includes(dig.length)) throw new Error(`O código tem ${dig.length} dígitos; um boleto tem 44 (código de barras) ou 47 (linha digitável) e uma conta de consumo tem 48.`);
+    if (!dig) throw new ErroUsuario("Informe o código de barras ou a linha digitável.");
+    if (![44, 47, 48].includes(dig.length)) throw new ErroUsuario(`Código de barras com ${dig.length} dígitos: esperava 44, 47 ou 48 (44 é o código de barras, 47 a linha digitável do boleto e 48 a de conta de consumo).`);
     return dig;
   }
   function codigoDeBarras(texto2) {
@@ -10569,7 +10664,7 @@ ${xref}
     if (!conf.permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Dados e backup → Banco.");
     exigirConta(d2, dados.conta_id);
     if (!(Number(dados.valor) > 0)) throw new Error("Informe o valor a pagar.");
-    if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new Error(`O valor (${reais(dados.valor)}) passa do limite por pagamento (${reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
+    if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new ErroUsuario(`O valor (${reais(dados.valor)}) passa do limite por pagamento (${reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
     if (dados.imovel_id && !buscar(d2, "imoveis", dados.imovel_id)) throw new Error("Imóvel não encontrado.");
     if (!["boleto", "pix"].includes(dados.forma)) throw new Error("Escolha a forma: boleto (código de barras) ou Pix.");
     const content = conteudoDoPagamento(dados);
@@ -10809,7 +10904,7 @@ ${xref}
   var pastaContador3 = () => config().pasta_contador || PASTA_CONTADOR;
   var rotuloDe = (lista3, id) => lista3[id] || id;
   var ROTULO_CURTO = { boleto: "Boleto nosso", conta_imovel: "Conta do imóvel", iptu: "IPTU", imposto: "Imposto", tarifa: "Tarifa", transferencia: "Transferência", outro: "Outro", ignorar: "Ignorada" };
-  var SEM_COMPROVANTE2 = ["ignorar", "transferencia"];
+  var SEM_COMPROVANTE2 = ["ignorar"];
   var SEM_IMOVEL = ["tarifa", "transferencia", "ignorar", "imposto"];
   var semAcento = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
   var mov = (id) => {
@@ -10930,22 +11025,14 @@ ${xref}
     if (m.observacoes) partes.push(`<span class="suave">${esc(m.observacoes)}</span>`);
     return partes.join("<br>");
   }
-  function irmaoDe(db, x, tabela) {
-    if (tabela === "pagamentos_banco") return x.movimentacao_id ? { tabela: "movimentacoes_banco", x: buscar(db, "movimentacoes_banco", x.movimentacao_id) } : null;
-    return x.pagamento_banco_id ? { tabela: "pagamentos_banco", x: buscar(db, "pagamentos_banco", x.pagamento_banco_id) } : null;
-  }
-  var mesmasPastas = (db, a, b) => JSON.stringify([pastaDoComprovante(db, a), pastaContador(db, a)]) === JSON.stringify([pastaDoComprovante(db, b), pastaContador(db, b)]);
-  var irmaoComMesmasPastas = (db, x, tabela) => {
-    const i = irmaoDe(db, x, tabela);
-    return i && i.x && mesmasPastas(db, x, i.x) ? i : null;
-  };
-  function ondeEstaComprovante(x, tabela = "movimentacoes_banco") {
+  var irmaoDe = (db, x, tabela) => irmaoDoComprovante(db, x, tabela);
+  function ondeEstaComprovante(x, tabela = "movimentacoes_banco", semIrmao = false) {
     const p2 = pastaDoComprovante(d(), x);
     if (p2 && x.comprovante) return { ...p2, nome: x.comprovante, origem: x.comprovante_origem };
     const c = pastaContador(d(), x);
     if (c && x.comprovante_contador) return { ...c, nome: x.comprovante_contador, origem: x.comprovante_origem };
-    const irmao = irmaoComMesmasPastas(d(), x, tabela);
-    return irmao && temComprovante(irmao.x) ? ondeEstaComprovante(irmao.x, irmao.tabela) : null;
+    const irmao = semIrmao ? null : irmaoDe(d(), x, tabela);
+    return irmao && temComprovante(irmao.x) ? ondeEstaComprovante(irmao.x, irmao.tabela, true) : null;
   }
   var comComprovante = (x, tabela = "movimentacoes_banco") => temComprovante(x) || !!ondeEstaComprovante(x, tabela);
   function descreverPasta(p2) {
@@ -10986,12 +11073,7 @@ ${xref}
     if (!p2 && !c) throw new Error("Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).");
     const comprovante2 = p2 ? await salvarArquivo(await pastaDoEscopo(p2.escopo, p2.id), arquivo()) : null;
     const contador = c ? await salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
-    await alterar((db) => {
-      const dados = { nome_arquivo: base, comprovante: comprovante2, comprovante_contador: contador, origem };
-      registrarComprovante(db, x.id, dados, login(), tabela);
-      const irmao = irmaoComMesmasPastas(db, buscar(db, tabela, x.id), tabela);
-      if (irmao && !temComprovante(irmao.x)) registrarComprovante(db, irmao.x.id, dados, login(), irmao.tabela);
-    });
+    await alterar((db) => registrarComprovante(db, x.id, { nome_arquivo: base, comprovante: comprovante2, comprovante_contador: contador, origem }, login(), tabela));
     const pastas = [p2 ? descreverPasta(p2) : "", c ? descreverPasta(c) : ""].filter(Boolean);
     if (avisar) aviso(`Comprovante guardado em ${pastas.join(" e em ")}.`);
     return { comprovante: comprovante2, contador, pastas };
@@ -11101,6 +11183,32 @@ ${xref}
     ${grupos.map(([s, l]) => `<div class="cartao rolagem" id="pagamentos-${s}"><h2>${esc(rotuloDe(SITUACOES_PAGAMENTO, s))} <span class="suave">(${l.length})</span></h2>
       <table class="cobrancas responsiva">${CABECALHO_PAG}${l.map(linhaPagamento).join("")}</table></div>`).join("") || '<div class="cartao"><p class="suave">Nenhum pagamento preparado ainda.</p></div>'}`;
   }
+  function lerCodigoPagamento(texto2) {
+    const t = String(texto2 || "").trim();
+    if (!t) return { vazio: true };
+    const dig = t.replace(/\D/g, "");
+    if (/^[\d .-]+$/.test(t)) {
+      if ([44, 47, 48].includes(dig.length)) return { forma: "boleto", codigo_barras: dig, dica: `${dig.length} dígitos ✓` };
+      if ([11, 14].includes(dig.length)) return { forma: "pix", chave_pix: dig, dica: `chave Pix (${dig.length === 11 ? "CPF" : "CNPJ"}) ✓` };
+      return { erro: `Código de barras com ${dig.length} dígitos: esperava 44, 47 ou 48.` };
+    }
+    const tel = t.replace(/[ ()-]/g, "");
+    if (/^\+55\d{10,11}$/.test(tel)) return { forma: "pix", chave_pix: tel, dica: "chave Pix (telefone) ✓" };
+    if (/^000201/.test(t)) return { forma: "pix", pix_copia_cola: t, dica: "Pix copia e cola ✓" };
+    return { forma: "pix", chave_pix: t, dica: "chave Pix ✓" };
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("input", (ev) => {
+      const el = ev.target;
+      if (!(el instanceof HTMLInputElement) || !el.classList.contains("codigo-barras")) return;
+      const dica = el.parentElement && el.parentElement.querySelector("[data-dica-codigo]");
+      if (!dica) return;
+      const r = lerCodigoPagamento(el.value);
+      dica.textContent = r.vazio ? "" : r.erro || r.dica;
+      dica.classList.toggle("texto-aviso", !!r.erro);
+      dica.classList.toggle("texto-ok", !r.erro && !r.vazio);
+    });
+  }
   function caixaPagarPeloBanco(i, comp) {
     const permitidas = contasPermitidas(d(), i.id, comp);
     const hoje3 = hojeIso();
@@ -11111,7 +11219,7 @@ ${xref}
     const lotes = [...new Set(pendentes.map((p2) => p2.grupo_id || ""))].map((g) => [g, pendentes.filter((p2) => (p2.grupo_id || "") === g)]);
     const outros = doImovel.filter((p2) => !PENDENTES.includes(p2.situacao)).slice(0, 10);
     const linha = (tipo, n) => `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
-    <td><input name="codigo_${n}" class="codigo-barras" placeholder="código de barras, linha digitável, Pix copia e cola ou chave Pix" autocomplete="off"></td>
+    <td><input name="codigo_${n}" class="codigo-barras" placeholder="código de barras, linha digitável, Pix copia e cola ou chave Pix" autocomplete="off"><div class="suave dica-codigo" data-dica-codigo></div></td>
     <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="0,00" style="width:120px"></td>
     <td><input type="date" name="data_${n}" value="${hoje3}" min="${hoje3}" style="width:auto"></td></tr>`;
     const itemLote = (p2) => `<tr><td><b>${esc(p2.tipo_conta)}</b> ${compBr(p2.competencia)}</td><td>${esc(p2.beneficiario && p2.beneficiario.nome || "-")}</td>
@@ -11487,18 +11595,37 @@ ${xref}
       const total = prontos.reduce((t, p2) => t + p2.valor, 0);
       const comErro = (items || []).filter((it2) => it2.status !== "READ_DATA" && it2.status !== "SCHEDULED" && it2.status !== "PROCESSING" && it2.status !== "PROCESSED");
       const r = await janela({
-        titulo: "Enviar para aprovação no app do C6",
-        sim: "Aprovar e enviar",
-        forte: true,
+        titulo: "Aprovar e enviar: confira o pagamento (1 de 2)",
+        sim: "Conferi, continuar",
+        forte: false,
         html: `<p>Conta que paga: <b>${esc(nomeConta(conta))}</b></p><ul>${prontos.map((p2) => {
           const i = p2.imovel_id ? buscar2("imoveis", p2.imovel_id) : null;
-          return `<li>${i ? `${esc(i.nome)} · ` : ""}${esc(p2.tipo_conta)} ${compBr(p2.competencia)} · ${esc(p2.beneficiario && p2.beneficiario.nome || "")} · <b>${reais(p2.valor)}</b>${p2.vencimento ? ` · vence ${dataBr(p2.vencimento)}` : ""}</li>`;
+          const codigo = CODIGO_PAG(p2);
+          return `<li>${i ? `${esc(i.nome)} · ` : ""}${esc(p2.tipo_conta)} ${compBr(p2.competencia)} · ${esc(p2.beneficiario && p2.beneficiario.nome || "")} · <b>${reais(p2.valor)}</b>${p2.vencimento ? ` · vence ${dataBr(p2.vencimento)}` : ""} · pagar em ${dataBr(p2.data_pagamento)}${codigo ? `<br><span class="codigo-barras suave">${esc(codigo)}</span>` : ""}</li>`;
         }).join("")}</ul>
         <p>Total: <b>${reais(total)}</b> em ${prontos.length} pagamento(s).</p>
         ${comErro.length ? `<p class="texto-aviso">${comErro.length} item(ns) com erro de leitura ficam de fora (são tirados do lote no banco).</p>` : ""}
-        <p class="suave">Você está aprovando como administrador. Depois de enviado, o pagamento só acontece quando alguém autorizado aprovar no aplicativo do C6.</p>`
+        <p class="suave">Você está aprovando como administrador. Na próxima janela, digite o valor total para confirmar. Depois de enviado, o pagamento só acontece quando alguém autorizado aprovar no aplicativo do C6.</p>`
       });
       if (!r) return;
+      const r2 = await janela({
+        titulo: "Confirmação final (2 de 2)",
+        sim: "PAGAR",
+        forte: true,
+        html: `<p>Para enviar ${prontos.length} pagamento(s) pela conta <b>${esc(nomeConta(conta))}</b>, digite o valor total exatamente como aparece: <b>${esc(reais(total, false))}</b></p>
+        <p><input name="total" inputmode="decimal" placeholder="0,00" autocomplete="off" style="width:100%"></p>
+        <p class="suave">Qualquer diferença cancela o envio; nada vai ao banco.</p>`,
+        ligar(dlg) {
+          const el = dlg.querySelector('[name="total"]');
+          if (el) el.focus();
+        }
+      });
+      if (!r2) return;
+      const digitado = String((r2.total || [""])[0] || "").trim();
+      if (!digitado || centavos(digitado) !== total) {
+        aviso(`Envio cancelado: o valor digitado (${digitado || "em branco"}) é diferente do total ${reais(total)}. Nada foi enviado ao banco.`, "aviso");
+        return;
+      }
       await alterar((db) => prontos.forEach((p2) => {
         if (buscar(db, "pagamentos_banco", p2.id).situacao === "rascunho") aprovarPagamento(db, p2.id, login());
       }));
@@ -11589,8 +11716,8 @@ ${xref}
         if (x.data_pagamento < hojeIso()) throw new Error(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
       }
       const prontos = itens.map((x) => {
-        const dig = x.codigo.replace(/\D/g, "");
-        const boleto = /^[\d .-]+$/.test(x.codigo) && [44, 47, 48].includes(dig.length);
+        const r = lerCodigoPagamento(x.codigo);
+        if (r.erro) throw new ErroUsuario(`${x.tipo_conta}: ${r.erro}`);
         return {
           conta_id: f.conta,
           imovel_id: i.id,
@@ -11599,10 +11726,10 @@ ${xref}
           competencia: f.competencia,
           valor: x.valor,
           data_pagamento: x.data_pagamento,
-          forma: boleto ? "boleto" : "pix",
-          codigo_barras: boleto ? dig : null,
-          pix_copia_cola: !boleto && /^000201/.test(x.codigo) ? x.codigo : null,
-          chave_pix: !boleto && !/^000201/.test(x.codigo) ? x.codigo : null,
+          forma: r.forma,
+          codigo_barras: r.codigo_barras || null,
+          pix_copia_cola: r.pix_copia_cola || null,
+          chave_pix: r.chave_pix || null,
           descricao: ""
         };
       });
@@ -14974,12 +15101,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${!cb.data_pagamento && memoria.pagamentoDivergente && memoria.pagamentoDivergente.id === cb.id ? formNfDivergente(cb, memoria.pagamentoDivergente) : cb.data_pagamento ? `<div class="grade">${item("Pago em", dataBr(cb.data_pagamento))}${item("Situação", `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ""}`)}
         ${ehComplementoCaucao(cb) ? "" : `${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}`}
         ${item("Valor recebido", reais(cb.valor_pago))}${ehComplementoCaucao(cb) ? "" : item("Valor da nota fiscal", `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta("digitado à mão", "aviso")}` : ""}`)}</div>
-        ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto). ` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
+        ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao("estornar", "Desfazer pagamento", { id: cb.id }, "perigo pequeno", validas.length ? "Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado." : "Desfazer o pagamento?") : ""}` : `<p>Se for pago hoje (${dataBr(hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? "" : ehComplementoCaucao(cb) ? ` (${sim.dias_atraso} dias de atraso, sem multa e juros)` : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${ehComplementoCaucao(cb) ? " · sem NF (complemento da caução)" : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
         ${opera() && cb.situacao !== "Carência" ? formPagamento(cb, false) : ""}`}</div>
     ${caixaBancoC6(cb)}
     ${caixaBoleto(cb)}
-    <div class="cartao"><h2>NFs</h2><table><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
+    <div class="cartao rolagem"><h2>NFs</h2><table class="responsiva"><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${numeroFatura(f.numero)}</td><td>${esc(buscar2("emitentes", f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === "Emitida" ? "ok" : "perigo")}</td></tr>`).join("") || `<tr><td colspan="7" class="suave">${!geraNf(c) ? "Este inquilino não emite NF (só controle do pagamento)." : ehComplementoCaucao(cb) ? "Complemento da caução: não gera NF." : cb.data_pagamento ? "Aguardando numeração (tela NF)." : "Confirme o pagamento para gerar a NF."}</td></tr>`}</table>
       ${cb.data_pagamento && !validas.length && geraNf(c) && !ehComplementoCaucao(cb) && opera() ? `<p>${formNfExterna("cobranca", cb.id, cb.data_pagamento)}</p>` : ""}
       ${validas.length ? `<p class="acoes">${link(`#/imprimir/faturas?numero=${validas[0].numero}`, "Ver / imprimir NF", "botao")} ${botao("excel", "Baixar Excel", { numero: validas[0].numero })}</p>` : ""}</div></div>`;
@@ -15810,6 +15937,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (!resp) return null;
     return contaBanco(d(), String((resp.conta || [])[0] || ""));
   }
+  var avisoSemPix = (conta, banco) => conta && conta.chave_pix && !banco.pix_copia_cola && banco.situacao !== "erro" ? `O boleto saiu sem o Pix: a ponte não tem a chave Pix desta conta (C6_${String(conta.id).toUpperCase()}_CHAVE_PIX). O inquilino paga só pela linha digitável.` : "";
   async function emitirNoC6(cb, conta) {
     let r;
     try {
@@ -17118,6 +17246,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!conta) return;
       const banco = await emitirNoC6(cb, conta);
       aviso(`Boleto emitido no C6 pela conta ${conta.apelido}${banco.ambiente === "sandbox" ? " (sandbox: teste, não vale como cobrança)" : ""}. Linha digitável: ${banco.linha_digitavel || "-"}`, banco.ambiente === "sandbox" ? "aviso" : "ok");
+      if (avisoSemPix(conta, banco)) aviso(avisoSemPix(conta, banco), "aviso");
       await mostrar();
     },
     /** Emite todos os boletos em aberto do mês ainda não emitidos; os que precisam de escolha da conta ficam para emitir um a um. */
@@ -17128,20 +17257,23 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const falhas = [];
       let emitidos = 0;
       const semConta = lista3.filter((cb) => !contaSugerida(d(), cb));
-      const contaDoLote = semConta.length ? await escolherContaC6(null, `${semConta.length} boleto(s) sem empresa definida pelo imóvel.`) : null;
+      const contaDoLote = semConta.length ? await escolherContaC6(null, `${semConta.length} boleto(s) em aberto do mês: escolha a empresa que emite o lote.`) : null;
       if (semConta.length && !contaDoLote) return;
       const usadas = /* @__PURE__ */ new Set();
+      const semPix = [];
       for (const cb of lista3) {
         try {
           const conta = contaSugerida(d(), cb) || contaDoLote;
           usadas.add(conta.apelido);
-          await emitirNoC6(buscar2("cobrancas", cb.id), conta);
+          const banco = await emitirNoC6(buscar2("cobrancas", cb.id), conta);
+          if (avisoSemPix(conta, banco)) semPix.push(conta);
           emitidos += 1;
         } catch (e) {
           falhas.push(`${buscar2("contratos", cb.contrato_id).inquilino_nome}: ${e.message}`);
         }
       }
       aviso(`${emitidos} boleto(s) emitido(s) no C6${usadas.size ? ` pela(s) conta(s) ${[...usadas].join(", ")}` : ""}.${falhas.length ? ` ${falhas.length} falharam: ${falhas.join(" · ")}` : ""}`, falhas.length ? "aviso" : "ok");
+      if (semPix.length) aviso(`${semPix.length} boleto(s) saiu(íram) sem o Pix: a ponte não tem a chave Pix da(s) conta(s) ${[...new Set(semPix.map((c) => `C6_${String(c.id).toUpperCase()}_CHAVE_PIX`))].join(", ")}.`, "aviso");
       await mostrar();
     },
     /** Consulta a situação no banco; se o banco diz que foi pago e aqui ainda não está, propõe registrar o pagamento (nunca registra sozinho). */
@@ -18106,7 +18238,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${calendarioDoPainel(competenciaValida(rota.q.mes, competenciaDe(hoje3)), hoje3)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
         ${gruposDeAlertas(alertas).map(([tipo, lista3]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista3.length})</span></h3>
-          ${lista3.map((a) => `<div class="${classeAlerta(a)}"><a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}</div>`).join("")}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
+          ${lista3.map((a) => `<div class="${classeAlerta(a)}">${a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`}</div>`).join("")}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       ${caixaHistorico("Últimas alterações", `${tabelaHistorico(ultimos(() => true, 12))}
         <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString("pt-BR")}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
@@ -18396,6 +18528,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     desenharMensagens();
     if (tipo !== "erro") setTimeout(() => fecharMensagem(m.id), tipo === "aviso" ? 15e3 : 6e3);
   }
+  var logarErro = (e) => {
+    if (!(e instanceof ErroUsuario) && !(e && e.esperado)) console.error(e);
+  };
   function janelaErro(texto2) {
     const dlg = document.createElement("dialog");
     dlg.className = "janela-erro";
@@ -18525,7 +18660,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
     E.d = disco;
     const u = E.d.usuarios.find((x) => x.login === loginTexto);
-    if (!await conferirSenha(u, senha)) throw new Error("Login ou senha incorretos.");
+    if (!await conferirSenha(u, senha)) throw new ErroUsuario("Login ou senha incorretos.");
     if (u.pendente) throw new Error("Seu pedido de acesso ainda não foi aprovado pelo administrador.");
     if (!u.ativo) throw new Error("Este usuário está bloqueado. Fale com o administrador.");
     const reforco = await reforcarSenha(u, senha);
@@ -18674,7 +18809,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         await mostrar(resposta);
       }
     } catch (e) {
-      console.error(e);
+      logarErro(e);
       aviso(e.message, "erro");
       if (botao2) botao2.disabled = false;
     }
@@ -18725,7 +18860,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     try {
       await ACOES[el.dataset.acao](el.dataset, el);
     } catch (e) {
-      console.error(e);
+      logarErro(e);
       aviso(e.message, "erro");
     } finally {
       delete el.dataset.ocupado;
@@ -18769,7 +18904,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       try {
         await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
       } catch (e) {
-        console.error(e);
+        logarErro(e);
         aviso(e.message, "erro");
       }
       return;

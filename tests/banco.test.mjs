@@ -87,7 +87,7 @@ test('contas por empresa: id normalizado, uma empresa por conta, padrão (ANK), 
   assert.equal(R.configBanco(d).ativo, false);
 });
 
-test('conta dos boletos: sempre a padrão; no modo "escolher", a da empresa do imóvel quando é uma só, senão pergunta', () => {
+test('conta dos boletos: sempre a padrão; no modo "escolher", pergunta SEMPRE (pré-marcada a da empresa do imóvel quando é uma só, senão a padrão)', () => {
   const { d, ank, jck, loja } = base();
   comContas(d, ank, jck);
   R.gerarCobrancas(d, '2026-02', 'teste');
@@ -95,7 +95,8 @@ test('conta dos boletos: sempre a padrão; no modo "escolher", a da empresa do i
   R.inserir(d, 'participacoes', { imovel_id: loja.id, emitente_id: jck.id, percentual: 100 }, 'teste');
   assert.equal(R.contaSugerida(d, cb).id, 'ank'); // modo padrão: ANK mesmo com o imóvel da JCK
   R.salvarConfigBanco(d, { modo_conta_boleto: 'escolher' }, 'teste');
-  assert.equal(R.contaSugerida(d, cb).id, 'jck'); // única empresa do imóvel
+  assert.equal(R.contaSugerida(d, cb), null); // pergunta mesmo com uma só empresa no imóvel (pedido do dono)
+  assert.equal(R.contaPreMarcada(d, cb).id, 'jck'); // ... já marcada a única empresa do imóvel
   R.inserir(d, 'participacoes', { imovel_id: loja.id, emitente_id: ank.id, percentual: 50 }, 'teste');
   assert.deepEqual(R.contasDoImovel(d, cb).map((x) => x.id), ['ank', 'jck']);
   assert.equal(R.contaSugerida(d, cb), null); // precisa perguntar
@@ -292,7 +293,22 @@ test('erro na emissão, cancelamento e reemissão; boleto alterado depois de emi
   assert.equal(cb.banco.linha_digitavel, RESPOSTA_EMISSAO.payment_method.bank_slip.digitable_line); // fica para consulta
   assert.equal(R.emitidoNoBanco(cb), false);
   assert.doesNotThrow(() => R.excluirContaBanco(d, 'ank', 'teste')); // sem boleto aberto na conta, pode sair
+  // reemissão depois do cancelamento: a data de emissão é a nova e a anterior fica guardada
+  const emitidoAntes = cb.banco.emitido_em;
+  cb.banco.emitido_em = '2026-02-20T10:00:00.000Z';
   R.registrarBoletoBancario(d, cb.id, { ...RESPOSTA_EMISSAO, external_reference_id: 'B00000001ZZZZZZZZZZ0000000' }, 'teste', { conta_id: 'jck' });
+  assert.notEqual(cb.banco.emitido_em, '2026-02-20T10:00:00.000Z');
+  assert.ok(cb.banco.emitido_em > '2026-02-20T10:00:00.000Z');
+  assert.equal(cb.banco.consultado_em, null);
+  assert.equal(cb.banco.emissoes_anteriores.length, 1);
+  assert.deepEqual([cb.banco.emissoes_anteriores[0].emitido_em, cb.banco.emissoes_anteriores[0].id_externo], ['2026-02-20T10:00:00.000Z', 'B00000001ABCDEFGHIJ0000000']);
+  assert.ok(cb.banco.emissoes_anteriores[0].cancelado_em);
+  assert.ok(emitidoAntes);
+  // consulta do boleto reemitido não mexe na data de emissão
+  const emitidoNovo = cb.banco.emitido_em;
+  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, external_reference_id: 'B00000001ZZZZZZZZZZ0000000' }, 'teste');
+  assert.deepEqual([cb.banco.emitido_em, cb.banco.emissoes_anteriores.length], [emitidoNovo, 1]);
+  assert.ok(cb.banco.consultado_em);
   assert.throws(() => R.excluirContaBanco(d, 'jck', 'teste'), /em aberto no banco/);
 });
 

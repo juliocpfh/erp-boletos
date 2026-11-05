@@ -387,6 +387,7 @@ th.centro, td.centro { text-align: center; }
 .abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
 .abas a.ativo { border-bottom-color: var(--info, #0891b2); font-weight: 700; }
 .texto-aviso { color: #b45309; font-weight: 700; }
+.texto-ok { color: #15803d; }
 /* Lista de Imóveis: contas (Sanepar, Copel, gás, condomínio) numa linha fina embaixo do endereço */
 .contas { font-size: 12px; color: var(--suave); white-space: nowrap; }
 .contas b { color: var(--texto); font-weight: 600; }
@@ -488,8 +489,17 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 
 /* Banco (C6): boleto emitido, QR Code do Pix e botões que ainda não funcionam */
 button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
-.boleto-banco td { padding: 4px 8px; vertical-align: top; }
+.boleto-banco { width: 100%; max-width: 100%; table-layout: fixed; }
+.boleto-banco td, .boleto-banco th { padding: 4px 8px; vertical-align: top; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .boleto-banco td.copia-cola { word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.boleto-banco.codigos td:first-child { width: 26%; }
+.boleto-banco.codigos td.n { width: 84px; }
+@media (max-width: 760px) {
+  /* no celular, cada código vira um bloco: rótulo, valor quebrado em linhas e o botão Copiar embaixo (sem rolagem lateral) */
+  table.boleto-banco.codigos, table.boleto-banco.codigos tbody, table.boleto-banco.codigos tr, table.boleto-banco.codigos td { display: block; width: auto; max-width: 100%; }
+  table.boleto-banco.codigos tr { border-bottom: 1px dashed var(--borda); padding: 6px 0; }
+  table.boleto-banco.codigos td { padding: 2px 0; text-align: left; }
+}
 .qr-pix { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
 .qr-pix img { width: 180px; height: 180px; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
 #saude-ponte ul { padding-left: 18px; }

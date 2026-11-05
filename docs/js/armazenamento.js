@@ -200,6 +200,28 @@ async function copiarPasta(origem, destino) {
   }
 }
 
+/**
+ * Guarda contra mover/juntar uma pasta para dentro dela mesma ou para ela própria (visto no OPFS do Chromium: nome com acento
+ * resolvendo para a pasta-mãe, e "juntar" apagando a pasta do imóvel inteira). Devolve o motivo (texto) ou null se é seguro.
+ */
+async function destinoPerigoso(origem, paiNovo, novo) {
+  try {
+    if (await origem.isSameEntry(paiNovo) || (await origem.resolve(paiNovo)) !== null) return 'o destino fica dentro da própria pasta de origem';
+    let destino = null;
+    try { destino = await paiNovo.getDirectoryHandle(novo); } catch { /* não existe: ok */ }
+    if (destino && await origem.isSameEntry(destino)) return 'origem e destino são a mesma pasta';
+  } catch (e) {
+    return `não deu para conferir origem e destino (${e.message})`;
+  }
+  return null;
+}
+
+async function contarArquivos(dir) {
+  let n = 0;
+  for await (const [, h] of dir.entries()) n += h.kind === 'file' ? 1 : await contarArquivos(h);
+  return n;
+}
+
 /** Renomeia uma subpasta (ex.: quando o inquilino sai e a pasta ganha a data de saída). */
 export async function renomearPasta(pai, antigo, novo) {
   antigo = limparNome(antigo);
@@ -212,6 +234,8 @@ export async function renomearPasta(pai, antigo, novo) {
     await pai.getDirectoryHandle(novo, { create: true });
     return;
   }
+  const perigo = await destinoPerigoso(origem, pai, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não renomeada para "${novo}": ${perigo}.`); return; }
   try {
     await pai.getDirectoryHandle(novo);
     return; // já existe uma pasta com o nome novo: não mistura conteúdos
@@ -238,6 +262,8 @@ export async function moverPasta(paiAntigo, antigo, paiNovo, novo) {
     await paiNovo.getDirectoryHandle(novo, { create: true });
     return;
   }
+  const perigo = await destinoPerigoso(origem, paiNovo, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não movida para "${novo}": ${perigo}.`); return; }
   try {
     await paiNovo.getDirectoryHandle(novo);
     return; // já existe uma pasta com o nome novo: não mistura conteúdos
@@ -264,6 +290,9 @@ export async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
   let origem;
   try { origem = await paiAntigo.getDirectoryHandle(antigo); } catch { return 0; }
   if (antigo === novo && await paiAntigo.isSameEntry(paiNovo)) return 0;
+  // nunca junta uma pasta com ela mesma nem a leva para dentro dela: isso apagaria a pasta inteira (os arquivos "repetidos" são os próprios)
+  const perigo = await destinoPerigoso(origem, paiNovo, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não juntada em "${novo}": ${perigo}.`); return contarArquivos(origem); }
   let existe = true;
   try { await paiNovo.getDirectoryHandle(novo); } catch { existe = false; }
   if (!existe) {

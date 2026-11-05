@@ -2894,7 +2894,9 @@ function alertaRotinaEntrada(d, c, hoje) {
  */
 export function arquivosReferenciados(d) {
   const out = [];
-  const usa = (escopo, id, nome) => { if (nome && id) out.push({ escopo, id, nome }); };
+  const vistos = new Set();
+  // o mesmo PDF pode ser apontado por dois registros (pagamento pelo banco e a movimentação que o confirmou): entra uma vez
+  const usa = (escopo, id, nome) => { const k = `${escopo}:${id}|${nome}`; if (nome && id && !vistos.has(k)) { vistos.add(k); out.push({ escopo, id, nome }); } };
   for (const c of d.contratos) {
     for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
     for (const [campo] of DOCUMENTOS_ENTRADA) {
@@ -2975,7 +2977,7 @@ export function rotulosDosArquivos(d) {
       const c = pastaContador(d, x);
       const rotulo = rotuloDoComprovante(d, x);
       if (p) poe(p.escopo, p.id, x.comprovante, rotulo);
-      if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d, x.conta_id)} ${C.compBr(competenciaDoComprovante(x))}) · ${rotulo}`);
+      if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d, contaDeOrigem(d, x))} ${C.compBr(mesDoDinheiro(d, x))}) · ${rotulo}`);
     }
   }
   return m;
@@ -3442,13 +3444,12 @@ export function contasDoImovel(d, cb) {
 }
 
 /**
- * Conta que emite este boleto sem perguntar: no modo 'padrao', a padrão; no modo 'escolher', a da empresa do imóvel quando ele tem
- * uma só; null = a tela pergunta (pré-marcando ``contaPreMarcada``).
+ * Conta que emite este boleto sem perguntar: no modo 'padrao', a padrão; no modo 'escolher', null = a tela pergunta SEMPRE
+ * (mesmo com uma só empresa no imóvel), pré-marcando ``contaPreMarcada``. Pedido do dono: escolher boleto a boleto é escolher mesmo.
  */
 export function contaSugerida(d, cb) {
   if (configBanco(d).modo_conta_boleto !== 'escolher') return contaEmissora(d);
-  const doImovel = contasDoImovel(d, cb);
-  return doImovel.length === 1 ? doImovel[0] : null;
+  return null;
 }
 
 /** Conta a vir marcada na pergunta: a da empresa do imóvel (se uma só), senão a padrão. */
@@ -3649,13 +3650,17 @@ export function registrarBoletoBancario(d, cbId, resposta, usuario, extra = {}) 
   if (!cb) throw new Error('Boleto não encontrado.');
   const n = normalizarRespostaC6(resposta);
   const antes = cb.banco || {};
+  // emissão nova depois de um cancelamento (ou referência externa diferente): a data de emissão é a de agora e a anterior fica guardada
+  const reemissao = !!antes.emitido_em && ((antes.situacao === 'cancelado' && n.situacao !== 'cancelado') || (!!n.id_externo && !!antes.id_externo && n.id_externo !== antes.id_externo));
+  const emissoesAnteriores = reemissao ? [...(antes.emissoes_anteriores || []), { emitido_em: antes.emitido_em, cancelado_em: antes.cancelado_em || null, id_externo: antes.id_externo || null, nosso_numero: antes.nosso_numero || null, linha_digitavel: antes.linha_digitavel || null }] : (antes.emissoes_anteriores || null);
   const banco = {
     provedor: 'c6', conta_id: extra.conta_id || antes.conta_id || null, ambiente: extra.ambiente || antes.ambiente || null,
     id_externo: n.id_externo || antes.id_externo || null, id_banco: n.id_banco || antes.id_banco || null, nosso_numero: n.nosso_numero || antes.nosso_numero || null,
     linha_digitavel: n.linha_digitavel || antes.linha_digitavel || null, codigo_barras: n.codigo_barras || antes.codigo_barras || null,
     pix_copia_cola: n.pix_copia_cola || antes.pix_copia_cola || null, pix_qr_base64: n.pix_qr_base64 || antes.pix_qr_base64 || null, pix_qr_mime: n.pix_qr_mime || antes.pix_qr_mime || null,
     situacao: n.situacao, situacao_banco: n.situacao_banco, valor: n.valor ?? antes.valor ?? valorNoBanco(d, cb), vencimento: n.vencimento || antes.vencimento || cb.vencimento,
-    emitido_em: antes.emitido_em || new Date().toISOString(), consultado_em: antes.emitido_em ? new Date().toISOString() : null,
+    emitido_em: antes.emitido_em && !reemissao ? antes.emitido_em : new Date().toISOString(), consultado_em: antes.emitido_em && !reemissao ? new Date().toISOString() : null,
+    ...(emissoesAnteriores ? { emissoes_anteriores: emissoesAnteriores } : {}),
     pago_em: n.pago_em || antes.pago_em || null, credito_em: n.credito_em || antes.credito_em || null, valor_pago: n.valor_pago ?? antes.valor_pago ?? null, erro: null,
     notificacoes: n.notificacoes || antes.notificacoes || null, negativacao: n.negativacao ? { ...(antes.negativacao || {}), ...n.negativacao } : (antes.negativacao || null),
     simulado: !!((resposta && resposta.simulado) || antes.simulado),
@@ -4527,8 +4532,27 @@ export const apelidoDaConta = (d, contaId) => {
   const e = c.emitente_id ? buscar(d, 'emitentes', c.emitente_id) : null;
   return c.apelido || (e ? e.nome.split(' ')[0] : String(contaId).toUpperCase());
 };
-/** Mês do comprovante para a pasta do contador: competência da conta ou mês da data. */
-export const competenciaDoComprovante = (x) => (x.competencia && /^\d{4}-\d{2}$/.test(x.competencia) ? x.competencia : String(x.data || x.pago_em || x.data_pagamento || '').slice(0, 7)) || C.hojeIso().slice(0, 7);
+/**
+ * Mês da pasta do contador: sempre o mês em que o dinheiro saiu/entrou. Movimentação do extrato: a data dela (a ponta que recebe uma
+ * transferência usa a data da ponta que enviou); pagamento pelo banco: a data da movimentação ligada ou, sem ela, a data do pagamento.
+ * Ex.: conta de 12/2026 paga em 28/11/2026 → pasta 2026-11 (não a competência).
+ */
+export function mesDoDinheiro(d, x) {
+  const mov = d && x.movimentacao_id ? buscar(d, 'movimentacoes_banco', x.movimentacao_id) : null;
+  const par = d && x.classificacao === 'transferencia' && x.tipo === 'entrada' && x.par_movimentacao_id ? buscar(d, 'movimentacoes_banco', x.par_movimentacao_id) : null;
+  const data = (par && par.data) || (mov && mov.data) || x.data || x.pago_em || x.data_pagamento || '';
+  return String(data).slice(0, 7) || C.hojeIso().slice(0, 7);
+}
+export const competenciaDoComprovante = (x, d = null) => mesDoDinheiro(d, x);
+
+/** Conta de onde o dinheiro saiu: a própria; na ponta que recebe uma transferência entre as nossas contas, a conta da outra ponta. */
+export function contaDeOrigem(d, x) {
+  if (x.classificacao === 'transferencia' && x.tipo === 'entrada' && x.par_movimentacao_id) {
+    const par = buscar(d, 'movimentacoes_banco', x.par_movimentacao_id);
+    if (par) return par.conta_id;
+  }
+  return x.conta_id;
+}
 
 /**
  * Onde fica o PDF do comprovante no imóvel: IPTU → "IPTU (guias)/<ano do IPTU>" (iptuano); com imóvel → "Contas pagas/<ano da data>"
@@ -4545,11 +4569,14 @@ export function pastaDoComprovante(d, x) {
   return { escopo: 'contasano', id: idPastaAno(x.imovel_id, String(data).slice(0, 4)) };
 }
 
-/** Pasta do contador ("_Contador/<Empresa>/<AAAA-MM>") da conta bancária da movimentação, ou null se a conta não tem empresa. */
+/**
+ * Pasta do contador ("_Contador/<Empresa>/<AAAA-MM>"): a empresa da conta de onde o dinheiro saiu (transferência: a conta de origem),
+ * no mês do dinheiro (``mesDoDinheiro``). null se a conta não tem empresa.
+ */
 export function pastaContador(d, x) {
-  const c = contaBancaria(d, x.conta_id);
+  const c = contaBancaria(d, contaDeOrigem(d, x));
   if (!c || !c.emitente_id) return null;
-  return { escopo: 'contador', id: idContador(c.emitente_id, competenciaDoComprovante(x)) };
+  return { escopo: 'contador', id: idContador(c.emitente_id, mesDoDinheiro(d, x)) };
 }
 
 /** Etiqueta do comprovante na caixa de arquivos: "comprovante do banco ANK: Água 11/2026 (05/11/2026, R$ 123,45)". */
@@ -4583,7 +4610,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
     const importadoAte = (cfg.ultima_importacao || {})[c.id] || null;
     return { id: c.id, apelido: apelidoDaConta(d, c.id), semDestino: semDestinoDe(c.id), importadoAte, semImportar: !importadoAte || importadoAte < ate };
   });
-  const semComprovante = movs.filter((m) => m.classificacao && !['ignorar', 'transferencia'].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador).length;
+  const semComprovante = movs.filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador).length;
   const pagamentosPendentes = (d.pagamentos_banco || []).filter((p) => ['aguardando_aprovacao', 'agendado', 'erro'].includes(p.situacao)).length;
   return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
 }
@@ -4594,7 +4621,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   if (!cfg.ativo) return null;
   const limite = C.somarDias(hoje, -DIAS_ALERTA_BANCO);
   const semDestino = (d.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
-  const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && !['ignorar', 'transferencia'].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador && m.data <= limite);
+  const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador && m.data <= limite);
   const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
   const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
   if (!semDestino.length && !semComprovante.length && !enviados.length && !erros.length) return null;

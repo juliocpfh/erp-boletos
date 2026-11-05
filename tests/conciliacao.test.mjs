@@ -122,6 +122,18 @@ test('sugestão de destino: palavras da descrição com o imóvel pela matrícul
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa], ['conta_imovel', loja.id, 'Luz']);
   s = Z.sugerirDestino(d, iptu);
   assert.deepEqual([s.classificacao, s.imovel_id, s.iptu.n, s.confianca], ['iptu', loja.id, 1, 'alta']);
+  // a parcela citada na descrição vale mais que a primeira em aberto com o mesmo valor (todas de R$ 100,00)
+  for (const [desc, n] of [['IPTU PREFEITURA CURITIBA INSC 01.234.567 PARCELA 3/10', 3], ['IPTU PREF CURITIBA 01.234.567 PARC 04', 4], ['IPTU 01.234.567 3ª PARCELA', 3], ['IPTU 01.234.567 2A PARC', 2]]) {
+    const [m] = importar(d, 'ank', [saida(`p${n}${desc.length}`, '2026-11-09', '100.00', desc)]).novas;
+    s = Z.sugerirDestino(d, m);
+    assert.deepEqual([s.classificacao, s.iptu.n, s.confianca], ['iptu', n, 'alta'], desc);
+    assert.match(s.motivo, /parcela citada/);
+  }
+  assert.deepEqual([Z.parcelaCitada('PARCELA 3/10'), Z.parcelaCitada('PARC. 07'), Z.parcelaCitada('3ª PARCELA'), Z.parcelaCitada('COTA UNICA'), Z.parcelaCitada('IPTU PREFEITURA')], [3, 7, 3, 0, null]);
+  // parcela citada já paga: cai na regra do valor (primeira em aberto)
+  R.marcarIptuPago(d, d.iptus[0].id, 5, '2026-06-10', 'julio');
+  const [paga] = importar(d, 'ank', [saida('p5x', '2026-11-09', '100.00', 'IPTU 01.234.567 PARCELA 5/10')]).novas;
+  assert.equal(Z.sugerirDestino(d, paga).iptu.n, 1);
   s = Z.sugerirDestino(d, net);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.confianca], ['conta_imovel', null, 'Internet', 'baixa'], 'palavra sem imóvel conhecido: sugestão fraca');
 });
@@ -325,6 +337,7 @@ test('pagamentos pelo banco: preparar (validações), aprovar, lote enviado, sit
   assert.throws(() => Z.prepararPagamentos(d, [{ ...dados, valor: 0 }], 'ana'), /Informe o valor/);
   d.config_banco.limite_pagamento = 10000;
   assert.throws(() => Z.prepararPagamentos(d, [dados], 'ana'), /limite por pagamento/);
+  assert.throws(() => Z.prepararPagamentos(d, [dados], 'ana'), C.ErroUsuario, 'erro do usuário: a tela mostra, mas não vai ao console');
   d.config_banco.limite_pagamento = 0;
   assert.throws(() => Z.prepararPagamentos(d, [{ ...dados, codigo_barras: '123456789012345678901234567890' }], 'ana'), /30 dígitos/);
   assert.throws(() => Z.prepararPagamentos(d, [{ ...dados, conta_id: 'zzz' }], 'ana'), /não está configurada/);
@@ -409,11 +422,69 @@ test('pagamento confirmado pela saída do extrato: vira pago na data da moviment
   assert.equal(R.buscar(d, 'despesas', lanc.id).comprovante, 'pag.pdf');
 });
 
+test('comprovante único: a pasta do contador é a do mês do dinheiro (não da competência) e o nome vai para o pagamento, a movimentação e a conta', () => {
+  const { d, sobre, jck } = base();
+  d.config_banco.permitir_pagamentos = true;
+  // conta de 12/2026 paga pelo banco em 28/11/2026: a pasta do contador é 2026-11
+  const [p] = Z.prepararPagamentos(d, [{ conta_id: 'jck', imovel_id: sobre.id, origem: { tipo: 'avulso', id: null, n: null }, tipo_conta: 'Condomínio', competencia: '2026-12', forma: 'boleto', codigo_barras: '2'.repeat(47), valor: 45000, data_pagamento: '2026-11-28' }], 'ana');
+  assert.deepEqual(Z.escopoContador(d, p), { escopo: 'contador', id: R.idContador(jck.id, '2026-11') }, 'sem movimentação: a data do pagamento');
+  Z.aprovarPagamento(d, p.id, 'julio');
+  Z.marcarPagamentoEnviado(d, p.id, { id_externo: 'it-1' }, 'julio');
+  const { novas: [mov] } = importar(d, 'jck', [saida('s1', '2026-11-28', '450.00', 'PIX CONDOMINIO EDIFICIO EXEMPLO')]);
+  Z.marcarPagoPeloExtrato(d, p.id, mov.id, 'julio');
+  const pago = R.buscar(d, 'pagamentos_banco', p.id);
+  assert.equal(pago.competencia, '2026-12');
+  assert.deepEqual(Z.escopoContador(d, pago), Z.escopoContador(d, R.buscar(d, 'movimentacoes_banco', mov.id)), 'pagamento e movimentação na mesma pasta do contador');
+  assert.equal(R.mesDoDinheiro(d, pago), '2026-11');
+  assert.deepEqual(Z.escopoDoComprovante(d, pago), Z.escopoDoComprovante(d, R.buscar(d, 'movimentacoes_banco', mov.id)));
+  // pagamento sem movimentação ligada mas com data futura e competência anterior: vale a data do pagamento
+  assert.equal(R.mesDoDinheiro(null, { competencia: '2026-10', data_pagamento: '2026-11-03' }), '2026-11');
+  // o comprovante registrado no pagamento aparece na movimentação e na conta lançada
+  Z.registrarComprovante(d, pago.id, { nome_arquivo: 'x', comprovante: 'cond.pdf', comprovante_contador: 'cond.pdf', origem: 'ponte' }, 'julio', 'pagamentos_banco');
+  const m = R.buscar(d, 'movimentacoes_banco', mov.id);
+  assert.deepEqual([m.comprovante, m.comprovante_contador, m.comprovante_origem], ['cond.pdf', 'cond.pdf', 'ponte']);
+  assert.equal(R.buscar(d, 'despesas', pago.despesa_id).comprovante, 'cond.pdf');
+  assert.deepEqual(Z.irmaoDoComprovante(d, pago, 'pagamentos_banco').x.id, mov.id);
+  assert.deepEqual(Z.irmaoDoComprovante(d, m).x.id, pago.id);
+  // um arquivo só nas referências (os dois registros apontam para o mesmo PDF)
+  const refs = R.arquivosReferenciados(d).filter((x) => x.nome === 'cond.pdf');
+  assert.deepEqual(refs.map((x) => [x.escopo, x.id]), [['contasano', R.idPastaAno(sobre.id, 2026)], ['contador', R.idContador(jck.id, '2026-11')]]);
+  // pelo lado da movimentação também copia para o pagamento
+  Z.registrarComprovante(d, mov.id, { comprovante: 'cond2.pdf', comprovante_contador: 'cond2.pdf', origem: 'manual' }, 'julio');
+  assert.deepEqual([R.buscar(d, 'pagamentos_banco', p.id).comprovante, R.buscar(d, 'pagamentos_banco', p.id).comprovante_origem], ['cond2.pdf', 'manual']);
+});
+
+test('transferência entre as nossas contas tem comprovante: um só, na pasta do contador da conta de ORIGEM no mês da movimentação, sem pasta de imóvel', () => {
+  const { d, ank } = base();
+  const [ted] = importar(d, 'ank', [saida('t1', '2026-11-30', '2000.00', 'TED PARA JCK ADMINISTRADORA', { transaction_type: 'TRANSFER' })]).novas;
+  const [rec] = importar(d, 'jck', [entrada('j1', '2026-12-01', '2000.00', { transaction_type: 'TRANSFER', description: 'TED RECEBIDA ANK ADMINISTRADORA', title: 'Transferência recebida' })]).novas;
+  Z.vincularMovimentacao(d, ted.id, { classificacao: 'transferencia' }, 'julio');
+  assert.equal(R.buscar(d, 'movimentacoes_banco', rec.id).par_movimentacao_id, ted.id);
+  assert.equal(Z.movimentacoesDo(d, { filtro: 'sem_comprovante' }).length, 2, 'as duas pontas pedem comprovante');
+  assert.equal(R.pendenciasBancoDoMes(d, '2026-11', '2026-12-05').semComprovante, 1);
+  const origem = { escopo: 'contador', id: R.idContador(ank.id, '2026-11') };
+  assert.deepEqual(Z.escopoContador(d, R.buscar(d, 'movimentacoes_banco', ted.id)), origem);
+  assert.deepEqual(Z.escopoContador(d, R.buscar(d, 'movimentacoes_banco', rec.id)), origem, 'a ponta que recebe usa a pasta da conta de origem (e o mês dela)');
+  assert.equal(Z.escopoDoComprovante(d, R.buscar(d, 'movimentacoes_banco', rec.id)), null);
+  assert.equal(Z.contaDeOrigem(d, R.buscar(d, 'movimentacoes_banco', rec.id)), 'ank');
+  assert.equal(Z.nomeComprovante(d, R.buscar(d, 'movimentacoes_banco', ted.id)), '2026-11-30 ANK Geral Transferencia 2.000,00.pdf');
+  assert.match(Z.nomeComprovante(d, R.buscar(d, 'movimentacoes_banco', rec.id)), /ANK Geral Transferencia 2\.000,00\.pdf$/, 'nome com a empresa de origem');
+  Z.registrarComprovante(d, ted.id, { comprovante_contador: '2026-11-30 ANK Geral Transferencia 2.000,00.pdf', origem: 'ponte' }, 'julio');
+  assert.equal(R.buscar(d, 'movimentacoes_banco', rec.id).comprovante_contador, '2026-11-30 ANK Geral Transferencia 2.000,00.pdf', 'a outra ponta divide o mesmo PDF');
+  assert.equal(Z.movimentacoesDo(d, { filtro: 'sem_comprovante' }).length, 0);
+  assert.equal(R.arquivosReferenciados(d).filter((x) => /Transferencia/.test(x.nome)).length, 1, 'um arquivo só');
+  assert.match(R.rotulosDosArquivos(d).get(`contador:${origem.id}|2026-11-30 ANK Geral Transferencia 2.000,00.pdf`), /cópia para o contador \(ANK 11\/2026\)/);
+  const { arquivos } = Z.desvincularMovimentacao(d, ted.id, 'julio');
+  assert.deepEqual(arquivos, [{ ...origem, nome: '2026-11-30 ANK Geral Transferencia 2.000,00.pdf' }]);
+  assert.equal(R.buscar(d, 'movimentacoes_banco', rec.id).comprovante_contador, null, 'desfazer limpa as duas pontas');
+});
+
 test('código de barras: 44, 47 e 48 dígitos passam (com pontos e espaços), 46 e letras falham; linha digitável vira código de 44', () => {
   assert.equal(Z.validarCodigoBarras('34191.09008 00123.456789 01234.567890 1 23456789012345').length, 47);
   assert.equal(Z.validarCodigoBarras('8'.repeat(44)).length, 44);
   assert.equal(Z.validarCodigoBarras('8'.repeat(48)).length, 48);
-  assert.throws(() => Z.validarCodigoBarras('8'.repeat(46)), /46 dígitos/);
+  assert.throws(() => Z.validarCodigoBarras('8'.repeat(46)), /46 dígitos: esperava 44, 47 ou 48/);
+  assert.throws(() => Z.validarCodigoBarras('8'.repeat(46)), C.ErroUsuario);
   assert.throws(() => Z.validarCodigoBarras('abc'), /Informe o código/);
   assert.throws(() => Z.validarCodigoBarras(''), /Informe/);
   // boleto: AAABC.CCCCX DDDDD.DDDDDY EEEEE.EEEEEZ K UUUUVVVVVVVVVV → AAAB K UUUUVVVVVVVVVV CCCCC DDDDDDDDDD EEEEEEEEEE

@@ -97,7 +97,9 @@ export function caixaBancoC6(cb) {
   const div = R.divergenciaBancaria(cb);
   const linha = (rotulo, valor) => (valor ? `<tr><td class="suave">${rotulo}</td><td class="copia-cola"><b>${esc(valor)}</b></td><td class="n">${botao('copiar', 'Copiar', { texto: valor })}</td></tr>` : '');
   const qr = B.imagemQrPix(cb);
-  return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}</div></div>
+  const semPix = b.situacao === 'emitido' && !b.pix_copia_cola;
+  return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta('sem Pix', 'aviso')}` : ''}</div></div>
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? `: a ponte não tem a chave Pix desta conta (C6_${esc(String(conta.id).toUpperCase())}_CHAVE_PIX). O inquilino paga só pela linha digitável; para ter o QR Code, configure a chave na ponte e emita de novo.` : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco C6).'}</div>` : ''}
     ${R.aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ''}
     ${b.situacao === 'pago' && !cb.data_pagamento ? `<div class="alerta aviso"><b>O banco informou o pagamento</b>${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ''}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ''}, mas ele ainda não está registrado aqui. ${opera() ? botao('consultarBoletoC6', 'Registrar o pagamento', { id: cb.id }, 'pequeno') : 'Peça a um operador para registrar.'}</div>` : ''}
     ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ''}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ''}.${opera() ? ` ${botao('alterarBoletoC6', 'Atualizar o boleto no banco com os valores do sistema', { id: cb.id }, 'pequeno', 'Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?')}` : ''} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ''}
@@ -105,7 +107,7 @@ export function caixaBancoC6(cb) {
       ${item('Emitido em', b.emitido_em ? new Date(b.emitido_em).toLocaleString('pt-BR') : '-')}${b.pago_em ? item('Pago em (banco)', `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ''}`) : ''}
       ${item('Valor no banco', reais(b.valor))}${item('Vencimento no banco', b.vencimento ? dataBr(b.vencimento) : '-')}
       ${item('Situação no banco', `${esc(b.situacao_banco || b.situacao)}${b.consultado_em ? `<br><span class="suave">consultado em ${new Date(b.consultado_em).toLocaleString('pt-BR')}</span>` : ''}`)}</div>
-    <table class="boleto-banco">${linha('Linha digitável', b.linha_digitavel)}${linha('Código de barras', b.codigo_barras)}${linha('Nosso número', b.nosso_numero)}${linha('Pix copia e cola', b.pix_copia_cola)}${linha('Referência', b.id_externo)}</table>
+    <table class="boleto-banco codigos">${linha('Linha digitável', b.linha_digitavel)}${linha('Código de barras', b.codigo_barras)}${linha('Nosso número', b.nosso_numero)}${linha('Pix copia e cola', b.pix_copia_cola)}${linha('Referência', b.id_externo)}</table>
     ${qr ? `<div class="qr-pix"><img src="${qr}" alt="QR Code do Pix" width="180" height="180"><div class="suave">QR Code do Pix: o inquilino lê com o app do banco.</div></div>` : ''}
     ${tabelaNotificacoes(b)}
     ${blocoNegativacao(cb, conta)}
@@ -131,7 +133,7 @@ export function caixaContaDosBoletos() {
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg.modo_conta_boleto !== 'escolher' ? 'checked' : ''}> Sempre pela empresa padrão:</label>
         <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? 'selected' : ''}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join('')}</select></div>
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg.modo_conta_boleto === 'escolher' ? 'checked' : ''}> Escolher a empresa boleto a boleto</label>
-        <div class="ajuda">Ao emitir, o sistema pergunta a conta (já marcada a da empresa do imóvel, quando ele tem uma só). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
+        <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>`
     : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;

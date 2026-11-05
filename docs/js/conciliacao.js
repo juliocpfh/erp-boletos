@@ -5,10 +5,10 @@ import * as C from './calculos.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  pendenciasBancoDoMes, CONFIG_BANCO_FASE2,
+  pendenciasBancoDoMes, CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem,
 } from './regras.js';
 
-export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, contaBancaria as contaDo, apelidoDaConta };
+export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, contaBancaria as contaDo, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
 
 export const CLASSIFICACOES = {
   conta_imovel: 'Conta do imóvel (água, luz, gás, condomínio, internet, outra)',
@@ -158,7 +158,8 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
 // --------------------------------------------------------------------------
 // Consulta
 // --------------------------------------------------------------------------
-const semComprovante = (m) => m.classificacao && !['ignorar', 'transferencia'].includes(m.classificacao) && !m.comprovante && !m.comprovante_contador;
+/** Precisa de comprovante toda movimentação com destino, menos a ignorada (a transferência entre as nossas contas também: um PDF só, na pasta do contador da conta de origem). */
+const semComprovante = (m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador;
 
 export function movimentacoesDo(d, { conta_id = null, mes = null, imovel_id = null, filtro = 'todas' } = {}) {
   return (d.movimentacoes_banco || []).filter((m) => (!conta_id || m.conta_id === conta_id) && (!mes || String(m.data).slice(0, 7) === mes)
@@ -205,7 +206,7 @@ function tipoDoComprovante(d, mov) {
 export function nomeComprovante(d, mov, { modelo = null, extensao = '.pdf' } = {}) {
   const i = mov.imovel_id ? buscar(d, 'imoveis', mov.imovel_id) : null;
   const data = mov.data || mov.pago_em || mov.data_pagamento || hoje();
-  const tokens = { data, empresa: apelidoDaConta(d, mov.conta_id), imovel: i ? i.nome : 'Geral', tipo: tipoDoComprovante(d, mov),
+  const tokens = { data, empresa: apelidoDaConta(d, contaDeOrigem(d, mov)), imovel: i ? i.nome : 'Geral', tipo: tipoDoComprovante(d, mov),
     valor: C.reais(mov.valor, false), mes: mov.competencia || String(data).slice(0, 7), contrapartida: (mov.contrapartida && mov.contrapartida.nome) || (mov.beneficiario && mov.beneficiario.nome) || '' };
   const m = modelo || cfg(d).modelo_nome_comprovante || CONFIG_BANCO_FASE2.modelo_nome_comprovante;
   const nome = nomeSemAcento(m.replace(/\{(\w+)\}/g, (_, k) => tokens[k] ?? '')).slice(0, 120).trim();
@@ -345,6 +346,13 @@ const PALAVRAS = [
   [/\bDARF\b|RECEITA FEDERAL|\bPIS\b|COFINS|\bIRPJ\b|\bCSLL\b|SIMPLES NACIONAL/, 'imposto', null],
   [/TARIFA|\bTAR\b|PACOTE DE SERVICOS|MENSALIDADE|MANUTENCAO DE CONTA/, 'tarifa', null],
 ];
+/** Número da parcela citado na descrição ("PARCELA 3/10", "PARC. 03", "3ª PARCELA", "COTA UNICA" → 0); null se não cita. */
+export function parcelaCitada(texto) {
+  const t = String(texto || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (/COTA\s*UNICA|PARCELA\s*UNICA/.test(t)) return 0;
+  const m = /PARC(?:ELA)?\.?\s*0?(\d{1,2})\b/.exec(t) || /\b0?(\d{1,2})\s*[ªA°º]?\s*PARC(?:ELA)?/.exec(t);
+  return m ? Number(m[1]) : null;
+}
 const textoDaMov = (m) => `${m.descricao || ''} ${m.titulo || ''} ${(m.contrapartida && (`${m.contrapartida.nome || ''} ${m.contrapartida.documento || ''}`)) || ''}`
   .toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -406,8 +414,12 @@ export function sugerirDestino(d, mov) {
     if (!re.test(texto) || mov.tipo !== 'saida') continue;
     if (classificacao === 'iptu') {
       const p = imv ? d.iptus.filter((x) => x.imovel_id === imv.imovel.id).sort((a, b) => b.ano - a.ano)[0] : null;
-      const parcela = p ? parcelasIptu(d, p).find((pc) => pc.proprietario && !pc.paga && (pc.valor === mov.valor || pc.valorProprietario === mov.valor)) : null;
-      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: parcela ? parcela.n : null } : null, motivo: 'descrição de IPTU', confianca: parcela ? 'alta' : 'media' };
+      const pcs = p ? parcelasIptu(d, p).filter((pc) => pc.proprietario) : [];
+      // "PARCELA 3/10", "PARC 3", "3ª PARCELA": a parcela citada vale mais que a primeira em aberto com o mesmo valor
+      const nCitado = parcelaCitada(texto);
+      const citada = nCitado !== null ? pcs.find((pc) => pc.n === nCitado && !pc.paga) || null : null;
+      const parcela = citada || pcs.find((pc) => !pc.paga && (pc.valor === mov.valor || pc.valorProprietario === mov.valor)) || null;
+      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: parcela ? parcela.n : null } : null, motivo: citada ? `descrição de IPTU (${citada.rotulo} parcela citada)` : 'descrição de IPTU', confianca: parcela ? 'alta' : 'media' };
     } else if (classificacao === 'imposto') porPalavra = { classificacao: 'imposto', motivo: 'descrição de imposto', confianca: 'media' };
     else if (classificacao === 'tarifa') porPalavra = { classificacao: 'tarifa', motivo: 'descrição de tarifa', confianca: 'media' };
     else porPalavra = { classificacao: 'conta_imovel', imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === 'nome' ? 'descrição' : 'matrícula/UC cadastrada'}` : `descrição de ${tipo}`, confianca: imv ? 'media' : 'baixa' };
@@ -552,7 +564,7 @@ export function desvincularMovimentacao(d, movId, usuario) {
   if (mov.guia_imposto_id && buscar(d, 'guias_impostos', mov.guia_imposto_id)) atualizar(d, 'guias_impostos', mov.guia_imposto_id, { paga_em: null, movimentacao_id: null }, usuario, 'Guia solta da movimentação do extrato');
   if (mov.par_movimentacao_id) {
     const par = buscar(d, 'movimentacoes_banco', mov.par_movimentacao_id);
-    if (par) atualizar(d, 'movimentacoes_banco', par.id, { classificacao: null, par_movimentacao_id: null, classificada_em: null, classificada_por: null }, usuario, 'Transferência desfeita (outra ponta)');
+    if (par) atualizar(d, 'movimentacoes_banco', par.id, { classificacao: null, par_movimentacao_id: null, classificada_em: null, classificada_por: null, comprovante: null, comprovante_contador: null, comprovante_origem: null }, usuario, 'Transferência desfeita (outra ponta)');
   }
   atualizar(d, 'movimentacoes_banco', mov.id, { ...CAMPOS_DESTINO, observacoes: mov.observacoes || '' }, usuario, 'Destino da movimentação desfeito');
   return { arquivos };
@@ -561,15 +573,34 @@ export function desvincularMovimentacao(d, movId, usuario) {
 // --------------------------------------------------------------------------
 // Comprovantes
 // --------------------------------------------------------------------------
-/** Registra o(s) PDF(s) guardado(s): na pasta do imóvel (comprovante) e/ou na do contador (comprovante_contador). origem: banco | ponte | manual. */
+/**
+ * O registro irmão, que é o mesmo dinheiro e divide o mesmo comprovante: do pagamento pelo banco, a movimentação do extrato que o
+ * confirmou (e vice-versa); de uma ponta da transferência entre as nossas contas, a outra ponta. null se não há.
+ */
+export function irmaoDoComprovante(d, x, tabela = 'movimentacoes_banco') {
+  if (tabela === 'pagamentos_banco') return x.movimentacao_id && buscar(d, 'movimentacoes_banco', x.movimentacao_id) ? { tabela: 'movimentacoes_banco', x: buscar(d, 'movimentacoes_banco', x.movimentacao_id) } : null;
+  if (x.pagamento_banco_id && buscar(d, 'pagamentos_banco', x.pagamento_banco_id)) return { tabela: 'pagamentos_banco', x: buscar(d, 'pagamentos_banco', x.pagamento_banco_id) };
+  if (x.classificacao === 'transferencia' && x.par_movimentacao_id && buscar(d, 'movimentacoes_banco', x.par_movimentacao_id)) return { tabela: 'movimentacoes_banco', x: buscar(d, 'movimentacoes_banco', x.par_movimentacao_id) };
+  return null;
+}
+
+/**
+ * Registra o(s) PDF(s) guardado(s): na pasta do imóvel (comprovante) e/ou na do contador (comprovante_contador). origem: banco | ponte | manual.
+ * Um comprovante só para o mesmo dinheiro: o nome vai também para a conta lançada (despesas.comprovante) e para o irmão
+ * (pagamento pelo banco ↔ movimentação do extrato que o confirmou; as duas pontas da transferência), que estão na mesma pasta.
+ */
 export function registrarComprovante(d, movId, { nome_arquivo = null, comprovante = null, comprovante_contador = null, origem = 'banco' } = {}, usuario, tabela = 'movimentacoes_banco') {
   const x = buscar(d, tabela, movId);
   if (!x) throw new Error('Movimentação não encontrada.');
   if (!comprovante && !comprovante_contador) throw new Error('Informe o nome do arquivo do comprovante.');
   const dados = { comprovante: comprovante || x.comprovante || null, comprovante_contador: comprovante_contador || x.comprovante_contador || null, comprovante_origem: origem, nome_arquivo: nome_arquivo || x.nome_arquivo || null };
   atualizar(d, tabela, x.id, dados, usuario, `Comprovante guardado: ${comprovante || comprovante_contador}`);
-  if (tabela === 'movimentacoes_banco' && x.despesa_id && buscar(d, 'despesas', x.despesa_id)) atualizar(d, 'despesas', x.despesa_id, { comprovante: dados.comprovante }, usuario, 'Comprovante da conta (extrato)');
-  if (tabela === 'pagamentos_banco' && x.despesa_id && buscar(d, 'despesas', x.despesa_id)) atualizar(d, 'despesas', x.despesa_id, { comprovante: dados.comprovante }, usuario, 'Comprovante da conta (pagamento pelo banco)');
+  if (x.despesa_id && buscar(d, 'despesas', x.despesa_id)) atualizar(d, 'despesas', x.despesa_id, { comprovante: dados.comprovante || dados.comprovante_contador }, usuario, tabela === 'pagamentos_banco' ? 'Comprovante da conta (pagamento pelo banco)' : 'Comprovante da conta (extrato)');
+  const irmao = irmaoDoComprovante(d, x, tabela);
+  if (irmao && (irmao.x.comprovante !== dados.comprovante || irmao.x.comprovante_contador !== dados.comprovante_contador)) {
+    atualizar(d, irmao.tabela, irmao.x.id, dados, usuario, `Comprovante guardado: ${comprovante || comprovante_contador} (o mesmo do ${tabela === 'pagamentos_banco' ? 'pagamento pelo banco' : irmao.tabela === 'pagamentos_banco' ? 'extrato' : 'outra ponta da transferência'})`);
+    if (irmao.x.despesa_id && irmao.x.despesa_id !== x.despesa_id && buscar(d, 'despesas', irmao.x.despesa_id)) atualizar(d, 'despesas', irmao.x.despesa_id, { comprovante: dados.comprovante || dados.comprovante_contador }, usuario, 'Comprovante da conta');
+  }
   return x;
 }
 
@@ -589,8 +620,8 @@ export function removerComprovante(d, movId, usuario, tabela = 'movimentacoes_ba
 /** Só dígitos; aceita 44 (código de barras), 47 (linha digitável de boleto) ou 48 (arrecadação/concessionária). */
 export function validarCodigoBarras(texto) {
   const dig = String(texto || '').replace(/\D/g, '');
-  if (!dig) throw new Error('Informe o código de barras ou a linha digitável.');
-  if (![44, 47, 48].includes(dig.length)) throw new Error(`O código tem ${dig.length} dígitos; um boleto tem 44 (código de barras) ou 47 (linha digitável) e uma conta de consumo tem 48.`);
+  if (!dig) throw new C.ErroUsuario('Informe o código de barras ou a linha digitável.');
+  if (![44, 47, 48].includes(dig.length)) throw new C.ErroUsuario(`Código de barras com ${dig.length} dígitos: esperava 44, 47 ou 48 (44 é o código de barras, 47 a linha digitável do boleto e 48 a de conta de consumo).`);
   return dig;
 }
 
@@ -624,7 +655,7 @@ function validarPagamento(d, dados) {
   if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco.');
   exigirConta(d, dados.conta_id);
   if (!(Number(dados.valor) > 0)) throw new Error('Informe o valor a pagar.');
-  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new Error(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
+  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
   if (dados.imovel_id && !buscar(d, 'imoveis', dados.imovel_id)) throw new Error('Imóvel não encontrado.');
   if (!['boleto', 'pix'].includes(dados.forma)) throw new Error('Escolha a forma: boleto (código de barras) ou Pix.');
   const content = conteudoDoPagamento(dados);

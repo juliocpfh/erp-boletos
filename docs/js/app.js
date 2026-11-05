@@ -220,6 +220,9 @@ export function aviso(texto, tipo = 'ok') {
 }
 
 /** Erro: janela no meio da tela com botão "Entendi" (a tela não sobe sozinha, então um aviso no topo passaria despercebido). */
+/** Erro de programa vai ao console; o que o usuário digitou errado (senha, valor acima do limite, código curto) só aparece na tela. */
+const logarErro = (e) => { if (!(e instanceof C.ErroUsuario) && !(e && e.esperado)) console.error(e); };
+
 function janelaErro(texto) {
   const dlg = document.createElement('dialog');
   dlg.className = 'janela-erro';
@@ -358,7 +361,7 @@ export async function entrar(loginTexto, senha) {
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
-  if (!(await conferirSenha(u, senha))) throw new Error('Login ou senha incorretos.');
+  if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
   // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
@@ -511,7 +514,7 @@ document.addEventListener('submit', async (ev) => {
       await mostrar(resposta);
     }
   } catch (e) {
-    console.error(e);
+    logarErro(e);
     aviso(e.message, 'erro');
     if (botao) botao.disabled = false;
   }
@@ -564,7 +567,7 @@ document.addEventListener('click', async (ev) => {
   try {
     await ACOES[el.dataset.acao](el.dataset, el);
   } catch (e) {
-    console.error(e);
+    logarErro(e);
     aviso(e.message, 'erro');
   } finally {
     delete el.dataset.ocupado;
@@ -605,7 +608,7 @@ document.addEventListener('change', async (ev) => {
     try {
       await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
     } catch (e) {
-      console.error(e);
+      logarErro(e);
       aviso(e.message, 'erro');
     }
     return;

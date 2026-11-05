@@ -638,8 +638,8 @@ export const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão'
 
 export const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.tipo));
 
-/** Para onde leva o clique no alerta: o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
-export const linkAlerta = (a) => (a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
+/** Para onde leva o clique no alerta: o que traz ``link`` (ex.: Banco → #/banco) vai para lá; o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
+export const linkAlerta = (a) => (a.link ? a.link : a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
   : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}`);
 
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */

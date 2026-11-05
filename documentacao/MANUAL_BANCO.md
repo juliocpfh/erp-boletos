@@ -99,7 +99,7 @@ Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quan
 | Conta de um imóvel paga por nós (água, luz, gás, condomínio, internet, outra) | **Atrelar a imóvel/conta**: escolha o imóvel, o tipo e o mês da conta. O sistema lança a conta em **Contas pagas por nós** com o valor e a data do extrato | "PAGAMENTO BOLETO SANEPAR" de R$ 123,45 em 05/11/2026 → Loja 1 · Água 11/2026 |
 | IPTU pago na prefeitura | **Atrelar a imóvel/conta**, tipo **IPTU**, e escolha a parcela em aberto. A parcela fica marcada como paga | R$ 210,00 em 10/11/2026 → Loja 1 · IPTU 2026 · 3ª parcela |
 | Aluguel recebido (boleto ou Pix do boleto) | **É o pagamento do boleto…**: o sistema lista os boletos em aberto que batem ("bate certinho" ou "provável"). Escolha, confira a data e o valor e clique em **Confirmar pagamento** | entrada de R$ 1.219,50 em 11/12/2026 → boleto 11/2026 da Maria Exemplo |
-| Transferência entre as nossas contas | **Outro destino → Transferência**. A linha aparece nos dois extratos (saída na ANK, entrada na JCK) e o sistema liga as duas, para não virar conta de imóvel duas vezes | "TED PARA JCK" de R$ 5.000,00 em 20/11/2026 |
+| Transferência entre as nossas contas | **Outro destino → Transferência**. A linha aparece nos dois extratos (saída na ANK, entrada na JCK) e o sistema liga as duas, para não virar conta de imóvel duas vezes. Tem comprovante também: um PDF só, com o nome da empresa de origem, na pasta do contador da conta de **origem** (`_Contador/ANK/2026-11/`), sem pasta de imóvel | "TED PARA JCK" de R$ 5.000,00 em 20/11/2026 |
 | Tarifa do banco | **Outro destino → Tarifa** | "TARIFA PACOTE" de R$ 39,90 |
 | Imposto da empresa (PIS/COFINS, IRPJ, CSLL) | **Outro destino → Imposto**, ligando à guia do mês | DARF de R$ 450,00 em 20/11/2026 |
 | Só precisa do comprovante, sem imóvel | **Outro destino → Outro**, com uma observação | compra de material de escritório |
@@ -121,7 +121,7 @@ Regras que o sistema aplica ao atrelar uma conta a um imóvel:
    - `2026-11-20 ANK Geral Transferencia 5.000,00.pdf` ("Geral" quando não há imóvel)
 3. O mesmo PDF é guardado em **dois lugares** da pasta de dados (OneDrive):
    - **pasta do imóvel**: `arquivos/Loja 1/Contas pagas/2026/` (IPTU vai para `arquivos/Loja 1/IPTU (guias)/2026/`);
-   - **pasta do contador**: `arquivos/_Contador/ANK/2026-11/` (uma pasta por empresa e por mês; a da JCK é `_Contador/JCK/2026-11/`).
+   - **pasta do contador**: `arquivos/_Contador/ANK/2026-11/` (uma pasta por empresa e por mês; a da JCK é `_Contador/JCK/2026-11/`). O mês é sempre o **mês em que o dinheiro saiu ou entrou** (a data da linha do extrato), não o mês da conta: a conta de 12/2026 paga em 28/11/2026 vai para `2026-11`. Um pagamento feito pelo sistema e a linha do extrato que o confirmou dividem o **mesmo** PDF, que aparece nos dois e em Contas pagas por nós.
 4. Para quem já deu destino a tudo, **Baixar todos os comprovantes do mês** baixa de uma vez os que faltam, com o nome padrão, e diz quantos deram certo.
 5. O comprovante aparece com um 📎 na linha do extrato, na caixa **Banco** da página do imóvel e em **Contas pagas por nós**. O **×** ao lado apaga só o arquivo (a linha volta a "sem comprovante"). Se a conta for excluída, o PDF sai das duas pastas e a linha do extrato volta a "sem destino".
 
