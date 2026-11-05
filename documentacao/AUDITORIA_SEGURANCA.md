@@ -4,6 +4,8 @@ Data: 2026-11-05 · Branch auditada: `claude/revisao-geral` (site) + worktrees `
 
 Legenda de caminhos: `docs/...` = repositório principal; `[ada] ...` = `.claude/worktrees/agent-ada31a4450d7d05a9/...`; `[a72] ...` = `.claude/worktrees/agent-a723848969648dc4a/...`.
 
+> **Situação em 05/11/2026 (depois das correções):** A1, A2, M1, M7, M8, B1, B2, B5, B7 corrigidos no site (`tests/seguranca.test.mjs`, `tests/backup-seguro.test.mjs`); M2, M3, M4, M5, M6, B3, B4, B6 corrigidos na ponte (`tests/ponte-c6.test.mjs`, `ponte-c6/testes/`). Pendente: decisão sobre cifrar o arquivo de dados (seção 3) e os itens que dependem do dono (`SEGURANCA.md`, capítulo "Pendências do dono").
+
 ## 1. Tabela resumo
 
 | Grav. | # | Achado | Onde | Correção (resumo) |
