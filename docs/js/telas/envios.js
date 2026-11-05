@@ -8,6 +8,7 @@ import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
+import * as Z from '../conciliacao.js';
 import { aplicarReajusteNaTela } from './acoes.js';
 import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
@@ -428,7 +429,12 @@ export const FORMULARIOS = {
     const texto = String(f.get('valor_nf') || '').trim();
     const valorNf = texto ? C.centavos(texto) : null;
     const justificativa = String(f.get('justificativa') || '').trim();
-    const r = await alterar((db) => R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa }));
+    const r = await alterar((db) => {
+      const res = R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa });
+      // veio da tela Banco (entrada do extrato com valor diferente do previsto): a movimentação fica ligada ao boleto
+      if (p.movimentacao_id) Z.ligarMovimentacaoAoBoleto(db, p.movimentacao_id, p.id, login());
+      return res;
+    });
     memoria.pagamentoDivergente = null;
     aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
     await mostrar();

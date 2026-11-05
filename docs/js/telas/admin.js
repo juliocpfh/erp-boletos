@@ -5,6 +5,7 @@ import * as B from '../backup-seguro.js';
 import { dataBr } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
+import { caixaConfigBanco2 } from './banco.js';
 import { CADASTROS } from './cadastros.js';
 import { botao, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 
@@ -157,6 +158,7 @@ export async function telaDados() {
       <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.</p>
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
+    ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', {}, 'secundario') : ''}
