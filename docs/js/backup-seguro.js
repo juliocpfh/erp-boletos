@@ -6,6 +6,8 @@
 // mas só quem sabe a senha abre um backup. Cada arquivo carrega a chave privada cifrada: para restaurar
 // basta o arquivo e a senha, mesmo em outro computador ou sem conseguir entrar no sistema.
 
+import { hojeIso } from './calculos.js';
+
 export const ARQUIVO_CHAVE = 'chave-do-backup.json';
 export const PASTA_DIARIO = 'copias-diarias';
 export const PASTA_SEMANAL = 'completos-semanais';
@@ -13,6 +15,10 @@ export const PASTA_PROGRAMA = 'programa';
 export const EXTENSAO = '.bkp';
 const MAGICO = 'IMOVEIS-BACKUP-SEGURO-1';
 const ITERACOES = 310000;
+// o número de iterações vem do próprio arquivo: fora desta faixa é arquivo adulterado (um número enorme travaria o navegador)
+const ITERACOES_MIN = 100000;
+const ITERACOES_MAX = 2000000;
+export const SENHA_MINIMA_BACKUP = 12;
 export const MANTER_DIARIOS = 60;
 export const MANTER_SEMANAIS = 8;
 export const MANTER_MENSAIS = 12;
@@ -36,7 +42,7 @@ async function chaveDaSenha(senha, sal, iteracoes) {
 
 /** Cria o par de chaves da pasta. A senha protege a chave privada (sem ela, nenhum backup abre). */
 export async function criarChave(senha) {
-  if (String(senha).length < 8) throw new Error('A senha do backup precisa ter pelo menos 8 caracteres.');
+  if (String(senha).length < SENHA_MINIMA_BACKUP) throw new Error(`A senha do backup precisa ter pelo menos ${SENHA_MINIMA_BACKUP} caracteres (uma frase curta serve).`);
   const par = await sutil().generateKey({ name: 'RSA-OAEP', modulusLength: 3072, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['wrapKey', 'unwrapKey']);
   const sal = aleatorio(16);
   const iv = aleatorio(12);
@@ -49,8 +55,10 @@ export async function criarChave(senha) {
 }
 
 async function abrirPrivada(chave, senha) {
+  const iteracoes = Number(chave && chave.iteracoes);
+  if (!Number.isInteger(iteracoes) || iteracoes < ITERACOES_MIN || iteracoes > ITERACOES_MAX) throw new Error('O arquivo de backup está danificado.');
   try {
-    const bruta = await sutil().decrypt({ name: 'AES-GCM', iv: deB64(chave.iv) }, await chaveDaSenha(senha, deB64(chave.sal), chave.iteracoes), deB64(chave.privada_cifrada));
+    const bruta = await sutil().decrypt({ name: 'AES-GCM', iv: deB64(chave.iv) }, await chaveDaSenha(senha, deB64(chave.sal), iteracoes), deB64(chave.privada_cifrada));
     return await sutil().importKey('pkcs8', bruta, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['unwrapKey']);
   } catch {
     throw new Error('Senha do backup incorreta.');
@@ -71,11 +79,19 @@ export async function cifrar(chave, bytes, info = {}) {
   const publica = await sutil().importKey('spki', deB64(chave.publica), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['wrapKey']);
   const aes = await sutil().generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
   const iv = aleatorio(12);
-  const conteudo = await sutil().encrypt({ name: 'AES-GCM', iv }, aes, bytes);
   const embrulhada = await sutil().wrapKey('raw', aes, publica, { name: 'RSA-OAEP' });
-  const cabecalho = { ...info, criado_em: new Date().toISOString(), chave_embrulhada: b64(embrulhada), iv: b64(iv),
+  // O cabeçalho (tipo, data, revisão, chave) fica legível, mas entra na conta de integridade do conteúdo (additionalData):
+  // mexer nele, mesmo sem a senha, faz o arquivo deixar de abrir. `protegido` marca os arquivos gravados assim
+  // (os anteriores abrem sem essa conferência; tirar a marca não ajuda, porque o conteúdo foi cifrado com ela).
+  const cabecalho = { ...info, criado_em: new Date().toISOString(), protegido: 1, chave_embrulhada: b64(embrulhada), iv: b64(iv),
     chave: { iteracoes: chave.iteracoes, privada_cifrada: chave.privada_cifrada, sal: chave.sal, iv: chave.iv } };
-  const topo = texto(`${MAGICO}\n${JSON.stringify(cabecalho)}\n`);
+  const cabecalhoBytes = texto(JSON.stringify(cabecalho));
+  const conteudo = await sutil().encrypt({ name: 'AES-GCM', iv, additionalData: cabecalhoBytes }, aes, bytes);
+  const prefixo = texto(`${MAGICO}\n`);
+  const topo = new Uint8Array(prefixo.length + cabecalhoBytes.length + 1);
+  topo.set(prefixo, 0);
+  topo.set(cabecalhoBytes, prefixo.length);
+  topo[topo.length - 1] = 10; // "\n"
   const saida = new Uint8Array(topo.length + conteudo.byteLength);
   saida.set(topo, 0);
   saida.set(new Uint8Array(conteudo), topo.length);
@@ -88,16 +104,22 @@ export function cabecalhoDe(bytes) {
   const fim1 = u.indexOf(10);
   const fim2 = u.indexOf(10, fim1 + 1);
   if (fim1 < 0 || fim2 < 0 || new TextDecoder().decode(u.subarray(0, fim1)) !== MAGICO) throw new Error('Este arquivo não é um backup seguro deste sistema.');
-  return { cabecalho: JSON.parse(new TextDecoder().decode(u.subarray(fim1 + 1, fim2))), inicio: fim2 + 1 };
+  const brutos = u.subarray(fim1 + 1, fim2);
+  let cabecalho;
+  try { cabecalho = JSON.parse(new TextDecoder().decode(brutos)); } catch { throw new Error('O arquivo de backup está danificado.'); }
+  if (!cabecalho || typeof cabecalho !== 'object') throw new Error('O arquivo de backup está danificado.');
+  return { cabecalho, brutos, inicio: fim2 + 1 };
 }
 
 export async function decifrar(bytes, senha) {
   const u = new Uint8Array(bytes);
-  const { cabecalho, inicio } = cabecalhoDe(u);
+  const { cabecalho, brutos, inicio } = cabecalhoDe(u);
   const privada = await abrirPrivada(cabecalho.chave, senha);
   const aes = await sutil().unwrapKey('raw', deB64(cabecalho.chave_embrulhada), privada, { name: 'RSA-OAEP' }, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
   try {
-    const dados = await sutil().decrypt({ name: 'AES-GCM', iv: deB64(cabecalho.iv) }, aes, u.subarray(inicio));
+    // arquivos novos: o cabeçalho, tal como está no arquivo, entra na conferência de integridade
+    const extra = cabecalho.protegido ? { additionalData: brutos } : {};
+    const dados = await sutil().decrypt({ name: 'AES-GCM', iv: deB64(cabecalho.iv), ...extra }, aes, u.subarray(inicio));
     return { info: cabecalho, dados: new Uint8Array(dados) };
   } catch {
     throw new Error('O arquivo de backup está danificado.');
@@ -163,7 +185,7 @@ export async function lerChave(dir) {
 
 export const gravarChave = (dir, chave) => gravar(dir, ARQUIVO_CHAVE, JSON.stringify(chave, null, 1));
 
-const hoje = () => new Date().toISOString().slice(0, 10);
+const hoje = () => hojeIso(); // data local (toISOString daria o dia seguinte depois das 21h)
 
 /** Cópia do banco do dia (sobrescreve a do mesmo dia a cada gravação). */
 export async function espelhar(dir, chave, dados) {

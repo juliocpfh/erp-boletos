@@ -4,7 +4,7 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
+import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
 
 /** Situações da solicitação, com o símbolo do resumo (tela Inquilinos) e da lista de solicitações. */
 export const SITUACOES_SOLICITACAO = [
@@ -110,7 +110,7 @@ export function telaIptu(ano) {
     const p = doAno(i);
     const idGuias = idGuiasDoAno(i.id, ano);
     // guias do ano: 📎1 ×, 📎2 ×… e o clipe cinza para anexar mais uma
-    const guias = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-upload="iptuano:${idGuias}"></label>` : ''}</span>`;
+    const guias = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-upload="iptuano:${idGuias}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
     const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias}`;
     if (!p) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, 'aviso')} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno') : ''}</td></tr>`;
     const mapa = mapas.get(i.id);

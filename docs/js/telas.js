@@ -5,17 +5,18 @@
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
 import { aviso, E, ir, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
-import { PAPEIS } from './auth.js';
+import { PAPEIS, SENHA_MINIMA } from './auth.js';
 import * as C from './calculos.js';
 import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
 import { telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
+import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -33,6 +34,7 @@ const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: 
 export const TELAS = {
   _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
   _listaArquivos: listaArquivos,
+  _naoEncontrado: naoEncontrado,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
 
@@ -124,6 +126,12 @@ export const TELAS = {
     if (pctEl.value !== '' && valEl.value === '') doPct();
   },
 
+  arquivoSumiu: (copias) => `<main><div id="mensagens"></div><div class="cartao login" style="max-width:600px"><h1>Administração de Imóveis</h1>
+    <div class="alerta perigo"><b>O arquivo ${esc(S.ARQUIVO_BANCO)} não está na pasta "${esc(E.pasta.name)}"</b>, mas há cópia(s) com outro nome: <b>${copias.map(esc).join('</b>, <b>')}</b>.
+      Isso costuma acontecer quando o OneDrive encontra duas versões ao mesmo tempo. Nada foi perdido.</div>
+    <p>Abra a pasta no computador, renomeie a cópia mais recente para <b>${esc(S.ARQUIVO_BANCO)}</b> e clique em Tentar de novo. Se houver mais de uma cópia, guarde as outras em outra pasta.</p>
+    <p class="acoes">${botao('reabrir', 'Tentar de novo')} ${botao('escolherPasta', 'Escolher outra pasta', {}, 'secundario')}</p>${LINK_RESTAURAR}</div></main>`,
+
   semSuporte: () => `<main><div class="cartao login"><h1>Administração de Imóveis</h1>
     <div class="alerta aviso">Este navegador não consegue salvar numa pasta do computador. Abra este endereço no <b>Google Chrome</b> ou no <b>Microsoft Edge</b> (no computador, não no celular).</div></div></main>`,
 
@@ -141,14 +149,14 @@ export const TELAS = {
 
   primeiroAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Primeiro acesso</h1>
-    <p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados: crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos 6 caracteres). Depois o administrador libera os demais em Usuários.</p>
+    <p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados: crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.</p>
     <div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
       Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>
     <form data-form="primeiroAcesso">
       <p><label>Seu nome</label><input name="nome" autofocus></p>
       <p><label>Login</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo 6 caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
+      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
       <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
       <button>Criar e entrar</button> ${botao('escolherPasta', 'Escolher outra pasta')}
     </form>${LINK_RESTAURAR}</div></main>`,
@@ -166,7 +174,7 @@ export const TELAS = {
     <form data-form="pedirAcesso">
       <p><label>Seu nome</label><input name="nome" autofocus></p>
       <p><label>Login (sem espaços)</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo 6 caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
+      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
       <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
       <button>Enviar pedido</button> <a class="botao secundario" href="#/">Voltar</a>
     </form></div></main>`,
@@ -216,10 +224,10 @@ export const TELAS = {
         ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
-      ${calendarioDoPainel(rota.q.mes || C.competenciaDe(hoje), hoje)}
+      ${calendarioDoPainel(C.competenciaValida(rota.q.mes, C.competenciaDe(hoje)), hoje)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario('admin') ? link('#/alertas-config', 'Editar', 'botao secundario pequeno') : ''}</div>
         ${gruposDeAlertas(alertas).map(([tipo, lista]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
-          ${lista.map((a) => `<div class="${classeAlerta(a)}"><a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? ` · ${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
+          ${lista.map((a) => `<div class="${classeAlerta(a)}">${a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? ' · ' : ''}${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
         <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString('pt-BR')}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
@@ -234,7 +242,7 @@ export const TELAS = {
     // matrícula ao lado do nome (número ou vazio); embaixo do nome, os arquivos dela (📎1 ×, 📎2 ×…) e o botão "Anexar"
     const numeroMatricula = (i) => `<span class="contas">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}</span>`;
     const anexosMatricula = (i) => `<span class="contas matricula"><span data-arquivos="matricula:${i.id}"></span>
-      ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}"></label>` : ''}</span>`;
+      ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && !R.herancaAgendada(d(), c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
@@ -258,42 +266,44 @@ export const TELAS = {
 
   imovel(rota) {
     const i = buscar('imoveis', rota.partes[1]);
-    if (!i) return '<h1>Imóvel não encontrado</h1>';
+    if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
     return telaImovel(i);
   },
 
   contrato(rota) {
     const c = buscar('contratos', rota.partes[1]);
-    if (!c) return '<h1>Contrato não encontrado</h1>';
+    if (!c) return naoEncontrado('Contrato não encontrado', '#/inquilinos', 'Ver os inquilinos');
     return telaContrato(c);
   },
 
   novo: (rota, estado) => telaFormulario(rota.partes[1], null, rota.q, estado),
   editar(rota, estado) {
     const r = buscar(rota.partes[1], rota.partes[2]);
-    if (!r) return '<h1>Registro não encontrado</h1>';
+    if (!r) return naoEncontrado('Registro não encontrado');
     return telaFormulario(rota.partes[1], r, rota.q, estado);
   },
 
-  cobrancas: (rota) => telaCobrancas(rota.q.comp || competenciaPadrao(), rota.q.ordem),
+  // mês e ordem vêm do endereço: só valem no formato esperado (a validação final da ordem é em telaCobrancas)
+  cobrancas: (rota) => telaCobrancas(C.competenciaValida(rota.q.comp, competenciaPadrao()), rota.q.ordem),
   cobranca(rota) {
     const cb = buscar('cobrancas', rota.partes[1]);
-    return cb ? telaCobranca(cb) : '<h1>Boleto não encontrado</h1>';
+    return cb ? telaCobranca(cb) : naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos');
   },
-  faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  faturas: (rota) => telaFaturas(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
   resultados: (rota) => telaResultados(rota.q),
-  impostos: (rota) => telaImpostos(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  impostos: (rota) => telaImpostos(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
   contas: (rota) => telaContas(rota),
+  banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
   reajustes: (rota) => telaReajustes(rota.q),
-  calendario: (rota) => { ir(`#/${rota.q.mes ? `?mes=${rota.q.mes}` : ''}`); return ''; },
+  calendario: (rota) => { const mes = C.competenciaValida(rota.q.mes, ''); ir(`#/${mes ? `?mes=${mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
   aditivo: (rota) => telaAditivo(rota),
   'modelos-contrato': () => telaModelos(),
   vistoria: (rota) => telaVistoria(rota),
   'modelo-vistoria': (rota) => telaModeloVistoria(rota),
-  fechamento: (rota) => telaFechamento(rota.q.mes || C.competenciaDe(C.hojeIso())),
+  fechamento: (rota) => telaFechamento(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
   'alertas-config'() {
     if (!podeUsuario('admin')) return '<div class="alerta erro">Só administradores mudam a aparência dos alertas.</div>';
     const opcoes = (lista, v) => lista.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');

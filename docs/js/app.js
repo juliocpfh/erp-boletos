@@ -1,6 +1,7 @@
 // Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
-import { conferirSenha, novoSal, pode, resumoSenha } from './auth.js';
+import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
+import { carregarPonteLocal } from './banco.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
@@ -22,37 +23,66 @@ export const E = {
 export const login = () => (E.usuario ? E.usuario.login : 'sistema');
 
 // --------------------------------------------------------------------------
-// Sessão: o login fica lembrado neste navegador (todas as abas) por 12 horas sem uso, até clicar em Sair.
+// Sessão: o login fica lembrado neste navegador (todas as abas) por 12 horas sem uso, até clicar em Sair,
+// e no máximo 7 dias desde o login (depois pede a senha de novo, mesmo em uso).
 // Antes ficava só na aba (sessionStorage): cada aba nova (impressão, Ctrl+clique) pedia login de novo.
+// Na versão sem internet (arquivo aberto do disco, file://) todos os arquivos HTML do computador compartilham o mesmo
+// localStorage: ali a sessão fica só na aba (sessionStorage), para outro arquivo aberto no navegador não a ler.
 // --------------------------------------------------------------------------
 const SESSAO = 'imoveis-sessao';
 const DURACAO_SESSAO = 12 * 3600 * 1000;
+const LIMITE_SESSAO = 7 * 24 * 3600 * 1000;
 
+const MAX_SESSOES = 10; // por usuário (vários navegadores/computadores)
+
+const deposito = () => (location.protocol === 'file:' ? sessionStorage : localStorage);
+
+/** Sessão lembrada: { login, token, criada_em } ou null. O token é um número aleatório criado no login e guardado também no usuário do banco. */
 function lerSessao() {
   try {
-    const s = JSON.parse(localStorage.getItem(SESSAO) || 'null');
-    return s && s.ate > Date.now() ? s.login : null;
+    const s = JSON.parse(deposito().getItem(SESSAO) || 'null');
+    const valida = s && s.ate > Date.now() && s.login && s.token && s.criada_em && Date.now() - s.criada_em < LIMITE_SESSAO;
+    return valida ? s : null;
   } catch {
     return null;
   }
 }
 
-function gravarSessao(loginTexto) {
+function gravarSessao(loginTexto, token = null) {
   try {
-    if (loginTexto) localStorage.setItem(SESSAO, JSON.stringify({ login: loginTexto, ate: Date.now() + DURACAO_SESSAO }));
-    else localStorage.removeItem(SESSAO);
+    const atual = lerSessao();
+    const mesma = atual && atual.login === loginTexto;
+    const t = token || (mesma ? atual.token : null);
+    if (loginTexto && t) {
+      deposito().setItem(SESSAO, JSON.stringify({ login: loginTexto, token: t, ate: Date.now() + DURACAO_SESSAO, criada_em: token ? Date.now() : atual.criada_em }));
+    } else deposito().removeItem(SESSAO);
   } catch { /* navegador sem armazenamento: pede login de novo */ }
 }
 
-/** Usuário da sessão lembrada, se ainda estiver ativo no banco. */
+const novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** Usuário da sessão lembrada, se ainda estiver ativo no banco e o token da sessão for dele. */
 const usuarioDaSessao = () => {
-  const salvo = lerSessao();
-  return (E.d && salvo && E.d.usuarios.find((u) => u.login === salvo && u.ativo && !u.pendente)) || null;
+  const s = lerSessao();
+  return (E.d && s && E.d.usuarios.find((u) => u.login === s.login && u.ativo && !u.pendente && (u.sessoes || []).includes(s.token))) || null;
 };
 
+/** Registra no banco o token de uma sessão nova do usuário (fica fora do histórico). */
+async function abrirSessao(u) {
+  const token = novoToken();
+  await alterar((db) => {
+    const x = db.usuarios.find((y) => y.id === u.id);
+    if (x) x.sessoes = [...(x.sessoes || []), token].slice(-MAX_SESSOES);
+  }, { soSessao: true });
+  E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
+  gravarSessao(u.login, token);
+}
+
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
-window.addEventListener('storage', (ev) => {
+window.addEventListener('storage', async (ev) => {
   if (ev.key !== SESSAO || !E.d) return;
+  // a outra aba acabou de gravar o token novo no banco: relê o disco antes de conferir
+  try { E.d = (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
   const u = usuarioDaSessao();
   if ((u && u.login) !== (E.usuario && E.usuario.login)) {
     E.usuario = u;
@@ -64,15 +94,31 @@ export const podeUsuario = (papel) => pode(E.usuario, papel);
 // --------------------------------------------------------------------------
 // Gravação: relê o arquivo, aplica a alteração e grava (para não apagar o que outra pessoa salvou)
 // --------------------------------------------------------------------------
-export async function alterar(fn) {
+let filaGravacao = Promise.resolve();
+/** Uma gravação de cada vez: duas ao mesmo tempo (duplo clique, arrumações do Painel) sobrescreveriam uma à outra. */
+export function alterar(fn, opcoes = {}) {
+  const minha = filaGravacao.then(() => alterarAgora(fn, opcoes));
+  filaGravacao = minha.catch(() => {});
+  return minha;
+}
+
+export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${S.ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
+
+/** A última gravação do arquivo foi só de entrada/saída de usuário (token de sessão): não é uma alteração dos dados. */
+const soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
+
+async function alterarAgora(fn, { soSessao = false } = {}) {
   const disco = await S.lerBanco(E.pasta);
+  if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
+    const avisar = !soSessaoNoDisco(disco);
     E.d = disco;
-    aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
+    if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
   const copia = structuredClone(E.d || disco);
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
+  copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
   if (E.seguro && E.seguro.chave) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, copia));
@@ -146,9 +192,11 @@ async function verificarMudancasExternas() {
   try {
     const disco = await S.lerBanco(E.pasta);
     if (disco && disco.revisao !== E.d.revisao) {
+      const soSessao = soSessaoNoDisco(disco);
       E.d = disco;
       renovarUsuario();
       atualizarFaixa();
+      if (soSessao) return; // alguém só entrou ou saiu: nada mudou nos dados
       const editando = document.querySelector('main form[data-form]');
       if (editando) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
       else await mostrar();
@@ -172,6 +220,9 @@ export function aviso(texto, tipo = 'ok') {
 }
 
 /** Erro: janela no meio da tela com botão "Entendi" (a tela não sobe sozinha, então um aviso no topo passaria despercebido). */
+/** Erro de programa vai ao console; o que o usuário digitou errado (senha, valor acima do limite, código curto) só aparece na tela. */
+const logarErro = (e) => { if (!(e instanceof C.ErroUsuario) && !(e && e.esperado)) console.error(e); };
+
 function janelaErro(texto) {
   const dlg = document.createElement('dialog');
   dlg.className = 'janela-erro';
@@ -296,26 +347,27 @@ export async function reabrirPastaLembrada() {
 }
 
 export async function criarBanco(nome, loginTexto, senha) {
-  const sal = novoSal();
-  const hash = await resumoSenha(senha, sal);
   const novo = E.d || R.bancoVazio();
-  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, senha_sal: sal,
-    senha_hash: hash, criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
+  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
+    criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
   await S.gravarBanco(E.pasta, novo);
   E.d = novo;
-  E.usuario = u;
-  gravarSessao(u.login);
+  await abrirSessao(u);
 }
 
 export async function entrar(loginTexto, senha) {
-  E.d = await S.lerBanco(E.pasta);
+  const disco = await S.lerBanco(E.pasta);
+  if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
+  E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
-  if (!(await conferirSenha(u, senha))) throw new Error('Login ou senha incorretos.');
+  if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
-  E.usuario = u;
-  gravarSessao(u.login);
+  // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
+  const reforco = await reforcarSenha(u, senha);
+  if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
+  await abrirSessao(u);
 }
 
 /** Atualiza o usuário logado depois de alterar o cadastro dele (ou sai, se foi bloqueado). */
@@ -326,10 +378,14 @@ export function renovarUsuario() {
   gravarSessao(u && u.login);
 }
 
-export function sair() {
+export async function sair() {
+  const s = lerSessao();
+  const u = E.usuario;
   E.usuario = null;
   gravarSessao(null);
   ir('#/');
+  // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
+  if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }, { soSessao: true }).catch(() => {});
 }
 
 // --------------------------------------------------------------------------
@@ -338,7 +394,8 @@ export function sair() {
 function rotaAtual() {
   const [caminho, consulta] = (location.hash.slice(1) || '/').split('?');
   const partes = caminho.split('/').filter(Boolean);
-  return { partes, q: Object.fromEntries(new URLSearchParams(consulta || '')) };
+  // parâmetros fora do formato esperado (ex.: comp=2026-01"><img…) são descartados: a tela usa o padrão
+  return { partes, q: C.sanearParametros(Object.fromEntries(new URLSearchParams(consulta || ''))) };
 }
 
 function atualizarFaixa() {
@@ -349,7 +406,7 @@ function atualizarFaixa() {
 
 const MENU = [
   ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
-  ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'], ['#/faturas', 'NF', 'fatura'],
+  ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|inadimplencia'], ['#/faturas', 'NF', 'fatura'], ['#/banco', 'Banco', '^banco'],
   ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/resultados', 'Resultados', '^resultados|^contas|^impostos'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^backup|^empresas'],
 ];
@@ -363,7 +420,8 @@ function layout(conteudo, rota) {
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
   return `<header class="topo nao-imprimir">
-      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a><nav>${menu}</nav>
+      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
+      <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -379,13 +437,14 @@ export async function mostrar(estadoForm = null) {
     if (rota.partes[0] === 'restaurar-backup') html = await TELAS.restaurarBackup();
     else if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
     else if (!E.pasta) html = await TELAS.inicio();
+    else if (!E.d && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
     else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();
     else {
       gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
       const tela = TELAS[nome];
-      const conteudo = tela ? await tela(rota, estadoForm) : '<h1>Página não encontrada</h1>';
+      const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
     }
     // na mesma página, as caixas recolhíveis (<details id>) que estavam abertas continuam abertas depois de uma ação
@@ -425,6 +484,18 @@ async function montarExtras(raiz) {
     el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
   }
   TELAS._ligarDesconto(raiz);
+  // no celular, as tabelas largas viram cartões: cada célula mostra o nome da coluna (ver estilo.css, @media)
+  for (const tabela of raiz.querySelectorAll('table.responsiva')) {
+    const cabecalho = [...tabela.querySelectorAll('tr:first-child th')].map((th) => th.textContent.trim());
+    for (const tr of tabela.querySelectorAll('tr')) {
+      let k = 0;
+      for (const td of tr.children) {
+        if (td.tagName === 'TD' && cabecalho[k] && !td.dataset.rotulo && (td.colSpan || 1) === 1) td.dataset.rotulo = cabecalho[k];
+        k += td.colSpan || 1;
+      }
+    }
+  }
+  for (const caixa of raiz.querySelectorAll('.rolagem')) caixa.classList.toggle('tem-rolagem', caixa.scrollWidth > caixa.clientWidth + 2);
 }
 
 // --------------------------------------------------------------------------
@@ -443,7 +514,7 @@ document.addEventListener('submit', async (ev) => {
       await mostrar(resposta);
     }
   } catch (e) {
-    console.error(e);
+    logarErro(e);
     aviso(e.message, 'erro');
     if (botao) botao.disabled = false;
   }
@@ -479,15 +550,28 @@ document.addEventListener('click', (ev) => {
 });
 
 document.addEventListener('click', async (ev) => {
+  const menu = ev.target.closest('[data-menu]');
+  if (menu) {
+    const topo = menu.closest('header.topo');
+    const aberto = topo.classList.toggle('menu-aberto');
+    menu.setAttribute('aria-expanded', String(aberto));
+    return;
+  }
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
   ev.preventDefault();
+  if (el.dataset.ocupado) return; // segundo clique enquanto a ação roda (ex.: "Gerar boletos" duas vezes)
   if (el.dataset.confirmar && !confirm(el.dataset.confirmar)) return;
+  el.dataset.ocupado = '1';
+  if (el.tagName === 'BUTTON') el.disabled = true;
   try {
     await ACOES[el.dataset.acao](el.dataset, el);
   } catch (e) {
-    console.error(e);
+    logarErro(e);
     aviso(e.message, 'erro');
+  } finally {
+    delete el.dataset.ocupado;
+    if (el.tagName === 'BUTTON') el.disabled = false;
   }
 });
 
@@ -524,7 +608,7 @@ document.addEventListener('change', async (ev) => {
     try {
       await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
     } catch (e) {
-      console.error(e);
+      logarErro(e);
       aviso(e.message, 'erro');
     }
     return;
@@ -573,6 +657,7 @@ window.addEventListener('focus', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
+  await carregarPonteLocal(); // endereço e senha da ponte do banco, só deste navegador
   if (E.teste) {
     await abrirPasta(await pastaDeTeste());
     return;

@@ -35,6 +35,10 @@ export function conferirContrato(dados, r, q) {
     if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
   }
   if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), DIAS_FUTURO)) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${DIAS_FUTURO} dias no futuro.`);
+  // inquilino novo que emite NF num imóvel ainda sem empresa emitente: lembrar agora (sem isso a NF não é numerada)
+  if (!r && imovelId && dados.gerar_nf !== false && !R.participacoesDo(d(), imovelId).length) {
+    out.push(`O imóvel ${(buscar('imoveis', imovelId) || {}).nome || ''} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
+  }
   if (dados.vigencia_inicio && dados.data_entrada && Math.abs(C.diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
   const antigo = r ? CADASTROS.contratos.valores(r) : null;
   for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));

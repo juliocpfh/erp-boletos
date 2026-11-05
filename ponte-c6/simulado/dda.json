@@ -1,0 +1,41 @@
+{
+  "_comentario": "DDA fictício no formato EXATO de GET /v1/schedule_payments/query (agendamento-de-pagamentos.yaml, bonds), por conta.",
+  "ank": {
+    "items": [
+      {
+        "amount": 123.45,
+        "bank_code": "341",
+        "bank_name": "Itaú Unibanco",
+        "beneficiary_name": "Companhia de Saneamento do Paraná - SANEPAR",
+        "content": "34191123450000012345000003048720009224128213",
+        "due_date": "2026-11-15",
+        "overdue": false,
+        "payer_name": "ANK Administradora Ltda"
+      },
+      {
+        "amount": 210.8,
+        "bank_code": "001",
+        "bank_name": "Banco do Brasil",
+        "beneficiary_name": "Copel Distribuição S.A.",
+        "content": "00191123450000021080000003048720009224128213",
+        "due_date": "2026-11-12",
+        "overdue": false,
+        "payer_name": "ANK Administradora Ltda"
+      }
+    ]
+  },
+  "jck": {
+    "items": [
+      {
+        "amount": 450,
+        "bank_code": "336",
+        "bank_name": "Banco C6",
+        "beneficiary_name": "Condomínio Edifício Exemplo",
+        "content": "33691123450000045000000003048720009765974213",
+        "due_date": "2026-11-10",
+        "overdue": true,
+        "payer_name": "JCK Administradora Ltda"
+      }
+    ]
+  }
+}

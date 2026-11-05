@@ -12,7 +12,7 @@ for (const v of Object.values(F)) {
 }
 
 /** Campos que nunca saem do sistema (resumo e sal da senha). */
-const SECRETO = /senha|hash|(^|_)sal$/;
+const SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
 // Campos em centavos que não estão nos formulários (calculados nos boletos, NFs, saídas…)
 const DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia)(_|$)/;
 const NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs)$/;

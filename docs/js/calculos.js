@@ -2,6 +2,14 @@
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
 
+/**
+ * Erro "do usuário": o que ele digitou ou pediu não serve (senha errada, valor acima do limite, código de barras curto).
+ * A tela mostra a mensagem como qualquer erro, mas não registra no console (não é defeito do programa).
+ */
+export class ErroUsuario extends Error {
+  constructor(mensagem) { super(mensagem); this.name = 'ErroUsuario'; this.esperado = true; }
+}
+
 /** Arredonda para o inteiro mais próximo, meio para cima (também para negativos). */
 export function arred(x) {
   const s = x < 0 ? -1 : 1;
@@ -341,4 +349,44 @@ export function ufDoCep(cep) {
   const p = Number(n.slice(0, 5));
   const f = FAIXAS_CEP.find(([de, ate]) => p >= de && p <= ate);
   return f ? f[2] : '';
+}
+
+// --------------------------------------------------------------------------
+// Parâmetros do endereço (#/tela?comp=…&ordem=…): só valem no formato esperado
+// Quem monta o endereço pode ser qualquer pessoa (um link mandado por WhatsApp): o que não estiver
+// no formato é descartado e a tela usa o padrão. Isso impede texto estranho de chegar ao HTML.
+// --------------------------------------------------------------------------
+const COMPETENCIA_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATA_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/** 'AAAA-MM' válido, senão o padrão. */
+export function competenciaValida(texto, padrao) {
+  return COMPETENCIA_RE.test(String(texto || '')) ? String(texto) : padrao;
+}
+
+/** 'AAAA-MM-DD' válido, senão o padrão. */
+export function dataValida(texto, padrao = '') {
+  return DATA_RE.test(String(texto || '')) ? String(texto) : padrao;
+}
+
+/** Formato aceito de cada parâmetro conhecido do endereço; os demais passam como estão (as telas escapam o texto). */
+const FORMATOS_PARAMETRO = {
+  comp: COMPETENCIA_RE, mes: COMPETENCIA_RE, competencia: COMPETENCIA_RE, mes_ref: COMPETENCIA_RE,
+  data: DATA_RE,
+  de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/, ate: DATA_RE, // "de" também é a tela de origem (de=iptu, de=inquilinos)
+  imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
+  vincular: /^\d+$/, seguro: /^\d+$/, empresa: /^\d+$/, vistoria: /^\d+$/, id: /^\d+$/,
+  ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
+  ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
+  ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,
+};
+
+/** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */
+export function sanearParametros(q) {
+  const limpo = {};
+  for (const [k, v] of Object.entries(q || {})) {
+    const re = FORMATOS_PARAMETRO[k];
+    if (!re || re.test(String(v))) limpo[k] = String(v);
+  }
+  return limpo;
 }

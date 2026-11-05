@@ -1,20 +1,31 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
 import { alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
-import { conferirSenha, novoSal, resumoSenha } from '../auth.js';
+import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
+import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
+import * as Z from '../conciliacao.js';
 import { aplicarReajusteNaTela } from './acoes.js';
 import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
+import { FORMULARIOS_BANCO } from './banco.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
+
+/** Pagamento confirmado num imóvel sem empresa emitente: avisa agora, para não descobrir só na hora de numerar a NF. */
+function avisarImovelSemEmpresa(cb) {
+  const c = cb && buscar('contratos', cb.contrato_id);
+  const i = c && buscar('imoveis', c.imovel_id);
+  if (!i || !R.geraNf(c) || R.ehComplementoCaucao(cb) || R.participacoesDo(d(), i.id).length) return;
+  aviso(`O imóvel ${i.nome} ainda não tem empresa que emite a NF: defina na página do imóvel (caixa "Empresas que emitem a NF") antes de numerar.`, 'aviso');
+}
 
 export const FORMULARIOS = {
   async configurarSeguro(form) {
@@ -280,7 +291,8 @@ export const FORMULARIOS = {
     const lg = String(f.get('login')).trim().toLowerCase();
     const senha = String(f.get('senha'));
     if (!nome || !lg) throw new Error('Preencha nome e login.');
-    if (senha.length < 6 || senha !== f.get('senha2')) throw new Error('A senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
+    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
     await criarBanco(nome, lg, senha);
     ir('#/');
   },
@@ -297,11 +309,11 @@ export const FORMULARIOS = {
     const lg = String(f.get('login') || '').trim().toLowerCase();
     const senha = String(f.get('senha') || '');
     if (!nome || !lg || /\s/.test(lg)) throw new Error('Preencha o nome e um login sem espaços.');
-    if (senha.length < 6 || senha !== f.get('senha2')) throw new Error('A senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
+    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
     if (E.d.usuarios.some((u) => u.login === lg)) throw new Error('Já existe um usuário (ou pedido) com este login.');
-    const sal = novoSal();
-    const hash = await resumoSenha(senha, sal);
-    await alterar((db) => R.inserir(db, 'usuarios', { login: lg, nome, papel: 'consulta', ativo: false, pendente: true, senha_sal: sal, senha_hash: hash,
+    const campos = await camposDeSenha(senha);
+    await alterar((db) => R.inserir(db, 'usuarios', { login: lg, nome, papel: 'consulta', ativo: false, pendente: true, ...campos,
       criado_em: new Date().toISOString() }, lg, `Pedido de acesso de ${nome}`));
     aviso('Pedido enviado. Assim que o administrador aprovar, entre com o seu login e senha.');
     ir('#/');
@@ -311,10 +323,10 @@ export const FORMULARIOS = {
     const f = new FormData(form);
     if (!(await conferirSenha(E.usuario, String(f.get('atual'))))) throw new Error('Senha atual incorreta.');
     const nova = String(f.get('nova'));
-    if (nova.length < 6 || nova !== f.get('nova2')) throw new Error('A nova senha precisa ter pelo menos 6 caracteres e as duas precisam ser iguais.');
-    const sal = novoSal();
-    const hash = await resumoSenha(nova, sal);
-    await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, { senha_sal: sal, senha_hash: hash }, login(), 'Trocou a própria senha'));
+    if (senhaCurta(nova)) throw new Error(ERRO_SENHA_CURTA);
+    if (nova !== f.get('nova2')) throw new Error('As duas senhas precisam ser iguais.');
+    const campos = await camposDeSenha(nova);
+    await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, campos, login(), 'Trocou a própria senha'));
     E.usuario = R.buscar(E.d, 'usuarios', E.usuario.id);
     aviso('Senha alterada.');
     ir('#/');
@@ -407,6 +419,7 @@ export const FORMULARIOS = {
     if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
     else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
       : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+    avisarImovelSemEmpresa(pago);
     await mostrar();
   },
 
@@ -418,7 +431,12 @@ export const FORMULARIOS = {
     const texto = String(f.get('valor_nf') || '').trim();
     const valorNf = texto ? C.centavos(texto) : null;
     const justificativa = String(f.get('justificativa') || '').trim();
-    const r = await alterar((db) => R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa }));
+    const r = await alterar((db) => {
+      const res = R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa });
+      // veio da tela Banco (entrada do extrato com valor diferente do previsto): a movimentação fica ligada ao boleto
+      if (p.movimentacao_id) Z.ligarMovimentacaoAoBoleto(db, p.movimentacao_id, p.id, login());
+      return res;
+    });
     memoria.pagamentoDivergente = null;
     aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
     await mostrar();
@@ -570,6 +588,35 @@ export const FORMULARIOS = {
     ir('#/');
   },
 
+  /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
+  async configBanco(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = new FormData(form);
+    // endereço e senha da ponte: só neste navegador (IndexedDB); o que é compartilhado vai para o JSON
+    await BANCO.salvarPonteLocal({ ponte_url: f.get('ponte_url'), senha_ponte: f.get('senha_ponte') });
+    await alterar((db) => R.salvarConfigBanco(db, { ativo: f.get('ativo') === '1' }, login()));
+    aviso(E.d.config_banco.ativo ? 'Integração com o C6 ativa: os botões "Emitir no C6" estão ligados neste computador.' : 'Configuração salva (integração desligada). A senha da ponte ficou só neste computador.');
+    await mostrar();
+  },
+
+  /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
+  async modoContaBoleto(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = new FormData(form);
+    await alterar((db) => R.salvarConfigBanco(db, { modo_conta_boleto: f.get('modo'), conta_padrao_id: f.get('conta_padrao_id') || undefined }, login()));
+    aviso(f.get('modo') === 'escolher' ? 'Ao emitir, o sistema vai perguntar a empresa de cada boleto.' : 'Os boletos saem sempre pela empresa padrão.');
+    await mostrar();
+  },
+
+  /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
+  async contaBanco(form) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    const f = Object.fromEntries(new FormData(form));
+    const conta = await alterar((db) => R.salvarContaBanco(db, f, login()));
+    aviso(`Conta ${conta.apelido} salva. Lembre de configurar a mesma conta ("${conta.id}") no .env da ponte.`);
+    await mostrar();
+  },
+
   async modeloExcel(form) {
     const arq = new FormData(form).get('modelo');
     if (!arq || !arq.size) throw new Error('Escolha o arquivo .xlsx.');
@@ -587,3 +634,6 @@ export const FORMULARIOS = {
     await mostrar();
   },
 };
+
+// Banco (extrato, comprovantes e pagamentos pelo C6): formulários em telas/banco.js
+Object.assign(FORMULARIOS, FORMULARIOS_BANCO);

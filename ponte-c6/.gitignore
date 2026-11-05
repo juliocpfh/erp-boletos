@@ -1,0 +1,6 @@
+# chaves e dados locais da ponte: nunca no GitHub
+.env
+contas/
+credenciais/
+notificacoes/
+registros/

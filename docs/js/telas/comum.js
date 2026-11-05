@@ -7,6 +7,10 @@ import { dataBr, pct, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 
+/** Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). */
+export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') => `<h1>${esc(titulo)}</h1>
+  <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto, 'botao')}${href !== '#/' ? ` ${link('#/', 'Voltar ao painel', 'botao secundario')}` : ''}</p>`;
+
 /** Estado de tela que passa de um assunto a outro: troca de titular escolhida no contrato novo; pagamento com valor diferente aguardando a NF. */
 export const memoria = { continuacao: null, pagamentoDivergente: null };
 
@@ -87,7 +91,16 @@ export const SUB_ANUNCIO = 'Anúncio';
 /** Arquivo da matrícula: fica nos documentos do imóvel, com o nome começando por "Matricula". */
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
-const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas' };
+const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas', contas: 'Contas pagas' };
+
+/** Comprovantes do banco: pasta do imóvel por ano ("Imóvel/Contas pagas/2026", escopo `contasano`, id = imóvel×10000 + ano, como o IPTU). */
+export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
+
+/** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
+export const PASTA_CONTADOR = '_Contador';
+export const idPastaContador = (emitenteId, comp) => emitenteId * 1000000 + Number(String(comp).replace('-', ''));
+export const decodificarIdContador = (id) => ({ emitenteId: Math.floor(id / 1000000), comp: `${String(id % 1000000).slice(0, 4)}-${String(id % 1000000).slice(4)}` });
+const pastaContador = () => (d().config_banco && d().config_banco.pasta_contador) || PASTA_CONTADOR;
 
 /** Apólices do seguro obrigatório: subpasta dentro da pasta do inquilino (antes ficava na pasta do imóvel). */
 const SUB_SEGURO = 'Seguro (apólices)';
@@ -108,7 +121,7 @@ export function nomePastaContrato(c) {
 /** Guias do IPTU por ano: o id junta imóvel e ano (imóvel 5, 2026 → 52026), numa subpasta do ano. */
 export const idGuiasDoAno = (imovelId, ano) => imovelId * 10000 + ano;
 
-function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(id / 10000) : id; }
+function imovelDoEscopo(escopo, id) { return ['iptuano', 'contasano'].includes(escopo) ? Math.floor(id / 10000) : id; }
 
 /** Documentos de entrada assinados: subpasta dentro da pasta do inquilino. */
 const SUB_ASSINADOS = 'Documentos assinados';
@@ -121,7 +134,8 @@ const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos', 'segu
 
 const SUB_DO_ESCOPO = { assinados: SUB_ASSINADOS, aditivos: SUB_ADITIVOS, seguro: SUB_SEGURO };
 
-export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
+export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id }
+  : escopo === 'contador' ? {} : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
 /** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Aditivos, correções e comunicação". */
 export function chavePasta(escopo, id) {
@@ -129,8 +143,13 @@ export function chavePasta(escopo, id) {
     const c = buscar('contratos', id);
     return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), SUB_DO_ESCOPO[escopo] || ''].join('/') : null;
   }
+  if (escopo === 'contador') {
+    const { emitenteId, comp } = decodificarIdContador(Number(id));
+    const e = buscar('emitentes', emitenteId);
+    return e ? [pastaContador(), e.nome, comp].join('/') : null;
+  }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
-  return i ? [i.pasta || i.nome, escopo].join('/') : null;
+  return i ? [i.pasta || i.nome, escopo, ...(escopo === 'contasano' ? [String(Number(id) % 10000)] : [])].join('/') : null;
 }
 
 /** Depois de apagar o arquivo de um campo do formulário: troca só o quadro "Já guardado" (sem redesenhar a página). */
@@ -287,10 +306,18 @@ export const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) =>
 /** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
 export async function apagarAnexos(lista, motivo) {
   const apagados = [];
+  const falharam = [];
   for (const a of lista) {
-    try { await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome); apagados.push(a); } catch { /* já não estava na pasta */ }
+    try {
+      await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome);
+      apagados.push(a);
+    } catch (e) {
+      // "não existe" é normal (já tinha sido apagado fora do sistema); outro erro (arquivo aberto, OneDrive travado) é avisado
+      if (e && e.name !== 'NotFoundError') falharam.push(a.nome);
+    }
   }
   if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
+  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, 'aviso');
   return apagados.length;
 }
 
@@ -315,8 +342,15 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
     const c = buscar('contratos', id);
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
+  if (escopo === 'contador') {
+    const { emitenteId, comp } = decodificarIdContador(Number(id));
+    const e = buscar('emitentes', emitenteId);
+    if (!e) throw new Error('Empresa da conta bancária não encontrada.');
+    return S.subpasta(raiz, [pastaContador(), e.nome, comp], criar);
+  }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)], criar);
+  if (escopo === 'contasano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.contas, String(id % 10000)], criar);
   return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS], criar);
 }
 
@@ -604,8 +638,8 @@ export const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão'
 
 export const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.tipo));
 
-/** Para onde leva o clique no alerta: o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
-export const linkAlerta = (a) => (a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
+/** Para onde leva o clique no alerta: o que traz ``link`` (ex.: Banco → #/banco) vai para lá; o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
+export const linkAlerta = (a) => (a.link ? a.link : a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
   : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}`);
 
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */
@@ -618,10 +652,14 @@ export const gruposDeAlertas = (alertas) => {
 /** Caixa de últimas alterações: começa recolhida e só abre quando o usuário clica nela. */
 export const caixaHistorico = (titulo, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
 
+/** Tipos aceitos ao anexar: documentos (PDF e fotos) e, nas pastas gerais, também planilha, Word e ZIP. Página e script nunca (ver S.nomeAnexavel). */
+export const ACEITA_DOCUMENTOS = '.pdf,.jpg,.jpeg,.png,.webp,.gif';
+export const ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
+
 export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" ${escopo === 'anuncio' ? 'accept="image/*"' : ''}></label>` : ''}
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
     ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'Ao anexar aqui, o sistema pergunta se é a apólice ou outro documento e de qual vigência.'}</p>` : ''}</div>`;
 }
 
@@ -655,9 +693,10 @@ export async function listaArquivos(escopo, id, modo = '') {
   if (!itens.length && escopo !== 'contrato') return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
   if (escopo === 'anuncio') {
     const figs = await Promise.all(itens.map(async (a) => {
-      const u = URL.createObjectURL(await S.abrirArquivo(dir, a.nome));
+      // tipo forçado pela extensão conhecida: um arquivo estranho na pasta não abre como página
+      const u = URL.createObjectURL(new Blob([await S.abrirArquivo(dir, a.nome)], { type: S.tipoParaAbrir(a.nome) || 'application/octet-stream' }));
       urls.push(u);
-      return `<figure><a href="${u}" target="_blank"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
+      return `<figure><a href="${u}" target="_blank" rel="noopener noreferrer"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
     }));
     return `<div class="fotos">${figs.join('')}</div>`;
   }

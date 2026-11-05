@@ -2,7 +2,7 @@
 // a conferência (avisos.js), como salvar e para onde voltar. telaFormulario desenha o formulário; o envio é FORMULARIOS.cadastro (envios.js).
 import { alterar, aviso, E, login, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
-import { novoSal, resumoSenha } from '../auth.js';
+import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as F from '../formularios.js';
@@ -10,7 +10,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, naoEncontrado, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -389,7 +389,7 @@ export const CADASTROS = {
     extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
       <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
         ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
-      <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple>
+      <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
     ajustar(dados, erros, r, form) {
       const arq = form.querySelector('[name=arquivo_apolice]').files[0];
@@ -721,9 +721,8 @@ export const CADASTROS = {
       dados.login = String(dados.login || '').toLowerCase();
       const senha = String(new FormData(form).get('senha') || '');
       if (senha) {
-        if (senha.length < 6) erros.login = 'A senha precisa de pelo menos 6 caracteres';
-        dados.senha_sal = novoSal();
-        dados.senha_hash = await resumoSenha(senha, dados.senha_sal);
+        if (senhaCurta(senha)) erros.login = ERRO_SENHA_CURTA;
+        Object.assign(dados, await camposDeSenha(senha));
       } else if (!r) erros.login = 'Informe uma senha inicial';
       if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = 'Já existe um usuário com este login';
       if (r && r.id === E.usuario.id && (dados.papel !== 'admin' || !dados.ativo)) erros.papel = 'Você não pode tirar o seu próprio acesso de administrador';
@@ -757,7 +756,7 @@ export const CADASTROS = {
 
 export function telaFormulario(tabela, registro, q, estado) {
   const cfg = CADASTROS[tabela];
-  if (!cfg) return '<h1>Página não encontrada</h1>';
+  if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
   const campos = cfg.campos(registro, q);
   let valores = estado ? estado.valores : F.paraFormulario(campos, registro && cfg.valores ? cfg.valores(registro) : registro);
@@ -770,5 +769,5 @@ export function telaFormulario(tabela, registro, q, estado) {
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
       ${F.camposHtml(campos, valores, estado ? estado.erros : {}, { compacto: !!cfg.compacto })}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
-      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${cfg.voltar(registro, q)}">Voltar</a></p></form>`;
+      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg.voltar(registro, q))}">Voltar</a></p></form>`;
 }

@@ -5,3 +5,4 @@ __pycache__/
 dados/
 .claude/settings.local.json
 previas/
+.claude/worktrees/

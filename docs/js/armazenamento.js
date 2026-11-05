@@ -1,5 +1,6 @@
 // Leitura e gravação na pasta escolhida pelo usuário (ex.: uma pasta do OneDrive),
 // usando a File System Access API do Chrome/Edge. Nada é enviado para a internet.
+import { hojeIso } from './calculos.js';
 import { normalizar } from './regras.js';
 
 export const ARQUIVO_BANCO = 'imoveis-dados.json';
@@ -39,6 +40,10 @@ export const pastaLembrada = () => idbOp('readonly', (s) => s.get('pasta')).catc
 export const lembrarPastaSegura = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta_segura'));
 export const pastaSeguraLembrada = () => idbOp('readonly', (s) => s.get('pasta_segura')).catch(() => null);
 export const esquecerPastaSegura = () => idbOp('readwrite', (s) => s.delete('pasta_segura'));
+// endereço e senha da ponte do banco (C6): só neste navegador, nunca no JSON compartilhado da pasta
+export const lembrarPonte = (dados) => idbOp('readwrite', (s) => s.put(dados, 'ponte'));
+export const ponteLembrada = () => idbOp('readonly', (s) => s.get('ponte')).catch(() => null);
+export const esquecerPonte = () => idbOp('readwrite', (s) => s.delete('ponte'));
 
 export async function escolherPasta() {
   const handle = await window.showDirectoryPicker({ id: 'imoveis', mode: 'readwrite' });
@@ -93,7 +98,7 @@ export async function gravarBanco(pasta, dados) {
 /** Cópia do banco uma vez por dia em backups/, guardando as 30 mais recentes. */
 export async function backupDiario(pasta, dados) {
   const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
-  const nome = `imoveis-dados-${new Date().toISOString().slice(0, 10)}.json`;
+  const nome = `imoveis-dados-${hojeIso()}.json`; // data local (toISOString daria o dia seguinte depois das 21h)
   if (await arquivoExiste(dir, nome)) return;
   await escreverTexto(dir, nome, JSON.stringify(dados));
   const nomes = [];
@@ -136,7 +141,29 @@ export async function listar(dir) {
   return itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+/**
+ * Tipos que o navegador executaria como página (com script e acesso aos dados do sistema) se fossem abertos:
+ * não podem ser anexados. O anexo é de quem o inquilino ou o fornecedor entregou: não dá para confiar nele.
+ */
+const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
+export const ERRO_TIPO_ARQUIVO = 'Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.';
+
+/** O arquivo pode ser anexado (não é página nem script)? */
+export function nomeAnexavel(nome) {
+  return !EXTENSOES_PROIBIDAS.test(String(nome || '').trim());
+}
+
+/** Tipos que abrem numa aba nova (PDF e fotos); os outros só se baixam. */
+const TIPOS_ABRIR = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+
+/** Tipo seguro para abrir o anexo numa aba nova ('application/pdf', 'image/png'…), ou '' se ele deve ser só baixado. */
+export function tipoParaAbrir(nome) {
+  const ext = (String(nome || '').match(/\.([a-z0-9]+)$/i) || [])[1];
+  return (ext && TIPOS_ABRIR[ext.toLowerCase()]) || '';
+}
+
 export async function salvarArquivo(dir, arquivo) {
+  if (!nomeAnexavel(arquivo.name)) throw new Error(ERRO_TIPO_ARQUIVO);
   const nome = limparNome(arquivo.name);
   const ponto = nome.lastIndexOf('.');
   const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ''];
@@ -173,6 +200,28 @@ async function copiarPasta(origem, destino) {
   }
 }
 
+/**
+ * Guarda contra mover/juntar uma pasta para dentro dela mesma ou para ela própria (visto no OPFS do Chromium: nome com acento
+ * resolvendo para a pasta-mãe, e "juntar" apagando a pasta do imóvel inteira). Devolve o motivo (texto) ou null se é seguro.
+ */
+async function destinoPerigoso(origem, paiNovo, novo) {
+  try {
+    if (await origem.isSameEntry(paiNovo) || (await origem.resolve(paiNovo)) !== null) return 'o destino fica dentro da própria pasta de origem';
+    let destino = null;
+    try { destino = await paiNovo.getDirectoryHandle(novo); } catch { /* não existe: ok */ }
+    if (destino && await origem.isSameEntry(destino)) return 'origem e destino são a mesma pasta';
+  } catch (e) {
+    return `não deu para conferir origem e destino (${e.message})`;
+  }
+  return null;
+}
+
+async function contarArquivos(dir) {
+  let n = 0;
+  for await (const [, h] of dir.entries()) n += h.kind === 'file' ? 1 : await contarArquivos(h);
+  return n;
+}
+
 /** Renomeia uma subpasta (ex.: quando o inquilino sai e a pasta ganha a data de saída). */
 export async function renomearPasta(pai, antigo, novo) {
   antigo = limparNome(antigo);
@@ -185,6 +234,8 @@ export async function renomearPasta(pai, antigo, novo) {
     await pai.getDirectoryHandle(novo, { create: true });
     return;
   }
+  const perigo = await destinoPerigoso(origem, pai, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não renomeada para "${novo}": ${perigo}.`); return; }
   try {
     await pai.getDirectoryHandle(novo);
     return; // já existe uma pasta com o nome novo: não mistura conteúdos
@@ -211,6 +262,8 @@ export async function moverPasta(paiAntigo, antigo, paiNovo, novo) {
     await paiNovo.getDirectoryHandle(novo, { create: true });
     return;
   }
+  const perigo = await destinoPerigoso(origem, paiNovo, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não movida para "${novo}": ${perigo}.`); return; }
   try {
     await paiNovo.getDirectoryHandle(novo);
     return; // já existe uma pasta com o nome novo: não mistura conteúdos
@@ -237,6 +290,9 @@ export async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
   let origem;
   try { origem = await paiAntigo.getDirectoryHandle(antigo); } catch { return 0; }
   if (antigo === novo && await paiAntigo.isSameEntry(paiNovo)) return 0;
+  // nunca junta uma pasta com ela mesma nem a leva para dentro dela: isso apagaria a pasta inteira (os arquivos "repetidos" são os próprios)
+  const perigo = await destinoPerigoso(origem, paiNovo, novo);
+  if (perigo) { console.warn(`Pasta "${antigo}" não juntada em "${novo}": ${perigo}.`); return contarArquivos(origem); }
   let existe = true;
   try { await paiNovo.getDirectoryHandle(novo); } catch { existe = false; }
   if (!existe) {
@@ -246,6 +302,15 @@ export async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
   const sobrou = await juntarConteudo(origem, await paiNovo.getDirectoryHandle(novo));
   if (!sobrou) await paiAntigo.removeEntry(antigo, { recursive: true });
   return sobrou;
+}
+
+async function mesmosBytes(a, b) {
+  const [x, y] = await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
+  if (x.byteLength !== y.byteLength) return false;
+  const u = new Uint8Array(x);
+  const v = new Uint8Array(y);
+  for (let i = 0; i < u.length; i += 1) if (u[i] !== v[i]) return false;
+  return true;
 }
 
 async function juntarConteudo(origem, destino) {
@@ -263,6 +328,8 @@ async function juntarConteudo(origem, destino) {
     try { la = await (await destino.getFileHandle(nome)).getFile(); } catch { /* não existe no destino */ }
     // vazio no destino: sobra de uma cópia que falhou no meio (ex.: OneDrive sincronizando); o de verdade é o da origem
     if (la && la.size !== arq.size && la.size && arq.size) { sobrou += 1; continue; }
+    // mesmo nome e mesmo tamanho, mas conteúdo diferente: também fica na origem (nunca apagar sem conferir os bytes)
+    if (la && la.size && la.size === arq.size && !await mesmosBytes(la, arq)) { sobrou += 1; continue; }
     if (!la || (!la.size && arq.size)) await escreverTexto(destino, nome, arq);
     feitos.push(nome);
   }
@@ -296,11 +363,19 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
   const banco = zip.file(ARQUIVO_BANCO);
   if (!banco) throw new Error(`O ZIP não contém o arquivo ${ARQUIVO_BANCO}.`);
   const nomes = Object.keys(zip.files);
+  // Confere todos os caminhos antes de gravar qualquer coisa: um nome inválido no meio deixaria a pasta
+  // com metade dos anexos novos e o banco antigo. Cada parte do caminho passa por limparNome (igual ao anexar).
+  const entradas = [];
   for (const n of nomes) {
     const partes = n.split('/');
     if (n.startsWith('/') || partes.includes('..') || (n !== ARQUIVO_BANCO && ![PASTA_ARQUIVOS, PASTA_MODELOS].includes(partes[0]))) {
       throw new Error(`Arquivo inesperado dentro do ZIP: ${n}`);
     }
+    const entrada = zip.files[n];
+    if (entrada.dir || n === ARQUIVO_BANCO) continue;
+    const pastas = partes.slice(0, -1).map(limparNome);
+    if (pastas.some((p) => !p) || partes.length < 2) throw new Error(`Arquivo inesperado dentro do ZIP: ${n}`);
+    entradas.push({ entrada, pastas, nome: limparNome(partes.at(-1)) });
   }
   const novos = normalizar(JSON.parse(await banco.async('string')));
   if (novos.formato !== 'imoveis-v1') throw new Error('O ZIP não é uma exportação deste sistema.');
@@ -314,12 +389,9 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
     const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
     await escreverTexto(dir, `antes-da-importacao-${carimbo}.json`, JSON.stringify(dadosAtuais));
   }
-  for (const n of nomes) {
-    const entrada = zip.files[n];
-    if (entrada.dir || n === ARQUIVO_BANCO) continue;
-    const partes = n.split('/');
-    const dir = await subpasta(pasta, partes.slice(0, -1));
-    await escreverTexto(dir, partes.at(-1), await entrada.async('blob'));
+  for (const { entrada, pastas, nome } of entradas) {
+    const dir = await subpasta(pasta, pastas);
+    await escreverTexto(dir, nome, await entrada.async('blob'));
   }
   await gravarBanco(pasta, novos);
   return novos;

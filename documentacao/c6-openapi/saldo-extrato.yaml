@@ -1,0 +1,325 @@
+openapi: 3.1.1
+info:
+  title: Saldo & Extrato
+  version: 2.0.1
+  description: |-
+    ## O que esta API permite?
+    Esta API permite consultar o saldo e o extrato de uma conta, fornecendo informações detalhadas sobre lançamentos, valores, datas, tipos de operação e transação, além de dados adicionais. Facilita o acesso aos dados financeiros do cliente de forma segura e estruturada.
+
+    <br>
+
+    ________________
+
+    ## **Resumo Técnico da API**
+
+    Esta API possui as seguintes operações disponíveis:
+
+    | Operação                                                                    |
+    |:---------------------------------------------------------------------------:|
+    | [Consultar extrato](statement#tag/api-de-saldo-e-extrato/get/)              |
+    | [Consultar saldo](statement#tag/api-de-saldo-e-extrato/get/balance)         |
+
+    Endereço dos ambientes:
+
+    | Ambiente | Host                                 | Path            |
+    |:--------:|------------------------------------- |-----------------|
+    | Sandbox  | https://baas-api-sandbox.c6bank.info | /v1/statement/  |
+    | Produção | https://baas-api.c6bank.info         | /v1/statement/  |
+
+    **Observações**
+
+    O intervalo entre <code>start_date</code> e <code>end_date</code> não pode exceder 30 dias. A API não impõe restrições de retenção ou limite de tempo sobre os dados consultados, sendo o limite aplicado exclusivamente à duração do período informado, independentemente das datas consultadas.
+
+    O uso desta API é exclusivo para clientes do segmento Pessoa Jurídica (PJ).
+servers:
+  - url: https://baas-api-sandbox.c6bank.info/v1/statement
+    description: Ambiente sandbox
+  - url: https://baas-api.c6bank.info/v1/statement
+    description: Ambiente produtivo
+tags:
+  - name: API de Saldo e Extrato
+    description: Operações de consulta de saldo e extrato
+paths:
+  /:
+    parameters:
+      - name: start_date
+        in: query
+        description: |
+          Data inicial do período a ser consultado, no formato `YYYY-MM-DD`.
+          O intervalo entre `start_date` e `end_date` não pode exceder 30 dias.
+        required: true
+        pattern: ^\d{4}-\d{2}-\d{2}$
+        schema:
+          type: string
+          format: date
+          examples:
+            - 2025-10-10
+      - name: end_date
+        in: query
+        description: >
+          Data final do período a ser consultado, no formato `YYYY-MM-DD`.
+
+          Deve ser igual ou posterior a `start_date` e respeitar o limite de 30
+          dias do período.
+        required: true
+        pattern: ^\d{4}-\d{2}-\d{2}$
+        schema:
+          type: string
+          format: date
+          examples:
+            - 2025-10-10
+      - $ref: "#/components/parameters/Authorization"
+    get:
+      tags:
+        - API de Saldo e Extrato
+      summary: Consultar extrato
+      description: >
+        Retorna os lançamentos da conta dentro do período informado em
+        `start_date` e `end_date`. O período consultado não pode exceder 30
+        dias.
+      responses:
+        "200":
+          description: Extrato consultado com sucesso. Retorna a lista de lançamentos do
+            período.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatementResponse"
+  /balance:
+    parameters:
+      - $ref: "#/components/parameters/Authorization"
+    get:
+      tags:
+        - API de Saldo e Extrato
+      summary: Consultar saldo
+      description: |
+        Retorna o saldo da conta.
+      responses:
+        "200":
+          description: Saldo consultado com sucesso. Retorna o detalhamento do saldo e dos
+            limites da conta.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+components:
+  parameters:
+    Authorization:
+      name: Authorization
+      in: header
+      description: Token de acesso obtido na API de Autenticação. Deve ser enviado no
+        formato `Bearer {{your_access_token}}`.
+      required: true
+      schema:
+        type: string
+        examples:
+          - Bearer {{your_access_token}}
+  schemas:
+    Entries:
+      type: object
+      description: Representa um lançamento individual do extrato da conta.
+      properties:
+        local_reference:
+          type: string
+          description: Referência interna do lançamento no C6 Bank, utilizada para
+            rastreabilidade.
+          examples:
+            - 01JGHAMYWRSAW41GAMFKEG17VA
+        created_at:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$
+          description: Data e hora em que o lançamento foi registrado, no formato
+            `YYYY-MM-DDTHH:MM:SS`.
+          examples:
+            - 2025-12-05T14:30:00
+        entry_date:
+          type: string
+          format: date
+          pattern: ^\d{4}-\d{2}-\d{2}$
+          description: Data contábil em que o lançamento foi efetivado na conta, no
+            formato `YYYY-MM-DD`.
+          examples:
+            - 2025-12-05
+        amount:
+          type: string
+          description: Valor do lançamento, com duas casas decimais. O sinal da
+            movimentação é indicado por `operation_type`.
+          examples:
+            - "1500.00"
+        title:
+          type: string
+          description: Título curto que identifica a natureza da movimentação no extrato.
+          examples:
+            - Pix Recebido C6 QR Code de Regressivo
+        description:
+          type: string
+          description: Texto complementar com o detalhamento do lançamento.
+          examples:
+            - Pix QR Code para pagamento de Supermercado XYZ
+        reference:
+          type: string
+          description: Identificador único e estável do lançamento. É o campo que deve ser
+            usado como chave para conciliação e de-duplicação na
+            re-sincronização, evitando o registro duplicado de um mesmo
+            lançamento.
+          examples:
+            - 019aeec0-a61a-8043-4a46-2f191aebdf9a
+        operation_type:
+          type: string
+          enum:
+            - OUTGOING
+            - INCOMING
+          description: |
+            Sentido do lançamento em relação à conta:
+            - `INCOMING` - entrada (crédito) de recursos.
+            - `OUTGOING` - saída (débito) de recursos.
+          examples:
+            - INCOMING
+        transaction_type:
+          type: string
+          enum:
+            - PAYMENT
+            - TRANSFER
+            - PAYMENT_REVERSAL
+            - PERSONAL_LOAN
+            - INSTALLMENT_LOAN
+            - PARKY
+            - TAGGY
+            - C6_TAG_PASSAGE
+            - C6_TAG_STAY
+            - DIRECT_DEBIT_AGREEMENT
+            - SPREAD_OP_OF_EXCHANGE
+            - IOF_OP_OF_EXCHANGE
+            - GLOBAL_ACCOUNT
+            - FUND
+            - RECHARGE
+            - KICK
+            - PREPAYMENT
+            - CREDIT_CARD_SALE
+            - DEBIT_CARD_SALE
+            - OVERFLOW
+            - CREDIT_PIX_DEVOLUTION_RECEIVED
+            - DEBIT_PIX_DEVOLUTION_SENT
+            - CREDIT_QRCODE_PIX_PAYMENT_RECEIVED
+            - CREDIT_PIX_PAYMENT_RECEIVED
+            - DEBIT_PIX_PAYMENT_REALIZED
+            - DEBIT_OPEN_BANKING_PIX_REALIZED
+            - VEHICLE_TAX
+            - TECH_INVEST
+            - OTHER
+          description: Categoria da transação que originou o lançamento, como Pix,
+            transferência, pagamento, empréstimo ou venda em cartão.
+          examples:
+            - CREDIT_QRCODE_PIX_PAYMENT_RECEIVED
+        end_to_end_id:
+          type: string
+          description: Identificador ponta a ponta (end-to-end) da transação, quando
+            aplicável.
+      required:
+        - reference
+        - created_at
+        - entry_date
+        - amount
+        - title
+        - description
+        - operation_type
+        - transaction_type
+    StatementResponse:
+      type: object
+      description: Resposta da consulta de extrato, contendo os lançamentos do período
+        informado.
+      properties:
+        entries:
+          type: array
+          description: Lista de lançamentos do período, ordenados por data. Retorna vazia
+            quando não há movimentações no intervalo.
+          items:
+            $ref: "#/components/schemas/Entries"
+    ExceedsLimit:
+      type: object
+      description: Detalhamento do limite de excedente (cheque especial adicional)
+        concedido à conta.
+      properties:
+        total:
+          type: number
+          description: Valor total do limite de excedente concedido.
+        used:
+          type: number
+          description: Parcela do limite de excedente já utilizada.
+        available:
+          type: number
+          description: Parcela do limite de excedente ainda disponível para uso.
+    Limit:
+      type: object
+      description: Detalhamento do limite de crédito (cheque especial) concedido à conta.
+      properties:
+        total:
+          type: number
+          description: Valor total do limite de crédito concedido.
+        used:
+          type: number
+          description: Parcela do limite de crédito já utilizada.
+        available:
+          type: number
+          description: Parcela do limite de crédito ainda disponível para uso.
+    BalanceResponse:
+      type: object
+      description: Resposta da consulta de saldo, com o detalhamento do saldo atual e
+        dos limites da conta.
+      properties:
+        date:
+          type: string
+          format: date
+          pattern: ^\d{4}-\d{2}-\d{2}$
+          description: Data de referência a que o saldo se refere, no formato `YYYY-MM-DD`.
+          examples:
+            - 2025-12-05
+        currency_code:
+          type: string
+          description: Código da moeda do saldo, no padrão ISO 4217. Para contas em Real,
+            o valor é `BRL`.
+          examples:
+            - BRL
+        available:
+          type: number
+          description: Saldo disponível para uso imediato, sem considerar limites de
+            crédito.
+        locked:
+          type: number
+          description: Valor bloqueado na conta e temporariamente indisponível para
+            movimentação.
+        future:
+          type: number
+          description: Saldo previsto a partir de lançamentos já agendados ou ainda não
+            liquidados.
+        charges:
+          type: number
+          description: Total de encargos pendentes de cobrança na conta.
+        exceeds_limit:
+          $ref: "#/components/schemas/ExceedsLimit"
+        limit:
+          $ref: "#/components/schemas/Limit"
+        total_available:
+          type: number
+          description: Total disponível considerando o saldo disponível somado ao limite
+            de crédito disponível.
+        total_available_with_exceed_limit:
+          type: number
+          description: Total disponível considerando também o limite de excedente
+            disponível.
+        limit_used_type:
+          type: string
+          enum:
+            - CDB
+            - OVERDRAFT
+            - NONE
+          description: >
+            Origem do recurso utilizado quando o saldo disponível é
+            insuficiente:
+
+            - `CDB` - utilização de investimento em CDB como garantia/limite.
+
+            - `OVERDRAFT` - utilização do cheque especial.
+
+            - `NONE` - nenhum limite em uso.
