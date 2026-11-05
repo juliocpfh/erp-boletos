@@ -480,7 +480,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   assert.equal(d.movimentacoes_banco[0].valor, 1000);
   // sem config_banco nenhum: cria só os campos novos
   const d2 = R.normalizar(R.bancoVazio());
-  assert.deepEqual([d2.config_banco.ativo, d2.config_banco.pasta_contador, d2.movimentacoes_banco, d2.pagamentos_banco], [undefined, '_Contador', [], []]);
+  assert.deepEqual([d2.config_banco.ativo, d2.config_banco.pasta_contador, d2.movimentacoes_banco, d2.pagamentos_banco], [false, '_Contador', [], []] /* a base cria config_banco com ativo:false */);
   // histórico: alteração em movimentação não aparece em "desfazer"
   const { d: d3 } = base();
   const [m] = importar(d3, 'ank', [saida('r1', '2026-11-05', '10.00', 'A')]).novas;
