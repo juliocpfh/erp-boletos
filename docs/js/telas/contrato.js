@@ -645,6 +645,7 @@ export function telaContrato(c) {
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${alertaArquivosFaltando(c.id)}
+    ${i && R.geraNf(c) && R.contratoAtivo(c, hoje) && !R.participacoesDo(d(), i.id).length ? `<div class="alerta aviso"><b>Imóvel sem empresa que emite a NF.</b> Os boletos saem normalmente, mas não dá para numerar a NF dos pagamentos até definir a empresa (e o percentual) ${link(`#/imovel/${i.id}?ir=empresas`, 'na página do imóvel')}.</div>` : ''}
     ${R.geraNf(c) ? '' : `<div class="alerta controle"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE} ${opera() ? botao('alternarNf', 'Passar a emitir NF', { id: c.id }, 'secundario pequeno', 'Este inquilino passa a emitir NF e a contar nos resultados?') : ''}</div>`}
     ${selosContrato(c)}
     ${linhaIncluso(c)}

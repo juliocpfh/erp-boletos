@@ -15,7 +15,7 @@ import { telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurar
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -33,6 +33,7 @@ const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: 
 export const TELAS = {
   _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
   _listaArquivos: listaArquivos,
+  _naoEncontrado: naoEncontrado,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
 
@@ -123,6 +124,12 @@ export const TELAS = {
     }
     if (pctEl.value !== '' && valEl.value === '') doPct();
   },
+
+  arquivoSumiu: (copias) => `<main><div id="mensagens"></div><div class="cartao login" style="max-width:600px"><h1>Administração de Imóveis</h1>
+    <div class="alerta perigo"><b>O arquivo ${esc(S.ARQUIVO_BANCO)} não está na pasta "${esc(E.pasta.name)}"</b>, mas há cópia(s) com outro nome: <b>${copias.map(esc).join('</b>, <b>')}</b>.
+      Isso costuma acontecer quando o OneDrive encontra duas versões ao mesmo tempo. Nada foi perdido.</div>
+    <p>Abra a pasta no computador, renomeie a cópia mais recente para <b>${esc(S.ARQUIVO_BANCO)}</b> e clique em Tentar de novo. Se houver mais de uma cópia, guarde as outras em outra pasta.</p>
+    <p class="acoes">${botao('reabrir', 'Tentar de novo')} ${botao('escolherPasta', 'Escolher outra pasta', {}, 'secundario')}</p>${LINK_RESTAURAR}</div></main>`,
 
   semSuporte: () => `<main><div class="cartao login"><h1>Administração de Imóveis</h1>
     <div class="alerta aviso">Este navegador não consegue salvar numa pasta do computador. Abra este endereço no <b>Google Chrome</b> ou no <b>Microsoft Edge</b> (no computador, não no celular).</div></div></main>`,
@@ -258,27 +265,27 @@ export const TELAS = {
 
   imovel(rota) {
     const i = buscar('imoveis', rota.partes[1]);
-    if (!i) return '<h1>Imóvel não encontrado</h1>';
+    if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
     return telaImovel(i);
   },
 
   contrato(rota) {
     const c = buscar('contratos', rota.partes[1]);
-    if (!c) return '<h1>Contrato não encontrado</h1>';
+    if (!c) return naoEncontrado('Contrato não encontrado', '#/inquilinos', 'Ver os inquilinos');
     return telaContrato(c);
   },
 
   novo: (rota, estado) => telaFormulario(rota.partes[1], null, rota.q, estado),
   editar(rota, estado) {
     const r = buscar(rota.partes[1], rota.partes[2]);
-    if (!r) return '<h1>Registro não encontrado</h1>';
+    if (!r) return naoEncontrado('Registro não encontrado');
     return telaFormulario(rota.partes[1], r, rota.q, estado);
   },
 
   cobrancas: (rota) => telaCobrancas(rota.q.comp || competenciaPadrao(), rota.q.ordem),
   cobranca(rota) {
     const cb = buscar('cobrancas', rota.partes[1]);
-    return cb ? telaCobranca(cb) : '<h1>Boleto não encontrado</h1>';
+    return cb ? telaCobranca(cb) : naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos');
   },
   faturas: (rota) => telaFaturas(rota.q.mes || C.competenciaDe(C.hojeIso())),
   resultados: (rota) => telaResultados(rota.q),

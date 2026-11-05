@@ -28,27 +28,45 @@ export const login = () => (E.usuario ? E.usuario.login : 'sistema');
 const SESSAO = 'imoveis-sessao';
 const DURACAO_SESSAO = 12 * 3600 * 1000;
 
+const MAX_SESSOES = 10; // por usuário (vários navegadores/computadores)
+
+/** Sessão lembrada: { login, token } ou null. O token é um número aleatório criado no login e guardado também no usuário do banco. */
 function lerSessao() {
   try {
     const s = JSON.parse(localStorage.getItem(SESSAO) || 'null');
-    return s && s.ate > Date.now() ? s.login : null;
+    return s && s.ate > Date.now() && s.login && s.token ? s : null;
   } catch {
     return null;
   }
 }
 
-function gravarSessao(loginTexto) {
+function gravarSessao(loginTexto, token = null) {
   try {
-    if (loginTexto) localStorage.setItem(SESSAO, JSON.stringify({ login: loginTexto, ate: Date.now() + DURACAO_SESSAO }));
+    const atual = lerSessao();
+    const t = token || (atual && atual.login === loginTexto ? atual.token : null);
+    if (loginTexto && t) localStorage.setItem(SESSAO, JSON.stringify({ login: loginTexto, token: t, ate: Date.now() + DURACAO_SESSAO }));
     else localStorage.removeItem(SESSAO);
   } catch { /* navegador sem armazenamento: pede login de novo */ }
 }
 
-/** Usuário da sessão lembrada, se ainda estiver ativo no banco. */
+const novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** Usuário da sessão lembrada, se ainda estiver ativo no banco e o token da sessão for dele. */
 const usuarioDaSessao = () => {
-  const salvo = lerSessao();
-  return (E.d && salvo && E.d.usuarios.find((u) => u.login === salvo && u.ativo && !u.pendente)) || null;
+  const s = lerSessao();
+  return (E.d && s && E.d.usuarios.find((u) => u.login === s.login && u.ativo && !u.pendente && (u.sessoes || []).includes(s.token))) || null;
 };
+
+/** Registra no banco o token de uma sessão nova do usuário (fica fora do histórico). */
+async function abrirSessao(u) {
+  const token = novoToken();
+  await alterar((db) => {
+    const x = db.usuarios.find((y) => y.id === u.id);
+    if (x) x.sessoes = [...(x.sessoes || []), token].slice(-MAX_SESSOES);
+  });
+  E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
+  gravarSessao(u.login, token);
+}
 
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
 window.addEventListener('storage', (ev) => {
@@ -64,8 +82,19 @@ export const podeUsuario = (papel) => pode(E.usuario, papel);
 // --------------------------------------------------------------------------
 // Gravação: relê o arquivo, aplica a alteração e grava (para não apagar o que outra pessoa salvou)
 // --------------------------------------------------------------------------
-export async function alterar(fn) {
+let filaGravacao = Promise.resolve();
+/** Uma gravação de cada vez: duas ao mesmo tempo (duplo clique, arrumações do Painel) sobrescreveriam uma à outra. */
+export function alterar(fn) {
+  const minha = filaGravacao.then(() => alterarAgora(fn));
+  filaGravacao = minha.catch(() => {});
+  return minha;
+}
+
+export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${S.ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
+
+async function alterarAgora(fn) {
   const disco = await S.lerBanco(E.pasta);
+  if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
     E.d = disco;
     aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
@@ -304,18 +333,18 @@ export async function criarBanco(nome, loginTexto, senha) {
   novo.revisao = (novo.revisao || 0) + 1;
   await S.gravarBanco(E.pasta, novo);
   E.d = novo;
-  E.usuario = u;
-  gravarSessao(u.login);
+  await abrirSessao(u);
 }
 
 export async function entrar(loginTexto, senha) {
-  E.d = await S.lerBanco(E.pasta);
+  const disco = await S.lerBanco(E.pasta);
+  if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
+  E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
   if (!(await conferirSenha(u, senha))) throw new Error('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
-  E.usuario = u;
-  gravarSessao(u.login);
+  await abrirSessao(u);
 }
 
 /** Atualiza o usuário logado depois de alterar o cadastro dele (ou sai, se foi bloqueado). */
@@ -326,10 +355,14 @@ export function renovarUsuario() {
   gravarSessao(u && u.login);
 }
 
-export function sair() {
+export async function sair() {
+  const s = lerSessao();
+  const u = E.usuario;
   E.usuario = null;
   gravarSessao(null);
   ir('#/');
+  // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
+  if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }).catch(() => {});
 }
 
 // --------------------------------------------------------------------------
@@ -363,7 +396,8 @@ function layout(conteudo, rota) {
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
   return `<header class="topo nao-imprimir">
-      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a><nav>${menu}</nav>
+      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
+      <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -379,13 +413,14 @@ export async function mostrar(estadoForm = null) {
     if (rota.partes[0] === 'restaurar-backup') html = await TELAS.restaurarBackup();
     else if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
     else if (!E.pasta) html = await TELAS.inicio();
+    else if (!E.d && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
     else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();
     else {
       gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
       const tela = TELAS[nome];
-      const conteudo = tela ? await tela(rota, estadoForm) : '<h1>Página não encontrada</h1>';
+      const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
     }
     // na mesma página, as caixas recolhíveis (<details id>) que estavam abertas continuam abertas depois de uma ação
@@ -425,6 +460,14 @@ async function montarExtras(raiz) {
     el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
   }
   TELAS._ligarDesconto(raiz);
+  // no celular, as tabelas largas viram cartões: cada célula mostra o nome da coluna (ver estilo.css, @media)
+  for (const tabela of raiz.querySelectorAll('table.responsiva')) {
+    const cabecalho = [...tabela.querySelectorAll('tr:first-child th')].map((th) => th.textContent.trim());
+    for (const tr of tabela.querySelectorAll('tr')) {
+      [...tr.children].forEach((td, k) => { if (td.tagName === 'TD' && cabecalho[k] && !td.dataset.rotulo) td.dataset.rotulo = cabecalho[k]; });
+    }
+  }
+  for (const caixa of raiz.querySelectorAll('.rolagem')) caixa.classList.toggle('tem-rolagem', caixa.scrollWidth > caixa.clientWidth + 2);
 }
 
 // --------------------------------------------------------------------------
@@ -479,15 +522,28 @@ document.addEventListener('click', (ev) => {
 });
 
 document.addEventListener('click', async (ev) => {
+  const menu = ev.target.closest('[data-menu]');
+  if (menu) {
+    const topo = menu.closest('header.topo');
+    const aberto = topo.classList.toggle('menu-aberto');
+    menu.setAttribute('aria-expanded', String(aberto));
+    return;
+  }
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
   ev.preventDefault();
+  if (el.dataset.ocupado) return; // segundo clique enquanto a ação roda (ex.: "Gerar boletos" duas vezes)
   if (el.dataset.confirmar && !confirm(el.dataset.confirmar)) return;
+  el.dataset.ocupado = '1';
+  if (el.tagName === 'BUTTON') el.disabled = true;
   try {
     await ACOES[el.dataset.acao](el.dataset, el);
   } catch (e) {
     console.error(e);
     aviso(e.message, 'erro');
+  } finally {
+    delete el.dataset.ocupado;
+    if (el.tagName === 'BUTTON') el.disabled = false;
   }
 });
 

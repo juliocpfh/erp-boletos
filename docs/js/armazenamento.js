@@ -1,5 +1,6 @@
 // Leitura e gravação na pasta escolhida pelo usuário (ex.: uma pasta do OneDrive),
 // usando a File System Access API do Chrome/Edge. Nada é enviado para a internet.
+import { hojeIso } from './calculos.js';
 import { normalizar } from './regras.js';
 
 export const ARQUIVO_BANCO = 'imoveis-dados.json';
@@ -93,7 +94,7 @@ export async function gravarBanco(pasta, dados) {
 /** Cópia do banco uma vez por dia em backups/, guardando as 30 mais recentes. */
 export async function backupDiario(pasta, dados) {
   const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
-  const nome = `imoveis-dados-${new Date().toISOString().slice(0, 10)}.json`;
+  const nome = `imoveis-dados-${hojeIso()}.json`; // data local (toISOString daria o dia seguinte depois das 21h)
   if (await arquivoExiste(dir, nome)) return;
   await escreverTexto(dir, nome, JSON.stringify(dados));
   const nomes = [];
@@ -248,6 +249,15 @@ export async function juntarPasta(paiAntigo, antigo, paiNovo, novo) {
   return sobrou;
 }
 
+async function mesmosBytes(a, b) {
+  const [x, y] = await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
+  if (x.byteLength !== y.byteLength) return false;
+  const u = new Uint8Array(x);
+  const v = new Uint8Array(y);
+  for (let i = 0; i < u.length; i += 1) if (u[i] !== v[i]) return false;
+  return true;
+}
+
 async function juntarConteudo(origem, destino) {
   let sobrou = 0;
   const feitos = [];
@@ -263,6 +273,8 @@ async function juntarConteudo(origem, destino) {
     try { la = await (await destino.getFileHandle(nome)).getFile(); } catch { /* não existe no destino */ }
     // vazio no destino: sobra de uma cópia que falhou no meio (ex.: OneDrive sincronizando); o de verdade é o da origem
     if (la && la.size !== arq.size && la.size && arq.size) { sobrou += 1; continue; }
+    // mesmo nome e mesmo tamanho, mas conteúdo diferente: também fica na origem (nunca apagar sem conferir os bytes)
+    if (la && la.size && la.size === arq.size && !await mesmosBytes(la, arq)) { sobrou += 1; continue; }
     if (!la || (!la.size && arq.size)) await escreverTexto(destino, nome, arq);
     feitos.push(nome);
   }

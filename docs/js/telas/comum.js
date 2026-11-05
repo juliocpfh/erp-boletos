@@ -7,6 +7,10 @@ import { dataBr, pct, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 
+/** Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). */
+export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') => `<h1>${esc(titulo)}</h1>
+  <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto, 'botao')}${href !== '#/' ? ` ${link('#/', 'Voltar ao painel', 'botao secundario')}` : ''}</p>`;
+
 /** Estado de tela que passa de um assunto a outro: troca de titular escolhida no contrato novo; pagamento com valor diferente aguardando a NF. */
 export const memoria = { continuacao: null, pagamentoDivergente: null };
 
@@ -287,10 +291,18 @@ export const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) =>
 /** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
 export async function apagarAnexos(lista, motivo) {
   const apagados = [];
+  const falharam = [];
   for (const a of lista) {
-    try { await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome); apagados.push(a); } catch { /* já não estava na pasta */ }
+    try {
+      await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome);
+      apagados.push(a);
+    } catch (e) {
+      // "não existe" é normal (já tinha sido apagado fora do sistema); outro erro (arquivo aberto, OneDrive travado) é avisado
+      if (e && e.name !== 'NotFoundError') falharam.push(a.nome);
+    }
   }
   if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
+  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; apague depois em Dados e backup ("Limpar anexos soltos").`, 'aviso');
   return apagados.length;
 }
 

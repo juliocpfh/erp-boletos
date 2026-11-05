@@ -4,7 +4,7 @@ import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { botao, buscar, d, etiqueta, link, opera } from './comum.js';
+import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 
 /** Inadimplência: quem está devendo, há quantos dias, quanto hoje; e quem costuma atrasar. */
 export function telaInadimplencia() {
@@ -43,7 +43,7 @@ function mesComContas(imovelId) {
 
 export function telaContas(rota) {
   const i = buscar('imoveis', rota.partes[1]);
-  if (!i) return '<h1>Imóvel não encontrado</h1>';
+  if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
   const comp = rota.q.comp || mesComContas(i.id);
   const ultimos = R.ultimosValores(d(), i.id);
   const permitidas = R.contasPermitidas(d(), i.id, comp);

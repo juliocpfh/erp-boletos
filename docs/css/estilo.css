@@ -441,3 +441,36 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
 .reajuste-valor { min-width: 140px; }
 .reajuste-botoes { margin-left: auto; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .caucao-parcelas { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+
+/* Celular e telas estreitas: menu recolhido, faixa curta, tabelas largas como cartões ou com aviso de rolagem */
+.menu-botao { display: none; }
+@media (max-width: 760px) {
+  header.topo { padding: 8px 12px; gap: 8px 12px; align-items: center; }
+  header.topo .marca { flex: 1; font-size: 16px; }
+  header.topo .marca img { height: 32px; }
+  header.topo .conta { font-size: 12px; order: 3; width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; }
+  header.topo .conta br { display: none; }
+  .menu-botao { display: inline-block; background: rgba(255,255,255,.15); color: #fff; padding: 6px 10px; font-size: 14px; }
+  header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }
+  header.topo.menu-aberto nav { display: flex; }
+  header.topo nav a { padding: 9px 10px; font-size: 15px; }
+  .faixa { padding: 4px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  main { padding: 12px 12px 60px; }
+  .cartao { padding: 12px; }
+  h1 { font-size: 21px; }
+  /* tabela que rola para o lado: avisa que há mais colunas */
+  .rolagem.tem-rolagem { position: relative; }
+  .rolagem.tem-rolagem::before { content: "← arraste para o lado para ver as outras colunas →"; display: block; font-size: 12px; color: var(--suave); margin-bottom: 6px; }
+  /* tabela "responsiva": cada linha vira um cartão com o nome da coluna antes de cada valor */
+  table.responsiva, table.responsiva tbody { display: block; }
+  table.responsiva tr { display: block; border: 1px solid var(--borda); border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; background: var(--cartao); }
+  table.responsiva tr:first-child { display: none; }
+  table.responsiva td { display: block; padding: 5px 0; border-bottom: 1px dashed var(--borda); text-align: left; white-space: normal; }
+  table.responsiva td:last-child { border-bottom: 0; }
+  table.responsiva td:empty { display: none; }
+  table.responsiva td::before { content: attr(data-rotulo); display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
+  table.responsiva td:not([data-rotulo])::before, table.responsiva td[data-rotulo=""]::before { display: none; }
+  table.responsiva tr.total { display: none; } /* a soma do mês não cabe no formato de cartão (colunas unidas) */
+  table.responsiva form.inline, table.responsiva form.inline input { max-width: 100%; }
+  .rolagem.tem-rolagem:has(table.responsiva)::before { display: none; }
+}

@@ -6,6 +6,8 @@
 // mas só quem sabe a senha abre um backup. Cada arquivo carrega a chave privada cifrada: para restaurar
 // basta o arquivo e a senha, mesmo em outro computador ou sem conseguir entrar no sistema.
 
+import { hojeIso } from './calculos.js';
+
 export const ARQUIVO_CHAVE = 'chave-do-backup.json';
 export const PASTA_DIARIO = 'copias-diarias';
 export const PASTA_SEMANAL = 'completos-semanais';
@@ -163,7 +165,7 @@ export async function lerChave(dir) {
 
 export const gravarChave = (dir, chave) => gravar(dir, ARQUIVO_CHAVE, JSON.stringify(chave, null, 1));
 
-const hoje = () => new Date().toISOString().slice(0, 10);
+const hoje = () => hojeIso(); // data local (toISOString daria o dia seguinte depois das 21h)
 
 /** Cópia do banco do dia (sobrescreve a do mesmo dia a cada gravação). */
 export async function espelhar(dir, chave, dados) {

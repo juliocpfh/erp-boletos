@@ -16,6 +16,14 @@ import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
+/** Pagamento confirmado num imóvel sem empresa emitente: avisa agora, para não descobrir só na hora de numerar a NF. */
+function avisarImovelSemEmpresa(cb) {
+  const c = cb && buscar('contratos', cb.contrato_id);
+  const i = c && buscar('imoveis', c.imovel_id);
+  if (!i || !R.geraNf(c) || R.ehComplementoCaucao(cb) || R.participacoesDo(d(), i.id).length) return;
+  aviso(`O imóvel ${i.nome} ainda não tem empresa que emite a NF: defina na página do imóvel (caixa "Empresas que emitem a NF") antes de numerar.`, 'aviso');
+}
+
 export const FORMULARIOS = {
   async configurarSeguro(form) {
     if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
@@ -407,6 +415,7 @@ export const FORMULARIOS = {
     if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
     else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
       : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+    avisarImovelSemEmpresa(pago);
     await mostrar();
   },
 

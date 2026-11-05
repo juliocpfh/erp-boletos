@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { demonstrativo } from './cobrancas.js';
-import { botao, buscar, d, link, opera, ordenar, pastaDoEscopo, urls } from './comum.js';
+import { botao, buscar, d, link, naoEncontrado, opera, ordenar, pastaDoEscopo, urls } from './comum.js';
 import { botoesReajuste, cartaReajuste } from './reajustes.js';
 
 export async function telaImprimir(rota) {
@@ -20,7 +20,7 @@ export async function telaImprimir(rota) {
   const voltar = (pdf = null) => `<div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${pdf ? botao('baixarPdfTela', 'Baixar PDF', pdf, 'secundario') : ''}<button class="secundario" data-acao="voltar">Voltar</button></div>`;
   if (tipo === 'carta') {
     const c = buscar('contratos', rota.q.contrato);
-    if (!c) return '<p>Inquilino não encontrado.</p>';
+    if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
     const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
     const carta = cartaReajuste(c, rota.q.comp);
     // sem o índice, não há carta (só o aviso): sem botão de PDF
@@ -30,7 +30,7 @@ export async function telaImprimir(rota) {
   }
   if (['contrato', 'vistoria', 'chaves', 'aditivo'].includes(tipo)) {
     const m = await documentoMontado(tipo, rota.q);
-    if (!m) return '<p>Registro não encontrado.</p>';
+    if (!m) return naoEncontrado('Registro não encontrado', '#/inquilinos', 'Ver os inquilinos');
     const falta = K.pendenciasDoContrato(d(), m.c);
     const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === 'aditivo' ? 'aditivos' : 'documentos'}`;
     return `<div class="impressao">
@@ -258,9 +258,9 @@ export const roteiroTexto = (comodo) => `## ${comodo}\n${ROTEIROS[comodo].map((x
 export function telaVistoria(rota) {
   const id = rota.partes[1];
   const v = id === 'novo' ? null : buscar('vistorias', id);
-  if (id !== 'novo' && !v) return '<h1>Vistoria não encontrada</h1>';
+  if (id !== 'novo' && !v) return naoEncontrado('Vistoria não encontrada', '#/inquilinos', 'Ver os inquilinos');
   const c = buscar('contratos', v ? v.contrato_id : rota.q.contrato);
-  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
   const i = buscar('imoveis', c.imovel_id) || {};
   const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
@@ -365,7 +365,7 @@ export const MODELO_COMODOS = {
 
 export function telaModeloVistoria(rota) {
   const i = buscar('imoveis', rota.partes[1]);
-  if (!i) return '<h1>Imóvel não encontrado</h1>';
+  if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
   const outros = ordenar(d().imoveis.filter((x) => x.id !== i.id && x.modelo_vistoria), 'nome');
   const resumo = K.lerModeloVistoria(i.modelo_vistoria);
   // aberto pela vistoria: salvar e cancelar voltam para ela
@@ -415,7 +415,7 @@ async function fotosDaVistoria(v) {
 
 export function telaGerarContrato(rota) {
   const c = buscar('contratos', rota.partes[1]);
-  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   const modelos = K.modelosDe(d());
   const naoRes = c.finalidade === 'Não residencial';
   const sugerido = Number(rota.q.modelo) || (modelos.find((m) => /n[ãa]o residencial|comercial/i.test(m.nome) === naoRes) || modelos[0]).id;
@@ -447,9 +447,9 @@ export function telaGerarContrato(rota) {
 export function telaAditivo(rota) {
   const id = rota.partes[1];
   const a = id === 'novo' ? null : buscar('aditivos', id);
-  if (id !== 'novo' && !a) return '<h1>Termo aditivo não encontrado</h1>';
+  if (id !== 'novo' && !a) return naoEncontrado('Termo aditivo não encontrado', '#/inquilinos', 'Ver os inquilinos');
   const c = buscar('contratos', a ? a.contrato_id : rota.q.contrato);
-  if (!c) return '<h1>Inquilino não encontrado</h1>';
+  if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
   if (!opera()) return '<h1>Sem permissão para gerar termos aditivos</h1>';
   const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : 'vencimento') : rota.q.tipo;
@@ -576,7 +576,7 @@ export function telaModelo(rota) {
   const id = rota.partes[1];
   const m = id === 'novo' ? { id: '', nome: '', texto: '', tipo: rota.q.tipo in TIPOS_MODELO ? rota.q.tipo : 'contrato' }
     : Object.keys(TIPOS_MODELO).flatMap((t) => K.modelosDe(d(), t)).find((x) => String(x.id) === id);
-  if (!m) return '<h1>Modelo não encontrado</h1>';
+  if (!m) return naoEncontrado('Modelo não encontrado', '#/modelos-contrato', 'Ver os modelos');
   const tipo = K.tipoDoModelo(m);
   const aditivo = tipo !== 'contrato';
   return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>

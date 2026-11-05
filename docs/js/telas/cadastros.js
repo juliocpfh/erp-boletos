@@ -10,7 +10,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
+import { arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, naoEncontrado, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -757,7 +757,7 @@ export const CADASTROS = {
 
 export function telaFormulario(tabela, registro, q, estado) {
   const cfg = CADASTROS[tabela];
-  if (!cfg) return '<h1>Página não encontrada</h1>';
+  if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
   const campos = cfg.campos(registro, q);
   let valores = estado ? estado.valores : F.paraFormulario(campos, registro && cfg.valores ? cfg.valores(registro) : registro);
