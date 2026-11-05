@@ -91,7 +91,16 @@ export const SUB_ANUNCIO = 'Anúncio';
 /** Arquivo da matrícula: fica nos documentos do imóvel, com o nome começando por "Matricula". */
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
-const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas' };
+const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas', contas: 'Contas pagas' };
+
+/** Comprovantes do banco: pasta do imóvel por ano ("Imóvel/Contas pagas/2026", escopo `contasano`, id = imóvel×10000 + ano, como o IPTU). */
+export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
+
+/** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
+export const PASTA_CONTADOR = '_Contador';
+export const idPastaContador = (emitenteId, comp) => emitenteId * 1000000 + Number(String(comp).replace('-', ''));
+export const decodificarIdContador = (id) => ({ emitenteId: Math.floor(id / 1000000), comp: `${String(id % 1000000).slice(0, 4)}-${String(id % 1000000).slice(4)}` });
+const pastaContador = () => (d().config_banco && d().config_banco.pasta_contador) || PASTA_CONTADOR;
 
 /** Apólices do seguro obrigatório: subpasta dentro da pasta do inquilino (antes ficava na pasta do imóvel). */
 const SUB_SEGURO = 'Seguro (apólices)';
@@ -112,7 +121,7 @@ export function nomePastaContrato(c) {
 /** Guias do IPTU por ano: o id junta imóvel e ano (imóvel 5, 2026 → 52026), numa subpasta do ano. */
 export const idGuiasDoAno = (imovelId, ano) => imovelId * 10000 + ano;
 
-function imovelDoEscopo(escopo, id) { return escopo === 'iptuano' ? Math.floor(id / 10000) : id; }
+function imovelDoEscopo(escopo, id) { return ['iptuano', 'contasano'].includes(escopo) ? Math.floor(id / 10000) : id; }
 
 /** Documentos de entrada assinados: subpasta dentro da pasta do inquilino. */
 const SUB_ASSINADOS = 'Documentos assinados';
@@ -125,7 +134,8 @@ const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos', 'segu
 
 const SUB_DO_ESCOPO = { assinados: SUB_ASSINADOS, aditivos: SUB_ADITIVOS, seguro: SUB_SEGURO };
 
-export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id } : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
+export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id }
+  : escopo === 'contador' ? {} : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
 /** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Aditivos, correções e comunicação". */
 export function chavePasta(escopo, id) {
@@ -133,8 +143,13 @@ export function chavePasta(escopo, id) {
     const c = buscar('contratos', id);
     return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), SUB_DO_ESCOPO[escopo] || ''].join('/') : null;
   }
+  if (escopo === 'contador') {
+    const { emitenteId, comp } = decodificarIdContador(Number(id));
+    const e = buscar('emitentes', emitenteId);
+    return e ? [pastaContador(), e.nome, comp].join('/') : null;
+  }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
-  return i ? [i.pasta || i.nome, escopo].join('/') : null;
+  return i ? [i.pasta || i.nome, escopo, ...(escopo === 'contasano' ? [String(Number(id) % 10000)] : [])].join('/') : null;
 }
 
 /** Depois de apagar o arquivo de um campo do formulário: troca só o quadro "Já guardado" (sem redesenhar a página). */
@@ -327,8 +342,15 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
     const c = buscar('contratos', id);
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
+  if (escopo === 'contador') {
+    const { emitenteId, comp } = decodificarIdContador(Number(id));
+    const e = buscar('emitentes', emitenteId);
+    if (!e) throw new Error('Empresa da conta bancária não encontrada.');
+    return S.subpasta(raiz, [pastaContador(), e.nome, comp], criar);
+  }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
   if (escopo === 'iptuano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.iptu, String(id % 10000)], criar);
+  if (escopo === 'contasano') return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS.contas, String(id % 10000)], criar);
   return S.subpasta(raiz, [i.pasta || i.nome, SUBPASTAS[escopo] || SUB_DOCS], criar);
 }
 

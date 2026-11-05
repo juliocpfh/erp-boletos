@@ -4,6 +4,7 @@ import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
+import { caixaPagarPeloBanco } from './banco.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 
 /** Inadimplência: quem está devendo, há quantos dias, quanto hoje; e quem costuma atrasar. */
@@ -39,6 +40,15 @@ function mesComContas(imovelId) {
     if (R.contasPermitidas(d(), imovelId, m).tipos.length) return m;
   }
   return atual;
+}
+
+/** Coluna "Banco" dos lançamentos: movimentação do extrato ligada à conta (com o comprovante) ou "sem extrato". */
+function bancoDaDespesa(x) {
+  const m = (d().movimentacoes_banco || []).find((y) => y.despesa_id === x.id || (x.movimentacao_id && y.id === x.movimentacao_id));
+  const peloBanco = x.pagamento_banco_id || (d().pagamentos_banco || []).some((p) => p.despesa_id === x.id && p.situacao === 'pago');
+  if (!m) return `${peloBanco ? etiqueta('pelo banco', 'info') : `<a class="suave" href="#/banco?imovel=${x.imovel_id}">sem extrato</a>`}`;
+  const nome = m.comprovante || m.comprovante_contador;
+  return `${peloBanco ? `${etiqueta('pelo banco', 'info')} ` : ''}<a href="#/banco?conta=${esc(m.conta_id)}&mes=${String(m.data).slice(0, 7)}">${dataBr(m.data)}</a>${nome ? `<br><span class="suave" title="${esc(nome)}">📎 comprovante</span>` : `<br>${etiqueta('sem comprovante', 'aviso')}`}`;
 }
 
 export function telaContas(rota) {
@@ -77,10 +87,12 @@ export function telaContas(rota) {
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
       <p class="suave">Preencha só as contas pagas. Verificou e não há conta no mês? Informe 0,00 e escreva na observação (ex.: "verificado, sem conta em aberto"): fica registrado e conta como lançado no fechamento. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
       ${permitidas.tipos.length ? '<div class="acoes"><button>Lançar</button></div>' : ''}</form>
-    <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th></th></tr>
-      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td>
+    ${caixaPagarPeloBanco(i, comp)}
+    <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th>Banco</th><th></th></tr>
+      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td><td>${bancoDaDespesa(x)}</td>
         <td class="n">${opera() ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : ''}</td></tr>`).join('')
-      || '<tr><td colspan="6" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div></div>`;
+      || '<tr><td colspan="7" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div>
+      <p class="suave">Coluna "Banco": a movimentação do extrato ligada a esta conta e o comprovante guardado (tela Banco). "pelo banco" = paga pelo sistema via C6.</p></div>`;
 }
 
 /** Abas da página Resultados. */

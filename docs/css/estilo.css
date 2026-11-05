@@ -169,6 +169,17 @@ body.arrastando-caixa { user-select: none; cursor: grabbing; }
 
 .so-impressao { display: none; }
 @page { size: A4; margin: 10mm; }
+/* Banco (extrato do C6): entrada em verde, saída normal, etiquetas de destino, linha ignorada apagada, código de barras */
+.mov-entrada { color: var(--ok); font-weight: 600; }
+.mov-saida { font-weight: 600; }
+.etiqueta.destino { background: #ede9fe; color: #5b21b6; }
+.banco-sugestao { display: inline-block; background: #e0f2fe; color: var(--info, #0891b2); border-radius: 6px; padding: 1px 8px; font-size: 12px; }
+tr.mov-ignorada td { color: var(--suave); text-decoration: line-through; }
+tr.mov-ignorada td .etiqueta, tr.mov-ignorada td button, tr.mov-ignorada td a { text-decoration: none; }
+.codigo-barras { font-family: ui-monospace, Consolas, monospace; letter-spacing: .5px; word-break: break-all; }
+input.codigo-barras { min-width: 260px; width: 100%; }
+table.banco td:nth-child(2) { max-width: 320px; }
+
 @media print {
   header.topo, .faixa, .nao-imprimir, #mensagens { display: none !important; }
   body { background: #fff; }
