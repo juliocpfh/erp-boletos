@@ -485,3 +485,11 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   table.responsiva form.inline, table.responsiva form.inline input { max-width: 100%; }
   .rolagem.tem-rolagem:has(table.responsiva)::before { display: none; }
 }
+
+/* Banco (C6): boleto emitido, QR Code do Pix e botões que ainda não funcionam */
+button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
+.boleto-banco td { padding: 4px 8px; vertical-align: top; }
+.boleto-banco td.copia-cola { word-break: break-all; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.qr-pix { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
+.qr-pix img { width: 180px; height: 180px; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
+#saude-ponte ul { padding-left: 18px; }

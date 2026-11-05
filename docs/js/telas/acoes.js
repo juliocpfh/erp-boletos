@@ -3,6 +3,7 @@ import { alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarS
 import * as S from '../armazenamento.js';
 import { PAPEIS } from '../auth.js';
 import * as B from '../backup-seguro.js';
+import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as K from '../contratos.js';
@@ -14,6 +15,7 @@ import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
+import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
@@ -46,7 +48,7 @@ async function excelDoNumero(ExcelJS, modelo, numero) {
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.imovel_id === r.id) ? 'Este imóvel tem inquilinos. Exclua os contratos antes.' : null), voltar: () => '#/imoveis' },
   contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
-  cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
+  cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   iptus: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
   seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
@@ -73,6 +75,75 @@ async function redesenharFormulario(el, ajustes, lista) {
   await mostrar({ valores, erros: {} });
   const editor = document.querySelector(`[data-editor="${lista}"]`);
   if (editor) editor.hidden = false;
+}
+
+// --------------------------------------------------------------------------
+// Banco (C6): auxiliares das ações de boleto
+// --------------------------------------------------------------------------
+/**
+ * Conta que emite: no modo "padrão" a conta padrão (ANK); no modo "escolher", pergunta numa janela com as contas configuradas,
+ * pré-marcada a da empresa do imóvel (se uma só) ou a padrão. ``lote``: texto da pergunta para vários boletos. null = cancelou.
+ */
+async function escolherContaC6(cb, lote = '') {
+  const sugerida = cb && R.contaSugerida(d(), cb);
+  if (sugerida && !lote) return sugerida;
+  const contas = R.configBanco(d()).contas;
+  if (!contas.length) throw new Error('Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).');
+  if (contas.length === 1) return contas[0];
+  const marcada = cb ? R.contaPreMarcada(d(), cb) : R.contaEmissora(d());
+  const resp = await janela({ titulo: 'Por qual empresa emitir o boleto?',
+    html: `<p>${lote || `Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}, ${esc(reais(R.totais(cb).a_pagar_sem_desconto))}).`} Escolha a conta do C6 que recebe:</p>
+      ${contas.map((x) => `<p><label class="check-mini"><input type="radio" name="conta" value="${esc(x.id)}" ${marcada && marcada.id === x.id ? 'checked' : ''}> <b>${esc((buscar('emitentes', x.emitente_id) || {}).nome || x.apelido)}</b> · conta ${esc(x.apelido)}${x.ambiente === 'sandbox' ? ' (sandbox: teste)' : ''}</label></p>`).join('')}
+      <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Empresas.</p>`,
+    sim: 'Emitir', nao: 'Cancelar' });
+  if (!resp) return null;
+  return R.contaBanco(d(), String((resp.conta || [])[0] || ''));
+}
+
+/** Chama a ponte e grava a resposta no boleto; em falha do banco, grava o erro no boleto e repassa a mensagem. */
+async function emitirNoC6(cb, conta) {
+  let r;
+  try {
+    r = await BANCO.emitirBoleto(d(), cb, conta);
+  } catch (e) {
+    // recusa do banco ou da ponte (não falta de conexão): fica registrada no boleto
+    if (e instanceof BANCO.ErroPonte && e.status) await alterar((db) => R.registrarErroBancario(db, cb.id, e.message, login(), { conta_id: conta.id, ambiente: conta.ambiente }));
+    throw e;
+  }
+  return alterar((db) => R.registrarBoletoBancario(db, cb.id, r.resposta, login(), { conta_id: conta.id, ambiente: r.resposta.ambiente || conta.ambiente }));
+}
+
+/** Banco disse que pagou: janela com a data em que pagou e a data contábil (crédito); só grava se o usuário confirmar. */
+async function proporPagamentoDoBanco(cb) {
+  const b = cb.banco;
+  const hoje = C.hojeIso();
+  const pagou = b.pago_em || hoje;
+  const credito = b.credito_em || pagou;
+  const previsto = R.previstoNoPagamento(cb, credito, { dataPagou: pagou !== credito ? pagou : null });
+  const valorBanco = b.valor_pago ?? null;
+  const difere = valorBanco !== null && valorBanco !== previsto.valor_devido;
+  const resp = await janela({ titulo: 'O banco confirmou o pagamento. Registrar aqui?',
+    html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${b.pago_em ? ` em <b>${esc(dataBr(b.pago_em))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${b.credito_em ? `, creditado em <b>${esc(dataBr(b.credito_em))}</b>` : ''}.</p>
+      <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
+      <p><label>Data contábil (entrada na conta: é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
+      <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
+      ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
+      <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
+    sim: 'Registrar pagamento', nao: 'Agora não' });
+  if (!resp) { aviso('Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".', 'info'); return; }
+  const data = String((resp.data || [])[0] || '');
+  const dataPagou = String((resp.pagou || [])[0] || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
+  if (dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+  const pagouEmDia = dataPagou <= cb.vencimento && data > cb.vencimento;
+  if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
+    // mesmo caminho do pagamento com valor diferente digitado à mão: justificativa + valor da NF na página do boleto
+    memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}` };
+    ir(`#/cobranca/${cb.id}?ir=pagamento`);
+    return;
+  }
+  const r = await alterar((db) => R.registrarPagamento(db, cb.id, data, difere ? valorBanco : null, login(), { pagouEmDia, dataPagou: pagouEmDia || dataPagou === data ? null : dataPagou }));
+  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
 }
 
 const numerosSelecionados = () => {
@@ -1272,6 +1343,218 @@ export const ACOES = {
 
   async baixarArquivo({ escopo, id, nome }) {
     baixar(await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
+  },
+
+  // ------------------------------------------------------------------------
+  // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
+  // ------------------------------------------------------------------------
+  /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
+  async testarPonteC6() {
+    const alvo = document.getElementById('saude-ponte');
+    if (alvo) alvo.innerHTML = '<p class="suave">Falando com a ponte…</p>';
+    try {
+      const s = await BANCO.saudePonte(d());
+      if (alvo) alvo.innerHTML = htmlSaude(s);
+      aviso(s.simulado ? 'Ponte respondeu em modo simulado.' : s.configurado ? 'Ponte pronta para falar com o banco.' : 'Ponte respondeu, mas ainda faltam as chaves do banco (veja abaixo).', s.configurado && !s.simulado ? 'ok' : 'aviso');
+    } catch (e) {
+      if (alvo) alvo.innerHTML = `<div class="alerta perigo">${esc(e.message)}</div>`;
+      throw e;
+    }
+  },
+
+  async testarContaC6({ conta }) {
+    const alvo = document.getElementById('saude-ponte');
+    if (alvo) alvo.innerHTML = '<p class="suave">Falando com a ponte…</p>';
+    try {
+      const s = await BANCO.saudeConta(d(), conta);
+      if (alvo) alvo.innerHTML = htmlSaude({ ponte: true, simulado: s.simulado, configurado: s.configurado, contas: { [conta]: s } }, conta);
+    } catch (e) {
+      if (alvo) alvo.innerHTML = `<div class="alerta perigo">${esc(e.message)}</div>`;
+      throw e;
+    }
+  },
+
+  /** Preenche o formulário "Incluir ou alterar uma conta" com a conta escolhida. */
+  editarContaBanco({ conta }) {
+    const c = R.contaBanco(d(), conta);
+    if (!c) throw new Error('Conta não encontrada.');
+    const det = document.getElementById('nova-conta-banco');
+    const form = det && det.querySelector('form');
+    if (!form) return;
+    det.open = true;
+    for (const [k, v] of Object.entries(c)) if (form.elements[k] && typeof v !== 'object') form.elements[k].value = v ?? '';
+    for (const [k, v] of Object.entries(c.notificar || {})) if (form.elements[`notificar_${k}`]) form.elements[`notificar_${k}`].checked = !!v;
+    if (form.elements.negativacao_ativa) form.elements.negativacao_ativa.checked = !!(c.negativacao && c.negativacao.ativa);
+    if (form.elements.negativacao_dias && c.negativacao) form.elements.negativacao_dias.value = c.negativacao.dias_atraso;
+    form.elements.id.focus();
+    det.scrollIntoView({ block: 'start' });
+  },
+
+  async excluirContaBanco({ conta }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    await alterar((db) => R.excluirContaBanco(db, conta, login()));
+    aviso('Conta tirada da integração.');
+    await mostrar();
+  },
+
+  /** Emite um boleto no C6: escolhe a conta (pergunta se o imóvel tem mais de uma empresa), chama a ponte e grava a resposta. */
+  async emitirBoletoC6({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode emitir boletos.');
+    const cb = buscar('cobrancas', id);
+    const conta = await escolherContaC6(cb);
+    if (!conta) return;
+    const banco = await emitirNoC6(cb, conta);
+    aviso(`Boleto emitido no C6 pela conta ${conta.apelido}${banco.ambiente === 'sandbox' ? ' (sandbox: teste, não vale como cobrança)' : ''}. Linha digitável: ${banco.linha_digitavel || '-'}`, banco.ambiente === 'sandbox' ? 'aviso' : 'ok');
+    await mostrar();
+  },
+
+  /** Emite todos os boletos em aberto do mês ainda não emitidos; os que precisam de escolha da conta ficam para emitir um a um. */
+  async emitirBoletosMesC6({ comp }) {
+    if (!opera()) throw new Error('Seu usuário não pode emitir boletos.');
+    const lista = R.boletosParaEmitir(d(), comp);
+    if (!lista.length) throw new Error('Nenhum boleto em aberto sem emissão neste mês.');
+    const falhas = [];
+    let emitidos = 0;
+    // modo "escolher": os boletos de imóvel com uma só empresa usam a conta dela; para os outros, pergunta uma vez
+    const semConta = lista.filter((cb) => !R.contaSugerida(d(), cb));
+    const contaDoLote = semConta.length ? await escolherContaC6(null, `${semConta.length} boleto(s) sem empresa definida pelo imóvel.`) : null;
+    if (semConta.length && !contaDoLote) return;
+    const usadas = new Set();
+    for (const cb of lista) {
+      try {
+        const conta = R.contaSugerida(d(), cb) || contaDoLote;
+        usadas.add(conta.apelido);
+        await emitirNoC6(buscar('cobrancas', cb.id), conta);
+        emitidos += 1;
+      } catch (e) {
+        falhas.push(`${buscar('contratos', cb.contrato_id).inquilino_nome}: ${e.message}`);
+      }
+    }
+    aviso(`${emitidos} boleto(s) emitido(s) no C6${usadas.size ? ` pela(s) conta(s) ${[...usadas].join(', ')}` : ''}.${falhas.length ? ` ${falhas.length} falharam: ${falhas.join(' · ')}` : ''}`, falhas.length ? 'aviso' : 'ok');
+    await mostrar();
+  },
+
+  /** Consulta a situação no banco; se o banco diz que foi pago e aqui ainda não está, propõe registrar o pagamento (nunca registra sozinho). */
+  async consultarBoletoC6({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    const cb = buscar('cobrancas', id);
+    const resposta = await BANCO.consultarBoleto(d(), cb);
+    const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login()));
+    if (banco.situacao !== 'pago') {
+      aviso(R.aguardandoCredito({ banco }) ? 'O inquilino pagou e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento.'
+        : banco.situacao === 'cancelado' ? 'O banco informa que este boleto está cancelado.' : `Situação no banco: ${banco.situacao_banco || 'em aberto'}. Ainda não foi pago.`, 'info');
+      await mostrar();
+      return;
+    }
+    if (cb.data_pagamento) {
+      aviso('O banco confirma o pagamento, que já está registrado aqui.');
+      await mostrar();
+      return;
+    }
+    await proporPagamentoDoBanco(buscar('cobrancas', id));
+    await mostrar();
+  },
+
+  /** Negativação do pagador no birô: só administrador, conta com a opção ligada, 2ª confirmação com o nome do inquilino e o prazo. */
+  async negativarC6({ id }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador negativa um pagador.');
+    const cb = buscar('cobrancas', id);
+    const conta = R.contaBanco(d(), cb.banco && cb.banco.conta_id);
+    if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+    const c = buscar('contratos', cb.contrato_id);
+    const resp = await janela({ titulo: '2ª confirmação: negativar no birô de crédito', forte: true,
+      html: `<p>O banco vai incluir <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? ` (${esc(c.inquilino_cpf)})` : ''} no birô de crédito se o boleto de <b>${esc(compBr(cb.competencia))}</b> (${esc(reais(cb.banco.valor))}, vencimento ${esc(dataBr(cb.vencimento))}) não for pago em até <b>${conta.negativacao.dias_atraso} dias de atraso</b>.</p>
+        <p><label>Dias de atraso</label><input type="number" name="dias" min="1" value="${conta.negativacao.dias_atraso}" required></p>
+        <p>Digite <b>NEGATIVAR</b> para confirmar: <input name="confirmo" autocomplete="off" required></p>`,
+      sim: 'Agendar a negativação', nao: 'Cancelar' });
+    if (!resp) return;
+    if (String((resp.confirmo || [])[0] || '').trim().toUpperCase() !== 'NEGATIVAR') throw new Error('Digite NEGATIVAR para confirmar. Nada foi feito.');
+    const dias = Number((resp.dias || [])[0]);
+    if (!Number.isInteger(dias) || dias < 1) throw new Error('Informe os dias de atraso.');
+    const resposta = await BANCO.negativarBoleto(d(), cb, dias);
+    await alterar((db) => R.registrarNegativacao(db, cb.id, resposta, login(), dias));
+    aviso(`Negativação agendada no C6${resposta && resposta.denial_date ? ` para ${dataBr(resposta.denial_date)}` : ''}.`, 'aviso');
+    await mostrar();
+  },
+
+  async cancelarNegativacaoC6({ id }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador cancela a negativação.');
+    const cb = buscar('cobrancas', id);
+    const resposta = await BANCO.cancelarNegativacao(d(), cb);
+    await alterar((db) => { R.registrarCancelamentoNegativacao(db, cb.id, login()); if (resposta && resposta.external_reference_id) R.registrarBoletoBancario(db, cb.id, resposta, login()); });
+    aviso('Cancelamento da negativação pedido ao C6.');
+    await mostrar();
+  },
+
+  /**
+   * Conferência dos pagamentos do mês no banco: lista na conta emissora os boletos pagos (ou aguardando crédito) por data de pagamento,
+   * atualiza a situação de cada um aqui e, para os pagos ainda não registrados, propõe registrar um a um (sempre com confirmação).
+   */
+  async conferirPagamentosC6({ comp }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    const { de, ate } = R.periodoConferenciaC6(d(), comp);
+    const contas = [...new Set(d().cobrancas.filter((cb) => cb.competencia === comp && cb.banco && cb.banco.conta_id).map((cb) => cb.banco.conta_id))];
+    if (!contas.length) throw new Error('Nenhum boleto deste mês foi emitido no C6.');
+    aviso(`Conferindo no banco os pagamentos de ${dataBr(de)} a ${dataBr(ate)}…`, 'info');
+    let atualizados = 0;
+    const pagosSemRegistro = [];
+    for (const contaId of contas) {
+      const itens = await BANCO.listarTodosBoletos(d(), contaId, { payment_date_from: de, payment_date_to: ate });
+      const { casados } = R.casarListagemC6(d(), itens, contaId);
+      for (const { cb, item } of casados) {
+        const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
+        atualizados += 1;
+        if (banco.situacao === 'pago' && !buscar('cobrancas', cb.id).data_pagamento) pagosSemRegistro.push(cb.id);
+      }
+    }
+    for (const cbId of pagosSemRegistro) await proporPagamentoDoBanco(buscar('cobrancas', cbId));
+    aviso(`${atualizados} boleto(s) conferido(s) no banco${pagosSemRegistro.length ? `; ${pagosSemRegistro.length} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}.`);
+    await mostrar();
+  },
+
+  /** Boleto mudou depois de emitido: manda ao banco o valor, o vencimento e a descrição atuais (PATCH). Se recusar, cancelar e emitir outro. */
+  async alterarBoletoC6({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    const cb = buscar('cobrancas', id);
+    let resposta;
+    try {
+      resposta = await BANCO.alterarBoleto(d(), cb);
+    } catch (e) {
+      throw new Error(`${e.message} Alternativa: "Cancelar no banco" e depois "Emitir no C6" de novo.`);
+    }
+    await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login()));
+    aviso('Boleto atualizado no C6 com os valores do sistema.');
+    await mostrar();
+  },
+
+  async cancelarBoletoC6({ id }) {
+    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    const cb = buscar('cobrancas', id);
+    const resposta = await BANCO.cancelarBoleto(d(), cb);
+    await alterar((db) => R.registrarCancelamentoBancario(db, cb.id, login(), resposta));
+    aviso('Boleto cancelado no C6. Se precisar, emita outro.');
+    await mostrar();
+  },
+
+  /** Só com a ponte em modo simulado: marca o boleto fictício como pago, para testar o fluxo de consulta → registrar pagamento. */
+  async pagarSimuladoC6({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb.banco || !cb.banco.simulado) throw new Error('Este boleto não é fictício.');
+    const previsto = R.previstoNoPagamento(cb, C.hojeIso(), {});
+    await BANCO.chamarPonte(cb.banco.conta_id, 'POST', `/simulado/pagar/${encodeURIComponent(cb.banco.id_externo)}`, { payment_date: C.hojeIso(), amount: R.centavosParaReais(previsto.valor_devido) });
+    aviso('Pagamento fictício registrado na ponte. Agora clique em "Consultar situação no banco".', 'info');
+  },
+
+  abrirPdfC6({ id }) {
+    const cb = buscar('cobrancas', id);
+    // a ponte exige a senha num cabeçalho, que uma aba nova não manda: baixa pelo fetch e abre o arquivo
+    return BANCO.chamarPonteCrua('GET', `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+      const r = await fetch(url, o);
+      if (!r.ok) return r;
+      const blob = await r.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } });
   },
 
   /** Dados e backup: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
