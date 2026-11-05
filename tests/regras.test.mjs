@@ -1905,3 +1905,24 @@ test('troca de titular sem o termo assinado: o contrato continua no anterior, me
   assert.equal(R.buscar(d, 'contratos', n.id).heranca_transferida, '2026-11-01');
   assert.equal(R.buscar(d, 'contratos', c.id).data_saida, '2026-10-31');
 });
+
+test('banco (C6): normalizar cria as tabelas e os campos novos; comprovantes do extrato entram em arquivosReferenciados e rotulosDosArquivos', () => {
+  const { d, loja } = base();
+  const ank = d.emitentes[0];
+  delete d.movimentacoes_banco;
+  delete d.pagamentos_banco;
+  d.config_banco = { ativo: true, contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id }] };
+  R.normalizar(d);
+  assert.deepEqual([d.movimentacoes_banco, d.pagamentos_banco, d.config_banco.pasta_contador, d.config_banco.tolerancia_dias, d.config_banco.permitir_pagamentos, d.config_banco.ativo], [[], [], '_Contador', 3, false, true]);
+  const [de] = R.lancarDespesas(d, loja.id, '2026-05', [{ tipo: 'Água', valor: 12345, data_pagamento: '2026-05-20' }], 'julio');
+  const m = R.inserir(d, 'movimentacoes_banco', { conta_id: 'ank', id_externo: 'r1', data: '2026-05-20', valor: 12345, tipo: 'saida', descricao: 'SANEPAR', classificacao: 'conta_imovel',
+    imovel_id: loja.id, despesa_id: de.id, comprovante: '2026-05-20 ANK Loja 1 Agua 123,45.pdf', comprovante_contador: '2026-05-20 ANK Loja 1 Agua 123,45.pdf' }, 'julio');
+  const refs = R.arquivosReferenciados(d).filter((a) => a.nome.includes('Agua'));
+  assert.deepEqual(refs, [{ escopo: 'contasano', id: R.idPastaAno(loja.id, 2026), nome: m.comprovante }, { escopo: 'contador', id: R.idContador(ank.id, '2026-05'), nome: m.comprovante_contador }]);
+  const rot = R.rotulosDosArquivos(d);
+  assert.equal(rot.get(`contasano:${R.idPastaAno(loja.id, 2026)}|${m.comprovante}`), 'comprovante do banco ANK: Água 05/2026 (20/05/2026, R$ 123,45)');
+  assert.match(rot.get(`contador:${R.idContador(ank.id, '2026-05')}|${m.comprovante}`), /^cópia para o contador \(ANK 05\/2026\)/);
+  R.normalizar(d); // de novo: nada muda
+  assert.equal(d.movimentacoes_banco[0].comprovante, m.comprovante);
+  assert.equal(R.alteracoesDesfaziveis(d).size, 0, 'movimentações do banco não se desfazem pelo histórico');
+});
