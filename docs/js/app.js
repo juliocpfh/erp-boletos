@@ -1,5 +1,6 @@
 // Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
+import { carregarPonteLocal } from './banco.js';
 import { conferirSenha, novoSal, pode, resumoSenha } from './auth.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
@@ -573,6 +574,7 @@ window.addEventListener('focus', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
+  await carregarPonteLocal(); // endereço e senha da ponte do banco, só deste navegador
   if (E.teste) {
     await abrirPasta(await pastaDeTeste());
     return;

@@ -39,6 +39,10 @@ export const pastaLembrada = () => idbOp('readonly', (s) => s.get('pasta')).catc
 export const lembrarPastaSegura = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta_segura'));
 export const pastaSeguraLembrada = () => idbOp('readonly', (s) => s.get('pasta_segura')).catch(() => null);
 export const esquecerPastaSegura = () => idbOp('readwrite', (s) => s.delete('pasta_segura'));
+// endereço e senha da ponte do banco (C6): só neste navegador, nunca no JSON compartilhado da pasta
+export const lembrarPonte = (dados) => idbOp('readwrite', (s) => s.put(dados, 'ponte'));
+export const ponteLembrada = () => idbOp('readonly', (s) => s.get('ponte')).catch(() => null);
+export const esquecerPonte = () => idbOp('readwrite', (s) => s.delete('ponte'));
 
 export async function escolherPasta() {
   const handle = await window.showDirectoryPicker({ id: 'imoveis', mode: 'readwrite' });
