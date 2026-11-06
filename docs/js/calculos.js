@@ -375,7 +375,7 @@ const FORMATOS_PARAMETRO = {
   data: DATA_RE,
   de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/, ate: DATA_RE, // "de" também é a tela de origem (de=iptu, de=inquilinos)
   imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
-  vincular: /^\d+$/, seguro: /^\d+$/, empresa: /^\d+$/, vistoria: /^\d+$/, id: /^\d+$/,
+  vincular: /^\d+$/, seguro: /^\d+$/, custo: /^\d+$/, airbnb: /^\d+$/, empresa: /^\d+$/, vistoria: /^\d+$/, id: /^\d+$/,
   ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
   ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
   ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,

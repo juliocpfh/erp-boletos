@@ -83,6 +83,8 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .numeros .cartao { margin: 0; text-align: center; }
 .numeros .grande { font-size: 28px; font-weight: 700; }
+/* no celular, valor em reais numa linha só (R$ 12.884,70 não quebra no meio) */
+@media (max-width: 760px) { .numeros .grande { font-size: 20px; white-space: nowrap; } .numeros .cartao { padding: 10px 8px; } }
 .formulario { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px 18px; }
 .formulario .largo { grid-column: 1 / -1; }
 .formulario h3 { grid-column: 1 / -1; border-bottom: 1px solid var(--borda); padding-bottom: 4px; margin-top: 18px; }
@@ -329,6 +331,25 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
   .contrato .ct-rodape { display: none; }
 }
 .destaque-contas { font-weight: 700; }
+/* Financeiro: lançar custo / Airbnb (campos que se ajeitam na largura) e colunas da tabela de resultados */
+.grade-lancar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 10px; align-items: end; margin-bottom: 12px; }
+.grade-lancar label { margin: 0; font-size: 13px; }
+.grade-lancar input, .grade-lancar select { width: 100%; margin-top: 2px; }
+.tabela-resultados .col-imovel { min-width: 140px; max-width: 220px; white-space: normal; }
+.tabela-resultados .col-imovel .etiqueta { white-space: normal; display: inline-block; margin-top: 2px; }
+.tabela-resultados .col-reforma { border-left: 1px solid var(--borda); }
+@media (max-width: 760px) {
+  .tabela-resultados .col-imovel { max-width: none; }
+  .tabela-resultados .col-reforma { border-left: 0; }
+  /* cartão compacto: rótulo à esquerda e valor à direita na mesma linha (o nome do imóvel fica em cima, sem rótulo) */
+  table.responsiva.tabela-resultados td { text-align: right; padding: 4px 0; }
+  table.responsiva.tabela-resultados td::before { float: left; margin: 0 8px 0 0; text-align: left; }
+  table.responsiva.tabela-resultados td::after { content: ""; display: block; clear: both; }
+  table.responsiva.tabela-resultados td.col-imovel { text-align: left; font-size: 15px; }
+  table.responsiva.tabela-resultados td.col-imovel::before { display: none; }
+  table.responsiva.tabela-resultados td:first-child:not(.col-imovel) { display: none; }
+  table.responsiva.tabela-resultados .barra { margin-left: auto; max-width: 60%; }
+}
 
 /* Vistoria: grade por cômodo, tabelas e fotos no documento */
 .vistoria-comodo { border: 1px solid var(--borda); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
@@ -383,7 +404,8 @@ th.centro, td.centro { text-align: center; }
 .x-excluir, button.x-excluir { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; margin: 0 2px;
   background: var(--perigo); color: #fff; border: 0; border-radius: 4px; font-size: 22px; font-weight: 400; line-height: 1; padding-bottom: 2px; box-sizing: border-box; text-decoration: none; cursor: pointer; vertical-align: middle; }
 .x-excluir:hover { background: #991b1b; }
-.abas { display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
+.abas { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
+@media (max-width: 760px) { .abas a { padding: 6px 10px; font-size: 14px; } }
 .abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
 .abas a.ativo { border-bottom-color: var(--info, #0891b2); font-weight: 700; }
 .texto-aviso { color: #b45309; font-weight: 700; }

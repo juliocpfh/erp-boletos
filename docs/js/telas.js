@@ -22,7 +22,7 @@ import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
-import { telaContas, telaImpostos, telaInadimplencia, telaResultados } from './telas/financeiro.js';
+import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
 import { telaReajustes } from './telas/reajustes.js';
 
@@ -290,7 +290,9 @@ export const TELAS = {
     return cb ? telaCobranca(cb) : naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos');
   },
   faturas: (rota) => telaFaturas(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
+  financeiro: (rota) => telaFinanceiro(rota.q),
   resultados: (rota) => telaResultados(rota.q),
+  liquido: (rota) => telaLiquido(rota.q),
   impostos: (rota) => telaImpostos(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
   contas: (rota) => telaContas(rota),
   banco: (rota) => telaBanco(rota),

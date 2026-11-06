@@ -592,7 +592,10 @@ test('contas nossas: imóvel vago, até 2 meses depois de alugar, depois só as 
   assert.deepEqual([set.motivo, set.tipos], ['inquilino', []]);
   c.conta_condominio = 'Incluso no aluguel';
   assert.deepEqual(R.contasPermitidas(d, loja.id, '2026-09').tipos, ['Condomínio']);
-  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Água', valor: 5000 }], 'julio'), /inquilino paga Água/);
+  // qualquer imóvel aceita conta nossa (ex.: débito antigo, troca de titular): o contrato só orienta a tela
+  const [agua] = R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Água', valor: 5000, vencimento: '2026-09-15' }], 'julio');
+  assert.equal(agua.vencimento, '2026-09-15');
+  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Água', valor: 5000, vencimento: '15/09/2026' }], 'julio'), /vencimento inválido/);
   R.lancarDespesas(d, loja.id, '2026-09', [{ tipo: 'Condomínio', valor: 45000 }], 'julio');
   c.data_saida = '2026-11-15';
   assert.equal(R.contasPermitidas(d, loja.id, '2026-11').motivo, 'vago', 'mês da saída');
@@ -1925,4 +1928,72 @@ test('banco (C6): normalizar cria as tabelas e os campos novos; comprovantes do 
   R.normalizar(d); // de novo: nada muda
   assert.equal(d.movimentacoes_banco[0].comprovante, m.comprovante);
   assert.equal(R.alteracoesDesfaziveis(d).size, 0, 'movimentações do banco não se desfazem pelo histórico');
+});
+
+test('situação dos custos: vago aceita Airbnb; alugado há pouco avisa até 2 meses depois da entrada; conta incluída no contrato', () => {
+  const { d, loja, c } = base(); // entrada em 07/06/2026
+  const sala = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Sala vaga', endereco: 'Rua Teste, 1' }, 'julio');
+  assert.deepEqual([R.situacaoCustos(d, sala.id, '2026-10-15').motivo, R.situacaoCustos(d, sala.id, '2026-10-15').airbnb], ['vago', true]);
+  const s = R.situacaoCustos(d, loja.id, '2026-07-15');
+  assert.equal(s.motivo, 'alugou');
+  assert.equal(s.ate, '2026-08-31');
+  assert.match(s.rotulo, /alugado em 07\/06\/2026: veja se ficou conta nossa pendente \(aviso até 31\/08\/2026\)/);
+  assert.equal(R.situacaoCustos(d, loja.id, '2026-07-15').airbnb, true, 'junho ainda teve dias vagos: dá para lançar o Airbnb atrasado');
+  assert.deepEqual([R.situacaoCustos(d, loja.id, '2026-10-15').motivo, R.situacaoCustos(d, loja.id, '2026-10-15').airbnb], ['inquilino', false]);
+  c.conta_condominio = 'Incluso no aluguel';
+  assert.match(R.situacaoCustos(d, loja.id, '2026-10-15').rotulo, /Condomínio: incluso no contrato/);
+});
+
+test('Airbnb: ganho só em imóvel vago; uma NF por mês, sem imóvel, com a soma; NF numerada trava o mês', () => {
+  const { d, loja } = base();
+  const sala = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Apto 204', endereco: 'Rua Teste, 1' }, 'julio');
+  const studio = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Studio 12', endereco: 'Rua Teste, 2' }, 'julio');
+  assert.throws(() => R.lancarGanhoAirbnb(d, loja.id, { data_recebimento: '2026-10-03', competencia: '2026-10', valor: 50000 }, 'julio'), /não estava vago/);
+  assert.throws(() => R.lancarGanhoAirbnb(d, sala.id, { data_recebimento: '2026-10-03', competencia: '2026-10', valor: 0 }, 'julio'), /informe o valor/);
+  R.lancarGanhoAirbnb(d, sala.id, { data_recebimento: '2026-10-03', competencia: '2026-10', valor: 121000, observacoes: 'reserva 3 noites' }, 'julio');
+  R.lancarGanhoAirbnb(d, studio.id, { data_recebimento: '2026-10-12', competencia: '2026-10', valor: 64000 }, 'julio');
+  const nfs = () => R.etapasFechamento(d, '2026-10', '2026-11-02').find((e) => e.chave === 'nfs');
+  assert.match(nfs().detalhe, /gerar a NF do Airbnb \(R\$ 1\.850,00\)/);
+  assert.throws(() => R.gerarNfAirbnb(d, '2026-10', 'julio', '2026-10-20'), /depois da virada/);
+  const nf = R.gerarNfAirbnb(d, '2026-10', 'julio', '2026-11-02');
+  assert.deepEqual([nf.valor, nf.imovel_id, nf.airbnb_competencia, nf.data_pagamento, nf.tomador_nome], [185000, null, '2026-10', '2026-10-31', 'CONSUMIDOR NÃO IDENTIFICADO']);
+  assert.doesNotMatch(nfs().detalhe, /Airbnb/);
+  // ganho a mais no mês: a NF fica divergente até ser acertada (a mesma NF, sem criar outra)
+  R.lancarGanhoAirbnb(d, sala.id, { data_recebimento: '2026-10-27', competencia: '2026-10', valor: 15000 }, 'julio');
+  assert.equal(R.airbnbDoMes(d, '2026-10').divergente, true);
+  R.gerarNfAirbnb(d, '2026-10', 'julio', '2026-11-02');
+  assert.deepEqual([d.avulsas.length, R.nfAirbnbDe(d, '2026-10').valor], [1, 200000]);
+  // a NF sem imóvel não entra na receita de nenhum imóvel: cada um tem os seus ganhos
+  const res = R.resultadosFinanceiros(d, '2026-10-01', '2026-10-31');
+  const de = (i) => res.find((x) => x.imovel.id === i.id);
+  assert.deepEqual([de(sala).airbnb, de(studio).airbnb, de(sala).avulsas, de(sala).receita], [136000, 64000, 0, 136000]);
+  R.numerarFaturas(d, 'julio', { forcar: true });
+  assert.ok(R.airbnbDoMes(d, '2026-10').numerada);
+  assert.throws(() => R.lancarGanhoAirbnb(d, sala.id, { data_recebimento: '2026-11-01', competencia: '2026-10', valor: 1000 }, 'julio'), /já foi numerada/);
+  assert.throws(() => R.gerarNfAirbnb(d, '2026-10', 'julio', '2026-11-02'), /já foi numerada/);
+});
+
+test('resultado líquido: impostos estimados (11,33%) até a guia do contador; reforma abate só no fim', () => {
+  const { d, loja } = base();
+  const [ank, jck] = d.emitentes;
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  R.registrarPagamento(d, 1, '2026-08-05', null, 'julio'); // NF de R$ 1.215,00
+  R.inserir(d, 'reformas', { imovel_id: loja.id, data: '2026-08-20', descricao: 'Piso', valor: 50000 }, 'julio');
+  const r = () => R.resultadosFinanceiros(d, '2026-08-01', '2026-08-31').find((x) => x.imovel.id === loja.id);
+  assert.equal(R.aliquotaImpostos(), 11.33);
+  assert.deepEqual([r().impostos, r().impostosEstimados], [13766, 13766], 'sem NF ainda: 11,33% de R$ 1.215,00');
+  R.numerarFaturas(d, 'julio');
+  assert.ok(Math.abs(r().impostos - 13766) <= 2, 'com NF e sem guia do contador: a guia esperada (mesmos 11,33%)');
+  assert.equal(r().impostosEstimados, r().impostos);
+  for (const e of [ank, jck]) {
+    R.salvarGuiaImposto(d, e.id, 'PIS/COFINS', '2026-08', 2000, 'julio');
+    R.salvarGuiaImposto(d, e.id, 'IRPJ', '2026-T3', 3000, 'julio');
+  }
+  assert.ok(r().impostosEstimados > 0, 'falta a CSLL do contador: ainda estimado');
+  for (const e of [ank, jck]) R.salvarGuiaImposto(d, e.id, 'CSLL', '2026-T3', 1500, 'julio');
+  const x = r();
+  assert.deepEqual([x.impostos, x.impostosEstimados], [13000, 0], 'cada empresa: R$ 20 + R$ 30 + R$ 15 do contador sobre a sua metade da NF');
+  assert.equal(x.liquido, x.resultado - 13000);
+  assert.equal(x.lucro, x.liquido - 50000, 'reforma depois do imposto');
+  assert.equal(x.reformasPeriodo, 50000);
 });
