@@ -1,4 +1,4 @@
-// Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
+// Aplicação: estado, gravação na pasta escolhida (ou na nuvem, nuvem.js), rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
 import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
 import { carregarPonteLocal } from './banco.js';
@@ -6,11 +6,16 @@ import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
+import * as N from './nuvem.js';
+import { AnexosNuvem } from './pasta-nuvem.js';
+import { Cofrinho, guardarCifrado } from './cofrinho.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
+  nuvem: null, // dados na nuvem (Sincronia de nuvem.js): no lugar da pasta, quando o site tem /api/
+  anexos: null, // anexos na nuvem (pasta-nuvem.js); E.pasta vira a pasta virtual dele
   d: null, // banco em memória
   usuario: null,
   teste: new URLSearchParams(location.search).has('teste'),
@@ -81,8 +86,9 @@ async function abrirSessao(u) {
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
 window.addEventListener('storage', async (ev) => {
   if (ev.key !== SESSAO || !E.d) return;
+  if (E.cofrinho && !lerSessao()) E.cofrinho.chave = null; // saiu em outra aba: esta também tranca a cópia
   // a outra aba acabou de gravar o token novo no banco: relê o disco antes de conferir
-  try { E.d = (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
+  try { E.d = E.nuvem ? E.nuvem.atual() : (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
   const u = usuarioDaSessao();
   if ((u && u.login) !== (E.usuario && E.usuario.login)) {
     E.usuario = u;
@@ -108,6 +114,13 @@ export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais 
 const soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
 
 async function alterarAgora(fn, { soSessao = false } = {}) {
+  if (E.nuvem) {
+    // nuvem: compara antes e depois e manda só o que mudou (sem internet, fica na fila deste aparelho)
+    const resultado = await E.nuvem.alterar(fn);
+    E.d = E.nuvem.atual();
+    atualizarFaixa();
+    return resultado;
+  }
   const disco = await S.lerBanco(E.pasta);
   if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
@@ -187,7 +200,30 @@ async function rotinaSegura() {
   if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
 }
 
+/** Nuvem: terminou uma sincronia; `externo` = chegou mudança de outro aparelho (redesenha a tela). */
+function aoMudarNuvem(externo) {
+  if (!E.nuvem || !E.nuvem.atual()) return;
+  E.d = E.nuvem.atual();
+  renovarUsuario();
+  atualizarFaixa();
+  if (!externo) return;
+  if (!E.usuario) return mostrar();
+  const editando = document.querySelector('main form[data-form]');
+  if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
+  else mostrar();
+}
+
 async function verificarMudancasExternas() {
+  if (E.nuvem) {
+    if (document.hidden) return;
+    await E.nuvem.sincronizar().catch(() => {}); // aoMudar avisa
+    if (E.anexos) {
+      await E.anexos.enviarFila().catch(() => {});
+      for (const t of E.anexos.avisos.splice(0)) aviso(t, 'aviso');
+      atualizarFaixa();
+    }
+    return;
+  }
   if (!E.pasta || !E.d || document.hidden) return;
   try {
     const disco = await S.lerBanco(E.pasta);
@@ -339,6 +375,40 @@ export async function escolherPasta() {
   }
 }
 
+const MODO_NUVEM = 'imoveis-modo-nuvem';
+/** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
+export async function abrirNuvem() {
+  // cópia do aparelho cifrada (cofrinho.js): a chave só fica aberta durante o login lembrado
+  const cru = N.guardarNoNavegador();
+  E.cofrinho = new Cofrinho(cru);
+  await E.cofrinho.daSessao(!!lerSessao());
+  const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador });
+  E.anexos = new AnexosNuvem({ guardar });
+  E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
+  await E.anexos.carregarFila();
+  try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
+  try {
+    E.d = await E.nuvem.iniciar();
+  } catch (e) {
+    // trancado (sem login) e sem internet: só a lista de usuários, para entrar com a senha e destrancar a cópia
+    const acesso = !E.cofrinho.chave && (await cru.ler('acesso'));
+    if (!acesso) throw e;
+    E.d = { ...R.bancoVazio(), usuarios: acesso };
+  }
+  // login lembrado sem a chave da cópia (ex.: entrou antes da cópia cifrada existir): pede a senha uma vez
+  E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
+  await mostrar();
+}
+
+/** Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). */
+async function destrancarNuvem(loginTexto, senha) {
+  await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
+  E.anexos.fila = null;
+  await E.anexos.carregarFila();
+  E.d = await E.nuvem.iniciar();
+}
+
 export async function reabrirPastaLembrada() {
   const h = await S.pastaLembrada();
   if (!h) return escolherPasta();
@@ -351,19 +421,26 @@ export async function criarBanco(nome, loginTexto, senha) {
   const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
     criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
-  await S.gravarBanco(E.pasta, novo);
-  E.d = novo;
-  await abrirSessao(u);
+  if (E.nuvem) { // nuvem vazia: primeira carga
+    await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
+    E.d = await E.nuvem.importar(novo);
+  }
+  else {
+    await S.gravarBanco(E.pasta, novo);
+    E.d = novo;
+  }
+  await abrirSessao(E.d.usuarios.find((x) => x.id === u.id) || u);
 }
 
 export async function entrar(loginTexto, senha) {
-  const disco = await S.lerBanco(E.pasta);
+  const disco = E.nuvem ? (E.nuvem.atual() || E.d) : await S.lerBanco(E.pasta); // nuvem trancada sem internet: só a lista de usuários
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
   if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
+  if (E.nuvem) await destrancarNuvem(u.login, senha);
   // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
   const reforco = await reforcarSenha(u, senha);
   if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
@@ -386,6 +463,14 @@ export async function sair() {
   ir('#/');
   // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
   if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }, { soSessao: true }).catch(() => {});
+  if (E.nuvem && E.cofrinho) {
+    // tenta mandar o que falta; tranca a cópia (a chave sai do aparelho) e, se não sobrou nada esperando, apaga a cópia
+    await E.nuvem.sincronizar().catch(() => {});
+    await E.anexos?.enviarFila().catch(() => {});
+    const nada = !E.nuvem.pendentesQtd() && !(E.anexos?.fila?.length);
+    await E.cofrinho.sair();
+    if (nada) await E.cofrinho.cru.apagar('base');
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -401,6 +486,13 @@ function rotaAtual() {
 function atualizarFaixa() {
   const el = document.getElementById('faixa');
   if (!el || !E.d) return;
+  if (E.nuvem) {
+    const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
+    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
+      + `${cf || rc ? ` · <a href="#/conflitos"><b>⚠ ${cf ? `${cf} conflito(s) para escolher` : ''}${cf && rc ? ' e ' : ''}${rc ? `${rc} mudança(s) recusada(s)` : ''}</b></a>` : ''}`
+      + ` · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
+    return;
+  }
   el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split('-').reverse().join('/')}` : ''}`;
 }
 
@@ -435,9 +527,9 @@ export async function mostrar(estadoForm = null) {
   try {
     let html;
     if (rota.partes[0] === 'restaurar-backup') html = await TELAS.restaurarBackup();
-    else if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
-    else if (!E.pasta) html = await TELAS.inicio();
-    else if (!E.d && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
+    else if (!S.suportado() && !E.teste && !E.nuvem) html = TELAS.semSuporte();
+    else if (!E.pasta && !E.nuvem) html = await TELAS.inicio();
+    else if (!E.d && E.pasta && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
     else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();
     else {
@@ -654,12 +746,27 @@ document.addEventListener('click', (ev) => {
   mostrar();
 });
 window.addEventListener('focus', verificarMudancasExternas);
+window.addEventListener('online', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
+  // aplicativo instalável: guarda as telas no aparelho para abrir sem internet (sw.js); não na versão de arquivo único
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   await carregarPonteLocal(); // endereço e senha da ponte do banco, só deste navegador
   if (E.teste) {
     await abrirPasta(await pastaDeTeste());
+    return;
+  }
+  // site com a nuvem ligada (/api/ responde), ou que já abriu pela nuvem neste aparelho (sem internet agora)
+  let lembrada = false;
+  try { lembrada = localStorage.getItem(MODO_NUVEM) === '1'; } catch { /* sem armazenamento */ }
+  if (location.protocol !== 'file:' && (lembrada || (await N.nuvemDisponivel()))) {
+    try { await abrirNuvem(); } catch (e) {
+      logarErro(e);
+      document.getElementById('app').innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="" class="botao">Tentar de novo</a></p></main>`;
+    }
     return;
   }
   const h = S.suportado() ? await S.pastaLembrada() : null;

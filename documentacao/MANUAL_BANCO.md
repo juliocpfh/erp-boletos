@@ -10,7 +10,7 @@ Para ligar o sistema ao banco pela primeira vez (chaves, certificado, programa "
 
 ## 1. O que dá para fazer sem entrar no banco
 
-Com a ponte ligada, direto no sistema (menu **Boletos**, **Banco**, página do imóvel e **Contas pagas por nós**):
+Com a ponte ligada, direto no sistema (menu **Boletos**, **Banco**, **Financeiro**, página do imóvel e **Contas pagas por nós**):
 
 - **Emitir o boleto com Pix** de cada inquilino no C6, um por vez ou todos os do mês, sempre pela conta da **ANK** (decisão de 16/10/2026: só a ANK emite boleto; a JCK recebe o repasse depois).
 - **Pegar o boleto pronto para mandar ao inquilino**: PDF, linha digitável e código Pix "copia e cola".
@@ -99,6 +99,7 @@ Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quan
 | Conta de um imóvel paga por nós (água, luz, gás, condomínio, internet, outra) | **Atrelar a imóvel/conta**: escolha o imóvel, o tipo e o mês da conta. O sistema lança a conta em **Contas pagas por nós** com o valor e a data do extrato | "PAGAMENTO BOLETO SANEPAR" de R$ 123,45 em 05/11/2026 → Loja 1 · Água 11/2026 |
 | IPTU pago na prefeitura | **Atrelar a imóvel/conta**, tipo **IPTU**, e escolha a parcela em aberto. A parcela fica marcada como paga | R$ 210,00 em 10/11/2026 → Loja 1 · IPTU 2026 · 3ª parcela |
 | Aluguel recebido (boleto ou Pix do boleto) | **É o pagamento do boleto…**: o sistema lista os boletos em aberto que batem ("bate certinho" ou "provável"). Escolha, confira a data e o valor e clique em **Confirmar pagamento** | entrada de R$ 1.219,50 em 11/12/2026 → boleto 11/2026 da Maria Exemplo |
+| Airbnb recebido (o Airbnb paga o total) ou reforma | **Airbnb recebido**: escolha o mês de referência e digite quanto é de cada imóvel vago; a soma tem que dar o valor do extrato. Cada parte vira um ganho do imóvel; a NF do Airbnb do mês (uma só, sem imóvel) sai da soma, em **Financeiro → Visão geral**. **Reforma**: escolha o imóvel e diga o que foi feito. Entra nas reformas do imóvel (fica à parte no resultado líquido) | "AIRBNB PAYMENTS" de R$ 1.210,00 → Apto 204 R$ 850,00 + Studio 12 R$ 360,00; "LOJA DE MATERIAIS" de R$ 2.300,00 → Casa · piso da cozinha |
 | Transferência entre as nossas contas | **Outro destino → Transferência**. A linha aparece nos dois extratos (saída na ANK, entrada na JCK) e o sistema liga as duas, para não virar conta de imóvel duas vezes. Tem comprovante também: um PDF só, com o nome da empresa de origem, na pasta do contador da conta de **origem** (`_Contador/ANK/2026-11/`), sem pasta de imóvel | "TED PARA JCK" de R$ 5.000,00 em 20/11/2026 |
 | Tarifa do banco | **Outro destino → Tarifa** | "TARIFA PACOTE" de R$ 39,90 |
 | Imposto da empresa (PIS/COFINS, IRPJ, CSLL) | **Outro destino → Imposto**, ligando à guia do mês | DARF de R$ 450,00 em 20/11/2026 |
@@ -107,7 +108,7 @@ Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quan
 
 Regras que o sistema aplica ao atrelar uma conta a um imóvel:
 
-- Só aceita conta paga por nós quando o contrato permite (imóvel vago, até 2 meses depois de alugar, ou contrato com "incluso no aluguel"). Se em 11/2026 a água da Loja 1 é por conta do inquilino, o sistema avisa: "Em 11/2026 o inquilino paga Água, conforme o contrato. Se mesmo assim foi paga por nós, escolha 'Outro' e escreva o motivo."
+- Aceita conta paga por nós em qualquer imóvel (ex.: débito antigo, troca de titular). Na janela, a conta que pelo contrato é do inquilino aparece marcada "(pelo contrato, o inquilino paga)", só como lembrete. Em Financeiro → Resultado bruto, a etiqueta do imóvel orienta: "vago", "alugado em 15/10/2026: veja se ficou conta nossa pendente" (até 2 meses depois da entrada) ou conta "incluso no contrato".
 - Uma linha só tem um destino. Errou? Clique no **×** (**Desfazer o destino**) e escolha de novo. Se o destino era um boleto, o desfazer é na tela **Boletos**, pelo botão **Desfazer pagamento**.
 - Os dados que vieram do banco (data, valor, descrição) nunca são editados: só o destino, o comprovante e as observações.
 

@@ -187,6 +187,9 @@ Com a Arquitetura A ou B e o checklist feito, o que sobra de risco é: uma pesso
 
 ---
 
+## 5b. Dados na nuvem (Cloudflare, em construção)
+O que o código já faz e o checklist de publicação: `nuvem/README.md`, seções "Segurança" e "Publicar". Em resumo: login pelo Cloudflare Access (4 e-mails) conferido também no Worker; papéis conferidos no servidor; histórico com o e-mail real; entradas e anexos perigosos barrados; backups diários só de leitura. Pendências do dono, na hora de publicar: 2FA no Cloudflare, bucket R2 sem acesso público, Access com sessão de 24 h, cabeçalhos de segurança (HSTS, X-Frame-Options) e `wrangler logout` depois de publicar.
+
 ## Fontes consultadas (novembro de 2026)
 
 Cloudflare

@@ -27,7 +27,7 @@
 1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros, já passados por `C.sanearParametros`: parâmetro novo ganha uma entrada em `FORMATOS_PARAMETRO` (`calculos.js`), e mês/data usam `C.competenciaValida(rota.q.mes, padrão)`/`C.dataValida` (ver `TELAS.cobrancas`). `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`. Registro que não existe: `naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos')` (`telas/comum.js`). Tabela larga: dentro de `<div class="cartao rolagem">`; com a classe `responsiva` (1ª linha com `th`) vira cartões no celular.
 3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`); o botão fica desabilitado enquanto a ação roda (`data-ocupado`), e `alterar` grava uma de cada vez. Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`). Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
-4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasResultados`; caixa recolhida: `<details>` (ex.: `caixaHistorico`); com `id`, fica aberta ou fechada como estava depois de uma ação na mesma página (`mostrar` em `app.js`).
+4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasFinanceiro` (`telas/financeiro.js`); caixa recolhida: `<details>` (ex.: `caixaHistorico`); com `id`, fica aberta ou fechada como estava depois de uma ação na mesma página (`mostrar` em `app.js`).
 5. Telas de impressão: um tipo novo em `telaImprimir` (`#/imprimir/<tipo>`), que desenha sem o menu.
 
 ## Adicionar uma regra de negócio
@@ -69,7 +69,7 @@ Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilit
 - [ ] Rodar `node tools/checar.mjs` (sintaxe do app inteiro + testes; `node --check` não pega tudo nos módulos do navegador).
 - [ ] Testar no navegador: `cd docs && python3 -m http.server 8000` e `http://localhost:8000/?teste`.
 - [ ] Mudou `docs/js`, `docs/vendor`, `docs/css/estilo.css` ou o modelo xlsx: rodar `node tools/checar.mjs --offline` (senão `tests/offline.test.mjs` falha).
-- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele. Nunca um segredo no JSON (senha/endereço da ponte: `lembrarPonte`; senha de usuário: `camposDeSenha`).
+- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele. Nunca um segredo no JSON (senha/endereço da ponte: `lembrarPonte`; senha de usuário: `camposDeSenha`). Na nuvem, campo e tabela novos sincronizam sozinhos; campo da raiz que muda a cada gravação (como `revisao`) entra em `RAIZ_DO_SERVIDOR` de `docs/js/nuvem.js` e `nuvem/cofre.mjs` (iguais; `tests/sincronia.test.mjs` confere).
 - [ ] Chamou um site novo (API externa)? Entra na `connect-src` da CSP em `docs/index.html` e em `tools/gerar-offline.mjs`, senão o navegador bloqueia. Mexeu na ponte? `node --test tests/ponte-c6.test.mjs` e `node --test "ponte-c6/testes/*.test.mjs"`.
 - [ ] Não usar dados reais de inquilinos em testes.
 

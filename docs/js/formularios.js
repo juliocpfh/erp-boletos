@@ -491,6 +491,8 @@ export const EMITENTE = [
 export const USUARIO = [
   campo('login', 'Login', 'texto', { obrig: true }),
   campo('nome', 'Nome', 'texto', { obrig: true }),
+  // dados na nuvem: a pessoa entra pelo código enviado a este e-mail (o mesmo da lista do Cloudflare Access)
+  campo('email', 'E-mail de acesso', 'email', { ajuda: 'Para entrar pela internet (nuvem). Precisa ser o mesmo da lista do Cloudflare.' }),
   campo('papel', 'Perfil', 'opcao', { obrig: true, opcoes: [['admin', 'Administrador'], ['operador', 'Operador (edita)'], ['consulta', 'Consulta (só vê)']] }),
   campo('ativo', 'Ativo', 'simnao', { padrao: true }),
 ];
