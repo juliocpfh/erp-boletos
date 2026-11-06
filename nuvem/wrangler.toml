@@ -1,0 +1,17 @@
+# Configuração do Worker (dados na nuvem). Publicar: na pasta nuvem/, `npx wrangler deploy` (passo a passo em README.md).
+# Os e-mails e os dados do Access NÃO ficam aqui: são cadastrados no painel do Cloudflare (Settings → Variables).
+name = "imoveis-dados"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+# Mesmo endereço do site: o navegador chama /api/ sem sair de erp.ankjck.com.br (sem CORS)
+routes = [{ pattern = "erp.ankjck.com.br/api/*", zone_name = "ankjck.com.br" }]
+
+[[r2_buckets]]
+binding = "DADOS"
+bucket_name = "imoveis-dados"
+
+[vars]
+ORIGEM = "https://erp.ankjck.com.br"
+# ACCESS_EQUIPE (ex.: ankjck.cloudflareaccess.com), ACCESS_AUD e EMAILS: no painel

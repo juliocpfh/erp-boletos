@@ -2,7 +2,7 @@
 
 Site estático (JS puro, sem build) que grava os dados num JSON numa pasta do computador do usuário; a parte bancária (C6) passa pela ponte `ponte-c6/` (Node, no computador do usuário).
 Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha documentação ali). Detalhes em `documentacao/` — leia só o que a tarefa pedir:
-`RESUMO.md` (o que o sistema faz, módulos, estado) · `ARQUITETURA.md` (camadas, onde está cada regra, pontos sensíveis) · `GUIA_DE_MODIFICACAO.md` (como acrescentar cadastro/tela/regra; ligar o C6) · `DECISOES.md` (regras de negócio do usuário) · `MANUAL_BANCO.md` (uso do banco pelo dono) · `LIGAR_C6.md`, `PLANO_BANCO_FASE2.md` (ponte e fase 2) · `C6_CAMPOS_CONFIRMADOS.md`, `C6_*.md`, `c6-openapi/` (formato oficial da API; os YAML são grandes) · `PESQUISA_API_C6.md` (histórico) · `SEGURANCA.md`, `AUDITORIA_SEGURANCA.md` (ameaças, achados e correções) · `PUBLICAR_NO_DOMINIO.md` (Cloudflare + Pages).
+`RESUMO.md` (o que o sistema faz, módulos, estado) · `ARQUITETURA.md` (camadas, onde está cada regra, pontos sensíveis) · `GUIA_DE_MODIFICACAO.md` (como acrescentar cadastro/tela/regra; ligar o C6) · `DECISOES.md` (regras de negócio do usuário) · `MANUAL_BANCO.md` (uso do banco pelo dono) · `LIGAR_C6.md`, `PLANO_BANCO_FASE2.md` (ponte e fase 2) · `C6_CAMPOS_CONFIRMADOS.md`, `C6_*.md`, `c6-openapi/` (formato oficial da API; os YAML são grandes) · `PESQUISA_API_C6.md` (histórico) · `SEGURANCA.md`, `AUDITORIA_SEGURANCA.md` (ameaças, achados e correções) · `PUBLICAR_NO_DOMINIO.md` (Cloudflare + Pages) · `ESTUDO_DADOS_NUVEM.md` (dados na nuvem, celular).
 
 ## Comandos
 | Para | Rode |
