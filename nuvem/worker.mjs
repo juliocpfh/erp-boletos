@@ -224,6 +224,20 @@ async function exigirPapel(env, email, nivel) {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new ErroHttp(r.status, e.erro || 'Sem permissão.'); }
 }
 
+/** Apaga uma pasta inteira (todos os arquivos com esse começo), em partes: responde `mais: true` para o site repetir. */
+async function apagarPasta(request, env) {
+  conferirGravacao(request, env);
+  let pedido;
+  try { pedido = JSON.parse(new TextDecoder().decode(await lerCorpo(request, 64 * 1024))); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
+  const chave = caminhoSeguro(pedido?.caminho, { pasta: true });
+  if (SO_LEITURA.includes(raizDe(chave))) throw new ErroHttp(403, 'Os backups não podem ser alterados.');
+  if (!chave.includes('/')) throw new ErroHttp(403, 'As pastas principais não podem ser apagadas.');
+  const r = await env.DADOS.list({ prefix: `${chave}/`, limit: 500 });
+  const chaves = r.objects.map((o) => o.key);
+  if (chaves.length) await env.DADOS.delete(chaves);
+  return json(200, { ok: true, apagados: chaves.length, mais: !!r.truncated });
+}
+
 // ---------------------------------------------------------------------------
 export async function atender(request, env, buscar = fetch) {
   const url = new URL(request.url);
@@ -236,6 +250,7 @@ export async function atender(request, env, buscar = fetch) {
     const m = request.method;
     if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
     if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
+    if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
     if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {

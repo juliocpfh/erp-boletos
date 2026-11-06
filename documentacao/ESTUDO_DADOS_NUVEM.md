@@ -56,7 +56,7 @@ Envia só o que mudou, funciona sem internet (fila de envio) e vira aplicativo i
 | 1. Worker: login (Access), anexos, backups | ✅ `nuvem/worker.mjs` |
 | 2. Cofre: filas, conflitos, faixas de códigos, contador da NF, papéis | ✅ `nuvem/cofre.mjs`, conferido com os dados reais (sai igual ao que entra) |
 | 3a. Site: cópia local, fila de envio, antes/depois a cada gravação, faixas de códigos, NF só com internet, tela de conflitos (`#/conflitos`), e-mail de acesso no usuário | ✅ `docs/js/nuvem.js` (`Sincronia`), `telas/nuvem.js`; testado no navegador com `node nuvem/local.mjs` |
-| 3b. Anexos pela nuvem (pasta "virtual" com a mesma interface da pasta, para o resto do código não mudar; fila de envio sem internet) | a fazer (no modo nuvem, anexos ainda não aparecem) |
+| 3b. Anexos pela nuvem: pasta "virtual" com a mesma interface da pasta (`docs/js/pasta-nuvem.js`, `E.pasta` no modo nuvem), o resto do código não muda; anexo novo sem internet fica no aparelho e sobe depois (mesmo nome enviado por outro aparelho: sobe como "(deste aparelho)" e avisa); abrir, apagar e mover pedem internet | ✅ testado no navegador e em `tests/pasta-nuvem.test.mjs` |
 | 3c. Aplicativo instalável (PWA, abre sem internet) e cópia local cifrada com a senha, apagada ao Sair; trava entre abas | a fazer |
 | 4. Passagem dos dados atuais (carga inicial e conferência) | a fazer |
 | 5. Publicar com o Access (4 e-mails), uns dias com a pasta de reserva | a fazer (passos em `nuvem/README.md`) |

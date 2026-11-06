@@ -7,12 +7,14 @@ import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
+import { AnexosNuvem } from './pasta-nuvem.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
   nuvem: null, // dados na nuvem (Sincronia de nuvem.js): no lugar da pasta, quando o site tem /api/
+  anexos: null, // anexos na nuvem (pasta-nuvem.js); E.pasta vira a pasta virtual dele
   d: null, // banco em memória
   usuario: null,
   teste: new URLSearchParams(location.search).has('teste'),
@@ -210,7 +212,16 @@ function aoMudarNuvem(externo) {
 }
 
 async function verificarMudancasExternas() {
-  if (E.nuvem) { if (!document.hidden) await E.nuvem.sincronizar().catch(() => {}); return; } // aoMudar avisa
+  if (E.nuvem) {
+    if (document.hidden) return;
+    await E.nuvem.sincronizar().catch(() => {}); // aoMudar avisa
+    if (E.anexos) {
+      await E.anexos.enviarFila().catch(() => {});
+      for (const t of E.anexos.avisos.splice(0)) aviso(t, 'aviso');
+      atualizarFaixa();
+    }
+    return;
+  }
   if (!E.pasta || !E.d || document.hidden) return;
   try {
     const disco = await S.lerBanco(E.pasta);
@@ -366,6 +377,9 @@ const MODO_NUVEM = 'imoveis-modo-nuvem';
 /** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
 export async function abrirNuvem() {
   E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar: N.guardarNoNavegador(), aoMudar: (externo) => aoMudarNuvem(externo) });
+  E.anexos = new AnexosNuvem({ guardar: N.guardarNoNavegador('imoveis-anexos') });
+  E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
+  await E.anexos.carregarFila();
   try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
   E.d = await E.nuvem.iniciar();
   E.usuario = usuarioDaSessao();
@@ -438,7 +452,7 @@ function atualizarFaixa() {
   const el = document.getElementById('faixa');
   if (!el || !E.d) return;
   if (E.nuvem) {
-    const n = E.nuvem.pendentesQtd(); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
+    const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
     el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
       + `${cf || rc ? ` · <a href="#/conflitos"><b>⚠ ${cf ? `${cf} conflito(s) para escolher` : ''}${cf && rc ? ' e ' : ''}${rc ? `${rc} mudança(s) recusada(s)` : ''}</b></a>` : ''}`
       + ` · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;

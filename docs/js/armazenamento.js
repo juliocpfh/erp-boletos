@@ -134,8 +134,9 @@ export async function listar(dir) {
   const itens = [];
   for await (const [nome, h] of dir.entries()) {
     if (h.kind === 'file') {
-      const f = await h.getFile();
-      itens.push({ nome, tamanho: f.size, foto: /\.(jpe?g|png|gif|webp)$/i.test(nome) });
+      // na nuvem (pasta-nuvem.js) o tamanho já vem na lista: não baixa o arquivo só para saber o tamanho
+      const tamanho = h.tamanho ?? (await h.getFile()).size;
+      itens.push({ nome, tamanho, foto: /\.(jpe?g|png|gif|webp)$/i.test(nome) });
     }
   }
   return itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));

@@ -15,7 +15,7 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - **Códigos novos sem internet:** cada aparelho pede uma faixa (`POST dados/faixa`, até 1000 por vez) e nunca repete código com outro aparelho.
 - **NF:** o número só sai com internet, pelo contador (`POST dados/contador`, `proxima_fatura`). O lote não consegue mudar esse número.
 - **Backups:** uma cópia completa por dia no R2 (`backups/`, horário de Brasília, 30 guardadas, só leitura) e outra antes de qualquer "substituir tudo". Os registros excluídos ficam guardados no cofre.
-- **Anexos:** `GET/PUT/DELETE arquivos/<caminho>`, `GET lista/<pasta>/` e `POST mover` (pastas grandes vão em partes de 200, `mais: true`).
+- **Anexos:** `GET/PUT/DELETE arquivos/<caminho>`, `GET lista/<pasta>/`, `POST mover` e `POST apagar` (pasta inteira; pastas grandes vão em partes, `mais: true`). No site, `docs/js/pasta-nuvem.js` imita a pasta do computador por cima dessas rotas.
 
 ## Segurança (o que o código já faz)
 1. **Login de verdade:** cada pedido confere o token do Cloudflare Access (assinatura, aplicativo, equipe e validade). Sem essa configuração, recusa tudo. Quem entra: a lista de e-mails do Access (painel) **e** um usuário ativo com esse e-mail em Usuários (o cofre confere). `EMAILS` é uma trava extra opcional.
