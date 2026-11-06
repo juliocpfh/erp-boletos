@@ -28,7 +28,7 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 
 **Riscos que continuam (e o que reduz):**
 - As senhas do sistema (hash PBKDF2, 600 mil voltas) vão para cada aparelho, como hoje na pasta, porque o login do sistema é conferido no aparelho. Quem passa pelo Access pode tentar quebrá-las: senhas longas. O Access e os papéis no servidor valem mesmo assim.
-- Etapa 3: a cópia local no celular fica no navegador. A ideia é cifrá-la com a senha do sistema e apagá-la ao "Sair".
+- A cópia no aparelho é cifrada (`docs/js/cofrinho.js`): sem a senha do sistema (ou o login lembrado), não se lê nada dos inquilinos; fica aberta só a lista de usuários (senhas embaralhadas), para o login funcionar sem internet. Sair apaga a chave do aparelho.
 
 ## Publicar (etapa 5, junto com o login; não fazer antes)
 1. Cloudflare → **R2** → ativar (pede cartão; o grátis cobre 10 GB) → **Create bucket** `imoveis-dados`. **Não** ligar o acesso público (r2.dev) nem domínio público no bucket. Em **Billing**, criar alerta de gasto.

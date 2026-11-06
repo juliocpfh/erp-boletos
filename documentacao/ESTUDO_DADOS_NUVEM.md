@@ -57,7 +57,7 @@ Envia só o que mudou, funciona sem internet (fila de envio) e vira aplicativo i
 | 2. Cofre: filas, conflitos, faixas de códigos, contador da NF, papéis | ✅ `nuvem/cofre.mjs`, conferido com os dados reais (sai igual ao que entra) |
 | 3a. Site: cópia local, fila de envio, antes/depois a cada gravação, faixas de códigos, NF só com internet, tela de conflitos (`#/conflitos`), e-mail de acesso no usuário | ✅ `docs/js/nuvem.js` (`Sincronia`), `telas/nuvem.js`; testado no navegador com `node nuvem/local.mjs` |
 | 3b. Anexos pela nuvem: pasta "virtual" com a mesma interface da pasta (`docs/js/pasta-nuvem.js`, `E.pasta` no modo nuvem), o resto do código não muda; anexo novo sem internet fica no aparelho e sobe depois (mesmo nome enviado por outro aparelho: sobe como "(deste aparelho)" e avisa); abrir, apagar e mover pedem internet | ✅ testado no navegador e em `tests/pasta-nuvem.test.mjs` |
-| 3c. Aplicativo instalável (PWA, abre sem internet) e cópia local cifrada com a senha, apagada ao Sair; trava entre abas | a fazer |
+| 3c. Cópia do aparelho cifrada (`docs/js/cofrinho.js`: AES-GCM, chave aberta só com a senha via PBKDF2; aberta durante o login lembrado; Sair apaga a chave e, sem nada pendente, a cópia; aberta só a lista de usuários para o login sem internet; outro usuário não entra trocando a chave se houver mudança não enviada) · trava entre abas (Web Locks, lote com código da aba) · Desfazer só do que já foi enviado · aplicativo instalável (`docs/manifest.webmanifest`, `docs/sw.js`, ícones de `tools/gerar-icones.mjs`) | ✅ testado no navegador, menos o instalável (o navegador embutido do Claude não registra service worker): conferir no celular/Chrome ao publicar |
 | 4. Passagem dos dados atuais (carga inicial e conferência) | a fazer |
 | 5. Publicar com o Access (4 e-mails), uns dias com a pasta de reserva | a fazer (passos em `nuvem/README.md`) |
 
@@ -65,4 +65,3 @@ Achados da etapa 2: o servidor passa a conferir os papéis (consulta, operador, 
 
 ### Como testar no computador (etapa 3a)
 `node nuvem/local.mjs` → `http://localhost:8787` (site + /api com o cofre num SQLite em `nuvem/.local/`; sem login do Access; `EMAIL_TESTE` = e-mail do usuário de teste). `http://localhost:8787/__internet?ligar=0` simula a queda da internet (e `=1` volta). Na 1ª vez, crie o administrador com o login igual ao `EMAIL_TESTE`.
-Cuidados conhecidos: o "Desfazer" do Histórico usa a posição da entrada; com a nuvem, só desfazer o que já foi enviado (falta travar na 3c). Duas abas abertas no mesmo aparelho dividem a fila (falta a trava entre abas, 3c).

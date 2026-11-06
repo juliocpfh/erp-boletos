@@ -98,6 +98,10 @@ export function telaEmpresas() {
 /** Desfaz as alterações escolhidas no Histórico (só administrador) e recalcula os boletos em aberto ligados a elas. */
 export async function desfazerItens(itens) {
   if (!podeUsuario('admin')) throw new Error('Só o administrador desfaz alterações.');
+  // nuvem: o Desfazer usa a posição no histórico, que só fica igual em todos os aparelhos depois de enviada
+  if (E.nuvem && itens.some((x) => Number(String(x).split(':')[0]) >= (E.nuvem.base?.historico?.length || 0))) {
+    throw Object.assign(new Error('Esta alteração ainda não foi para a nuvem. Espere a faixa do topo mostrar "tudo enviado" e desfaça de novo.'), { esperado: true });
+  }
   let recalculados = 0;
   await alterar((db) => {
     for (const { tabela, id } of R.desfazerAlteracoes(db, itens, login())) {

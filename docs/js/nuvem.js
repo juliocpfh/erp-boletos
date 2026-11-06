@@ -116,10 +116,12 @@ const aleatorio = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b
  * @param {{ler: (k: string) => Promise<any>, gravar: (k: string, v: any) => Promise<void>, apagar?: (k: string) => Promise<void>}} o.guardar  cópia local (IndexedDB)
  */
 export class Sincronia {
-  constructor({ api, guardar, aoMudar = () => {} }) {
-    this.api = api; this.guardar = guardar; this.aoMudar = aoMudar;
+  /** `trava(fn)`: uma aba de cada vez mexe na fila (navigator.locks no navegador); sem ela, roda direto. */
+  constructor({ api, guardar, aoMudar = () => {}, trava = (fn) => fn() }) {
+    this.api = api; this.guardar = guardar; this.aoMudar = aoMudar; this.trava = trava;
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
+    this.aba = aleatorio().slice(0, 6);
   }
 
   async iniciar() {
@@ -194,6 +196,7 @@ export class Sincronia {
       const depois = structuredClone(antes);
       const resultado = fn(depois);
       this.avancarFaixas(depois.seq || {});
+      await this.trava(async () => { await this.releFila(); });
       const lote = this.novoLote(diferencas(antes, depois));
       try {
         await this.api('POST', 'lote', lote);
@@ -211,15 +214,27 @@ export class Sincronia {
 
   novoLote(ops) {
     this.n += 1;
-    return { id: `${this.aparelho}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString() };
+    // a aba entra no código do lote: duas abas do mesmo aparelho nunca geram o mesmo (a nuvem trataria o 2º como repetido)
+    return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString() };
+  }
+
+  /** Outra aba deste aparelho pode ter mexido na fila: relê antes de mexer (sempre dentro da trava). */
+  async releFila() {
+    const p = await this.guardar.ler('pendentes');
+    if (Array.isArray(p)) this.pendentes = p;
+    this.n = Math.max(this.n, Number(await this.guardar.ler('n')) || 0);
+    this.vista = null;
   }
 
   async enfileirar(ops) {
-    this.pendentes.push(this.novoLote(ops));
-    this.vista = null;
-    await this.guardar.gravar('n', this.n);
-    await this.guardar.gravar('pendentes', this.pendentes);
-    await this.guardar.gravar('faixas', this.faixas);
+    await this.trava(async () => {
+      await this.releFila();
+      this.pendentes.push(this.novoLote(ops));
+      this.vista = null;
+      await this.guardar.gravar('n', this.n);
+      await this.guardar.gravar('pendentes', this.pendentes);
+      await this.guardar.gravar('faixas', this.faixas);
+    });
   }
 
   /** Depois de `inserir`, a posição de cada faixa anda junto com o `seq` local. */
@@ -239,7 +254,8 @@ export class Sincronia {
   async sincronizar({ exigirInternet = false } = {}) {
     // uma passada de cada vez; quem chega no meio espera e faz a sua (para pegar o que mudou depois que a outra começou)
     while (this.enviando) await this.enviando.catch(() => {});
-    this.enviando = (async () => {
+    this.enviando = this.trava(async () => {
+      await this.releFila();
       try {
         // envia em ordem; o lote só sai da fila depois que a base nova (com ele) chegar no puxar:
         // se a internet cair entre um e outro, reenviar é seguro (a nuvem reconhece o lote repetido)
@@ -271,7 +287,7 @@ export class Sincronia {
         if (passageiro(e)) this.online = false;
         throw e;
       }
-    })();
+    });
     try {
       await this.enviando;
     } catch (e) {
@@ -377,6 +393,9 @@ export async function nuvemDisponivel(base = 'api/') {
     return r.ok && (r.headers.get('content-type') || '').includes('json');
   } catch { return false; }
 }
+
+/** Trava entre abas do mesmo aparelho (Web Locks); navegador sem suporte: roda direto. */
+export const travaDoNavegador = (fn) => (globalThis.navigator?.locks ? navigator.locks.request('imoveis-nuvem-fila', fn) : fn());
 
 export function guardarNoNavegador(nome = 'imoveis-nuvem') {
   const abrir = () => new Promise((ok, erro) => {

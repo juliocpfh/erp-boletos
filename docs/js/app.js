@@ -8,6 +8,7 @@ import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
 import { AnexosNuvem } from './pasta-nuvem.js';
+import { Cofrinho, guardarCifrado } from './cofrinho.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
 
@@ -85,6 +86,7 @@ async function abrirSessao(u) {
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
 window.addEventListener('storage', async (ev) => {
   if (ev.key !== SESSAO || !E.d) return;
+  if (E.cofrinho && !lerSessao()) E.cofrinho.chave = null; // saiu em outra aba: esta também tranca a cópia
   // a outra aba acabou de gravar o token novo no banco: relê o disco antes de conferir
   try { E.d = E.nuvem ? E.nuvem.atual() : (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
   const u = usuarioDaSessao();
@@ -376,14 +378,35 @@ export async function escolherPasta() {
 const MODO_NUVEM = 'imoveis-modo-nuvem';
 /** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
 export async function abrirNuvem() {
-  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar: N.guardarNoNavegador(), aoMudar: (externo) => aoMudarNuvem(externo) });
-  E.anexos = new AnexosNuvem({ guardar: N.guardarNoNavegador('imoveis-anexos') });
+  // cópia do aparelho cifrada (cofrinho.js): a chave só fica aberta durante o login lembrado
+  const cru = N.guardarNoNavegador();
+  E.cofrinho = new Cofrinho(cru);
+  await E.cofrinho.daSessao(!!lerSessao());
+  const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador });
+  E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
   try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
-  E.d = await E.nuvem.iniciar();
-  E.usuario = usuarioDaSessao();
+  try {
+    E.d = await E.nuvem.iniciar();
+  } catch (e) {
+    // trancado (sem login) e sem internet: só a lista de usuários, para entrar com a senha e destrancar a cópia
+    const acesso = !E.cofrinho.chave && (await cru.ler('acesso'));
+    if (!acesso) throw e;
+    E.d = { ...R.bancoVazio(), usuarios: acesso };
+  }
+  // login lembrado sem a chave da cópia (ex.: entrou antes da cópia cifrada existir): pede a senha uma vez
+  E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
   await mostrar();
+}
+
+/** Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). */
+async function destrancarNuvem(loginTexto, senha) {
+  await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
+  E.anexos.fila = null;
+  await E.anexos.carregarFila();
+  E.d = await E.nuvem.iniciar();
 }
 
 export async function reabrirPastaLembrada() {
@@ -398,7 +421,10 @@ export async function criarBanco(nome, loginTexto, senha) {
   const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
     criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
-  if (E.nuvem) E.d = await E.nuvem.importar(novo); // nuvem vazia: primeira carga
+  if (E.nuvem) { // nuvem vazia: primeira carga
+    await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
+    E.d = await E.nuvem.importar(novo);
+  }
   else {
     await S.gravarBanco(E.pasta, novo);
     E.d = novo;
@@ -407,13 +433,14 @@ export async function criarBanco(nome, loginTexto, senha) {
 }
 
 export async function entrar(loginTexto, senha) {
-  const disco = E.nuvem ? E.nuvem.atual() : await S.lerBanco(E.pasta);
+  const disco = E.nuvem ? (E.nuvem.atual() || E.d) : await S.lerBanco(E.pasta); // nuvem trancada sem internet: só a lista de usuários
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
   if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
+  if (E.nuvem) await destrancarNuvem(u.login, senha);
   // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
   const reforco = await reforcarSenha(u, senha);
   if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
@@ -436,6 +463,14 @@ export async function sair() {
   ir('#/');
   // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
   if (s && u) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x && x.sessoes) x.sessoes = x.sessoes.filter((t) => t !== s.token); }, { soSessao: true }).catch(() => {});
+  if (E.nuvem && E.cofrinho) {
+    // tenta mandar o que falta; tranca a cópia (a chave sai do aparelho) e, se não sobrou nada esperando, apaga a cópia
+    await E.nuvem.sincronizar().catch(() => {});
+    await E.anexos?.enviarFila().catch(() => {});
+    const nada = !E.nuvem.pendentesQtd() && !(E.anexos?.fila?.length);
+    await E.cofrinho.sair();
+    if (nada) await E.cofrinho.cru.apagar('base');
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -715,6 +750,10 @@ window.addEventListener('online', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
+  // aplicativo instalável: guarda as telas no aparelho para abrir sem internet (sw.js); não na versão de arquivo único
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   await carregarPonteLocal(); // endereço e senha da ponte do banco, só deste navegador
   if (E.teste) {
     await abrirPasta(await pastaDeTeste());
