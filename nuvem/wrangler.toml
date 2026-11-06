@@ -15,3 +15,12 @@ bucket_name = "imoveis-dados"
 [vars]
 ORIGEM = "https://erp.ankjck.com.br"
 # ACCESS_EQUIPE (ex.: ankjck.cloudflareaccess.com), ACCESS_AUD e EMAILS: no painel
+
+# Cofre dos dados (cofre.mjs): um Durable Object com SQLite, grátis até 5 GB
+[[durable_objects.bindings]]
+name = "COFRE"
+class_name = "CofreDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CofreDO"]

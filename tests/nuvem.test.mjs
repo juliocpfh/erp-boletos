@@ -1,96 +1,50 @@
-// Worker da nuvem (nuvem/worker.mjs) com um R2 de mentira em memória: banco com ETag, conflito, backup do dia,
+// Worker da nuvem (nuvem/worker.mjs) com um R2 de mentira em memória: repasse ao cofre (testes do cofre em cofre.test.mjs),
 // anexos, listagem, mover/juntar pastas, caminhos perigosos e login do Access (JWT assinado aqui mesmo). Dados fictícios.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as W from '../nuvem/worker.mjs';
+import { r2Falso } from './r2-falso.mjs';
 
-/** R2 em memória com o mesmo formato do Cloudflare (get/head/put/delete/list, etag e onlyIf.etagMatches). */
-function r2Falso() {
-  const m = new Map();
-  let n = 0;
-  const objeto = (key, o) => ({ key, size: o.dados.byteLength, etag: o.etag, httpEtag: `"${o.etag}"`, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata });
-  return {
-    m,
-    async head(key) { const o = m.get(key); return o ? objeto(key, o) : null; },
-    async get(key) {
-      const o = m.get(key); if (!o) return null;
-      return { ...objeto(key, o), body: new Blob([o.dados]).stream(), arrayBuffer: async () => o.dados.slice().buffer, text: async () => new TextDecoder().decode(o.dados) };
-    },
-    async put(key, valor, op = {}) {
-      const atual = m.get(key);
-      if (op.onlyIf?.etagMatches && atual?.etag !== op.onlyIf.etagMatches) return null;
-      const dados = typeof valor === 'string' ? new TextEncoder().encode(valor) : new Uint8Array(valor);
-      n += 1;
-      const o = { dados, etag: `e${n}`, httpMetadata: op.httpMetadata, customMetadata: op.customMetadata };
-      m.set(key, o);
-      return objeto(key, o);
-    },
-    async delete(chaves) { for (const k of [].concat(chaves)) m.delete(k); },
-    async list({ prefix = '', delimiter, cursor, limit = 1000 } = {}) {
-      const todas = [...m.keys()].filter((k) => k.startsWith(prefix)).sort();
-      const objetos = []; const pastas = new Set();
-      for (const k of todas) {
-        const resto = k.slice(prefix.length);
-        if (delimiter && resto.includes(delimiter)) pastas.add(prefix + resto.slice(0, resto.indexOf(delimiter) + 1));
-        else objetos.push(k);
-      }
-      const ini = Number(cursor || 0);
-      const fatia = objetos.slice(ini, ini + limit);
-      const truncated = ini + limit < objetos.length;
-      return { objects: fatia.map((k) => objeto(k, m.get(k))), delimitedPrefixes: [...pastas], truncated, cursor: truncated ? String(ini + limit) : undefined };
-    },
-  };
-}
-
-const BASE = 'https://erp.ankjck.com.br';
+const BASE = 'http://localhost:8787'; // MODO_TESTE só vale no próprio computador
 const pedir = (env, metodo, caminho, corpo, cab = {}) => W.atender(new Request(`${BASE}${caminho}`, {
   method: metodo, body: corpo, headers: { ...(metodo !== 'GET' ? { 'X-Sistema': 'imoveis', Origin: BASE } : {}), ...cab },
-}), env);
+}), { ORIGEM: BASE, ...env });
 const banco = (extra = {}) => JSON.stringify({ formato: 'imoveis-v1', imoveis: [], ...extra });
 
-test('banco: primeira gravação, leitura com ETag, gravação condicional e conflito', async () => {
+test('modo de teste publicado por engano continua pedindo login; OPTIONS recusado', async () => {
   const env = { MODO_TESTE: '1', DADOS: r2Falso() };
-  assert.equal((await pedir(env, 'GET', '/api/banco')).status, 404);
-  assert.equal((await pedir(env, 'PUT', '/api/banco', banco())).status, 428, 'sem If-Match nem If-None-Match');
-  const r1 = await pedir(env, 'PUT', '/api/banco', banco(), { 'If-None-Match': '*' });
-  assert.equal(r1.status, 200);
-  assert.equal((await pedir(env, 'PUT', '/api/banco', banco(), { 'If-None-Match': '*' })).status, 412, 'já existe');
-  const lido = await pedir(env, 'GET', '/api/banco');
-  const etag = lido.headers.get('ETag');
-  assert.equal(etag, (await r1.json()).etag);
-  assert.equal(JSON.parse(await lido.text()).formato, 'imoveis-v1');
-  // pessoa A grava com o ETag lido; pessoa B, com o mesmo ETag (velho), é recusada
-  const a = await pedir(env, 'PUT', '/api/banco', banco({ quem: 'A' }), { 'If-Match': etag });
-  assert.equal(a.status, 200);
-  const b = await pedir(env, 'PUT', '/api/banco', banco({ quem: 'B' }), { 'If-Match': etag });
-  assert.equal(b.status, 412);
-  assert.equal((await b.json()).etag, (await a.json()).etag, 'devolve o ETag atual para recarregar');
-  assert.equal(JSON.parse(await (await pedir(env, 'GET', '/api/banco')).text()).quem, 'A');
+  const r = await W.atender(new Request('https://erp.ankjck.com.br/api/saude'), env);
+  assert.equal(r.status, 503, 'sem Access configurado: recusa');
+  assert.equal((await pedir(env, 'GET', '/api/saude')).status, 200, 'no computador: entra');
+  assert.equal((await W.atender(new Request(`${BASE}/api/arquivos/a.pdf`, { method: 'OPTIONS' }), env)).status, 405);
 });
 
-test('banco: recusa JSON danificado, outro formato e pedido sem o cabeçalho do sistema ou de outra origem', async () => {
-  const env = { MODO_TESTE: '1', DADOS: r2Falso() };
-  assert.equal((await pedir(env, 'PUT', '/api/banco', '{quebrado', { 'If-None-Match': '*' })).status, 400);
-  assert.equal((await pedir(env, 'PUT', '/api/banco', JSON.stringify({ formato: 'outro' }), { 'If-None-Match': '*' })).status, 400);
-  const semCab = await W.atender(new Request(`${BASE}/api/banco`, { method: 'PUT', body: banco(), headers: { 'If-None-Match': '*' } }), env);
-  assert.equal(semCab.status, 403);
-  assert.equal((await pedir(env, 'PUT', '/api/banco', banco(), { 'If-None-Match': '*', Origin: 'https://site-ruim.com' })).status, 403);
-  assert.equal(env.DADOS.m.size, 0);
+test('dados: o Worker repassa ao cofre com o e-mail conferido, sem deixar o navegador mandar o e-mail', async () => {
+  const pedidos = [];
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { pedidos.push({ url: req.url, metodo: req.method, email: req.headers.get('X-Email-Conferido'), corpo: req.body ? await req.text() : null }); return new Response('{"ok":true}'); } }) };
+  const env = { MODO_TESTE: '1', EMAIL_TESTE: 'dono@exemplo.com.br', DADOS: r2Falso(), COFRE };
+  assert.equal((await pedir(env, 'GET', '/api/dados/mudancas?desde=5', undefined, { 'X-Email-Conferido': 'outro@exemplo.com.br' })).status, 200);
+  assert.deepEqual(pedidos[0], { url: 'https://cofre/mudancas?desde=5', metodo: 'GET', email: 'dono@exemplo.com.br', corpo: null });
+  assert.equal((await pedir(env, 'POST', '/api/dados/lote', '{"id":"x"}')).status, 200);
+  assert.equal(pedidos[1].corpo, '{"id":"x"}');
+  assert.equal((await pedir(env, 'GET', '/api/dados/lote')).status, 404, 'método errado');
+  assert.equal((await pedir(env, 'POST', '/api/dados/qualquer', '{}')).status, 404);
+  const semCab = await W.atender(new Request(`${BASE}/api/dados/lote`, { method: 'POST', body: '{}' }), { ORIGEM: BASE, ...env });
+  assert.equal(semCab.status, 403, 'gravação sem o cabeçalho do sistema');
+  assert.equal(pedidos.length, 2);
 });
 
-test('backup do dia: um por dia no horário de Brasília, guardando os 30 mais recentes', async () => {
-  const env = { DADOS: r2Falso() };
-  assert.equal(W.hojeBrasilia(new Date('2026-11-06T23:30:00-03:00')), '2026-11-06', 'às 23h30 ainda é o mesmo dia');
-  assert.equal(await W.backupDiario(env, banco(), new Date('2026-11-06T12:00:00-03:00')), true);
-  assert.equal(await W.backupDiario(env, banco(), new Date('2026-11-06T18:00:00-03:00')), false, 'segundo do dia não grava');
-  for (let d = 0; d < 35; d += 1) await W.backupDiario(env, banco(), new Date(Date.UTC(2026, 6, 1 + d, 15)));
-  const nomes = [...env.DADOS.m.keys()].filter((k) => k.startsWith('backups/')).sort();
-  assert.equal(nomes.length, W.MANTER_BACKUPS);
-  assert.equal(nomes.at(-1), 'backups/imoveis-dados-2026-11-06.json');
-  // o PUT do banco também faz o backup
-  const env2 = { MODO_TESTE: '1', DADOS: r2Falso() };
-  await pedir(env2, 'PUT', '/api/banco', banco(), { 'If-None-Match': '*' });
-  assert.ok([...env2.DADOS.m.keys()].some((k) => /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/.test(k)));
+test('anexos seguem o papel do usuário: consulta lê, mas não grava', async () => {
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => (new URL(req.url).searchParams.get('nivel') === 'operador' ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response('{"papel":"consulta"}')) }) };
+  const env = { MODO_TESTE: '1', DADOS: r2Falso(), COFRE };
+  await env.DADOS.put('arquivos/a.pdf', 'x');
+  assert.equal((await pedir(env, 'GET', '/api/arquivos/a.pdf')).status, 200);
+  const r = await pedir(env, 'PUT', '/api/arquivos/b.pdf', 'x');
+  assert.equal(r.status, 403);
+  assert.match((await r.json()).erro, /não pode/);
+  assert.equal((await pedir(env, 'DELETE', '/api/arquivos/a.pdf')).status, 403);
+  assert.equal((await pedir(env, 'POST', '/api/mover', '{"de":"arquivos/a.pdf","para":"arquivos/c.pdf"}')).status, 403);
+  assert.ok(env.DADOS.m.has('arquivos/a.pdf'));
 });
 
 test('arquivos: gravar, ler com tipo seguro, não sobrescrever, apagar; backups só leitura; página/script barrados', async () => {
@@ -145,7 +99,7 @@ test('mover: renomeia pasta, recusa destino ocupado, junta devolvendo o que sobr
   for (const k of ['arquivos/Sala 1/Inquilinos/Ana/a.pdf', 'arquivos/Sala 1/Inquilinos/Ana/b.pdf', 'arquivos/Sala 1/Inquilinos/Bia/c.pdf']) await env.DADOS.put(k, k);
   const mover = (corpo) => pedir(env, 'POST', '/api/mover', JSON.stringify(corpo), { 'Content-Type': 'application/json' });
   const r = await mover({ de: 'arquivos/Sala 1/Inquilinos/Ana', para: 'arquivos/Sala 1/Inquilinos/Ana Souza' });
-  assert.deepEqual(await r.json(), { ok: true, movidos: 2, sobraram: [] });
+  assert.deepEqual(await r.json(), { ok: true, movidos: 2, sobraram: [], mais: false });
   assert.equal(await (await env.DADOS.get('arquivos/Sala 1/Inquilinos/Ana Souza/a.pdf')).text(), 'arquivos/Sala 1/Inquilinos/Ana/a.pdf', 'conteúdo preservado');
   assert.ok(![...env.DADOS.m.keys()].some((k) => k.includes('/Ana/')));
   await env.DADOS.put('arquivos/Sala 1/Inquilinos/Bia/a.pdf', 'outro');
@@ -156,6 +110,12 @@ test('mover: renomeia pasta, recusa destino ocupado, junta devolvendo o que sobr
   assert.equal((await mover({ de: 'arquivos/Sala 1', para: 'arquivos/Sala 1/Inquilinos/X' })).status, 400);
   assert.equal((await mover({ de: 'arquivos/Sala 1', para: 'backups/x' })).status, 403);
   assert.equal((await mover({ de: 'arquivos/Nada', para: 'arquivos/Outra' })).status, 404);
+  // pasta grande: move em partes (limite de chamadas do plano grátis) e o site repete até acabar
+  for (let i = 0; i < 450; i += 1) await env.DADOS.put(`arquivos/Grande/f${i}.pdf`, 'x');
+  const partes = [];
+  for (let n = 0; n < 5; n += 1) { const p = await (await mover({ de: 'arquivos/Grande', para: 'arquivos/Nova' })).json(); partes.push(p.movidos); if (!p.mais) break; }
+  assert.deepEqual(partes, [200, 200, 50]);
+  assert.equal([...env.DADOS.m.keys()].filter((k) => k.startsWith('arquivos/Nova/')).length, 450);
 });
 
 // ---------------------------------------------------------------------------
@@ -181,7 +141,7 @@ test('login: só com token do Access válido, da equipe e do aplicativo certos, 
   const env = { DADOS: r2Falso(), ACCESS_EQUIPE: EQUIPE, ACCESS_AUD: AUD, EMAILS: 'dono@exemplo.com.br, Socio@Exemplo.com.br' };
   const agora = Math.floor(Date.now() / 1000);
   const valido = { aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, email: 'socio@exemplo.com.br' };
-  const saude = async (jwt, e = env) => W.atender(new Request(`${BASE}/api/saude`, { headers: jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {} }), e, buscarCerts);
+  const saude = async (jwt, e = env) => W.atender(new Request('https://erp.ankjck.com.br/api/saude', { headers: jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {} }), e, buscarCerts);
   const ok = await saude(await token(valido));
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).email, 'socio@exemplo.com.br', 'e-mail sem diferença de maiúsculas');

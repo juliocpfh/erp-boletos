@@ -1,14 +1,15 @@
 // Worker do Cloudflare: guarda o banco (imoveis-dados.json) e os anexos no R2, no lugar da pasta do OneDrive.
 // Só entra quem passou pelo Cloudflare Access (e-mail na lista EMAILS). Não fala com o C6 (a ponte continua no computador).
-// Rotas (todas em /api/): saude · banco (GET/PUT com ETag) · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · mover.
+// Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
+// · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · mover.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
-export const ARQUIVO_BANCO = 'imoveis-dados.json';
-export const MANTER_BACKUPS = 30;
+export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
-const SO_LEITURA = ['backups']; // backups só o próprio Worker grava
-const MAX_BANCO = 30 * 1024 * 1024;
+const SO_LEITURA = ['backups']; // backups só o cofre grava
+const MAX_DADOS = 30 * 1024 * 1024; // carga inicial do banco inteiro
 const MAX_ARQUIVO = 50 * 1024 * 1024;
+const POR_PEDIDO = 200; // arquivos movidos por pedido (limite de chamadas do plano grátis)
 const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i; // igual a nomeAnexavel (docs/js/armazenamento.js)
 const TIPOS_ABRIR = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
 
@@ -19,11 +20,6 @@ class ErroHttp extends Error {
 const json = (status, dados, cabecalhos = {}) => new Response(JSON.stringify(dados), {
   status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cabecalhos },
 });
-
-/** Data de hoje no horário de Brasília ('AAAA-MM-DD'): o backup do dia segue a data local, como na pasta. */
-export function hojeBrasilia(agora = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora);
-}
 
 /**
  * Caminho dentro do R2 a partir do pedaço do endereço ("arquivos/Imóvel%201/foto.jpg").
@@ -67,7 +63,8 @@ async function chavesAccess(equipe, buscar) {
 
 /** Confere o login e devolve o e-mail. Sem Access configurado, recusa (exceto MODO_TESTE=1, só para os testes locais). */
 export async function conferirLogin(request, env, buscar = fetch) {
-  if (env.MODO_TESTE === '1') return 'teste@exemplo.com.br';
+  // Modo de teste (sem login) só vale no próprio computador: publicado por engano com MODO_TESTE=1, continua pedindo login
+  if (env.MODO_TESTE === '1' && ['localhost', '127.0.0.1'].includes(new URL(request.url).hostname)) return env.EMAIL_TESTE || 'teste@exemplo.com.br';
   const equipe = String(env.ACCESS_EQUIPE || '').trim(); // ex.: ankjck.cloudflareaccess.com
   const aud = String(env.ACCESS_AUD || '').trim();
   const emails = String(env.EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -107,46 +104,22 @@ async function lerCorpo(request, maximo) {
 }
 
 // ---------------------------------------------------------------------------
-// Banco (o JSON inteiro): grava só se ninguém mudou antes (If-Match com o ETag lido)
+// Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-async function lerBanco(env) {
-  const obj = await env.DADOS.get(ARQUIVO_BANCO);
-  if (!obj) return json(404, { erro: 'Ainda não há dados na nuvem.' });
-  return new Response(obj.body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ETag: obj.httpEtag, 'X-Content-Type-Options': 'nosniff' } });
-}
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST' };
 
-async function gravarBanco(request, env, email) {
-  conferirGravacao(request, env);
-  const seEtag = request.headers.get('If-Match');
-  const seNovo = request.headers.get('If-None-Match') === '*';
-  if (!seEtag && !seNovo) throw new ErroHttp(428, 'Falta If-Match (ETag da última leitura) ou If-None-Match: *.');
-  const corpo = await lerCorpo(request, MAX_BANCO);
-  const texto = new TextDecoder().decode(corpo);
-  // Conferência leve: ler o JSON inteiro (2,2 MB hoje) gasta ~9 ms, e o plano grátis dá 10 ms de processamento por pedido.
-  // O navegador grava com JSON.stringify, "formato" é o primeiro campo; o arquivo precisa terminar fechado.
-  if (!/^\s*\{\s*"formato"\s*:\s*"imoveis-v1"/.test(texto.slice(0, 200))) throw new ErroHttp(400, 'Não é um banco deste sistema.');
-  if (!/\}\s*$/.test(texto.slice(-50))) throw new ErroHttp(400, 'Dados danificados (arquivo incompleto).');
-  // Primeira gravação: confere antes (o R2 não garante o "*"); as seguintes: só se o ETag ainda for o lido
-  const existe = seNovo ? await env.DADOS.head(ARQUIVO_BANCO) : null;
-  const condicao = seNovo ? undefined : { etagMatches: seEtag.replace(/^W\//, '').replace(/"/g, '') };
-  const gravado = existe ? null : await env.DADOS.put(ARQUIVO_BANCO, texto, { onlyIf: condicao, httpMetadata: { contentType: 'application/json' }, customMetadata: { por: email } });
-  if (!gravado) {
-    const atual = await env.DADOS.head(ARQUIVO_BANCO);
-    throw new ErroHttp(412, 'Outra pessoa gravou antes. Recarregue os dados e faça de novo.', { etag: atual?.httpEtag || null });
+async function repassarAoCofre(request, env, rota, email, url) {
+  if (ROTAS_COFRE[rota] !== request.method) throw new ErroHttp(404, 'Não encontrado.');
+  if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
+  let corpo;
+  if (request.method === 'POST') {
+    conferirGravacao(request, env);
+    corpo = await lerCorpo(request, rota === 'importar' ? MAX_DADOS : 8 * 1024 * 1024);
   }
-  await backupDiario(env, texto);
-  return json(200, { ok: true, etag: gravado.httpEtag });
-}
-
-/** Uma cópia por dia (horário de Brasília) em backups/, guardando as 30 mais recentes. */
-export async function backupDiario(env, texto, agora = new Date()) {
-  const nome = `backups/imoveis-dados-${hojeBrasilia(agora)}.json`;
-  if (await env.DADOS.head(nome)) return false;
-  await env.DADOS.put(nome, texto, { httpMetadata: { contentType: 'application/json' } });
-  const nomes = (await listarTudo(env, 'backups/imoveis-dados-')).map((o) => o.key).filter((k) => /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/.test(k)).sort();
-  const velhos = nomes.slice(0, Math.max(0, nomes.length - MANTER_BACKUPS));
-  if (velhos.length) await env.DADOS.delete(velhos);
-  return true;
+  const cofre = env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
+  return cofre.fetch(new Request(`https://cofre/${rota}${url.search}`, {
+    method: request.method, body: corpo, headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email },
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +185,7 @@ async function listarPasta(env, chave) {
  * Move uma pasta (ou um arquivo) para outro lugar: { de, para, juntar }.
  * Sem "juntar", recusa se o destino já tiver algo; com "juntar", move o que não existe no destino e devolve o que sobrou.
  * O R2 não tem "mover": copia e apaga, um arquivo por vez (se cair no meio, repetir termina o serviço).
+ * O plano grátis deixa ~1000 chamadas ao R2 por pedido: move até POR_PEDIDO arquivos e responde `mais: true` para o site repetir.
  */
 async function mover(request, env) {
   conferirGravacao(request, env);
@@ -225,7 +199,7 @@ async function mover(request, env) {
   const arquivoSo = await env.DADOS.head(de);
   const itens = arquivoSo ? [{ key: de, rel: '' }] : (await listarTudo(env, `${de}/`)).map((o) => ({ key: o.key, rel: o.key.slice(de.length) }));
   if (!itens.length) throw new ErroHttp(404, 'Nada para mover.');
-  const destinos = itens.map((i) => ({ ...i, novo: `${para}${i.rel}` }));
+  const destinos = itens.slice(0, POR_PEDIDO).map((i) => ({ ...i, novo: `${para}${i.rel}` }));
   const existentes = new Set();
   for (const d of destinos) if (await env.DADOS.head(d.novo)) existentes.add(d.novo);
   if (existentes.size && !pedido.juntar) throw new ErroHttp(409, 'Já existe uma pasta ou arquivo com esse nome no destino.');
@@ -238,7 +212,15 @@ async function mover(request, env) {
     await env.DADOS.delete(d.key);
     movidos += 1;
   }
-  return json(200, { ok: true, movidos, sobraram });
+  return json(200, { ok: true, movidos, sobraram, mais: itens.length > POR_PEDIDO });
+}
+
+/** Anexos seguem o papel do usuário no sistema (o cofre sabe): ler = qualquer usuário ativo; gravar/apagar/mover = operador ou admin. */
+async function exigirPapel(env, email, nivel) {
+  if (env.MODO_TESTE === '1' && !env.COFRE) return; // testes dos anexos sem cofre
+  if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
+  const r = await env.COFRE.get(env.COFRE.idFromName('principal')).fetch(new Request(`https://cofre/papel?nivel=${nivel}`, { headers: { 'X-Email-Conferido': email } }));
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new ErroHttp(r.status, e.erro || 'Sem permissão.'); }
 }
 
 // ---------------------------------------------------------------------------
@@ -248,17 +230,16 @@ export async function atender(request, env, buscar = fetch) {
   if (!url.pathname.startsWith('/api/') && url.pathname !== '/api') return json(404, { erro: 'Não encontrado.' });
   try {
     if (!env.DADOS) throw new ErroHttp(503, 'Worker sem o R2 ligado (binding DADOS).');
+    if (request.method === 'OPTIONS') throw new ErroHttp(405, 'Método não aceito.'); // sem CORS: só o próprio site chama
     const email = await conferirLogin(request, env, buscar);
     const m = request.method;
     if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
-    if (rota === 'banco') {
-      if (m === 'GET') return await lerBanco(env);
-      if (m === 'PUT') return await gravarBanco(request, env, email);
-    }
-    if (rota === 'mover' && m === 'POST') return await mover(request, env);
-    if (rota.startsWith('lista/') && m === 'GET') return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true }));
+    if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
+    if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
+    if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
+      await exigirPapel(env, email, m === 'GET' ? 'consulta' : 'operador');
       if (m === 'GET') return await lerArquivo(env, chave);
       if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
       if (m === 'DELETE') return await apagarArquivo(request, env, chave);

@@ -47,3 +47,16 @@
 - Ler o JSON inteiro (2,2 MB) gasta ~9 ms, perto do limite grátis de 10 ms por pedido: o Worker confere só o começo e o fim. Se o arquivo crescer muito, a saída é o plano pago do Workers (US$ 5/mês) ou dividir o banco.
 
 Fontes: preços oficiais do [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) e do [R2](https://developers.cloudflare.com/r2/pricing/); [pausa do Supabase](https://supabase.com/docs/guides/platform/free-project-pausing.md); [mudança do Firebase Storage](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024?hl=es); [Cloudflare Zero Trust, plano grátis](https://www.cloudflare.com/plans/sase-zero-trust.md); [Graph: envio com If-Match](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession).
+
+## Caminho do meio (decidido em 2026-11-06; substitui "arquivo inteiro")
+Envia só o que mudou, funciona sem internet (fila de envio) e vira aplicativo instalável. Regras em `DECISOES.md` (2026-11-06): NF só com internet; campo disputado espera a escolha.
+
+| Etapa | Situação |
+|---|---|
+| 1. Worker: login (Access), anexos, backups | ✅ `nuvem/worker.mjs` |
+| 2. Cofre: filas, conflitos, faixas de códigos, contador da NF, papéis | ✅ `nuvem/cofre.mjs`, conferido com os dados reais (sai igual ao que entra) |
+| 3. Site: cópia local (cifrada), fila de envio, antes/depois a cada gravação, faixas de códigos em `inserir`, aplicativo instalável, tela de conflitos | a fazer |
+| 4. Passagem dos dados atuais (carga inicial e conferência) | a fazer |
+| 5. Publicar com o Access (4 e-mails), uns dias com a pasta de reserva | a fazer (passos em `nuvem/README.md`) |
+
+Achados da etapa 2: o servidor passa a conferir os papéis (consulta, operador, admin) pelo e-mail do login, o que hoje a pasta não consegue. Na etapa 3, cada usuário precisa ter o e-mail do Access no cadastro (`login` ou campo `email`). Quem gera códigos fora de `inserir` (ex.: `fiadores`, `avulsas` em `regras.js`) também precisa usar a faixa.
