@@ -69,7 +69,7 @@ Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilit
 - [ ] Rodar `node tools/checar.mjs` (sintaxe do app inteiro + testes; `node --check` não pega tudo nos módulos do navegador).
 - [ ] Testar no navegador: `cd docs && python3 -m http.server 8000` e `http://localhost:8000/?teste`.
 - [ ] Mudou `docs/js`, `docs/vendor`, `docs/css/estilo.css` ou o modelo xlsx: rodar `node tools/checar.mjs --offline` (senão `tests/offline.test.mjs` falha).
-- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele. Nunca um segredo no JSON (senha/endereço da ponte: `lembrarPonte`; senha de usuário: `camposDeSenha`).
+- [ ] Campo novo no banco: valor padrão ou migração em `normalizar`, se registros antigos precisarem dele. Nunca um segredo no JSON (senha/endereço da ponte: `lembrarPonte`; senha de usuário: `camposDeSenha`). Na nuvem, campo e tabela novos sincronizam sozinhos; campo da raiz que muda a cada gravação (como `revisao`) entra em `RAIZ_DO_SERVIDOR` de `docs/js/nuvem.js` e `nuvem/cofre.mjs` (iguais; `tests/sincronia.test.mjs` confere).
 - [ ] Chamou um site novo (API externa)? Entra na `connect-src` da CSP em `docs/index.html` e em `tools/gerar-offline.mjs`, senão o navegador bloqueia. Mexeu na ponte? `node --test tests/ponte-c6.test.mjs` e `node --test "ponte-c6/testes/*.test.mjs"`.
 - [ ] Não usar dados reais de inquilinos em testes.
 

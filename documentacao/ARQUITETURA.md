@@ -7,9 +7,9 @@
 | Aplicação (estado, rotas, eventos) | `docs/js/app.js` | `telas.js` (TELAS; repassa FORMULARIOS de `telas/envios.js` e ACOES de `telas/acoes.js`, que absorvem `FORMULARIOS_BANCO`/`ACOES_BANCO` de `telas/banco.js`), `armazenamento.js`, `backup-seguro.js`; parâmetros do endereço passam por `calculos.js` → `sanearParametros` |
 | Regras de negócio | `docs/js/regras.js`, `docs/js/conciliacao.js` (banco fase 2), `docs/js/alertas.js`, `docs/js/contratos.js` | `calculos.js`; recebem o banco `d` como parâmetro (não tocam em disco nem em DOM, exceto `contratos.js`, que só gera texto/HTML/DOCX) |
 | Cálculo puro | `docs/js/calculos.js` | nada (só funções) |
-| Dados | `docs/js/armazenamento.js`; banco: `docs/js/banco.js`, `docs/js/banco-fase2.js` (clientes da ponte, só JSON por HTTP) | File System Access API e IndexedDB (atalho da pasta); a ponte `ponte-c6/` (em `?teste`, a ponte simulada dentro do site com `simulado-banco.js`) |
+| Dados | `docs/js/armazenamento.js`; nuvem (em construção): `nuvem.js` (`Sincronia`: `alterar` em `app.js` passa por ela quando `E.nuvem` existe), `pasta-nuvem.js` (`E.pasta` vira pasta virtual da API), `cofrinho.js` (cópia cifrada no IndexedDB), `migracao.js`; banco: `docs/js/banco.js`, `docs/js/banco-fase2.js` (clientes da ponte, só JSON por HTTP) | File System Access API e IndexedDB (atalho da pasta); a ponte `ponte-c6/` (em `?teste`, a ponte simulada dentro do site com `simulado-banco.js`) |
 
-Regra prática: `regras.js`, `conciliacao.js`, `calculos.js`, `banco.js` e `banco-fase2.js` rodam no Node (são os testados em `tests/`). `telas.js`, `telas/` e `app.js` só rodam no navegador. Nas tabelas abaixo, "`telas.js` → X" é o grupo das telas: X fica em `docs/js/telas.js` ou num arquivo de `docs/js/telas/` (`node tools/mapa.mjs X` diz qual).
+Regra prática: `regras.js`, `conciliacao.js`, `calculos.js`, `nuvem.js`, `pasta-nuvem.js`, `cofrinho.js`, `migracao.js`, `banco.js` e `banco-fase2.js` rodam no Node (são os testados em `tests/`). `telas.js`, `telas/` e `app.js` só rodam no navegador. Nas tabelas abaixo, "`telas.js` → X" é o grupo das telas: X fica em `docs/js/telas.js` ou num arquivo de `docs/js/telas/` (`node tools/mapa.mjs X` diz qual).
 
 ## Mapa de pastas
 | Caminho | Responsabilidade |
@@ -22,14 +22,14 @@ Regra prática: `regras.js`, `conciliacao.js`, `calculos.js`, `banco.js` e `banc
 | `docs/offline/administracao-imoveis.html` | Programa inteiro em um arquivo (gerado, não editar) |
 | `tools/gerar-offline.mjs`, `tools/fontes-offline.mjs`; `tests/*.test.mjs` | Gera o arquivo offline (com CSP por hash de cada script) e calcula o hash das fontes; testes `node:test` de regras, cálculos, contratos, formulários, backup, offline, segurança (`seguranca.test.mjs`), banco (`banco.test.mjs`, `conciliacao.test.mjs`) e ponte (`ponte-c6.test.mjs`, sobe a ponte em modo simulado; os módulos da fase 2 têm testes próprios em `ponte-c6/testes/`) |
 | `ponte-c6/` | Ponte entre o site e a API do C6 (fora de `docs/`, não é publicada): `servidor.mjs` (senha, CORS, contas, boletos, webhook, roteiro; monta as rotas da fase 2 de `rotas-fase2.mjs`: extrato, saldo, boletos pagos, DDA, pagamentos com `PAGAMENTOS=1`, comprovante), `mapa-c6.mjs`, `c6-*.mjs`, `c6-simulado.mjs` + `simulado/`, `README.md`, `README-fase2.md`, `.env.exemplo`, `testes/`; `.env`, `contas/`, `credenciais/`, `notificacoes/` e `registros/` ficam fora do Git |
+| `nuvem/` | Dados na nuvem (fora de `docs/`, publicado no Cloudflare com `wrangler`): `worker.mjs` (login do Access, papéis, anexos no R2, repassa ao cofre), `cofre.mjs` (Durable Object com SQLite: lote de mudanças, conflitos, faixas, contador da NF, backup diário), `local.mjs` (nuvem de teste no computador), `wrangler.toml`; ver `nuvem/README.md` |
 
 Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, `arquivos/<imóvel>/...` (subpastas `Matrículas`, `Anúncio`, `IPTU (guias)/<ano>`, `Reformas` e `Inquilinos/<Nome (entrada a saída)>`, esta com `Documentos assinados`, `Aditivos, correções e comunicação` (termos aditivos e cartas de reajuste) e `Seguro (apólices)`; caminho do inquilino por `telas/comum.js` → `pastaPaiContrato`, que devolve as partes), `modelos/` (ver `README.md`).
 
 ## Modelo de dados
 - O banco é um objeto: `{ formato: 'imoveis-v1', revisao, seq, historico, listas, estilos_alertas, config_banco, <tabela>: [ ... ] }` (`estilos_alertas`: aparência escolhida para cada tipo de alerta; `config_banco`: integração com o C6, sem segredos: `normalizar` apaga `senha_ponte`/`ponte_url` se aparecerem).
 - As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`, `aditivos`, `solicitacoes`, `guias_impostos`, `movimentacoes_banco`, `pagamentos_banco`…). `bancoVazio()` cria uma lista para cada uma.
-- `id` de cada registro vem de `d.seq[tabela]` (em `inserir`).
-- Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
+- `id` de cada registro vem de `d.seq[tabela]` (em `inserir`). Na nuvem, `seq` não sincroniza: cada aparelho usa uma faixa reservada (`Sincronia.faixas`, `POST dados/faixa`) para não repetir código sem internet. Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
 - `normalizar(d)` em `regras.js` migra bancos antigos ao abrir (campos renomeados, tabelas novas).
 
 ## Onde estão as regras

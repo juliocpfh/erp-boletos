@@ -1,6 +1,6 @@
 # Publicar o sistema em erp.ankjck.com.br
 
-Hoje o sistema abre em `https://juliocpfh.github.io/erp-boletos/`. Este guia mostra como fazê-lo abrir em **`https://erp.ankjck.com.br`**, usando o que já existe: o GitHub Pages (que entrega as telas) e o Cloudflare (onde fica o domínio `ankjck.com.br`).
+**Feito em 06/11/2026:** o sistema abre em `https://erp.ankjck.com.br` (nuvem cinza; o endereço antigo `juliocpfh.github.io/erp-boletos` redireciona; `ankjck.com.br` continua com o site do prédio). Este guia mostra como fazê-lo abrir em **`https://erp.ankjck.com.br`**, usando o que já existe: o GitHub Pages (que entrega as telas) e o Cloudflare (onde fica o domínio `ankjck.com.br`).
 
 Nada muda nos dados: eles continuam na pasta do computador/OneDrive. Só muda o endereço que se digita no navegador.
 
