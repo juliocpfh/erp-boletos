@@ -1,4 +1,4 @@
-// Aplicação: estado, gravação na pasta escolhida, rotas e ações. As telas estão em telas.js.
+// Aplicação: estado, gravação na pasta escolhida (ou na nuvem, nuvem.js), rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
 import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
 import { carregarPonteLocal } from './banco.js';
@@ -6,11 +6,13 @@ import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
+import * as N from './nuvem.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
+  nuvem: null, // dados na nuvem (Sincronia de nuvem.js): no lugar da pasta, quando o site tem /api/
   d: null, // banco em memória
   usuario: null,
   teste: new URLSearchParams(location.search).has('teste'),
@@ -82,7 +84,7 @@ async function abrirSessao(u) {
 window.addEventListener('storage', async (ev) => {
   if (ev.key !== SESSAO || !E.d) return;
   // a outra aba acabou de gravar o token novo no banco: relê o disco antes de conferir
-  try { E.d = (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
+  try { E.d = E.nuvem ? E.nuvem.atual() : (await S.lerBanco(E.pasta)) || E.d; } catch { /* fica com o que está na memória */ }
   const u = usuarioDaSessao();
   if ((u && u.login) !== (E.usuario && E.usuario.login)) {
     E.usuario = u;
@@ -108,6 +110,13 @@ export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais 
 const soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
 
 async function alterarAgora(fn, { soSessao = false } = {}) {
+  if (E.nuvem) {
+    // nuvem: compara antes e depois e manda só o que mudou (sem internet, fica na fila deste aparelho)
+    const resultado = await E.nuvem.alterar(fn);
+    E.d = E.nuvem.atual();
+    atualizarFaixa();
+    return resultado;
+  }
   const disco = await S.lerBanco(E.pasta);
   if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
@@ -187,7 +196,21 @@ async function rotinaSegura() {
   if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
 }
 
+/** Nuvem: terminou uma sincronia; `externo` = chegou mudança de outro aparelho (redesenha a tela). */
+function aoMudarNuvem(externo) {
+  if (!E.nuvem || !E.nuvem.atual()) return;
+  E.d = E.nuvem.atual();
+  renovarUsuario();
+  atualizarFaixa();
+  if (!externo) return;
+  if (!E.usuario) return mostrar();
+  const editando = document.querySelector('main form[data-form]');
+  if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
+  else mostrar();
+}
+
 async function verificarMudancasExternas() {
+  if (E.nuvem) { if (!document.hidden) await E.nuvem.sincronizar().catch(() => {}); return; } // aoMudar avisa
   if (!E.pasta || !E.d || document.hidden) return;
   try {
     const disco = await S.lerBanco(E.pasta);
@@ -339,6 +362,16 @@ export async function escolherPasta() {
   }
 }
 
+const MODO_NUVEM = 'imoveis-modo-nuvem';
+/** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
+export async function abrirNuvem() {
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar: N.guardarNoNavegador(), aoMudar: (externo) => aoMudarNuvem(externo) });
+  try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
+  E.d = await E.nuvem.iniciar();
+  E.usuario = usuarioDaSessao();
+  await mostrar();
+}
+
 export async function reabrirPastaLembrada() {
   const h = await S.pastaLembrada();
   if (!h) return escolherPasta();
@@ -351,13 +384,16 @@ export async function criarBanco(nome, loginTexto, senha) {
   const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
     criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
-  await S.gravarBanco(E.pasta, novo);
-  E.d = novo;
-  await abrirSessao(u);
+  if (E.nuvem) E.d = await E.nuvem.importar(novo); // nuvem vazia: primeira carga
+  else {
+    await S.gravarBanco(E.pasta, novo);
+    E.d = novo;
+  }
+  await abrirSessao(E.d.usuarios.find((x) => x.id === u.id) || u);
 }
 
 export async function entrar(loginTexto, senha) {
-  const disco = await S.lerBanco(E.pasta);
+  const disco = E.nuvem ? E.nuvem.atual() : await S.lerBanco(E.pasta);
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
@@ -401,6 +437,13 @@ function rotaAtual() {
 function atualizarFaixa() {
   const el = document.getElementById('faixa');
   if (!el || !E.d) return;
+  if (E.nuvem) {
+    const n = E.nuvem.pendentesQtd(); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
+    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
+      + `${cf || rc ? ` · <a href="#/conflitos"><b>⚠ ${cf ? `${cf} conflito(s) para escolher` : ''}${cf && rc ? ' e ' : ''}${rc ? `${rc} mudança(s) recusada(s)` : ''}</b></a>` : ''}`
+      + ` · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
+    return;
+  }
   el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split('-').reverse().join('/')}` : ''}`;
 }
 
@@ -435,9 +478,9 @@ export async function mostrar(estadoForm = null) {
   try {
     let html;
     if (rota.partes[0] === 'restaurar-backup') html = await TELAS.restaurarBackup();
-    else if (!S.suportado() && !E.teste) html = TELAS.semSuporte();
-    else if (!E.pasta) html = await TELAS.inicio();
-    else if (!E.d && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
+    else if (!S.suportado() && !E.teste && !E.nuvem) html = TELAS.semSuporte();
+    else if (!E.pasta && !E.nuvem) html = await TELAS.inicio();
+    else if (!E.d && E.pasta && (await S.copiasEmConflito(E.pasta).catch(() => [])).length) html = TELAS.arquivoSumiu(await S.copiasEmConflito(E.pasta));
     else if (!E.d || !E.d.usuarios.length) html = TELAS.primeiroAcesso();
     else if (!E.usuario) html = rota.partes[0] === 'pedir-acesso' ? TELAS.pedirAcesso() : TELAS.login();
     else {
@@ -654,12 +697,23 @@ document.addEventListener('click', (ev) => {
   mostrar();
 });
 window.addEventListener('focus', verificarMudancasExternas);
+window.addEventListener('online', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
   await carregarPonteLocal(); // endereço e senha da ponte do banco, só deste navegador
   if (E.teste) {
     await abrirPasta(await pastaDeTeste());
+    return;
+  }
+  // site com a nuvem ligada (/api/ responde), ou que já abriu pela nuvem neste aparelho (sem internet agora)
+  let lembrada = false;
+  try { lembrada = localStorage.getItem(MODO_NUVEM) === '1'; } catch { /* sem armazenamento */ }
+  if (location.protocol !== 'file:' && (lembrada || (await N.nuvemDisponivel()))) {
+    try { await abrirNuvem(); } catch (e) {
+      logarErro(e);
+      document.getElementById('app').innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="" class="botao">Tentar de novo</a></p></main>`;
+    }
     return;
   }
   const h = S.suportado() ? await S.pastaLembrada() : null;

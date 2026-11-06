@@ -15,6 +15,7 @@ import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
+import { ACOES_NUVEM } from './nuvem.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
@@ -1620,4 +1621,4 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO);
+Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM);

@@ -24,6 +24,7 @@ import { telaFaturas } from './telas/faturas.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
+import { telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
 
 // --------------------------------------------------------------------------
@@ -149,7 +150,7 @@ export const TELAS = {
 
   primeiroAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Primeiro acesso</h1>
-    <p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados: crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.</p>
+    <p class="suave">${E.nuvem ? '<b>Dados na nuvem</b>. A nuvem ainda não tem dados:' : `Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados:`} crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.</p>
     <div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
       Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>
@@ -162,7 +163,7 @@ export const TELAS = {
     </form>${LINK_RESTAURAR}</div></main>`,
 
   login: () => `<main><div id="mensagens"></div><div class="cartao login">
-    <h1>Administração de Imóveis</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b></p>
+    <h1>Administração de Imóveis</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}</p>
     <form data-form="login">
       <p><label>Login</label><input name="login" autofocus autocomplete="username"></p>
       <p><label>Senha</label><input type="password" name="senha" autocomplete="current-password"></p>
@@ -170,7 +171,7 @@ export const TELAS = {
     </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
 
   pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
-    <h1>Pedir acesso</h1><p class="suave">Pasta: <b>${esc(E.pasta.name)}</b>. O administrador recebe o pedido em Usuários e libera o acesso.</p>
+    <h1>Pedir acesso</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}. O administrador recebe o pedido em Usuários e libera o acesso.</p>
     <form data-form="pedirAcesso">
       <p><label>Seu nome</label><input name="nome" autofocus></p>
       <p><label>Login (sem espaços)</label><input name="login" autocomplete="username"></p>
@@ -330,6 +331,7 @@ export const TELAS = {
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
   dados: () => telaDados(),
+  conflitos: () => telaConflitos(),
   usuarios() {
     if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
     const pendentes = d().usuarios.filter((u) => u.pendente);

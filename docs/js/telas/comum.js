@@ -724,7 +724,7 @@ export async function listaArquivos(escopo, id, modo = '') {
 
 /** Renomeia a pasta no disco quando o nome do imóvel ou do inquilino (datas) muda. */
 export async function renomearNoDisco(paiPartes, antigo, novo) {
-  if (!antigo || antigo === novo) return;
+  if (!antigo || antigo === novo || !E.pasta) return; // nuvem: anexos ainda na etapa 3b
   try {
     const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
     await S.renomearPasta(await S.subpasta(raiz, paiPartes), antigo, novo);

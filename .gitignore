@@ -6,3 +6,4 @@ dados/
 .claude/settings.local.json
 previas/
 .claude/worktrees/
+nuvem/.local/

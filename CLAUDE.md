@@ -11,6 +11,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 | Conferir tudo antes do commit | `node tools/checar.mjs` (sintaxe via esbuild + testes de `tests/`; `node --check` NÃO detecta erros nestes módulos); com `--offline` gera também a versão sem internet |
 | Testar a ponte do C6 | `node --test tests/ponte-c6.test.mjs` (sobe a ponte em modo simulado) e `node --test "ponte-c6/testes/*.test.mjs"` (módulos da fase 2; `checar.mjs` não os roda) |
 | Rodar a ponte em modo simulado | `cd ponte-c6 && SIMULADO=1 PONTE_SENHA=<frase com 20+ caracteres> CONTAS=ank,jck node servidor.mjs` → `http://127.0.0.1:8765` (ou copie `.env.exemplo` para `.env`); nada vai ao banco |
+| Testar os dados na nuvem (Cloudflare) | `node nuvem/local.mjs` → `http://localhost:8787` (site + `/api` com o cofre em SQLite; `/__internet?ligar=0` simula a queda); detalhes em `nuvem/README.md` e `documentacao/ESTUDO_DADOS_NUVEM.md` |
 | Rodar no navegador | `cd docs && python3 -m http.server 8000` → `http://localhost:8000/?teste` (pasta interna, sem escolher pasta; em `?teste` a ponte é simulada dentro do site, `banco-fase2.js` + `simulado-banco.js`) |
 
 ## Leia por partes (economia de contexto)

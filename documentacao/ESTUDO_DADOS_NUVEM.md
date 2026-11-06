@@ -55,8 +55,14 @@ Envia só o que mudou, funciona sem internet (fila de envio) e vira aplicativo i
 |---|---|
 | 1. Worker: login (Access), anexos, backups | ✅ `nuvem/worker.mjs` |
 | 2. Cofre: filas, conflitos, faixas de códigos, contador da NF, papéis | ✅ `nuvem/cofre.mjs`, conferido com os dados reais (sai igual ao que entra) |
-| 3. Site: cópia local (cifrada), fila de envio, antes/depois a cada gravação, faixas de códigos em `inserir`, aplicativo instalável, tela de conflitos | a fazer |
+| 3a. Site: cópia local, fila de envio, antes/depois a cada gravação, faixas de códigos, NF só com internet, tela de conflitos (`#/conflitos`), e-mail de acesso no usuário | ✅ `docs/js/nuvem.js` (`Sincronia`), `telas/nuvem.js`; testado no navegador com `node nuvem/local.mjs` |
+| 3b. Anexos pela nuvem (pasta "virtual" com a mesma interface da pasta, para o resto do código não mudar; fila de envio sem internet) | a fazer (no modo nuvem, anexos ainda não aparecem) |
+| 3c. Aplicativo instalável (PWA, abre sem internet) e cópia local cifrada com a senha, apagada ao Sair; trava entre abas | a fazer |
 | 4. Passagem dos dados atuais (carga inicial e conferência) | a fazer |
 | 5. Publicar com o Access (4 e-mails), uns dias com a pasta de reserva | a fazer (passos em `nuvem/README.md`) |
 
 Achados da etapa 2: o servidor passa a conferir os papéis (consulta, operador, admin) pelo e-mail do login, o que hoje a pasta não consegue. Na etapa 3, cada usuário precisa ter o e-mail do Access no cadastro (`login` ou campo `email`). Quem gera códigos fora de `inserir` (ex.: `fiadores`, `avulsas` em `regras.js`) também precisa usar a faixa.
+
+### Como testar no computador (etapa 3a)
+`node nuvem/local.mjs` → `http://localhost:8787` (site + /api com o cofre num SQLite em `nuvem/.local/`; sem login do Access; `EMAIL_TESTE` = e-mail do usuário de teste). `http://localhost:8787/__internet?ligar=0` simula a queda da internet (e `=1` volta). Na 1ª vez, crie o administrador com o login igual ao `EMAIL_TESTE`.
+Cuidados conhecidos: o "Desfazer" do Histórico usa a posição da entrada; com a nuvem, só desfazer o que já foi enviado (falta travar na 3c). Duas abas abertas no mesmo aparelho dividem a fila (falta a trava entre abas, 3c).

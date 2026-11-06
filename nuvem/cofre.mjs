@@ -12,7 +12,10 @@ export const DIAS_LOG = 60; // aparelho parado há mais tempo baixa tudo de novo
 export const MANTER_BACKUPS = 30;
 /** Campos da raiz que só o servidor controla (o aparelho não manda; mudam a cada gravação e dariam conflito à toa). */
 export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualizado_por', 'seq', 'revisao_so_sessao', 'historico', '_nuvem'];
-/** Contadores que só andam com internet, um de cada vez, aqui (número da NF). */
+/**
+ * Contadores que só andam com internet (número da NF): o lote só muda se o valor que o aparelho viu ainda for o atual;
+ * senão o lote inteiro volta (409, `contador: true`) e o aparelho refaz com o número novo. Ou pelo `contador()`.
+ */
 export const CONTADORES = ['proxima_fatura'];
 /** Segredos que nunca ficam nos dados (regra 8 do CLAUDE.md; normalizar também apaga). */
 const SEGREDOS = ['senha_ponte', 'ponte_url'];
@@ -176,6 +179,7 @@ export class Cofre {
       mais: linhas.length === limite,
       mudancas: linhas.map((l) => ({ seq: l.seq, tipo: l.tipo, tabela: l.tabela, id: l.id, dados: l.dados === null ? null : JSON.parse(l.dados), por: l.por, em: l.em })),
       conflitos: this.conflitosAbertos(),
+      revisao: Number(this.controle('revisao') || 0), atualizado_em: this.controle('atualizado_em'), atualizado_por: this.controle('atualizado_por'),
     };
   }
 
@@ -198,7 +202,11 @@ export class Cofre {
     if (ja) return { ...JSON.parse(ja.resposta), repetido: true };
     if (!Array.isArray(lote.ops) || lote.ops.length > MAX_OPS) throw new ErroCofre(400, `Lote inválido (até ${MAX_OPS} mudanças).`);
     if (this.vazio()) throw new ErroCofre(409, 'A nuvem ainda não tem dados: faça a carga inicial.');
-    const quem = this.exigir(email, 'operador');
+    const quem = this.exigir(email, 'consulta');
+    // consulta só registra a própria entrada e saída (sessão do login); qualquer outra mudança é recusada
+    if (quem.papel === 'consulta' && !lote.ops.every((o) => o?.op === 'alterar' && o.tabela === 'usuarios' && o.id === quem.id && Object.keys(o.campos || {}).every((c) => c === 'sessoes'))) {
+      throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
+    }
     return this.transacao(() => {
       const resultados = []; const novosConflitos = [];
       for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
@@ -300,7 +308,12 @@ export class Cofre {
   mudarRaiz(op, email, quem, novosConflitos) {
     const campo = nomeCampo(op.campo);
     if (RAIZ_DO_SERVIDOR.includes(campo)) return { ok: true, ignorado: true };
-    if (CONTADORES.includes(campo)) throw new ErroCofre(400, 'O número da NF só anda pelo contador da nuvem (com internet).');
+    if (CONTADORES.includes(campo)) {
+      const linha = this.q('SELECT valor FROM raiz WHERE campo = ?', campo)[0];
+      if (!igual(linha ? JSON.parse(linha.valor) : undefined, op.antes)) throw new ErroCofre(409, 'O número da NF mudou em outro aparelho: refaça com o número novo.', { contador: true });
+      this.gravarRaiz(campo, op.depois, email);
+      return { ok: true };
+    }
     if (campo === 'ordem_caixas' && quem.papel !== 'admin') throw new ErroCofre(403, 'Só o administrador muda a ordem das caixas.');
     const linha = this.q('SELECT valor, meta FROM raiz WHERE campo = ?', campo)[0];
     const atual = linha ? JSON.parse(linha.valor) : undefined;
@@ -382,6 +395,9 @@ export class Cofre {
         fechar([c.id]);
       }
       this.registrarLog('resolvido', c.tabela, id || null, { conflito: c.id, escolha }, email);
+      this.controle('revisao', Number(this.controle('revisao') || 0) + 1);
+      this.controle('atualizado_em', this.agora());
+      this.controle('atualizado_por', email);
       return { ok: true, seq: this.ultimoSeq() };
     });
   }

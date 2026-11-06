@@ -146,7 +146,11 @@ test('número da NF: só pelo contador, um de cada vez, nunca repete', () => {
   const c = carregado();
   assert.deepEqual([c.contador({ nome: 'proxima_fatura' }, DONO).numero, c.contador({ nome: 'proxima_fatura' }, SOCIO).numero], [157, 158]);
   assert.equal(c.tudo().proxima_fatura, 159);
-  assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 159, depois: 160 }]), DONO), (e) => e.status === 400);
+  // pelo lote: só se o número que o aparelho viu ainda for o atual; senão o lote inteiro volta
+  c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 159, depois: 160 }]), DONO);
+  assert.throws(() => c.aplicar(lote([{ op: 'historico', entrada: { nf: 159 } }, { op: 'raiz', campo: 'proxima_fatura', antes: 159, depois: 160 }]), SOCIO), (e) => e.status === 409 && e.extra.contador);
+  assert.equal(c.tudo().proxima_fatura, 160);
+  assert.equal(c.tudo().historico.filter((h) => h.nf).length, 0, 'nada do lote recusado ficou');
   assert.throws(() => c.contador({ nome: 'outro' }, DONO), (e) => e.status === 400);
   assert.throws(() => c.contador({ nome: 'proxima_fatura' }, CONSULTA), (e) => e.status === 403);
 });
@@ -154,6 +158,8 @@ test('número da NF: só pelo contador, um de cada vez, nunca repete', () => {
 test('papéis: consulta só lê; operador não mexe em usuários (só a própria senha) nem na ordem das caixas; e-mail sem usuário não entra', () => {
   const c = carregado();
   assert.throws(() => c.aplicar(lote([{ op: 'historico', entrada: { a: 1 } }]), CONSULTA), (e) => e.status === 403);
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { sessoes: { antes: undefined, depois: ['t1'] } } }]), CONSULTA).ok, true, 'consulta registra a própria sessão');
+  assert.throws(() => c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 1, campos: { sessoes: { antes: undefined, depois: ['t1'] } } }]), CONSULTA), (e) => e.status === 403, 'mas não a de outro');
   assert.throws(() => c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { papel: { antes: 'operador', depois: 'admin' } } }]), OPERADOR), (e) => e.status === 403, 'não se promove');
   assert.throws(() => c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 1, campos: { senha_hash: { antes: 'h1', depois: 'x' } } }]), OPERADOR), (e) => e.status === 403, 'não troca a senha de outro');
   assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: 'novo', papel: 'admin' } }]), OPERADOR), (e) => e.status === 403);
