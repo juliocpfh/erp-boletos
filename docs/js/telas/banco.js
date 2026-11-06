@@ -27,11 +27,11 @@ const pastaContador = () => config().pasta_contador || PASTA_CONTADOR;
 /** Rótulo de um objeto { id: rotulo } (CLASSIFICACOES, SITUACOES_PAGAMENTO). */
 const rotuloDe = (lista, id) => lista[id] || id;
 /** Nome curto da classificação para as etiquetas da tabela (o nome completo fica na janela "Dar destino"). */
-const ROTULO_CURTO = { boleto: 'Boleto nosso', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', outro: 'Outro', ignorar: 'Ignorada' };
+const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', outro: 'Outro', ignorar: 'Ignorada' };
 /** Destinos que não precisam de comprovante (igual a conciliacao.js: só a ignorada; a transferência entre as nossas contas tem um PDF só, na pasta do contador da conta de origem). */
 const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
-const SEM_IMOVEL = ['tarifa', 'transferencia', 'ignorar', 'imposto'];
+const SEM_IMOVEL = ['tarifa', 'transferencia', 'ignorar', 'imposto', 'airbnb'];
 const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 const mov = (id) => { const m = movs().find((x) => x.id === Number(id)); if (!m) throw new Error('Movimentação não encontrada.'); return m; };
 const pag = (id) => { const p = pagamentos().find((x) => x.id === Number(id)); if (!p) throw new Error('Pagamento não encontrado.'); return p; };
@@ -139,6 +139,12 @@ function destinoHtml(m, sugestao) {
   if (g) partes.push(`<a href="#/impostos?mes=${esc(String(g.periodo).slice(0, 7))}">${esc(g.imposto)} ${esc(g.periodo)}</a>`);
   const par = m.par_movimentacao_id ? movs().find((x) => x.id === m.par_movimentacao_id) : null;
   if (par) partes.push(`<a href="#/banco?conta=${esc(par.conta_id)}&mes=${String(par.data).slice(0, 7)}">↔ ${esc(nomeConta(par.conta_id))} ${dataBr(par.data)}</a>`);
+  if (m.classificacao === 'airbnb') {
+    const gs = (d().ganhos_airbnb || []).filter((g) => g.movimentacao_id === m.id);
+    for (const g of gs) { const gi = buscar('imoveis', g.imovel_id); partes.push(`<a href="#/resultados?airbnb=${g.imovel_id}">${esc(gi ? gi.nome : '?')} ${reais(g.valor)}</a> <span class="suave">(${compBr(g.competencia)})</span>`); }
+  }
+  const rf = m.reforma_id ? buscar('reformas', m.reforma_id) : null;
+  if (rf) partes.push(`<a href="#/imovel/${rf.imovel_id}?ir=reformas">reforma: ${esc(rf.descricao)}</a>`);
   if (m.pagamento_banco_id) partes.push(etiqueta('pago pelo sistema', 'info'));
   if (m.observacoes) partes.push(`<span class="suave">${esc(m.observacoes)}</span>`);
   return partes.join('<br>');
@@ -477,6 +483,10 @@ async function janelaDestino(m, inicialDe = null) {
       <span class="suave">Se a conta ainda não foi lançada, deixe "— lançar agora": o sistema cria a conta com o valor e a data da movimentação.</span></p>
     <p data-campo="tipo_despesa"><label>Qual conta</label><select name="tipo_despesa" style="width:100%"></select>
       <label>Mês da conta</label><input type="month" name="competencia" value="${compInicial}" style="width:100%"></p>
+    <div data-campo="airbnb"><p><label>Mês de referência do Airbnb</label><input type="month" name="competencia_air" value="${compInicial}" style="width:100%"></p>
+      <p><label>Quanto é de cada imóvel vago</label></p><div data-air-lista></div>
+      <p class="suave" data-air-soma></p></div>
+    <p data-campo="reforma"><label>O que foi feito na reforma</label><input name="descricao_reforma" placeholder="ex.: piso da cozinha" style="width:100%"></p>
     <p data-campo="boleto"><label>Boleto do inquilino</label><select name="boleto" style="width:100%"></select>
       <span class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou. Se o valor for diferente do previsto, o sistema pede a justificativa e o valor da NF na página do boleto.</span></p>
     <p data-campo="iptu"><label>IPTU (ano)</label><select name="iptu" style="width:100%"></select><label>Parcela</label><select name="iptu_parcela" style="width:100%"></select></p>
@@ -489,8 +499,24 @@ async function janelaDestino(m, inicialDe = null) {
     const encherTipos = () => {
       const imovelId = Number(sel('imovel').value) || null;
       const comp = /^\d{4}-\d{2}$/.test(sel('competencia').value) ? sel('competencia').value : compInicial;
-      const tipos = imovelId ? R.contasPermitidas(d(), imovelId, comp).tipos : [...R.TIPOS_DESPESA];
-      sel('tipo_despesa').innerHTML = opcoes(tipos.map((t) => [t, t]), tipos.includes(s.tipo_despesa) ? s.tipo_despesa : tipos[0], tipos.length ? '' : `— em ${compBr(comp)} o inquilino paga todas as contas`);
+      // qualquer imóvel aceita conta nossa; a situação do mês só aparece como lembrete
+      const tipos = [...R.TIPOS_DESPESA];
+      const p = imovelId ? R.contasPermitidas(d(), imovelId, comp) : null;
+      sel('tipo_despesa').innerHTML = opcoes(tipos.map((t) => [t, `${t}${p && p.motivo === 'inquilino' ? ' (pelo contrato, o inquilino paga)' : p && p.motivo === 'incluso' && !p.tipos.includes(t) ? ' (pelo contrato, o inquilino paga)' : ''}`]), tipos.includes(s.tipo_despesa) ? s.tipo_despesa : tipos[0]);
+    };
+    const somaAir = () => {
+      const soma = [...dlg.querySelectorAll('[data-air]')].reduce((t, el) => t + (C.centavos(el.value || '0') || 0), 0);
+      dlg.querySelector('[data-air-soma]').innerHTML = `Soma: <b>${reais(soma)}</b> de ${reais(m.valor)}${soma === m.valor ? ' ✓' : ` · falta ${reais(m.valor - soma)}`}`;
+    };
+    const encherAirbnb = () => {
+      const comp = /^\d{4}-\d{2}$/.test(sel('competencia_air').value) ? sel('competencia_air').value : compInicial;
+      const vagos = ordenar(d().imoveis, 'nome').filter((i) => R.contasPermitidas(d(), i.id, comp).motivo === 'vago');
+      dlg.querySelector('[data-air-lista]').innerHTML = vagos.length
+        ? vagos.map((i) => `<p style="display:flex;gap:8px;align-items:center;margin:4px 0"><span style="flex:1">${esc(i.nome)}</span><input name="air_${i.id}" data-air inputmode="decimal" placeholder="0,00" style="width:140px"></p>`).join('')
+        : `<p class="suave">Nenhum imóvel vago em ${compBr(comp)}: ganho do Airbnb só em imóvel vago.</p>`;
+      if (vagos.length === 1) dlg.querySelector('[data-air]').value = (m.valor / 100).toFixed(2).replace('.', ',');
+      dlg.querySelectorAll('[data-air]').forEach((el) => el.addEventListener('input', somaAir));
+      somaAir();
     };
     const encherParcelas = () => {
       const p = buscar('iptus', Number(sel('iptu').value));
@@ -517,6 +543,8 @@ async function janelaDestino(m, inicialDe = null) {
       campo('despesa').hidden = k !== 'conta_imovel';
       campo('tipo_despesa').hidden = k !== 'conta_imovel' || !!sel('despesa').value;
       campo('boleto').hidden = k !== 'boleto';
+      campo('airbnb').hidden = k !== 'airbnb';
+      campo('reforma').hidden = k !== 'reforma';
       campo('iptu').hidden = k !== 'iptu';
       campo('guia').hidden = k !== 'imposto';
       campo('par').hidden = k !== 'transferencia';
@@ -526,6 +554,8 @@ async function janelaDestino(m, inicialDe = null) {
     sel('despesa').addEventListener('change', mostrarCampos);
     sel('competencia').addEventListener('change', encherTipos);
     sel('iptu').addEventListener('change', encherParcelas);
+    sel('competencia_air').addEventListener('change', encherAirbnb);
+    encherAirbnb();
     encher();
   } });
   if (!r) return null;
@@ -537,6 +567,9 @@ async function janelaDestino(m, inicialDe = null) {
     cobranca_id: classificacao === 'boleto' ? Number(v('boleto')) || null : null, pagouEmDia: classificacao === 'boleto' && s.cobranca_id === (Number(v('boleto')) || null) ? (s.pagouEmDia ?? null) : null,
     iptu_id: classificacao === 'iptu' ? Number(v('iptu')) || null : null, iptu_parcela: classificacao === 'iptu' && v('iptu_parcela') !== '' ? Number(v('iptu_parcela')) : null,
     guia_imposto_id: classificacao === 'imposto' ? Number(v('guia')) || null : null, par_movimentacao_id: classificacao === 'transferencia' && parSugerido ? parSugerido.id : null,
+    competencia_air: classificacao === 'airbnb' ? v('competencia_air') || null : null,
+    divisao: classificacao === 'airbnb' ? Object.keys(r).filter((k) => k.startsWith('air_') && String(v(k)).trim()).map((k) => ({ imovel_id: Number(k.slice(4)), valor: C.centavos(v(k)) })) : [],
+    descricao_reforma: classificacao === 'reforma' ? String(v('descricao_reforma') || '').trim() : '',
     observacoes: String(v('observacoes') || '').trim() };
 }
 
@@ -563,6 +596,7 @@ function destinoDaSugestao(s) {
   if (!s || !s.classificacao) return null;
   const base = { classificacao: s.classificacao, imovel_id: s.imovel_id || null, tipo_despesa: s.tipo_despesa || null, competencia: null, despesa_id: s.despesa_id || null, cobranca_id: s.cobranca_id || null,
     pagouEmDia: s.pagouEmDia ?? null, iptu_id: s.iptu ? s.iptu.id : null, iptu_parcela: s.iptu && s.iptu.n !== null && s.iptu.n !== undefined ? Number(s.iptu.n) : null, guia_imposto_id: null, par_movimentacao_id: s.par_movimentacao_id || null, observacoes: '' };
+  if (['airbnb', 'reforma'].includes(s.classificacao)) return null; // a janela pede a divisão / o que foi feito
   if (s.classificacao === 'boleto' && !base.cobranca_id) return null;
   if (s.classificacao === 'conta_imovel' && !base.despesa_id && (!base.imovel_id || !R.TIPOS_DESPESA.includes(base.tipo_despesa))) return null;
   if (s.classificacao === 'iptu' && (!base.iptu_id || base.iptu_parcela === null)) return null;

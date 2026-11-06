@@ -243,9 +243,11 @@ test('confirmar pagamento pela listagem do Bolepix (sem extrato): usa credit_dat
 test('destino "conta do imóvel": cria a conta ligada, respeita quem paga pelo contrato e o desfazer exclui a conta e devolve os arquivos', () => {
   const { d, loja, sobre, ank } = base();
   const { novas: [a, b] } = importar(d, 'ank', [saida('r1', '2026-11-05', '123.45', 'SANEPAR'), saida('r2', '2026-11-06', '98.00', 'COPEL')]);
-  // Loja 1 ocupada por Maria desde 06/2026, água não é "inclusa no aluguel": é do inquilino
-  assert.throws(() => Z.vincularMovimentacao(d, a.id, { classificacao: 'conta_imovel', imovel_id: loja.id, tipo_despesa: 'Água', competencia: '2026-11' }, 'julio'), /Em 11\/2026 o inquilino paga Água/);
-  assert.equal(R.buscar(d, 'movimentacoes_banco', a.id).classificacao, null);
+  // Loja 1 ocupada por Maria desde 06/2026 (a água é dela pelo contrato): mesmo assim a conta nossa entra (débito antigo, troca de titular...)
+  Z.vincularMovimentacao(d, a.id, { classificacao: 'conta_imovel', imovel_id: loja.id, tipo_despesa: 'Água', competencia: '2026-11' }, 'julio');
+  assert.equal(R.buscar(d, 'movimentacoes_banco', a.id).classificacao, 'conta_imovel');
+  Z.desvincularMovimentacao(d, a.id, 'julio');
+  assert.deepEqual([R.buscar(d, 'movimentacoes_banco', a.id).classificacao, d.despesas.length], [null, 0]);
   assert.throws(() => Z.vincularMovimentacao(d, a.id, { classificacao: 'conta_imovel', imovel_id: sobre.id }, 'julio'), /Escolha a conta/);
   Z.vincularMovimentacao(d, a.id, { classificacao: 'conta_imovel', imovel_id: sobre.id, tipo_despesa: 'Água', competencia: '2026-11', observacoes: 'conta do mês' }, 'julio');
   const mov = R.buscar(d, 'movimentacoes_banco', a.id);
@@ -567,4 +569,27 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   assert.deepEqual([d3.config_banco.pasta_contador, d3.config_banco.tolerancia_dias, d3.config_banco.permitir_pagamentos, d3.config_banco.limite_pagamento, d3.config_banco.senha_ponte], ['Contador Ebano', 4, true, 500000, undefined] /* senha da ponte nunca fica no banco */);
   assert.equal(JSON.stringify(d3.historico.at(-1).detalhes).includes('nova'), false);
   assert.throws(() => Z.salvarConfigBanco2(d3, { modelo_nome_comprovante: 'sem campos' }, 'julio'), /entre chaves/);
+});
+
+test('destino Airbnb (dividido entre os imóveis vagos) e reforma: lançam no lugar certo e se desfazem', () => {
+  const { d, loja, sobre } = base();
+  const studio = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Studio 12', endereco: 'Rua Y, 2', cidade: 'Curitiba' }, 'julio');
+  const { novas } = importar(d, 'ank', [entrada('A1', '2026-10-05', '1850.00', { description: 'AIRBNB PAYMENTS UK' }), saida('S1', '2026-10-20', '2300.00', 'LOJA DE MATERIAIS')]);
+  const [air, mat] = novas;
+  assert.equal(Z.sugerirDestino(d, air).classificacao, 'airbnb');
+  assert.throws(() => Z.vincularMovimentacao(d, air.id, { classificacao: 'airbnb', divisao: [{ imovel_id: sobre.id, valor: 121000 }] }, 'julio'), /soma R\$ 1\.210,00/);
+  assert.throws(() => Z.vincularMovimentacao(d, air.id, { classificacao: 'airbnb', divisao: [{ imovel_id: loja.id, valor: 185000 }] }, 'julio'), /não estava vago/);
+  Z.vincularMovimentacao(d, air.id, { classificacao: 'airbnb', competencia_air: '2026-10',
+    divisao: [{ imovel_id: sobre.id, valor: 121000 }, { imovel_id: studio.id, valor: 64000 }] }, 'julio');
+  assert.deepEqual(d.ganhos_airbnb.map((g) => [g.imovel_id, g.valor, g.data_recebimento, g.movimentacao_id]),
+    [[sobre.id, 121000, '2026-10-05', air.id], [studio.id, 64000, '2026-10-05', air.id]]);
+  assert.equal(R.airbnbDoMes(d, '2026-10').total, 185000);
+  Z.desvincularMovimentacao(d, air.id, 'julio');
+  assert.deepEqual([d.ganhos_airbnb.length, R.buscar(d, 'movimentacoes_banco', air.id).classificacao], [0, null]);
+  assert.throws(() => Z.vincularMovimentacao(d, mat.id, { classificacao: 'reforma', imovel_id: loja.id }, 'julio'), /o que foi feito/);
+  Z.vincularMovimentacao(d, mat.id, { classificacao: 'reforma', imovel_id: loja.id, descricao_reforma: 'piso da cozinha' }, 'julio');
+  assert.deepEqual(d.reformas.map((r) => [r.imovel_id, r.valor, r.data, r.descricao]), [[loja.id, 230000, '2026-10-20', 'piso da cozinha']]);
+  assert.equal(R.resultadosFinanceiros(d, '2026-10-01', '2026-10-31').find((x) => x.imovel.id === loja.id).reformasPeriodo, 230000);
+  Z.desvincularMovimentacao(d, mat.id, 'julio');
+  assert.equal(d.reformas.length, 0);
 });

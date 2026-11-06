@@ -96,12 +96,35 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const linhas = R.TIPOS_DESPESA.map((t, n) => {
       const texto = String(f[`valor_${n}`] || '').trim();
-      return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], observacoes: String(f[`obs_${n}`] || '').trim() };
+      return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], vencimento: f[`venc_${n}`] || null, observacoes: String(f[`obs_${n}`] || '').trim() };
     });
     if (!f.competencia) throw new Error('Informe o mês da conta.');
     let n = 0;
     await alterar((db) => { n = R.lancarDespesas(db, Number(f.imovel), f.competencia, linhas, login()).length; });
     aviso(`${n} conta(s) lançada(s).`);
+    await mostrar();
+  },
+
+  /** Financeiro → Resultado bruto: um custo (conta paga por nós) num imóvel. */
+  async lancarCusto(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const texto = String(f.valor || '').trim();
+    if (!texto) throw new C.ErroUsuario('Informe o valor pago.');
+    if (!/^\d{4}-\d{2}$/.test(f.competencia || '')) throw new C.ErroUsuario('Informe o mês de referência.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f.data_pagamento || '')) throw new C.ErroUsuario('Informe a data do pagamento.');
+    await alterar((db) => R.lancarDespesas(db, Number(f.imovel), f.competencia, [{ tipo: f.tipo, valor: C.centavos(texto), data_pagamento: f.data_pagamento,
+      vencimento: f.vencimento || null, observacoes: String(f.observacoes || '').trim() }], login()));
+    aviso(`${f.tipo} de ${compBr(f.competencia)} lançada.`);
+    await mostrar();
+  },
+
+  /** Financeiro → Resultado bruto: um ganho do Airbnb num imóvel vago. */
+  async lancarAirbnb(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const texto = String(f.valor || '').trim();
+    await alterar((db) => R.lancarGanhoAirbnb(db, Number(f.imovel), { data_recebimento: f.data_recebimento, competencia: f.competencia, valor: texto ? C.centavos(texto) : 0,
+      observacoes: f.observacoes }, login()));
+    aviso('Ganho do Airbnb lançado.');
     await mostrar();
   },
 
@@ -512,6 +535,7 @@ export const FORMULARIOS = {
     await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
   },
   irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get('mes')}`),
+  irFinanceiro: (form) => ir(`#/financeiro?mes=${new FormData(form).get('mes')}`),
 
   /** Valor da guia calculado pelo contador (vazio apaga). */
   async guiaImposto(form) {
@@ -526,7 +550,7 @@ export const FORMULARIOS = {
 
   filtroResultados(form) {
     const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
-    ir(`#/resultados?${q}`);
+    ir(`#/${form.dataset.base === 'liquido' ? 'liquido' : 'resultados'}?${q}`);
   },
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),

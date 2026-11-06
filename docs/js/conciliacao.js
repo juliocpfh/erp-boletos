@@ -4,7 +4,7 @@
 import * as C from './calculos.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
-  lancarDespesas, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
+  lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
   pendenciasBancoDoMes, CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem,
 } from './regras.js';
 
@@ -13,6 +13,8 @@ export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoConta
 export const CLASSIFICACOES = {
   conta_imovel: 'Conta do imóvel (água, luz, gás, condomínio, internet, outra)',
   boleto: 'Aluguel recebido (boleto)',
+  airbnb: 'Airbnb recebido (dividir entre os imóveis vagos)',
+  reforma: 'Reforma / investimento no imóvel',
   iptu: 'IPTU pago na prefeitura',
   imposto: 'Imposto da empresa (PIS/COFINS, IRPJ, CSLL)',
   tarifa: 'Tarifa do banco',
@@ -122,7 +124,7 @@ export function movimentacaoDoC6(contaId, e) {
 }
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
-  pagamento_banco_id: null, par_movimentacao_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
+  pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
   observacoes: '', classificada_em: null, classificada_por: null, despesa_criada: false };
 
 /**
@@ -396,6 +398,8 @@ export function sugerirDestino(d, mov) {
       if (/TRANSF|TED|PIX|DOC/.test(texto) || /TRANSFER|PIX/.test(String(mov.categoria_banco || ''))) return { classificacao: 'transferencia', motivo: `cita a outra empresa (${c.apelido || (e && e.nome)})`, confianca: 'alta' };
     }
   }
+  // 3a) entrada do Airbnb (o Airbnb paga o total; a divisão entre os imóveis é feita na janela)
+  if (mov.tipo === 'entrada' && /AIRBNB/.test(texto)) return { classificacao: 'airbnb', motivo: 'descrição do Airbnb', confianca: 'alta' };
   // 3) entrada que parece boleto
   if (mov.tipo === 'entrada' && !mov.classificacao) {
     const casa = conciliarMovimentacoes(d, [mov]);
@@ -464,7 +468,8 @@ const carimbo = (usuario) => ({ classificada_em: new Date().toISOString(), class
 /**
  * Dá destino a uma movimentação. ``destino``: { classificacao, imovel_id, tipo_despesa, competencia, despesa_id, cobranca_id, iptu_id, iptu_parcela,
  * guia_imposto_id, par_movimentacao_id, observacoes, nome_arquivo }. Lança erro em português se inválido; já classificada lança.
- * - conta_imovel: liga a conta já lançada (despesa_id) ou cria uma via lancarDespesas (respeita contasPermitidas);
+ * - conta_imovel: liga a conta já lançada (despesa_id) ou cria uma via lancarDespesas (qualquer imóvel);
+ * - airbnb: divide a entrada entre imóveis vagos (divisao: [{ imovel_id, valor }], soma = valor do extrato) em ganhos_airbnb; reforma: cria a reforma do imóvel;
  * - boleto: confirma o pagamento (confirmarPagamentoPeloBanco; pode devolver { divergente });
  * - iptu: marca a parcela paga pelo proprietário na data da movimentação; imposto: grava paga_em na guia;
  * - transferencia: liga a outra ponta (par) e marca as duas; tarifa/outro/ignorar: só marca.
@@ -499,6 +504,29 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     const i = buscar(d, 'imoveis', de.imovel_id);
     atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, imovel_id: de.imovel_id, despesa_id: de.id, despesa_criada: criada }, usuario,
       `Destino: ${i ? i.nome : ''} · ${de.tipo} ${C.compBr(de.competencia)}`);
+    return mov;
+  }
+  if (cl === 'airbnb') {
+    if (mov.tipo !== 'entrada') throw new C.ErroUsuario('Uma saída no extrato não pode ser ganho do Airbnb.');
+    const partes = (destino.divisao || []).filter((x) => x && x.valor > 0);
+    if (!partes.length) throw new C.ErroUsuario('Informe quanto do Airbnb é de cada imóvel.');
+    const soma = partes.reduce((t, x) => t + x.valor, 0);
+    if (soma !== mov.valor) throw new C.ErroUsuario(`A divisão soma ${C.reais(soma)}, mas entrou ${C.reais(mov.valor)}: acerte os valores.`);
+    const comp = destino.competencia_air || destino.competencia || String(mov.data).slice(0, 7);
+    const ganhos = partes.map((x) => lancarGanhoAirbnb(d, Number(x.imovel_id), { data_recebimento: mov.data, competencia: comp, valor: x.valor, observacoes: obs, movimentacao_id: mov.id }, usuario));
+    atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, imovel_id: ganhos.length === 1 ? ganhos[0].imovel_id : null }, usuario,
+      `Destino: Airbnb de ${C.compBr(comp)} (${ganhos.length} imóvel(is))`);
+    return mov;
+  }
+  if (cl === 'reforma') {
+    if (mov.tipo !== 'saida') throw new C.ErroUsuario('Uma entrada no extrato não pode ser reforma.');
+    const i = destino.imovel_id ? buscar(d, 'imoveis', destino.imovel_id) : null;
+    if (!i) throw new C.ErroUsuario('Escolha o imóvel da reforma.');
+    const descricao = String(destino.descricao_reforma || obs || '').trim();
+    if (!descricao) throw new C.ErroUsuario('Diga o que foi feito na reforma (ex.: piso da cozinha).');
+    const r = inserir(d, 'reformas', { imovel_id: i.id, data: mov.data, descricao, valor: mov.valor, fornecedor: '', documento: '', observacoes: obs, movimentacao_id: mov.id }, usuario,
+      `Reforma: ${descricao} ${C.reais(mov.valor)} (extrato)`);
+    atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, imovel_id: i.id, reforma_id: r.id }, usuario, `Destino: ${i.nome} · reforma (${descricao})`);
     return mov;
   }
   if (cl === 'iptu') {
@@ -560,6 +588,15 @@ export function desvincularMovimentacao(d, movId, usuario) {
     if (de && mov.despesa_criada) excluir(d, 'despesas', de.id, usuario, 'Conta excluída (destino da movimentação desfeito)');
     else if (de) atualizar(d, 'despesas', de.id, { movimentacao_id: null, comprovante: null }, usuario, 'Conta solta da movimentação do extrato');
   }
+  if (mov.classificacao === 'airbnb') {
+    const ganhos = (d.ganhos_airbnb || []).filter((x) => x.movimentacao_id === mov.id);
+    for (const g of ganhos) {
+      const nf = d.avulsas.find((a) => a.airbnb_competencia === g.competencia);
+      if (nf && d.faturas.some((f) => f.origem_tipo === 'avulsa' && f.origem_id === nf.id && f.situacao === 'Emitida')) throw new Error(`A NF do Airbnb de ${C.compBr(g.competencia)} já foi numerada: o destino não pode ser desfeito.`);
+    }
+    for (const g of ganhos) excluir(d, 'ganhos_airbnb', g.id, usuario, 'Ganho do Airbnb excluído (destino da movimentação desfeito)');
+  }
+  if (mov.reforma_id && buscar(d, 'reformas', mov.reforma_id)) excluir(d, 'reformas', mov.reforma_id, usuario, 'Reforma excluída (destino da movimentação desfeito)');
   if (mov.iptu_id && mov.iptu_parcela !== null && buscar(d, 'iptus', mov.iptu_id)) marcarIptuPago(d, mov.iptu_id, mov.iptu_parcela, '', usuario);
   if (mov.guia_imposto_id && buscar(d, 'guias_impostos', mov.guia_imposto_id)) atualizar(d, 'guias_impostos', mov.guia_imposto_id, { paga_em: null, movimentacao_id: null }, usuario, 'Guia solta da movimentação do extrato');
   if (mov.par_movimentacao_id) {

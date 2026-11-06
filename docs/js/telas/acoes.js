@@ -59,7 +59,14 @@ const TABELAS_EXCLUSAO = {
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   devolucoes_garantia: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   depositos_garantia: { depois: (db, r) => (r.complementar ? null : R.acertarGarantiaDepositada(db, r.contrato_id, r.qual, login())), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
-  despesas: {},
+  despesas: { checar: (db, r) => (r.movimentacao_id || r.pagamento_banco_id ? 'Esta conta veio do banco: desfaça o destino da movimentação na tela Banco.' : null) },
+  ganhos_airbnb: {
+    checar: (db, r) => {
+      if (r.movimentacao_id) return 'Este ganho veio do extrato: desfaça o destino da movimentação na tela Banco.';
+      const m = R.airbnbDoMes(db, r.competencia);
+      return m.numerada ? `A NF do Airbnb de ${compBr(r.competencia)} já foi numerada: este ganho não pode ser excluído.` : null;
+    },
+  },
   ressarcimentos: {
     checar: (db, r) => ((R.boletoDoMes(db, r.contrato_id, r.competencia_abatimento) || {}).data_pagamento
       ? 'Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes.' : null),
@@ -480,6 +487,13 @@ export const ACOES = {
     const outro = buscar('imoveis', sel.value);
     if (t.value.trim() && !confirm('Substituir o texto atual pelo modelo do outro imóvel?')) return;
     t.value = outro.modelo_vistoria || '';
+  },
+
+  /** Financeiro: cria ou acerta a NF do Airbnb do mês (uma só, sem imóvel, com a soma dos ganhos). */
+  async gerarNfAirbnb({ mes }) {
+    const nf = await alterar((db) => R.gerarNfAirbnb(db, mes, login()));
+    aviso(nf ? `NF do Airbnb de ${compBr(mes)} pronta (${reais(nf.valor)}): numere na tela NF.` : `Nenhum ganho do Airbnb em ${compBr(mes)}.`);
+    await mostrar();
   },
 
   /** Contas pagas por nós: preenche cada valor vazio com o último lançado. */
@@ -1229,34 +1243,38 @@ export const ACOES = {
     ws.addRow([`Resultados financeiros de ${dataBr(de)} a ${dataBr(ate)}`]).font = { bold: true, size: 14 };
     ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')}`]).font = { italic: true, color: { argb: 'FF666666' } };
     ws.addRow([]);
-    const colunas = [['Posição', 9], ['Imóvel', 30], ['Valor do imóvel + reformas', 22], ['Aluguel recebido', 18], ['NFs avulsas', 15], ['IPTU pago pelo proprietário', 22],
-      ['Contas pagas por nós', 20], ['Resultado', 18], ['Retorno ao ano', 15], ['Reformas no período', 18], ['Pagamentos', 12], ['Observação', 30]];
+    const colunas = [['Posição', 9], ['Imóvel', 30], ['Valor do imóvel + reformas', 22], ['Aluguel recebido', 18], ['NFs avulsas', 15], ['Airbnb', 15], ['IPTU pago pelo proprietário', 22],
+      ['Contas pagas por nós', 20], ['Resultado bruto', 18], ['Retorno ao ano', 15], ['Impostos (rateio)', 18], ['Impostos estimados', 18], ['Líquido', 18], ['Retorno líquido ao ano', 15],
+      ['Reformas no período', 18], ['Lucro depois das reformas', 20], ['Pagamentos', 12], ['Observação', 30]];
     const cab = ws.addRow(colunas.map(([t]) => t));
     cab.font = { bold: true };
     cab.alignment = { wrapText: true, vertical: 'middle' };
     cab.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } }; });
     colunas.forEach(([, w], i) => { ws.getColumn(i + 1).width = w; });
     const r = (v) => v / 100;
-    lista.forEach((x, n) => ws.addRow([x.retornoAnual !== null && !x.controle ? n + 1 : '', x.imovel.nome, r(x.base), r(x.aluguel), r(x.avulsas), -r(x.iptu), -r(x.contas), r(x.resultado),
-      x.retornoAnual === null ? '' : x.retornoAnual / 100, r(x.reformasPeriodo), x.mesesPagos, x.controle ? 'boleto de controle: não conta' : (x.base ? '' : 'informe o valor do imóvel')]));
+    lista.forEach((x, n) => ws.addRow([x.retornoAnual !== null && !x.controle ? n + 1 : '', x.imovel.nome, r(x.base), r(x.aluguel), r(x.avulsas), r(x.airbnb), -r(x.iptu), -r(x.contas), r(x.resultado),
+      x.retornoAnual === null ? '' : x.retornoAnual / 100, -r(x.impostos), -r(x.impostosEstimados), r(x.liquido), x.retornoLiquido === null ? '' : x.retornoLiquido / 100,
+      -r(x.reformasPeriodo), r(x.lucro), x.mesesPagos, x.controle ? 'boleto de controle: não conta' : (x.base ? '' : 'informe o valor do imóvel')]));
     const conta = lista.filter((x) => !x.controle);
     const soma = (k) => r(conta.reduce((t, x) => t + x[k], 0));
     const base = conta.reduce((t, x) => t + x.base, 0);
     const resultado = conta.reduce((t, x) => t + x.resultado, 0);
     const meses = lista[0] ? lista[0].meses : 12;
-    const tot = ws.addRow(['', 'Total', soma('base'), soma('aluguel'), soma('avulsas'), -soma('iptu'), -soma('contas'), soma('resultado'), base ? (resultado * 12 / meses / base) : '', soma('reformasPeriodo'), '', '']);
+    const liquido = conta.reduce((t, x) => t + x.liquido, 0);
+    const tot = ws.addRow(['', 'Total', soma('base'), soma('aluguel'), soma('avulsas'), soma('airbnb'), -soma('iptu'), -soma('contas'), soma('resultado'), base ? (resultado * 12 / meses / base) : '',
+      -soma('impostos'), -soma('impostosEstimados'), soma('liquido'), base ? (liquido * 12 / meses / base) : '', -soma('reformasPeriodo'), soma('lucro'), '', '']);
     tot.font = { bold: true };
     tot.eachCell((c) => { c.border = { top: { style: 'medium' } }; });
-    for (const col of [3, 4, 5, 6, 7, 8, 10]) ws.getColumn(col).numFmt = moeda;
-    ws.getColumn(9).numFmt = '0.00%';
+    for (const col of [3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16]) ws.getColumn(col).numFmt = moeda;
+    for (const col of [10, 14]) ws.getColumn(col).numFmt = '0.00%';
     ws.views = [{ state: 'frozen', ySplit: 4 }];
     // contas pagas por nós no período, uma por linha
     const wc = wb.addWorksheet('Contas pagas por nós');
-    wc.addRow(['Imóvel', 'Mês da conta', 'Conta', 'Valor', 'Pago em', 'Observação']).font = { bold: true };
-    [30, 14, 14, 15, 13, 40].forEach((w, i) => { wc.getColumn(i + 1).width = w; });
+    wc.addRow(['Imóvel', 'Mês da conta', 'Conta', 'Valor', 'Pago em', 'Observação', 'Vencimento']).font = { bold: true };
+    [30, 14, 14, 15, 13, 40, 13].forEach((w, i) => { wc.getColumn(i + 1).width = w; });
     E.d.despesas.filter((x) => x.data_pagamento >= de && x.data_pagamento <= ate)
       .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)))
-      .forEach((x) => wc.addRow([(buscar('imoveis', x.imovel_id) || {}).nome || '', compBr(x.competencia), x.tipo, r(x.valor), new Date(`${x.data_pagamento}T12:00:00`), x.observacoes || '']));
+      .forEach((x) => wc.addRow([(buscar('imoveis', x.imovel_id) || {}).nome || '', compBr(x.competencia), x.tipo, r(x.valor), new Date(`${x.data_pagamento}T12:00:00`), x.observacoes || '', x.vencimento ? new Date(`${x.vencimento}T12:00:00`) : '']));
     // ressarcimentos de condomínio abatidos em boletos pagos no período (quando não saíram da NF)
     E.d.cobrancas.filter((cb) => cb.ressarcimento > 0 && !cb.ressarcimento_na_nf && cb.data_pagamento >= de && cb.data_pagamento <= ate).forEach((cb) => {
       const c = buscar('contratos', cb.contrato_id) || {};
@@ -1264,6 +1282,16 @@ export const ACOES = {
     });
     wc.getColumn(4).numFmt = moeda;
     wc.getColumn(5).numFmt = 'dd/mm/yyyy';
+    wc.getColumn(7).numFmt = 'dd/mm/yyyy';
+    // ganhos do Airbnb no período, um por linha
+    const wa = wb.addWorksheet('Airbnb');
+    wa.addRow(['Imóvel', 'Mês de referência', 'Recebido em', 'Valor', 'Observação']).font = { bold: true };
+    [30, 16, 13, 15, 40].forEach((w, i) => { wa.getColumn(i + 1).width = w; });
+    (E.d.ganhos_airbnb || []).filter((g) => g.data_recebimento >= de && g.data_recebimento <= ate)
+      .sort((a, b) => String(a.data_recebimento).localeCompare(String(b.data_recebimento)))
+      .forEach((g) => wa.addRow([(buscar('imoveis', g.imovel_id) || {}).nome || '', compBr(g.competencia), new Date(`${g.data_recebimento}T12:00:00`), r(g.valor), g.observacoes || '']));
+    wa.getColumn(3).numFmt = 'dd/mm/yyyy';
+    wa.getColumn(4).numFmt = moeda;
     const buf = await wb.xlsx.writeBuffer();
     baixar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Resultados ${de} a ${ate}.xlsx`);
   },

@@ -1,5 +1,6 @@
-// Financeiro: inadimplência, contas pagas por nós, resultados por imóvel e impostos esperados por empresa.
+// Financeiro: visão geral do mês (extratos), resultado bruto e líquido por imóvel (custos e Airbnb lançados ali), impostos, inadimplência e contas pagas por nós.
 import * as C from '../calculos.js';
+import * as Z from '../conciliacao.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -12,7 +13,7 @@ export function telaInadimplencia() {
   const hoje = C.hojeIso();
   const r = R.inadimplencia(d(), hoje);
   const imovelDe = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || '';
-  return `<div class="cabecalho"><h1>Inadimplência</h1>${link('#/cobrancas', 'Ver boletos')}</div>
+  return `<h1>Financeiro</h1>${abasFinanceiro('inadimplencia')}<div class="cabecalho"><h2>Inadimplência</h2>${link('#/cobrancas', 'Ver boletos')}</div>
     <div class="numeros">
       <div class="cartao"><div class="grande">${r.devedores.length}</div>inquilino(s) em atraso</div>
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
@@ -63,40 +64,42 @@ export function telaContas(rota) {
   const linha = (tipo, n) => {
     const u = ultimos[tipo];
     const ja = doMes.filter((x) => x.tipo === tipo).reduce((t, x) => t + x.valor, 0);
-    if (!permitidas.tipos.includes(tipo)) return '';
-    return `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}"></td>
+    const doInquilino = permitidas.motivo !== 'vago' && permitidas.motivo !== 'alugou' && !permitidas.tipos.includes(tipo);
+    return `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}">${doInquilino ? '<br><span class="suave">pelo contrato, do inquilino</span>' : ''}</td>
       <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="${u ? F.dinheiroTexto(u.valor) : '0,00'}" style="width:130px"></td>
+      <td><input type="date" name="venc_${n}" style="width:auto"></td>
       <td><input type="date" name="data_${n}" value="${hoje}" style="width:auto"></td>
       <td><input name="obs_${n}" placeholder="${tipo === 'Outra' ? 'qual conta? (ex.: taxa de lixo)' : 'opcional'}"></td>
       <td class="suave nw">${u ? `último: ${reais(u.valor)} (${compBr(u.competencia)})` : ''}${ja ? `<br><b>já lançado neste mês: ${reais(ja)}</b>` : ''}</td></tr>`;
   };
-  return `<p class="suave"><a href="#/resultados">← Resultados</a> · <a href="#/imovel/${i.id}">${esc(i.nome)}</a></p>
+  return `<p class="suave"><a href="#/resultados">← Financeiro</a> · <a href="#/imovel/${i.id}">${esc(i.nome)}</a></p>
     <h1>Contas pagas por nós · ${esc(i.nome)}</h1>
-    <div class="alerta ${permitidas.tipos.length ? 'info' : 'aviso'}">${{
+    <div class="alerta ${permitidas.motivo === 'alugou' ? 'aviso' : 'info'}">${{
     vago: `<b>Imóvel vago em ${compBr(comp)}:</b> as contas são nossas.`,
     alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : '')} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ''}): até ${R.MESES_DEPOIS_DE_ALUGAR} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
     incluso: `<b>Pelo contrato do inquilino</b>, estas contas estão incluídas no aluguel e são nossas: ${esc(permitidas.tipos.join(', '))}.`,
-    inquilino: `<b>Em ${compBr(comp)} o inquilino paga todas as contas</b>, conforme o contrato. Não há conta nossa para lançar neste mês.`,
+    inquilino: `<b>Em ${compBr(comp)}, pelo contrato, o inquilino paga as contas.</b> Lance aqui só o que for nosso (ex.: débito antigo, troca de titular).`,
   }[permitidas.motivo]}
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
       <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
-        ${permitidas.tipos.length ? '<button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button>' : ''}</div>
-      <div class="rolagem"><table><tr><th>Conta</th><th>Valor pago</th><th>Pago em</th><th>Observação</th><th></th></tr>
+        <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
+      <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Valor pago</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
       <p class="suave">Preencha só as contas pagas. Verificou e não há conta no mês? Informe 0,00 e escreva na observação (ex.: "verificado, sem conta em aberto"): fica registrado e conta como lançado no fechamento. Entram nos Resultados pela data do pagamento. "Repetir os últimos valores" copia o último valor de cada conta (bom para condomínio e valores fixos).</p>
-      ${permitidas.tipos.length ? '<div class="acoes"><button>Lançar</button></div>' : ''}</form>
+      <div class="acoes"><button>Lançar</button></div></form>
     ${caixaPagarPeloBanco(i, comp)}
-    <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Pago em</th><th>Observação</th><th>Banco</th><th></th></tr>
-      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td><td>${bancoDaDespesa(x)}</td>
+    <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table class="responsiva"><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th>Banco</th><th></th></tr>
+      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${x.vencimento ? dataBr(x.vencimento) : '-'}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td><td>${bancoDaDespesa(x)}</td>
         <td class="n">${opera() ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : ''}</td></tr>`).join('')
-      || '<tr><td colspan="7" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div>
+      || '<tr><td colspan="8" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div>
       <p class="suave">Coluna "Banco": a movimentação do extrato ligada a esta conta e o comprovante guardado (tela Banco). "pelo banco" = paga pelo sistema via C6.</p></div>`;
 }
 
-/** Abas da página Resultados. */
-const abasResultados = (atual) => `<div class="abas">${[['resultados', '#/resultados', 'Resultados por imóvel'], ['impostos', '#/impostos', 'Impostos']]
+/** Abas da página Financeiro. */
+const abasFinanceiro = (atual) => `<div class="abas">${[['financeiro', '#/financeiro', 'Visão geral'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
+  ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência']]
   .map(([k, h, t]) => `<a href="${h}" class="${k === atual ? 'ativo' : ''}">${t}</a>`).join('')}</div>`;
 
 /**
@@ -126,7 +129,7 @@ export function telaImpostos(comp) {
     : (g.contador ? reais(g.contador.valor) : '-')}</td>
       <td class="n">${dif === null ? '<span class="suave">-</span>' : dif === 0 ? etiqueta('igual', 'ok') : `<span class="${Math.abs(dif) > 100 ? 'texto-aviso' : 'suave'}">${dif > 0 ? '+' : '-'} ${reais(Math.abs(dif))}</span>`}</td></tr>`;
   };
-  return `<h1>Resultados financeiros</h1>${abasResultados('impostos')}
+  return `<h1>Financeiro</h1>${abasFinanceiro('impostos')}
     <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -145,35 +148,179 @@ export function telaImpostos(comp) {
       || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
 }
 
-export function telaResultados(q) {
+/** Período da tela (de/até do endereço; padrão: últimos 12 meses) e os atalhos de período para a rota ``base``. */
+function periodo(q, base) {
   const hoje = C.hojeIso();
   // as datas vêm do endereço (#/resultados?de=…&ate=…): só valem no formato AAAA-MM-DD
   const ate = C.dataValida(q.ate, hoje);
   const de = C.dataValida(q.de, C.somarDias(C.somarMesesData(ate, -12), 1));
-  // imóveis só com boleto de controle vão para o fim, sem posição no ranking
-  const lista = R.resultadosFinanceiros(d(), de, ate).sort((a, b) => a.controle - b.controle);
   const ano = Number(hoje.slice(0, 4));
   const atalhos = [
     ['Últimos 12 meses', C.somarDias(C.somarMesesData(hoje, -12), 1), hoje],
     ['Este ano', `${ano}-01-01`, hoje],
     ['Ano passado', `${ano - 1}-01-01`, `${ano - 1}-12-31`],
     ['Últimos 5 anos', C.somarDias(C.somarAnos(hoje, -5), 1), hoje],
-  ].map(([t, a, b]) => link(`#/resultados?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
+  ].map(([t, a, b]) => link(`#/${base}?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
+  const form = `<form class="cartao acoes" data-form="filtroResultados" data-base="${base}"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
+      ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>`;
+  return { de, ate, form };
+}
+
+const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor do imóvel</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
+const menos = (v) => (v ? `- ${reais(v)}` : '<span class="suave">-</span>');
+
+/** Quadro para lançar um custo (conta paga por nós) num imóvel, com os últimos lançamentos. */
+function painelCusto(i, voltar) {
+  const s = R.situacaoCustos(d(), i.id);
+  const hoje = C.hojeIso();
+  const lista = R.despesasDo(d(), i.id).slice(0, 12);
+  return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Custo pago por nós · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
+    ${s.rotulo ? `<p>${etiqueta(s.rotulo, s.classe)}</p>` : '<p class="suave">Pelo contrato, o inquilino paga as contas: lance aqui só o que for nosso (ex.: débito antigo, troca de titular).</p>'}
+    ${opera() ? `<form data-form="lancarCusto" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
+      <label>Conta<select name="tipo">${R.TIPOS_DESPESA.map((t) => `<option>${esc(t)}</option>`).join('')}</select></label>
+      <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
+      <label>Vencimento<input type="date" name="vencimento"></label>
+      <label>Pago em<input type="date" name="data_pagamento" value="${hoje}"></label>
+      <label>Valor pago<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
+      <label>Observação<input name="observacoes" placeholder="opcional"></label>
+      <div><button>Lançar</button></div></form>` : ''}
+    <div class="rolagem"><table class="responsiva compacta"><tr><th>Mês</th><th>Conta</th><th>Vencimento</th><th>Pago em</th><th class="n">Valor</th><th>Observação</th><th></th></tr>
+      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td>${x.vencimento ? dataBr(x.vencimento) : '<span class="suave">-</span>'}</td><td>${dataBr(x.data_pagamento)}</td><td class="n">${reais(x.valor)}</td><td>${esc(x.observacoes || '')}</td>
+        <td class="n">${opera() && !x.movimentacao_id && !x.pagamento_banco_id ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : x.movimentacao_id ? '<span class="suave">extrato</span>' : ''}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="suave">Nenhum custo lançado.</td></tr>'}</table></div>
+    <p class="suave">Entra nos resultados pela data do pagamento. Vindo do extrato do banco, o custo já chega lançado (Financeiro → Visão geral → destino "Conta do imóvel"). <a href="#/contas/${i.id}">Lançar o mês inteiro de uma vez</a>.</p></div>`;
+}
+
+/** Quadro para lançar um ganho do Airbnb num imóvel vago, com os últimos lançamentos. */
+function painelAirbnb(i, voltar) {
+  const hoje = C.hojeIso();
+  const lista = R.ganhosAirbnbDo(d(), i.id).slice(0, 12);
+  return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Ganho do Airbnb · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
+    ${opera() ? `<form data-form="lancarAirbnb" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
+      <label>Recebido em<input type="date" name="data_recebimento" value="${hoje}"></label>
+      <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
+      <label>Valor recebido<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
+      <label>Observação<input name="observacoes" placeholder="ex.: reserva 2 noites"></label>
+      <div><button>Lançar</button></div></form>` : ''}
+    <div class="rolagem"><table class="responsiva compacta"><tr><th>Recebido em</th><th>Mês</th><th class="n">Valor</th><th>Observação</th><th></th></tr>
+      ${lista.map((g) => `<tr><td>${dataBr(g.data_recebimento)}</td><td>${compBr(g.competencia)}</td><td class="n">${reais(g.valor)}</td><td>${esc(g.observacoes || '')}</td>
+        <td class="n">${opera() && !g.movimentacao_id ? botao('excluir', '×', { tabela: 'ganhos_airbnb', id: g.id }, 'x-excluir', `Excluir o ganho do Airbnb de ${dataBr(g.data_recebimento)} (${reais(g.valor)})?`) : g.movimentacao_id ? '<span class="suave">extrato</span>' : ''}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="suave">Nenhum ganho lançado.</td></tr>'}</table></div>
+    <p class="suave">A NF do Airbnb é uma só por mês, sem imóvel, com a soma dos ganhos de todos os imóveis (gerada em Financeiro → Visão geral depois da virada do mês). Estes lançamentos são o nosso controle de quanto entrou em cada imóvel.</p></div>`;
+}
+
+/** Resultado bruto por imóvel: aluguel, Airbnb, IPTU e custos (lançados aqui mesmo). */
+export function telaResultados(q) {
+  const { de, ate, form } = periodo(q, 'resultados');
+  // imóveis só com boleto de controle vão para o fim, sem posição no ranking
+  const lista = R.resultadosFinanceiros(d(), de, ate).sort((a, b) => a.controle - b.controle);
   const tot = (k) => lista.filter((x) => !x.controle).reduce((s, x) => s + x[k], 0);
-  const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
   const maior = Math.max(0, ...lista.map((x) => x.retornoAnual || 0));
-  return `<h1>Resultados financeiros</h1>${abasResultados('resultados')}
-    <form class="cartao acoes" data-form="filtroResultados"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
-      ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>
-    <div class="cartao rolagem"><table class="compacta"><tr><th>#</th><th>Imóvel</th><th class="n" title="Valor do imóvel + reformas até a data">Imóvel + reformas</th><th class="n" title="Aluguel recebido (valor das NFs) + NFs avulsas">Receita</th><th class="n" title="IPTU pago pelo proprietário + contas pagas por nós">Despesas</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th></tr>
-      ${lista.map((x, n) => `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td>
-        <td><a href="#/imovel/${x.imovel.id}" title="${x.mesesPagos} pagamento(s) no período"><b>${esc(x.imovel.nome)}</b></a>${x.controle ? ` ${etiqueta('controle: não conta', 'controle')}` : ''}</td>
+  const aqui = `#/resultados?de=${de}&ate=${ate}`;
+  const situacoes = new Map(lista.map((x) => [x.imovel.id, R.situacaoCustos(d(), x.imovel.id)]));
+  const painelI = q.custo ? buscar('imoveis', q.custo) : q.airbnb ? buscar('imoveis', q.airbnb) : null;
+  const painel = painelI ? (q.custo ? painelCusto(painelI, aqui) : painelAirbnb(painelI, aqui)) : '';
+  const totalBase = tot('base');
+  return `<h1>Financeiro</h1>${abasFinanceiro('resultados')}${form}
+    <div class="numeros">
+      <div class="cartao"><div class="grande">${reais(tot('receita'))}</div>receita (aluguel ${reais(tot('aluguel') + tot('avulsas'))} + Airbnb ${reais(tot('airbnb'))})</div>
+      <div class="cartao"><div class="grande">- ${reais(tot('iptu') + tot('contas'))}</div>IPTU ${reais(tot('iptu'))} + custos ${reais(tot('contas'))}</div>
+      <div class="cartao"><div class="grande">${reais(tot('resultado'))}</div>resultado bruto${totalBase ? ` · ${pctTxt((tot('resultado') * 12 / (lista[0] ? lista[0].meses : 12) / totalBase) * 100)} ao ano` : ''}</div></div>
+    ${painel}
+    <div class="cartao rolagem"><table class="compacta responsiva tabela-resultados"><tr><th>#</th><th>Imóvel</th><th class="n" title="Valor do imóvel + reformas até a data">Imóvel + reformas</th><th class="n" title="Aluguel recebido (valor das NFs) + NFs avulsas do imóvel">Aluguel</th><th class="n" title="Ganhos do Airbnb lançados no imóvel (só imóvel vago)">Airbnb</th><th class="n" title="IPTU pago pelo proprietário">IPTU</th><th class="n" title="Contas pagas por nós (água, luz, gás, condomínio, internet, outra)">Custos</th><th class="n">Resultado</th><th class="n">Retorno ao ano</th></tr>
+      ${lista.map((x, n) => {
+    const s = situacoes.get(x.imovel.id);
+    return `<tr class="${x.controle ? 'linha-controle' : ''}"><td>${x.retornoAnual !== null && !x.controle ? n + 1 : ''}</td>
+        <td class="col-imovel"><a href="#/imovel/${x.imovel.id}" title="${x.mesesPagos} pagamento(s) no período"><b>${esc(x.imovel.nome)}</b></a>${x.controle ? ` ${etiqueta('controle: não conta', 'controle')}` : ''}${s.rotulo ? `<br>${etiqueta(s.rotulo, s.classe)}` : ''}</td>
         <td class="n nw">${x.base ? reais(x.base) : '<span class="suave">-</span>'}${x.reformasPeriodo ? `<br><span class="suave">reformas ${reais(x.reformasPeriodo)}</span>` : ''}</td>
-        <td class="n nw">${reais(x.receita)}${x.avulsas ? `<br><span class="suave">avulsas ${reais(x.avulsas)}</span>` : ''}</td>
-        <td class="n nw">${x.iptu || x.contas ? `- ${reais(x.iptu + x.contas)}` : '-'}${x.iptu && x.contas ? `<br><span class="suave">IPTU ${reais(x.iptu)}</span>` : ''}${x.contas ? `<br><a class="suave" href="#/contas/${x.imovel.id}">contas ${reais(x.contas)}</a>` : x.iptu ? '<br><span class="suave">IPTU</span>' : ''}
-          ${opera() && R.contasPermitidas(d(), x.imovel.id, mesComContas(x.imovel.id)).tipos.length ? `<br>${link(`#/contas/${x.imovel.id}`, '+ contas', 'link-botao destaque-contas')}` : ''}</td>
-        <td class="n nw"><b>${reais(x.resultado)}</b></td><td class="n nw"><b>${pctTxt(x.retornoAnual)}</b>${x.retornoAnual ? `<div class="barra"><span style="width:${Math.max(2, (x.retornoAnual / maior) * 100).toFixed(0)}%"></span></div>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum imóvel.</td></tr>'}
-      <tr class="total"><td></td><td>Total</td><td class="n nw">${reais(tot('base'))}</td><td class="n nw">${reais(tot('receita'))}</td><td class="n nw">- ${reais(tot('iptu') + tot('contas'))}</td><td class="n nw">${reais(tot('resultado'))}</td>
-        <td class="n nw">${tot('base') ? pctTxt((tot('resultado') * 12 / (lista[0] ? lista[0].meses : 12) / tot('base')) * 100) : '-'}</td></tr></table>
-    <p class="suave">Receita = valor da NF de cada boleto pago no período (sem IPTU, seguro e tarifa, que são repasses) + NFs avulsas do imóvel; boletos de controle não entram. Despesas = IPTU pago pelo proprietário + contas pagas por nós, pela data do pagamento (lance em "+ contas"). Retorno ao ano = resultado convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Passe o mouse nos títulos para ver o que cada coluna soma; o Excel traz tudo separado.</p></div>`;
+        <td class="n nw">${x.aluguel + x.avulsas ? reais(x.aluguel + x.avulsas) : '<span class="suave">-</span>'}${x.avulsas ? `<br><span class="suave">avulsas ${reais(x.avulsas)}</span>` : ''}</td>
+        <td class="n nw">${x.airbnb ? `<a href="${aqui}&airbnb=${x.imovel.id}&ir=lancar">${reais(x.airbnb)}</a>` : '<span class="suave">-</span>'}${opera() && s.airbnb ? `<br>${link(`${aqui}&airbnb=${x.imovel.id}&ir=lancar`, '+ Airbnb', 'link-botao')}` : ''}</td>
+        <td class="n nw">${menos(x.iptu)}</td>
+        <td class="n nw">${x.contas ? `<a href="${aqui}&custo=${x.imovel.id}&ir=lancar">- ${reais(x.contas)}</a>` : '<span class="suave">-</span>'}${opera() ? `<br>${link(`${aqui}&custo=${x.imovel.id}&ir=lancar`, '+ custo', `link-botao${s.motivo === 'alugou' || s.motivo === 'vago' ? ' destaque-contas' : ''}`)}` : ''}</td>
+        <td class="n nw"><b>${reais(x.resultado)}</b></td><td class="n nw"><b>${pctTxt(x.retornoAnual)}</b>${x.retornoAnual ? `<div class="barra"><span style="width:${Math.max(2, (x.retornoAnual / maior) * 100).toFixed(0)}%"></span></div>` : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="suave">Nenhum imóvel.</td></tr>'}
+      <tr class="total"><td></td><td>Total</td><td class="n nw">${reais(totalBase)}</td><td class="n nw">${reais(tot('aluguel') + tot('avulsas'))}</td><td class="n nw">${reais(tot('airbnb'))}</td><td class="n nw">${menos(tot('iptu'))}</td><td class="n nw">${menos(tot('contas'))}</td><td class="n nw">${reais(tot('resultado'))}</td>
+        <td class="n nw">${totalBase ? pctTxt((tot('resultado') * 12 / (lista[0] ? lista[0].meses : 12) / totalBase) * 100) : '-'}</td></tr></table>
+    <p class="suave">Aluguel = valor da NF de cada boleto pago no período (sem IPTU, seguro e tarifa, que são repasses) + NFs avulsas do imóvel; boletos de controle não entram. Airbnb = ganhos lançados em cada imóvel vago ("+ Airbnb" ou pelo extrato do banco). Custos = contas pagas por nós ("+ custo", em qualquer imóvel), pela data do pagamento. Retorno ao ano = resultado convertido para 12 meses ÷ (valor do imóvel + reformas até a data). Impostos e reformas: aba Resultado líquido.</p></div>`;
+}
+
+/** Resultado líquido por imóvel: resultado bruto − impostos = líquido; reformas à parte, abatidas no fim (lucro depois das reformas). */
+export function telaLiquido(q) {
+  const { de, ate, form } = periodo(q, 'liquido');
+  const lista = R.resultadosFinanceiros(d(), de, ate).filter((x) => !x.controle).sort((a, b) => (b.retornoLiquido ?? -Infinity) - (a.retornoLiquido ?? -Infinity));
+  const tot = (k) => lista.reduce((s, x) => s + x[k], 0);
+  const meses = lista[0] ? lista[0].meses : 12;
+  const est = tot('impostosEstimados');
+  return `<h1>Financeiro</h1>${abasFinanceiro('liquido')}${form}
+    <div class="numeros">
+      <div class="cartao"><div class="grande">${reais(tot('resultado'))}</div>resultado bruto (receita − IPTU − custos)</div>
+      <div class="cartao"><div class="grande">- ${reais(tot('impostos'))}</div>impostos ${est ? etiqueta(est === tot('impostos') ? 'estimados' : `${reais(est)} estimados`, 'aviso') : etiqueta('confirmados pelo contador', 'ok')}</div>
+      <div class="cartao"><div class="grande">${reais(tot('liquido'))}</div>líquido${tot('base') ? ` · ${pctTxt((tot('liquido') * 12 / meses / tot('base')) * 100)} ao ano` : ''}</div>
+      <div class="cartao"><div class="grande">${reais(tot('lucro'))}</div>lucro depois das reformas (${reais(tot('reformasPeriodo'))})</div></div>
+    <div class="cartao rolagem"><table class="compacta responsiva tabela-resultados"><tr><th>Imóvel</th><th class="n">Receita</th><th class="n">IPTU</th><th class="n">Custos</th><th class="n" title="Rateados pela NF de cada recebimento (Airbnb: pelos ganhos do imóvel)">Impostos</th><th class="n">Líquido</th><th class="n">Retorno líquido ao ano</th><th class="n col-reforma" title="Reformas pagas no período: separadas, abatem só no fim">Reformas</th><th class="n">Lucro depois das reformas</th></tr>
+      ${lista.map((x) => `<tr><td class="col-imovel"><a href="#/imovel/${x.imovel.id}"><b>${esc(x.imovel.nome)}</b></a></td>
+        <td class="n nw">${reais(x.receita)}${x.airbnb ? `<br><span class="suave">Airbnb ${reais(x.airbnb)}</span>` : ''}</td>
+        <td class="n nw">${menos(x.iptu)}</td><td class="n nw">${menos(x.contas)}</td>
+        <td class="n nw">${menos(x.impostos)}${x.impostosEstimados ? `<br><span class="suave">${x.impostosEstimados === x.impostos ? 'estimado' : `${reais(x.impostosEstimados)} estimado`}</span>` : ''}</td>
+        <td class="n nw"><b>${reais(x.liquido)}</b></td><td class="n nw">${pctTxt(x.retornoLiquido)}</td>
+        <td class="n nw col-reforma">${x.reformasPeriodo ? etiqueta(`- ${reais(x.reformasPeriodo)}`, 'aviso') : '<span class="suave">-</span>'}</td>
+        <td class="n nw"><b>${reais(x.lucro)}</b></td></tr>`).join('') || '<tr><td colspan="9" class="suave">Nenhum imóvel.</td></tr>'}
+      <tr class="total"><td>Total</td><td class="n nw">${reais(tot('receita'))}</td><td class="n nw">${menos(tot('iptu'))}</td><td class="n nw">${menos(tot('contas'))}</td><td class="n nw">${menos(tot('impostos'))}</td><td class="n nw">${reais(tot('liquido'))}</td>
+        <td class="n nw">${tot('base') ? pctTxt((tot('liquido') * 12 / meses / tot('base')) * 100) : '-'}</td><td class="n nw col-reforma">${menos(tot('reformasPeriodo'))}</td><td class="n nw">${reais(tot('lucro'))}</td></tr></table>
+    <p class="suave">Líquido = receita − IPTU − custos − impostos. Impostos: o valor de cada NF × a parte do faturamento da empresa que foi para PIS/COFINS, IRPJ e CSLL no mês da NF (pela guia do contador, quando informada em Impostos; senão a esperada); recebimento ainda sem NF: ${pct(R.aliquotaImpostos())} estimado. A NF do Airbnb (uma só no mês) é dividida pelos ganhos lançados em cada imóvel. "Estimado" vira confirmado sozinho quando as três guias do mês (PIS/COFINS do mês, IRPJ e CSLL do trimestre) têm o valor do contador. Reformas ficam à parte e só abatem no fim: no lucro presumido o imposto é sobre o faturamento, então a reforma não diminui o imposto. Boletos de controle não entram.</p></div>`;
+}
+
+/** Visão geral do mês: dinheiro que entrou e saiu nos extratos, o que falta dar destino, NF do Airbnb, impostos e o líquido do mês. */
+export function telaFinanceiro(q) {
+  const hoje = C.hojeIso();
+  const atual = C.competenciaDe(hoje);
+  const mes = C.competenciaValida(q.mes, atual);
+  const [ini, fim] = C.limitesCompetencia(mes);
+  const movs = (d().movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
+  const conta = (m) => !['transferencia', 'ignorar'].includes(m.classificacao);
+  const entradas = movs.filter((m) => m.tipo === 'entrada' && conta(m)).reduce((t, m) => t + m.valor, 0);
+  const saidas = movs.filter((m) => m.tipo === 'saida' && conta(m)).reduce((t, m) => t + m.valor, 0);
+  const semDestino = movs.filter((m) => !m.classificacao).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
+  const res = R.resultadosFinanceiros(d(), ini, fim).filter((x) => !x.controle);
+  const tot = (k) => res.reduce((s, x) => s + x[k], 0);
+  // NF do Airbnb: do próprio mês, se já passou; no mês corrente, a do mês anterior
+  const mesAir = mes < atual ? mes : C.somarMeses(mes, -1);
+  const air = R.airbnbDoMes(d(), mesAir);
+  const impostos = R.impostosDoMes(d(), mes);
+  const nomeConta = (id) => { const c = ((d().config_banco || {}).contas || []).find((x) => x.id === id); return c ? (c.apelido || c.id) : id; };
+  const sugestao = (m) => { try { return Z.sugerirDestino(d(), m); } catch { return null; } };
+  return `<h1>Financeiro</h1>${abasFinanceiro('financeiro')}
+    <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
+      <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
+      <form data-form="irFinanceiro" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
+      ${mes < atual ? `<a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a>` : ''}</div></div>
+    <div class="numeros">
+      <div class="cartao"><div class="grande">${reais(entradas)}</div>entradas nos extratos</div>
+      <div class="cartao"><div class="grande">${reais(saidas)}</div>saídas nos extratos</div>
+      <div class="cartao"><div class="grande">${reais(tot('liquido'))}</div>líquido do mês ${tot('impostosEstimados') ? etiqueta('estimado', 'aviso') : ''}</div>
+      <div class="cartao"><div class="grande">${semDestino.length}</div>movimentação(ões) sem destino</div></div>
+    <div class="cartao"><h2>Movimentações do extrato sem destino</h2>
+      ${semDestino.length ? `<div class="rolagem"><table class="responsiva compacta"><tr><th>Data</th><th>Conta</th><th>Descrição no extrato</th><th class="n">Valor</th><th>Destino</th></tr>
+        ${semDestino.map((m) => { const s = sugestao(m); return `<tr><td class="nw">${dataBr(m.data)}<br><span class="suave">${m.tipo === 'entrada' ? 'entrada' : 'saída'}</span></td><td>${esc(nomeConta(m.conta_id))}</td><td>${esc(m.titulo || '')} ${esc(m.descricao || '')}</td>
+          <td class="n nw ${m.tipo === 'saida' ? 'texto-aviso' : ''}">${m.tipo === 'saida' ? '- ' : ''}${reais(m.valor)}</td>
+          <td>${s && s.classificacao ? `<span class="suave">parece: ${esc(Z.CLASSIFICACOES[s.classificacao] || s.classificacao)}</span><br>` : ''}${opera() ? `${s && s.classificacao ? `${botao('usarSugestao', 'Usar sugestão', { id: m.id })} ` : ''}${botao('darDestino', 'Dar destino', { id: m.id })}` : ''}</td></tr>`; }).join('')}</table></div>`
+    : `<p class="suave">${movs.length ? 'Todas as movimentações do mês têm destino. ✓' : `Nenhuma movimentação do banco em ${compBr(mes)} (busque o extrato na tela <a href="#/banco?mes=${mes}">Banco</a>).`}</p>`}
+      <p class="suave">Cada destino lança no lugar certo: aluguel no boleto, Airbnb dividido entre os imóveis vagos, conta do imóvel nos custos, reforma no imóvel, IPTU na parcela, imposto na guia. Tudo aparece nos resultados. Extrato completo e comprovantes: <a href="#/banco?mes=${mes}">tela Banco</a>.</p></div>
+    <div class="cartao"><div class="cabecalho"><h2>NF do Airbnb de ${compBr(mesAir)}</h2>${air.numerada ? etiqueta(`NF nº ${R.numeroFatura(air.numerada)}`, 'ok') : air.nf ? etiqueta(air.divergente ? 'soma mudou: gere de novo' : 'aguardando número', air.divergente ? 'aviso' : 'info') : air.total ? etiqueta('a gerar', 'aviso') : ''}</div>
+      ${air.total ? `<p>Uma NF só, sem imóvel, com a soma dos ganhos: <b>${reais(air.total)}</b> = ${air.porImovel.map((x) => `${esc(x.imovel.nome)} ${reais(x.valor)}`).join(' + ')}.</p>` : `<p class="suave">Nenhum ganho do Airbnb lançado com referência a ${compBr(mesAir)}.</p>`}
+      ${air.nf && air.nf.valor !== air.total ? `<p class="texto-aviso">A NF está com ${reais(air.nf.valor)}, mas os ganhos somam ${reais(air.total)}.</p>` : ''}
+      ${opera() && !air.numerada && (air.total || air.nf) && mesAir < atual && (!air.nf || air.divergente) ? botao('gerarNfAirbnb', air.nf ? 'Acertar a NF do Airbnb' : 'Gerar a NF do Airbnb', { mes: mesAir }, 'pequeno') : ''}
+      ${air.nf && !air.numerada ? ` ${link('#/faturas', 'Numerar na tela NF')}` : ''}
+      <p class="suave">Gerada depois da virada do mês, com os dados padrão do Airbnb; entra na numeração das NFs do fechamento.</p></div>
+    <div class="cartao"><div class="cabecalho"><h2>Impostos de ${compBr(mes)}</h2>${link(`#/impostos?mes=${mes}`, 'Ver as guias')}</div>
+      ${impostos.map((x) => { const confirmadas = x.guias.filter((g) => g.contador).length; return `<p><b>${esc(x.empresa.nome)}</b>: guia esperada ${reais(x.guias.reduce((t, g) => t + (g.abaixoDoMinimo ? 0 : g.aPagar), 0))} ${confirmadas === x.guias.length ? etiqueta('confirmada pelo contador', 'ok') : etiqueta(confirmadas ? `${confirmadas} de ${x.guias.length} guias do contador` : 'estimada', 'aviso')}</p>`; }).join('') || '<p class="suave">Nenhuma empresa cadastrada.</p>'}
+      <p class="suave">Os resultados usam a estimativa até você informar o valor da guia do contador em Impostos; aí se corrigem sozinhos.</p></div>
+    <div class="cartao"><h2>Resultado de ${compBr(mes)}</h2>
+      <table class="compacta"><tr><td>Receita (aluguel ${reais(tot('aluguel') + tot('avulsas'))} + Airbnb ${reais(tot('airbnb'))})</td><td class="n nw">${reais(tot('receita'))}</td></tr>
+        <tr><td>IPTU</td><td class="n nw">${menos(tot('iptu'))}</td></tr><tr><td>Custos</td><td class="n nw">${menos(tot('contas'))}</td></tr>
+        <tr><td>Impostos${tot('impostosEstimados') ? ' (estimado)' : ''}</td><td class="n nw">${menos(tot('impostos'))}</td></tr>
+        <tr class="total"><td>Líquido</td><td class="n nw">${reais(tot('liquido'))}</td></tr>
+        <tr><td>Reformas (à parte)</td><td class="n nw">${menos(tot('reformasPeriodo'))}</td></tr>
+        <tr class="total"><td>Lucro depois das reformas</td><td class="n nw">${reais(tot('lucro'))}</td></tr></table>
+      <p class="suave">Pelo dia em que o dinheiro entrou ou saiu. Por imóvel: abas Resultado bruto e Resultado líquido.</p></div>`;
 }

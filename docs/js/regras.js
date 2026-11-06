@@ -14,7 +14,7 @@ export const TABELAS = {
   devolucoes_garantia: 'Devolução da garantia (troca de titular)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
@@ -3772,20 +3772,159 @@ export function resumoSolicitacoes(d) {
 export const reformasDo =(d, imovelId) => d.reformas.filter((r) => r.imovel_id === imovelId)
   .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
 
+// --------------------------------------------------------------------------
+// Airbnb: ganhos lançados por imóvel (só imóvel vago); o Airbnb informa só o total, então a NF é UMA por mês, sem imóvel
+// --------------------------------------------------------------------------
+export const ganhosAirbnbDo = (d, imovelId) => (d.ganhos_airbnb || []).filter((g) => g.imovel_id === imovelId)
+  .sort((a, b) => String(b.data_recebimento).localeCompare(String(a.data_recebimento)) || b.id - a.id);
+
+/** NF avulsa do Airbnb de um mês de referência (criada por gerarNfAirbnb), ou null. */
+export const nfAirbnbDe = (d, comp) => d.avulsas.find((a) => a.airbnb_competencia === comp) || null;
+
+/** Ganhos do Airbnb de um mês de referência: { comp, ganhos, total, porImovel: [{ imovel, valor }], nf, numerada, divergente }. */
+export function airbnbDoMes(d, comp) {
+  const ganhos = (d.ganhos_airbnb || []).filter((g) => g.competencia === comp);
+  const total = ganhos.reduce((t, g) => t + g.valor, 0);
+  const por = new Map();
+  for (const g of ganhos) por.set(g.imovel_id, (por.get(g.imovel_id) || 0) + g.valor);
+  const porImovel = [...por].map(([id, valor]) => ({ imovel: buscar(d, 'imoveis', id), valor })).filter((x) => x.imovel)
+    .sort((a, b) => a.imovel.nome.localeCompare(b.imovel.nome, 'pt-BR'));
+  const nf = nfAirbnbDe(d, comp);
+  const numerada = nf ? faturasDe(d, 'avulsa', nf.id) : [];
+  return { comp, ganhos, total, porImovel, nf, numerada: numerada.length ? numerada[0].numero : null, divergente: !!nf && nf.valor !== total };
+}
+
+/**
+ * Lança um ganho do Airbnb num imóvel. ``dados``: { data_recebimento, competencia (mês de referência), valor (centavos), observacoes, movimentacao_id }.
+ * Só imóvel vago em algum dia do mês de referência; não entra em mês cuja NF do Airbnb já foi numerada.
+ */
+export function lancarGanhoAirbnb(d, imovelId, dados, usuario) {
+  const i = buscar(d, 'imoveis', imovelId);
+  if (!i) throw new C.ErroUsuario('Escolha o imóvel.');
+  const comp = dados.competencia || C.competenciaDe(dados.data_recebimento || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dados.data_recebimento || ''))) throw new C.ErroUsuario('Informe a data em que o dinheiro entrou.');
+  if (!/^\d{4}-\d{2}$/.test(String(comp || ''))) throw new C.ErroUsuario('Informe o mês de referência.');
+  if (!(dados.valor > 0)) throw new C.ErroUsuario(`${i.nome}: informe o valor recebido do Airbnb.`);
+  if (contasPermitidas(d, i.id, comp).motivo !== 'vago') throw new C.ErroUsuario(`${i.nome} não estava vago em ${C.compBr(comp)}: ganho do Airbnb só em imóvel vago.`);
+  const m = airbnbDoMes(d, comp);
+  if (m.numerada) throw new C.ErroUsuario(`A NF do Airbnb de ${C.compBr(comp)} já foi numerada (nº ${numeroFatura(m.numerada)}): lance no mês de referência seguinte.`);
+  return inserir(d, 'ganhos_airbnb', { imovel_id: i.id, data_recebimento: dados.data_recebimento, competencia: comp, valor: dados.valor,
+    observacoes: String(dados.observacoes || '').trim(), movimentacao_id: dados.movimentacao_id || null }, usuario, `${i.nome}: Airbnb de ${C.compBr(comp)} (${C.reais(dados.valor)})`);
+}
+
+/**
+ * Cria ou acerta a NF avulsa do Airbnb do mês (sem imóvel, com os dados padrão do Airbnb): valor = soma dos ganhos lançados nos imóveis.
+ * Só depois da virada do mês; NF já numerada não muda. Sem ganhos, apaga a NF ainda sem número. Devolve a NF (ou null).
+ */
+export function gerarNfAirbnb(d, comp, usuario, hoje = C.hojeIso()) {
+  if (comp >= C.competenciaDe(hoje)) throw new C.ErroUsuario(`A NF do Airbnb de ${C.compBr(comp)} sai depois da virada do mês (a partir de ${C.dataBr(`${C.somarMeses(comp, 1)}-01`)}).`);
+  const m = airbnbDoMes(d, comp);
+  if (m.numerada) throw new C.ErroUsuario(`A NF do Airbnb de ${C.compBr(comp)} já foi numerada (nº ${numeroFatura(m.numerada)}).`);
+  const [ini, fim] = C.limitesCompetencia(comp);
+  if (!m.total) {
+    if (m.nf) excluir(d, 'avulsas', m.nf.id, usuario, `NF do Airbnb de ${C.compBr(comp)} apagada (nenhum ganho lançado)`);
+    return null;
+  }
+  const dados = { valor: m.total, data_pagamento: fim, periodo_inicio: ini, periodo_fim: fim };
+  const detalhe = m.porImovel.map((x) => `${x.imovel.nome} ${C.reais(x.valor)}`).join(' + ');
+  if (m.nf) return atualizar(d, 'avulsas', m.nf.id, dados, usuario, `NF do Airbnb de ${C.compBr(comp)}: ${C.reais(m.total)} (${detalhe})`);
+  const modelo = modeloAirbnb(d);
+  return inserir(d, 'avulsas', { ...modelo, ...dados, imovel_id: null, airbnb_competencia: comp, descricao: `${modelo.descricao || 'Airbnb'} ${C.compBr(comp)}` },
+    usuario, `NF do Airbnb de ${C.compBr(comp)}: ${C.reais(m.total)} (${detalhe})`);
+}
+
+/**
+ * Situação de um imóvel para os custos (no mês de ``hoje``): vago (aceita Airbnb), alugado há pouco (aviso de conta nossa pendente
+ * até 2 meses depois da entrada), conta incluída no contrato, ou o inquilino paga tudo. { motivo, rotulo, classe, airbnb, ate }.
+ */
+export function situacaoCustos(d, imovelId, hoje = C.hojeIso()) {
+  const comp = C.competenciaDe(hoje);
+  const p = contasPermitidas(d, imovelId, comp);
+  const airbnb = p.motivo === 'vago' || contasPermitidas(d, imovelId, C.somarMeses(comp, -1)).motivo === 'vago';
+  if (p.motivo === 'vago') return { motivo: 'vago', rotulo: 'vago', classe: 'ok', airbnb };
+  if (p.motivo === 'alugou') {
+    const ate = C.limitesCompetencia(C.somarMeses(C.competenciaDe(p.contrato.data_entrada), MESES_DEPOIS_DE_ALUGAR))[1];
+    return { motivo: 'alugou', rotulo: `alugado em ${C.dataBr(p.contrato.data_entrada)}: veja se ficou conta nossa pendente (aviso até ${C.dataBr(ate)})`, classe: 'aviso', airbnb, ate };
+  }
+  if (p.motivo === 'incluso') return { motivo: 'incluso', rotulo: `${p.tipos.join(', ')}: incluso no contrato (nosso)`, classe: 'info', airbnb };
+  return { motivo: 'inquilino', rotulo: '', classe: '', airbnb };
+}
+
+// --------------------------------------------------------------------------
+// Impostos por imóvel: a NF de cada recebimento × a alíquota efetiva da empresa no mês da emissão
+// (guia do contador, quando informada; senão a esperada). Sem NF ainda: 11,33% (PIS/COFINS + IRPJ + CSLL) estimado.
+// --------------------------------------------------------------------------
+export const aliquotaImpostos = () => Math.round(IMPOSTOS.reduce((t, x) => t + x.aliquota, 0) * 100) / 100;
+
+/** Fração do faturamento da empresa que vai para impostos no mês: { taxa, confirmado } (confirmado = as 3 guias do contador informadas). */
+function taxaImpostos(d, emitenteId, mes, cache) {
+  const chave = `${emitenteId}|${mes}`;
+  if (cache.has(chave)) return cache.get(chave);
+  const e = buscar(d, 'emitentes', emitenteId);
+  const fatMes = e ? faturamentoNf(d, e.id, mes).valor : 0;
+  let r = { taxa: aliquotaImpostos() / 100, confirmado: false };
+  if (fatMes) {
+    const tri = guiasDaEmpresa(d, e, mesesDoTrimestre(mes)[2]);
+    let taxa = 0;
+    let confirmado = true;
+    for (const x of IMPOSTOS) {
+      const contador = guiaDo(d, e.id, x.imposto, x.mensal ? mes : trimestreDe(mes));
+      if (!contador) confirmado = false;
+      if (x.mensal) taxa += contador ? contador.valor / fatMes : x.aliquota / 100;
+      else {
+        const total = contador ? contador.valor : tri.guias.find((g) => g.imposto === x.imposto).esperado;
+        taxa += tri.trimestre ? total / tri.trimestre : x.aliquota / 100;
+      }
+    }
+    r = { taxa, confirmado };
+  }
+  cache.set(chave, r);
+  return r;
+}
+
+/** Imposto das NFs de uma origem (boleto ou avulsa): { valor, confirmado }. Sem NF ainda: estimado sobre ``valorSemNf``. */
+function impostoDaOrigem(d, tipo, id, valorSemNf, cache) {
+  const fs = faturasDe(d, tipo, id);
+  if (!fs.length) return { valor: Math.round((valorSemNf * aliquotaImpostos()) / 100), confirmado: false };
+  let v = 0;
+  let ok = true;
+  for (const f of fs) {
+    const t = taxaImpostos(d, f.emitente_id, String(f.emissao || '').slice(0, 7), cache);
+    v += f.valor * t.taxa;
+    ok = ok && t.confirmado;
+  }
+  return { valor: Math.round(v), confirmado: ok };
+}
+
 /**
  * Resultado de cada imóvel num período (datas "AAAA-MM-DD", pelo dia em que o dinheiro entrou):
- * aluguel recebido (aluguel com desconto ou com multa e juros, sem IPTU, seguro e tarifa) e NFs avulsas do imóvel,
- * menos o IPTU pago pelo proprietário e as reformas do período. Retorno anual = resultado anualizado ÷ (valor do imóvel + reformas).
+ * receita = aluguel recebido (valor da NF do boleto) + NFs avulsas do imóvel + ganhos do Airbnb; resultado (bruto) = receita − IPTU pago
+ * pelo proprietário − contas pagas por nós; líquido = resultado − impostos (rateados pela NF de cada recebimento; a NF do Airbnb, pelos
+ * ganhos de cada imóvel); lucro = líquido − reformas do período (a reforma vem depois do imposto: no lucro presumido ela não abate imposto).
+ * Retorno anual = resultado anualizado ÷ (valor do imóvel + reformas).
  */
 export function resultadosFinanceiros(d, de, ate) {
   const meses = Math.max(1, C.mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
   const dentro = (x) => x && x >= de && x <= ate;
+  const cache = new Map();
   return d.imoveis.map((i) => {
     // boleto de controle (inquilino sem NF) não entra no resultado financeiro
     const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
     const pagas = d.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
     const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
-    const avulsas = d.avulsas.filter((a) => a.imovel_id === i.id && dentro(a.data_pagamento)).reduce((s, a) => s + a.valor, 0);
+    const listaAvulsas = d.avulsas.filter((a) => a.imovel_id === i.id && !a.airbnb_competencia && dentro(a.data_pagamento));
+    const avulsas = listaAvulsas.reduce((s, a) => s + a.valor, 0);
+    const ganhos = (d.ganhos_airbnb || []).filter((g) => g.imovel_id === i.id && dentro(g.data_recebimento));
+    const airbnb = ganhos.reduce((s, g) => s + g.valor, 0);
+    let impostos = 0;
+    let impostosEstimados = 0;
+    const somar = (r) => { impostos += r.valor; if (!r.confirmado) impostosEstimados += r.valor; };
+    for (const cb of pagas) if (cb.valor_nf > 0) somar(impostoDaOrigem(d, 'cobranca', cb.id, cb.valor_nf, cache));
+    for (const a of listaAvulsas) somar(impostoDaOrigem(d, 'avulsa', a.id, a.valor, cache));
+    for (const g of ganhos) {
+      const nf = nfAirbnbDe(d, g.competencia);
+      if (nf && nf.valor > 0) { const r = impostoDaOrigem(d, 'avulsa', nf.id, nf.valor, cache); somar({ valor: Math.round((r.valor * g.valor) / nf.valor), confirmado: r.confirmado }); } else somar({ valor: Math.round((g.valor * aliquotaImpostos()) / 100), confirmado: false });
+    }
     let iptu = 0;
     for (const p of d.iptus.filter((x) => x.imovel_id === i.id)) {
       for (const pc of parcelasIptu(d, p)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
@@ -3796,11 +3935,13 @@ export function resultadosFinanceiros(d, de, ate) {
     // contas pagas por nós + ressarcimentos de condomínio abatidos em boletos pagos no período (se não saíram da NF)
     const contas = d.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0)
       + pagas.filter((cb) => !cb.ressarcimento_na_nf).reduce((s, cb) => s + (cb.ressarcimento || 0), 0);
-    const receita = aluguel + avulsas;
+    const receita = aluguel + avulsas + airbnb;
     const resultado = receita - iptu - contas;
+    const liquido = resultado - impostos;
     const base = (i.valor_imovel || 0) + investido;
-    return { imovel: i, receita, aluguel, avulsas, iptu, contas, reformasPeriodo, investido, resultado, base, meses, controle: imovelSoControle(d, i.id, ate),
-      retornoAnual: base ? (resultado * 12 / meses / base) * 100 : null, mesesPagos: pagas.length };
+    return { imovel: i, receita, aluguel, avulsas, airbnb, iptu, contas, reformasPeriodo, investido, resultado, impostos, impostosEstimados, liquido,
+      lucro: liquido - reformasPeriodo, base, meses, controle: imovelSoControle(d, i.id, ate),
+      retornoAnual: base ? (resultado * 12 / meses / base) * 100 : null, retornoLiquido: base ? (liquido * 12 / meses / base) * 100 : null, mesesPagos: pagas.length };
   }).sort((a, b) => (b.retornoAnual ?? -Infinity) - (a.retornoAnual ?? -Infinity));
 }
 
@@ -3858,11 +3999,13 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
   if (semValor.length) throw new Error(`${semValor.join(', ')}: informe o valor (0,00 se foi verificado e não há conta).`);
   const novas = linhas.filter((l) => l.valor > 0 || (l.valor === 0 && obs(l)));
   if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
-  const { tipos } = contasPermitidas(d, i.id, competencia);
-  const fora = novas.filter((l) => !tipos.includes(l.tipo)).map((l) => l.tipo);
-  if (fora.length) throw new Error(`Em ${C.compBr(competencia)} o inquilino paga ${fora.join(', ')}, conforme o contrato. Só entram contas que são nossas.`);
+  // qualquer imóvel aceita conta nossa (ex.: troca de titular, débito antigo); contasPermitidas só orienta a tela e o fechamento
+  const ruim = novas.find((l) => !TIPOS_DESPESA.includes(l.tipo));
+  if (ruim) throw new Error(`Conta desconhecida: ${ruim.tipo}.`);
+  const venc = novas.find((l) => l.vencimento && !/^\d{4}-\d{2}-\d{2}$/.test(l.vencimento));
+  if (venc) throw new Error(`${venc.tipo}: vencimento inválido.`);
   return novas.map((l) => inserir(d, 'despesas', { imovel_id: i.id, competencia, tipo: l.tipo, valor: l.valor, data_pagamento: l.data_pagamento || C.hojeIso(),
-    observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} ${l.valor ? `paga por nós (${C.reais(l.valor)})` : `verificada, sem conta (R$ 0,00: ${obs(l)})`}`));
+    vencimento: l.vencimento || null, observacoes: l.observacoes || '' }, usuario, `${i.nome}: ${l.tipo} de ${C.compBr(competencia)} ${l.valor ? `paga por nós (${C.reais(l.valor)})` : `verificada, sem conta (R$ 0,00: ${obs(l)})`}`));
 }
 
 // --------------------------------------------------------------------------
@@ -3950,7 +4093,10 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
   // a carta vai junto com o boleto do próprio aluguel corrigido (o índice só sai no começo do mês do reajuste)
   const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, mes)).filter((r) => r && r.faltaCarta);
-  const nfs = pendentesDeFatura(d).filter((x) => String(x.data).slice(0, 7) <= mes).length;
+  const air = airbnbDoMes(d, mes);
+  // ganhos do Airbnb lançados sem a NF do mês (ou com a soma mudada): conta como 1 pendência da etapa das NFs
+  const airPendente = air.total > 0 && !air.numerada && (!air.nf || air.divergente) ? 1 : 0;
+  const nfs = pendentesDeFatura(d).filter((x) => String(x.data).slice(0, 7) <= mes).length + airPendente;
   const dia20 = `${mes}-${String(DIA_GERAR_BOLETOS).padStart(2, '0')}`;
   // basta uma conta lançada no imóvel (do mês, ou paga no mês): nem todo imóvel tem todas as contas
   const lancou = (i) => d.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || '').slice(0, 7) === mes));
@@ -3970,7 +4116,8 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
         detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? 'extrato ainda não buscado' : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ') : 'nenhuma conta configurada' };
     })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
-      pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: nfs ? `${nfs} pagamento(s) aguardando número` : 'nada aguardando número', link: '#/faturas' },
+      pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
+      link: airPendente ? `#/financeiro?mes=${mes}` : '#/faturas' },
     (() => {
       const conferir = ativos.filter((c) => { const m = condominioAConferir(c, hoje); return m && m <= comp; });
       return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
@@ -4592,6 +4739,8 @@ export function rotuloDoComprovante(d, x) {
   else if (x.classificacao === 'imposto') oque = 'imposto da empresa';
   else if (x.classificacao === 'tarifa') oque = 'tarifa do banco';
   else if (x.classificacao === 'transferencia') oque = 'transferência entre as contas';
+  else if (x.classificacao === 'airbnb') oque = 'Airbnb recebido';
+  else if (x.classificacao === 'reforma') { const r = x.reforma_id ? buscar(d, 'reformas', x.reforma_id) : null; oque = `reforma${r ? ` (${r.descricao})` : ''}`; }
   return `comprovante do banco ${conta}: ${oque} (${data ? `${C.dataBr(data)}, ` : ''}${valor})`;
 }
 

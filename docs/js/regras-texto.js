@@ -74,14 +74,17 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - A reserva começa exatamente no aluguel marcado e segue nos seguintes só se sobrar. Pode ser marcada como já abatida em aluguel antigo.
 
 11. CONTAS (ÁGUA, ENERGIA, GÁS, CONDOMÍNIO, INTERNET)
-- Contas pagas por nós só nos meses de imóvel vago, até 2 meses depois de alugar, ou quando o contrato diz "Incluso no aluguel".
+- Contas pagas por nós (custos do imóvel) podem ser lançadas em qualquer imóvel, com mês de referência, vencimento, data do pagamento e valor (Financeiro → Resultado bruto → "+ custo", ou pelo destino do extrato). A etiqueta do imóvel orienta: "vago"; "alugado em X: veja se ficou conta nossa pendente" até 2 meses depois da entrada; conta "incluso no contrato" (nossa); sem etiqueta, o inquilino paga pelo contrato.
+- Ganho do Airbnb: só em imóvel vago, lançado por imóvel (data em que entrou, mês de referência, valor). O Airbnb informa só o total, então a NF do Airbnb é UMA por mês, sem imóvel, com a soma dos ganhos de todos os imóveis, gerada depois da virada do mês (Financeiro → Visão geral); NF já numerada trava o mês.
 - Ressarcimento de taxa extraordinária de condomínio é abatido no boleto seguinte (Lei 8.245/91, art. 22, X).
 
-12. IMPOSTOS (aba Impostos em Resultados)
+12. IMPOSTOS (aba Impostos em Financeiro)
 - Base = valor das NFs emitidas no mês (data de emissão, sem canceladas).
 - PIS/COFINS 3,65% mensal, vence dia 25. IRPJ 4,80% e CSLL 2,88% (presunção de 32%) trimestrais, no último dia útil do mês seguinte ao trimestre. Fim de semana e feriado nacional antecipam.
 - Adicional do IRPJ: 10% do lucro presumido acima de R$ 60.000,00 no trimestre. Acréscimo da LC 224/2025 na receita acima de R$ 1,25 milhão por trimestre.
 - Guia abaixo de R$ 10,00 não se paga: o valor passa para a guia seguinte do mesmo imposto.
+- Resultado líquido por imóvel (Financeiro): receita (aluguel + NFs avulsas do imóvel + Airbnb) − IPTU − custos − impostos = líquido. Imposto de cada recebimento = valor da NF × parte do faturamento da empresa que foi para PIS/COFINS, IRPJ e CSLL no mês da NF; estimado (11,33%) até as três guias do contador serem informadas, aí se corrige sozinho. A NF do Airbnb é dividida pelos ganhos de cada imóvel.
+- Reforma fica à parte e abate só no fim (lucro depois das reformas): no lucro presumido o imposto é sobre o faturamento, então a reforma não diminui o imposto. Créditos da reforma tributária (2027) ainda não entram.
 
 13. ARQUIVOS
 - Excluir ou desfazer um lançamento apaga também o arquivo anexado (se nenhum outro lançamento o usa). O "x" ao lado do clipe apaga só o arquivo e deixa o lançamento esperando novo anexo.
@@ -102,7 +105,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 16. BANCO E CONCILIAÇÃO (C6)
 - As duas contas (ANK e JCK) têm extrato separado, buscado pelo programa "Ponte C6" no computador. Cada lançamento do banco entra uma vez só (pela chave "reference" do C6); buscar de novo não duplica. O extrato é pedido em janelas de até 30 dias.
 - Cada movimentação precisa de um destino: conta do imóvel (água, luz, gás, condomínio, internet, outra), aluguel recebido (boleto), IPTU pago na prefeitura, imposto da empresa, tarifa do banco, transferência entre as nossas contas, outro ou ignorar. O sistema sugere o destino (matrícula/UC cadastrada no imóvel, valor do boleto, descrição, última movimentação igual), mas nada é gravado sem alguém confirmar.
-- Dar destino "conta do imóvel" cria a conta em "Contas pagas por nós" com o valor e a data do extrato, respeitando quem paga pelo contrato; desfazer o destino exclui a conta criada (e os comprovantes guardados). IPTU marca a parcela paga pelo proprietário; a transferência liga as duas pontas (ANK e JCK) para não virar conta duas vezes.
+- Dar destino "conta do imóvel" cria a conta em "Contas pagas por nós" com o valor e a data do extrato (em qualquer imóvel); desfazer o destino exclui a conta criada (e os comprovantes guardados). IPTU marca a parcela paga pelo proprietário; a transferência liga as duas pontas (ANK e JCK) para não virar conta duas vezes.
 - Aluguel: a entrada do extrato (ou a lista de pagos do Bolepix) confirma o pagamento do boleto com a data em que o dinheiro entrou (data contábil). Valor diferente do previsto segue o fluxo de divergência (NF digitada com justificativa). Boleto já pago não é confirmado de novo; desfazer o pagamento devolve a movimentação a "sem destino".
 - Comprovante: PDF do banco com nome padrão "AAAA-MM-DD Empresa Imóvel Conta Valor" (ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf"), sem acento, modelo editável em Dados e backup. Guardado na pasta do imóvel ("Contas pagas/ano"; IPTU em "IPTU (guias)/ano") e numa cópia para o contador ("_Contador/Empresa/AAAA-MM").
 - Pagamentos pelo banco: nunca automáticos. Alguém prepara (rascunho), o administrador confere e aprova no sistema digitando o valor, o pedido vai ao C6 como lote para aprovação e é aprovado de novo no app do banco por quem tem poderes. Boleto (código de barras), Pix copia e cola ou chave Pix; limite por pagamento e liga/desliga em Dados e backup. Pago, a conta do imóvel é lançada (ou marcada) com a data do pagamento e o comprovante; a saída no extrato confirma e fecha o ciclo.
