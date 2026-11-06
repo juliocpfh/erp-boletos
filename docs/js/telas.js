@@ -151,6 +151,10 @@ export const TELAS = {
   primeiroAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Primeiro acesso</h1>
     <p class="suave">${E.nuvem ? '<b>Dados na nuvem</b>. A nuvem ainda não tem dados:' : `Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados:`} crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.</p>
+    ${E.nuvem ? `<div class="alerta info"><b>Já usa o sistema?</b> Leve os dados e os anexos da pasta de sempre (OneDrive) para a nuvem. A pasta não é alterada; no fim, tudo é conferido.
+      Depois cada um entra com o login e a senha de sempre.
+      <p class="acoes" style="margin-top:8px">${botao('levarParaNuvem', 'Levar os dados da pasta para a nuvem', {}, '')}</p><div id="progresso-nuvem"></div></div>
+      <p class="suave">Ou, para começar do zero:</p>` : ''}
     ${E.nuvem ? '' : `<div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
       Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}

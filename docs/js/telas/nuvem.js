@@ -1,5 +1,7 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
-import { aviso, E, mostrar, podeUsuario } from '../app.js';
+import { aviso, E, janela, mostrar, podeUsuario } from '../app.js';
+import * as S from '../armazenamento.js';
+import { levarParaNuvem } from '../migracao.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao } from './comum.js';
@@ -47,7 +49,42 @@ export function telaConflitos() {
       ${botao('esquecerRecusas', 'Já vi, limpar a lista', {}, 'secundario')}</div>` : ''}`;
 }
 
+const mb = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
+
+/** Relatório da passagem da pasta para a nuvem (etapa 4). */
+function relatorio(r) {
+  const itens = [
+    `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
+    `${r.total} anexos (${mb(r.totalBytes)}) ${r.faltando.length ? `<b>${r.faltando.length} faltando na nuvem</b>: ${esc(r.faltando.slice(0, 10).join('; '))}` : 'conferidos: todos na nuvem com o mesmo tamanho ✓'}${r.pulados ? ` (${r.pulados} já estavam lá)` : ''}`,
+    ...(r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join('; '))}`] : []),
+  ];
+  return `<div class="alerta ${r.ok && !r.recusados.length ? 'ok' : 'perigo'}"><b>${r.ok && !r.recusados.length ? 'Pronto: os dados estão na nuvem.' : 'Terminou, mas confira:'}</b><ul>${itens.map((i) => `<li>${i}</li>`).join('')}</ul></div>`;
+}
+
 export const ACOES_NUVEM = {
+  /** Etapa 4: escolhe a pasta de sempre e leva tudo para a nuvem (nuvem vazia; ou o administrador substitui). */
+  async levarParaNuvem(ds) {
+    if (!S.suportado()) throw Object.assign(new Error('Faça isto no computador (Chrome ou Edge), onde está a pasta do OneDrive.'), { esperado: true });
+    const substituir = ds.substituir === '1';
+    if (substituir && !(await janela({ titulo: 'Substituir os dados da nuvem?', html: '<p>Tudo o que está na nuvem é trocado pelo que está na pasta escolhida (fica uma cópia de antes nos backups da nuvem). Mudanças feitas por outros aparelhos depois da última vez que a pasta foi usada <b>se perdem</b>.</p>', sim: 'Substituir', forte: true }))) return;
+    let pasta;
+    // só leitura: a pasta de sempre não é alterada (e não fica lembrada como pasta dos dados)
+    try { pasta = await window.showDirectoryPicker({ id: 'imoveis', mode: 'read' }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
+    const el = document.getElementById('progresso-nuvem');
+    const r = await levarParaNuvem(pasta, {
+      anexos: E.anexos, sinc: E.nuvem, substituir,
+      aoAndar: (p) => {
+        if (!el) return;
+        const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando o banco de dados…', conferencia: 'Conferindo tudo…' }[p.fase];
+        el.innerHTML = `<p><progress max="${p.totalBytes || 1}" value="${p.bytes}" style="width:100%"></progress><br>${esc(fase)}<br><span class="suave">${esc(p.nome || '')}</span></p>`;
+      },
+    });
+    E.d = E.nuvem.atual();
+    if (el) el.innerHTML = relatorio(r);
+    else aviso(r.ok ? 'Dados levados para a nuvem e conferidos.' : 'Terminou com diferenças: confira.', r.ok ? 'ok' : 'aviso');
+    if (r.ok && !substituir) setTimeout(() => mostrar(), 8000); // depois de ler o relatório, aparece o login
+  },
+
   async resolverConflito(ds) {
     await E.nuvem.resolver(Number(ds.conflito), ds.escolha);
     E.d = E.nuvem.atual();
