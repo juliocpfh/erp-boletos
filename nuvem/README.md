@@ -18,7 +18,8 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - **Anexos:** `GET/PUT/DELETE arquivos/<caminho>`, `GET lista/<pasta>/` e `POST mover` (pastas grandes vão em partes de 200, `mais: true`).
 
 ## Segurança (o que o código já faz)
-1. **Login de verdade:** cada pedido confere o token do Cloudflare Access (assinatura, aplicativo, equipe e validade) e o e-mail na lista `EMAILS`. Sem essa configuração, recusa tudo. O modo de teste sem login só vale em `localhost`.
+1. **Login de verdade:** cada pedido confere o token do Cloudflare Access (assinatura, aplicativo, equipe e validade). Sem essa configuração, recusa tudo. Quem entra: a lista de e-mails do Access (painel) **e** um usuário ativo com esse e-mail em Usuários (o cofre confere). `EMAILS` é uma trava extra opcional.
+   - Trocar o e-mail de alguém: Usuários → trocar o e-mail; no painel do Access, pôr o novo e tirar o antigo. Alguém que sai: desativar em Usuários (bloqueia na hora). O modo de teste sem login só vale em `localhost`.
 2. **Papéis conferidos no servidor**, pelo e-mail do usuário no sistema (`usuarios[].login` ou `.email`). *Consulta* só lê (dados e anexos). *Operador* grava, mas não mexe em usuários (só troca a própria senha) nem na ordem das caixas. *Administrador* faz tudo e é o único que substitui os dados. E-mail sem usuário ativo não entra.
 3. **Quem gravou de verdade:** o histórico recebe o e-mail do login (`email_nuvem`), e não só o nome que o aparelho informa.
 4. **Entradas barradas:** nomes de tabela e campo só com letras, números e `_` (nada de `__proto__` ou SQL); registro de até 1 MB; lote de até 2000 mudanças e 8 MB; códigos inteiros positivos; os campos `senha_ponte` e `ponte_url` são apagados se aparecerem.
@@ -34,6 +35,6 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 2. **Zero Trust** → criar a equipe (ex.: `ankjck`) → **Access → Applications → Add → Self-hosted**: domínio `erp.ankjck.com.br` (o site inteiro), política *Allow* só com os 4 e-mails, login por **código no e-mail**, sessão de **24 horas**. Copiar o **AUD** do aplicativo.
 3. DNS: o `erp` com a **nuvem laranja** (SSL/TLS em **Full (strict)**; ver `PUBLICAR_NO_DOMINIO.md`, etapa 4). Em **Rules → Transform Rules → Response headers**, para `erp.ankjck.com.br`: `Strict-Transport-Security: max-age=15552000`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`.
 4. Na pasta `nuvem/`: `npx wrangler login`, `npx wrangler deploy` e, no fim, `npx wrangler logout` (para não deixar o acesso aberto no computador).
-5. `npx wrangler secret put EMAILS` (os 4 e-mails separados por vírgula), `ACCESS_EQUIPE` (ex.: `ankjck.cloudflareaccess.com`) e `ACCESS_AUD`. **Nunca** criar `MODO_TESTE` no Cloudflare.
+5. `npx wrangler secret put ACCESS_EQUIPE` (ex.: `ankjck.cloudflareaccess.com`) e `ACCESS_AUD` (`EMAILS` é opcional: se usar, lembre de mantê-la igual à lista do Access). **Nunca** criar `MODO_TESTE` no Cloudflare.
 6. Conta Cloudflare: **verificação em 2 etapas** ligada, sem outros membros, sem chaves de API sobrando.
 7. Conferir: `https://erp.ankjck.com.br/api/saude` pede o código no e-mail e depois mostra `{"ok":true,"email":…}`; numa janela anônima, sem login, `/api/dados/tudo` não abre.

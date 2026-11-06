@@ -1,5 +1,5 @@
 // Worker do Cloudflare: guarda o banco (imoveis-dados.json) e os anexos no R2, no lugar da pasta do OneDrive.
-// Só entra quem passou pelo Cloudflare Access (e-mail na lista EMAILS). Não fala com o C6 (a ponte continua no computador).
+// Só entra quem passou pelo Cloudflare Access (lista de e-mails no painel) e tem usuário ativo com esse e-mail no sistema (o cofre confere). Não fala com o C6 (a ponte continua no computador).
 // Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · mover.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
@@ -68,7 +68,7 @@ export async function conferirLogin(request, env, buscar = fetch) {
   const equipe = String(env.ACCESS_EQUIPE || '').trim(); // ex.: ankjck.cloudflareaccess.com
   const aud = String(env.ACCESS_AUD || '').trim();
   const emails = String(env.EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  if (!equipe || !aud || !emails.length) throw new ErroHttp(503, 'Worker sem configuração de login (ACCESS_EQUIPE, ACCESS_AUD, EMAILS).');
+  if (!equipe || !aud) throw new ErroHttp(503, 'Worker sem configuração de login (ACCESS_EQUIPE, ACCESS_AUD).');
   const token = request.headers.get('Cf-Access-Jwt-Assertion') || '';
   const partes = token.split('.');
   if (partes.length !== 3) throw new ErroHttp(401, 'Entre de novo (login do Access).');
@@ -83,7 +83,8 @@ export async function conferirLogin(request, env, buscar = fetch) {
   const auds = Array.isArray(dados.aud) ? dados.aud : [dados.aud];
   if (!ok || !auds.includes(aud) || dados.iss !== `https://${equipe}` || !(dados.exp > agora) || (dados.nbf && dados.nbf > agora + 60)) throw new ErroHttp(401, 'Login inválido ou vencido.');
   const email = String(dados.email || '').toLowerCase();
-  if (!emails.includes(email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
+  // EMAILS é opcional (trava extra): quem manda é a lista do Access e o cadastro de usuários do sistema
+  if (!email || (emails.length && !emails.includes(email))) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   return email;
 }
 

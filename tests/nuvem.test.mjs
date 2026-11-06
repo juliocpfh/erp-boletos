@@ -156,4 +156,7 @@ test('login: só com token do Access válido, da equipe e do aplicativo certos, 
   adulterado[1] = b64(Buffer.from(JSON.stringify({ ...valido, email: 'dono@exemplo.com.br', exp: agora + 99999 })));
   assert.equal((await saude(adulterado.join('.'))).status, 401, 'assinatura não confere');
   assert.equal((await saude(await token(valido), { DADOS: r2Falso() })).status, 503, 'sem configuração do Access: recusa tudo');
+  const semLista = { ...env, EMAILS: '' };
+  assert.equal((await saude(await token({ ...valido, email: 'estranho@exemplo.com.br' }), semLista)).status, 200, 'sem EMAILS: a porta é o Access e o cadastro de usuários (o cofre confere)');
+  assert.equal((await saude(await token({ ...valido, email: '' }), semLista)).status, 403, 'token sem e-mail');
 });
