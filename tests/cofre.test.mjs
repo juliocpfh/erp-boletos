@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
-import { Cofre, CofreDO, backupDoDia, canon, MAX_FAIXA, SO_ADMIN } from '../nuvem/cofre.mjs';
+import { Cofre, CofreDO, backupDoDia, canon, MANTER_SUBSTITUICOES, MAX_FAIXA, proximaManutencao, SO_ADMIN } from '../nuvem/cofre.mjs';
 import { r2Falso } from './r2-falso.mjs';
 
 /** Mesmo formato do ctx.storage.sql do Cloudflare: exec(consulta, ...valores).toArray(). */
@@ -243,4 +243,58 @@ test('Durable Object: rotas, e-mail obrigatório, backup do dia no R2 e cópia a
   const d = await (await chamar('/tudo', null, CONSULTA)).json();
   assert.equal(d.contratos.length, 2);
   assert.equal(await backupDoDia(dobj.cofre, env.DADOS, new Date()), false, 'um por dia (o cofre gravou o de hoje, pelo relógio de verdade)');
+});
+
+test('B11: só o administrador substitui os dados; a cópia "antes-da-substituicao" só é feita para ele e ficam as 5 mais recentes', async () => {
+  const sql = sqlFalso();
+  const env = { DADOS: r2Falso() };
+  const dobj = new CofreDO({ storage: { sql, transactionSync: transacaoDe(sql) } }, env);
+  const chamar = (rota, corpo, email = DONO) => dobj.fetch(new Request(`https://cofre${rota}`, { method: 'POST', body: JSON.stringify(corpo), headers: { 'X-Email-Conferido': email } }));
+  assert.equal((await chamar('/importar', { dados: bancoExemplo() })).status, 200);
+  const antes = () => [...env.DADOS.m.keys()].filter((k) => k.endsWith('-antes-da-substituicao.json'));
+  assert.equal((await chamar('/importar', { dados: bancoExemplo(), substituir: true }, OPERADOR)).status, 403);
+  assert.equal((await chamar('/importar', { dados: bancoExemplo() })).status, 409, 'sem confirmar: nada');
+  assert.deepEqual(antes(), [], 'recusado: nenhuma cópia feita');
+  assert.equal((await chamar('/importar', { dados: bancoExemplo(), substituir: true })).status, 200);
+  assert.equal(antes().length, 1);
+  // faxina: dessas cópias ficam só as MANTER_SUBSTITUICOES mais recentes
+  for (let d = 1; d <= 7; d += 1) await backupDoDia(dobj.cofre, env.DADOS, new Date(`2026-12-${String(d).padStart(2, '0')}T12:00:00-03:00`), 'antes-da-substituicao');
+  assert.equal(antes().length, MANTER_SUBSTITUICOES);
+  assert.ok(antes().every((k) => /2026-12-0[3-7]/.test(k)), 'ficaram as mais recentes');
+});
+
+test('B6: backup do dia e faxina rodam no alarme diário (3h de Brasília); sem alarme, o primeiro POST do dia faz o backup e a faxina é no máximo 1×/hora', async () => {
+  assert.equal(proximaManutencao(new Date('2026-11-07T10:00:00-03:00')).toISOString(), '2026-11-08T06:00:00.000Z');
+  assert.equal(proximaManutencao(new Date('2026-11-07T01:00:00-03:00')).toISOString(), '2026-11-07T06:00:00.000Z');
+  // com alarme (Cloudflare)
+  const sql = sqlFalso();
+  let alarme = null;
+  const ctx = { storage: { sql, transactionSync: transacaoDe(sql), setAlarm: async (q) => { alarme = q; }, getAlarm: async () => alarme } };
+  const env = { DADOS: r2Falso() };
+  const dobj = new CofreDO(ctx, env);
+  let limpezas = 0; const limparReal = dobj.cofre.limpar.bind(dobj.cofre); dobj.cofre.limpar = () => { limpezas += 1; limparReal(); };
+  const chamar = (rota, corpo) => dobj.fetch(new Request(`https://cofre${rota}`, { method: 'POST', body: JSON.stringify(corpo), headers: { 'X-Email-Conferido': DONO } }));
+  assert.equal((await chamar('/importar', { dados: bancoExemplo() })).status, 200);
+  assert.ok(alarme instanceof Date, 'alarme marcado no primeiro pedido');
+  assert.equal(alarme.getTime(), proximaManutencao().getTime());
+  assert.equal(limpezas, 0, 'com alarme, a faxina não roda dentro do pedido');
+  assert.ok([...env.DADOS.m.keys()].some((k) => /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/.test(k)), 'o 1º POST do dia ainda garante o backup');
+  dobj.cofre.controle('ultimo_backup', '2000-01-01'); // como se o dia tivesse virado
+  await dobj.alarm();
+  assert.equal(limpezas, 1, 'a faxina rodou no alarme');
+  assert.equal(dobj.cofre.controle('ultimo_backup'), new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), 'o alarme fez o backup do dia');
+  assert.ok(alarme.getTime() > Date.now(), 'e se remarcou');
+  // sem alarme (testes, nuvem local): faxina no máximo 1× por hora, dentro do POST
+  const sql2 = sqlFalso();
+  const dobj2 = new CofreDO({ storage: { sql: sql2, transactionSync: transacaoDe(sql2) } }, { DADOS: r2Falso() });
+  let limpezas2 = 0; const limpar2 = dobj2.cofre.limpar.bind(dobj2.cofre); dobj2.cofre.limpar = () => { limpezas2 += 1; limpar2(); };
+  const chamar2 = (rota, corpo) => dobj2.fetch(new Request(`https://cofre${rota}`, { method: 'POST', body: JSON.stringify(corpo), headers: { 'X-Email-Conferido': DONO } }));
+  await chamar2('/importar', { dados: bancoExemplo() });
+  await chamar2('/lote', lote([{ op: 'historico', entrada: { a: 1 } }]));
+  await chamar2('/lote', lote([{ op: 'historico', entrada: { a: 2 } }]));
+  assert.equal(limpezas2, 1, 'três POSTs na mesma hora: uma faxina');
+  dobj2.cofre.controle('ultima_faxina', new Date(Date.now() - 2 * 3600000).toISOString());
+  await chamar2('/lote', lote([{ op: 'historico', entrada: { a: 3 } }]));
+  assert.equal(limpezas2, 2, 'passada uma hora, roda de novo');
+  assert.ok(sql2.db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'log_em'").all().length, 'índice em log(em)');
 });

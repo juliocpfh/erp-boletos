@@ -109,6 +109,39 @@ export class AnexosNuvem {
     return r;
   }
 
+  /**
+   * Carrega de uma vez as listas de todas as pastas dentro de `partes` (uma ida à nuvem, em partes se for grande), para a
+   * conferência dos arquivos do Painel não pedir pasta por pasta. Depois, `lista` de cada pasta sai da memória por VALIDADE_LISTA.
+   * Sem internet: não faz nada (as listas guardadas continuam valendo). Devolve quantos arquivos vieram.
+   */
+  async carregarTudo(partes) {
+    const raiz = partes.join('/');
+    const arvore = new Map([[raiz, { pastas: new Set(), arquivos: new Map() }]]);
+    const pasta = (chave) => { let l = arvore.get(chave); if (!l) { l = { pastas: new Set(), arquivos: new Map() }; arvore.set(chave, l); } return l; };
+    let total = 0;
+    try {
+      let cursor;
+      for (let n = 0; n < 1000; n += 1) {
+        const r = await (await this.pedir('GET', `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)).json();
+        for (const a of r.arquivos) {
+          const p = a.caminho.split('/');
+          let chave = raiz;
+          for (let i = 0; i < p.length - 1; i += 1) { pasta(chave).pastas.add(p[i]); chave = `${chave}/${p[i]}`; }
+          pasta(chave).arquivos.set(p.at(-1), a.tamanho);
+          total += 1;
+        }
+        if (!r.mais) break;
+        cursor = r.cursor;
+      }
+    } catch (e) {
+      if (passageiro(e)) return 0;
+      throw e;
+    }
+    const em = Date.now();
+    for (const [chave, l] of arvore) this.listas.set(chave, { em, pastas: l.pastas, arquivos: l.arquivos });
+    return total;
+  }
+
   /** A lista dessas pastas precisa ser buscada de novo (mas fica guardada para quando estiver sem internet). */
   esquecerLista(partes) {
     for (let i = partes.length; i >= 1; i -= 1) { const l = this.listas.get(partes.slice(0, i).join('/')); if (l) l.em = 0; }

@@ -408,6 +408,8 @@ function ancoraDoArquivo(escopo, rotulo) {
  */
 export async function conferirArquivos() {
   if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };
+  // nuvem: as listas de todas as pastas vêm numa ida só (senão seria um pedido por pasta de inquilino)
+  if (E.nuvem && E.anexos?.carregarTudo) await E.anexos.carregarTudo([S.PASTA_ARQUIVOS]);
   const rotulos = R.rotulosDosArquivos(d());
   const vistos = new Set();
   const sumidos = [];
@@ -586,7 +588,8 @@ const motivoDisco = (e) => (['InvalidStateError', 'NotReadableError', 'NoModific
 let pastasOrganizadas = false;
 
 export async function organizarPastasUmaVez() {
-  if (pastasOrganizadas || !opera() || !E.pasta) return;
+  // nuvem: as pastas já foram levadas organizadas (levarParaNuvem); percorrer todas custaria um pedido por pasta
+  if (pastasOrganizadas || !opera() || !E.pasta || E.nuvem) return;
   pastasOrganizadas = true;
   const avisos = await organizarPastas();
   if (avisos.length) aviso(`Organização das pastas, confira: ${avisos.join('; ')}.`, 'aviso');

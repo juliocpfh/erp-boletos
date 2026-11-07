@@ -1,5 +1,6 @@
-// Gera docs/offline/administracao-imoveis.html: o programa inteiro num único arquivo (código, estilo,
-// componentes e modelo da NF), que abre com dois cliques no Chrome ou no Edge, sem internet e sem o GitHub.
+// Gera docs/offline/administracao-imoveis.html, a VERSÃO PC: o programa inteiro num único arquivo (código, estilo,
+// componentes e modelo da NF), que abre com dois cliques no Chrome ou no Edge, sem internet e sem o site. O GitHub gera
+// sozinho a cada merge na main (.github/workflows/versao-pc.yml) e o sistema a copia para a pasta do backup seguro.
 // Uso: node tools/gerar-offline.mjs   (precisa do esbuild, baixado pelo npx na primeira vez)
 import { execFileSync, execSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -52,7 +53,7 @@ const html = `<!doctype html>
 <body>
 <div id="app"><main><p class="suave">Carregando…</p></main></div>
 <noscript>Ative o JavaScript para usar o sistema.</noscript>
-<!-- Versão para usar sem internet, gerada em ${hoje} por tools/gerar-offline.mjs. Não edite: gere de novo. -->
+<!-- Versão PC, gerada em ${hoje} por tools/gerar-offline.mjs (pelo GitHub a cada mudança na main). Não edite: gere de novo. -->
 ${scripts}
 </body>
 </html>

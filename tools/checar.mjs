@@ -26,13 +26,14 @@ const rodar = (titulo, cmd, args) => {
 };
 
 rodar('sintaxe e imports (esbuild)', 'npx', ['-y', 'esbuild@0.24.0', 'docs/js/app.js', '--bundle', '--log-level=error', `--outfile=${SAIDA_NULA}`]);
-if (process.argv.includes('--offline')) rodar('versão sem internet', 'node', ['tools/gerar-offline.mjs']);
-const testes = fs.readdirSync(path.join(RAIZ, 'tests')).filter((n) => n.endsWith('.test.mjs')).map((n) => path.join('tests', n));
+// a versão PC (docs/offline/) é gerada pelo GitHub a cada merge na main (.github/workflows/versao-pc.yml); --offline gera à mão
+if (process.argv.includes('--offline')) rodar('versão PC', 'node', ['tools/gerar-offline.mjs']);
+const testesEm = (pasta) => fs.readdirSync(path.join(RAIZ, ...pasta.split('/'))).filter((n) => n.endsWith('.test.mjs')).map((n) => path.join(...pasta.split('/'), n));
+// os da ponte (fase 2, ponte-c6/testes/) entram junto: a ponte roda no computador do usuário e não tem outra conferência
+const testes = [...testesEm('tests'), ...testesEm('ponte-c6/testes')];
 const saida = rodar('testes', 'node', ['--test', ...testes]);
 if (saida) {
   // Node 22 imprime "# pass 72"; Node 24 imprime "ℹ pass 72"
   const resumo = (k) => (new RegExp(`^(?:# |ℹ )${k} (\\d+)`, 'm').exec(saida) || [])[1];
   console.log(`  ${resumo('pass')} passaram, ${resumo('fail')} falharam`);
-} else {
-  console.log('  Se só falhou "versão sem internet … atualizada", rode: node tools/checar.mjs --offline');
 }
