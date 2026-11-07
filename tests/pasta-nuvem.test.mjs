@@ -107,6 +107,40 @@ test('mesmo nome enviado por outro aparelho enquanto este estava sem internet: n
   assert.match(cliente.avisos[0], /deste aparelho/);
 });
 
+test('anexo recusado pela nuvem (não é falta de internet) não se perde: fica no aparelho para baixar ou esquecer', async () => {
+  const { R2, estado, cliente, guardado } = montar();
+  estado.internet = false;
+  await cliente.gravar(['arquivos', 'Apto 604', 'pagina.html'], new Blob(['<p>x</p>'])); // sem passar por nomeAnexavel (ex.: versão antiga do site)
+  assert.equal(await cliente.pendentes(), 1);
+  estado.internet = true;
+  await cliente.enviarFila();
+  assert.equal(await cliente.pendentes(), 0);
+  assert.equal(cliente.naoEnviados.length, 1);
+  assert.match(cliente.naoEnviados[0].erro, /não pode ser anexado/);
+  assert.match(cliente.avisos[0], /Conflitos da nuvem/);
+  assert.ok(!R2.m.has('arquivos/Apto 604/pagina.html'));
+  const f = await cliente.lerNaoEnviado(cliente.naoEnviados[0].id);
+  assert.equal(f.nome, 'pagina.html');
+  assert.equal(await f.blob.text(), '<p>x</p>', 'o arquivo continua guardado');
+  // recarregou a página: a lista continua
+  const outro = new AnexosNuvem({ base: BASE, buscar: cliente.buscar, guardar: cliente.guardar });
+  await outro.carregarFila();
+  assert.equal(outro.naoEnviados.length, 1);
+  await outro.esquecerNaoEnviado(outro.naoEnviados[0].id);
+  assert.equal(outro.naoEnviados.length, 0);
+  assert.ok(![...guardado.keys()].some((k) => k.startsWith('anexo:')), 'esquecer apaga o arquivo do aparelho');
+});
+
+test('pedido que não responde: tempo limite vira "sem internet" (passageiro), nada fica pendurado', async () => {
+  const pendurado = (url, op) => new Promise((_, erro) => { op.signal.addEventListener('abort', () => erro(op.signal.reason)); });
+  const guardado = new Map();
+  const guardar = { ler: async (k) => guardado.get(k), gravar: async (k, v) => { guardado.set(k, v); }, apagar: async (k) => { guardado.delete(k); } };
+  const cliente = new AnexosNuvem({ base: BASE, buscar: pendurado, guardar, limite: 30, limiteAnexo: 30 });
+  await assert.rejects(cliente.ler(['arquivos', 'a.pdf']), /Sem internet/);
+  await cliente.gravar(['arquivos', 'b.pdf'], new Blob(['B'])); // PUT pendurado: vai para a fila, como sem internet
+  assert.equal(await cliente.pendentes(), 1);
+});
+
 test('raiz: só as pastas do sistema; backups não se apagam', async () => {
   const { raiz } = montar();
   assert.deepEqual(await S.subpastas(raiz), ['arquivos', 'backups', 'modelos']);
