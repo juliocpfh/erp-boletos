@@ -1011,17 +1011,22 @@ export const ACOES = {
     await mostrar();
   },
 
-  async iptuPago({ id, n, data }) {
-    await alterar((db) => R.marcarIptuPago(db, Number(id), Number(n), data || null, login()));
-    await mostrar();
-  },
-
-  /** Quadradinho vermelho na tela IPTU do ano: pergunta a data e marca a guia como paga. */
-  async iptuPagoRapido({ id, n, texto }) {
-    const r = await janela({ titulo: 'Marcar a guia do IPTU como paga', sim: 'Marcar como paga', nao: 'Cancelar',
-      html: `<p>${esc(texto)}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
-    if (!r) return;
-    const data = String((r.data || [])[0] || '');
+  /**
+   * Guia do IPTU paga por você: um caminho só para as três telas (caixa do imóvel, lista de guias a pagar e quadradinho do mapa
+   * do ano; C17). Sem ``data``, pergunta a data numa janela; ``data: ''`` desfaz (parcela paga pelo banco não se desfaz aqui).
+   */
+  async iptuPago({ id, n, data, texto }) {
+    if (data === '') {
+      await alterar((db) => R.marcarIptuPago(db, Number(id), Number(n), null, login()));
+      await mostrar();
+      return;
+    }
+    if (!data) {
+      const r = await janela({ titulo: 'Marcar a guia do IPTU como paga', sim: 'Marcar como paga', nao: 'Cancelar',
+        html: `<p>${esc(texto || '')}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+      if (!r) return;
+      data = String((r.data || [])[0] || '');
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
     await alterar((db) => R.marcarIptuPago(db, Number(id), Number(n), data, login()));
     aviso('Parcela do IPTU marcada como paga.');

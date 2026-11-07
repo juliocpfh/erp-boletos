@@ -42,7 +42,9 @@ function tabelaIptu(p) {
   const guia = (pc) => {
     if (pc.paga) return `${etiqueta(`paga em ${dataBr(pc.paga)}`, 'ok')} ${opera() ? botao('iptuPago', 'desfazer', { id: p.id, n: pc.n, data: '' }, 'link-botao', 'Desfazer o pagamento desta guia?') : ''}`;
     const aberta = pc.proprietario ? etiqueta('em aberto', 'perigo') : '';
-    return opera() ? `<form data-form="iptuPago" data-id="${p.id}" data-n="${pc.n}" class="pagamento">${aberta}<input type="date" name="data" value="${C.hojeIso()}"><button class="pequeno">Paga</button></form>` : aberta;
+    // o mesmo caminho das outras telas (ACOES.iptuPago pergunta a data numa janela)
+    const texto = `IPTU ${p.ano} · ${pc.rotulo}${pc.n === 0 ? '' : ' parcela'}: sua parte ${reais(pc.valorProprietario)}${pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : ''}`;
+    return opera() ? `${aberta} ${botao('iptuPago', 'Marcar como paga', { id: p.id, n: pc.n, texto }, 'secundario pequeno')}` : aberta;
   };
   return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vence na prefeitura</th><th>Boleto do inquilino</th><th class="n">Valor</th><th>Parte do inquilino</th><th>Sua parte</th><th>Guia na prefeitura</th></tr>
     ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr(pc.comp)}</span>` : '-'}</td><td class="n">${reais(pc.valor)}</td>
