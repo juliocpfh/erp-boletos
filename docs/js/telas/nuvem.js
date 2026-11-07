@@ -1,6 +1,7 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
-import { aviso, baixar, E, janela, mostrar, podeUsuario } from '../app.js';
+import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
+import { dataBr } from '../calculos.js';
 import { levarParaNuvem } from '../migracao.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -56,6 +57,30 @@ export function telaConflitos() {
 
 const mb = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
 
+/** Dia de um backup da nuvem pelo nome (`imoveis-dados-AAAA-MM-DD[-antes-da-substituicao].json`). */
+const diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+))?\.json$/) || []).slice(1);
+const pastaBackups = () => E.pasta.getDirectoryHandle(S.PASTA_BACKUPS);
+
+/** Backups diários dos dados da nuvem (30 dias, feitos pelo servidor): baixar ou voltar para um dia. Só administrador. */
+export async function telaBackupsNuvem() {
+  if (!E.nuvem) return '<h1>Backups da nuvem</h1><p class="suave">Só existem com os dados na nuvem.</p>';
+  if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
+  let lista;
+  try { lista = (await S.listar(await pastaBackups())).filter((a) => diaDoBackup(a.nome).length); } catch (e) {
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
+  }
+  lista.sort((a, b) => b.nome.localeCompare(a.nome));
+  const linhas = lista.map((a) => {
+    const [dia, , motivo] = diaDoBackup(a.nome);
+    return `<tr><td>${dataBr(dia)}</td><td>${motivo ? 'cópia feita antes de substituir os dados' : 'backup do dia'}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
+      <td>${botao('baixarBackupNuvem', 'Baixar', { nome: a.nome }, 'secundario pequeno')} ${botao('restaurarBackupNuvem', 'Voltar para este dia', { nome: a.nome }, 'perigo pequeno')}</td></tr>`;
+  }).join('');
+  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
+    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita na primeira gravação de cada dia. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele dia (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
+      <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito na primeira gravação do dia).</td></tr>'}</table></div></div>`;
+}
+
 /** Relatório da passagem da pasta para a nuvem (etapa 4). */
 function relatorio(r) {
   const itens = [
@@ -104,6 +129,28 @@ export const ACOES_NUVEM = {
     const f = await E.anexos.lerNaoEnviado(ds.id);
     if (!f) return aviso('Este anexo não está mais neste aparelho.', 'erro');
     baixar(f.blob, f.nome);
+  },
+  async baixarBackupNuvem({ nome }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador baixa backups.');
+    const [dia] = diaDoBackup(nome);
+    if (!dia) throw new Error('Backup desconhecido.');
+    baixar(await S.abrirArquivo(await pastaBackups(), nome), nome);
+  },
+  /** Volta os dados da nuvem para os de um dia (o servidor guarda antes uma cópia "antes-da-substituicao"). */
+  async restaurarBackupNuvem({ nome }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador restaura backups.');
+    const [dia] = diaDoBackup(nome);
+    if (!dia) throw new Error('Backup desconhecido.');
+    if (E.nuvem.pendentesQtd()) throw Object.assign(new Error('Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de voltar para um backup.'), { esperado: true });
+    const ok = await janela({ titulo: `Voltar os dados para ${dataBr(dia)}?`, forte: true, sim: 'Voltar para este dia',
+      html: `<p>Os dados da nuvem passam a ser os do backup de <b>${dataBr(dia)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois desse dia se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita antes de substituir").</p>` });
+    if (!ok) return;
+    const dados = JSON.parse(await (await S.abrirArquivo(await pastaBackups(), nome)).text());
+    if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
+    E.d = await E.nuvem.importar(dados, { substituir: true });
+    await reabrirSessao();
+    aviso(`Dados voltaram para ${dataBr(dia)}. Os outros aparelhos recebem a versão nova sozinhos.`);
+    ir('#/');
   },
   async esquecerNaoEnviado(ds) {
     if (!(await janela({ titulo: 'Esquecer este anexo?', html: '<p>O arquivo some deste aparelho e não está na nuvem.</p>', sim: 'Esquecer', forte: true }))) return;

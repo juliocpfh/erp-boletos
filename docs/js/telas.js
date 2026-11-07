@@ -24,7 +24,7 @@ import { telaFaturas } from './telas/faturas.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
-import { telaConflitos } from './telas/nuvem.js';
+import { telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
 
 // --------------------------------------------------------------------------
@@ -38,6 +38,7 @@ export const TELAS = {
   _naoEncontrado: naoEncontrado,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
+  'backups-nuvem': () => telaBackupsNuvem(),
 
   _ligarDesconto(raiz) {
     ligarCamposAutomaticos(raiz);

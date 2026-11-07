@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
-import { Cofre, CofreDO, backupDoDia, canon, MAX_FAIXA } from '../nuvem/cofre.mjs';
+import { Cofre, CofreDO, backupDoDia, canon, MAX_FAIXA, SO_ADMIN } from '../nuvem/cofre.mjs';
 import { r2Falso } from './r2-falso.mjs';
 
 /** Mesmo formato do ctx.storage.sql do Cloudflare: exec(consulta, ...valores).toArray(). */
@@ -165,6 +165,22 @@ test('papéis: consulta só lê; operador não mexe em usuários (só a própria
   assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: 'novo', papel: 'admin' } }]), OPERADOR), (e) => e.status === 403);
   assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo: 'ordem_caixas', antes: undefined, depois: { painel: [] } }]), OPERADOR), (e) => e.status === 403);
   assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { senha_hash: { antes: 'h3', depois: 'nova' } } }]), OPERADOR).ok, true, 'troca a própria senha');
+  // o que a tela só mostra ao administrador a nuvem também barra (SO_ADMIN): configuração do banco, logo, excluir imóvel/contrato/NF, empresas
+  for (const campo of SO_ADMIN.raiz) assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo, antes: undefined, depois: { x: 1 } }]), OPERADOR), (e) => e.status === 403, campo);
+  assert.throws(() => c.aplicar(lote([{ op: 'excluir', tabela: 'contratos', id: 22 }]), OPERADOR), (e) => e.status === 403, 'operador não exclui contrato');
+  assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'emitentes', id: 9, dados: { id: 9, nome: 'X' } }]), OPERADOR), (e) => e.status === 403, 'operador não mexe nas empresas');
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 22, campos: { valor: { antes: 250000, depois: 260000 } } }]), OPERADOR).ok, true, 'mas edita');
+  assert.equal(c.aplicar(lote([{ op: 'excluir', tabela: 'contratos', id: 22 }]), DONO).ok, true, 'administrador exclui');
+  // senhas (resumo) e tokens dos outros não vão para o aparelho de quem não é administrador; o próprio usuário vai inteiro
+  const desde = c.ultimoSeq();
+  c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 1, campos: { sessoes: { antes: undefined, depois: ['tok-dono'] } } }]), DONO);
+  const paraOperador = c.tudo(c.exigir(OPERADOR, 'consulta'));
+  assert.deepEqual(paraOperador.usuarios.find((u) => u.id === 1), { id: 1, login: DONO, nome: undefined, email: undefined, papel: 'admin', ativo: true, pendente: undefined });
+  assert.equal(paraOperador.usuarios.find((u) => u.id === 3).senha_hash, 'nova', 'o próprio vai com a senha (o login é conferido no aparelho)');
+  assert.equal(c.tudo(c.exigir(DONO, 'consulta')).usuarios.find((u) => u.id === 3).senha_hash, 'nova', 'administrador vê tudo');
+  assert.equal(c.tudo().usuarios.find((u) => u.id === 1).sessoes[0], 'tok-dono', 'backup vai inteiro');
+  const fila = c.mudancas(desde, c.exigir(OPERADOR, 'consulta')).mudancas.filter((m) => m.tipo === 'registro' && m.tabela === 'usuarios' && m.id === 1);
+  assert.ok(fila.length && fila.every((m) => m.dados.sessoes === undefined && m.dados.senha_hash === undefined), 'nem pela fila');
   assert.throws(() => c.tudo() && c.exigir('estranho@exemplo.com.br', 'consulta'), (e) => e.status === 403);
   // usuário desativado deixa de entrar
   c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { ativo: { antes: true, depois: false } } }]), DONO);

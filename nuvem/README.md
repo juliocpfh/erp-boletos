@@ -14,21 +14,21 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - **Conflito** (mesmo campo mudado em dois aparelhos sem se verem): o campo volta ao valor anterior e nada vale até alguém escolher (`POST dados/resolver`). Excluir um registro que outro mudou, ou mudar um que outro excluiu, também espera a escolha.
 - **Códigos novos sem internet:** cada aparelho pede uma faixa (`POST dados/faixa`, até 1000 por vez) e nunca repete código com outro aparelho.
 - **NF:** o número só sai com internet, pelo contador (`POST dados/contador`, `proxima_fatura`). O lote não consegue mudar esse número.
-- **Backups:** uma cópia completa por dia no R2 (`backups/`, horário de Brasília, 30 guardadas, só leitura) e outra antes de qualquer "substituir tudo". Os registros excluídos ficam guardados no cofre.
+- **Backups:** uma cópia completa por dia no R2 (`backups/`, horário de Brasília, 30 guardadas, só leitura e só o administrador baixa) e outra antes de qualquer "substituir tudo". Dados e backup → **Backups da nuvem** lista, baixa e "volta para um dia" (substitui os dados; os anexos ficam). O backup seguro (pasta cifrada no computador do administrador) continua funcionando na nuvem: segunda camada, fora do Cloudflare. Os registros excluídos ficam guardados no cofre.
 - **Anexos:** `GET/PUT/DELETE arquivos/<caminho>`, `GET lista/<pasta>/`, `POST mover` e `POST apagar` (pasta inteira; pastas grandes vão em partes, `mais: true`). No site, `docs/js/pasta-nuvem.js` imita a pasta do computador por cima dessas rotas.
 
 ## Segurança (o que o código já faz)
 1. **Login de verdade:** cada pedido confere o token do Cloudflare Access (assinatura, aplicativo, equipe e validade). Sem essa configuração, recusa tudo. Quem entra: a lista de e-mails do Access (painel) **e** um usuário ativo com esse e-mail em Usuários (o cofre confere). `EMAILS` é uma trava extra opcional.
    - Trocar o e-mail de alguém: Usuários → trocar o e-mail; no painel do Access, pôr o novo e tirar o antigo. Alguém que sai: desativar em Usuários (bloqueia na hora). O modo de teste sem login só vale em `localhost`.
-2. **Papéis conferidos no servidor**, pelo e-mail do usuário no sistema (`usuarios[].login` ou `.email`). *Consulta* só lê (dados e anexos). *Operador* grava, mas não mexe em usuários (só troca a própria senha) nem na ordem das caixas. *Administrador* faz tudo e é o único que substitui os dados. E-mail sem usuário ativo não entra.
+2. **Papéis conferidos no servidor**, pelo e-mail do usuário no sistema (`usuarios[].login` ou `.email`). *Consulta* só lê (dados e anexos). *Operador* grava, mas não mexe em usuários (só troca a própria senha) nem no que a tela só mostra ao administrador (`SO_ADMIN` em `cofre.mjs`: configuração do banco, logo, ordem das caixas, aparência dos alertas, empresas, excluir imóvel/contrato/vistoria/cálculo final/modelo/NF). *Administrador* faz tudo e é o único que substitui os dados. E-mail sem usuário ativo não entra. O login da tela só aceita o usuário desse mesmo e-mail (`entrar` em `app.js`).
 3. **Quem gravou de verdade:** o histórico recebe o e-mail do login (`email_nuvem`), e não só o nome que o aparelho informa.
 4. **Entradas barradas:** nomes de tabela e campo só com letras, números e `_` (nada de `__proto__` ou SQL); registro de até 1 MB; lote de até 2000 mudanças e 8 MB; códigos inteiros positivos; os campos `senha_ponte` e `ponte_url` são apagados se aparecerem.
 5. **Só o próprio site chama:** gravação exige o cabeçalho `X-Sistema` e a origem do site, e não há CORS (outro site não consegue pedir nada).
 6. **Anexos:** `.html/.svg/.xml/.js` recusados; abrem na aba só PDF e foto, com `sandbox` (sem scripts) e `nosniff`; caminhos com `..`, barra invertida ou caracteres de controle são recusados.
 
 **Riscos que continuam (e o que reduz):**
-- As senhas do sistema (hash PBKDF2, 600 mil voltas) vão para cada aparelho, como hoje na pasta, porque o login do sistema é conferido no aparelho. Quem passa pelo Access pode tentar quebrá-las: senhas longas. O Access e os papéis no servidor valem mesmo assim.
-- A cópia no aparelho é cifrada (`docs/js/cofrinho.js`): sem a senha do sistema (ou o login lembrado), não se lê nada dos inquilinos; fica aberta só a lista de usuários (senhas embaralhadas), para o login funcionar sem internet. Sair apaga a chave do aparelho.
+- A senha do sistema (hash PBKDF2, 600 mil voltas) do próprio usuário vai para o aparelho dele, porque o login do sistema é conferido no aparelho; as dos outros e os tokens de sessão só vão para aparelhos de administrador (`usuarioParaAparelho` em `cofre.mjs`). Quem passa pelo Access pode tentar quebrar a própria: senhas longas. O Access e os papéis no servidor valem mesmo assim.
+- A cópia no aparelho é cifrada (`docs/js/cofrinho.js`): sem a senha do sistema (ou o login lembrado), não se lê nada dos inquilinos; fica aberta só a lista de usuários (senhas embaralhadas, sem os tokens de sessão), para o login funcionar sem internet. Sair apaga a chave do aparelho.
 
 ## Como está publicado (2026-11-06)
 - Conta Cloudflare do e-mail jckadmb@gmail.com, com verificação em 2 etapas (aplicativo) e alerta de gasto.

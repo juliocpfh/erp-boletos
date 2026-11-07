@@ -255,7 +255,8 @@ export async function atender(request, env, buscar = fetch) {
     if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
-      await exigirPapel(env, email, m === 'GET' ? 'consulta' : 'operador');
+      // backups têm o banco inteiro (com as senhas de todos): só o administrador lê
+      await exigirPapel(env, email, m !== 'GET' ? 'operador' : rota.startsWith('backups/') ? 'admin' : 'consulta');
       if (m === 'GET') return await lerArquivo(env, chave);
       if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
       if (m === 'DELETE') return await apagarArquivo(request, env, chave);

@@ -30,7 +30,7 @@ Na pasta de dados do usuário (não no repo): `imoveis-dados.json`, `backups/`, 
 - O banco é um objeto: `{ formato: 'imoveis-v1', revisao, seq, historico, listas, estilos_alertas, config_banco, <tabela>: [ ... ] }` (`estilos_alertas`: aparência escolhida para cada tipo de alerta; `config_banco`: integração com o C6, sem segredos: `normalizar` apaga `senha_ponte`/`ponte_url` se aparecerem).
 - As tabelas são as chaves de `TABELAS` em `docs/js/regras.js` (ex.: `imoveis`, `contratos`, `cobrancas`, `faturas`, `emitentes`, `participacoes`, `fiadores`, `iptus`, `ressarcimentos`, `fechamentos`, `aditivos`, `solicitacoes`, `guias_impostos`, `movimentacoes_banco`, `pagamentos_banco`…). `bancoVazio()` cria uma lista para cada uma.
 - `id` de cada registro vem de `d.seq[tabela]` (em `inserir`). Na nuvem, `seq` não sincroniza: cada aparelho usa uma faixa reservada (`Sincronia.faixas`, `POST dados/faixa`) para não repetir código sem internet. Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
-- `normalizar(d)` em `regras.js` migra bancos antigos ao abrir (campos renomeados, tabelas novas). Na nuvem, `Sincronia.atual()` aplica em toda vista e `enviarAjustes()` manda as correções à nuvem uma vez, ao entrar, por quem pode gravar (`ajustesParaNuvem` em `app.js`; consulta só vê).
+- `normalizar(d)` em `regras.js` migra bancos antigos ao abrir (campos renomeados, tabelas novas). Na nuvem, `Sincronia.atual()` aplica em toda vista e `enviarAjustes()` manda as correções à nuvem uma vez, quando o administrador entra (`ajustesParaNuvem` em `app.js`; os outros só veem na própria tela).
 
 ## Onde estão as regras
 | Assunto | Arquivo → função |
