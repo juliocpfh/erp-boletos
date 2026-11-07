@@ -460,6 +460,7 @@ export async function sair() {
   const s = lerSessao();
   const u = E.usuario;
   E.usuario = null;
+  anexosVistos.clear(); // nomes dos anexos não ficam para o próximo que entrar
   gravarSessao(null);
   ir('#/');
   // o token desta sessão deixa de valer no banco (erro aqui não impede sair)
@@ -522,6 +523,8 @@ function layout(conteudo, rota) {
 }
 
 let paginaDesenhada = null;
+/** Últimas listas de anexos mostradas (chave = data-arquivos), para a tela já abrir com elas. Fotos do anúncio ficam de fora (endereços temporários). */
+const anexosVistos = new Map();
 export async function mostrar(estadoForm = null) {
   const app = document.getElementById('app');
   const rota = rotaAtual();
@@ -548,9 +551,9 @@ export async function mostrar(estadoForm = null) {
     // Mantém a altura e as listas de anexos já mostradas até as novas chegarem, e devolve a posição da rolagem.
     const mesma = endereco === paginaDesenhada;
     const rolagem = mesma ? window.scrollY : 0;
-    const anexosVistos = mesma ? new Map([...app.querySelectorAll('[data-arquivos]')].map((el) => [el.dataset.arquivos, el.innerHTML])) : new Map();
     if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
     app.innerHTML = html;
+    // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
     for (const el of app.querySelectorAll('[data-arquivos]')) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
     if (mesma) window.scrollTo(0, rolagem);
     paginaDesenhada = endereco;
@@ -580,13 +583,23 @@ export async function mostrar(estadoForm = null) {
 
 /** Partes que precisam ler a pasta depois de desenhadas: listas de arquivos e fotos. */
 async function montarExtras(raiz) {
+  // primeiro arruma as tabelas (cartões no celular) com o que já está na tela: não espera os anexos
+  arrumarTabelas(raiz);
   // todas as listas de anexos ao mesmo tempo (na nuvem, uma de cada vez deixava a tela aparecendo aos poucos)
+  let mudou = false;
   await Promise.all([...raiz.querySelectorAll('[data-arquivos]')].map(async (el) => {
-    const [escopo, id, modo] = el.dataset.arquivos.split(':');
+    const chave = el.dataset.arquivos;
+    const [escopo, id, modo] = chave.split(':');
     const html = await TELAS._listaArquivos(escopo, Number(id), modo);
-    if (el.innerHTML !== html) el.innerHTML = html;
+    if (escopo !== 'anuncio') anexosVistos.set(chave, html);
+    if (el.isConnected && el.innerHTML !== html) { el.innerHTML = html; mudou = true; }
   }));
   TELAS._ligarDesconto(raiz);
+  if (mudou) arrumarTabelas(raiz); // a lista de anexos dentro de uma tabela pode ter deixado ela larga
+}
+
+/** Celular: tabelas que não cabem viram cartões (com o nome da coluna em cada valor); caixas com rolagem ganham o aviso. */
+function arrumarTabelas(raiz) {
   if (window.matchMedia?.('(max-width: 760px)').matches) cartoesNoCelular(raiz);
   // no celular, as tabelas largas viram cartões: cada célula mostra o nome da coluna (ver estilo.css, @media)
   for (const tabela of raiz.querySelectorAll('table.responsiva')) {
