@@ -2289,3 +2289,26 @@ test('D3: texto do lembrete muda com a fase do boleto e traz Pix quando emitido 
   cb.banco = { pix_copia_cola: '00020126pixteste', linha_digitavel: '33690.00001 11111.111111 22222.222222 1 00000000012345' };
   assert.match(R.textoLembrete(d, cb, '2026-08-01').texto, /Pix copia e cola:\n00020126pixteste/);
 });
+
+test('D14: alerta adiado some até a data, "cuidando" vale 30 dias, voltar reaparece e o vencido é limpo na abertura', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08/2026
+  const hoje = '2026-09-01';
+  const inad = R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência');
+  assert.ok(inad && !inad.adiamento);
+  R.adiarAlerta(d, inad.chave, 'adiado', 'julio', { hoje });
+  assert.equal(R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência').adiamento.ate, '2026-09-07');
+  assert.ok(R.alertasComAdiamento(d, '2026-09-08').find((a) => a.tipo === 'Inadimplência').adiamento === null);
+  R.adiarAlerta(d, inad.chave, 'cuidando', 'ana', { hoje });
+  assert.equal(d.adiamentos_alerta.length, 1); // trocou o anterior
+  assert.equal(d.adiamentos_alerta[0].quem, 'ana');
+  assert.equal(d.adiamentos_alerta[0].ate, '2026-09-30');
+  assert.equal(R.adiamentosVencidos(d, '2026-10-01').length, 1);
+  assert.equal(R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01', soConferir: true }) >= 1, true);
+  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01' });
+  assert.equal(d.adiamentos_alerta.length, 0);
+  R.adiarAlerta(d, inad.chave, 'adiado', 'julio', { hoje });
+  assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), true);
+  assert.equal(d.adiamentos_alerta.length, 0);
+  assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), false);
+});

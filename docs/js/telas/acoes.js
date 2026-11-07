@@ -945,6 +945,18 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Painel: adia um alerta por 7 dias ("adiado") ou 30 ("cuidando", com quem marcou). Some do Painel e da página do inquilino até a data. */
+  async adiarAlerta({ chave, modo, tipo }) {
+    const r = await alterar((db) => R.adiarAlerta(db, chave, modo, login(), { tipo, quem: E.usuario.nome }));
+    aviso(modo === 'cuidando' ? `Anotado: ${E.usuario.nome} está cuidando. O alerta volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.` : `Alerta adiado: volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.`);
+    await mostrar();
+  },
+
+  async voltarAlerta({ chave }) {
+    await alterar((db) => R.voltarAlerta(db, chave, login()));
+    await mostrar();
+  },
+
   /**
    * Lembrete ao inquilino (D3): janela com o texto pronto (editável) e os botões de e-mail (canal oficial), WhatsApp e copiar.
    * O texto muda com a fase do boleto (antes do vencimento, no dia, atrasado) e traz o Pix quando o boleto saiu pelo banco.

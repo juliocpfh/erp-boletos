@@ -163,6 +163,23 @@ label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; 
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 
+/* Alertas adiáveis (Painel): os botões ficam à direita, pequenos */
+.alerta.com-adiar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
+.alerta.com-adiar > a, .alerta.com-adiar > .adiar-alerta { display: inline; }
+.alerta.com-adiar .adiar-alerta { margin-left: auto; }
+
+/* Índice das caixas (páginas do inquilino e do imóvel) e botão de recolher cada caixa */
+.indice-caixas { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 0 0 14px; font-size: 14px; }
+.indice-caixas a { padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: var(--primaria); white-space: nowrap; }
+.indice-caixas a:hover { background: #e0e7ff; text-decoration: none; }
+.recolher-caixa, button.recolher-caixa { background: none; color: var(--suave); border: 0; padding: 0 6px 0 0; font-size: 16px; line-height: 1; cursor: pointer; vertical-align: middle; }
+.recolher-caixa:hover, button.recolher-caixa:hover { color: var(--primaria); filter: none; }
+.cartao > .cabecalho > .recolher-caixa { align-self: center; }
+.cartao > .recolher-caixa { float: left; margin-top: 4px; }
+.cartao.recolhida > *:not(.cabecalho):not(h2):not(.recolher-caixa):not(.alca-caixa) { display: none; }
+.cartao.recolhida > .cabecalho > *:not(h2):not(.recolher-caixa) { display: none; }
+.cartao.recolhida > .cabecalho, .cartao.recolhida > h2 { margin-bottom: 0; }
+
 /* Ordem das caixas: ícone ☰ para o administrador arrastar */
 .caixa-movel { position: relative; }
 .alca-caixa { position: absolute; top: 3px; left: 3px; z-index: 2; font-size: 15px; line-height: 1; padding: 1px 2px; color: var(--primaria); cursor: grab; user-select: none; touch-action: none; opacity: .7; }

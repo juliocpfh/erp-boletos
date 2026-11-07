@@ -15,7 +15,7 @@ export const TABELAS = {
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
-  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -4501,6 +4501,8 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
       if (!soConferir) completarPorDepositos(d, c, qual, usuario);
     }
   }
+  // adiamentos de alerta vencidos (ou de alerta que já não existe): saem, com histórico
+  for (const x of adiamentosVencidos(d, hoje)) { n += 1; if (!soConferir) excluir(d, 'adiamentos_alerta', x.id, usuario, `Adiamento do alerta "${x.tipo}" encerrado (até ${C.dataBr(x.ate)})`); }
   return n;
 }
 
@@ -5080,4 +5082,50 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   linhas.push('', 'Qualquer dúvida, estamos à disposição.', '', ASSINATURA_LEMBRETE);
   const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
   return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
+}
+
+// --------------------------------------------------------------------------
+// Alertas adiáveis (D14): "adiar 7 dias" e "já estou cuidando" (30 dias), com quem marcou; o alerta some do Painel até a data
+// --------------------------------------------------------------------------
+export const DIAS_ADIAR_ALERTA = 7;
+export const DIAS_CUIDANDO_ALERTA = 30;
+
+/** Chave estável de um alerta (tipo + contrato/imóvel + âncora): o texto muda todo dia ("há 12 dias"), a chave não. */
+export const chaveAlerta = (a) => [a.tipo, a.contrato_id || '', a.imovel_id || '', a.ancora || ''].join('|');
+
+/** Adiamento em vigor para a chave (``ate`` >= hoje), ou null. */
+export function adiamentoDe(d, chave, hoje = C.hojeIso()) {
+  return (d.adiamentos_alerta || []).find((x) => x.chave === chave && x.ate >= hoje) || null;
+}
+
+/** Todos os alertas com o campo ``adiamento`` preenchido nos adiados (o Painel mostra os demais e guarda os adiados recolhidos). */
+export function alertasComAdiamento(d, hoje = C.hojeIso()) {
+  return todosAlertas(d, hoje).map((a) => ({ ...a, chave: chaveAlerta(a), adiamento: adiamentoDe(d, chaveAlerta(a), hoje) }));
+}
+
+/**
+ * Adia um alerta: ``modo`` "adiado" (7 dias) ou "cuidando" (30 dias; quem marcou aparece no Painel). Troca o adiamento
+ * anterior da mesma chave. Ex.: em 07/11/2026, "adiar 7 dias" esconde o alerta até 14/11/2026 (volta em 15/11).
+ */
+export function adiarAlerta(d, chave, modo, usuario, { hoje = C.hojeIso(), dias = null, tipo = '', quem = '' } = {}) {
+  if (!['adiado', 'cuidando'].includes(modo)) throw new Error('Modo de adiamento desconhecido.');
+  const n = dias || (modo === 'cuidando' ? DIAS_CUIDANDO_ALERTA : DIAS_ADIAR_ALERTA);
+  const ate = C.somarDias(hoje, n - 1);
+  const atual = (d.adiamentos_alerta || []).find((x) => x.chave === chave);
+  const dados = { chave, tipo: tipo || chave.split('|')[0], modo, ate, quem: quem || usuario, em: hoje };
+  const texto = `Alerta "${dados.tipo}" ${modo === 'cuidando' ? 'em cuidado por' : 'adiado por'} ${dados.quem} até ${C.dataBr(ate)}`;
+  return atual ? atualizar(d, 'adiamentos_alerta', atual.id, dados, usuario, texto) : inserir(d, 'adiamentos_alerta', dados, usuario, texto);
+}
+
+/** Volta a mostrar o alerta (apaga o adiamento). */
+export function voltarAlerta(d, chave, usuario) {
+  const atual = (d.adiamentos_alerta || []).find((x) => x.chave === chave);
+  if (atual) excluir(d, 'adiamentos_alerta', atual.id, usuario, `Alerta "${atual.tipo}" volta a aparecer`);
+  return !!atual;
+}
+
+/** Adiamentos vencidos (``ate`` < hoje) ou de alertas que já não existem: apagados na rotina de abertura. */
+export function adiamentosVencidos(d, hoje = C.hojeIso()) {
+  const chaves = new Set(todosAlertas(d, hoje).map(chaveAlerta));
+  return (d.adiamentos_alerta || []).filter((x) => x.ate < hoje || !chaves.has(x.chave));
 }

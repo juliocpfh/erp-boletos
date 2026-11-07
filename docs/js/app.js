@@ -4,6 +4,7 @@ import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
 import { carregarPonteLocal } from './banco.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
+import { montarIndice } from './indice.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
@@ -629,6 +630,8 @@ export async function mostrar(estadoForm = null) {
       const pagina = rota.partes[0] || 'painel';
       arrumarCaixas(app.querySelector('main'), pagina, (grupo) => R.ordemGuardada(E.d, pagina, grupo),
         podeUsuario('admin') ? (grupo, nomes) => alterar((db) => R.salvarOrdemCaixas(db, pagina, grupo, nomes, login())).catch((e) => aviso(e.message, 'erro')) : null);
+      // páginas longas (inquilino, imóvel): índice embaixo do nome e botão para recolher cada caixa (lembrado neste navegador)
+      montarIndice(app.querySelector('main'), pagina);
     }
     atualizarFaixa();
     desenharMensagens();

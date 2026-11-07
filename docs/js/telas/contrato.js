@@ -628,7 +628,8 @@ export function telaContrato(c) {
   const pctBonif = R.percentualBonificacao(c);
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
   // documentos de entrada e contas a transferir aparecem na rotina de entrada (recolhida: também na faixa dos documentos)
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo)) : [];
+  // alertas adiados no Painel ("adiar 7 dias" / "já estou cuidando") ficam de fora aqui também
+  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo) && !R.adiamentoDe(d(), R.chaveAlerta({ ...a, contrato_id: c.id }), hoje)) : [];
   const rotina = caixaRotinaEntrada(c, hoje);
   const agendada = R.herancaAgendada(d(), c, hoje);
   const anteriorAgendado = agendada && R.contratoHerdado(d(), c);
