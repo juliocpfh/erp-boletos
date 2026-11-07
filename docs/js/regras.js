@@ -5179,3 +5179,29 @@ export function marcarGarantiaDevolvida(d, encerramentoId, data, usuario) {
     data ? `${c ? `${c.inquilino_nome}: ` : ''}garantia ${e.saldo >= 0 ? 'devolvida' : 'saldo acertado'} em ${C.dataBr(data)}` : `${c ? `${c.inquilino_nome}: ` : ''}devolução da garantia desfeita`);
   return e;
 }
+
+// --------------------------------------------------------------------------
+// Declaração anual de aluguéis para o IRPF do inquilino (D9): por empresa que emitiu as NFs, o aluguel efetivamente pago no ano
+// --------------------------------------------------------------------------
+/**
+ * Valores que o inquilino pagou de aluguel no ano-calendário, por empresa emitente: as NFs emitidas (não canceladas) dos boletos
+ * do contrato (e dos contratos anteriores da mesma cadeia, quando é continuação), com emissão no ano. A NF é só o aluguel
+ * (sem IPTU, seguro, tarifa e FCI), por isso serve de base. Ex.: 12 NFs de R$ 1.218,50 em 2026 → total R$ 14.622,00.
+ */
+export function declaracaoAnual(d, contratoId, ano) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  const ids = new Set([c.id, ...cadeiaDeContratos(d, c).antes.map((x) => x.id)]);
+  const cobrancas = new Map(d.cobrancas.filter((x) => ids.has(x.contrato_id)).map((x) => [x.id, x]));
+  const nfs = d.faturas.filter((f) => f.situacao === 'Emitida' && f.origem_tipo === 'cobranca' && cobrancas.has(f.origem_id) && String(f.emissao).slice(0, 4) === String(ano))
+    .sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
+  const porEmpresa = new Map();
+  for (const f of nfs) {
+    const cb = cobrancas.get(f.origem_id);
+    if (!porEmpresa.has(f.emitente_id)) porEmpresa.set(f.emitente_id, { emitente: buscar(d, 'emitentes', f.emitente_id), itens: [], total: 0 });
+    const g = porEmpresa.get(f.emitente_id);
+    g.itens.push({ numero: f.numero, emissao: f.emissao, competencia: cb.competencia, valor: f.valor, pago_em: cb.data_pagamento });
+    g.total += f.valor;
+  }
+  return { contrato: c, imovel: buscar(d, 'imoveis', c.imovel_id), ano: Number(ano), empresas: [...porEmpresa.values()].sort((a, b) => a.emitente.nome.localeCompare(b.emitente.nome, 'pt-BR')), total: nfs.reduce((s, f) => s + f.valor, 0) };
+}

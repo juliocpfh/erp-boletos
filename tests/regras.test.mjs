@@ -2343,3 +2343,20 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.equal(r[6].feito, false); // boleto de 11/2026 ainda não gerado
   assert.match(r[6].detalhe, /não gerado/);
 });
+
+test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago, e inclui o contrato anterior da cadeia', () => {
+  const { d, c } = base();
+  for (const m of ['2026-06', '2026-07', '2026-08']) R.gerarCobrancas(d, m, 'julio');
+  const cbs = d.cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => a.competencia.localeCompare(b.competencia));
+  R.registrarPagamento(d, cbs[0].id, '2026-07-10', null, 'julio', { pagouEmDia: true });
+  R.registrarPagamento(d, cbs[1].id, '2026-08-10', null, 'julio', { pagouEmDia: true });
+  R.registrarPagamento(d, cbs[2].id, '2027-01-05', null, 'julio', {}); // pago só em 2027: fica fora de 2026
+  R.numerarFaturas(d, 'julio');
+  const r = R.declaracaoAnual(d, c.id, 2026);
+  assert.equal(r.empresas.length, 2); // ANK e JCK, 50% cada
+  assert.equal(r.empresas[0].itens.length, 2);
+  assert.equal(r.total, cbs[0].valor_nf + cbs[1].valor_nf);
+  assert.equal(r.empresas[0].total + r.empresas[1].total, r.total);
+  assert.equal(R.declaracaoAnual(d, c.id, 2027).total, cbs[2].valor_nf);
+  assert.equal(R.declaracaoAnual(d, c.id, 2025).empresas.length, 0);
+});

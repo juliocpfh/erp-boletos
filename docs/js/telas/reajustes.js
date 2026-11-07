@@ -13,7 +13,9 @@ const dataExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.
 /** Partes dos botões do reajuste de um contrato numa competência: a carta (gerar, marcar enviada) e a correção (aplicar ou "corrigido"). */
 export function partesReajuste(c, r, naCarta = false) {
   // reajuste de ano anterior: só a correção (sem carta)
+  // D4: "Enviar por e-mail" baixa o PDF, abre o e-mail com o texto pronto e marca a carta como enviada
   const carta = !r.comCarta || (!r.faltaCarta && !r.carta) ? '' : `${naCarta ? '' : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, 'Gerar carta', 'botao pequeno')}
+    ${opera() && !r.carta && r.corrigido ? botao('enviarCartaEmail', '✉ Enviar por e-mail', { contrato: c.id, comp: r.competencia }, 'pequeno') : ''}
     ${opera() ? botao('cartaEnviada', r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : 'Marcar carta enviada', { contrato: c.id, comp: r.competencia, enviada: r.carta ? '' : '1' }, r.carta ? 'link-botao' : 'secundario pequeno', r.carta ? 'Desfazer o envio da carta?' : '') : ''}`;
   if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, 'ok') };
   if (!opera()) return { carta, correcao: '' };

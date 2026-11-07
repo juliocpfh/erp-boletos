@@ -21,7 +21,7 @@ import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
-import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
 import { usarVisualizador, visualizar } from '../visualizador.js';
@@ -1214,6 +1214,34 @@ export const ACOES = {
       html: `<p>Aqui você altera só os <b>dados do contrato</b>: inquilino, documentos, prazo, valores combinados, garantia e condições.</p>
         <p><b>Não use para</b> correções do aluguel, reajustes, boletos, pagamentos, depósitos da garantia e demais lançamentos: faça isso pelos botões da própria tela do inquilino.</p>` });
     if (ok) ir(`#/editar/contratos/${id}`);
+  },
+
+  /**
+   * Carta de reajuste por e-mail (D4; o e-mail é o canal oficial): baixa o PDF da carta, abre o Gmail (ou o programa de e-mail)
+   * já com destinatário, assunto e o texto da carta, e marca a carta como enviada (guardando o PDF na pasta do inquilino).
+   * O PDF baixado precisa ser anexado à mão (o navegador não anexa arquivo num e-mail sozinho).
+   */
+  async enviarCartaEmail({ contrato, comp }) {
+    const c = buscar('contratos', contrato);
+    if (!c) throw new Error('Inquilino não encontrado.');
+    const carta = await pdfDaCarta(c, comp);
+    if (!carta) throw new Error('A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).');
+    const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar('imoveis', c.imovel_id) || {}).nome || ''}`.trim();
+    const para = c.inquilino_email || '';
+    const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+    const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`, sim: 'Abrir o e-mail e marcar como enviada',
+      html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+        <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
+        <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
+    if (!r) return;
+    baixar(carta.blob, carta.nome);
+    window.open((r.por || [])[0] === 'mailto' ? mailto : gmail, '_blank', 'noopener');
+    if ((r.marcar || [])[0] === '1') {
+      await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1' });
+      return;
+    }
+    aviso('PDF baixado e e-mail aberto. A carta não foi marcada como enviada.');
   },
 
   /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */

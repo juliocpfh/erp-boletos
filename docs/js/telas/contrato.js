@@ -445,7 +445,9 @@ function caixaBoletosInquilino(c, cobs, hoje) {
   const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
   const recentes = cobs.slice(0, BOLETOS_INQUILINO);
   const antigos = cobs.slice(BOLETOS_INQUILINO);
-  return `<div class="cartao"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
+  const anoDecl = new Date().getFullYear() - 1;
+  return `<div class="cartao"><div class="cabecalho"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
+      ${R.geraNf(c) && cobs.some((x) => x.data_pagamento) ? link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, 'Declaração anual de aluguéis (IRPF)', 'botao secundario pequeno') : ''}</div>
     <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join('') || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
     ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join('')}</table></div></details>` : ''}
     ${R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => { const l = d().cobrancas.filter((y) => y.contrato_id === x.id).sort((a, b) => b.competencia.localeCompare(a.competencia));

@@ -43,6 +43,16 @@ export async function telaImprimir(rota) {
       ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
       ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
   }
+  if (tipo === 'declaracao') {
+    const c = buscar('contratos', rota.q.contrato);
+    if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
+    const ano = Number(rota.q.ano) || new Date().getFullYear() - 1;
+    const r = R.declaracaoAnual(d(), c.id, ano);
+    const anos = [...new Set(d().faturas.map((f) => Number(String(f.emissao).slice(0, 4))))].sort((a, b) => b - a);
+    const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? '' : 'secundario '}pequeno`)).join(' ')}</div>`;
+    return `<div class="impressao">${voltar(r.empresas.length ? { seletor: '.impressao .declaracoes', nome: nomeArquivoDoc('Declaracao anual aluguel', c, String(ano)) } : null)}${abas}
+      ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join('')}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
+  }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
@@ -158,6 +168,17 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
  * Devolve o nome do arquivo, ou null se a carta não sai (falta o índice). Ex.: "Carta reajuste Casa 01 - Maria - 2026-11.pdf".
  */
 export async function guardarCartaNaPasta(c, comp) {
+  const carta = await pdfDaCarta(c, comp);
+  if (!carta) return null;
+  await S.escreverTexto(await pastaDoEscopo('aditivos', c.id), carta.nome, carta.blob);
+  return carta.nome;
+}
+
+/**
+ * PDF da carta de reajuste (desenhada fora da tela) com o nome do arquivo e o texto puro da carta (corpo do e-mail, D4).
+ * Null quando a carta não sai (falta o índice).
+ */
+export async function pdfDaCarta(c, comp) {
   const html = cartaReajuste(c, comp);
   if (!html.includes('class="carta"')) return null;
   const caixa = document.createElement('div');
@@ -166,10 +187,12 @@ export async function guardarCartaNaPasta(c, comp) {
   caixa.innerHTML = html;
   document.body.append(caixa);
   try {
-    const blob = await pdfDoDocumento(caixa.querySelector('.carta'), [], { margemLado: 15 });
-    const nome = `${nomeArquivoDoc('Carta reajuste', c, comp)}.pdf`;
-    await S.escreverTexto(await pastaDoEscopo('aditivos', c.id), nome, blob);
-    return nome;
+    const el = caixa.querySelector('.carta');
+    const blob = await pdfDoDocumento(el, [], { margemLado: 15 });
+    // texto puro: parágrafos e linhas da tabela, sem a logo
+    el.querySelectorAll('.ct-capa, .ct-marca, .ct-marcas').forEach((x) => x.remove());
+    const texto = [...el.querySelectorAll('p, tr')].map((x) => (x.tagName === 'TR' ? [...x.children].map((td) => td.textContent.trim()).filter(Boolean).join(' · ') : x.innerText.replace(/\s*\n\s*/g, '\n').trim())).filter(Boolean).join('\n\n');
+    return { blob, nome: `${nomeArquivoDoc('Carta reajuste', c, comp)}.pdf`, texto };
   } finally {
     caixa.remove();
   }
@@ -192,6 +215,32 @@ export async function guardarCartasAntigas() {
 }
 
 /** Nome dos arquivos baixados: "Documento Imóvel - Inquilino - ano de entrada" (ex.: "Contrato locação Loja 1 - Maria - 2026"). */
+const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const dataPorExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES_EXTENSO[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
+
+/**
+ * Declaração anual de aluguéis (D9): uma folha por empresa que emitiu as NFs, para o IRPF do inquilino. Só o aluguel pago
+ * (valor das NFs emitidas no ano-calendário), com a lista das NFs e o total.
+ */
+function declaracaoHtml(r, g) {
+  const { contrato: c, imovel: i, ano } = r;
+  const e = g.emitente;
+  const pj = c.inquilino_tipo === 'Pessoa jurídica (empresa)';
+  return `<div class="carta declaracao">
+    ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
+    <p style="text-align:center"><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}${e.endereco ? `<br>${esc(e.endereco)}` : ''}</p>
+    <h2 style="text-align:center;margin:18px 0">DECLARAÇÃO DE RENDIMENTOS DE ALUGUEL · ANO-CALENDÁRIO ${ano}</h2>
+    <p>Declaramos, para fins de comprovação junto à Receita Federal (Imposto de Renda), que recebemos de <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? `, ${pj ? 'CNPJ' : 'CPF'} <b>${esc(c.inquilino_cpf)}</b>` : ''},
+      locatário(a) do imóvel <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}${i.cidade ? `, ${i.cidade}` : ''}` : 'sem imóvel')}</b>, no ano-calendário de <b>${ano}</b>, os valores abaixo a título de <b>aluguel</b>, conforme as notas fiscais emitidas:</p>
+    <table class="carta-tabela" style="width:100%"><tr><th>Aluguel de</th><th>NF nº</th><th>Emissão</th><th class="n">Valor</th></tr>
+      ${g.itens.map((x) => `<tr><td>${C.compBr(x.competencia)}</td><td>${R.numeroFatura(x.numero)}</td><td>${dataBr(x.emissao)}</td><td class="n">${C.reais(x.valor)}</td></tr>`).join('')}
+      <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${C.reais(g.total)}</b></td></tr></table>
+    ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ''}
+    <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
+    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${dataPorExtenso(C.hojeIso())}.</p>
+    <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
+}
+
 export function nomeArquivoDoc(documento, c, fim = String(c.data_entrada || c.vigencia_inicio || '').slice(0, 4)) {
   const i = buscar('imoveis', c.imovel_id);
   return S.limparNome(`${documento} ${i ? i.nome : 'sem imóvel'} - ${c.inquilino_nome}${fim ? ` - ${fim}` : ''}`);
