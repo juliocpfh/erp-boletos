@@ -85,6 +85,19 @@ async function abrirSessao(u) {
   E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
   gravarSessao(u.login, token);
   ajustesParaNuvem();
+  rotinaDeAbertura();
+}
+
+/**
+ * Regras de negócio ao abrir (inativar quem saiu, "possui termo aditivo", caução completa pelos depósitos): antes rodavam caladas
+ * em `normalizar`; desde a rotina C9 passam pelo histórico com o usuário logado (operador ou administrador). Só grava se há
+ * o que ajustar; entra na fila de gravação como qualquer mudança.
+ */
+function rotinaDeAbertura() {
+  if (!E.d || !pode(E.usuario, 'operador')) return;
+  const quem = E.usuario.login;
+  if (!R.rotinaDeAbertura(E.d, quem, { soConferir: true })) return;
+  alterar((db) => R.rotinaDeAbertura(db, quem)).then(() => mostrar()).catch((e) => aviso(`Rotina de abertura: ${e.message}`, 'aviso'));
 }
 
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
@@ -399,6 +412,7 @@ export async function abrirPasta(handle) {
   E.d = await S.lerBanco(handle);
   E.backupFeito = false;
   E.usuario = usuarioDaSessao();
+  rotinaDeAbertura(); // login lembrado: as regras de abertura passam pelo histórico com esse usuário
   await mostrar();
   rotinaSegura().catch((e) => { E.seguroErro = e.message; });
 }
@@ -437,6 +451,7 @@ export async function abrirNuvem() {
   // login lembrado sem a chave da cópia (ex.: entrou antes da cópia cifrada existir): pede a senha uma vez
   E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
   ajustesParaNuvem(); // login lembrado: as correções vão sem passar por abrirSessao
+  rotinaDeAbertura();
   await mostrar();
   if (E.d) rotinaSegura().catch((e) => { E.seguroErro = e.message; }); // backup seguro no computador do administrador, também na nuvem
 }

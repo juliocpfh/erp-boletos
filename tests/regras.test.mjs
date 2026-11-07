@@ -938,7 +938,10 @@ test('"possui termo aditivo" só com termo registrado: troca de garantia não ma
   assert.notEqual(c.possui_aditivos, true);
   c.possui_aditivos = true; // marcado sem termo (versão anterior)
   R.normalizar(d);
+  assert.equal(c.possui_aditivos, true, 'normalizar não mexe mais (C9): é a rotina de abertura, com histórico');
+  assert.equal(R.rotinaDeAbertura(d, 'julio'), 1);
   assert.equal(c.possui_aditivos, false);
+  assert.match(d.historico.at(-1).descricao, /não possui mais termo aditivo/);
 });
 
 test('fiadores do contrato (para editar o contrato): sem os que entraram na troca de garantia', () => {
@@ -1597,12 +1600,14 @@ test('caução ainda não depositada inteira: aplicação conta o já depositado
   assert.equal(R.valorGarantia(d, c), 420000, 'caução atual = valor corrigido (o complemento da correção conta)');
 });
 
-test('dados antigos: depósitos que já cobrem a caução do contrato ficam registrados ao abrir', () => {
+test('dados antigos: depósitos que já cobrem a caução do contrato ficam registrados na rotina de abertura (não mais em normalizar)', () => {
   const { d, c } = base();
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07' });
   R.inserir(d, 'depositos_garantia', { contrato_id: c.id, qual: 'caucao', troca_id: null, data: '2026-06-08', valor: 300000, comprovante: 'a.pdf' }, 'julio');
   assert.equal(R.garantiaDepositada(c), false);
   R.normalizar(d);
+  assert.equal(R.garantiaDepositada(c), false, 'normalizar só migra (C9)');
+  R.rotinaDeAbertura(d, 'julio');
   assert.equal(R.garantiaDepositada(c), true);
   assert.equal(c.caucao_pago_em, '2026-06-08');
 });
@@ -2178,4 +2183,33 @@ test('resultado líquido: impostos estimados (11,33%) até a guia do contador; r
   assert.equal(x.liquido, x.resultado - 13000);
   assert.equal(x.lucro, x.liquido - 50000, 'reforma depois do imposto');
   assert.equal(x.reformasPeriodo, 50000);
+});
+
+test('C9: rotina de abertura inativa quem saiu e completa a caução pelos depósitos com usuário e histórico; só confere com soConferir', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  c.data_saida = '2026-07-15';
+  const antes = d.historico.length;
+  assert.equal(R.rotinaDeAbertura(d, 'julio', { hoje: '2026-08-01', soConferir: true }), 1, 'só conta');
+  assert.deepEqual([c.ativo, d.historico.length], [undefined, antes], 'soConferir não grava');
+  R.normalizar(d);
+  assert.equal(c.ativo, undefined, 'normalizar não inativa mais');
+  assert.equal(R.rotinaDeAbertura(d, 'ana', { hoje: '2026-08-01' }), 1);
+  assert.equal(c.ativo, false);
+  const h = d.historico.at(-1);
+  assert.deepEqual([h.usuario, h.tabela, h.registro_id], ['ana', 'contratos', c.id]);
+  assert.match(h.descricao, /inativo \(saída em 15\/07\/2026\)/);
+  assert.equal(R.rotinaDeAbertura(d, 'ana', { hoje: '2026-08-01' }), 0, 'nada mais a ajustar');
+  // caução em depósitos: dois depósitos que somam o valor inicial deixam a caução registrada como depositada, com histórico
+  const { d: d2, c: c2 } = base();
+  R.atualizar(d2, 'contratos', c2.id, { garantia_tipo: 'Caução', caucao_valor: 270000, caucao_meses: 2, caucao_data: '2026-06-07' }, 'julio');
+  R.inserir(d2, 'depositos_garantia', { contrato_id: c2.id, qual: 'caucao', data: '2026-06-07', valor: 135000, comprovante: null }, 'julio');
+  R.inserir(d2, 'depositos_garantia', { contrato_id: c2.id, qual: 'caucao', data: '2026-07-07', valor: 135000, comprovante: 'c.pdf' }, 'julio');
+  assert.equal(R.garantiaDepositada(c2), false);
+  assert.equal(R.rotinaDeAbertura(d2, 'ana', { hoje: '2026-08-01', soConferir: true }), 1);
+  assert.equal(R.garantiaDepositada(c2), false);
+  assert.equal(R.rotinaDeAbertura(d2, 'ana', { hoje: '2026-08-01' }), 1);
+  assert.deepEqual([R.garantiaDepositada(c2), c2.caucao_por_depositos, c2.caucao_pago_em, c2.comprovante_caucao], [true, true, '2026-07-07', 'c.pdf']);
+  assert.match(d2.historico.at(-1).descricao, /caução completa \(R\$ 2\.700,00 em 2 depósito\(s\)\)/);
 });
