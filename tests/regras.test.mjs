@@ -2213,3 +2213,38 @@ test('C9: rotina de abertura inativa quem saiu e completa a caução pelos depó
   assert.deepEqual([R.garantiaDepositada(c2), c2.caucao_por_depositos, c2.caucao_pago_em, c2.comprovante_caucao], [true, true, '2026-07-07', 'c.pdf']);
   assert.match(d2.historico.at(-1).descricao, /caução completa \(R\$ 2\.700,00 em 2 depósito\(s\)\)/);
 });
+
+test('C13: contrato encerrado (inativo ou com a saída registrada) some da inadimplência e do alerta', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08
+  const hoje = '2026-09-01';
+  assert.equal(R.inadimplencia(d, hoje).devedores.length, 1);
+  assert.ok(R.todosAlertas(d, hoje).some((a) => a.tipo === 'Inadimplência'));
+  // saída registrada (cálculo final): o que ficou devendo vai no acerto da saída, não na inadimplência
+  R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2026-08-20', saldo: 0 }, 'julio');
+  assert.equal(R.contratoEncerrado(d, c), true);
+  assert.equal(R.inadimplencia(d, hoje).devedores.length, 0);
+  assert.ok(!R.todosAlertas(d, hoje).some((a) => a.tipo === 'Inadimplência'));
+  // só inativo (sem cálculo final) também some
+  const { d: d2, c: c2 } = base();
+  R.gerarCobrancas(d2, '2026-06', 'julio');
+  R.gerarCobrancas(d2, '2026-07', 'julio');
+  assert.equal(R.inadimplencia(d2, hoje).devedores.length, 1);
+  c2.ativo = false;
+  assert.equal(R.inadimplencia(d2, hoje).devedores.length, 0);
+});
+
+test('C7: etapa "Banco" do fechamento avisa comprovantes não baixados e pagamentos sem confirmação, sem segurar a etapa', () => {
+  const { d } = base();
+  const ank = d.emitentes[0];
+  d.config_banco = { ...R.CONFIG_BANCO_PADRAO, ativo: true, provedor: 'c6', conta_padrao_id: 'ank', contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id, ambiente: 'sandbox' }] };
+  R.normalizar(d);
+  d.config_banco.ultima_importacao.ank = '2026-11-30';
+  const banco = () => R.etapasFechamento(d, '2026-11', '2026-12-02').find((e) => e.chave === 'banco');
+  assert.deepEqual([banco().feito, banco().manual], [true, undefined], 'toda etapa é automática e também pode ser marcada à mão (E4)');
+  R.inserir(d, 'movimentacoes_banco', { conta_id: 'ank', id_externo: 'r1', data: '2026-11-05', valor: 1000, tipo: 'saida', classificacao: 'tarifa', comprovante: null, comprovante_contador: null }, 'julio');
+  R.inserir(d, 'pagamentos_banco', { conta_id: 'ank', situacao: 'agendado', valor: 5000, data_pagamento: '2026-11-10', competencia: '2026-11', tipo_conta: 'Luz' }, 'julio');
+  assert.match(banco().detalhe, /ANK: tudo com destino · 1 comprovante\(s\) não baixado\(s\) · 1 pagamento\(s\) pelo banco sem confirmação$/);
+  assert.equal(banco().feito, true, 'avisos não seguram a etapa');
+});

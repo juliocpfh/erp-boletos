@@ -4210,8 +4210,9 @@ export const DIA_GERAR_BOLETOS = 20;
  * - a partir de 20/10: gerar os boletos do aluguel de 10/2026 (vencem em 11/2026), com a carta de quem reajusta em 10/2026;
  * - no mês: conferir os pagamentos dos boletos que vencem em outubro (aluguel de 09/2026), condomínio e contas;
  * - a partir de 01/11 (depois da virada): lançar as NFs avulsas e do Airbnb de outubro e numerar as NFs de outubro.
- * Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, manual, marcado, aPartirDe, prevista }. As automáticas ficam
- * feitas quando não há pendência; as manuais, quando alguém marca. Antes de ``aPartirDe``, a etapa pendente é só prevista.
+ * Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, marcado, aPartirDe, prevista }. Toda etapa fica feita sozinha
+ * quando não há pendência e também quando alguém marca (as duas valem para todas, inclusive "contas": decisão do dono E4,
+ * 2026-11-07). Antes de ``aPartirDe``, a etapa pendente é só prevista.
  */
 export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const comp = C.somarMeses(mes, -1); // aluguel do mês anterior: boletos que vencem neste mês
@@ -4249,7 +4250,9 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
         : `extrato buscado em ${C.dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`);
       return { chave: 'banco', titulo: `Conferir o extrato de ${C.compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(' e ') || 'banco'}) e dar destino às movimentações`,
         pendentes: b.semDestino + b.contasSemImportar.length, link: `#/banco?mes=${mes}`, contas: b.porConta,
+        // comprovantes não baixados e pagamentos pelo banco sem resposta são só aviso: não seguram a etapa
         detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ')
+          + (b.semComprovante ? ` · ${b.semComprovante} comprovante(s) não baixado(s)` : '') + (b.pagamentosPendentes ? ` · ${b.pagamentosPendentes} pagamento(s) pelo banco sem confirmação` : '')
           + (b.mesFechado ? '' : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : 'nenhuma conta configurada' };
     })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
@@ -4260,7 +4263,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
       return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
         detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : 'nada a conferir', link: conferir.length === 1 ? `#/contrato/${conferir[0].id}?ir=ressarcimentos` : '#/inquilinos' };
     })(),
-    { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length, manual: true,
+    { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length,
       detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
   ];
   for (const e of etapas) {
@@ -4643,16 +4646,20 @@ export function marcarCartaEnviada(d, contratoId, comp, enviada, usuario) {
 // --------------------------------------------------------------------------
 /** A partir de quantos dias de atraso o devedor fica em vermelho. */
 export const DIAS_VERMELHO = 5;
+/** Contrato encerrado (inativo ou com a saída do inquilino registrada): a inadimplência dele some (decisão do dono, C13, 2026-11-07). */
+export const contratoEncerrado = (d, c) => c.ativo === false || !!encerramentoDo(d, c.id);
+
 /**
  * Devedores: inquilinos com boleto vencido e não pago (carência sem valor não conta), com o valor de hoje
- * (multa e juros até hoje). Histórico: pagamentos com atraso nos últimos 12 meses, para ver quem costuma atrasar.
+ * (multa e juros até hoje); contrato encerrado não entra (``contratoEncerrado``). Histórico: pagamentos com atraso
+ * nos últimos 12 meses, para ver quem costuma atrasar.
  */
 export function inadimplencia(d, hoje = C.hojeIso()) {
   const porContrato = new Map();
   for (const cb of d.cobrancas) {
     if (cb.data_pagamento || cb.situacao === 'Carência' || !(cb.vencimento < hoje)) continue;
     const c = buscar(d, 'contratos', cb.contrato_id);
-    if (!c) continue;
+    if (!c || contratoEncerrado(d, c)) continue;
     if (!porContrato.has(c.id)) porContrato.set(c.id, { contrato: c, boletos: [] });
     const r = C.liquidar(cb, hoje);
     porContrato.get(c.id).boletos.push({ cobranca: cb, dias: C.diasEntre(cb.vencimento, hoje), valor: totais(cb).a_pagar_sem_desconto, hojeValor: r.valor_devido });
@@ -4962,7 +4969,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const partes = [];
   if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
-  if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago`);
+  if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
   return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
 }
