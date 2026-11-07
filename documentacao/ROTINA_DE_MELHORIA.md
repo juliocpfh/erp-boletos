@@ -55,8 +55,8 @@ Análise feita um dia depois de a nuvem entrar no ar. Cada item traz a evidênci
 - [ ] **C10.** Histórico desfaz `data_pagamento` de conta paga pelo banco e `paga_em` de guia (`SEM_DESFAZER` não cobre `despesas`, `iptus`, `guias_impostos`); a exclusão é barrada no mesmo caso (`acoes.js:64`). O "desfazer" da parcela do IPTU (`imovel.js:43`, `marcarIptuPago`) idem. Bloquear quando há `pagamento_banco_id`/`movimentacao_id`.
 
 **Alertas** (`regras.js` ~2446, 2588, 3243-3265; `telas/contrato.js`)
-- [ ] **C11.** Tipo "Correção do aluguel" configurável mas sem alerta; "Devolver garantia" existe e não é configurável. Trocar.
-- [ ] **C12.** Aviso de documentos faltando em 5 lugares (alerta Rotina, faixa cadastros incompletos, faixa do inquilino, caixa Rotina, caixa Documentos); "Marcar assinado" 2× na mesma página. Uma fonte só.
+- [x] **C11.** Tipo "Correção do aluguel" configurável mas sem alerta; "Devolver garantia" existe e não é configurável. Trocar. Feito em 2026-11-07 (branch rotina-c11-c12): "Devolver garantia" entrou em `TIPOS_ALERTA` e "Correção do aluguel" saiu; `normalizar` passa a aparência escolhida para "Correção do aluguel" a "Reajuste do aluguel" (se este ficou no padrão) e apaga a antiga.
+- [x] **C12.** Aviso de documentos faltando em 5 lugares (alerta Rotina, faixa cadastros incompletos, faixa do inquilino, caixa Rotina, caixa Documentos); "Marcar assinado" 2× na mesma página. Uma fonte só. Feito em 2026-11-07 (branch rotina-c11-c12): `documentosPendentes(d, c)` em `regras.js` (falta / falta assinatura) alimenta o alerta "Rotina de entrada", a faixa de cadastros incompletos e a faixa do inquilino; o formulário "Marcar assinado" ficou só na caixa "Contrato, Vistoria, Termos e Aditivos" (a rotina de entrada e a faixa do topo só apontam para lá).
 - [ ] **C13.** Inadimplência nunca some (qualquer contrato, inclusive inativo/controle). Ver D8.
 
 **Dados e backup — sobras do modo pasta** (`telas/admin.js`)
