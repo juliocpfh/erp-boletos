@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-ecU12hvYax40+moDHHJMz3g0bU5dd1zWewonUFePfHk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-b1pUqGxB5JnMa7bKI4MIbGuzPW3HnFf6rcIN4+tgXMU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="1b669e8eb89c0968">
+<meta name="fontes" content="351380e25aeda319">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1471,6 +1471,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     CONTA_BANCO_PADRAO: () => CONTA_BANCO_PADRAO,
     CORES_ALERTA: () => CORES_ALERTA,
     DIAS_ALERTA_BANCO: () => DIAS_ALERTA_BANCO,
+    DIAS_EXTRATO_RECENTE: () => DIAS_EXTRATO_RECENTE,
     DIAS_SEM_IMOVEL: () => DIAS_SEM_IMOVEL,
     DIAS_VERMELHO: () => DIAS_VERMELHO,
     DIA_GERAR_BOLETOS: () => DIA_GERAR_BOLETOS,
@@ -1486,6 +1487,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     LIMITE_LC224_TRIMESTRE: () => LIMITE_LC224_TRIMESTRE,
     LISTAS: () => LISTAS,
     MESES_DEPOIS_DE_ALUGAR: () => MESES_DEPOIS_DE_ALUGAR,
+    MESES_FECHAMENTO_ATRASADO: () => MESES_FECHAMENTO_ATRASADO,
     MINIMO_GUIA: () => MINIMO_GUIA,
     MODELO_AIRBNB: () => MODELO_AIRBNB,
     MODOS_CONTA_BOLETO: () => MODOS_CONTA_BOLETO,
@@ -1627,6 +1629,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     enderecoDoPagador: () => enderecoDoPagador,
     estiloAlerta: () => estiloAlerta,
     estornarPagamento: () => estornarPagamento,
+    etapasAtrasadas: () => etapasAtrasadas,
     etapasFechamento: () => etapasFechamento,
     eventosDoMes: () => eventosDoMes,
     excluir: () => excluir,
@@ -6703,8 +6706,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const marcado2 = (chave) => d2.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
     const ativos = d2.contratos.filter((c) => c.ativo !== false && c.imovel_id);
     const semBoleto = ativos.filter((c) => diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d2, c.id, mes));
-    const gerados = d2.cobrancas.filter((x) => x.competencia === mes).length;
-    const doMes = d2.cobrancas.filter((x) => x.competencia === comp);
+    const gerados = d2.cobrancas.filter((x) => x.competencia === mes && !ehComplementoCaucao(x)).length;
+    const doMes = d2.cobrancas.filter((x) => x.competencia === comp && !ehComplementoCaucao(x));
     const emAberto2 = doMes.filter((x) => !x.data_pagamento && x.situacao !== "Carência");
     const vencidos = emAberto2.filter((x) => x.vencimento < hoje3);
     const cartas = ativos.map((c) => reajusteNaCompetencia(d2, c, mes)).filter((r) => r && r.faltaCarta);
@@ -6741,13 +6744,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       },
       ...d2.config_banco && d2.config_banco.ativo ? [(() => {
         const b = pendenciasBancoDoMes(d2, mes, hoje3);
+        const buscado = (x) => !x.importadoAte ? "extrato ainda não buscado" : b.mesFechado ? `extrato buscado só até ${dataBr(x.importadoAte)}, falta até o fim do mês` : `extrato buscado em ${dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`;
         return {
           chave: "banco",
           titulo: `Conferir o extrato de ${compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(" e ") || "banco"}) e dar destino às movimentações`,
           pendentes: b.semDestino + b.contasSemImportar.length,
           link: `#/banco?mes=${mes}`,
           contas: b.porConta,
-          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? "extrato ainda não buscado" : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") : "nenhuma conta configurada"
+          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : "nenhuma conta configurada"
         };
       })()] : [],
       {
@@ -6787,6 +6791,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       e.prevista = !e.feito && !!e.aPartirDe && hoje3 < e.aPartirDe;
     }
     return etapas;
+  }
+  var MESES_FECHAMENTO_ATRASADO = 12;
+  function etapasAtrasadas(d2, mesAtual, hoje3 = hojeIso()) {
+    const inicio = [String(d2.criado_em || "").slice(0, 7), somarMeses(mesAtual, -MESES_FECHAMENTO_ATRASADO)].sort().pop();
+    const out = [];
+    for (let mes = inicio; mes < mesAtual; mes = somarMeses(mes, 1)) {
+      out.push(...etapasFechamento(d2, mes, hoje3).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
+    }
+    return out;
   }
   function marcarEtapaFechamento(d2, mes, etapa, feito, usuario) {
     const atual = d2.fechamentos.find((f) => f.competencia === mes && f.etapa === etapa);
@@ -7264,6 +7277,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     copiar_para_contador: true
   };
   var DIAS_ALERTA_BANCO = 7;
+  var DIAS_EXTRATO_RECENTE = 7;
   var idPastaAno = (imovelId, ano) => Number(imovelId) * 1e4 + Number(ano);
   var idContador = (emitenteId, comp) => Number(emitenteId) * 1e6 + Number(String(comp).replace("-", ""));
   var decodificarIdContador = (id) => {
@@ -7336,7 +7350,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const cfg2 = d2.config_banco || {};
     const contas2 = cfg2.contas || [];
     const fim = limitesCompetencia(mes)[1];
-    const ate = fim < hoje3 ? fim : hoje3;
+    const mesFechado = fim < hoje3;
+    const ate = mesFechado ? fim : somarDias(hoje3, -DIAS_EXTRATO_RECENTE);
     const movs2 = (d2.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
     const semDestinoDe = (id) => movs2.filter((m) => m.conta_id === id && !m.classificacao).length;
     const porConta = contas2.map((c) => {
@@ -7345,7 +7360,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     });
     const semComprovante = movs2.filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador).length;
     const pagamentosPendentes = (d2.pagamentos_banco || []).filter((p2) => ["aguardando_aprovacao", "agendado", "erro"].includes(p2.situacao)).length;
-    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
+    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
     const cfg2 = d2.config_banco || {};
@@ -20320,9 +20335,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const pend = pendentesDeFatura(d());
       const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
       const mesAtual = competenciaDe(hoje3);
-      const mesAnterior = somarMeses(mesAtual, -1);
       const faltamEtapas = [
-        ...etapasFechamento(d(), mesAnterior, hoje3).filter((e) => e.chave === "nfs" && !e.feito).map((e) => ({ ...e, mes: mesAnterior })),
+        ...etapasAtrasadas(d(), mesAtual, hoje3),
         ...etapasFechamento(d(), mesAtual, hoje3).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))
       ];
       const previstas = etapasFechamento(d(), mesAtual, hoje3).filter((e) => e.prevista && e.chave !== "cartas");
