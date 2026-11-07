@@ -22,6 +22,7 @@ import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from '
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { siglaEmpresa } from './faturas.js';
+import { usarVisualizador, visualizar } from '../visualizador.js';
 
 // --------------------------------------------------------------------------
 // Botões
@@ -1408,6 +1409,7 @@ export const ACOES = {
     const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
+    if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar); // celular: mostra na tela em vez de baixar
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
@@ -1626,7 +1628,8 @@ export const ACOES = {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
-      window.open(URL.createObjectURL(blob), '_blank');
+      if (usarVisualizador()) visualizar(blob, 'boleto.pdf', 'application/pdf', baixar);
+      else window.open(URL.createObjectURL(blob), '_blank');
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     } });
   },

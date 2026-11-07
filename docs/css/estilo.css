@@ -507,6 +507,24 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   table.responsiva tr.total { display: none; } /* a soma do mês não cabe no formato de cartão (colunas unidas) */
   table.responsiva form.inline, table.responsiva form.inline input { max-width: 100%; }
   .rolagem.tem-rolagem:has(table.responsiva)::before { display: none; }
+  /* cartões automáticos (app.js, cartoesNoCelular): título no meio da tabela vira o título do cartão; nada de largura mínima */
+  table.cartoes-auto { min-width: 0 !important; width: 100% !important; }
+  table.cartoes-auto tr:not(:first-child) > th { display: block; text-align: left; padding: 4px 0; border: 0; white-space: normal; }
+  table.cartoes-auto td { white-space: normal !important; overflow-wrap: anywhere; width: auto !important; }
+  table.cartoes-auto tr.total { display: block; }
+  /* tabela larga sem títulos (listas de tarefas do contrato): cada linha quebra para baixo em vez de esticar para o lado */
+  table.linhas-celular, table.linhas-celular tbody { display: block; min-width: 0 !important; width: 100% !important; }
+  table.linhas-celular tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--borda); }
+  table.linhas-celular td, table.linhas-celular th { display: block; border: 0; padding: 0; white-space: normal !important; width: auto !important; }
+  /* Imóveis: as duas linhas de cada imóvel formam um cartão só (nome e endereço em cima; matrícula, contas e valor embaixo) */
+  table.lista-imoveis.cartoes-auto td::before { display: none; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l1 { margin-bottom: 0; border-bottom: 0; border-radius: 8px 8px 0 0; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 { display: flex; flex-wrap: wrap; gap: 2px 14px; border-top: 0; border-radius: 0 0 8px 8px; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 td { border: 0; padding: 2px 0; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 td.anexos { flex-basis: 100%; }
+  table.lista-imoveis.cartoes-auto td.sobra { display: none; }
+  table.lista-imoveis.cartoes-auto td.nome a, table.lista-imoveis.cartoes-auto td.end-imovel { white-space: normal; }
+  table.lista-imoveis.cartoes-auto td.n { text-align: left; }
 }
 
 /* Banco (C6): boleto emitido, QR Code do Pix e botões que ainda não funcionam */
@@ -525,3 +543,12 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .qr-pix { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
 .qr-pix img { width: 180px; height: 180px; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
 #saude-ponte ul { padding-left: 18px; }
+
+/* Visualizador de anexos no celular (visualizador.js): PDF e fotos por cima da tela, sem baixar */
+.visualizador { position: fixed; inset: 0; z-index: 1000; background: #1e293b; display: flex; flex-direction: column; }
+.vis-topo { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #0f172a; color: #fff; }
+.vis-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.vis-corpo { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; -webkit-overflow-scrolling: touch; }
+.vis-corpo canvas, .vis-corpo img { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
+body.com-visualizador { overflow: hidden; }

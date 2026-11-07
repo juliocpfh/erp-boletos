@@ -207,6 +207,7 @@ function aoMudarNuvem(externo) {
   renovarUsuario();
   atualizarFaixa();
   if (!externo) return;
+  E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
   if (!E.usuario) return mostrar();
   const editando = document.querySelector('main form[data-form]');
   if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
@@ -543,7 +544,15 @@ export async function mostrar(estadoForm = null) {
     const endereco = location.hash.split('?')[0];
     const abertos = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id][open]')].map((el) => el.id) : [];
     const fechados = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id]:not([open])')].map((el) => el.id) : [];
+    // redesenho da mesma página (ex.: chegou mudança de outro aparelho): a tela não pode encolher nem voltar ao topo.
+    // Mantém a altura e as listas de anexos já mostradas até as novas chegarem, e devolve a posição da rolagem.
+    const mesma = endereco === paginaDesenhada;
+    const rolagem = mesma ? window.scrollY : 0;
+    const anexosVistos = mesma ? new Map([...app.querySelectorAll('[data-arquivos]')].map((el) => [el.dataset.arquivos, el.innerHTML])) : new Map();
+    if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
     app.innerHTML = html;
+    for (const el of app.querySelectorAll('[data-arquivos]')) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
+    if (mesma) window.scrollTo(0, rolagem);
     paginaDesenhada = endereco;
     for (const id of abertos) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = true; }
     for (const id of fechados) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = false; }
@@ -556,7 +565,7 @@ export async function mostrar(estadoForm = null) {
     atualizarFaixa();
     desenharMensagens();
     mensagens = [];
-    await montarExtras(app);
+    try { await montarExtras(app); } finally { app.style.minHeight = ''; }
     // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel).
     // Depois tira o ?ir= do endereço: assim o mesmo atalho funciona de novo e outras ações na página não pulam para a caixa.
     const alvo = rota.q.ir && document.getElementById(rota.q.ir);
@@ -571,11 +580,14 @@ export async function mostrar(estadoForm = null) {
 
 /** Partes que precisam ler a pasta depois de desenhadas: listas de arquivos e fotos. */
 async function montarExtras(raiz) {
-  for (const el of raiz.querySelectorAll('[data-arquivos]')) {
+  // todas as listas de anexos ao mesmo tempo (na nuvem, uma de cada vez deixava a tela aparecendo aos poucos)
+  await Promise.all([...raiz.querySelectorAll('[data-arquivos]')].map(async (el) => {
     const [escopo, id, modo] = el.dataset.arquivos.split(':');
-    el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
-  }
+    const html = await TELAS._listaArquivos(escopo, Number(id), modo);
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }));
   TELAS._ligarDesconto(raiz);
+  if (window.matchMedia?.('(max-width: 760px)').matches) cartoesNoCelular(raiz);
   // no celular, as tabelas largas viram cartões: cada célula mostra o nome da coluna (ver estilo.css, @media)
   for (const tabela of raiz.querySelectorAll('table.responsiva')) {
     const cabecalho = [...tabela.querySelectorAll('tr:first-child th')].map((th) => th.textContent.trim());
@@ -588,6 +600,27 @@ async function montarExtras(raiz) {
     }
   }
   for (const caixa of raiz.querySelectorAll('.rolagem')) caixa.classList.toggle('tem-rolagem', caixa.scrollWidth > caixa.clientWidth + 2);
+}
+
+/** Tabelas com desenho próprio (fatura, contrato, vistoria, boleto, cartas): continuam como estão no celular. */
+const SEM_CARTOES = '.fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria, .boleto-banco, .carta-tabela, .mapa-iptu, table.responsiva';
+
+/**
+ * Celular: a tabela que não cabe na largura da tela vira cartões (como as "responsiva"), em vez de rolar para o lado.
+ * Só as que têm a 1ª linha de títulos (th), de onde saem os rótulos de cada valor.
+ */
+function cartoesNoCelular(raiz) {
+  for (const t of raiz.querySelectorAll('main table')) {
+    if (t.matches(SEM_CARTOES) || t.closest('.fatura-xls, .demonstrativo')) continue;
+    const primeira = t.rows[0];
+    if (!primeira || !primeira.cells.length) continue;
+    const caixa = t.parentElement;
+    const larga = t.scrollWidth > (caixa?.clientWidth || window.innerWidth) + 2 || t.getBoundingClientRect().right > window.innerWidth + 2;
+    if (!larga) continue;
+    // com títulos: cartões com o nome da coluna; sem títulos (listas de tarefas): cada linha quebra para baixo
+    if ([...primeira.cells].every((c) => c.tagName === 'TH')) t.classList.add('responsiva', 'cartoes-auto');
+    else t.classList.add('linhas-celular');
+  }
 }
 
 // --------------------------------------------------------------------------

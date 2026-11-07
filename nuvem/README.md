@@ -35,14 +35,16 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - **Worker `erp-boletos`** (nome igual no `wrangler.toml`): Workers Builds ligado ao repositório, raiz `/nuvem`, `npx wrangler deploy` a cada merge na `main` (não precisa `wrangler login`). Rota `erp.ankjck.com.br/api/*`.
 - **Variáveis do Worker** (Settings → Variables and secrets, o quadro de cima, não o de Build): `ACCESS_EQUIPE` = `fragrant-haze-f916.cloudflareaccess.com` e `ACCESS_AUD` (do aplicativo "Sistema de Imoveis"), as duas do tipo **Secret** (tipo Text é apagado no próximo deploy). Nunca `MODO_TESTE`.
 - **R2** `imoveis-dados`, sem endereço público.
-- **Zero Trust** (equipe "Familia", plano Free) → Access → Applications: "Sistema de Imoveis" (`erp.ankjck.com.br` inteiro, política "Familia" com os 4 e-mails, só **One-time PIN**, entrada direta, sessão 24 h) e "Cadeado GitHub" (**Bypass** para todos só em `erp.ankjck.com.br/.well-known/acme-challenge`, para o GitHub Pages renovar o certificado; sem ele o cadeado vence em ~3 meses). O provedor "Cloudflare" que vem pronto pede conta do Cloudflare: não usar.
+- **Zero Trust** (equipe "Familia", plano Free) → Access → Applications: "Sistema de Imoveis" (`erp.ankjck.com.br` inteiro, política "Familia" com os 4 e-mails, só **One-time PIN**, entrada direta, sessão **1 mês** desde 2026-11-07; a política segue o prazo do aplicativo) e "Cadeado GitHub" (**Bypass** para todos só em `erp.ankjck.com.br/.well-known/acme-challenge`, para o GitHub Pages renovar o certificado; sem ele o cadeado vence em ~3 meses). O provedor "Cloudflare" que vem pronto pede conta do Cloudflare: não usar.
+- Página do código (Reusable components → Custom pages → Access login page): nome "ERP - ANKJCK" e frase em português. Não trocar o endereço da equipe (`fragrant-haze-f916`): é o `ACCESS_EQUIPE` do Worker.
+- Cabeçalhos (Rules → Transform Rules → "Cabecalhos de seguranca do sistema", só `erp.ankjck.com.br`): `Strict-Transport-Security: max-age=15552000`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (2026-11-07).
 - DNS: `erp` CNAME `juliocpfh.github.io` com nuvem laranja; SSL/TLS **Full (strict)**.
 - Usuários: o login de cada um é o próprio e-mail, igual ao "E-mail de acesso" e à lista do Access.
 - Conferir: sem login, `curl -I https://erp.ankjck.com.br/api/saude` dá 302 para `…cloudflareaccess.com`; com login, `{"ok":true,"email":…,"teste":false}`.
 
 ## Próximos passos
 1. Arquivo do aplicativo instalável com o login: `<link rel="manifest" … crossorigin="use-credentials">` em `docs/index.html` (sem isso o Access barra o manifest). Entra na PR do "salvar" de 2026-11-06.
-2. Cabeçalhos (Rules → Transform Rules → Response headers, `erp.ankjck.com.br`): `Strict-Transport-Security: max-age=15552000`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+2. ~~Cabeçalhos~~ feito em 2026-11-07 (acima).
 3. Testar no celular: instalar o aplicativo, usar sem internet, conflito entre dois aparelhos.
 4. Passagem/"Substituir…" mais rápida: 4 anexos de cada vez (`docs/js/migracao.js`; a de 2026-11-06 levou muito tempo com 283 anexos, 256 MB).
 5. Depois de uns dias sem problema: aposentar a pasta do OneDrive como reserva (decisão do usuário).

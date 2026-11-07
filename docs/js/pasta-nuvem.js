@@ -4,7 +4,8 @@
 // A raiz tem as pastas "arquivos", "modelos" e "backups" (só leitura), como a pasta dos dados de hoje.
 
 const RAIZES = ['arquivos', 'modelos', 'backups'];
-const VALIDADE_LISTA = 15000; // ms: a lista de uma pasta é reaproveitada por pouco tempo (o painel percorre muitas pastas)
+const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por pouco tempo (o painel percorre muitas pastas;
+// a tela se redesenha a cada mudança de outro aparelho). O que este aparelho grava, apaga ou move já atualiza a lista na hora.
 
 const naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, 'NotFoundError');
 const semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
@@ -19,6 +20,7 @@ export class AnexosNuvem {
   constructor({ base = 'api/', buscar = (...a) => fetch(...a), guardar }) {
     this.base = base; this.buscar = buscar; this.guardar = guardar;
     this.listas = new Map(); // caminho → { em, pastas: Set, arquivos: Map(nome → tamanho) }
+    this.buscando = new Map(); // caminho → pedido em andamento (várias caixas da tela pedindo a mesma pasta: um pedido só)
     this.criadas = new Set(); // pastas criadas vazias (o R2 não tem pasta sem arquivo)
     this.fila = null; this.avisos = []; this.enviando = null;
   }
@@ -55,7 +57,12 @@ export class AnexosNuvem {
     let l = this.listas.get(chave);
     if (!l || fresca || Date.now() - l.em > VALIDADE_LISTA) {
       try {
-        const r = await (await this.pedir('GET', `lista/${codificar(partes)}/`)).json();
+        let pedido = this.buscando.get(chave);
+        if (!pedido) {
+          pedido = this.pedir('GET', `lista/${codificar(partes)}/`).then((resp) => resp.json()).finally(() => this.buscando.delete(chave));
+          this.buscando.set(chave, pedido);
+        }
+        const r = await pedido;
         l = { em: Date.now(), pastas: new Set(r.pastas), arquivos: new Map(r.arquivos.map((a) => [a.nome, a.tamanho])) };
         this.guardar?.gravar(`lista:${chave}`, { pastas: r.pastas, arquivos: r.arquivos }).catch(() => {});
       } catch (e) {
