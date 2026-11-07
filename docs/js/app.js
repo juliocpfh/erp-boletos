@@ -38,7 +38,7 @@ const SESSAO = 'imoveis-sessao';
 const DURACAO_SESSAO = 12 * 3600 * 1000;
 const LIMITE_SESSAO = 7 * 24 * 3600 * 1000;
 
-const MAX_SESSOES = 10; // por usuário (vários navegadores/computadores)
+const MAX_SESSOES = N.MAX_SESSOES; // por usuário (vários navegadores/computadores); na nuvem, o cofre junta as listas dos aparelhos
 
 const deposito = () => (location.protocol === 'file:' ? sessionStorage : localStorage);
 

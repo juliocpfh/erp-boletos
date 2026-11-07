@@ -21,6 +21,8 @@ export const CONTADORES = ['proxima_fatura'];
 const SEGREDOS = ['senha_ponte', 'ponte_url'];
 /** O que o operador pode mudar no próprio usuário (trocar a senha); o resto de "usuarios" é do administrador. */
 const USUARIO_PROPRIO = ['senha_sal', 'senha_hash', 'senha_iteracoes', 'sessoes', 'pendente'];
+/** Sessões lembradas por usuário (igual a MAX_SESSOES de docs/js/nuvem.js; tests/sincronia.test.mjs confere). */
+export const MAX_SESSOES = 10;
 const NIVEL = { consulta: 1, operador: 2, admin: 3 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
 
@@ -280,6 +282,15 @@ export class Cofre {
       for (const [c, v] of campos) {
         nomeCampo(c);
         const antes = semSegredos(v?.antes); const depois = semSegredos(v?.depois);
+        if (tabela === 'usuarios' && c === 'sessoes') {
+          // sessões (tokens de login) de vários aparelhos: junta as listas em vez de disputar (cada aparelho só sabe das suas);
+          // o que este aparelho tirou (sair) some, o que os outros puseram fica
+          const tirados = new Set((Array.isArray(antes) ? antes : []).filter((t) => !(Array.isArray(depois) ? depois : []).includes(t)));
+          const juntas = [...new Set([...(Array.isArray(dados[c]) ? dados[c] : []), ...(Array.isArray(depois) ? depois : [])])].filter((t) => !tirados.has(t)).slice(-MAX_SESSOES);
+          if (igual(dados[c], juntas)) continue;
+          dados[c] = juntas; meta[c] = { por: email, em: this.agora() };
+          mudou = true; continue;
+        }
         const aberto = this.q("SELECT id FROM conflitos WHERE resolvido_em IS NULL AND tipo = 'campo' AND tabela = ? AND reg_id = ? AND campo = ?", tabela, String(id), c)[0];
         if (aberto) { // campo já em disputa: vira mais uma proposta, nada vale até a escolha
           novosConflitos.push(this.abrirConflito('campo', tabela, id, c, dados[c], meta[c]?.por || null, depois, email));

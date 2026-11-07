@@ -6,6 +6,8 @@
 export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualizado_por', 'seq', 'revisao_so_sessao', 'historico', '_nuvem'];
 /** Contador que só anda com internet (número da NF): gravação que o muda vai na hora e espera a resposta. */
 export const CONTADORES = ['proxima_fatura'];
+/** Sessões lembradas por usuário (vários navegadores/computadores); igual a MAX_SESSOES de nuvem/cofre.mjs, que junta as listas dos aparelhos. */
+export const MAX_SESSOES = 10;
 const FAIXA = 1000; // códigos reservados por tabela para este aparelho
 const RESERVA_MINIMA = 200; // abaixo disso, pede uma faixa nova quando tiver internet
 

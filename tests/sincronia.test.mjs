@@ -54,6 +54,7 @@ const imovel = (s, id = 1) => s.atual().imoveis.find((x) => x.id === id);
 test('a lista de campos do servidor é a mesma no sistema e no cofre', () => {
   assert.deepEqual(N.RAIZ_DO_SERVIDOR, K.RAIZ_DO_SERVIDOR);
   assert.deepEqual(N.CONTADORES, K.CONTADORES);
+  assert.equal(N.MAX_SESSOES, K.MAX_SESSOES);
   const x = { b: [1, { d: 1, c: 2 }], a: 'x' };
   assert.equal(N.canon(x), K.canon(x));
 });
@@ -213,6 +214,31 @@ test('normalizar roda na nuvem: a tela vê a migração e quem pode gravar manda
   await a.sinc.sincronizar(); await b.sinc.sincronizar();
   assert.equal(imovel(b.sinc).nome, 'Apto 604 anunciado');
   assert.equal(a.sinc.conflitos.length, 0);
+});
+
+test('a mesma pessoa entra em dois aparelhos: as sessões se juntam, sem conflito; sair num tira só a dele', async () => {
+  const { a } = await cenario();
+  const pc = aparelho(novoCofreDO(), DONO); // só para ter um segundo Sincronia do mesmo e-mail contra o mesmo cofre
+  pc.api = a.api; pc.sinc = new N.Sincronia({ api: a.api, guardar: pc.guardar });
+  await pc.sinc.iniciar();
+  const entrar = (s, token) => s.alterar((d) => { const u = d.usuarios.find((x) => x.id === 1); u.sessoes = [...(u.sessoes || []), token].slice(-N.MAX_SESSOES); });
+  // os dois entram sem ver um ao outro (cada um acha que a lista está vazia)
+  await entrar(a.sinc, 'tok-celular'); await entrar(pc.sinc, 'tok-pc');
+  await a.sinc.sincronizar(); await pc.sinc.sincronizar(); await a.sinc.sincronizar();
+  for (const s of [a.sinc, pc.sinc]) {
+    assert.deepEqual([...s.atual().usuarios.find((x) => x.id === 1).sessoes].sort(), ['tok-celular', 'tok-pc']);
+    assert.equal(s.conflitos.length, 0); assert.equal(s.recusas.length, 0);
+  }
+  // o celular sai (tira o próprio token) enquanto o PC, sem ver isso, entra de novo: fica só o que vale
+  a.internet = false; pc.internet = false;
+  await a.sinc.alterar((d) => { const u = d.usuarios.find((x) => x.id === 1); u.sessoes = u.sessoes.filter((t) => t !== 'tok-celular'); });
+  await entrar(pc.sinc, 'tok-pc-2');
+  a.internet = true; pc.internet = true;
+  await pc.sinc.sincronizar(); await a.sinc.sincronizar(); await pc.sinc.sincronizar();
+  for (const s of [a.sinc, pc.sinc]) {
+    assert.deepEqual([...s.atual().usuarios.find((x) => x.id === 1).sessoes].sort(), ['tok-pc', 'tok-pc-2']);
+    assert.equal(s.conflitos.length, 0);
+  }
 });
 
 test('aparelho novo sem internet e sem cópia: avisa que precisa conectar', async () => {
