@@ -165,14 +165,8 @@ export function normalizar(d) {
   for (const c of d.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = C.hojeIso();
   // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
   for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
-  // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
-  // (o termo gerado e ainda não assinado, sem arquivo, não conta; o registrado como perdido conta, desde 2026-11-06)
-  const comAditivo = new Set(d.aditivos.filter((a) => a.arquivo || a.perdido_em).map((a) => a.contrato_id));
-  for (const c of d.contratos) c.possui_aditivos = comAditivo.has(c.id);
-  // quem já saiu (ou teve fim do vínculo) e já tem o boleto do último mês fica inativo
-  for (const c of d.contratos) desativarSeSaiu(d, c);
-  // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
-  for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
+  // "Possui termo aditivo" só com termo registrado, inativar quem saiu e completar a caução pelos depósitos eram feitos aqui,
+  // calados: desde 2026-11-07 (rotina C9) ficam em `rotinaDeAbertura`, que roda com o usuário logado e passa pelo histórico.
   // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
   const renovados = new Set(d.renovacoes.map((x) => x.contrato_id));
   for (const c of d.contratos) {
@@ -590,16 +584,25 @@ export function garantiaADepositar(d, c, qual, hoje = C.hojeIso()) {
   return { combinado, corrigida, necessaria, depositos, depositado, falta: Math.max(necessaria - depositado, 0) };
 }
 
-/** Depósitos da caução (ou do depósito de garantia) que já cobrem o valor inicial, sem estar registrada: registra. */
-function completarPorDepositos(d, c, qual, usuario) {
+/**
+ * Depósitos da caução (ou do depósito de garantia) que já cobrem o valor inicial, sem a garantia estar registrada como depositada:
+ * devolve os campos a gravar e o texto do histórico, ou null (nada a fazer). Não grava.
+ */
+function depositosCompletam(d, c, qual) {
   const g = GARANTIAS_DEPOSITADAS[qual];
-  if (garantiaDepositada(c)) return false;
+  if (garantiaDepositada(c)) return null;
   const s = garantiaADepositar(d, c, qual);
   const ultimo = s.depositos.filter((x) => !x.complementar).pop();
-  if (!ultimo || !s.necessaria || s.falta > 0) return false;
-  const dados = { [g.pago]: ultimo.data, [g.comprovante]: ultimo.comprovante || null, [`${qual}_por_depositos`]: true };
-  if (usuario) atualizar(d, 'contratos', c.id, dados, usuario, `${c.inquilino_nome}: ${g.nome} completa (${C.reais(s.depositado)} em ${s.depositos.length} depósito(s))`);
-  else Object.assign(c, dados);
+  if (!ultimo || !s.necessaria || s.falta > 0) return null;
+  return { dados: { [g.pago]: ultimo.data, [g.comprovante]: ultimo.comprovante || null, [`${qual}_por_depositos`]: true },
+    texto: `${c.inquilino_nome}: ${g.nome} completa (${C.reais(s.depositado)} em ${s.depositos.length} depósito(s))` };
+}
+
+/** Registra a garantia como depositada quando os depósitos já cobrem o valor inicial (``depositosCompletam``). */
+function completarPorDepositos(d, c, qual, usuario) {
+  const x = depositosCompletam(d, c, qual);
+  if (!x) return false;
+  atualizar(d, 'contratos', c.id, x.dados, usuario, x.texto);
   return true;
 }
 
@@ -4462,15 +4465,42 @@ export function reajustePendente(d, c, hoje = C.hojeIso()) {
 }
 
 /**
- * Quem saiu (ou teve fim do vínculo na troca de titular) deixa de estar ativo: quando a data já passou e o boleto do
- * último mês já existe (para não deixar de gerar o aluguel proporcional desse mês). ``usuario`` vazio: só ajusta (ao abrir).
+ * Quem saiu (ou teve fim do vínculo na troca de titular) deve deixar de estar ativo: quando a data já passou e o boleto do
+ * último mês já existe (para não deixar de gerar o aluguel proporcional desse mês). Só confere; não grava.
  */
-export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
+export function deveDesativar(d, c, hoje = C.hojeIso()) {
   if (c.ativo === false || !c.data_saida || c.data_saida >= hoje) return false;
   if (c.imovel_id && !boletoDoMes(d, c.id, c.data_saida.slice(0, 7)) && C.diasOcupados(c.data_saida.slice(0, 7), c.data_entrada, c.data_saida) > 0) return false;
-  if (usuario) atualizar(d, 'contratos', c.id, { ativo: false }, usuario, `${c.inquilino_nome}: inativo (${fimDeVinculo(d, c) ? 'fim do vínculo' : 'saída'} em ${C.dataBr(c.data_saida)})`);
-  else c.ativo = false;
   return true;
+}
+
+/** Inativa quem saiu quando ``deveDesativar``; registra no histórico (``usuario`` vazio: "sistema"). */
+export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
+  if (!deveDesativar(d, c, hoje)) return false;
+  atualizar(d, 'contratos', c.id, { ativo: false }, usuario || 'sistema', `${c.inquilino_nome}: inativo (${fimDeVinculo(d, c) ? 'fim do vínculo' : 'saída'} em ${C.dataBr(c.data_saida)})`);
+  return true;
+}
+
+/**
+ * Rotina de abertura (C9, 2026-11-07): regras de negócio que antes rodavam caladas em ``normalizar`` passam pelo histórico com o
+ * usuário que abriu o sistema. Ex.: Maria saiu em 15/07 e o boleto de julho já existe → em 01/08 o contrato fica inativo
+ * "por julio"; os depósitos da caução chegaram a R$ 4.050,00 → a caução fica registrada como depositada. Com
+ * ``soConferir``, só conta o que mudaria (para a tela não gravar à toa). Devolve o número de ajustes.
+ */
+export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = false } = {}) {
+  let n = 0;
+  for (const c of d.contratos) {
+    // "possui termo aditivo" só com termo registrado (assinado ou perdido): a marca antiga (vencimento/garantia) sai
+    if (!!c.possui_aditivos !== (aditivosValidos(d, c.id).length > 0)) { n += 1; if (!soConferir) marcarAditivos(d, c.id, usuario); }
+    if (deveDesativar(d, c, hoje)) { n += 1; if (!soConferir) desativarSeSaiu(d, c, usuario, hoje); }
+    if (!(d.depositos_garantia || []).length) continue;
+    for (const qual of ['caucao', 'deposito']) {
+      if (!(qual === 'caucao' ? temCaucao(c) : temDeposito(c)) || !depositosCompletam(d, c, qual)) continue;
+      n += 1;
+      if (!soConferir) completarPorDepositos(d, c, qual, usuario);
+    }
+  }
+  return n;
 }
 
 /**
