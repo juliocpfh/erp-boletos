@@ -442,7 +442,8 @@ export const RENOVACAO = [
 ];
 
 // a data de saída vem do contrato ("Informar data de saída"); a leitura dos relógios na saída é a mesma da vistoria de saída
-// (vem preenchida e, se mudar aqui, muda lá também)
+// (vem preenchida e, se mudar aqui, muda lá também). O "Vistoria de saída" (sem/com pendências, não feita) não é digitado:
+// sai da vistoria de saída registrada (contratos.js, resultadoVistoriaSaida) e é guardado em vistoria_saida ao salvar
 export const ENCERRAMENTO = [
   ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
@@ -451,8 +452,7 @@ export const ENCERRAMENTO = [
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
   campo('fci_credito', 'FCI corrigido: crédito do inquilino', 'dinheiro', { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
   campo('fci_danos', 'Reparos de danos pagos com o FCI', 'dinheiro', { ajuda: 'Só danos apurados na vistoria de saída (nunca aluguel ou contas). O que passar do FCI vira débito; o que sobrar do FCI volta ao inquilino' }),
-  campo('vistoria_saida', 'Vistoria de saída', 'opcao', { opcoes: ['Sem pendências', 'Com pendências', 'Contestada', 'Não feita'] }),
-  campo('observacoes', 'Observações', 'area'),
+  campo('observacoes', 'Observações', 'area', { ajuda: 'Se o inquilino contestar a vistoria de saída, anote aqui' }),
 ];
 
 export const AVULSA = [

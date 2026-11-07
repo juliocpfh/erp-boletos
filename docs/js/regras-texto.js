@@ -56,7 +56,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro).
 - Valor da NF = aluguel com bonificação (pago em dia) ou com multa e juros (atrasado). Não inclui IPTU, seguro nem tarifa. O padrão é NF com o aluguel cheio e o ressarcimento de condomínio como gasto.
 - Valor recebido diferente do previsto para a data: pede justificativa e a NF é digitada à mão (a justificativa fica só no sistema).
-- Para corrigir erro de NF, usa-se "Voltar a última numeração" (NFs não se apagam, para não deixar buracos).
+- Para corrigir uma NF errada há dois caminhos, na tela NFs: (1) "Cancelar" a NF: o número fica cancelado (não é reaproveitado) e o pagamento volta para a fila e recebe um número novo; o administrador pode depois apagar a NF cancelada da lista (fica só no Histórico). (2) "Voltar a última numeração" (ou "desfazer a partir de um número", para NFs numeradas antes de existir o ciclo ou para voltar mais de um ciclo): as NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e os mesmos números são usados de novo, na ordem das datas. Assim a sequência nunca fica com buraco: ou o número consta como cancelado, ou é reaproveitado.
 - O sistema não emite NFS-e na prefeitura.
 
 8. IPTU

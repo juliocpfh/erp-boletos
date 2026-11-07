@@ -381,6 +381,7 @@ test('voltar a última numeração, incluir pagamento esquecido de data intermed
   R.desfazerUltimaNumeracao(d, 'julio');
   assert.equal(d.proxima_fatura, 51);
   assert.deepEqual([...new Set(d.faturas.map((f) => f.numero))], [50]);
+  assert.equal(d.historico.at(-1).descricao, 'Numeração desfeita: nº 0051 a 0052', 'voltar o ciclo passa por "a partir do nº" e guarda a descrição do ciclo');
   // o pagamento de setembro tinha passado despercebido
   R.registrarPagamento(d, 3, '2026-09-05', null, 'julio');
   R.numerarFaturas(d, 'julio');

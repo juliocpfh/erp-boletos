@@ -125,6 +125,34 @@ test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', 
   assert.deepEqual(ts.destaques, [true, false]);
 });
 
+test('vistoria de saída registrada é a fonte única do "Vistoria de saída" do cálculo final', () => {
+  const { d, c } = base();
+  // sem vistoria de saída: "Não feita"; dado antigo guardado no cálculo final continua valendo
+  assert.deepEqual(K.resultadoVistoriaSaida(d, c), { texto: 'Não feita', vistoria: null, pendencias: [] });
+  assert.equal(K.textoVistoriaSaida(d, c, null), 'Não feita');
+  assert.equal(K.textoVistoriaSaida(d, c, { vistoria_saida: 'Com pendências' }), 'Com pendências');
+  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Entrada', data: '2026-09-04', itens: [
+    { comodo: 'Sala', item: 'Teto', situacao: 'Bom', obs: '' }, { comodo: 'Sala', item: 'Paredes', situacao: 'Avaria', obs: 'já tinha furos' }] }, 'j');
+  const saida = R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2029-03-05', itens: [
+    { comodo: 'Sala', item: 'Teto', situacao: 'Bom', obs: '' }, { comodo: 'Sala', item: 'Paredes', situacao: 'Avaria', obs: 'furos' }] }, 'j');
+  // igual à entrada (a avaria das paredes já existia): sem pendências
+  assert.equal(K.resultadoVistoriaSaida(d, c).texto, 'Sem pendências');
+  // piorou (teto) e item novo com avaria (porta, sem comparação na entrada): com pendências, listadas
+  saida.itens = [{ comodo: 'Sala', item: 'Teto', situacao: 'Avaria', obs: 'infiltração' }, { comodo: 'Sala', item: 'Paredes', situacao: 'Avaria', obs: '' }, { comodo: 'Sala', item: 'Porta', situacao: 'Não funciona', obs: '' }];
+  const r = K.resultadoVistoriaSaida(d, c);
+  assert.equal(r.vistoria.id, saida.id);
+  assert.deepEqual([r.texto, r.pendencias], ['Com pendências', ['Sala – Teto (Avaria: infiltração)', 'Sala – Porta (Não funciona)']]);
+  // a vistoria registrada vale sobre o que foi guardado antes; "Contestada" antigo fica anotado
+  assert.equal(K.textoVistoriaSaida(d, c, { vistoria_saida: 'Sem pendências' }), 'Com pendências');
+  assert.equal(K.textoVistoriaSaida(d, c, { vistoria_saida: 'Contestada' }), 'Com pendências (contestada pelo inquilino)');
+  // sem grade (imóvel sem modelo): valem as linhas "DIFERENÇA:" do descritivo
+  saida.itens = [];
+  saida.descritivo = '## SALA\n- teto: bom estado\n- parede: DIFERENÇA: furos de quadro';
+  assert.deepEqual(K.resultadoVistoriaSaida(d, c).pendencias, ['parede: DIFERENÇA: furos de quadro']);
+  saida.descritivo = '## SALA\n- teto: bom estado';
+  assert.equal(K.resultadoVistoriaSaida(d, c).texto, 'Sem pendências');
+});
+
 test('marca-d\'água: fundo repetido na tela e logo fixa para a impressão', () => {
   assert.equal(K.marcaDagua(null), '');
   const html = K.marcaDagua('data:image/png;base64,AAAA');
