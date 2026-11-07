@@ -593,3 +593,56 @@ test('destino Airbnb (dividido entre os imóveis vagos) e reforma: lançam no lu
   Z.desvincularMovimentacao(d, mat.id, 'julio');
   assert.equal(d.reformas.length, 0);
 });
+
+test('pagamento ligado ao banco não se desfaz pelo Histórico nem pelo "desfazer" da parcela do IPTU (só pela tela Banco)', () => {
+  const { d, loja, iptu } = base();
+  // conta do imóvel paga à mão: o Histórico desfaz a data normalmente
+  const [solta] = R.lancarDespesas(d, loja.id, '2026-11', [{ tipo: 'Água', valor: 5000 }], 'julio');
+  R.atualizar(d, 'despesas', solta.id, { data_pagamento: '2026-11-03' }, 'julio', 'paga à mão');
+  const iSolta = d.historico.length - 1;
+  assert.ok(R.alteracoesDesfaziveis(d).has(`${iSolta}:data_pagamento`));
+  // conta ligada ao extrato: a data de pagamento some da lista do Histórico e o desfazer é barrado com mensagem clara
+  const [ligada] = R.lancarDespesas(d, loja.id, '2026-11', [{ tipo: 'Luz', valor: 12345 }], 'julio');
+  const [mov] = importar(d, 'ank', [saida('c10a', '2026-11-05', '123.45', 'COPEL')]).novas;
+  Z.vincularMovimentacao(d, mov.id, { classificacao: 'conta_imovel', imovel_id: loja.id, despesa_id: ligada.id }, 'julio');
+  const iLigada = d.historico.findLastIndex((h) => h.tabela === 'despesas' && h.registro_id === ligada.id && h.detalhes && h.detalhes.data_pagamento);
+  assert.equal(R.buscar(d, 'despesas', ligada.id).data_pagamento, '2026-11-05');
+  assert.ok(!R.alteracoesDesfaziveis(d).has(`${iLigada}:data_pagamento`), 'ligada ao extrato: fora da lista');
+  assert.throws(() => R.desfazerAlteracoes(d, [`${iLigada}:data_pagamento`], 'julio'), (e) => e instanceof C.ErroUsuario && /tela Banco/.test(e.message));
+  assert.equal(R.buscar(d, 'despesas', ligada.id).data_pagamento, '2026-11-05', 'nada mudou');
+  // desfeito o destino na tela Banco, a conta se solta pelo caminho certo
+  Z.desvincularMovimentacao(d, mov.id, 'julio');
+  assert.equal(R.buscar(d, 'despesas', ligada.id).movimentacao_id, null);
+  // guia paga pelo extrato
+  R.salvarGuiaImposto(d, d.emitentes[0].id, 'PIS/COFINS', '2026-10', 36500, 'julio');
+  const g = d.guias_impostos[0];
+  const [darf] = importar(d, 'ank', [saida('c10b', '2026-11-25', '365.00', 'DARF')]).novas;
+  Z.vincularMovimentacao(d, darf.id, { classificacao: 'imposto', guia_imposto_id: g.id }, 'julio');
+  const iGuia = d.historico.findLastIndex((h) => h.tabela === 'guias_impostos' && h.detalhes && h.detalhes.paga_em);
+  assert.ok(!R.alteracoesDesfaziveis(d).has(`${iGuia}:paga_em`));
+  assert.throws(() => R.desfazerAlteracoes(d, [`${iGuia}:paga_em`], 'julio'), /ligada ao extrato/);
+  // parcela do IPTU com destino no extrato: o botão "desfazer" da parcela e o Histórico são barrados; desfazer o destino libera
+  R.marcarIptuPago(d, iptu.id, 2, '2026-03-10', 'julio'); // parcela 2 paga à mão: continua desfazível
+  const [pIptu] = importar(d, 'ank', [saida('c10c', '2026-11-09', '100.00', 'IPTU 01.234.567 PARCELA 3/10')]).novas;
+  Z.vincularMovimentacao(d, pIptu.id, { classificacao: 'iptu', iptu_id: iptu.id, iptu_parcela: 3 }, 'julio');
+  assert.equal(R.buscar(d, 'iptus', iptu.id).pagas[3], '2026-11-09');
+  assert.ok(R.iptuPagoPeloBanco(d, iptu.id, 3));
+  assert.ok(!R.iptuPagoPeloBanco(d, iptu.id, 2));
+  assert.throws(() => R.marcarIptuPago(d, iptu.id, 3, '', 'julio'), (e) => e instanceof C.ErroUsuario && /paga pelo banco/.test(e.message));
+  R.marcarIptuPago(d, iptu.id, 2, '', 'julio'); // a paga à mão desfaz
+  assert.equal(R.buscar(d, 'iptus', iptu.id).pagas[2], undefined);
+  const iPagas = d.historico.findLastIndex((h) => h.tabela === 'iptus' && h.detalhes && h.detalhes.pagas && h.detalhes.pagas.para && h.detalhes.pagas.para[3] && !h.detalhes.pagas.de[3]);
+  assert.ok(iPagas > 0);
+  assert.ok(!R.alteracoesDesfaziveis(d).has(`${iPagas}:pagas`));
+  assert.throws(() => R.desfazerAlteracoes(d, [`${iPagas}:pagas`], 'julio'), /paga pelo banco/);
+  Z.desvincularMovimentacao(d, pIptu.id, 'julio');
+  assert.equal(R.buscar(d, 'iptus', iptu.id).pagas[3], undefined, 'pela tela Banco desfaz');
+  // conta paga por pagamento pelo C6 (sem extrato ainda): também barrado
+  d.config_banco.permitir_pagamentos = true;
+  const [p] = Z.prepararPagamentos(d, [{ conta_id: 'ank', origem: { tipo: 'despesa', id: solta.id }, forma: 'boleto', codigo_barras: '1'.repeat(44), valor: 5000, data_pagamento: '2026-11-06' }], 'ana');
+  Z.aprovarPagamento(d, p.id, 'julio');
+  Z.marcarPagamentoEnviado(d, p.id, { id_externo: 'it-c10' }, 'julio');
+  Z.atualizarPagamento(d, p.id, { situacao: 'pago', pago_em: '2026-11-06' }, 'julio');
+  const iPago = d.historico.findLastIndex((h) => h.tabela === 'despesas' && h.registro_id === solta.id && h.detalhes && h.detalhes.data_pagamento);
+  assert.throws(() => R.desfazerAlteracoes(d, [`${iPago}:data_pagamento`], 'julio'), /paga pelo banco \(pagamento nº/);
+});

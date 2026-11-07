@@ -357,7 +357,7 @@ async function enviarArquivosSeguro(contratoId, el) {
 /** Tipo e consulta da tela de impressão (ex.: #/imprimir/chaves?contrato=3 → ['chaves', { contrato: '3' }]). */
 function documentoDaTela() {
   const [caminho, consulta] = location.hash.replace(/^#\/?/, '').split('?');
-  return [caminho.split('/')[1], Object.fromEntries(new URLSearchParams(consulta || ''))];
+  return [caminho.split('/')[1], C.sanearParametros(Object.fromEntries(new URLSearchParams(consulta || '')))];
 }
 
 /** Contrato ou termo das chaves baixado ou impresso: marca "gerar" na rotina de entrada do inquilino (uma vez, com a data de hoje). */
@@ -938,12 +938,6 @@ export const ACOES = {
     setTimeout(() => { el.textContent = antes; }, 1500);
   },
 
-  async cancelarAvulsa({ id }) {
-    await alterar((db) => R.cancelarFaturas(db, 'avulsa', Number(id), login()));
-    aviso('NF cancelada. O número não será reaproveitado.');
-    await mostrar();
-  },
-
   async gerarCobrancas({ comp }) {
     const r = await alterar((db) => R.gerarCobrancas(db, comp, login()));
     aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
@@ -1076,10 +1070,6 @@ export const ACOES = {
     await alterar((db) => R.apagarCanceladas(db, Number(numero), login()));
     aviso(`NF nº ${R.numeroFatura(numero)} apagada da lista.`);
     await mostrar();
-  },
-
-  async aplicarReajuste({ contrato, comp }) {
-    await aplicarReajusteNaTela(Number(contrato), comp);
   },
 
   /** Tela Reajustes: desfaz a correção (só a mais recente do inquilino, sem boleto da caução pago). */
@@ -1433,6 +1423,14 @@ export const ACOES = {
   // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
   // ------------------------------------------------------------------------
   /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
+  /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
+  async esquecerPonteC6() {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    await BANCO.esquecerPonteLocal();
+    aviso('Ponte esquecida neste computador. Para usar o banco aqui de novo, informe o endereço e a senha e salve.');
+    await mostrar();
+  },
+
   async testarPonteC6() {
     const alvo = document.getElementById('saude-ponte');
     if (alvo) alvo.innerHTML = '<p class="suave">Falando com a ponte…</p>';

@@ -38,6 +38,12 @@ export async function salvarPonteLocal({ ponte_url, senha_ponte }) {
   return { ...local };
 }
 
+/** Apaga o endereço e a senha da ponte deste navegador (ex.: computador emprestado ou ponte trocada). */
+export async function esquecerPonteLocal() {
+  local = { ponte_url: '', senha_ponte: '' };
+  if (typeof indexedDB !== 'undefined') await S.esquecerPonte();
+}
+
 /** Endereço e senha da ponte deste navegador (a senha não sai daqui, exceto no cabeçalho da chamada). */
 export const ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url, configurada: !!local.ponte_url });
 
@@ -183,11 +189,6 @@ export async function listarTodosBoletos(d, contaId, filtros, opcoes = {}) {
     if (!(Number(r.total_pages) > pagina + 1)) break;
   }
   return itens;
-}
-
-/** Endereço do PDF do boleto na ponte (``GET /contas/:conta/boletos/:id/pdf``), para abrir numa aba. */
-export function urlPdfBoleto(d, cb) {
-  return urlDaPonte(configuracaoBanco(d), `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${idNoBanco(cb)}/pdf`);
 }
 
 /** Endereço da imagem do QR Code do Pix guardada no boleto (``data:`` URL), ou vazio. */

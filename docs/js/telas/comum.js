@@ -98,7 +98,6 @@ export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
 
 /** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
 export const PASTA_CONTADOR = '_Contador';
-export const idPastaContador = (emitenteId, comp) => emitenteId * 1000000 + Number(String(comp).replace('-', ''));
 export const decodificarIdContador = (id) => ({ emitenteId: Math.floor(id / 1000000), comp: `${String(id % 1000000).slice(0, 4)}-${String(id % 1000000).slice(4)}` });
 const pastaContador = () => (d().config_banco && d().config_banco.pasta_contador) || PASTA_CONTADOR;
 

@@ -597,7 +597,7 @@ export function desvincularMovimentacao(d, movId, usuario) {
     for (const g of ganhos) excluir(d, 'ganhos_airbnb', g.id, usuario, 'Ganho do Airbnb excluído (destino da movimentação desfeito)');
   }
   if (mov.reforma_id && buscar(d, 'reformas', mov.reforma_id)) excluir(d, 'reformas', mov.reforma_id, usuario, 'Reforma excluída (destino da movimentação desfeito)');
-  if (mov.iptu_id && mov.iptu_parcela !== null && buscar(d, 'iptus', mov.iptu_id)) marcarIptuPago(d, mov.iptu_id, mov.iptu_parcela, '', usuario);
+  if (mov.iptu_id && mov.iptu_parcela !== null && buscar(d, 'iptus', mov.iptu_id)) marcarIptuPago(d, mov.iptu_id, mov.iptu_parcela, '', usuario, { peloBanco: true });
   if (mov.guia_imposto_id && buscar(d, 'guias_impostos', mov.guia_imposto_id)) atualizar(d, 'guias_impostos', mov.guia_imposto_id, { paga_em: null, movimentacao_id: null }, usuario, 'Guia solta da movimentação do extrato');
   if (mov.par_movimentacao_id) {
     const par = buscar(d, 'movimentacoes_banco', mov.par_movimentacao_id);
@@ -745,8 +745,6 @@ export function prepararPagamentos(d, itens, usuario) {
     return p;
   });
 }
-/** Um pagamento só (mesmos dados de prepararPagamentos). */
-export const prepararPagamento = (d, dados, usuario) => prepararPagamentos(d, [dados], usuario)[0];
 
 function exigirPagamento(d, pagId) {
   const p = buscar(d, 'pagamentos_banco', pagId);

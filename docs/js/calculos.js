@@ -371,11 +371,11 @@ export function dataValida(texto, padrao = '') {
 
 /** Formato aceito de cada parâmetro conhecido do endereço; os demais passam como estão (as telas escapam o texto). */
 const FORMATOS_PARAMETRO = {
-  comp: COMPETENCIA_RE, mes: COMPETENCIA_RE, competencia: COMPETENCIA_RE, mes_ref: COMPETENCIA_RE,
+  comp: COMPETENCIA_RE, mes: COMPETENCIA_RE,
   data: DATA_RE,
   de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/, ate: DATA_RE, // "de" também é a tela de origem (de=iptu, de=inquilinos)
   imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
-  vincular: /^\d+$/, seguro: /^\d+$/, custo: /^\d+$/, airbnb: /^\d+$/, empresa: /^\d+$/, vistoria: /^\d+$/, id: /^\d+$/,
+  vincular: /^\d+$/, custo: /^\d+$/, airbnb: /^\d+$/, id: /^\d+$/,
   ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
   ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
   ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,

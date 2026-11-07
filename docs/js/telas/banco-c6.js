@@ -156,7 +156,7 @@ export function caixaConfigBanco() {
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(B.ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
       <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${B.ponteLocal().configurada ? '' : ' <b>Ainda não informados aqui.</b>'}</div>
       <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg.ativo)} ${cfg.contas.length ? '' : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
-      <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao('testarPonteC6', 'Testar conexão', {}, 'secundario')}</div></form>
+      <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao('testarPonteC6', 'Testar conexão', {}, 'secundario')}${B.ponteLocal().configurada ? ` ${botao('esquecerPonteC6', 'Esquecer a ponte neste computador', {}, 'perigo', 'Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.')}` : ''}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
