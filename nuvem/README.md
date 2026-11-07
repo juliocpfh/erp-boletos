@@ -47,5 +47,5 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 2. ~~Cabeçalhos~~ feito em 2026-11-07 (acima).
 3. Testar no celular: instalar o aplicativo, usar sem internet, conflito entre dois aparelhos.
 4. ~~Passagem/"Substituir…" com 4 anexos de cada vez~~ feito em 2026-11-07 (`docs/js/migracao.js`).
-4b. Cloudflare → Caching → Configuration → **Browser Cache TTL**: trocar "4 hours" por "Respect Existing Headers" (o GitHub pede 10 min). Não é obrigatório: o `sw.js` já confere tudo com o site.
+4b. ~~Cloudflare → Caching → Configuration → **Browser Cache TTL**: "4 hours" → "Respect Existing Headers"~~ feito em 2026-11-07 (vale o que o GitHub manda, 10 min; o `sw.js` já conferia tudo com o site).
 5. Depois de uns dias sem problema: aposentar a pasta do OneDrive como reserva (decisão do usuário).
