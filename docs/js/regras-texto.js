@@ -100,7 +100,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 15. USUÁRIOS E SEGURANÇA
 - Papéis: administrador (tudo, desfaz alterações de cadastro, backup seguro), operador (lança e edita) e consulta (só vê).
 - Senhas guardadas com PBKDF2-SHA256. Todas as alterações ficam no histórico.
-- Backup diário, ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador.
+- Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).
 
 16. BANCO E CONCILIAÇÃO (C6)
 - As duas contas (ANK e JCK) têm extrato separado, buscado pelo programa "Ponte C6" no computador. Cada lançamento do banco entra uma vez só (pela chave "reference" do C6); buscar de novo não duplica. O extrato é pedido em janelas de até 30 dias.

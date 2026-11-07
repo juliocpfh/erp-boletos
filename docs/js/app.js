@@ -134,6 +134,7 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
     // nuvem: compara antes e depois e manda só o que mudou (sem internet, fica na fila deste aparelho)
     const resultado = await E.nuvem.alterar(fn);
     E.d = E.nuvem.atual();
+    espelharSeguro(); // segunda camada, fora do Cloudflare: a cópia cifrada no computador do administrador
     atualizarFaixa();
     return resultado;
   }
@@ -209,10 +210,15 @@ export function backupCompletoSeguro() {
   });
 }
 
-/** Ao abrir a pasta: cópia do banco do dia e, se já passou uma semana, o backup completo. */
+/** Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). */
+function espelharSeguro() {
+  if (E.seguro && E.seguro.chave && E.d) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+}
+
+/** Ao abrir a pasta (ou a nuvem): cópia do banco do dia e, se já passou uma semana, o backup completo. */
 async function rotinaSegura() {
   if (!(await conectarSeguro(false)) || !E.d) return;
-  naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+  espelharSeguro();
   if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
 }
 
@@ -223,6 +229,7 @@ function aoMudarNuvem(externo) {
   renovarUsuario();
   atualizarFaixa();
   if (!externo) return;
+  espelharSeguro(); // o que os outros aparelhos mudaram também entra na cópia segura deste computador
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
   if (!E.usuario) return mostrar();
   const editando = document.querySelector('main form[data-form]');
@@ -418,6 +425,14 @@ export async function abrirNuvem() {
   E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
   ajustesParaNuvem(); // login lembrado: as correções vão sem passar por abrirSessao
   await mostrar();
+  if (E.d) rotinaSegura().catch((e) => { E.seguroErro = e.message; }); // backup seguro no computador do administrador, também na nuvem
+}
+
+/** Depois de substituir os dados (restaurar um backup da nuvem): registra a sessão de novo no banco novo, ou volta ao login. */
+export async function reabrirSessao() {
+  const u = E.usuario && E.d.usuarios.find((x) => x.login === E.usuario.login && x.ativo && !x.pendente);
+  if (u) await abrirSessao(u);
+  else { E.usuario = null; gravarSessao(null); }
 }
 
 /** Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). */

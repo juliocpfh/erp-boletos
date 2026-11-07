@@ -262,6 +262,19 @@ test('falhas passageiras (sem internet, tempo esgotado, 401, 408, 429, 5xx) fica
   assert.equal(a.sinc.pendentesQtd(), 0);
 });
 
+test('voltar para um backup: o administrador substitui os dados pelos do dia e os outros aparelhos baixam tudo de novo', async () => {
+  const { a, b } = await cenario();
+  const ontem = structuredClone(a.sinc.atual()); // o que o backup do dia teria (formato de tudo(), com _nuvem e seq)
+  await a.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Mudado hoje' }, DONO));
+  await a.sinc.sincronizar(); await b.sinc.sincronizar();
+  assert.equal(imovel(b.sinc).nome, 'Mudado hoje');
+  await a.sinc.importar(ontem, { substituir: true });
+  assert.equal(imovel(a.sinc).nome, 'Apto 604');
+  await b.sinc.sincronizar();
+  assert.equal(imovel(b.sinc).nome, 'Apto 604', 'o outro aparelho recebeu a versão restaurada');
+  assert.equal(b.sinc.pendentesQtd(), 0);
+});
+
 test('aparelho novo sem internet e sem cópia: avisa que precisa conectar', async () => {
   const { cofre } = await cenario();
   const c = aparelho(cofre, DONO);

@@ -35,7 +35,7 @@ test('dados: o Worker repassa ao cofre com o e-mail conferido, sem deixar o nave
 });
 
 test('anexos seguem o papel do usuário: consulta lê, mas não grava', async () => {
-  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => (new URL(req.url).searchParams.get('nivel') === 'operador' ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response('{"papel":"consulta"}')) }) };
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => (new URL(req.url).searchParams.get('nivel') !== 'consulta' ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response('{"papel":"consulta"}')) }) };
   const env = { MODO_TESTE: '1', DADOS: r2Falso(), COFRE };
   await env.DADOS.put('arquivos/a.pdf', 'x');
   assert.equal((await pedir(env, 'GET', '/api/arquivos/a.pdf')).status, 200);
@@ -45,6 +45,8 @@ test('anexos seguem o papel do usuário: consulta lê, mas não grava', async ()
   assert.equal((await pedir(env, 'DELETE', '/api/arquivos/a.pdf')).status, 403);
   assert.equal((await pedir(env, 'POST', '/api/mover', '{"de":"arquivos/a.pdf","para":"arquivos/c.pdf"}')).status, 403);
   assert.ok(env.DADOS.m.has('arquivos/a.pdf'));
+  await env.DADOS.put('backups/imoveis-dados-2026-01-01.json', '{}');
+  assert.equal((await pedir(env, 'GET', '/api/backups/imoveis-dados-2026-01-01.json')).status, 403, 'backup (banco inteiro, com senhas) só o administrador baixa');
 });
 
 test('arquivos: gravar, ler com tipo seguro, não sobrescrever, apagar; backups só leitura; página/script barrados', async () => {
@@ -64,6 +66,10 @@ test('arquivos: gravar, ler com tipo seguro, não sobrescrever, apagar; backups 
   assert.match(xlsx.headers.get('Content-Disposition'), /^attachment/);
   for (const nome of ['pagina.html', 'desenho.SVG', 'x.js', 'y.xml']) assert.equal((await pedir(env, 'PUT', `/api/arquivos/Sala%20101/${nome}`, 'x')).status, 415, nome);
   assert.equal((await pedir(env, 'PUT', '/api/backups/imoveis-dados-2026-01-01.json', banco())).status, 403);
+  // backups têm o banco inteiro (senhas de todos): só o administrador baixa; a lista qualquer um vê
+  await env.DADOS.put('backups/imoveis-dados-2026-01-01.json', banco());
+  assert.equal((await pedir(env, 'GET', '/api/backups/imoveis-dados-2026-01-01.json')).status, 200, 'administrador (modo de teste) lê');
+  assert.equal((await pedir(env, 'GET', '/api/lista/backups/')).status, 200);
   assert.equal((await pedir(env, 'DELETE', pdf)).status, 200);
   assert.equal((await pedir(env, 'GET', pdf)).status, 404);
 });
