@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-eZ+6YRuypI8ZmHpZI0hFAAD4yWgQWMivgK8s8Xq+jHM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-LjKZUVyeOahLlSYhHPyFS2lskTwAtDaknsUIwbq4jNo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="bb8c9fee4507d3f9">
+<meta name="fontes" content="a7e0d1d44e696a1a">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1603,6 +1603,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     desfazerUltimaNumeracao: () => desfazerUltimaNumeracao,
     desmarcarReservaAbatida: () => desmarcarReservaAbatida,
     despesasDo: () => despesasDo,
+    deveDesativar: () => deveDesativar,
     devolucaoGarantiaPendente: () => devolucaoGarantiaPendente,
     devolucaoPorRecebedor: () => devolucaoPorRecebedor,
     devolucoesGarantiaDo: () => devolucoesGarantiaDo,
@@ -1765,6 +1766,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     resultadosFinanceiros: () => resultadosFinanceiros,
     resumoRotinaEntrada: () => resumoRotinaEntrada,
     resumoSolicitacoes: () => resumoSolicitacoes,
+    rotinaDeAbertura: () => rotinaDeAbertura,
     rotinaEntrada: () => rotinaEntrada,
     rotinaRecente: () => rotinaRecente,
     rotuloDoComprovante: () => rotuloDoComprovante,
@@ -3222,10 +3224,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const i of d2.imoveis) if (!i.uf && ufDoCep(i.cep)) i.uf = ufDoCep(i.cep);
     for (const c of d2.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = hojeIso();
     for (const c of d2.contratos) if (c.garantia_tipo === "Caução") completarCaucao(c);
-    const comAditivo = new Set(d2.aditivos.filter((a) => a.arquivo || a.perdido_em).map((a) => a.contrato_id));
-    for (const c of d2.contratos) c.possui_aditivos = comAditivo.has(c.id);
-    for (const c of d2.contratos) desativarSeSaiu(d2, c);
-    for (const c of d2.contratos) for (const qual of ["caucao", "deposito"]) if ((qual === "caucao" ? temCaucao(c) : temDeposito(c)) && (d2.depositos_garantia || []).length) completarPorDepositos(d2, c, qual, null);
     const renovados = new Set(d2.renovacoes.map((x) => x.contrato_id));
     for (const c of d2.contratos) {
       if (!c.contrato_anterior_id) continue;
@@ -3566,15 +3564,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const depositado = registrada ? valorGarantia(d2, c) : depositos.filter((x) => !x.complementar).reduce((s, x) => s + x.valor, 0);
     return { combinado, corrigida, necessaria, depositos, depositado, falta: Math.max(necessaria - depositado, 0) };
   }
-  function completarPorDepositos(d2, c, qual, usuario) {
+  function depositosCompletam(d2, c, qual) {
     const g = GARANTIAS_DEPOSITADAS[qual];
-    if (garantiaDepositada(c)) return false;
+    if (garantiaDepositada(c)) return null;
     const s = garantiaADepositar(d2, c, qual);
     const ultimo = s.depositos.filter((x) => !x.complementar).pop();
-    if (!ultimo || !s.necessaria || s.falta > 0) return false;
-    const dados = { [g.pago]: ultimo.data, [g.comprovante]: ultimo.comprovante || null, [`${qual}_por_depositos`]: true };
-    if (usuario) atualizar(d2, "contratos", c.id, dados, usuario, `${c.inquilino_nome}: ${g.nome} completa (${reais(s.depositado)} em ${s.depositos.length} depósito(s))`);
-    else Object.assign(c, dados);
+    if (!ultimo || !s.necessaria || s.falta > 0) return null;
+    return {
+      dados: { [g.pago]: ultimo.data, [g.comprovante]: ultimo.comprovante || null, [`${qual}_por_depositos`]: true },
+      texto: `${c.inquilino_nome}: ${g.nome} completa (${reais(s.depositado)} em ${s.depositos.length} depósito(s))`
+    };
+  }
+  function completarPorDepositos(d2, c, qual, usuario) {
+    const x = depositosCompletam(d2, c, qual);
+    if (!x) return false;
+    atualizar(d2, "contratos", c.id, x.dados, usuario, x.texto);
     return true;
   }
   function caucaoSugerida(d2, c, dataRef = hojeIso()) {
@@ -7008,12 +7012,35 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (r && contratoHerdado(d2, c) && c.data_entrada && r.competencia < c.data_entrada.slice(0, 7)) return null;
     return r && (!r.corrigido || r.faltaCarta) ? r : null;
   }
-  function desativarSeSaiu(d2, c, usuario = null, hoje3 = hojeIso()) {
+  function deveDesativar(d2, c, hoje3 = hojeIso()) {
     if (c.ativo === false || !c.data_saida || c.data_saida >= hoje3) return false;
     if (c.imovel_id && !boletoDoMes(d2, c.id, c.data_saida.slice(0, 7)) && diasOcupados(c.data_saida.slice(0, 7), c.data_entrada, c.data_saida) > 0) return false;
-    if (usuario) atualizar(d2, "contratos", c.id, { ativo: false }, usuario, `${c.inquilino_nome}: inativo (${fimDeVinculo(d2, c) ? "fim do vínculo" : "saída"} em ${dataBr(c.data_saida)})`);
-    else c.ativo = false;
     return true;
+  }
+  function desativarSeSaiu(d2, c, usuario = null, hoje3 = hojeIso()) {
+    if (!deveDesativar(d2, c, hoje3)) return false;
+    atualizar(d2, "contratos", c.id, { ativo: false }, usuario || "sistema", `${c.inquilino_nome}: inativo (${fimDeVinculo(d2, c) ? "fim do vínculo" : "saída"} em ${dataBr(c.data_saida)})`);
+    return true;
+  }
+  function rotinaDeAbertura(d2, usuario, { hoje: hoje3 = hojeIso(), soConferir = false } = {}) {
+    let n = 0;
+    for (const c of d2.contratos) {
+      if (!!c.possui_aditivos !== aditivosValidos(d2, c.id).length > 0) {
+        n += 1;
+        if (!soConferir) marcarAditivos(d2, c.id, usuario);
+      }
+      if (deveDesativar(d2, c, hoje3)) {
+        n += 1;
+        if (!soConferir) desativarSeSaiu(d2, c, usuario, hoje3);
+      }
+      if (!(d2.depositos_garantia || []).length) continue;
+      for (const qual of ["caucao", "deposito"]) {
+        if (!(qual === "caucao" ? temCaucao(c) : temDeposito(c)) || !depositosCompletam(d2, c, qual)) continue;
+        n += 1;
+        if (!soConferir) completarPorDepositos(d2, c, qual, usuario);
+      }
+    }
+    return n;
   }
   function alertaReajuste(d2, c, hoje3) {
     const r = reajustePendente(d2, c, hoje3);
@@ -20633,6 +20660,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
     gravarSessao(u.login, token);
     ajustesParaNuvem();
+    rotinaDeAbertura2();
+  }
+  function rotinaDeAbertura2() {
+    if (!E.d || !pode(E.usuario, "operador")) return;
+    const quem = E.usuario.login;
+    if (!rotinaDeAbertura(E.d, quem, { soConferir: true })) return;
+    alterar((db) => rotinaDeAbertura(db, quem)).then(() => mostrar()).catch((e) => aviso(`Rotina de abertura: ${e.message}`, "aviso"));
   }
   window.addEventListener("storage", async (ev) => {
     if (ev.key !== SESSAO || !E.d) return;
@@ -20902,6 +20936,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.d = await lerBanco(handle);
     E.backupFeito = false;
     E.usuario = usuarioDaSessao();
+    rotinaDeAbertura2();
     await mostrar();
     rotinaSegura().catch((e) => {
       E.seguroErro = e.message;
@@ -20939,6 +20974,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
     E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
     ajustesParaNuvem();
+    rotinaDeAbertura2();
     await mostrar();
     if (E.d) rotinaSegura().catch((e) => {
       E.seguroErro = e.message;
