@@ -226,5 +226,5 @@ test('Durable Object: rotas, e-mail obrigatório, backup do dia no R2 e cópia a
   assert.equal((await chamar('/qualquer', { a: 1 })).status, 404);
   const d = await (await chamar('/tudo', null, CONSULTA)).json();
   assert.equal(d.contratos.length, 2);
-  assert.equal(await backupDoDia(dobj.cofre, env.DADOS, hora), false, 'um por dia');
+  assert.equal(await backupDoDia(dobj.cofre, env.DADOS, new Date()), false, 'um por dia (o cofre gravou o de hoje, pelo relógio de verdade)');
 });
