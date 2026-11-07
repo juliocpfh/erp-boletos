@@ -86,6 +86,12 @@ export function normalizar(d) {
     d.estilos_alertas['Rotina de entrada'] = d.estilos_alertas['Rotina de entrada'] || d.estilos_alertas['Documentos de entrada'];
     delete d.estilos_alertas['Documentos de entrada'];
   }
+  // "Correção do aluguel" nunca gerou alerta (o aviso do reajuste é "Reajuste do aluguel", mesmo padrão): a aparência
+  // escolhida passa ao reajuste, se este ficou no padrão; o tipo saiu da lista (entrou "Devolver garantia")
+  if (d.estilos_alertas && d.estilos_alertas['Correção do aluguel']) {
+    d.estilos_alertas['Reajuste do aluguel'] = d.estilos_alertas['Reajuste do aluguel'] || d.estilos_alertas['Correção do aluguel'];
+    delete d.estilos_alertas['Correção do aluguel'];
+  }
   // o anúncio passou a ser só uma descrição (o link antigo vira o texto)
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -1067,21 +1073,38 @@ export function parcelasIptu(d, p) {
 }
 
 /**
+ * IPTU quitado à vista pelo proprietário: o que os inquilinos pagam nos boletos, mês a mês (o mesmo cálculo do boleto,
+ * conforme "Inquilino que entrar": parcelas normais ou 1/12 nos meses ocupados). Um item por mês de vencimento do boleto:
+ * { mesBoleto, comp, n, rotulo, valor (soma dos inquilinos), inquilinos: [{ contrato, comp, dias, diasMes, valor }] }.
+ * Vazio quando não é à vista ou "Não cobrar do inquilino".
+ */
+export function mesesIptuAvista(d, p) {
+  if (!p.pago_avista) return [];
+  const porMes = new Map();
+  const umDoze = p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1];
+  for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+    for (let k = 0, comp = `${p.ano - 1}-01`; k < 36; k += 1, comp = C.somarMeses(comp, 1)) {
+      const [n, v] = iptuNaCompetencia(p, comp, c);
+      const dias = n ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+      if (!dias || (emCarencia(c, comp) && !c.carencia_cobrar_iptu)) continue;
+      const mesBoleto = c.cobranca_mes_seguinte === false ? comp : C.somarMeses(comp, 1);
+      const item = porMes.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? '1/12 (você pagou à vista)' : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
+      const valor = C.aluguelProporcional(v, dias, C.diasNoMes(comp));
+      item.valor += valor;
+      item.inquilinos.push({ contrato: c, comp, dias, diasMes: C.diasNoMes(comp), valor });
+      porMes.set(mesBoleto, item);
+    }
+  }
+  return [...porMes.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+}
+
+/**
  * Totais do IPTU no ano: quanto os inquilinos pagam nos boletos e quanto fica com o proprietário (e quanto dessa parte
  * ainda está em guia não paga). À vista: o inquilino paga conforme "Inquilino que entrar" (1/12 ou parcelas) nos meses ocupados.
  */
 export function totaisIptu(d, p) {
   const ps = parcelasIptu(d, p);
-  let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
-  if (p.pago_avista) {
-    for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
-      for (let k = 0, comp = `${p.ano - 1}-01`; k < 36; k += 1, comp = C.somarMeses(comp, 1)) {
-        const [n, v] = iptuNaCompetencia(p, comp, c);
-        const dias = n ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
-        if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += C.aluguelProporcional(v, dias, C.diasNoMes(comp));
-      }
-    }
-  }
+  const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d, p).reduce((s, x) => s + x.valor, 0);
   const custo = ps.reduce((s, x) => s + x.valor, 0);
   return { custo, inquilino, proprietario: custo - inquilino,
     emAberto: ps.filter((x) => x.proprietario && !x.paga).reduce((s, x) => s + x.valorProprietario, 0) };
@@ -1531,27 +1554,26 @@ export function ultimoCicloDeNumeracao(d) {
 export function desfazerUltimaNumeracao(d, usuario) {
   const ciclo = ultimoCicloDeNumeracao(d);
   if (!ciclo) throw new Error('Não há numeração para desfazer.');
-  const fs = d.faturas.filter((f) => f.lote === ciclo.lote);
   if (d.faturas.some((f) => f.lote !== ciclo.lote && f.numero >= ciclo.de)) {
     throw new Error(`Há NFs de outra numeração com número ${numeroFatura(ciclo.de)} ou maior. Use "a partir do nº".`);
   }
-  for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-  registrar(d, usuario, 'Alteração', 'faturas', null, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`, { proxima_fatura: { de: d.proxima_fatura, para: ciclo.de } });
-  d.proxima_fatura = ciclo.de;
+  // com a conferência acima, as NFs de nº >= ciclo.de são exatamente as do ciclo: o mesmo caminho de "a partir do nº"
+  desfazerNumeracao(d, ciclo.de, usuario, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`);
   return ciclo;
 }
 
 /**
  * Desfaz a numeração a partir de um número: apaga todas as NFs com número igual ou maior (emitidas ou canceladas),
  * os pagamentos voltam para a fila e o próximo número volta a ser este. Serve para corrigir e numerar de novo.
+ * É o único caminho que apaga NFs para renumerar ("Voltar a última numeração" passa por aqui).
  */
-export function desfazerNumeracao(d, aPartirDe, usuario) {
+export function desfazerNumeracao(d, aPartirDe, usuario, descricao = null) {
   const n = Number(aPartirDe);
   if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
   const fs = d.faturas.filter((f) => f.numero >= n);
   if (!fs.length) throw new Error(`Não há NF com número ${numeroFatura(n)} ou maior.`);
   for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-  registrar(d, usuario, 'Alteração', 'faturas', null, `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d.proxima_fatura, para: n } });
+  registrar(d, usuario, 'Alteração', 'faturas', null, descricao || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d.proxima_fatura, para: n } });
   d.proxima_fatura = n;
   return new Set(fs.map((f) => f.numero)).size;
 }
@@ -2628,12 +2650,20 @@ export function partesDoContrato(d, c) {
 export const textoParte = (p) => `${p.nome} (${p.papel})`;
 
 /**
- * Todo inquilino ativo (antigo ou novo): o que falta dos três documentos assinados (próprio ou herdado).
- * Faz parte do alerta único "Rotina de entrada" (alertaRotinaEntrada).
+ * Fonte única do que falta dos três documentos de entrada do inquilino ativo (antigo ou novo; próprio ou herdado):
+ * [{ campo, nome, feito, situacao }], situacao 'falta' (não assinado) ou 'parcial' (anexado, falta assinatura de alguém).
+ * Quem saiu, está inativo ou herdou de um titular anterior (marca-se lá) não tem pendência. Usada pelo alerta
+ * "Rotina de entrada", pela faixa de cadastros incompletos e pela faixa no topo da página do inquilino.
  */
+export function documentosPendentes(d, c) {
+  if (c.ativo === false || c.data_saida) return [];
+  return DOCUMENTOS_ENTRADA.map(([campo, nome, feito]) => ({ campo, nome, feito,
+    situacao: documentoFalta(d, c, campo) ? 'falta' : documentoParcial(d, c, campo) ? 'parcial' : null })).filter((x) => x.situacao);
+}
+
+/** Alerta do que falta dos três documentos assinados; faz parte do alerta único "Rotina de entrada" (alertaRotinaEntrada). */
 export function alertaDocumentosEntrada(c, d = null) {
-  if (c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  const falta = documentosPendentes(d, c).filter((x) => x.situacao === 'falta').map((x) => x.nome.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Rotina de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'rotina' } : null;
 }
 
@@ -3297,8 +3327,8 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 // Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
 // --------------------------------------------------------------------------
-export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência',
-  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
+export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
+  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
   'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
@@ -3308,7 +3338,6 @@ const PADRAO_ALERTA = { cor: 'Padrão', enfase: 'Normal', prioridade: 3 };
 export const ESTILOS_ALERTA_PADRAO = {
   'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 },
   'Reajuste do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
-  'Correção do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
   'A verificar': { cor: 'Amarelo', enfase: 'Normal', prioridade: 3 },
 };
 export const estiloAlerta = (d, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...((d && d.estilos_alertas) || {})[tipo] });
@@ -4187,8 +4216,9 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
   const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
   const semBoleto = ativos.filter((c) => C.diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, mes));
-  const gerados = d.cobrancas.filter((x) => x.competencia === mes).length;
-  const doMes = d.cobrancas.filter((x) => x.competencia === comp);
+  // o boleto à parte do complemento da caução não é aluguel: não conta como gerado nem como pagamento do mês
+  const gerados = d.cobrancas.filter((x) => x.competencia === mes && !ehComplementoCaucao(x)).length;
+  const doMes = d.cobrancas.filter((x) => x.competencia === comp && !ehComplementoCaucao(x));
   const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== 'Carência');
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
   // a carta vai junto com o boleto do próprio aluguel corrigido (o índice só sai no começo do mês do reajuste)
@@ -4211,9 +4241,13 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
       detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
     ...(d.config_banco && d.config_banco.ativo ? [(() => {
       const b = pendenciasBancoDoMes(d, mes, hoje);
+      // mês já fechado: o extrato precisa chegar ao fim do mês; mês corrente: basta ter sido buscado nos últimos dias
+      const buscado = (x) => (!x.importadoAte ? 'extrato ainda não buscado' : b.mesFechado ? `extrato buscado só até ${C.dataBr(x.importadoAte)}, falta até o fim do mês`
+        : `extrato buscado em ${C.dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`);
       return { chave: 'banco', titulo: `Conferir o extrato de ${C.compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(' e ') || 'banco'}) e dar destino às movimentações`,
         pendentes: b.semDestino + b.contasSemImportar.length, link: `#/banco?mes=${mes}`, contas: b.porConta,
-        detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? 'extrato ainda não buscado' : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ') : 'nenhuma conta configurada' };
+        detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ')
+          + (b.mesFechado ? '' : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : 'nenhuma conta configurada' };
     })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
@@ -4232,6 +4266,23 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
     e.prevista = !e.feito && !!e.aPartirDe && hoje < e.aPartirDe;
   }
   return etapas;
+}
+
+/** O Painel cobra as etapas atrasadas de até este número de meses anteriores (e nunca de antes da criação do banco de dados). */
+export const MESES_FECHAMENTO_ATRASADO = 12;
+
+/**
+ * Etapas ainda não feitas dos fechamentos dos meses anteriores a ``mesAtual`` (do mais antigo ao mais novo), cada uma com
+ * ``mes``. Ex.: em 07/11/2026, as NFs de 10/2026 e as contas de 09/2026 ainda não lançadas. Olha os meses desde a criação
+ * do banco de dados (no máximo MESES_FECHAMENTO_ATRASADO), para não cobrar meses de antes do sistema.
+ */
+export function etapasAtrasadas(d, mesAtual, hoje = C.hojeIso()) {
+  const inicio = [String(d.criado_em || '').slice(0, 7), C.somarMeses(mesAtual, -MESES_FECHAMENTO_ATRASADO)].sort().pop();
+  const out = [];
+  for (let mes = inicio; mes < mesAtual; mes = C.somarMeses(mes, 1)) {
+    out.push(...etapasFechamento(d, mes, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
+  }
+  return out;
 }
 
 /** Marca (ou desmarca) uma etapa do fechamento como feita. */
@@ -4762,6 +4813,8 @@ export const CONFIG_BANCO_FASE2 = {
 };
 /** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
 export const DIAS_ALERTA_BANCO = 7;
+/** No mês corrente, a etapa "Banco" do fechamento aceita o extrato buscado há até este número de dias (não precisa chegar até hoje). */
+export const DIAS_EXTRATO_RECENTE = 7;
 
 /** Id da pasta "<Imóvel>/Contas pagas/<ano>" (escopo contasano) e "<Imóvel>/IPTU (guias)/<ano>" (iptuano): igual a idGuiasDoAno. */
 export const idPastaAno = (imovelId, ano) => Number(imovelId) * 10000 + Number(ano);
@@ -4846,13 +4899,15 @@ export function rotuloDoComprovante(d, x) {
 
 /**
  * Pendências do banco no mês (para o fechamento e os alertas): movimentações sem destino, sem comprovante, contas cujo extrato
- * ainda não foi buscado até o fim do mês (ou até hoje) e pagamentos enviados sem confirmação.
+ * ainda não foi buscado até o fim do mês (mês já fechado) ou nos últimos DIAS_EXTRATO_RECENTE dias (mês corrente: ex.: em
+ * 07/11/2026, extrato buscado em 01/11 vale; em 30/10, não) e pagamentos enviados sem confirmação.
  */
 export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   const cfg = d.config_banco || {};
   const contas = cfg.contas || [];
   const fim = C.limitesCompetencia(mes)[1];
-  const ate = fim < hoje ? fim : hoje;
+  const mesFechado = fim < hoje;
+  const ate = mesFechado ? fim : C.somarDias(hoje, -DIAS_EXTRATO_RECENTE);
   const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
   const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
   const porConta = contas.map((c) => {
@@ -4861,7 +4916,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   });
   const semComprovante = movs.filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador).length;
   const pagamentosPendentes = (d.pagamentos_banco || []).filter((p) => ['aguardando_aprovacao', 'agendado', 'erro'].includes(p.situacao)).length;
-  return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
+  return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
 }
 
 /** Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias e pagamentos enviados sem confirmação. Só com o banco ligado. */

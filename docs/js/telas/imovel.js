@@ -52,7 +52,7 @@ function tabelaIptu(p) {
 /** Uma linha: quanto do IPTU do ano os inquilinos pagam nos boletos e quanto fica com você. */
 function resumoIptu(p) {
   const t = R.totaisIptu(d(), p);
-  return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · sua parte <b>${reais(t.proprietario)}</b>${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, 'perigo')}` : ''}</p>`;
+  return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · ${t.proprietario < 0 ? `sobra <b>${reais(-t.proprietario)}</b> para você (desconto do pagamento à vista)` : `sua parte <b>${reais(t.proprietario)}</b>`}${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, 'perigo')}` : ''}</p>`;
 }
 
 function caixaIptu(i) {

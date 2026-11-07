@@ -381,6 +381,7 @@ test('voltar a última numeração, incluir pagamento esquecido de data intermed
   R.desfazerUltimaNumeracao(d, 'julio');
   assert.equal(d.proxima_fatura, 51);
   assert.deepEqual([...new Set(d.faturas.map((f) => f.numero))], [50]);
+  assert.equal(d.historico.at(-1).descricao, 'Numeração desfeita: nº 0051 a 0052', 'voltar o ciclo passa por "a partir do nº" e guarda a descrição do ciclo');
   // o pagamento de setembro tinha passado despercebido
   R.registrarPagamento(d, 3, '2026-09-05', null, 'julio');
   R.numerarFaturas(d, 'julio');
@@ -477,6 +478,32 @@ test('IPTU: parcelas de imóvel vazio ficam com o proprietário, com alerta até
   assert.equal(R.alertasIptu(d, '2026-02-10').length, 0);
 });
 
+test('IPTU pago à vista pelo proprietário: o mapa mostra os meses em que o inquilino paga nos boletos', () => {
+  const { d, c } = base();
+  // IPTU 2026 de R$ 1.200 em 10x de R$ 120 (boletos de março a dezembro); o proprietário pagou à vista R$ 1.080 em 10/02
+  const p = d.iptus[0];
+  Object.assign(p, { valor_total: 120000, num_parcelas: 10, primeira_competencia: null, primeiro_vencimento_boleto: '2026-03',
+    pago_avista: true, valor_avista: 108000, data_quitacao: '2026-02-10', cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[0] });
+  c.data_entrada = '2026-01-01'; c.vigencia_inicio = '2026-01-01';
+  const meses = R.mesesIptuAvista(d, p);
+  assert.deepEqual(meses.map((m) => m.mesBoleto), ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']);
+  assert.deepEqual(meses.map((m) => m.valor), Array(10).fill(12000));
+  assert.deepEqual([meses[0].n, meses[0].rotulo, meses[0].comp, meses[0].inquilinos[0].contrato.id], [1, '1ª parcela (você pagou à vista)', '2026-02', c.id]);
+  // totais: inquilino paga os R$ 1.200 parcelados; a cota única (R$ 1.080) é o custo do proprietário, já paga
+  assert.deepEqual(R.totaisIptu(d, p), { custo: 108000, inquilino: 120000, proprietario: -12000, emAberto: 0 });
+  // 1/12 por mês ocupado: entrada em 07/06 paga proporcional em junho e cheio até dezembro (boletos de julho a janeiro)
+  Object.assign(c, { data_entrada: '2026-06-07', vigencia_inicio: '2026-06-07' });
+  p.cobranca_inquilino = R.COBRANCA_IPTU_QUITADO[1];
+  const doze = R.mesesIptuAvista(d, p);
+  assert.deepEqual(doze.map((m) => m.mesBoleto), ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01']);
+  assert.deepEqual([doze[0].valor, doze[1].valor, doze[0].rotulo], [8000, 10000, '1/12 (você pagou à vista)']);
+  // "Não cobrar do inquilino" e IPTU parcelado: nada
+  p.cobranca_inquilino = R.COBRANCA_IPTU_QUITADO[2];
+  assert.deepEqual(R.mesesIptuAvista(d, p), []);
+  p.pago_avista = false;
+  assert.deepEqual(R.mesesIptuAvista(d, p), []);
+});
+
 test('fiador com fim de vínculo vai para anteriores e gera alerta antes de terminar', () => {
   const d = R.bancoVazio();
   const c = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'X', data_entrada: '2026-01-01', garantia_tipo: 'Fiador', aluguel_inicial: 100000 }, 'julio');
@@ -530,6 +557,9 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
 test('documentos de entrada: alerta para todo inquilino ativo, até marcar os três com o arquivo assinado', () => {
   const { d, c } = base();
   assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/, 'inquilino antigo também gera alerta');
+  // fonte única do que falta (alerta, cadastros incompletos e faixa da página do inquilino)
+  assert.deepEqual(R.documentosPendentes(d, c).map((x) => [x.campo, x.situacao]), [['doc_contrato_em', 'falta'], ['doc_vistoria_em', 'falta'], ['doc_chaves_em', 'falta']]);
+  assert.equal(R.documentosPendentes(d, c)[1].feito, 'assinada');
   assert.throws(() => R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio'), /Anexe o arquivo do contrato de locação assinado/);
   assert.throws(() => R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio'), /Anexe o arquivo da vistoria de entrada assinada/);
   R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio', 'contrato-assinado.pdf');
@@ -547,6 +577,7 @@ test('documentos de entrada: alerta para todo inquilino ativo, até marcar os tr
   R.marcarDocumentoPerdido(d, c.id, 'doc_chaves_em', '2026-10-15', 'julio');
   assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), '2026-10-15');
   assert.equal(R.alertaDocumentosEntrada(c), null, 'documento perdido não gera alerta');
+  assert.deepEqual(R.documentosPendentes(d, c), [], 'perdido não fica pendente');
   R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-10-16', 'julio', 'chaves.jpg');
   assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), null, 'assinar limpa o "perdido"');
   R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
@@ -649,6 +680,69 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.equal(R.etapasFechamento(d, '2026-08', '2026-08-20').find((e) => e.chave === 'contas').feito, true);
   const ev = R.eventosDoMes(d, '2026-08', '2026-08-20').filter((e) => e.tipo === 'Fechamento').map((e) => e.data);
   assert.deepEqual(ev, ['2026-08-01', '2026-08-20', '2026-08-31'], 'NFs de 07/2026 no dia 1º, boletos no dia 20, o que falta no último dia');
+});
+
+test('fechamento: o boleto do complemento da caução não conta como aluguel (gerados nem pagamentos) — rotina C8', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio'); // aluguel de 07/2026, vence 10/08/2026
+  const por = (k, hoje = '2026-08-20') => R.etapasFechamento(d, '2026-08', hoje).find((e) => e.chave === k);
+  // complemento da caução em aberto nas competências 07/2026 e 08/2026 (vence 05/09/2026)
+  R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-07', vencimento: '2026-08-05', aluguel: 0, desconto: 0, outros: 20000, caucao_complemento: 20000, situacao: 'Em aberto' }, 'julio');
+  R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-08', vencimento: '2026-09-05', aluguel: 0, desconto: 0, outros: 20000, caucao_complemento: 20000, situacao: 'Em aberto' }, 'julio');
+  assert.equal(por('boletos').pendentes, 1, 'o complemento de 08/2026 não vale como boleto do aluguel de 08/2026');
+  assert.equal(por('pagamentos').pendentes, 1, 'só o aluguel de 07/2026 em aberto; o complemento não entra');
+  R.baixarEmLote(d, [d.cobrancas.find((x) => x.competencia === '2026-07' && !R.ehComplementoCaucao(x)).id], '2026-08-10', 'julio');
+  assert.deepEqual([por('pagamentos').feito, por('pagamentos').detalhe], [true, 'todos pagos'], 'complemento em aberto não segura a etapa');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  assert.deepEqual([por('boletos').feito, por('boletos').detalhe], [true, '1 boleto(s) gerado(s)'], 'o complemento não entra na contagem');
+});
+
+test('fechamento: etapas atrasadas dos meses anteriores no Painel, desde a criação do banco — rotina C6', () => {
+  const { d, c } = base();
+  d.criado_em = '2026-07-15T12:00:00.000Z';
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  // em 07/11/2026: aluguéis de 07, 08 e 09/2026 em aberto (pagamentos de 08, 09 e 10/2026), boletos de 10/2026 não gerados, contas de 07 e 08/2026 não marcadas
+  const at = R.etapasAtrasadas(d, '2026-11', '2026-11-07');
+  assert.deepEqual(at.map((e) => `${e.mes} ${e.chave}`), ['2026-07 contas', '2026-08 pagamentos', '2026-08 contas', '2026-09 pagamentos', '2026-10 boletos', '2026-10 pagamentos'],
+    'do mais antigo ao mais novo; 06/2026 (antes da criação do banco) não entra');
+  assert.ok(at.every((e) => e.titulo && e.link && !e.prevista));
+  for (const m of ['2026-07', '2026-08']) R.marcarEtapaFechamento(d, m, 'contas', true, 'julio');
+  R.baixarEmLote(d, d.cobrancas.map((x) => x.id), '2026-10-10', 'julio');
+  R.gerarCobrancas(d, '2026-10', 'julio');
+  assert.deepEqual(R.etapasAtrasadas(d, '2026-11', '2026-11-07').map((e) => `${e.mes} ${e.chave}`), ['2026-10 nfs'], 'pagos em 10/10/2026: só falta numerar as NFs de 10/2026 (depois da virada)');
+  R.marcarEtapaFechamento(d, '2026-10', 'nfs', true, 'julio');
+  assert.deepEqual(R.etapasAtrasadas(d, '2026-11', '2026-11-07'), [], 'tudo resolvido: nada atrasado');
+  // limite de 12 meses para trás, mesmo com o banco criado antes
+  d.criado_em = '2024-01-01T00:00:00.000Z';
+  c.data_entrada = '2024-06-07'; c.vigencia_inicio = '2024-06-07';
+  const meses = [...new Set(R.etapasAtrasadas(d, '2026-11', '2026-11-07').map((e) => e.mes))];
+  assert.equal(meses[0], '2025-11', 'começa 12 meses antes de 11/2026');
+  assert.equal(meses.at(-1), '2026-06');
+});
+
+test('fechamento: no mês corrente a etapa "Banco" aceita o extrato buscado nos últimos dias — rotina C5', () => {
+  const { d } = base();
+  const ank = d.emitentes[0];
+  d.config_banco = { ...R.CONFIG_BANCO_PADRAO, ativo: true, provedor: 'c6', conta_padrao_id: 'ank', contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id, ambiente: 'sandbox' }] };
+  R.normalizar(d);
+  const banco = (hoje, mes = '2026-11') => R.etapasFechamento(d, mes, hoje).find((e) => e.chave === 'banco');
+  assert.equal(R.DIAS_EXTRATO_RECENTE, 7);
+  assert.deepEqual([banco('2026-11-07').pendentes, banco('2026-11-07').feito], [1, false]);
+  assert.match(banco('2026-11-07').detalhe, /^ANK: extrato ainda não buscado \(no mês corrente, a etapa fica feita com o extrato buscado nos últimos 7 dias/);
+  d.config_banco.ultima_importacao.ank = '2026-10-30';
+  assert.equal(banco('2026-11-07').feito, false, 'buscado há 8 dias: ainda pendente');
+  assert.match(banco('2026-11-07').detalhe, /ANK: extrato buscado em 30\/10\/2026, há mais de 7 dias: busque de novo/);
+  d.config_banco.ultima_importacao.ank = '2026-11-01';
+  assert.deepEqual([banco('2026-11-07').feito, banco('2026-11-08').feito, banco('2026-11-09').feito], [true, true, false], 'buscado em 01/11: vale até 08/11');
+  assert.match(banco('2026-11-07').detalhe, /ANK: tudo com destino/);
+  // mês já fechado: o extrato precisa chegar ao fim do mês
+  assert.equal(banco('2026-12-02').feito, false);
+  assert.match(banco('2026-12-02').detalhe, /ANK: extrato buscado só até 01\/11\/2026, falta até o fim do mês$/);
+  d.config_banco.ultima_importacao.ank = '2026-11-30';
+  assert.equal(banco('2026-12-02').feito, true);
+  assert.equal(R.pendenciasBancoDoMes(d, '2026-11', '2026-12-02').mesFechado, true);
 });
 
 test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e muda de mês ao recalcular', () => {
@@ -886,6 +980,17 @@ test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pe
   assert.throws(() => R.salvarEstilosAlertas(d, { Fiador: { cor: 'Rosa', enfase: 'Forte', prioridade: 1 } }, 'julio'), /Confira/);
   R.salvarEstilosAlertas(d, {}, 'julio');
   assert.deepEqual(d.estilos_alertas, {});
+  // só tipos que algum alerta gera: "Devolver garantia" entrou; "Correção do aluguel" (nunca gerou alerta) saiu
+  assert.ok(R.TIPOS_ALERTA.includes('Devolver garantia'));
+  assert.ok(!R.TIPOS_ALERTA.includes('Correção do aluguel'));
+  assert.deepEqual(R.estiloAlerta(d, 'Devolver garantia'), { cor: 'Padrão', enfase: 'Normal', prioridade: 3 });
+  // dados antigos: a aparência escolhida para "Correção do aluguel" passa a "Reajuste do aluguel" (se este ficou no padrão)
+  d.estilos_alertas = { 'Correção do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } };
+  R.normalizar(d);
+  assert.deepEqual(d.estilos_alertas, { 'Reajuste do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } });
+  d.estilos_alertas = { 'Correção do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 }, 'Reajuste do aluguel': { cor: 'Verde', enfase: 'Discreta', prioridade: 5 } };
+  R.normalizar(d);
+  assert.deepEqual(d.estilos_alertas, { 'Reajuste do aluguel': { cor: 'Verde', enfase: 'Discreta', prioridade: 5 } }, 'a escolha do reajuste prevalece');
 });
 
 test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF, corrige a caução ao pagar', () => {

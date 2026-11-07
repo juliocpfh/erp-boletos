@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-dYpKFxTAtCF+dVzY+pCkppdbK+LMQOVZ5Unfuvw+10k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-1q9OwUf20zPq7Vpy1KBZvU6epseUR/2lvaEx4JiTQe0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7c50edc12f5e79b6">
+<meta name="fontes" content="3ba8af9ab220391f">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1471,6 +1471,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     CONTA_BANCO_PADRAO: () => CONTA_BANCO_PADRAO,
     CORES_ALERTA: () => CORES_ALERTA,
     DIAS_ALERTA_BANCO: () => DIAS_ALERTA_BANCO,
+    DIAS_EXTRATO_RECENTE: () => DIAS_EXTRATO_RECENTE,
     DIAS_SEM_IMOVEL: () => DIAS_SEM_IMOVEL,
     DIAS_VERMELHO: () => DIAS_VERMELHO,
     DIA_GERAR_BOLETOS: () => DIA_GERAR_BOLETOS,
@@ -1486,6 +1487,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     LIMITE_LC224_TRIMESTRE: () => LIMITE_LC224_TRIMESTRE,
     LISTAS: () => LISTAS,
     MESES_DEPOIS_DE_ALUGAR: () => MESES_DEPOIS_DE_ALUGAR,
+    MESES_FECHAMENTO_ATRASADO: () => MESES_FECHAMENTO_ATRASADO,
     MINIMO_GUIA: () => MINIMO_GUIA,
     MODELO_AIRBNB: () => MODELO_AIRBNB,
     MODOS_CONTA_BOLETO: () => MODOS_CONTA_BOLETO,
@@ -1614,6 +1616,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     documentoFalta: () => documentoFalta,
     documentoParcial: () => documentoParcial,
     documentoPerdido: () => documentoPerdido,
+    documentosPendentes: () => documentosPendentes,
     donoArquivoSeguro: () => donoArquivoSeguro,
     editarDepositoGarantia: () => editarDepositoGarantia,
     ehComplementoCaucao: () => ehComplementoCaucao,
@@ -1626,6 +1629,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     enderecoDoPagador: () => enderecoDoPagador,
     estiloAlerta: () => estiloAlerta,
     estornarPagamento: () => estornarPagamento,
+    etapasAtrasadas: () => etapasAtrasadas,
     etapasFechamento: () => etapasFechamento,
     eventosDoMes: () => eventosDoMes,
     excluir: () => excluir,
@@ -1693,6 +1697,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     mesDeAniversario: () => mesDeAniversario,
     mesDoDinheiro: () => mesDoDinheiro,
     mesesDoTrimestre: () => mesesDoTrimestre,
+    mesesIptuAvista: () => mesesIptuAvista,
     mesesUsoReserva: () => mesesUsoReserva,
     modeloAirbnb: () => modeloAirbnb,
     montarCobranca: () => montarCobranca,
@@ -2819,6 +2824,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var NAO_SE_APLICA = "Não se aplica";
   var GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
   var piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+  function resultadoVistoriaSaida(d2, c) {
+    const porData2 = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+    const doContrato = (d2.vistorias || []).filter((v) => v.contrato_id === c.id).sort(porData2);
+    const vistoria = doContrato.find((v) => v.tipo === "Saída") || null;
+    if (!vistoria) return { texto: "Não feita", vistoria: null, pendencias: [] };
+    const entrada = doContrato.find((v) => v.tipo === "Entrada");
+    const naEntrada = new Map((entrada && entrada.itens || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
+    let pendencias = (vistoria.itens || []).filter((x) => {
+      const ent = naEntrada.get(`${x.comodo}|${x.item}`);
+      return ent ? piorou(ent, x.situacao) : ["Avaria", "Não funciona"].includes(x.situacao);
+    }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ""})`);
+    if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ""));
+    return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias };
+  }
+  function textoVistoriaSaida(d2, c, encerramento) {
+    const r = resultadoVistoriaSaida(d2, c);
+    const guardado = encerramento && encerramento.vistoria_saida;
+    if (!r.vistoria) return guardado || r.texto;
+    return guardado === "Contestada" ? `${r.texto} (contestada pelo inquilino)` : r.texto;
+  }
   var FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
   function lerModeloVistoria(texto3) {
     const comodos = [];
@@ -3121,6 +3146,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (d2.estilos_alertas && d2.estilos_alertas["Documentos de entrada"]) {
       d2.estilos_alertas["Rotina de entrada"] = d2.estilos_alertas["Rotina de entrada"] || d2.estilos_alertas["Documentos de entrada"];
       delete d2.estilos_alertas["Documentos de entrada"];
+    }
+    if (d2.estilos_alertas && d2.estilos_alertas["Correção do aluguel"]) {
+      d2.estilos_alertas["Reajuste do aluguel"] = d2.estilos_alertas["Reajuste do aluguel"] || d2.estilos_alertas["Correção do aluguel"];
+      delete d2.estilos_alertas["Correção do aluguel"];
     }
     for (const i of d2.imoveis) {
       if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -3920,18 +3949,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       };
     });
   }
-  function totaisIptu(d2, p2) {
-    const ps = parcelasIptu(d2, p2);
-    let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
-    if (p2.pago_avista) {
-      for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
-        for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
-          const [n, v] = iptuNaCompetencia(p2, comp, c);
-          const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
-          if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += aluguelProporcional(v, dias, diasNoMes(comp));
-        }
+  function mesesIptuAvista(d2, p2) {
+    if (!p2.pago_avista) return [];
+    const porMes = /* @__PURE__ */ new Map();
+    const umDoze = p2.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1];
+    for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+      for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
+        const [n, v] = iptuNaCompetencia(p2, comp, c);
+        const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+        if (!dias || emCarencia(c, comp) && !c.carencia_cobrar_iptu) continue;
+        const mesBoleto = c.cobranca_mes_seguinte === false ? comp : somarMeses(comp, 1);
+        const item2 = porMes.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? "1/12 (você pagou à vista)" : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
+        const valor = aluguelProporcional(v, dias, diasNoMes(comp));
+        item2.valor += valor;
+        item2.inquilinos.push({ contrato: c, comp, dias, diasMes: diasNoMes(comp), valor });
+        porMes.set(mesBoleto, item2);
       }
     }
+    return [...porMes.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+  }
+  function totaisIptu(d2, p2) {
+    const ps = parcelasIptu(d2, p2);
+    const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d2, p2).reduce((s, x) => s + x.valor, 0);
     const custo = ps.reduce((s, x) => s + x.valor, 0);
     return {
       custo,
@@ -4410,22 +4449,19 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function desfazerUltimaNumeracao(d2, usuario) {
     const ciclo = ultimoCicloDeNumeracao(d2);
     if (!ciclo) throw new Error("Não há numeração para desfazer.");
-    const fs = d2.faturas.filter((f) => f.lote === ciclo.lote);
     if (d2.faturas.some((f) => f.lote !== ciclo.lote && f.numero >= ciclo.de)) {
       throw new Error(`Há NFs de outra numeração com número ${numeroFatura(ciclo.de)} ou maior. Use "a partir do nº".`);
     }
-    for (const f of fs) excluir(d2, "faturas", f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-    registrar(d2, usuario, "Alteração", "faturas", null, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`, { proxima_fatura: { de: d2.proxima_fatura, para: ciclo.de } });
-    d2.proxima_fatura = ciclo.de;
+    desfazerNumeracao(d2, ciclo.de, usuario, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`);
     return ciclo;
   }
-  function desfazerNumeracao(d2, aPartirDe, usuario) {
+  function desfazerNumeracao(d2, aPartirDe, usuario, descricao = null) {
     const n = Number(aPartirDe);
     if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
     const fs = d2.faturas.filter((f) => f.numero >= n);
     if (!fs.length) throw new Error(`Não há NF com número ${numeroFatura(n)} ou maior.`);
     for (const f of fs) excluir(d2, "faturas", f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-    registrar(d2, usuario, "Alteração", "faturas", null, `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
+    registrar(d2, usuario, "Alteração", "faturas", null, descricao || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
     d2.proxima_fatura = n;
     return new Set(fs.map((f) => f.numero)).size;
   }
@@ -5334,9 +5370,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ].filter((p2) => p2.nome);
   }
   var textoParte = (p2) => `${p2.nome} (${p2.papel})`;
+  function documentosPendentes(d2, c) {
+    if (c.ativo === false || c.data_saida) return [];
+    return DOCUMENTOS_ENTRADA.map(([campo2, nome, feito]) => ({
+      campo: campo2,
+      nome,
+      feito,
+      situacao: documentoFalta(d2, c, campo2) ? "falta" : documentoParcial(d2, c, campo2) ? "parcial" : null
+    })).filter((x) => x.situacao);
+  }
   function alertaDocumentosEntrada(c, d2 = null) {
-    if (c.ativo === false || c.data_saida) return null;
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d2, c, k)).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
+    const falta = documentosPendentes(d2, c).filter((x) => x.situacao === "falta").map((x) => x.nome.toLocaleLowerCase("pt-BR"));
     return falta.length ? { nivel: "aviso", tipo: "Rotina de entrada", texto: `falta ${falta.join(", ")}.`, ancora: "rotina" } : null;
   }
   var anterioresEncerrados = (d2, c, hoje3) => c.contrato_anterior_id ? cadeiaDeContratos(d2, c).antes.filter((a) => !contratoAtivo(a, hoje3)) : [];
@@ -5933,7 +5977,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var TIPOS_ALERTA = [
     "Vigência do contrato",
     "Reajuste do aluguel",
-    "Correção do aluguel",
     "Inadimplência",
     "Seguro obrigatório",
     "IPTU do proprietário",
@@ -5942,6 +5985,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     "Fiador",
     "Aplicação da garantia",
     "Correção da caução",
+    "Devolver garantia",
     "Titularidade",
     "Rotina de entrada",
     "Comprovante a buscar no banco",
@@ -5958,7 +6002,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var ESTILOS_ALERTA_PADRAO = {
     "Vigência do contrato": { cor: "Vermelho", enfase: "Forte", prioridade: 1 },
     "Reajuste do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
-    "Correção do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
     "A verificar": { cor: "Amarelo", enfase: "Normal", prioridade: 3 }
   };
   var estiloAlerta = (d2, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...(d2 && d2.estilos_alertas || {})[tipo] });
@@ -6680,8 +6723,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const marcado2 = (chave) => d2.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
     const ativos = d2.contratos.filter((c) => c.ativo !== false && c.imovel_id);
     const semBoleto = ativos.filter((c) => diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d2, c.id, mes));
-    const gerados = d2.cobrancas.filter((x) => x.competencia === mes).length;
-    const doMes = d2.cobrancas.filter((x) => x.competencia === comp);
+    const gerados = d2.cobrancas.filter((x) => x.competencia === mes && !ehComplementoCaucao(x)).length;
+    const doMes = d2.cobrancas.filter((x) => x.competencia === comp && !ehComplementoCaucao(x));
     const emAberto2 = doMes.filter((x) => !x.data_pagamento && x.situacao !== "Carência");
     const vencidos = emAberto2.filter((x) => x.vencimento < hoje3);
     const cartas = ativos.map((c) => reajusteNaCompetencia(d2, c, mes)).filter((r) => r && r.faltaCarta);
@@ -6718,13 +6761,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       },
       ...d2.config_banco && d2.config_banco.ativo ? [(() => {
         const b = pendenciasBancoDoMes(d2, mes, hoje3);
+        const buscado = (x) => !x.importadoAte ? "extrato ainda não buscado" : b.mesFechado ? `extrato buscado só até ${dataBr(x.importadoAte)}, falta até o fim do mês` : `extrato buscado em ${dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`;
         return {
           chave: "banco",
           titulo: `Conferir o extrato de ${compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(" e ") || "banco"}) e dar destino às movimentações`,
           pendentes: b.semDestino + b.contasSemImportar.length,
           link: `#/banco?mes=${mes}`,
           contas: b.porConta,
-          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? "extrato ainda não buscado" : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") : "nenhuma conta configurada"
+          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : "nenhuma conta configurada"
         };
       })()] : [],
       {
@@ -6764,6 +6808,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       e.prevista = !e.feito && !!e.aPartirDe && hoje3 < e.aPartirDe;
     }
     return etapas;
+  }
+  var MESES_FECHAMENTO_ATRASADO = 12;
+  function etapasAtrasadas(d2, mesAtual, hoje3 = hojeIso()) {
+    const inicio = [String(d2.criado_em || "").slice(0, 7), somarMeses(mesAtual, -MESES_FECHAMENTO_ATRASADO)].sort().pop();
+    const out = [];
+    for (let mes = inicio; mes < mesAtual; mes = somarMeses(mes, 1)) {
+      out.push(...etapasFechamento(d2, mes, hoje3).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
+    }
+    return out;
   }
   function marcarEtapaFechamento(d2, mes, etapa, feito, usuario) {
     const atual = d2.fechamentos.find((f) => f.competencia === mes && f.etapa === etapa);
@@ -7241,6 +7294,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     copiar_para_contador: true
   };
   var DIAS_ALERTA_BANCO = 7;
+  var DIAS_EXTRATO_RECENTE = 7;
   var idPastaAno = (imovelId, ano) => Number(imovelId) * 1e4 + Number(ano);
   var idContador = (emitenteId, comp) => Number(emitenteId) * 1e6 + Number(String(comp).replace("-", ""));
   var decodificarIdContador = (id) => {
@@ -7313,7 +7367,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const cfg2 = d2.config_banco || {};
     const contas2 = cfg2.contas || [];
     const fim = limitesCompetencia(mes)[1];
-    const ate = fim < hoje3 ? fim : hoje3;
+    const mesFechado = fim < hoje3;
+    const ate = mesFechado ? fim : somarDias(hoje3, -DIAS_EXTRATO_RECENTE);
     const movs2 = (d2.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
     const semDestinoDe = (id) => movs2.filter((m) => m.conta_id === id && !m.classificacao).length;
     const porConta = contas2.map((c) => {
@@ -7322,7 +7377,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     });
     const semComprovante = movs2.filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador).length;
     const pagamentosPendentes = (d2.pagamentos_banco || []).filter((p2) => ["aguardando_aprovacao", "agendado", "erro"].includes(p2.situacao)).length;
-    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
+    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
     const cfg2 = d2.config_banco || {};
@@ -8747,8 +8802,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     campo("debitos_descricao", "Descrição dos débitos", "area"),
     campo("fci_credito", "FCI corrigido: crédito do inquilino", "dinheiro", { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
     campo("fci_danos", "Reparos de danos pagos com o FCI", "dinheiro", { ajuda: "Só danos apurados na vistoria de saída (nunca aluguel ou contas). O que passar do FCI vira débito; o que sobrar do FCI volta ao inquilino" }),
-    campo("vistoria_saida", "Vistoria de saída", "opcao", { opcoes: ["Sem pendências", "Com pendências", "Contestada", "Não feita"] }),
-    campo("observacoes", "Observações", "area")
+    campo("observacoes", "Observações", "area", { ajuda: "Se o inquilino contestar a vistoria de saída, anote aqui" })
   ];
   var AVULSA = [
     campo("data_pagamento", "Data em que o dinheiro entrou", "data", { obrig: true }),
@@ -12343,7 +12397,7 @@ ${xref}
   var AJUDA_BANCO = "Busque o extrato uma vez por mês (ou quando quiser). Cada linha precisa de um destino: um imóvel e a conta dele (água, luz, gás, condomínio, IPTU), um boleto de aluguel recebido, um imposto, tarifa do banco ou transferência entre as nossas contas. O comprovante é guardado em PDF com um nome padrão (data, empresa, imóvel, conta e valor) na pasta do imóvel (Contas pagas/ano) e numa cópia para o contador (_Contador/Empresa/AAAA-MM).";
   function caixaPastaContador(e, mes) {
     return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador3())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
-    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", 'Cópias dos comprovantes guardados pela tela Banco. O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).', true, false)}</details>`;
+    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
   }
   function descreverSugestao(s) {
     const i = s.imovel_id ? buscar2("imoveis", s.imovel_id) : null;
@@ -14043,7 +14097,10 @@ Salvar assim mesmo?`)) {
     ${item("Débitos descontados", reais(e.debitos))}
     ${e.fci_credito ? `${item("💰 FCI corrigido (crédito do inquilino)", reais(e.fci_credito))}${item("Reparos de danos pagos com o FCI", reais(e.fci_usado || 0))}${item("FCI a devolver", reais(e.fci_devolver || 0))}` : ""}
     ${item(e.saldo >= 0 ? "Saldo a devolver ao inquilino" : "Saldo a cobrar do inquilino", `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
-    ${item("Vistoria de saída", esc(e.vistoria_saida || "-"))}</div>
+    ${item("Vistoria de saída", (() => {
+      const v = resultadoVistoriaSaida(d(), c);
+      return `${esc(textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ""}`;
+    })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ""}
     ${(() => {
       const dev = devolucaoPorRecebedor(d(), c, e.garantia_corrigida);
@@ -14195,11 +14252,11 @@ Salvar assim mesmo?`)) {
   }
   function faixaDocumentosEntrada(c) {
     if (!contratoAtivo(c)) return "";
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d(), c, k));
+    const falta = documentosPendentes(d(), c).filter((x) => x.situacao === "falta");
     if (!falta.length) return "";
     const g = geradoresDocumentos(c, "botao pequeno");
-    return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase("pt-BR")).join(", "))}.
-    <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(" ")} ${link(`#/contrato/${c.id}?ir=documentos`, "Marcar como assinado", "botao secundario pequeno")}</div></div>`;
+    return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map((x) => x.nome.toLocaleLowerCase("pt-BR")).join(", "))}.
+    <div class="acoes" style="margin-top:6px">${falta.map((x) => g[x.campo]).join(" ")} ${link(`#/contrato/${c.id}?ir=documentos`, "Marcar como assinado", "botao secundario pequeno")}</div></div>`;
   }
   var rotinaAberta = (c, hoje3) => contratoAtivo(c, hoje3) && !resumoRotinaEntrada(d(), c, hoje3).concluida && rotinaRecente(c, hoje3);
   function formMarcarDocumento(c, k, feito, comParcial = true) {
@@ -14244,7 +14301,7 @@ Salvar assim mesmo?`)) {
         if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
         if (e.situacao === "andamento") return link(ir2("documentos"), "Anexar o arquivo completo", mini);
         const ver = e.chave === "vistoria_assinada" && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, "Ver vistoria", mini)} ` : "";
-        return `${ver}${formMarcarDocumento(c, e.doc, doc[e.chave], false)}`;
+        return `${ver}${link(ir2("documentos"), `Marcar ${doc[e.chave]}`, mini)}`;
       }
       const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ""))();
       return `<div class="acoes" style="justify-content:flex-end">${atalho}
@@ -15091,7 +15148,9 @@ Salvar assim mesmo?`)) {
       },
       aviso: (r, q) => {
         const c = buscar2("contratos", q.contrato);
-        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
+        const v = resultadoVistoriaSaida(d(), c);
+        const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase("pt-BR")}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join("; ")}${v.pendencias.length > 5 ? "…" : ""}): confira os débitos` : ""}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
+        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
       },
       // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
       fixos: (r, q) => ({ data_saida: buscar2("contratos", q.contrato).data_saida }),
@@ -15101,6 +15160,7 @@ Salvar assim mesmo?`)) {
         if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
         for (const k of ["garantia_valor", "indice_percentual", "debitos", "fci_credito", "fci_danos"]) if (!dados[k]) dados[k] = 0;
         for (const k of relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = "Informe a leitura na saída";
+        dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
       },
       salvar: (db, dados, q) => encerrarContrato(db, Number(q.contrato), dados, login())
     },
@@ -15342,8 +15402,16 @@ Salvar assim mesmo?`)) {
     const nova = publicada && publicada.getTime() - emUso.getTime() > 6e4;
     return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
   }
+  function lembreteZipNuvem() {
+    const ultimo = d().historico.filter((h) => h.acao === "Exportação" && /ZIP/.test(h.descricao || "")).at(-1);
+    const dias = ultimo ? Math.floor((Date.now() - new Date(ultimo.quando).getTime()) / 864e5) : null;
+    const texto3 = ultimo ? `Último ZIP com todos os dados baixado em ${dataBr(ultimo.quando.slice(0, 10))} (há ${dias} dia${dias === 1 ? "" : "s"}).` : "Nenhum ZIP com todos os dados foi baixado ainda.";
+    const lembrar = !ultimo || dias > LEMBRETE_ZIP_DIAS;
+    return `<p class="suave">${texto3} ${lembrar ? etiqueta('vale baixar uma cópia para o seu computador (abaixo, "Exportar tudo em ZIP")', "aviso") : ""}</p>`;
+  }
+  var LEMBRETE_ZIP_DIAS = 7;
   async function telaDados() {
-    const conflitos = await copiasEmConflito(E.pasta);
+    const conflitos = E.nuvem ? [] : await copiasEmConflito(E.pasta);
     let modeloProprio = false;
     try {
       await (await E.pasta.getDirectoryHandle(PASTA_MODELOS)).getFileHandle(MODELO_FATURA);
@@ -15359,7 +15427,11 @@ Salvar assim mesmo?`)) {
       ${item("Versão do sistema", await versaoDoSistema())}</div>
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
-      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")} ${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
+      ${lembreteZipNuvem()}
+      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")}</p>
+      <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
+        <div class="alerta perigo" style="margin-top:8px"><b>Só para voltar a uma pasta do computador</b> (ex.: a pasta do OneDrive de antes da nuvem, ou uma pasta aberta de um backup). Tudo o que está na nuvem é trocado pelo que está na pasta: o que foi lançado depois, por qualquer aparelho, <b>se perde</b> (fica uma cópia de antes nos backups da nuvem). Para desfazer um dia ruim, prefira "Backups da nuvem".</div>
+        <p>${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div></details>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Backup seguro e versão PC (só administrador)</h2>
       <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração, um backup completo (banco + anexos) por semana e a <b>versão PC</b> do sistema (o programa inteiro num arquivo, atualizado sozinho). Se o site ou o Cloudflare caírem, a versão PC abre com os dados da última cópia; o <b>LEIA-ME.txt</b> da pasta explica.${E.nuvem ? " Na nuvem é a segunda camada, fora do Cloudflare: vale ter." : ""}</p>
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, "info")}</p>` : ""}
@@ -16339,7 +16411,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       "perigo",
       `Voltar a numeração nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}? Essas NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${numeroFatura(ciclo.de)}.`
     )}</p>` : '<p class="suave">As NFs atuais foram numeradas antes desta função existir: use a opção abaixo.</p>'}
-    <details><summary class="suave">Outra opção: desfazer a partir de um número</summary>
+    <p class="suave">Só uma NF errada? Use "Cancelar" na linha dela: o número fica cancelado e o pagamento recebe um número novo.</p>
+    <details><summary class="suave">Outra opção: desfazer a partir de um número (NFs numeradas antes de existir o ciclo, ou mais de um ciclo de uma vez)</summary>
       <form data-form="desfazerNumeracao" class="acoes" style="margin-top:8px"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ciclo ? ciclo.de : (ultimaFatura(d()) || {}).numero || 1}" style="width:120px"><button class="perigo secundario">Desfazer a partir deste número</button></form></details></div>`;
   }
   function caixaAvulsas() {
@@ -16617,11 +16690,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     };
     const quadradoDoMes = (pc, p2, mes) => {
       if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
-      const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? "cota única" : `${pc.rotulo} parcela`}`;
+      const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? "cota única" : pc.avista ? pc.rotulo : `${pc.rotulo} parcela`}`;
       if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
-      const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : "";
+      const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : pc.avista ? ` · inquilino paga ${reais(pc.avista.valor)} no boleto (${pc.avista.rotulo})` : "";
       const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : "";
-      if (pc.paga) return `<span class="q ${pc.valorInquilino ? "q-div" : "q-paga"}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
+      if (pc.paga) return `<span class="q ${pc.valorInquilino || pc.avista ? "q-div" : "q-paga"}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
       const titulo2 = `${nome}: sua parte ${reais(pc.valorProprietario)}${inq}${venc} · em aberto`;
       return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p2.id}" data-n="${pc.n}" data-texto="${esc(titulo2)}" title="${esc(titulo2)} (clique para marcar como paga)"></button>` : `<span class="q q-aberto" title="${esc(titulo2)}"></span>`;
     };
@@ -16629,12 +16702,19 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
     const mapas = new Map(imoveis.filter(doAno).map((i) => {
       const p2 = doAno(i);
-      return [i.id, new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]))];
+      const mapa = new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]));
+      for (const m of mesesIptuAvista(d(), p2)) {
+        const cota = mapa.get(m.mesBoleto);
+        if (cota) cota.avista = m;
+        else mapa.set(m.mesBoleto, { n: null, rotulo: m.rotulo, avista: m, valor: m.valor, proprietario: false });
+      }
+      return [i.id, mapa];
     }));
     const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
     const meses = [];
     for (let m = `${ano}-01`; m <= ultimo; m = somarMeses(m, 1)) meses.push(m);
     const soma = { inquilino: 0, sua: 0, aberto: 0 };
+    const suaParte = (v, aberto) => !v ? "-" : v < 0 ? `<span class="suave">sobra ${reais(-v)} para você</span>` : `<b class="${aberto ? "texto-perigo" : ""}">${reais(v)}</b>`;
     const linhas2 = imoveis.map((i) => {
       const p2 = doAno(i);
       const idGuias = idGuiasDoAno(i.id, ano);
@@ -16647,12 +16727,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       soma.sua += t.proprietario;
       soma.aberto += t.emAberto;
       return `<tr><td>${nome}</td><td class="nw">${valor(p2)}${primeira(p2)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p2, m)).join("")}</td>
-      <td class="n nw">${t.inquilino ? reais(t.inquilino) : "-"}</td><td class="n nw">${t.proprietario ? `<b class="${t.emAberto ? "texto-perigo" : ""}">${reais(t.proprietario)}</b>` : "-"}</td>
+      <td class="n nw">${t.inquilino ? reais(t.inquilino) : "-"}</td><td class="n nw">${suaParte(t.proprietario, t.emAberto)}</td>
       <td class="n">${opera() ? link(`#/editar/iptus/${p2.id}?de=iptu`, "Editar") : ""}</td></tr>`;
     }).join("");
     const faltam = imoveis.filter((i) => !doAno(i)).length;
     const guias = guiasIptuAPagar(d(), hoje3, 60);
-    const legenda = [["q-inq", "inquilino paga no boleto"], ["q-div", "dividido (mês de entrada ou saída), sua parte paga"], ["q-aberto", "sua parte, em aberto"], ["q-paga", "sua parte, paga"], ["q-vazio", "sem parcela"]].map(([c, t]) => `<span><span class="q ${c}"></span> ${t}</span>`).join("");
+    const legenda = [["q-inq", "inquilino paga no boleto"], ["q-div", "dividido (mês de entrada ou saída, ou cota única paga no mês de um boleto), sua parte paga"], ["q-aberto", "sua parte, em aberto"], ["q-paga", "sua parte, paga"], ["q-vazio", "sem parcela"]].map(([c, t]) => `<span><span class="q ${c}"></span> ${t}</span>`).join("");
     return `<p class="suave"><a href="#/imoveis">← Imóveis</a></p>
     <div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, "botao secundario")} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, "botao secundario")}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : ""}
@@ -16665,9 +16745,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje3}"><button class="pequeno">Paga</button></form>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ""}<span>${rotuloMes(m)}</span>`).join("")}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas2 || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
-      ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${reais(soma.sua)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
+      ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
     <div class="legenda-iptu">${legenda}</div>
-    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
+    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto: o cinza é a sua cota única, os verdes são os boletos dele); no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
   }
   function calendarioDoPainel(mes, hoje3) {
     const eventos = eventosDoMes(d(), mes, hoje3);
@@ -16730,9 +16810,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
       if (!c.inquilino_telefone) falta.push("telefone");
       if (!c.inquilino_email) falta.push("e-mail");
-      for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) {
-        if (documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo", doc: true });
-        else if (documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
+      for (const x of documentosPendentes(d(), c)) {
+        falta.push(x.situacao === "falta" ? { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (não ${x.feito})`, nivel: "perigo", doc: true } : { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
       }
       const temDados = falta.some((f) => !f.doc);
       if (falta.length) out.push({
@@ -17109,7 +17188,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function resumoIptu(p2) {
     const t = totaisIptu(d(), p2);
-    return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · sua parte <b>${reais(t.proprietario)}</b>${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, "perigo")}` : ""}</p>`;
+    return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · ${t.proprietario < 0 ? `sobra <b>${reais(-t.proprietario)}</b> para você (desconto do pagamento à vista)` : `sua parte <b>${reais(t.proprietario)}</b>`}${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, "perigo")}` : ""}</p>`;
   }
   function caixaIptu(i) {
     const iptus = d().iptus.filter((p2) => p2.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
@@ -17657,7 +17736,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro).
 - Valor da NF = aluguel com bonificação (pago em dia) ou com multa e juros (atrasado). Não inclui IPTU, seguro nem tarifa. O padrão é NF com o aluguel cheio e o ressarcimento de condomínio como gasto.
 - Valor recebido diferente do previsto para a data: pede justificativa e a NF é digitada à mão (a justificativa fica só no sistema).
-- Para corrigir erro de NF, usa-se "Voltar a última numeração" (NFs não se apagam, para não deixar buracos).
+- Para corrigir uma NF errada há dois caminhos, na tela NFs: (1) "Cancelar" a NF: o número fica cancelado (não é reaproveitado) e o pagamento volta para a fila e recebe um número novo; o administrador pode depois apagar a NF cancelada da lista (fica só no Histórico). (2) "Voltar a última numeração" (ou "desfazer a partir de um número", para NFs numeradas antes de existir o ciclo ou para voltar mais de um ciclo): as NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e os mesmos números são usados de novo, na ordem das datas. Assim a sequência nunca fica com buraco: ou o número consta como cancelado, ou é reaproveitado.
 - O sistema não emite NFS-e na prefeitura.
 
 8. IPTU
@@ -20291,9 +20370,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const pend = pendentesDeFatura(d());
       const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
       const mesAtual = competenciaDe(hoje3);
-      const mesAnterior = somarMeses(mesAtual, -1);
       const faltamEtapas = [
-        ...etapasFechamento(d(), mesAnterior, hoje3).filter((e) => e.chave === "nfs" && !e.feito).map((e) => ({ ...e, mes: mesAnterior })),
+        ...etapasAtrasadas(d(), mesAtual, hoje3),
         ...etapasFechamento(d(), mesAtual, hoje3).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))
       ];
       const previstas = etapasFechamento(d(), mesAtual, hoje3).filter((e) => e.prevista && e.chave !== "cartas");

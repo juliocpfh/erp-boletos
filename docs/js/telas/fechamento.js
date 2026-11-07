@@ -35,9 +35,10 @@ export function cadastrosIncompletos() {
     const falta = K.pendenciasDoContrato(d(), c).filter((t) => !t.endsWith('(em Empresas)'));
     if (!c.inquilino_telefone) falta.push('telefone');
     if (!c.inquilino_email) falta.push('e-mail');
-    for (const [k, nome, feito] of R.DOCUMENTOS_ENTRADA) {
-      if (R.documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (não ${feito})`, nivel: 'perigo', doc: true });
-      else if (R.documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase('pt-BR')} (falta assinatura)`, nivel: 'aviso', doc: true });
+    // documentos de entrada: a mesma fonte do alerta "Rotina de entrada" (documentosPendentes)
+    for (const x of R.documentosPendentes(d(), c)) {
+      falta.push(x.situacao === 'falta' ? { texto: `${x.nome.toLocaleLowerCase('pt-BR')} (não ${x.feito})`, nivel: 'perigo', doc: true }
+        : { texto: `${x.nome.toLocaleLowerCase('pt-BR')} (falta assinatura)`, nivel: 'aviso', doc: true });
     }
     // Dados faltando se completam na edição; documentos, na página do inquilino.
     const temDados = falta.some((f) => !f.doc);

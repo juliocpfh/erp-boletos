@@ -2,6 +2,7 @@
 // documentos de entrada e termos aditivos.
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
+import * as K from '../contratos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -269,7 +270,7 @@ function caixaSaida(c) {
     ${item('Débitos descontados', reais(e.debitos))}
     ${e.fci_credito ? `${item('💰 FCI corrigido (crédito do inquilino)', reais(e.fci_credito))}${item('Reparos de danos pagos com o FCI', reais(e.fci_usado || 0))}${item('FCI a devolver', reais(e.fci_devolver || 0))}` : ''}
     ${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
-    ${item('Vistoria de saída', esc(e.vistoria_saida || '-'))}</div>
+    ${item('Vistoria de saída', (() => { const v = K.resultadoVistoriaSaida(d(), c); return `${esc(K.textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ''}`; })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
     ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
@@ -444,14 +445,17 @@ function atalhosDocumentos(c) {
   return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(' ')}</div>` : '';
 }
 
-/** Topo da página do inquilino, com a rotina de entrada recolhida: o que falta dos documentos, com os botões para gerar. */
+/**
+ * Topo da página do inquilino, com a rotina de entrada recolhida: o que falta dos documentos (a mesma fonte do alerta,
+ * documentosPendentes), com os botões para gerar. Marcar como assinado é só na caixa "Contrato, Vistoria, Termos e Aditivos".
+ */
 function faixaDocumentosEntrada(c) {
   if (!R.contratoAtivo(c)) return '';
-  const falta = R.DOCUMENTOS_ENTRADA.filter(([k]) => R.documentoFalta(d(), c, k));
+  const falta = R.documentosPendentes(d(), c).filter((x) => x.situacao === 'falta');
   if (!falta.length) return '';
   const g = geradoresDocumentos(c, 'botao pequeno');
-  return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase('pt-BR')).join(', '))}.
-    <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(' ')} ${link(`#/contrato/${c.id}?ir=documentos`, 'Marcar como assinado', 'botao secundario pequeno')}</div></div>`;
+  return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map((x) => x.nome.toLocaleLowerCase('pt-BR')).join(', '))}.
+    <div class="acoes" style="margin-top:6px">${falta.map((x) => g[x.campo]).join(' ')} ${link(`#/contrato/${c.id}?ir=documentos`, 'Marcar como assinado', 'botao secundario pequeno')}</div></div>`;
 }
 
 const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEntrada(d(), c, hoje).concluida && R.rotinaRecente(c, hoje);
@@ -502,12 +506,12 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     if (!opera()) return '';
     if (['feita', 'pulada'].includes(e.situacao)) return e.manual ? botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao') : '';
     const pular = botao('pularEtapaEntrada', 'Não se aplica', { contrato: c.id, chave: e.chave }, 'link-botao');
-    // documento assinado: anexa aqui mesmo (igual à caixa "Contrato, Vistoria, Termos e Aditivos")
+    // documento assinado: marca-se num lugar só, a caixa "Contrato, Vistoria, Termos e Aditivos" (data, arquivo e "Marcar")
     if (e.doc) {
       if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
       if (e.situacao === 'andamento') return link(ir('documentos'), 'Anexar o arquivo completo', mini);
       const ver = e.chave === 'vistoria_assinada' && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, 'Ver vistoria', mini)} ` : '';
-      return `${ver}${formMarcarDocumento(c, e.doc, doc[e.chave], false)}`;
+      return `${ver}${link(ir('documentos'), `Marcar ${doc[e.chave]}`, mini)}`;
     }
     const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ''))();
     return `<div class="acoes" style="justify-content:flex-end">${atalho}
