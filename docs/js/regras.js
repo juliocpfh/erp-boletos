@@ -4147,8 +4147,9 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
   const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
   const semBoleto = ativos.filter((c) => C.diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, mes));
-  const gerados = d.cobrancas.filter((x) => x.competencia === mes).length;
-  const doMes = d.cobrancas.filter((x) => x.competencia === comp);
+  // o boleto à parte do complemento da caução não é aluguel: não conta como gerado nem como pagamento do mês
+  const gerados = d.cobrancas.filter((x) => x.competencia === mes && !ehComplementoCaucao(x)).length;
+  const doMes = d.cobrancas.filter((x) => x.competencia === comp && !ehComplementoCaucao(x));
   const emAberto = doMes.filter((x) => !x.data_pagamento && x.situacao !== 'Carência');
   const vencidos = emAberto.filter((x) => x.vencimento < hoje);
   // a carta vai junto com o boleto do próprio aluguel corrigido (o índice só sai no começo do mês do reajuste)
@@ -4171,9 +4172,13 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
       detalhe: emAberto.length ? `${emAberto.length} em aberto${vencidos.length ? `, ${vencidos.length} vencido(s)` : ''}` : 'todos pagos', link: `#/cobrancas?comp=${comp}` },
     ...(d.config_banco && d.config_banco.ativo ? [(() => {
       const b = pendenciasBancoDoMes(d, mes, hoje);
+      // mês já fechado: o extrato precisa chegar ao fim do mês; mês corrente: basta ter sido buscado nos últimos dias
+      const buscado = (x) => (!x.importadoAte ? 'extrato ainda não buscado' : b.mesFechado ? `extrato buscado só até ${C.dataBr(x.importadoAte)}, falta até o fim do mês`
+        : `extrato buscado em ${C.dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`);
       return { chave: 'banco', titulo: `Conferir o extrato de ${C.compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(' e ') || 'banco'}) e dar destino às movimentações`,
         pendentes: b.semDestino + b.contasSemImportar.length, link: `#/banco?mes=${mes}`, contas: b.porConta,
-        detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? 'extrato ainda não buscado' : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ') : 'nenhuma conta configurada' };
+        detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ')
+          + (b.mesFechado ? '' : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : 'nenhuma conta configurada' };
     })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
@@ -4192,6 +4197,23 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
     e.prevista = !e.feito && !!e.aPartirDe && hoje < e.aPartirDe;
   }
   return etapas;
+}
+
+/** O Painel cobra as etapas atrasadas de até este número de meses anteriores (e nunca de antes da criação do banco de dados). */
+export const MESES_FECHAMENTO_ATRASADO = 12;
+
+/**
+ * Etapas ainda não feitas dos fechamentos dos meses anteriores a ``mesAtual`` (do mais antigo ao mais novo), cada uma com
+ * ``mes``. Ex.: em 07/11/2026, as NFs de 10/2026 e as contas de 09/2026 ainda não lançadas. Olha os meses desde a criação
+ * do banco de dados (no máximo MESES_FECHAMENTO_ATRASADO), para não cobrar meses de antes do sistema.
+ */
+export function etapasAtrasadas(d, mesAtual, hoje = C.hojeIso()) {
+  const inicio = [String(d.criado_em || '').slice(0, 7), C.somarMeses(mesAtual, -MESES_FECHAMENTO_ATRASADO)].sort().pop();
+  const out = [];
+  for (let mes = inicio; mes < mesAtual; mes = C.somarMeses(mes, 1)) {
+    out.push(...etapasFechamento(d, mes, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
+  }
+  return out;
 }
 
 /** Marca (ou desmarca) uma etapa do fechamento como feita. */
@@ -4722,6 +4744,8 @@ export const CONFIG_BANCO_FASE2 = {
 };
 /** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
 export const DIAS_ALERTA_BANCO = 7;
+/** No mês corrente, a etapa "Banco" do fechamento aceita o extrato buscado há até este número de dias (não precisa chegar até hoje). */
+export const DIAS_EXTRATO_RECENTE = 7;
 
 /** Id da pasta "<Imóvel>/Contas pagas/<ano>" (escopo contasano) e "<Imóvel>/IPTU (guias)/<ano>" (iptuano): igual a idGuiasDoAno. */
 export const idPastaAno = (imovelId, ano) => Number(imovelId) * 10000 + Number(ano);
@@ -4806,13 +4830,15 @@ export function rotuloDoComprovante(d, x) {
 
 /**
  * Pendências do banco no mês (para o fechamento e os alertas): movimentações sem destino, sem comprovante, contas cujo extrato
- * ainda não foi buscado até o fim do mês (ou até hoje) e pagamentos enviados sem confirmação.
+ * ainda não foi buscado até o fim do mês (mês já fechado) ou nos últimos DIAS_EXTRATO_RECENTE dias (mês corrente: ex.: em
+ * 07/11/2026, extrato buscado em 01/11 vale; em 30/10, não) e pagamentos enviados sem confirmação.
  */
 export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   const cfg = d.config_banco || {};
   const contas = cfg.contas || [];
   const fim = C.limitesCompetencia(mes)[1];
-  const ate = fim < hoje ? fim : hoje;
+  const mesFechado = fim < hoje;
+  const ate = mesFechado ? fim : C.somarDias(hoje, -DIAS_EXTRATO_RECENTE);
   const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
   const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
   const porConta = contas.map((c) => {
@@ -4821,7 +4847,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   });
   const semComprovante = movs.filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador).length;
   const pagamentosPendentes = (d.pagamentos_banco || []).filter((p) => ['aguardando_aprovacao', 'agendado', 'erro'].includes(p.situacao)).length;
-  return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta };
+  return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
 }
 
 /** Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias e pagamentos enviados sem confirmação. Só com o banco ligado. */
