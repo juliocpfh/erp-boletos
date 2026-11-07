@@ -19,7 +19,7 @@
 | `regras.js` | Regras de negócio sobre o banco em memória: inserir/atualizar/excluir com histórico, boletos, NFs, reajuste, alertas, resultados |
 | `calculos.js` | Funções puras: dinheiro em centavos, datas, competências, proporcional, multa/juros, valor da NF; parâmetros do endereço (`sanearParametros`, `FORMATOS_PARAMETRO`, `competenciaValida`, `dataValida`) |
 | `formularios.js` | Definição dos campos de cada cadastro, desenho do formulário, leitura/validação, máscaras CPF/CNPJ/CEP |
-| `armazenamento.js` | Pasta via File System Access API: ler/gravar banco, backup diário, anexos (`nomeAnexavel` barra página/script; `tipoParaAbrir` decide o que abre na aba), ZIP; endereço e senha da ponte só neste navegador (`lembrarPonte`, `ponteLembrada`) |
+| `armazenamento.js` | Pasta via File System Access API: ler/gravar banco, backup diário, anexos (`nomeAnexavel` barra página/script; `tipoParaAbrir` decide o que abre na aba), ZIP; endereço e senha da ponte só neste navegador (`lembrarPonte`, `ponteLembrada`, `esquecerPonte`) |
 | `contratos.js` | Linguagem de modelos de contrato, extenso, vistoria/recibo, geração de HTML e `.docx` |
 | `modelos-contrato.js` | Textos padrão dos contratos (residencial e não residencial) e do aditivo de vencimento (`tipo: 'aditivo'`) |
 | `fatura.js` | Desenho da NF (HTML) e preenchimento do Excel a partir do modelo |

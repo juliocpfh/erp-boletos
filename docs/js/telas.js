@@ -3,7 +3,7 @@
 //   comum (componentes, pastas e anexos) · campos (preenchimento automático dos formulários) · imovel · contrato · cadastros (CADASTROS)
 //   avisos (conferência antes de salvar) · fechamento · cobrancas · faturas · consultas · reajustes · financeiro · documentos · admin
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
-import { aviso, E, ir, podeUsuario } from './app.js';
+import { aviso, E, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
 import { PAPEIS, SENHA_MINIMA } from './auth.js';
 import * as C from './calculos.js';
@@ -305,7 +305,6 @@ export const TELAS = {
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
   reajustes: (rota) => telaReajustes(rota.q),
-  calendario: (rota) => { const mes = C.competenciaValida(rota.q.mes, ''); ir(`#/${mes ? `?mes=${mes}` : ''}`); return ''; },
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
   aditivo: (rota) => telaAditivo(rota),

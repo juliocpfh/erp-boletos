@@ -358,7 +358,36 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // --------------------------------------------------------------------------
 const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
+/** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
+const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };
 const textoComparar = (x) => (x === undefined || x === null ? '' : typeof x === 'object' ? JSON.stringify(x) : String(x));
+
+/** Parcela do IPTU (n = 0: cota única) paga pelo banco: movimentação do extrato com destino nela ou pagamento pelo C6 ativo. */
+export function iptuPagoPeloBanco(d, iptuId, n) {
+  const id = Number(iptuId);
+  const parc = Number(n);
+  return (d.movimentacoes_banco || []).some((m) => m.classificacao === 'iptu' && m.iptu_id === id && Number(m.iptu_parcela) === parc)
+    || (d.pagamentos_banco || []).some((p) => p.origem && p.origem.tipo === 'iptu' && Number(p.origem.id) === id && Number(p.origem.n) === parc && !['cancelado', 'erro'].includes(p.situacao));
+}
+
+/**
+ * Por que o campo não pode ser desfeito pelo Histórico (texto) ou null. Conta/guia paga pelo banco e parcela do IPTU com
+ * destino no extrato (ou pagamento pelo C6) só se desfazem pela tela Banco: senão a conta ficaria "em aberto" com o dinheiro já saído.
+ */
+export function motivoNaoDesfazer(d, tabela, r, campo, anterior = undefined) {
+  const campos = CAMPOS_PAGAMENTO_BANCO[tabela];
+  if (!campos || !r || !campos.includes(campo)) return null;
+  if (tabela === 'iptus') {
+    // só as parcelas que mudariam ao voltar (o campo ``pagas`` guarda todas as parcelas juntas)
+    const atual = r.pagas || {};
+    const volta = (anterior && typeof anterior === 'object') ? anterior : {};
+    const parcelas = campo === 'data_quitacao' ? [0] : [...new Set([...Object.keys(atual), ...Object.keys(volta)])].filter((n) => atual[n] !== volta[n]).map(Number);
+    return parcelas.some((n) => iptuPagoPeloBanco(d, r.id, n)) ? `IPTU ${r.ano}: parcela paga pelo banco. Desfaça o destino da movimentação na tela Banco.` : null;
+  }
+  if (r.pagamento_banco_id) return `${tabela === 'despesas' ? 'Esta conta' : 'Esta guia'} foi paga pelo banco (pagamento nº ${r.pagamento_banco_id}): o pagamento não se desfaz pelo Histórico.`;
+  if (r.movimentacao_id) return `${tabela === 'despesas' ? 'Esta conta' : 'Esta guia'} está ligada ao extrato do banco: desfaça o destino da movimentação na tela Banco.`;
+  return null;
+}
 
 /**
  * Campos que podem ser desfeitos agora: Set de "índice no histórico:campo". Para cada campo de cada registro só vale a
@@ -381,7 +410,7 @@ export function alteracoesDesfaziveis(d) {
     const k = chave.split(':').slice(2).join(':');
     if (SEM_DESFAZER.has(h.tabela) || CAMPOS_SEM_DESFAZER.has(k) || !Array.isArray(d[h.tabela])) continue;
     const r = buscar(d, h.tabela, h.registro_id);
-    if (r && textoComparar(r[k]) === textoComparar(h.detalhes[k].para)) out.add(`${i}:${k}`);
+    if (r && textoComparar(r[k]) === textoComparar(h.detalhes[k].para) && !motivoNaoDesfazer(d, h.tabela, r, k, h.detalhes[k].de)) out.add(`${i}:${k}`);
   }
   return out;
 }
@@ -400,10 +429,14 @@ export function desfazerAlteracoes(d, itens, usuario) {
   const mudados = [];
   for (const i of [...porIndice.keys()].sort((a, b) => b - a)) {
     const pode = alteracoesDesfaziveis(d);
+    const h = d.historico[i];
+    const r = h ? buscar(d, h.tabela, h.registro_id) : null;
+    for (const k of porIndice.get(i)) {
+      const motivo = h && h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d, h.tabela, r, k, h.detalhes[k].de) : null;
+      if (motivo) throw new C.ErroUsuario(motivo);
+    }
     const campos = porIndice.get(i).filter((k) => pode.has(`${i}:${k}`));
     if (!campos.length) throw new Error('Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).');
-    const h = d.historico[i];
-    const r = buscar(d, h.tabela, h.registro_id);
     const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
     for (const k of campos) r[k] = h.detalhes[k].de ?? null;
     registrar(d, usuario, 'Alteração', h.tabela, r.id, `Desfeito pelo administrador (alteração de ${h.usuario} em ${new Date(h.quando).toLocaleString('pt-BR')})${h.descricao ? `: ${h.descricao}` : ''}`,
@@ -1084,9 +1117,16 @@ export function alertasIptu(d, hoje = C.hojeIso()) {
   return lista;
 }
 
-/** Marca (ou desmarca, com data vazia) a parcela do IPTU paga pelo proprietário. n = 0: cota única. */
-export function marcarIptuPago(d, iptuId, n, data, usuario) {
+/**
+ * Marca (ou desmarca, com data vazia) a parcela do IPTU paga pelo proprietário. n = 0: cota única.
+ * Parcela paga pelo banco não se desmarca aqui (só a tela Banco, ao desfazer o destino: ``peloBanco``).
+ */
+export function marcarIptuPago(d, iptuId, n, data, usuario, { peloBanco = false } = {}) {
   const p = buscar(d, 'iptus', iptuId);
+  if (!p) throw new C.ErroUsuario('IPTU não encontrado.');
+  if (!data && !peloBanco && iptuPagoPeloBanco(d, p.id, n)) {
+    throw new C.ErroUsuario(`IPTU ${p.ano} ${Number(n) === 0 ? 'cota única' : `${n}ª parcela`}: paga pelo banco. Para desfazer, desfaça o destino da movimentação na tela Banco.`);
+  }
   if (Number(n) === 0) {
     atualizar(d, 'iptus', p.id, { data_quitacao: data || null }, usuario, data ? `IPTU ${p.ano} quitado em ${C.dataBr(data)}` : `IPTU ${p.ano}: quitação desfeita`);
     return;

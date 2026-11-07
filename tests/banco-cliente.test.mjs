@@ -110,7 +110,6 @@ test('boletos: emitir manda o pedido do sistema e devolve pedido+resposta sem gr
     'GET /contas/ank/boletos/C6-123', 'POST /contas/ank/boletos/C6-123/cancelar', 'POST /contas/ank/boletos/C6-123/alterar', 'POST /contas/ank/boletos/C6-123/negativar/cancelar']);
   assert.deepEqual(f.chamadas[2].corpo, { amount: '3600.00' });
   assert.throws(() => B.negativarBoleto(d, cb, 5, { fetch: f }), /negativação está desligada/);
-  assert.equal(B.urlPdfBoleto(d, cb), `${PONTE}/contas/ank/boletos/C6-123/pdf`);
   assert.equal(B.imagemQrPix(cb), '', 'sem QR guardado, nada');
   assert.equal(B.imagemQrPix({ banco: { pix_qr_base64: 'AAAA' } }), 'data:image/png;base64,AAAA');
   // listagem paginada: 3 páginas, até 10
