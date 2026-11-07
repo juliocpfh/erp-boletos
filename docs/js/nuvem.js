@@ -417,10 +417,16 @@ export function apiDoSite(base = 'api/dados/', { limite = TEMPO_LIMITE, buscar =
 
 /** A nuvem está ligada neste endereço? (no GitHub Pages, sem o Worker, /api/ não existe). */
 export async function nuvemDisponivel(base = 'api/') {
+  return (await saudeDaNuvem(base)) !== null;
+}
+
+/** { email } de quem passou pelo login da internet (Access), ou null sem internet / sem a nuvem. */
+export async function saudeDaNuvem(base = 'api/') {
   try {
     const r = await fetch(`${base}saude`, { cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(10000) });
-    return r.ok && (r.headers.get('content-type') || '').includes('json');
-  } catch { return false; }
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return null;
+    return await r.json();
+  } catch { return null; }
 }
 
 /** Trava entre abas do mesmo aparelho (Web Locks); navegador sem suporte: roda direto. */

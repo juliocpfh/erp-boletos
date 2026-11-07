@@ -31,6 +31,7 @@ test('nada dos inquilinos fica legível no aparelho; a lista de usuários fica a
   await g.gravar('anexo:1', new Blob(['comprovante de Maria Exemplo']));
   assert.doesNotMatch(legivel(cru), /Maria|529\.982/, 'nem nome nem CPF em texto');
   assert.deepEqual((await cru.ler('acesso')).map((u) => u.login), ['dono']);
+  assert.ok((await cru.ler('acesso')).every((u) => u.sessoes === undefined), 'tokens de sessão só na cópia cifrada');
   assert.equal(await cru.ler('aguardando-dados'), 1);
   assert.deepEqual((await g.ler('base')).contratos[0].inquilino_nome, 'Maria Exemplo');
   // saiu: trancado (ler não abre, gravar não grava)
