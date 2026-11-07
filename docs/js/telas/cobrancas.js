@@ -60,7 +60,7 @@ const ORDENS_BOLETO = {
  * confirmado como "pagaram em dia" (o banco compensou depois) ou "pagaram atrasado em <dia>" (multa e juros até esse dia, no valor previsto).
  */
 function caixaBaixaLote(lista, hoje) {
-  const abertos = lista.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência');
+  const abertos = lista.filter((x) => R.aCobrar(x.cb));
   if (!abertos.length) return '';
   const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
   return `<details class="cartao baixa-lote"><summary><b>Baixa em lote</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
@@ -77,8 +77,8 @@ function caixaBaixaLote(lista, hoje) {
 /** Filtros da tela de Boletos (parâmetro ``filtro``): os três primeiros olham todos os meses; "pagos" e "todos" só o mês escolhido. */
 const FILTROS_BOLETO = {
   todos: { titulo: '', todosMeses: false, f: () => true },
-  abertos: { titulo: 'Boletos em aberto', todosMeses: true, f: (x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência' },
-  vencidos: { titulo: 'Boletos vencidos e não pagos', todosMeses: true, f: (x, hoje) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência' && x.cb.vencimento < hoje },
+  abertos: { titulo: 'Boletos em aberto', todosMeses: true, f: (x) => R.aCobrar(x.cb) },
+  vencidos: { titulo: 'Boletos vencidos e não pagos', todosMeses: true, f: (x, hoje) => R.aCobrar(x.cb) && x.cb.vencimento < hoje },
   semnf: { titulo: 'Boletos pagos ainda sem NF', todosMeses: true, f: (x) => x.cb.data_pagamento && R.geraNf(x.c) && !R.ehComplementoCaucao(x.cb) && !x.fs.length },
   pagos: { titulo: 'Boletos pagos', todosMeses: false, f: (x) => !!x.cb.data_pagamento },
 };
@@ -113,14 +113,14 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
       ${opera() && ['abertos', 'vencidos'].includes(filtro) ? caixaBaixaLote(lista, hoje) : ''}
       ${tabelaBoletos(lista, hoje, ordem, url, { comp: true, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
   }
-  const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id && !R.ehComplementoCaucao(x.cb)));
+  const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id && !R.ehBoletoAvulso(x.cb)));
   const caucoes = R.complementosCaucaoPendentes(d(), comp);
   const pend = R.pendentesDeFatura(d());
   // boleto de controle (inquilino sem NF) não entra nas somas
   const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
   const controle = lista.filter((x) => !R.geraNf(x.c)).length;
   // reajuste neste aluguel: corrigir antes e mandar a carta junto com este boleto (o índice sai no começo do mês)
-  const reajustes = new Map(lista.filter((x) => !R.ehComplementoCaucao(x.cb)).map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, comp)]).filter(([, r]) => r && r.faltaCarta));
+  const reajustes = new Map(lista.filter((x) => !R.ehBoletoAvulso(x.cb)).map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, comp)]).filter(([, r]) => r && r.faltaCarta));
   const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="${url({ comp: C.somarMeses(comp, -1) })}">← ${compBr(C.somarMeses(comp, -1))}</a>
@@ -163,13 +163,14 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
           ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
           ${R.ehComplementoCaucao(cb) ? `<br>${etiqueta('complemento da caução · sem NF', 'info')}` : ''}
-          ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(cb.competencia)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
+          ${R.ehParcelaAcordo(cb) ? `<br>${etiqueta(`acordo ${cb.acordo_parcela || ''} · ${cb.acordo_referente || ''}`.replace(/  +/g, ' '), 'info')}` : ''}
+          ${reajustes.has(c.id) && !R.ehBoletoAvulso(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(cb.competencia)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}
           ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>${R.ehComplementoCaucao(cb) ? 'sem multa e juros' : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
-        <td>${situacaoBoleto(cb, hoje)}${!cb.data_pagamento && cb.situacao !== 'Carência' && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', cb.vencimento < hoje ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
+        <td>${situacaoBoleto(cb, hoje)}${R.aCobrar(cb) && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', cb.vencimento < hoje ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}
@@ -198,6 +199,17 @@ export function demonstrativo(cb) {
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
   }
+  if (R.ehParcelaAcordo(cb)) {
+    return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: acordo${cb.acordo_parcela ? ` (parcela ${esc(cb.acordo_parcela)})` : ''}</h2><div class="suave">Referente a ${esc(cb.acordo_referente || '')}</div></div>
+      <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
+    <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
+    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
+    <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
+      ${linha(`Parcela${cb.acordo_parcela ? ` ${esc(cb.acordo_parcela)}` : ''} do acordo dos boletos em atraso (${esc(cb.acordo_referente || '')})`, reais(t.total_sem_desconto))}
+      <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
+      <tr><td colspan="2" class="suave">Após o vencimento: + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
+    ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}</div>`;
+  }
   return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto de aluguel</h2><div class="suave">Competência ${compBr(cb.competencia)}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
@@ -222,7 +234,7 @@ export function demonstrativo(cb) {
 
 /** Ajuste do mês: cobrança adicional ou ressarcimento (reforma, acerto etc.). Fica no histórico. */
 function caixaAjuste(cb) {
-  if (!opera() || cb.data_pagamento || R.ehComplementoCaucao(cb)) return '';
+  if (!opera() || cb.data_pagamento || R.ehBoletoAvulso(cb) || R.emAcordo(cb)) return '';
   const tipo = cb.outros < 0 ? 'ressarcimento' : 'adicional';
   return `<div class="cartao"><h2>Ajuste deste mês</h2>
     <p class="suave">Para corrigir o valor do boleto: cobrar algo a mais ou devolver/descontar um valor (reforma, acerto do mês anterior etc.). Fica registrado no histórico do inquilino.</p>
@@ -248,17 +260,32 @@ function caixaBoleto(cb) {
     <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div></div>`;
 }
 
+/** Acordo de dívida (D8): no boleto original, de qual acordo ele faz parte; na parcela, a que ela se refere. Os dois com os boletos do acordo e "Desfazer". */
+function caixaAcordo(cb) {
+  const a = R.buscar(d(), 'acordos', cb.acordo_id || cb.acordo_parcela_de);
+  if (!a || (!R.emAcordo(cb) && !R.ehParcelaAcordo(cb))) return '';
+  const parcelas = R.parcelasDoAcordo(d(), a);
+  const lista = (l) => l.map((x) => `${link(`#/cobranca/${x.id}`, R.ehParcelaAcordo(x) && x.acordo_parcela_de === a.id ? (x.acordo_parcela || 'boleto') : compBr(x.competencia))} ${reais(R.totais(x).a_pagar_sem_desconto)} · vence ${dataBr(x.vencimento)}${x.data_pagamento ? ` · pago em ${dataBr(x.data_pagamento)}` : ''}`).join('<br>');
+  const podeDesfazer = opera() && !a.desfeito_em && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x));
+  return `<div class="alerta info nao-imprimir"><b>Acordo de ${dataBr(a.data)}</b> com ${esc(R.buscar(d(), 'contratos', a.contrato_id).inquilino_nome)}: ${esc(a.referente)}
+    (${reais(a.divida_na_data)} na data) em ${a.parcelas} boleto(s), total ${reais(a.valor_total)}.${a.observacoes ? ` <i>${esc(a.observacoes)}</i>` : ''}
+    <br><b>Boletos do acordo:</b><br>${lista(parcelas)}
+    <br><b>Boletos que ele substituiu:</b><br>${lista(R.origensDoAcordo(d(), a))}
+    ${podeDesfazer ? `<br>${botao('desfazerAcordo', 'Desfazer o acordo', { id: a.id }, 'secundario pequeno', 'Desfazer o acordo? Os boletos do acordo serão excluídos e os originais voltam a ser cobrados.')}` : ''}</div>`;
+}
+
 export function telaCobranca(cb) {
   const c = buscar('contratos', cb.contrato_id);
   const fs = R.faturasDe(d(), 'cobranca', cb.id, false);
   const validas = fs.filter((f) => f.situacao === 'Emitida');
   const sim = cb.data_pagamento ? null : C.liquidar(cb, C.hojeIso());
   return `<div class="nao-imprimir"><p class="suave"><a href="#/cobrancas?comp=${cb.competencia}">← Boletos de ${compBr(cb.competencia)}</a> · <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></p>
-    <div class="cabecalho"><h1>Boleto ${R.ehComplementoCaucao(cb) ? 'do complemento da caução' : compBr(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
+    <div class="cabecalho"><h1>Boleto ${R.ehComplementoCaucao(cb) ? 'do complemento da caução' : R.ehParcelaAcordo(cb) ? `do acordo ${esc(cb.acordo_parcela || '')}` : compBr(cb.competencia)} ${situacao(cb.situacao)}</h1><div class="acoes">
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>${botao('baixarPdfTela', 'Baixar PDF', { seletor: '.demonstrativo', nome: nomeArquivoDoc(R.ehComplementoCaucao(cb) ? 'Demonstrativo complemento caução' : 'Demonstrativo boleto', c, cb.competencia) }, 'secundario')}
-      ${opera() && !cb.data_pagamento ? `${R.ehComplementoCaucao(cb) ? '' : link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir este boleto?')}` : ''}</div></div>
+      ${opera() && !cb.data_pagamento && !R.emAcordo(cb) && !R.ehParcelaAcordo(cb) ? `${R.ehComplementoCaucao(cb) ? '' : link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', 'Excluir este boleto?')}` : ''}</div></div>
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
     ${R.geraNf(c) ? '' : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
+    ${caixaAcordo(cb)}
     ${demonstrativo(cb)}
     <div class="nao-imprimir">${caixaAjuste(cb)}<div class="cartao" id="pagamento"><h2>Pagamento</h2>
       ${!cb.data_pagamento && memoria.pagamentoDivergente && memoria.pagamentoDivergente.id === cb.id ? formNfDivergente(cb, memoria.pagamentoDivergente) : cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
@@ -266,11 +293,12 @@ export function telaCobranca(cb) {
         ${item('Valor recebido', reais(cb.valor_pago))}${R.ehComplementoCaucao(cb) ? '' : item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta('digitado à mão', 'aviso')}` : ''}`)}</div>
         ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
+      : R.emAcordo(cb) ? '<p class="suave">Boleto em acordo: não se cobra mais. O pagamento é registrado nos boletos do acordo.</p>'
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : R.ehComplementoCaucao(cb) ? ` (${sim.dias_atraso} dias de atraso, sem multa e juros)` : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${R.ehComplementoCaucao(cb) ? ' · sem NF (complemento da caução)' : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
-        ${opera() && cb.situacao !== 'Carência' ? formPagamento(cb, false) : ''}
+        ${opera() && R.aCobrar(cb) ? formPagamento(cb, false) : ''}
         ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', cb.vencimento < C.hojeIso() ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
-    ${caixaBancoC6(cb)}
-    ${caixaBoleto(cb)}
+    ${R.emAcordo(cb) ? '' : caixaBancoC6(cb)}
+    ${R.emAcordo(cb) ? '' : caixaBoleto(cb)}
     <div class="cartao rolagem"><h2>NFs</h2><table class="responsiva"><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${R.numeroFatura(f.numero)}</td><td>${esc(buscar('emitentes', f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === 'Emitida' ? 'ok' : 'perigo')}</td></tr>`).join('')
       || `<tr><td colspan="7" class="suave">${!R.geraNf(c) ? 'Este inquilino não emite NF (só controle do pagamento).' : R.ehComplementoCaucao(cb) ? 'Complemento da caução: não gera NF.' : cb.data_pagamento ? 'Aguardando numeração (tela NF).' : 'Confirme o pagamento para gerar a NF.'}</td></tr>`}</table>

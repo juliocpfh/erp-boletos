@@ -257,7 +257,7 @@ export const nomePadraoComprovante = (d, mov) => nomeComprovante(d, mov);
 // --------------------------------------------------------------------------
 // Conciliação de boletos
 // --------------------------------------------------------------------------
-const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência';
+const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo';
 const semDigitos = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
 
 /** Boletos em aberto que casam com um recebimento de ``valor`` em ``data``: [{ cobranca, certeza, previsto, pagouEmDia }]. */

@@ -463,7 +463,7 @@ const despesasSemExtrato = (imovelId, m) => R.despesasDo(d(), imovelId).filter((
 /** Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. */
 function boletosAbertos(imovelId, m) {
   const cs = d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id);
-  return d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && !cb.data_pagamento && cb.situacao !== 'Carência')
+  return d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
     .map((cb) => ({ cb, previsto: R.previstoNoPagamento(cb, m.data).valor_devido }))
     .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))).slice(0, 30);
 }
