@@ -646,3 +646,21 @@ test('pagamento ligado ao banco não se desfaz pelo Histórico nem pelo "desfaze
   const iPago = d.historico.findLastIndex((h) => h.tabela === 'despesas' && h.registro_id === solta.id && h.detalhes && h.detalhes.data_pagamento);
   assert.throws(() => R.desfazerAlteracoes(d, [`${iPago}:data_pagamento`], 'julio'), /paga pelo banco \(pagamento nº/);
 });
+
+test('C3: pagamento enviado que o C6 não confirma nem recusa: o administrador marca "Foi cancelado no C6" (noBanco) e o alerta some', () => {
+  const { d, sobre } = base();
+  d.config_banco.permitir_pagamentos = true;
+  const dados = { conta_id: 'jck', imovel_id: sobre.id, origem: { tipo: 'avulso' }, tipo_conta: 'Luz', competencia: '2026-11', forma: 'boleto', codigo_barras: '7'.repeat(44),
+    beneficiario: { nome: 'COPEL' }, valor: 20000, vencimento: '2026-11-15', data_pagamento: '2026-11-10' };
+  const [p] = Z.prepararPagamentos(d, [dados], 'ana');
+  Z.aprovarPagamento(d, p.id, 'julio');
+  Z.registrarGrupoEnviado(d, [p.id], 'g-c3', [{ id: 'it-c3', content: p.content, amount: 200, status: 'SCHEDULED' }], 'julio');
+  assert.equal(p.situacao, 'agendado');
+  assert.match(R.alertaBanco(d, '2026-11-20').texto, /1 pagamento\(s\) enviado\(s\) ao banco sem confirmação.*Foi cancelado no C6/);
+  // sem o aval de que o C6 cancelou, não cancela; com ele, passa a cancelado com o motivo e sai do alerta
+  assert.throws(() => Z.cancelarPagamento(d, p.id, 'julio'), /enviado ao banco/);
+  Z.cancelarPagamento(d, p.id, 'julio', { noBanco: true, motivo: 'cancelado no C6: pelo gerente' });
+  assert.deepEqual([p.situacao, p.erro], ['cancelado', 'cancelado no C6: pelo gerente']);
+  assert.equal(R.alertaBanco(d, '2026-11-20'), null);
+  assert.equal(Z.SITUACOES_PAGAMENTO.aguardando_aprovacao, 'Aprovado no sistema, envio ao banco pendente');
+});
