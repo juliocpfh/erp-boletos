@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-pVj2OSe0qhAWGs0C+kJF7iYHUyBwEGrkzIQ4X00G4Xk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-eZ+6YRuypI8ZmHpZI0hFAAD4yWgQWMivgK8s8Xq+jHM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="cbb89d4e2766db39">
+<meta name="fontes" content="bb8c9fee4507d3f9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1581,6 +1581,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     continuadoPor: () => continuadoPor,
     contratoAtivo: () => contratoAtivo,
     contratoDoSeguro: () => contratoDoSeguro,
+    contratoEncerrado: () => contratoEncerrado,
     contratoHerdado: () => contratoHerdado,
     contratosSemImovelVencidos: () => contratosSemImovelVencidos,
     correcoesDo: () => correcoesDo,
@@ -6792,7 +6793,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           pendentes: b.semDestino + b.contasSemImportar.length,
           link: `#/banco?mes=${mes}`,
           contas: b.porConta,
-          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : "nenhuma conta configurada"
+          // comprovantes não baixados e pagamentos pelo banco sem resposta são só aviso: não seguram a etapa
+          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.semComprovante ? ` · ${b.semComprovante} comprovante(s) não baixado(s)` : "") + (b.pagamentosPendentes ? ` · ${b.pagamentosPendentes} pagamento(s) pelo banco sem confirmação` : "") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : "nenhuma conta configurada"
         };
       })()] : [],
       {
@@ -6820,7 +6822,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         chave: "contas",
         titulo: `Lançar as contas pagas por nós de ${compBr(mes)}`,
         pendentes: contas2.length,
-        manual: true,
         detalhe: contas2.length ? `sem lançamento: ${contas2.map((i) => i.nome).join(", ")}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : "nenhum imóvel com conta nossa",
         link: "#/resultados",
         imoveis: contas2.map((i) => i.id)
@@ -7145,12 +7146,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!enviada && atual) excluir(d2, "cartas_reajuste", atual.id, usuario, `Carta de reajuste de ${compBr(comp)}: envio desfeito`);
   }
   var DIAS_VERMELHO = 5;
+  var contratoEncerrado = (d2, c) => c.ativo === false || !!encerramentoDo(d2, c.id);
   function inadimplencia(d2, hoje3 = hojeIso()) {
     const porContrato = /* @__PURE__ */ new Map();
     for (const cb of d2.cobrancas) {
       if (cb.data_pagamento || cb.situacao === "Carência" || !(cb.vencimento < hoje3)) continue;
       const c = buscar(d2, "contratos", cb.contrato_id);
-      if (!c) continue;
+      if (!c || contratoEncerrado(d2, c)) continue;
       if (!porContrato.has(c.id)) porContrato.set(c.id, { contrato: c, boletos: [] });
       const r = liquidar(cb, hoje3);
       porContrato.get(c.id).boletos.push({ cobranca: cb, dias: diasEntre(cb.vencimento, hoje3), valor: totais(cb).a_pagar_sem_desconto, hojeValor: r.valor_devido });
@@ -16921,7 +16923,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${r.devedores.map((x) => `<tr class="${x.diasMax > DIAS_VERMELHO ? "fora" : ""}"><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}${x.contrato.inquilino_telefone ? `<br><span class="suave">${esc(x.contrato.inquilino_telefone)}</span>` : ""}${geraNf(x.contrato) ? "" : `<br>${etiqueta("boleto de controle", "controle")}`}</td>
         <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join("<br>")}</td>
         <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td></tr>`).join("") || '<tr><td colspan="5" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
-      <p class="suave">Mais de ${DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel.</p></div>
+      <p class="suave">Mais de ${DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
     <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
       ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
         <td class="n">${x.atrasados} de ${x.pagos}</td><td class="n">${x.mediaDias} dia(s)</td><td class="n">${x.maiorAtraso} dia(s)</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Ninguém pagou com atraso nos últimos 12 meses.</td></tr>'}</table>
