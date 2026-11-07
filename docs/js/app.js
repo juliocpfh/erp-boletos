@@ -38,7 +38,7 @@ const SESSAO = 'imoveis-sessao';
 const DURACAO_SESSAO = 12 * 3600 * 1000;
 const LIMITE_SESSAO = 7 * 24 * 3600 * 1000;
 
-const MAX_SESSOES = 10; // por usuário (vários navegadores/computadores)
+const MAX_SESSOES = N.MAX_SESSOES; // por usuário (vários navegadores/computadores); na nuvem, o cofre junta as listas dos aparelhos
 
 const deposito = () => (location.protocol === 'file:' ? sessionStorage : localStorage);
 
@@ -81,6 +81,7 @@ async function abrirSessao(u) {
   }, { soSessao: true });
   E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
   gravarSessao(u.login, token);
+  ajustesParaNuvem();
 }
 
 // Sair numa aba sai de todas; entrar numa aba vale para as outras.
@@ -108,7 +109,18 @@ export function alterar(fn, opcoes = {}) {
   return minha;
 }
 
-export const ERRO_ARQUIVO_SUMIU = `O arquivo ${S.ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${S.ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
+/**
+ * Nuvem: as correções que `normalizar` fez na cópia (campo ou tabela nova, migração) vão à nuvem uma vez, por quem pode
+ * gravar (regra 3 do CLAUDE.md vale também na nuvem). Entra na fila de gravação, como qualquer outra mudança.
+ */
+function ajustesParaNuvem() {
+  if (!E.nuvem || !pode(E.usuario, 'operador')) return;
+  filaGravacao = filaGravacao.then(async () => {
+    if (await E.nuvem.enviarAjustes()) { E.d = E.nuvem.atual(); atualizarFaixa(); }
+  }).catch(() => {});
+}
+
+export const ERRO_ARQUIVO_SUMIU =`O arquivo ${S.ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${S.ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
 
 /** A última gravação do arquivo foi só de entrada/saída de usuário (token de sessão): não é uma alteração dos dados. */
 const soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
@@ -384,7 +396,7 @@ export async function abrirNuvem() {
   E.cofrinho = new Cofrinho(cru);
   await E.cofrinho.daSessao(!!lerSessao());
   const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
-  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador });
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar });
   E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
@@ -399,6 +411,7 @@ export async function abrirNuvem() {
   }
   // login lembrado sem a chave da cópia (ex.: entrou antes da cópia cifrada existir): pede a senha uma vez
   E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
+  ajustesParaNuvem(); // login lembrado: as correções vão sem passar por abrirSessao
   await mostrar();
 }
 

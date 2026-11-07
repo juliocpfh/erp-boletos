@@ -6,6 +6,8 @@
 export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualizado_por', 'seq', 'revisao_so_sessao', 'historico', '_nuvem'];
 /** Contador que só anda com internet (número da NF): gravação que o muda vai na hora e espera a resposta. */
 export const CONTADORES = ['proxima_fatura'];
+/** Sessões lembradas por usuário (vários navegadores/computadores); igual a MAX_SESSOES de nuvem/cofre.mjs, que junta as listas dos aparelhos. */
+export const MAX_SESSOES = 10;
 const FAIXA = 1000; // códigos reservados por tabela para este aparelho
 const RESERVA_MINIMA = 200; // abaixo disso, pede uma faixa nova quando tiver internet
 
@@ -117,8 +119,8 @@ const aleatorio = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b
  */
 export class Sincronia {
   /** `trava(fn)`: uma aba de cada vez mexe na fila (navigator.locks no navegador); sem ela, roda direto. */
-  constructor({ api, guardar, aoMudar = () => {}, trava = (fn) => fn() }) {
-    this.api = api; this.guardar = guardar; this.aoMudar = aoMudar; this.trava = trava;
+  constructor({ api, guardar, aoMudar = () => {}, trava = (fn) => fn(), normalizar = (d) => d }) {
+    this.api = api; this.guardar = guardar; this.aoMudar = aoMudar; this.trava = trava; this.normalizar = normalizar;
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
     this.aba = aleatorio().slice(0, 6);
@@ -144,17 +146,34 @@ export class Sincronia {
     return this.atual();
   }
 
-  /** O banco que a tela usa (base + o que ainda não foi enviado). */
+  /** O banco que a tela usa (base + o que ainda não foi enviado), já com `normalizar` (campos e tabelas novos). */
   atual() {
     if (!this.base) return null;
-    if (!this.vista) {
-      const d = structuredClone(this.base);
-      for (const l of this.pendentes) aplicarOps(d, l.ops);
-      d.seq = { ...(d.seq || {}) };
-      for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) d.seq[t] = f.proximo - 1;
-      this.vista = d;
-    }
+    if (!this.vista) this.vista = this.normalizar(this.montar());
     return this.vista;
+  }
+
+  /** Base + fila deste aparelho, como está na nuvem (sem `normalizar`). */
+  montar() {
+    const d = structuredClone(this.base);
+    for (const l of this.pendentes) aplicarOps(d, l.ops);
+    d.seq = { ...(d.seq || {}) };
+    for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) d.seq[t] = f.proximo - 1;
+    return d;
+  }
+
+  /**
+   * As correções que `normalizar` fez (campo novo, tabela nova, migração) vão à nuvem como uma gravação deste aparelho,
+   * senão só existiriam na tela. Chamar depois de entrar, por quem pode gravar (usuário de consulta teria a mudança recusada).
+   * Dois aparelhos mandando a mesma correção não dão conflito (a nuvem ignora o que "já está assim"). Devolve quantas mudanças foram.
+   */
+  async enviarAjustes() {
+    if (!this.base) return 0;
+    const ops = diferencas(this.montar(), this.atual()).filter((o) => !(o.op === 'raiz' && CONTADORES.includes(o.campo)));
+    if (!ops.length) return 0;
+    await this.enfileirar(ops);
+    this.enviarDepois();
+    return ops.length;
   }
 
   pendentesQtd() { return this.pendentes.reduce((s, l) => s + l.ops.length, 0); }
