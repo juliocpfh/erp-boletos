@@ -23,8 +23,14 @@ export function canon(v) {
   if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;
   return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
 }
-const igual = (a, b) => canon(a) === canon(b);
+/**
+ * Iguais? Primeiro o JSON.stringify (nativo, rápido; `depois` é um clone de `antes`, então as chaves vêm na mesma ordem);
+ * só se der diferente é que a comparação com as chaves em ordem (`canon`) decide. Uma gravação compara o banco inteiro.
+ */
+const igual = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b) || canon(a) === canon(b);
 const ehTabela = (v) => Array.isArray(v) && v.every((r) => r && typeof r === 'object' && Number.isSafeInteger(r.id));
+/** Intervalo (ms) em que várias gravações seguidas (duplo clique, arrumações do Painel) vão numa sincronia só. */
+export const AGRUPAR_ENVIO = 300;
 
 /**
  * O que mudou de `antes` para `depois`, no formato do lote do cofre.
@@ -42,6 +48,7 @@ export function diferencas(antes, depois) {
     }
     if (RAIZ_DO_SERVIDOR.includes(k)) continue;
     const va = antes?.[k]; const vb = depois?.[k];
+    if (igual(va, vb)) continue; // tabela (ou campo) que não mudou: uma comparação só, sem olhar registro a registro
     if (ehTabela(va ?? []) && ehTabela(vb ?? []) && (Array.isArray(va) || Array.isArray(vb))) {
       const porId = new Map((va || []).map((r) => [r.id, r]));
       const novos = new Set();
@@ -60,7 +67,7 @@ export function diferencas(antes, depois) {
       for (const r of va || []) if (!novos.has(r.id)) ops.push({ op: 'excluir', tabela: k, id: r.id, base: r });
       continue;
     }
-    if (!igual(va, vb)) ops.push({ op: 'raiz', campo: k, antes: va, depois: vb });
+    ops.push({ op: 'raiz', campo: k, antes: va, depois: vb });
   }
   return ops;
 }
@@ -129,10 +136,12 @@ const aleatorio = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b
  */
 export class Sincronia {
   /** `trava(fn)`: uma aba de cada vez mexe na fila (navigator.locks no navegador); sem ela, roda direto. */
-  constructor({ api, guardar, aoMudar = () => {}, trava = (fn) => fn(), normalizar = (d) => d }) {
+  constructor({ api, guardar, aoMudar = () => {}, trava = (fn) => fn(), normalizar = (d) => d, agrupar = AGRUPAR_ENVIO }) {
     this.api = api; this.guardar = guardar; this.aoMudar = aoMudar; this.trava = trava; this.normalizar = normalizar;
+    this.agrupar = agrupar;
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
+    this.envioMarcado = null;
     this.aba = aleatorio().slice(0, 6);
   }
 
@@ -274,13 +283,22 @@ export class Sincronia {
     }
   }
 
-  enviarDepois() { setTimeout(() => this.sincronizar().catch(() => {}), 0); }
+  /**
+   * Marca uma sincronia para daqui a pouco: gravações seguidas (duplo clique, arrumações do Painel ao abrir) vão numa passada
+   * só, em vez de uma ida à nuvem por gravação. Cada gravação continua sendo um lote (um recusado não leva os outros).
+   */
+  enviarDepois() {
+    if (this.envioMarcado) return;
+    this.envioMarcado = setTimeout(() => { this.envioMarcado = null; this.sincronizar().catch(() => {}); }, this.agrupar);
+    this.envioMarcado.unref?.(); // no Node (testes) não segura o processo; no navegador não existe
+  }
 
   /**
    * Envia a fila (em ordem) e traz o que os outros mudaram. Sem internet: para e tenta de novo depois (nada se perde).
    * Lote recusado pela nuvem (sem permissão, código repetido…) sai da fila e vira aviso em `recusas`.
    */
   async sincronizar({ exigirInternet = false } = {}) {
+    if (this.envioMarcado) { clearTimeout(this.envioMarcado); this.envioMarcado = null; } // esta passada já leva a fila
     // uma passada de cada vez; quem chega no meio espera e faz a sua (para pegar o que mudou depois que a outra começou)
     while (this.enviando) await this.enviando.catch(() => {});
     this.enviando = this.trava(async () => {
@@ -329,13 +347,18 @@ export class Sincronia {
     }
   }
 
-  /** Traz da nuvem o que mudou desde a última vez (ou tudo de novo, se o aparelho ficou parado demais). */
-  /** Devolve true se chegou algo de outro aparelho (fora das chaves `meus`, que são deste). */
+  /**
+   * Traz da nuvem o que mudou desde a última vez (ou tudo de novo, se o aparelho ficou parado demais).
+   * Devolve true se chegou algo de outro aparelho (fora das chaves `meus`, que são deste).
+   * A cópia local (cifrada, o banco inteiro) só é regravada se chegou alguma coisa: a conferência de 30 em 30 s quase sempre volta vazia.
+   */
   async puxar(meus = { chaves: new Set(), historico: 0 }) {
-    let externo = false; let historicoMeu = meus.historico;
+    let externo = false; let historicoMeu = meus.historico; let mudou = false;
     for (let volta = 0; volta < 1000; volta += 1) {
-      const r = await this.api('GET', `mudancas?desde=${Number(this.base._nuvem?.seq || 0)}`);
-      if (r.refazer) { await this.baixarTudo(); externo = true; break; }
+      const desde = Number(this.base._nuvem?.seq || 0);
+      const r = await this.api('GET', `mudancas?desde=${desde}`);
+      if (r.refazer) { await this.baixarTudo(); externo = true; mudou = false; break; } // baixarTudo já gravou a cópia
+      if (r.mudancas.length || Number(r.seq) !== desde) mudou = true;
       for (const m of r.mudancas) {
         aplicarMudanca(this.base, m);
         if (m.tipo === 'historico') { if (historicoMeu > 0) historicoMeu -= 1; else externo = true; }
@@ -348,6 +371,7 @@ export class Sincronia {
       this.conflitos = r.conflitos || [];
       if (!r.mais) break;
     }
+    if (!mudou) return externo;
     this.vista = null;
     await this.guardar.gravar('base', this.base);
     return externo;
@@ -432,21 +456,40 @@ export async function saudeDaNuvem(base = 'api/') {
 /** Trava entre abas do mesmo aparelho (Web Locks); navegador sem suporte: roda direto. */
 export const travaDoNavegador = (fn) => (globalThis.navigator?.locks ? navigator.locks.request('imoveis-nuvem-fila', fn) : fn());
 
-export function guardarNoNavegador(nome = 'imoveis-nuvem') {
-  const abrir = () => new Promise((ok, erro) => {
-    const req = indexedDB.open(nome, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('dados');
-    req.onsuccess = () => ok(req.result);
-    req.onerror = () => erro(req.error);
+/** Cópia local no IndexedDB. A conexão fica aberta (abrir e fechar a cada leitura custava a cada gravação e a cada 30 s). */
+export function guardarNoNavegador(nome = 'imoveis-nuvem', { indexedDB: idb = globalThis.indexedDB } = {}) {
+  let aberto = null; // Promise com a conexão; some se o navegador a fechar (outra aba atualizando, memória) e abre de novo
+  const abrir = () => {
+    if (aberto) return aberto;
+    aberto = new Promise((ok, erro) => {
+      const req = idb.open(nome, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('dados');
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => { db.close(); aberto = null; };
+        db.onclose = () => { aberto = null; };
+        ok(db);
+      };
+      req.onerror = () => { aberto = null; erro(req.error); };
+    });
+    return aberto;
+  };
+  const transacao = (db, modo, fn) => new Promise((ok, erro) => {
+    const tx = db.transaction('dados', modo);
+    const req = fn(tx.objectStore('dados'));
+    tx.oncomplete = () => ok(req?.result);
+    tx.onerror = () => erro(tx.error);
+    tx.onabort = () => erro(tx.error);
   });
   const op = async (modo, fn) => {
-    const db = await abrir();
-    return new Promise((ok, erro) => {
-      const tx = db.transaction('dados', modo);
-      const req = fn(tx.objectStore('dados'));
-      tx.oncomplete = () => { db.close(); ok(req?.result); };
-      tx.onerror = () => { db.close(); erro(tx.error); };
-    });
+    try {
+      return await transacao(await abrir(), modo, fn);
+    } catch (e) {
+      // conexão que o navegador fechou por trás (InvalidStateError): abre outra e tenta uma vez
+      if (e?.name !== 'InvalidStateError') throw e;
+      aberto = null;
+      return transacao(await abrir(), modo, fn);
+    }
   };
   return {
     ler: (k) => op('readonly', (s) => s.get(k)),
