@@ -49,6 +49,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
 - Boleto de controle (inquilino sem NF) fica fora das somas e dos resultados.
+- Acordo de dívida (Financeiro → Inadimplência → "Fazer acordo"): não existe "baixar como perda" (o boleto é título executável). Os boletos vencidos escolhidos ficam "Em acordo" (saem da inadimplência e não se cobram mais) e saem boletos novos com o total combinado, divididos em parcelas mensais a partir do 1º vencimento. Ex.: boleto de R$ 1.350,00 vencido há 40 dias, acordo de R$ 1.500,00 em 3: boletos de R$ 500,00 vencendo 10/12, 10/01 e 10/02. Parcela do acordo atrasada: o inquilino volta para a inadimplência. Na NF de cada parcela vai a parte do aluguel com a multa e os juros do acordo (IPTU, seguro, tarifa e FCI dos boletos originais ficam fora, como sempre), com o período dos aluguéis que ela paga. O acordo só se desfaz enquanto nenhuma parcela foi paga nem emitida no C6; boleto original emitido no C6 precisa ser cancelado no banco antes do acordo.
 
 7. PAGAMENTO E NOTAS FISCAIS (NF)
 - Cada pagamento tem a data contábil (data em que o dinheiro entrou).
@@ -93,6 +94,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Termos aditivos, cartas de reajuste enviadas (PDF) e outras comunicações ficam na pasta "Aditivos, correções e comunicação" do inquilino.
 
 14. ALERTAS E AVISOS
+- Régua de cobrança (só aviso, nada é enviado sozinho): pelo boleto vencido mais antigo, a partir de 1 dia de atraso mandar o lembrete por e-mail, de 10 dias ligar para o inquilino, de 30 dias avaliar a negativação. Aparece no alerta de Inadimplência e na tela Inadimplência.
 - Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor e prioridade são editáveis pelo administrador.
 - Avisos antes de salvar: data de pagamento de mais de 90 dias atrás, datas no futuro, endereço sem número, telefone sem DDD, e-mail com erro, leitura menor que a anterior, IPTU ou seguro 30% fora do anterior, lançamento repetido.
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.

@@ -14,7 +14,7 @@ export const botaoInativo = (texto, titulo, cls = 'secundario pequeno') => `<but
 
 /** "Emitir no C6": ativo quando a integração está pronta; senão desabilitado explicando o que falta. Só para quem opera. */
 export function botaoEmitirC6(cb, cls = 'secundario pequeno') {
-  if (!opera() || cb.data_pagamento || cb.situacao === 'Carência' || R.emitidoNoBanco(cb)) return '';
+  if (!opera() || !R.aCobrar(cb) || R.emitidoNoBanco(cb)) return '';
   const texto = cb.banco && cb.banco.situacao === 'erro' ? 'Tentar emitir no C6 de novo' : cb.banco && cb.banco.situacao === 'cancelado' ? 'Emitir no C6 de novo' : 'Emitir no C6';
   return B.pontePronta(d()) ? botao('emitirBoletoC6', texto, { id: cb.id }, cls) : botaoInativo(texto, B.motivoIndisponivel(d()), cls);
 }

@@ -8,6 +8,18 @@ import * as R from '../regras.js';
 import { caixaPagarPeloBanco } from './banco.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 
+/** Acordos em andamento (com boleto ainda em aberto): o que falta pagar de cada um. */
+function caixaAcordos(hoje) {
+  const ativos = (d().acordos || []).filter((a) => !a.desfeito_em).map((a) => ({ a, parcelas: R.parcelasDoAcordo(d(), a) }))
+    .filter((x) => x.parcelas.some((cb) => !cb.data_pagamento)).sort((x, y) => y.a.data.localeCompare(x.a.data));
+  if (!ativos.length) return '';
+  return `<div class="cartao rolagem"><h2>Acordos em andamento</h2><table><tr><th>Inquilino</th><th>Acordo</th><th>Boletos</th><th class="n">Falta pagar</th></tr>
+    ${ativos.map(({ a, parcelas }) => { const c = buscar('contratos', a.contrato_id) || {}; const abertos = parcelas.filter((cb) => !cb.data_pagamento);
+      return `<tr><td><a href="#/contrato/${c.id}">${esc(c.inquilino_nome || '')}</a></td><td>${dataBr(a.data)} · ${esc(a.referente)}<br><span class="suave">total ${reais(a.valor_total)} em ${a.parcelas}</span></td>
+        <td>${parcelas.map((cb) => `<a href="#/cobranca/${cb.id}">${esc(cb.acordo_parcela || 'boleto')}</a> ${dataBr(cb.vencimento)} ${cb.data_pagamento ? etiqueta('pago', 'ok') : cb.vencimento < hoje ? etiqueta('vencido', 'perigo') : ''}`).join('<br>')}</td>
+        <td class="n">${reais(abertos.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0))}</td></tr>`; }).join('')}</table></div>`;
+}
+
 /** Inadimplência: quem está devendo, há quantos dias, quanto hoje; e quem costuma atrasar. */
 export function telaInadimplencia() {
   const hoje = C.hojeIso();
@@ -19,12 +31,14 @@ export function telaInadimplencia() {
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
       <div class="cartao"><div class="grande">${reais(r.total)}</div>em aberto (valor do boleto)</div>
       <div class="cartao"><div class="grande">${reais(r.totalHoje)}</div>hoje, com multa e juros</div></div>
-    <div class="cartao rolagem"><h2>Em atraso agora</h2><table><tr><th>Imóvel / inquilino</th><th>Boletos vencidos</th><th class="n">Dias (mais antigo)</th><th class="n">Em aberto</th><th class="n">Hoje, com multa e juros</th></tr>
+    <div class="cartao rolagem"><h2>Em atraso agora</h2><table><tr><th>Imóvel / inquilino</th><th>Boletos vencidos</th><th class="n">Dias (mais antigo)</th><th class="n">Em aberto</th><th class="n">Hoje, com multa e juros</th><th>Próximo passo</th></tr>
       ${r.devedores.map((x) => `<tr class="${x.diasMax > R.DIAS_VERMELHO ? 'fora' : ''}"><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}${x.contrato.inquilino_telefone ? `<br><span class="suave">${esc(x.contrato.inquilino_telefone)}</span>` : ''}${R.geraNf(x.contrato) ? '' : `<br>${etiqueta('boleto de controle', 'controle')}`}</td>
-        <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join('<br>')}</td>
-        <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td></tr>`).join('')
-      || '<tr><td colspan="5" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
-      <p class="suave">Mais de ${R.DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
+        <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${R.ehParcelaAcordo(b.cobranca) ? esc(`acordo ${b.cobranca.acordo_parcela || ''}`.trim()) : compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join('<br>')}</td>
+        <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td>
+        <td>${esc(x.passo)}${opera() ? `<br>${botao('lembrete', 'Cobrar', { id: x.boletos[0].cobranca.id }, 'secundario pequeno')} ${x.boletos.some((b) => !R.ehComplementoCaucao(b.cobranca)) ? botao('fazerAcordo', 'Fazer acordo', { contrato: x.contrato.id }, 'secundario pequeno') : ''}` : ''}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
+      <p class="suave">Mais de ${R.DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${R.REGUA_COBRANCA.slice().reverse().map((p) => `${p.dias} dia(s) de atraso: ${p.passo.toLocaleLowerCase('pt-BR')}`).join('; ')}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
+    ${caixaAcordos(hoje)}
     <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
       ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
         <td class="n">${x.atrasados} de ${x.pagos}</td><td class="n">${x.mediaDias} dia(s)</td><td class="n">${x.maiorAtraso} dia(s)</td></tr>`).join('')

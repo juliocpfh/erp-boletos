@@ -52,7 +52,7 @@ async function excelDoNumero(ExcelJS, modelo, numero) {
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.imovel_id === r.id) ? 'Este imóvel tem inquilinos. Exclua os contratos antes.' : null), voltar: () => '#/imoveis' },
   contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
-  cobrancas: { checar: (db, r) => (R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
+  cobrancas: { checar: (db, r) => (R.emAcordo(r) || R.ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   iptus: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
   seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
@@ -968,6 +968,61 @@ export const ACOES = {
 
   async voltarAlerta({ chave }) {
     await alterar((db) => R.voltarAlerta(db, chave, login()));
+    await mostrar();
+  },
+
+  /**
+   * Acordo de dívida (D8): janela com os boletos vencidos do inquilino (marcados), o total combinado (vem com o valor de
+   * hoje, com multa e juros), o número de boletos e o 1º vencimento; a prévia mostra os boletos novos e quanto vai na NF.
+   */
+  async fazerAcordo({ contrato }) {
+    const c = buscar('contratos', contrato);
+    const hoje = C.hojeIso();
+    const vencidos = d().cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && cb.vencimento < hoje && !R.ehComplementoCaucao(cb))
+      .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+    if (!vencidos.length) throw new C.ErroUsuario('Este inquilino não tem boleto vencido em aberto.');
+    const hojeDe = (cb) => C.liquidar(cb, hoje).valor_devido;
+    const proximo = C.vencimentoDaCompetencia(C.competenciaDe(hoje), c.dia_vencimento || 10, false);
+    const primeiro = proximo > hoje ? proximo : C.somarMesesData(proximo, 1);
+    const nome = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}` : compBr(cb.competencia));
+    const r = await janela({ titulo: `Acordo · ${esc(c.inquilino_nome)}`, sim: 'Fazer o acordo', nao: 'Cancelar',
+      html: `<p class="suave">Os boletos marcados ficam "em acordo" (saem da inadimplência) e o sistema cria os boletos novos. Se um boleto do acordo atrasar, o inquilino volta para a lista.</p>
+        <p><label>Boletos do acordo</label>${vencidos.map((cb) => `<label class="check-mini"><input type="checkbox" name="boleto" value="${cb.id}" checked data-hoje="${hojeDe(cb)}">
+          ${esc(nome(cb))} · venceu ${dataBr(cb.vencimento)} · ${reais(R.totais(cb).a_pagar_sem_desconto)} <span class="suave">(hoje ${reais(hojeDe(cb))})</span></label>`).join('<br>')}</p>
+        <div class="acoes"><p><label>Total combinado</label><input name="total" inputmode="decimal" data-dinheiro required style="width:140px"></p>
+          <p><label>Boletos</label><select name="parcelas">${Array.from({ length: 12 }, (_, k) => `<option value="${k + 1}" ${k === 2 ? 'selected' : ''}>${k + 1}</option>`).join('')}</select></p>
+          <p><label>1º vencimento</label><input type="date" name="vencimento" value="${primeiro}" min="${hoje}" required style="width:auto"></p></div>
+        <p><label>Observações (opcional)</label><input name="observacoes" placeholder="Ex.: combinado por telefone em ${dataBr(hoje)}"></p>
+        <div data-previa class="suave"></div>`,
+      ligar(dlg) {
+        const total = dlg.querySelector('[name=total]');
+        const previa = dlg.querySelector('[data-previa]');
+        const marcados = () => [...dlg.querySelectorAll('[name=boleto]:checked')];
+        let mexeu = false;
+        const ver = () => {
+          if (!mexeu) total.value = dinheiroTexto(marcados().reduce((s, el) => s + Number(el.dataset.hoje), 0));
+          try {
+            const p = R.previaAcordo(d(), { contrato_id: c.id, ids: marcados().map((el) => el.value), total: C.centavos(total.value || '0'),
+              parcelas: dlg.querySelector('[name=parcelas]').value, primeiro_vencimento: dlg.querySelector('[name=vencimento]').value }, hoje);
+            previa.innerHTML = `<b>Boletos novos:</b><br>${p.boletos.map((b) => `${b.parcela || 'único'} · vence ${dataBr(b.vencimento)} · <b>${reais(b.valor)}</b> (NF ${reais(b.nf)})`).join('<br>')}
+              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`;
+          } catch (e) { previa.innerHTML = `<span class="texto-perigo">${esc(e.message)}</span>`; }
+        };
+        total.addEventListener('input', () => { mexeu = true; });
+        dlg.addEventListener('change', ver);
+        ver();
+      } });
+    if (!r) return;
+    const dados = { contrato_id: c.id, ids: (r.boleto || []).map(Number), total: C.centavos(String((r.total || [])[0] || '0')), parcelas: Number((r.parcelas || [])[0]),
+      primeiro_vencimento: String((r.vencimento || [])[0] || ''), observacoes: String((r.observacoes || [])[0] || '') };
+    const x = await alterar((db) => R.fazerAcordo(db, dados, login(), hoje));
+    aviso(`Acordo feito: ${x.parcelas.length} boleto(s) novo(s), o primeiro vence em ${dataBr(x.parcelas[0].vencimento)}. Emita-os no banco como os outros.`, 'ok');
+    await mostrar();
+  },
+
+  async desfazerAcordo({ id }) {
+    await alterar((db) => R.desfazerAcordo(db, id, login()));
+    aviso('Acordo desfeito: os boletos originais voltaram a ser cobrados.', 'ok');
     await mostrar();
   },
 
