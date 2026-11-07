@@ -566,6 +566,10 @@ export const FORMULARIOS = {
   },
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
+  buscaGlobal(form) {
+    const q = String(new FormData(form).get('q') || '').trim().slice(0, 100);
+    ir(q ? `#/buscar?q=${encodeURIComponent(q)}` : '#/buscar');
+  },
   buscaInquilinos(form) {
     const busca = String(new FormData(form).get('busca') || '').trim();
     ir(busca ? `#/inquilinos?busca=${encodeURIComponent(busca)}` : '#/inquilinos');

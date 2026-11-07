@@ -4973,3 +4973,70 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
   return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
 }
+
+// --------------------------------------------------------------------------
+// Busca global (campo do cabeçalho): imóvel, inquilino, CPF/CNPJ, telefone, nº da NF e valor de boleto
+// --------------------------------------------------------------------------
+/** Texto para comparar: minúsculas e sem acento ("João" → "joao"). */
+export const textoDeBusca = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+const soDigitosBusca = (t) => String(t || '').replace(/\D/g, '');
+
+/**
+ * Busca em tudo o que o dono procura no dia a dia. Devolve grupos `{ tipo, itens: [{ titulo, detalhe, link, extra }] }`:
+ * imóveis (nome, endereço, matrícula, contas), inquilinos atuais e antigos (nome, apelido, CPF/CNPJ, telefone, e-mail, solidário,
+ * representante, fiador), NF pelo número ("77" ou "0077") e boletos pelo valor ("1.350,00": valor pontual, recebido ou da NF).
+ * Ex.: "529" acha o inquilino cujo CPF começa por 529 e o imóvel cuja matrícula tem 529.
+ */
+export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
+  const q = textoDeBusca(texto);
+  const digitos = soDigitosBusca(texto);
+  if (!q) return [];
+  const bate = (...campos) => campos.some((v) => v && textoDeBusca(v).includes(q));
+  // número: compara também só os dígitos (CPF com ou sem pontos, telefone com ou sem traço)
+  const bateDigitos = (...campos) => digitos.length >= 3 && campos.some((v) => v && soDigitosBusca(v).includes(digitos));
+  const grupos = [];
+  const imoveis = d.imoveis.filter((i) => bate(i.nome, i.endereco, i.complemento, i.cidade, i.matricula, i.sublote) || bateDigitos(i.matricula, i.copel_uc, i.sanepar_matricula, i.gas_relogio, i.cep))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map((i) => {
+      const atual = d.contratos.find((c) => c.imovel_id === i.id && contratoAtivo(c, hoje));
+      return { titulo: i.nome, detalhe: `${enderecoCompleto(i)}${atual ? ` · ${atual.inquilino_nome}` : ' · vago'}`, link: `#/imovel/${i.id}` };
+    });
+  if (imoveis.length) grupos.push({ tipo: 'Imóveis', itens: imoveis });
+  const fiadoresDe = (c) => d.fiadores.filter((f) => f.contrato_id === c.id);
+  const contratos = d.contratos.filter((c) => bate(c.inquilino_nome, c.inquilino_apelido, c.inquilino_email, c.solidario_nome, c.representante_nome, c.responsavel_nome)
+      || bateDigitos(c.inquilino_cpf, c.inquilino_telefone, c.solidario_cpf, c.representante_cpf, c.responsavel_telefone)
+      || fiadoresDe(c).some((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone)))
+    .sort((a, b) => Number(contratoAtivo(b, hoje)) - Number(contratoAtivo(a, hoje)) || a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
+    .map((c) => {
+      const i = buscar(d, 'imoveis', c.imovel_id);
+      const fiador = fiadoresDe(c).find((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone));
+      const porque = fiador ? `fiador ${fiador.nome}` : bate(c.solidario_nome) || bateDigitos(c.solidario_cpf) ? `solidário ${c.solidario_nome}` : bate(c.representante_nome) || bateDigitos(c.representante_cpf) ? `representante ${c.representante_nome}` : '';
+      return { titulo: c.inquilino_nome, detalhe: [i ? i.nome : 'sem imóvel', c.inquilino_cpf, porque].filter(Boolean).join(' · '), link: `#/contrato/${c.id}`,
+        extra: contratoAtivo(c, hoje) ? '' : c.data_saida ? `saiu em ${C.dataBr(c.data_saida)}` : 'inativo' };
+    });
+  if (contratos.length) grupos.push({ tipo: 'Inquilinos', itens: contratos });
+  // NF: só por número, inteiro ("77" acha a 0077, não a 0770)
+  if (/^\d{1,6}$/.test(q)) {
+    const n = Number(q);
+    const nfs = d.faturas.filter((f) => f.numero === n).map((f) => {
+      const e = buscar(d, 'emitentes', f.emitente_id);
+      const cb = f.cobranca_id ? buscar(d, 'cobrancas', f.cobranca_id) : null;
+      const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null;
+      return { titulo: `NF nº ${numeroFatura(f.numero)}${e ? ` · ${e.nome}` : ''}`, detalhe: `${C.dataBr(f.emissao)} · ${C.reais(f.valor)}${c ? ` · ${c.inquilino_nome}` : ''}`, link: `#/imprimir/faturas?numero=${f.numero}`, extra: f.situacao === 'Emitida' ? '' : f.situacao };
+    });
+    if (nfs.length) grupos.push({ tipo: 'Notas fiscais', itens: nfs });
+  }
+  // valor em reais: boletos com esse valor pontual, recebido ou da NF (ex.: "1.350,00" ou "1350")
+  let valor = null;
+  try { valor = /^[\d.,]+$/.test(q) && /[,.]\d{1,2}$|^\d+$/.test(q) ? C.centavos(q) : null; } catch { valor = null; }
+  if (valor > 0) {
+    const boletos = d.cobrancas.filter((cb) => [totais(cb).a_pagar_pontual, totais(cb).a_pagar_sem_desconto, cb.valor_pago, cb.valor_nf].includes(valor))
+      .sort((a, b) => b.competencia.localeCompare(a.competencia)).slice(0, 30).map((cb) => {
+        const c = buscar(d, 'contratos', cb.contrato_id);
+        const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+        return { titulo: `Boleto ${C.compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''}`, detalhe: `${i ? `${i.nome} · ` : ''}vence ${C.dataBr(cb.vencimento)} · pontual ${C.reais(totais(cb).a_pagar_pontual)}${cb.data_pagamento ? ` · recebido ${C.reais(cb.valor_pago)} em ${C.dataBr(cb.data_pagamento)}` : ''}`, link: `#/cobranca/${cb.id}`, extra: cb.situacao };
+      });
+    if (boletos.length) grupos.push({ tipo: 'Boletos com esse valor', itens: boletos });
+  }
+  return grupos;
+}

@@ -17,6 +17,9 @@ header.topo nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
 header.topo nav a { color: #dbe4ff; padding: 6px 10px; border-radius: 6px; }
 header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }
 header.topo .conta { font-size: 13px; color: #dbe4ff; text-align: right; }
+header.topo .busca-topo input { width: 150px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; background: rgba(255,255,255,.12); color: #fff; font-size: 13px; }
+header.topo .busca-topo input::placeholder { color: #c7d2fe; }
+header.topo .busca-topo input:focus { background: #fff; color: var(--texto); outline: none; width: 220px; }
 header.topo .conta a { color: #fff; }
 .faixa { background: #e8edfb; color: var(--primaria-escura); font-size: 13px; padding: 6px 20px; }
 main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
@@ -483,6 +486,8 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   header.topo .marca { flex: 1; font-size: 16px; }
   header.topo .marca img { height: 32px; }
   header.topo .conta { font-size: 12px; order: 3; width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; }
+  header.topo .busca-topo { order: 2; width: 100%; }
+  header.topo .busca-topo input, header.topo .busca-topo input:focus { width: 100%; }
   header.topo .conta br { display: none; }
   .menu-botao { display: inline-block; background: rgba(255,255,255,.15); color: #fff; padding: 6px 10px; font-size: 14px; }
   header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }

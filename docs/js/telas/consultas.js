@@ -1,10 +1,29 @@
-// Telas de consulta: solicitações dos inquilinos, lista de inquilinos, IPTU do ano e calendário do painel.
+// Telas de consulta: busca global, solicitações dos inquilinos, lista de inquilinos, IPTU do ano e calendário do painel.
 import { podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
+
+/** Filtros da busca global (parâmetro ``tipo`` do endereço → grupo devolvido por ``R.buscarGlobal``). */
+const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'Notas fiscais']];
+
+/** Busca global (campo do cabeçalho): resultados em grupos, com filtro por tipo. */
+export function telaBusca(q) {
+  const texto = String(q.q || '').trim();
+  const grupos = texto ? R.buscarGlobal(d(), texto) : [];
+  const filtro = TIPOS_BUSCA.find(([k]) => k === q.tipo);
+  const vistos = filtro ? grupos.filter((g) => g.tipo === filtro[1]) : grupos;
+  const total = grupos.reduce((s, g) => s + g.itens.length, 0);
+  const url = (tipo) => `#/buscar?q=${encodeURIComponent(texto)}${tipo ? `&tipo=${tipo}` : ''}`;
+  return `<h1>Busca</h1>
+    <form data-form="buscaGlobal" class="acoes" style="margin-bottom:12px"><input name="q" value="${esc(texto)}" placeholder="Imóvel, inquilino, CPF, telefone, nº da NF ou valor" style="width:420px;max-width:100%" autofocus><button>Buscar</button></form>
+    ${texto ? `<div class="abas"><a href="${url('')}" class="${filtro ? '' : 'ativo'}">Tudo (${total})</a>${TIPOS_BUSCA.map(([k, t]) => { const g = grupos.find((x) => x.tipo === t); return `<a href="${url(k)}" class="${filtro && filtro[0] === k ? 'ativo' : ''}">${t.replace(' com esse valor', '')} (${g ? g.itens.length : 0})</a>`; }).join('')}</div>` : ''}
+    ${vistos.map((g) => `<div class="cartao"><h2>${esc(g.tipo)} <span class="suave">(${g.itens.length})</span></h2>
+      ${g.itens.map((x) => `<p style="margin:6px 0"><a href="${x.link}"><b>${esc(x.titulo)}</b></a>${x.extra ? ` ${etiqueta(x.extra, 'neutra')}` : ''}<br><span class="suave">${esc(x.detalhe)}</span></p>`).join('')}</div>`).join('')
+    || (texto ? `<div class="alerta info">Nada encontrado para "<b>${esc(texto)}</b>"${filtro ? ` em ${filtro[1].toLocaleLowerCase('pt-BR')}` : ''}. Tente parte do nome, só os números do CPF ou telefone, o número da NF (ex.: 77) ou o valor do boleto (ex.: 1.350,00).</div>` : '<p class="suave">Digite parte do nome do imóvel ou do inquilino, CPF/CNPJ, telefone, e-mail, o número da NF ou o valor de um boleto.</p>')}`;
+}
 
 /** Situações da solicitação, com o símbolo do resumo (tela Inquilinos) e da lista de solicitações. */
 export const SITUACOES_SOLICITACAO = [

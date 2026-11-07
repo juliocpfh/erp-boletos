@@ -2248,3 +2248,24 @@ test('C7: etapa "Banco" do fechamento avisa comprovantes não baixados e pagamen
   assert.match(banco().detalhe, /ANK: tudo com destino · 1 comprovante\(s\) não baixado\(s\) · 1 pagamento\(s\) pelo banco sem confirmação$/);
   assert.equal(banco().feito, true, 'avisos não seguram a etapa');
 });
+
+test('D1: busca global acha imóvel, inquilino (nome, CPF, fiador), NF pelo número e boleto pelo valor', () => {
+  const { d, c } = base();
+  R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Carlos Fiador', cpf: '529.982.247-25' }, 'julio');
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const cb = d.cobrancas.find((x) => x.competencia === '2026-07');
+  const tipos = (t) => R.buscarGlobal(d, t, '2026-08-01').map((g) => g.tipo);
+  assert.deepEqual(tipos('loja'), ['Imóveis']);
+  assert.deepEqual(tipos('MARIA'), ['Inquilinos']);
+  assert.deepEqual(tipos('52998224725'), ['Inquilinos']); // CPF do fiador, sem pontos
+  assert.match(R.buscarGlobal(d, '529.982', '2026-08-01')[0].itens[0].detalhe, /fiador Carlos Fiador/);
+  assert.deepEqual(tipos('nilo brandao'), ['Imóveis']); // endereço sem acento
+  const valor = C.reais(R.totais(cb).a_pagar_pontual, false);
+  const boletos = R.buscarGlobal(d, valor, '2026-08-01').find((g) => g.tipo === 'Boletos com esse valor');
+  assert.equal(boletos.itens.length, 1);
+  assert.equal(boletos.itens[0].link, `#/cobranca/${cb.id}`);
+  R.inserir(d, 'faturas', { numero: 77, emitente_id: 1, cobranca_id: cb.id, emissao: '2026-07-12', valor: 100000, situacao: 'Emitida' }, 'julio');
+  assert.deepEqual(tipos('0077'), ['Notas fiscais']);
+  assert.deepEqual(tipos('770'), []);
+  assert.deepEqual(tipos('   '), []);
+});
