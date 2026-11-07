@@ -290,7 +290,7 @@ export const TELAS = {
   },
 
   // mês e ordem vêm do endereço: só valem no formato esperado (a validação final da ordem é em telaCobrancas)
-  cobrancas: (rota) => telaCobrancas(C.competenciaValida(rota.q.comp, competenciaPadrao()), rota.q.ordem),
+  cobrancas: (rota) => telaCobrancas(C.competenciaValida(rota.q.comp, competenciaPadrao()), rota.q.ordem, rota.q.filtro, rota.q.busca),
   cobranca(rota) {
     const cb = buscar('cobrancas', rota.partes[1]);
     return cb ? telaCobranca(cb) : naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos');

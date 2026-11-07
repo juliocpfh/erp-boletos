@@ -4299,13 +4299,14 @@ export function marcarEtapaFechamento(d, mes, etapa, feito, usuario) {
 }
 
 /** Baixa em lote: confirma como "pagou em dia" os boletos escolhidos, com a data em que o dinheiro entrou. */
-export function baixarEmLote(d, ids, dataContabil, usuario) {
+export function baixarEmLote(d, ids, dataContabil, usuario, { pagouEmDia = true, dataPagou = null } = {}) {
   const feitos = [];
   const pulados = [];
   for (const id of ids) {
     const cb = buscar(d, 'cobrancas', id);
     if (!cb || cb.data_pagamento || cb.situacao === 'Carência') { if (cb) pulados.push(cb); continue; }
-    registrarPagamento(d, cb.id, dataContabil, null, usuario, { pagouEmDia: true });
+    // atrasados em lote: todos pagaram no mesmo dia (``dataPagou``); multa e juros saem do cálculo de sempre, pelo valor previsto
+    registrarPagamento(d, cb.id, dataContabil, null, usuario, { pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou });
     feitos.push(cb);
   }
   return { feitos, pulados };

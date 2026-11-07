@@ -21,6 +21,7 @@ import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
 import { usarVisualizador, visualizar } from '../visualizador.js';
 
@@ -942,6 +943,27 @@ export const ACOES = {
     const r = await alterar((db) => R.gerarCobrancas(db, comp, login()));
     aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
     await mostrar();
+  },
+
+  /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
+  async pagarBoleto({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    const c = buscar('contratos', cb.contrato_id);
+    const i = c ? buscar('imoveis', c.imovel_id) : null;
+    const hoje = C.hojeIso();
+    const sim = C.liquidar(cb, hoje);
+    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ''}`,
+      html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
+        <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
+        <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
+        <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
+      sim: 'Confirmar pagamento' });
+    if (!resp) return;
+    const f = new FormData();
+    for (const [k, v] of Object.entries(resp)) f.set(k, v[0]);
+    await confirmarPagamentoBoleto(cb.id, f);
   },
 
   async estornar({ id }) {

@@ -785,11 +785,17 @@ document.addEventListener('click', async (ev) => {
 
 document.addEventListener('change', async (ev) => {
   if (ev.target.matches('select[data-ordem-boletos]')) {
-    ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+    // o atributo traz o endereço da lista atual (mês, filtro e busca) sem a ordem
+    ir(`${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
     return;
   }
   if (ev.target.matches('input[data-marcar-grupo]')) {
     ev.target.closest('form').querySelectorAll('input[name=ids]').forEach((x) => { x.checked = ev.target.checked; });
+    return;
+  }
+  // caixa marcada mostra um campo (ex.: baixa em lote "pagaram atrasado, em" → a data)
+  if (ev.target.matches('input[data-mostra]')) {
+    ev.target.closest('form').querySelectorAll(`[data-grupo-mostra="${ev.target.dataset.mostra}"]`).forEach((x) => { x.hidden = !ev.target.checked; });
     return;
   }
   if (ev.target.matches('input[data-marcar-todas]')) {

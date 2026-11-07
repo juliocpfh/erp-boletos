@@ -55,27 +55,64 @@ const ORDENS_BOLETO = {
   valor: (a, b) => b.t.a_pagar_pontual - a.t.a_pagar_pontual,
 };
 
-/** Baixa em lote separada por vencimento: só dá para confirmar juntos boletos que vencem no mesmo dia. */
+/**
+ * Baixa em lote separada por vencimento: só dá para confirmar juntos boletos que vencem no mesmo dia. Grupo já vencido pode ser
+ * confirmado como "pagaram em dia" (o banco compensou depois) ou "pagaram atrasado em <dia>" (multa e juros até esse dia, no valor previsto).
+ */
 function caixaBaixaLote(lista, hoje) {
   const abertos = lista.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência');
   if (!abertos.length) return '';
   const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
-  return `<details class="cartao baixa-lote"><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
+  return `<details class="cartao baixa-lote"><summary><b>Baixa em lote</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
     ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
       <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${v < hoje ? etiqueta('vencido', 'perigo') : ''} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
         <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
       <div class="lista-baixa">${xs.map((x) => `<label class="check-mini"><input type="checkbox" name="ids" value="${x.cb.id}"> ${esc(x.i.nome)} · ${esc(x.c.inquilino_nome)} · ${reais(x.t.a_pagar_pontual)}</label>`).join('')}</div>
-      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto"><button class="pequeno">Confirmar os marcados como pagos em dia</button></div></form>`).join('')}
-    <p class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha da tabela.</p></details>`;
+      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto">
+        ${v < hoje ? `<label class="check-mini" title="Pagaram depois do vencimento: multa e juros até o dia em que pagaram"><input type="checkbox" name="atrasado" value="1" data-mostra="pagou-${v}"> pagaram atrasado, em</label> <input type="date" name="pagou" value="${hoje}" style="width:auto" data-grupo-mostra="pagou-${v}" hidden>` : ''}
+        <button class="pequeno">Confirmar os marcados</button></div></form>`).join('')}
+    <p class="suave">Sem "pagaram atrasado", a baixa é como pagos em dia (sem multa e juros). Valor recebido diferente do previsto: confirme um a um, pelo botão da linha.</p></details>`;
 }
 
-export function telaCobrancas(comp, ordemPedida = 'vencimento') {
+/** Filtros da tela de Boletos (parâmetro ``filtro``): os três primeiros olham todos os meses; "pagos" e "todos" só o mês escolhido. */
+const FILTROS_BOLETO = {
+  todos: { titulo: '', todosMeses: false, f: () => true },
+  abertos: { titulo: 'Boletos em aberto', todosMeses: true, f: (x) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência' },
+  vencidos: { titulo: 'Boletos vencidos e não pagos', todosMeses: true, f: (x, hoje) => !x.cb.data_pagamento && x.cb.situacao !== 'Carência' && x.cb.vencimento < hoje },
+  semnf: { titulo: 'Boletos pagos ainda sem NF', todosMeses: true, f: (x) => x.cb.data_pagamento && R.geraNf(x.c) && !R.ehComplementoCaucao(x.cb) && !x.fs.length },
+  pagos: { titulo: 'Boletos pagos', todosMeses: false, f: (x) => !!x.cb.data_pagamento },
+};
+
+export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = 'todos', buscaPedida = '') {
   const ordem = ORDENS_BOLETO[ordemPedida] ? ordemPedida : 'vencimento'; // a ordem vem do endereço: só as conhecidas
+  const filtro = FILTROS_BOLETO[filtroPedido] ? filtroPedido : 'todos';
+  const F_ = FILTROS_BOLETO[filtro];
+  const busca = R.textoDeBusca(String(buscaPedida || '').slice(0, 80));
   const hoje = C.hojeIso();
-  const lista = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
+  const url = (q) => `#/cobrancas?${new URLSearchParams({ comp, ordem, ...(filtro !== 'todos' ? { filtro } : {}), ...(busca ? { busca: String(buscaPedida).trim() } : {}), ...q })}`;
+  const montar = (cb) => {
     const c = buscar('contratos', cb.contrato_id);
     return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: R.faturasDe(d(), 'cobranca', cb.id) };
-  }).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
+  };
+  const todas = d().cobrancas.filter((x) => F_.todosMeses || x.competencia === comp).map(montar);
+  const lista = todas.filter((x) => F_.f(x, hoje) && (!busca || [x.c.inquilino_nome, x.c.inquilino_apelido, x.i && x.i.nome].some((t) => R.textoDeBusca(t).includes(busca))))
+    .sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
+  // contagem de cada filtro (todos os meses nos três primeiros, o mês nos outros) para os botões
+  const doMes = d().cobrancas.filter((x) => x.competencia === comp).map(montar);
+  const todasMontadas = d().cobrancas.map(montar);
+  const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje)).length;
+  const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${k === 'todos' ? `Todos de ${compBr(comp)}` : `${x.titulo.replace('Boletos ', '').replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(' ')}
+    <form data-form="buscaBoletos" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}"><input type="hidden" name="filtro" value="${esc(filtro)}"><input name="busca" value="${esc(String(buscaPedida || ''))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: '' }).replace(/&busca=[^&]*/, '')}">Limpar</a>` : ''}</form></div>`;
+  if (filtro !== 'todos') {
+    // lista de trabalho (em aberto, vencidos, sem NF, pagos): sem as caixas do mês (gerar boletos, caução, recálculo)
+    const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
+    return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
+        <div class="acoes">${link(url({ filtro: 'todos' }), `← Boletos de ${compBr(comp)}`, 'botao secundario')}</div></div>
+      ${filtros}
+      ${filtro === 'semnf' && lista.length && opera() ? `<div class="alerta info">${lista.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
+      ${opera() && ['abertos', 'vencidos'].includes(filtro) ? caixaBaixaLote(lista, hoje) : ''}
+      ${tabelaBoletos(lista, hoje, ordem, url, { comp: true, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
+  }
   const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id && !R.ehComplementoCaucao(x.cb)));
   const caucoes = R.complementosCaucaoPendentes(d(), comp);
   const pend = R.pendentesDeFatura(d());
@@ -85,15 +122,12 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento') {
   // reajuste neste aluguel: corrigir antes e mandar a carta junto com este boleto (o índice sai no começo do mês)
   const reajustes = new Map(lista.filter((x) => !R.ehComplementoCaucao(x.cb)).map((x) => [x.c.id, R.reajusteNaCompetencia(d(), x.c, comp)]).filter(([, r]) => r && r.faltaCarta));
   const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
-  // botões de impressão em cima e embaixo da lista
-  const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
-      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>
-      ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
-      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${esc(C.somarMeses(comp, -1))}&ordem=${esc(ordem)}">← ${compBr(C.somarMeses(comp, -1))}</a>
+      <div class="acoes"><a class="botao secundario" href="${url({ comp: C.somarMeses(comp, -1) })}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
-      <a class="botao secundario" href="#/cobrancas?comp=${esc(C.somarMeses(comp, 1))}&ordem=${esc(ordem)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
-    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+      <a class="botao secundario" href="${url({ comp: C.somarMeses(comp, 1) })}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
+    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+    ${filtros}
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ''} ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido) ainda sem boleto: gere na tela Reajustes, em "Caução a completar" (boleto separado, sem tarifa e sem NF).
@@ -103,31 +137,45 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento') {
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ''}
-    ${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
-      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(comp)}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
+    ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, reajustes, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
+}
+
+/**
+ * Tabela dos boletos (lista do mês e listas filtradas). ``opcoes.comp``: mostra a competência na 1ª coluna (listas de vários meses);
+ * ``opcoes.reajustes``: Map contrato → reajuste do mês (só na lista do mês). O pagamento é confirmado numa janela (botão da linha).
+ */
+function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
+  const { reajustes = new Map(), totalLinha = '' } = opcoes;
+  const comp = lista.length ? lista[0].cb.competencia : C.competenciaDe(hoje);
+  // botões de impressão em cima e embaixo da lista
+  const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
+      ${opcoes.comp ? '' : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
+      ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
+  return `${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
+      <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: '' }).replace(/&ordem=&?/, '&').replace(/[?&]$/, ''))}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista.map(({ cb, c, i, t, fs }) => `<tr class="${R.geraNf(c) ? '' : 'linha-controle'}">
         <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (imprimir o demonstrativo ou excluir)"></td>
-        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
+        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a>${opcoes.comp ? ` <span class="suave nw">${compBr(cb.competencia)}</span>` : ''}<br>${esc(c.inquilino_nome)}${R.geraNf(c) ? '' : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, 'info')}` : ''}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, 'aviso')}` : ''}
           ${cb.carencia ? `<br>${etiqueta('carência', 'aviso')}` : ''}
           ${R.ehComplementoCaucao(cb) ? `<br>${etiqueta('complemento da caução · sem NF', 'info')}` : ''}
-          ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(comp)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
+          ${reajustes.has(c.id) && !R.ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(cb.competencia)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}
           ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>${R.ehComplementoCaucao(cb) ? 'sem multa e juros' : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
-        <td>${cb.data_pagamento || cb.situacao === 'Carência' ? situacaoBoleto(cb, hoje) : `${situacaoBoleto(cb, hoje)}${opera() ? `<br>${formPagamento(cb, true)}` : ''}`}</td>
+        <td>${situacaoBoleto(cb, hoje)}${!cb.data_pagamento && cb.situacao !== 'Carência' && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}` : ''}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}
           ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ''}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'secundario pequeno', 'Desfazer este pagamento?')}` : ''}` : ''}</td></tr>`).join('')
-      || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr(comp)}.</td></tr>`}
-      ${lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ''}
+      || `<tr><td colspan="9" class="suave">${opcoes.comp ? 'Nenhum boleto nesta situação.' : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`}
+      ${totalLinha}
     </table></div>
     ${lista.length ? `<div class="acoes">${impressao}</div>` : ''}`;
 }
