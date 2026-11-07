@@ -1,6 +1,6 @@
 // Aplicativo instalável: guarda as telas do sistema no aparelho para abrir sem internet.
 // Sempre tenta a versão nova primeiro (internet); sem internet, usa a guardada. Nunca guarda dados (/api/) nem outros sites.
-const CACHE = 'imoveis-telas-v1';
+const CACHE = 'imoveis-telas-v2';
 
 self.addEventListener('install', (ev) => {
   // guarda o essencial já na instalação (o resto entra no cache conforme é usado)
@@ -18,7 +18,9 @@ self.addEventListener('fetch', (ev) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.includes('/api/') || url.pathname.includes('/cdn-cgi/')) return;
   ev.respondWith((async () => {
     try {
-      const r = await fetch(req);
+      // confere sempre com o site (o Cloudflare manda o navegador guardar os arquivos por horas: sem isto, a versão nova
+      // publicada só aparecia horas depois); se não mudou, o site responde "igual" e nada é baixado de novo
+      const r = await (req.mode === 'navigate' ? fetch(req) : fetch(req, { cache: 'no-cache' }));
       // só guarda resposta normal do próprio site (não o login do Cloudflare, que vem como redirecionamento)
       if (r.ok && r.type === 'basic' && !r.redirected) {
         const copia = r.clone();

@@ -1413,6 +1413,13 @@ export const ACOES = {
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
+  /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
+  async atualizarSistema() {
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+    for (const reg of (await navigator.serviceWorker?.getRegistrations?.()) || []) await reg.update().catch(() => {});
+    location.reload();
+  },
+
   async baixarArquivo({ escopo, id, nome }) {
     baixar(await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
   },
