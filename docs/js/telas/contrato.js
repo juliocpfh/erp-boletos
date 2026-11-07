@@ -21,7 +21,7 @@ function selosContrato(c) {
   return `<div class="selos">${prazo}
     ${c.inquilino_tipo === 'Pessoa jurídica (empresa)' ? etiqueta('Empresa (PJ)', 'info') : ''}
     ${c.solidario_nome ? etiqueta(`Solidário: ${c.solidario_nome}`, 'neutra') : ''}
-    ${R.aditivosDo(d(), c.id).length ? etiqueta('Possui termo aditivo', 'aviso') : ''}
+    ${R.aditivosValidos(d(), c.id).length ? etiqueta('Possui termo aditivo', 'aviso') : ''}
     ${(() => { const n = R.solicitacoesDo(d(), c.id).filter((x) => ['Aberta', 'Em andamento'].includes(x.situacao || 'Aberta')).length; return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, 'perigo')}</a>` : ''; })()}
     ${c.gerar_nf === false ? seloControle() : ''}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ''}`, 'aviso') : ''}
@@ -581,23 +581,30 @@ function caixaDocumentos(c) {
 
 /** Termos aditivos: depois do contrato (mudança de vencimento, garantia, valor etc.), cada um com o arquivo assinado. */
 function caixaAditivos(c) {
-  const lista = R.aditivosDo(d(), c.id);
-  const abrir = (a) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`;
-  const anteriores = R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, R.aditivosDo(d(), x.id)]).filter(([, l]) => l.length);
+  const lista = R.aditivosValidos(d(), c.id);
+  const adm = podeUsuario('admin');
+  // perdido: assinado, mas o papel se perdeu (vale como assinado, sem arquivo); quem não é administrador aguarda a análise
+  const perdido = (a) => (a.perdido_pendente ? etiqueta(`perdido? aguardando o administrador (${a.perdido_pendente}, ${dataBr(a.perdido_em)})`, 'aviso')
+    : etiqueta(`perdido (registrado em ${dataBr(a.perdido_em)})`, 'perigo'));
+  const abrir = (a) => (R.aditivoPerdido(a) ? perdido(a) : `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`);
+  const acoesPerdido = (a) => `${adm && a.perdido_pendente ? `${botao('analisarAditivoPerdido', 'Confirmar perda', { id: a.id, aceitar: 1 }, 'pequeno')}
+    ${botao('analisarAditivoPerdido', 'Recusar', { id: a.id, aceitar: 0 }, 'perigo pequeno', 'Recusar a perda? O termo aditivo volta a "aguardando assinatura".')} ` : ''}${opera() ? botao('desmarcarAditivoPerdido', 'Desfazer "perdido"', { id: a.id }, 'link-botao', 'Tirar o registro de perdido? O termo aditivo volta a "aguardando assinatura" (o dia do vencimento já mudado não volta sozinho).') : ''}`;
+  const anteriores = R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, R.aditivosValidos(d(), x.id)]).filter(([, l]) => l.length);
   const ant = R.contratoHerdado(d(), c);
   const aguardando = R.aditivosAguardando(d(), c.id);
   const ver = (a) => (a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver / PDF') : '');
   return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, 'Gerar termo aditivo') : ''}</div>
-    ${ant && !lista.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
+    ${ant && !R.aditivosDo(d(), c.id).length ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ''}
+      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
+        ${a.tipo === 'Troca de titular' ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ' O administrador vai analisar.'}`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
-    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo assinado também é apagado.`) : ''}</td></tr>`).join('')}</table></div>`
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
+      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}
@@ -605,7 +612,9 @@ function caixaAditivos(c) {
       <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">
       <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
       <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-      <button class="secundario pequeno">Registrar aditivo</button></form>` : ''}`;
+      <button class="secundario pequeno">Registrar aditivo</button>
+      ${botao('registrarAditivoPerdido', 'Registrar como perdido', { contrato: c.id }, 'perigo pequeno')}</form>
+      <p class="suave">Termo assinado cujo papel se perdeu: "Perdido" (nos que aguardam assinatura) ou "Registrar como perdido" (termo antigo, sem o arquivo) vale como assinado. O termo da troca de titular não pode ser dado como perdido.</p>` : ''}`;
 }
 
 export function telaContrato(c) {
