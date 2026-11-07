@@ -81,6 +81,7 @@ Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilit
 | Tela nova | arquivo do assunto em `telas/` + `telas.js` (`TELAS`) + `app.js` (`MENU`) + `estilo.css` |
 | Qualquer mudança em `docs/js` | `docs/offline/administracao-imoveis.html` (a versão PC; o GitHub gera sozinho na `main`) |
 | Campo ou caminho da API do C6 | `docs/js/mapa-c6.js` + cópia idêntica `ponte-c6/mapa-c6.mjs` + `tests/banco.test.mjs`/`tests/ponte-c6.test.mjs`; rota nova da ponte: `ponte-c6/rotas-fase2.mjs` + `docs/js/banco-fase2.js` + dados fictícios em `ponte-c6/simulado/` copiados para `docs/js/simulado-banco.js` |
+| Função usada pelo site e pela ponte (datas, janelas, centavos, linha digitável) | `docs/js/c6-comum.js` + cópia idêntica `ponte-c6/c6-comum.mjs` (só funções puras, sem imports; `tests/banco.test.mjs` confere a igualdade) |
 
 ## Convenções
 | Item | Padrão observado no código |

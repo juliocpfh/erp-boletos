@@ -354,3 +354,18 @@ test('partesDoEndereco entende o endereço em uma linha do cadastro', () => {
   assert.deepEqual(R.partesDoEndereco('Rua Sem Cidade, 5'), { address: 'Rua Sem Cidade, 5', neighborhood: '', city: '', state: '', zip_code: '' });
   assert.equal(R.partesDoEndereco(''), null);
 });
+
+test('C19: c6-comum (datas, janelas, centavos, linha digitável) é um arquivo só, igual no site e na ponte', async () => {
+  assert.equal(fs.readFileSync(new URL('../docs/js/c6-comum.js', import.meta.url), 'utf8'), fs.readFileSync(new URL('../ponte-c6/c6-comum.mjs', import.meta.url), 'utf8'));
+  const K = await import('../docs/js/c6-comum.js');
+  assert.equal(K.somarDias('2026-01-30', 2), '2026-02-01');
+  assert.deepEqual(K.janelas('2026-10-01', '2026-10-31', 30), [{ de: '2026-10-01', ate: '2026-10-30' }, { de: '2026-10-31', ate: '2026-10-31' }]);
+  assert.deepEqual(K.janelas('2026-10-05', '2026-10-01', 30), []);
+  assert.deepEqual([K.centavosDoTexto('1500.00'), K.centavosDoTexto('10,5'), K.centavosDoTexto(-0.1)], [150000, 1050, -10]);
+  assert.throws(() => K.centavosDoTexto(''), /em branco/);
+  assert.throws(() => K.centavosDoTexto('abc'), /inválido/);
+  // mesma conversão que a ponte já testa em ponte-c6/testes/pagamentos.test.mjs (campos reordenados, dígitos verificadores de fora)
+  assert.equal(K.codigoDeBarrasDaLinha('34191.09008 00123.456789 01234.567890 1 23456789012345'), '34191234567890123451090000123456780123456789');
+  assert.equal(K.codigoDeBarrasDaLinha('8'.repeat(44)), '8'.repeat(44));
+  assert.throws(() => K.codigoDeBarrasDaLinha('123'), /44, 47 ou 48/);
+});
