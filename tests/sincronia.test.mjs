@@ -275,6 +275,32 @@ test('voltar para um backup: o administrador substitui os dados pelos do dia e o
   assert.equal(b.sinc.pendentesQtd(), 0);
 });
 
+test('velocidade: a conferência sem novidade não regrava a cópia local, e gravações seguidas vão numa sincronia só', async () => {
+  const { a, b } = await cenario();
+  const gravacoesDeBase = []; const idas = [];
+  const gravarReal = a.guardar.gravar; const apiReal = a.sinc.api;
+  a.guardar.gravar = async (k, v) => { if (k === 'base') gravacoesDeBase.push(k); return gravarReal(k, v); };
+  a.sinc.api = async (m, rota, corpo) => { idas.push(`${m} ${rota.split('?')[0]}`); return apiReal(m, rota, corpo); };
+  a.sinc.guardar = a.guardar;
+  // conferência de 30 em 30 s sem nada novo: nenhuma gravação da cópia (cifrar o banco inteiro à toa)
+  await a.sinc.sincronizar(); await a.sinc.sincronizar();
+  assert.equal(gravacoesDeBase.length, 0);
+  // chegou algo de outro aparelho: aí grava
+  await b.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Da sócia' }, SOCIA)); await b.sinc.sincronizar();
+  await a.sinc.sincronizar();
+  assert.equal(gravacoesDeBase.length, 1);
+  // três gravações seguidas (duplo clique, arrumações do Painel): uma ida só para buscar o que mudou, três lotes
+  a.sinc.agrupar = 20; idas.length = 0;
+  for (const nome of ['Um', 'Dois', 'Três']) await a.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome }, DONO));
+  assert.ok(a.sinc.envioMarcado, 'envio marcado para daqui a pouco');
+  await new Promise((ok) => setTimeout(ok, 200));
+  assert.equal(a.sinc.pendentesQtd(), 0, 'foi sozinho');
+  assert.equal(idas.filter((x) => x === 'POST lote').length, 3, 'cada gravação continua sendo um lote');
+  assert.equal(idas.filter((x) => x === 'GET mudancas').length, 1, 'uma passada só');
+  await b.sinc.sincronizar();
+  assert.equal(imovel(b.sinc).nome, 'Três');
+});
+
 test('aparelho novo sem internet e sem cópia: avisa que precisa conectar', async () => {
   const { cofre } = await cenario();
   const c = aparelho(cofre, DONO);
