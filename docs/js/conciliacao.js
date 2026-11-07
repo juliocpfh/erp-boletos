@@ -25,7 +25,7 @@ export const CLASSIFICACOES = {
 
 export const SITUACOES_PAGAMENTO = {
   rascunho: 'Rascunho',
-  aguardando_aprovacao: 'Aguardando aprovação do administrador',
+  aguardando_aprovacao: 'Aprovado no sistema, envio ao banco pendente',
   agendado: 'Enviado ao banco (aguardando aprovação no app do C6)',
   pago: 'Pago',
   erro: 'Erro no banco',
@@ -795,7 +795,10 @@ function efeitosDoPagamento(d, p, pagoEm, usuario) {
   }
 }
 
-/** Administrador conferiu e aprovou no sistema (1ª aprovação; a 2ª é no app do C6). Só de 'rascunho'. Devolve o pagamento. */
+/**
+ * Administrador conferiu e aprovou no sistema, no mesmo passo em que envia o lote ("Aprovar e enviar" na tela; a outra confirmação
+ * é no app do C6). Só de 'rascunho'. Fica 'aguardando_aprovacao' só se o envio ao banco falhar logo depois. Devolve o pagamento.
+ */
 export function aprovarPagamento(d, pagId, aprovador) {
   const p = exigirPagamento(d, pagId);
   if (!cfg(d).permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco.');

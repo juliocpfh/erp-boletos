@@ -4939,7 +4939,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const partes = [];
   if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
-  if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago`);
+  if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
   return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
 }

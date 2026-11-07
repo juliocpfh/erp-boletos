@@ -144,20 +144,17 @@ Vale para água, luz, gás, condomínio, internet, IPTU e guias de imposto. Prec
 - escolha a conta a pagar (ex.: **Luz**), o mês da conta (**11/2026**), o valor (**R$ 200,00**), o vencimento (**15/11/2026**);
 - a forma: **boleto** (cole a linha digitável ou o código de barras; o sistema confere que tem 44, 47 ou 48 números e avisa "47 dígitos ✓") ou **Pix** (chave ou copia e cola);
 - o beneficiário (ex.: Copel) e **qual conta paga** (ANK ou JCK; o sistema sugere a empresa com maior participação no imóvel);
-- clique em **Preparar pagamento**. A situação fica **"Aguardando aprovação do administrador"**. Nada foi ao banco ainda.
+- clique em **Preparar pagamento**. A situação fica **"Rascunho"** e o banco lê os códigos (confere beneficiário e vencimento e mostra "validado pelo banco"). Nada foi pago: o banco só leu. Se a ponte estava desligada, use **Mandar o banco ler o código** depois.
 
-**Passo 2 — Aprovar e enviar** (só o administrador). Na lista de pagamentos do imóvel, clique em **Aprovar e enviar ao banco**:
-- 1ª janela: o resumo completo (conta que paga e saldo, beneficiário, **valor**, vencimento, data do pagamento, código de barras, imóvel e conta). Confira e clique em "Conferi, continuar".
-- 2ª janela: digite o valor exatamente como aparece (**200,00**) e clique em **PAGAR**. Qualquer diferença cancela, sem enviar nada.
-- O pedido vai à ponte, que o envia ao C6. A situação passa a **"Enviado ao banco (agendado)"**.
+**Passo 2 — Aprovar e enviar** (só o administrador, e só depois de o banco ler). Na lista de pagamentos do imóvel, clique em **Aprovar e enviar**. Abre uma janela só, com o resumo completo (conta que paga, beneficiário, **valor**, vencimento, data do pagamento, código de barras, imóvel e conta); digite o valor total exatamente como aparece (**200,00**) e clique em **Aprovar e enviar**. Qualquer diferença cancela, sem enviar nada. O pedido vai à ponte, que o envia ao C6, e a situação passa a **"Enviado ao banco (aguardando aprovação no app do C6)"**. São duas confirmações ao todo: esta e a do app (decisão do dono em 07/11/2026; antes eram quatro).
 
 **Passo 3 — Aprovar no aplicativo do C6.** O C6 não paga só com o pedido do sistema: o pedido entra na fila de aprovação da conta. Uma pessoa autorizada abre o **aplicativo do C6** (ou o Web Banking), confere e aprova. Sem essa aprovação, o dinheiro não sai.
 
 **Passo 4 — Confirmar pelo extrato.** Clique em **Atualizar situação** no pagamento (ou busque o extrato do mês): quando a saída de R$ 200,00 aparecer na conta, a situação vira **"Pago"**, a conta entra em **Contas pagas por nós** com a data em que saiu e a etiqueta "pelo banco", e o comprovante é baixado com o nome padrão (ex.: `2026-11-14 ANK Loja 1 Luz 200,00.pdf`) para as duas pastas.
 
 Observações:
-- **Cancelar** só funciona enquanto o pagamento está em rascunho, aguardando aprovação ou com erro. Depois de enviado, cancele no app do C6.
-- Se a internet cair logo depois do **PAGAR**, o sistema mostra: "Não tive resposta do banco. Clique em 'Atualizar situação' antes de tentar de novo." Faça isso: o pedido tem um número único e o banco nunca o recebe duas vezes.
+- **Cancelar** (ou **Descartar** o lote) só funciona enquanto o pagamento está em rascunho, aprovado sem envio ou com erro; se o banco já tinha lido o código, o item é tirado do lote lido também (nada foi pago). Depois de enviado, cancele no app do C6 e, se o sistema continuar mostrando "Enviado ao banco" porque o C6 não avisou, o administrador clica em **Foi cancelado no C6**: o pagamento passa a "Cancelado" e some do alerta do Painel (se o dinheiro saiu, use "Confirmar pelo extrato" em vez disso).
+- Se a internet cair logo depois do **Aprovar e enviar**, o sistema mostra: "Não tive resposta do banco. Clique em 'Atualizar situação' antes de tentar de novo." Faça isso: o pedido tem um número único e o banco nunca o recebe duas vezes.
 - Se o DDA da conta estiver ativo, o C6 já conhece os boletos em nome da empresa; mesmo assim, no sistema cada pagamento é preparado e aprovado um a um.
 
 ### 2.10 Fechamento do mês
