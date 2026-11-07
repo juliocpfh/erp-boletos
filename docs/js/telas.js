@@ -202,9 +202,8 @@ export const TELAS = {
     const pend = R.pendentesDeFatura(d());
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
     const mesAtual = C.competenciaDe(hoje);
-    // etapas do mês já liberadas e não feitas, mais as NFs do mês anterior (numeradas depois da virada do mês)
-    const mesAnterior = C.somarMeses(mesAtual, -1);
-    const faltamEtapas = [...R.etapasFechamento(d(), mesAnterior, hoje).filter((e) => e.chave === 'nfs' && !e.feito).map((e) => ({ ...e, mes: mesAnterior })),
+    // tudo o que ficou para trás nos meses anteriores (ex.: NFs de 10/2026 numeradas depois da virada, contas de 09/2026), mais as etapas do mês já liberadas e não feitas
+    const faltamEtapas = [...R.etapasAtrasadas(d(), mesAtual, hoje),
       ...R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
     const previstas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => e.prevista && e.chave !== 'cartas');
     const incompletos = cadastrosIncompletos();
