@@ -93,7 +93,7 @@ export function telaIptu(ano) {
     const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : '';
     if (pc.paga) return `<span class="q ${pc.valorInquilino || pc.avista ? 'q-div' : 'q-paga'}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
     const titulo = `${nome}: sua parte ${reais(pc.valorProprietario)}${inq}${venc} · em aberto`;
-    return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p.id}" data-n="${pc.n}" data-texto="${esc(titulo)}" title="${esc(titulo)} (clique para marcar como paga)"></button>`
+    return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPago" data-id="${p.id}" data-n="${pc.n}" data-texto="${esc(titulo)}" title="${esc(titulo)} (clique para marcar como paga)"></button>`
       : `<span class="q q-aberto" title="${esc(titulo)}"></span>`;
   };
   const rotuloMes = (mes) => `${MESES[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? '' : `/${mes.slice(2, 4)}`}`;
@@ -144,7 +144,7 @@ export function telaIptu(ano) {
         <td><a href="#/imovel/${g.imovel.id}?ir=iptu">${esc(g.imovel.nome)}</a></td><td>${g.iptu.ano} · ${g.parcela.n === 0 ? 'cota única' : `${g.parcela.rotulo} parcela`}</td>
         <td class="suave">${g.parcela.n === 0 ? 'pago à vista por você' : g.parcela.valorInquilino ? `entrada ou saída (inquilino paga ${reais(g.parcela.valorInquilino)})` : 'imóvel vazio ou contrato sem IPTU'}</td>
         <td class="n nw"><b>${reais(g.parcela.valorProprietario)}</b></td>
-        <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje}"><button class="pequeno">Paga</button></form>` : ''}</td></tr>`).join('')
+        <td class="n nw">${opera() ? botao('iptuPago', 'Marcar como paga', { id: g.iptu.id, n: g.parcela.n, texto: `${g.imovel.nome} · IPTU ${g.iptu.ano} · ${g.parcela.n === 0 ? 'cota única' : `${g.parcela.rotulo} parcela`}: sua parte ${reais(g.parcela.valorProprietario)} · vence ${dataBr(g.venc)}` }, 'secundario pequeno') : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${rotuloMes(m)}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}

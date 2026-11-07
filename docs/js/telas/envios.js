@@ -496,14 +496,6 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  async iptuPago(form) {
-    const data = String(new FormData(form).get('data') || '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
-    await alterar((db) => R.marcarIptuPago(db, Number(form.dataset.id), Number(form.dataset.n), data, login()));
-    aviso('Parcela do IPTU marcada como paga.');
-    await mostrar();
-  },
-
   async desfazerNumeracao(form) {
     const n = Number(new FormData(form).get('numero'));
     if (!confirm(`Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`)) return;

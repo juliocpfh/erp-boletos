@@ -138,11 +138,13 @@ export function telaHistorico(q) {
   const filtrando = Object.values(q).some(Boolean);
   // administrador: desfaz alterações de cadastro, sempre da mais recente para a mais antiga de cada campo
   const desfazer = podeUsuario('admin') ? { pode: R.alteracoesDesfaziveis(d()), indice: new Map(d().historico.map((h, i) => [h, i])) } : null;
+  // só os tipos de registro que aparecem no histórico (tabela sem uso, como a antiga "recebimentos", não entra no filtro)
+  const usadas = new Set(d().historico.map((h) => h.tabela));
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista.length} registro(s)${filtrando ? ' com o filtro aplicado' : ''}</span></summary>
     <form class="formulario" data-form="filtroHistorico" style="margin-top:12px">
       <div><label>Usuário</label><select name="usuario"><option value=""></option>${usuarios.map((u) => `<option ${q.usuario === u ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></div>
-      <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(R.TABELAS).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(R.TABELAS).filter(([k]) => k === q.tabela || usadas.has(k)).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div><label>De</label><input type="date" name="de" value="${esc(q.de || '')}"></div><div><label>Até</label><input type="date" name="ate" value="${esc(q.ate || '')}"></div>
       <div><label>Contém o texto</label><input name="texto" value="${esc(q.texto || '')}"></div>
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
