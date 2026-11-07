@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-b1pUqGxB5JnMa7bKI4MIbGuzPW3HnFf6rcIN4+tgXMU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-1q9OwUf20zPq7Vpy1KBZvU6epseUR/2lvaEx4JiTQe0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="351380e25aeda319">
+<meta name="fontes" content="3ba8af9ab220391f">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2824,6 +2824,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var NAO_SE_APLICA = "Não se aplica";
   var GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
   var piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+  function resultadoVistoriaSaida(d2, c) {
+    const porData2 = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+    const doContrato = (d2.vistorias || []).filter((v) => v.contrato_id === c.id).sort(porData2);
+    const vistoria = doContrato.find((v) => v.tipo === "Saída") || null;
+    if (!vistoria) return { texto: "Não feita", vistoria: null, pendencias: [] };
+    const entrada = doContrato.find((v) => v.tipo === "Entrada");
+    const naEntrada = new Map((entrada && entrada.itens || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
+    let pendencias = (vistoria.itens || []).filter((x) => {
+      const ent = naEntrada.get(`${x.comodo}|${x.item}`);
+      return ent ? piorou(ent, x.situacao) : ["Avaria", "Não funciona"].includes(x.situacao);
+    }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ""})`);
+    if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ""));
+    return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias };
+  }
+  function textoVistoriaSaida(d2, c, encerramento) {
+    const r = resultadoVistoriaSaida(d2, c);
+    const guardado = encerramento && encerramento.vistoria_saida;
+    if (!r.vistoria) return guardado || r.texto;
+    return guardado === "Contestada" ? `${r.texto} (contestada pelo inquilino)` : r.texto;
+  }
   var FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
   function lerModeloVistoria(texto3) {
     const comodos = [];
@@ -4429,22 +4449,19 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function desfazerUltimaNumeracao(d2, usuario) {
     const ciclo = ultimoCicloDeNumeracao(d2);
     if (!ciclo) throw new Error("Não há numeração para desfazer.");
-    const fs = d2.faturas.filter((f) => f.lote === ciclo.lote);
     if (d2.faturas.some((f) => f.lote !== ciclo.lote && f.numero >= ciclo.de)) {
       throw new Error(`Há NFs de outra numeração com número ${numeroFatura(ciclo.de)} ou maior. Use "a partir do nº".`);
     }
-    for (const f of fs) excluir(d2, "faturas", f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-    registrar(d2, usuario, "Alteração", "faturas", null, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`, { proxima_fatura: { de: d2.proxima_fatura, para: ciclo.de } });
-    d2.proxima_fatura = ciclo.de;
+    desfazerNumeracao(d2, ciclo.de, usuario, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`);
     return ciclo;
   }
-  function desfazerNumeracao(d2, aPartirDe, usuario) {
+  function desfazerNumeracao(d2, aPartirDe, usuario, descricao = null) {
     const n = Number(aPartirDe);
     if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
     const fs = d2.faturas.filter((f) => f.numero >= n);
     if (!fs.length) throw new Error(`Não há NF com número ${numeroFatura(n)} ou maior.`);
     for (const f of fs) excluir(d2, "faturas", f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-    registrar(d2, usuario, "Alteração", "faturas", null, `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
+    registrar(d2, usuario, "Alteração", "faturas", null, descricao || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
     d2.proxima_fatura = n;
     return new Set(fs.map((f) => f.numero)).size;
   }
@@ -8785,8 +8802,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     campo("debitos_descricao", "Descrição dos débitos", "area"),
     campo("fci_credito", "FCI corrigido: crédito do inquilino", "dinheiro", { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
     campo("fci_danos", "Reparos de danos pagos com o FCI", "dinheiro", { ajuda: "Só danos apurados na vistoria de saída (nunca aluguel ou contas). O que passar do FCI vira débito; o que sobrar do FCI volta ao inquilino" }),
-    campo("vistoria_saida", "Vistoria de saída", "opcao", { opcoes: ["Sem pendências", "Com pendências", "Contestada", "Não feita"] }),
-    campo("observacoes", "Observações", "area")
+    campo("observacoes", "Observações", "area", { ajuda: "Se o inquilino contestar a vistoria de saída, anote aqui" })
   ];
   var AVULSA = [
     campo("data_pagamento", "Data em que o dinheiro entrou", "data", { obrig: true }),
@@ -12381,7 +12397,7 @@ ${xref}
   var AJUDA_BANCO = "Busque o extrato uma vez por mês (ou quando quiser). Cada linha precisa de um destino: um imóvel e a conta dele (água, luz, gás, condomínio, IPTU), um boleto de aluguel recebido, um imposto, tarifa do banco ou transferência entre as nossas contas. O comprovante é guardado em PDF com um nome padrão (data, empresa, imóvel, conta e valor) na pasta do imóvel (Contas pagas/ano) e numa cópia para o contador (_Contador/Empresa/AAAA-MM).";
   function caixaPastaContador(e, mes) {
     return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador3())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
-    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", 'Cópias dos comprovantes guardados pela tela Banco. O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).', true, false)}</details>`;
+    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
   }
   function descreverSugestao(s) {
     const i = s.imovel_id ? buscar2("imoveis", s.imovel_id) : null;
@@ -14081,7 +14097,10 @@ Salvar assim mesmo?`)) {
     ${item("Débitos descontados", reais(e.debitos))}
     ${e.fci_credito ? `${item("💰 FCI corrigido (crédito do inquilino)", reais(e.fci_credito))}${item("Reparos de danos pagos com o FCI", reais(e.fci_usado || 0))}${item("FCI a devolver", reais(e.fci_devolver || 0))}` : ""}
     ${item(e.saldo >= 0 ? "Saldo a devolver ao inquilino" : "Saldo a cobrar do inquilino", `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
-    ${item("Vistoria de saída", esc(e.vistoria_saida || "-"))}</div>
+    ${item("Vistoria de saída", (() => {
+      const v = resultadoVistoriaSaida(d(), c);
+      return `${esc(textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ""}`;
+    })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ""}
     ${(() => {
       const dev = devolucaoPorRecebedor(d(), c, e.garantia_corrigida);
@@ -15129,7 +15148,9 @@ Salvar assim mesmo?`)) {
       },
       aviso: (r, q) => {
         const c = buscar2("contratos", q.contrato);
-        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
+        const v = resultadoVistoriaSaida(d(), c);
+        const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase("pt-BR")}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join("; ")}${v.pendencias.length > 5 ? "…" : ""}): confira os débitos` : ""}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
+        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
       },
       // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
       fixos: (r, q) => ({ data_saida: buscar2("contratos", q.contrato).data_saida }),
@@ -15139,6 +15160,7 @@ Salvar assim mesmo?`)) {
         if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
         for (const k of ["garantia_valor", "indice_percentual", "debitos", "fci_credito", "fci_danos"]) if (!dados[k]) dados[k] = 0;
         for (const k of relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = "Informe a leitura na saída";
+        dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
       },
       salvar: (db, dados, q) => encerrarContrato(db, Number(q.contrato), dados, login())
     },
@@ -15380,8 +15402,16 @@ Salvar assim mesmo?`)) {
     const nova = publicada && publicada.getTime() - emUso.getTime() > 6e4;
     return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
   }
+  function lembreteZipNuvem() {
+    const ultimo = d().historico.filter((h) => h.acao === "Exportação" && /ZIP/.test(h.descricao || "")).at(-1);
+    const dias = ultimo ? Math.floor((Date.now() - new Date(ultimo.quando).getTime()) / 864e5) : null;
+    const texto3 = ultimo ? `Último ZIP com todos os dados baixado em ${dataBr(ultimo.quando.slice(0, 10))} (há ${dias} dia${dias === 1 ? "" : "s"}).` : "Nenhum ZIP com todos os dados foi baixado ainda.";
+    const lembrar = !ultimo || dias > LEMBRETE_ZIP_DIAS;
+    return `<p class="suave">${texto3} ${lembrar ? etiqueta('vale baixar uma cópia para o seu computador (abaixo, "Exportar tudo em ZIP")', "aviso") : ""}</p>`;
+  }
+  var LEMBRETE_ZIP_DIAS = 7;
   async function telaDados() {
-    const conflitos = await copiasEmConflito(E.pasta);
+    const conflitos = E.nuvem ? [] : await copiasEmConflito(E.pasta);
     let modeloProprio = false;
     try {
       await (await E.pasta.getDirectoryHandle(PASTA_MODELOS)).getFileHandle(MODELO_FATURA);
@@ -15397,7 +15427,11 @@ Salvar assim mesmo?`)) {
       ${item("Versão do sistema", await versaoDoSistema())}</div>
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
-      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")} ${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
+      ${lembreteZipNuvem()}
+      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")}</p>
+      <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
+        <div class="alerta perigo" style="margin-top:8px"><b>Só para voltar a uma pasta do computador</b> (ex.: a pasta do OneDrive de antes da nuvem, ou uma pasta aberta de um backup). Tudo o que está na nuvem é trocado pelo que está na pasta: o que foi lançado depois, por qualquer aparelho, <b>se perde</b> (fica uma cópia de antes nos backups da nuvem). Para desfazer um dia ruim, prefira "Backups da nuvem".</div>
+        <p>${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div></details>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Backup seguro e versão PC (só administrador)</h2>
       <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração, um backup completo (banco + anexos) por semana e a <b>versão PC</b> do sistema (o programa inteiro num arquivo, atualizado sozinho). Se o site ou o Cloudflare caírem, a versão PC abre com os dados da última cópia; o <b>LEIA-ME.txt</b> da pasta explica.${E.nuvem ? " Na nuvem é a segunda camada, fora do Cloudflare: vale ter." : ""}</p>
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, "info")}</p>` : ""}
@@ -16377,7 +16411,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       "perigo",
       `Voltar a numeração nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}? Essas NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${numeroFatura(ciclo.de)}.`
     )}</p>` : '<p class="suave">As NFs atuais foram numeradas antes desta função existir: use a opção abaixo.</p>'}
-    <details><summary class="suave">Outra opção: desfazer a partir de um número</summary>
+    <p class="suave">Só uma NF errada? Use "Cancelar" na linha dela: o número fica cancelado e o pagamento recebe um número novo.</p>
+    <details><summary class="suave">Outra opção: desfazer a partir de um número (NFs numeradas antes de existir o ciclo, ou mais de um ciclo de uma vez)</summary>
       <form data-form="desfazerNumeracao" class="acoes" style="margin-top:8px"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ciclo ? ciclo.de : (ultimaFatura(d()) || {}).numero || 1}" style="width:120px"><button class="perigo secundario">Desfazer a partir deste número</button></form></details></div>`;
   }
   function caixaAvulsas() {
@@ -17701,7 +17736,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro).
 - Valor da NF = aluguel com bonificação (pago em dia) ou com multa e juros (atrasado). Não inclui IPTU, seguro nem tarifa. O padrão é NF com o aluguel cheio e o ressarcimento de condomínio como gasto.
 - Valor recebido diferente do previsto para a data: pede justificativa e a NF é digitada à mão (a justificativa fica só no sistema).
-- Para corrigir erro de NF, usa-se "Voltar a última numeração" (NFs não se apagam, para não deixar buracos).
+- Para corrigir uma NF errada há dois caminhos, na tela NFs: (1) "Cancelar" a NF: o número fica cancelado (não é reaproveitado) e o pagamento volta para a fila e recebe um número novo; o administrador pode depois apagar a NF cancelada da lista (fica só no Histórico). (2) "Voltar a última numeração" (ou "desfazer a partir de um número", para NFs numeradas antes de existir o ciclo ou para voltar mais de um ciclo): as NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e os mesmos números são usados de novo, na ordem das datas. Assim a sequência nunca fica com buraco: ou o número consta como cancelado, ou é reaproveitado.
 - O sistema não emite NFS-e na prefeitura.
 
 8. IPTU
