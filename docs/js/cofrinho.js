@@ -48,10 +48,10 @@ export async function decifrar(chave, v) {
   return v.tipo === 'blob' ? new Blob([claro], { type: v.mime }) : JSON.parse(new TextDecoder().decode(claro));
 }
 
-/** Só o necessário para a tela de login (sem dados de inquilinos). */
+/** Só o necessário para a tela de login (sem dados de inquilinos nem os tokens de sessão, que ficam só na cópia cifrada). */
 export const usuariosParaAcesso = (usuarios = []) => usuarios.map((u) => ({
   id: u.id, login: u.login, nome: u.nome, email: u.email, papel: u.papel, ativo: u.ativo, pendente: u.pendente,
-  senha_sal: u.senha_sal, senha_hash: u.senha_hash, senha_iteracoes: u.senha_iteracoes, sessoes: u.sessoes,
+  senha_sal: u.senha_sal, senha_hash: u.senha_hash, senha_iteracoes: u.senha_iteracoes,
 }));
 
 /**

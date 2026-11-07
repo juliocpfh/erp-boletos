@@ -66,6 +66,9 @@ function gravarSessao(loginTexto, token = null) {
 
 const novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
+/** O usuário é o dono deste e-mail do login da internet? (mesma regra de papelDe em nuvem/cofre.mjs: login ou e-mail, sem maiúsculas) */
+export const usuarioDoEmail = (u, email) => [u.login, u.email].some((v) => String(v || '').toLowerCase() === String(email || '').toLowerCase());
+
 /** Usuário da sessão lembrada, se ainda estiver ativo no banco e o token da sessão for dele. */
 const usuarioDaSessao = () => {
   const s = lerSessao();
@@ -110,11 +113,12 @@ export function alterar(fn, opcoes = {}) {
 }
 
 /**
- * Nuvem: as correções que `normalizar` fez na cópia (campo ou tabela nova, migração) vão à nuvem uma vez, por quem pode
- * gravar (regra 3 do CLAUDE.md vale também na nuvem). Entra na fila de gravação, como qualquer outra mudança.
+ * Nuvem: as correções que `normalizar` fez na cópia (campo ou tabela nova, migração) vão à nuvem uma vez, pelo administrador
+ * (regra 3 do CLAUDE.md vale também na nuvem; elas mexem em config_banco e outros campos que só ele muda, SO_ADMIN do cofre).
+ * Entra na fila de gravação, como qualquer outra mudança. Os outros só veem a correção na própria tela até o administrador entrar.
  */
 function ajustesParaNuvem() {
-  if (!E.nuvem || !pode(E.usuario, 'operador')) return;
+  if (!E.nuvem || !pode(E.usuario, 'admin')) return;
   filaGravacao = filaGravacao.then(async () => {
     if (await E.nuvem.enviarAjustes()) { E.d = E.nuvem.atual(); atualizarFaixa(); }
   }).catch(() => {});
@@ -400,6 +404,7 @@ export async function abrirNuvem() {
   E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
+  E.emailNuvem = (await N.saudeDaNuvem())?.email || null; // quem passou pelo login da internet (null sem internet)
   try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
   try {
     E.d = await E.nuvem.iniciar();
@@ -451,6 +456,8 @@ export async function entrar(loginTexto, senha) {
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
+  // nuvem: o usuário do sistema tem de ser o mesmo do login da internet (a nuvem decide o que ele pode pelo e-mail)
+  if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new C.ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
   if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');

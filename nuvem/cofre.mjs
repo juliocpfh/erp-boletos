@@ -24,6 +24,15 @@ const USUARIO_PROPRIO = ['senha_sal', 'senha_hash', 'senha_iteracoes', 'sessoes'
 /** Sessões lembradas por usuário (igual a MAX_SESSOES de docs/js/nuvem.js; tests/sincronia.test.mjs confere). */
 export const MAX_SESSOES = 10;
 const NIVEL = { consulta: 1, operador: 2, admin: 3 };
+/**
+ * O que só o administrador muda (a tela já esconde, com podeUsuario('admin'); aqui a nuvem garante, seja qual for o aparelho).
+ * `raiz`: campos da raiz; `excluir`: tabelas cujos registros só ele apaga; `tabela`: tabelas que só ele mexe (além de `usuarios`, acima).
+ */
+export const SO_ADMIN = {
+  raiz: ['config_banco', 'logo', 'ordem_caixas', 'ressarcimento_abate_nf', 'estilos_alertas'],
+  excluir: ['imoveis', 'contratos', 'encerramentos', 'vistorias', 'modelos_contrato', 'faturas'],
+  tabela: ['emitentes'],
+};
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
 
 export class ErroCofre extends Error {
@@ -152,15 +161,25 @@ export class Cofre {
     });
   }
 
+  /**
+   * Usuário como vai para um aparelho que não é de administrador: os outros usuários sem senha (resumo) nem tokens de sessão;
+   * só o próprio usuário vai inteiro (o login é conferido no aparelho). `quem` = { papel, id } de exigir(); sem quem, vai tudo (backup).
+   */
+  usuarioParaAparelho(u, quem) {
+    if (!quem || quem.papel === 'admin' || !u || u.id === quem.id) return u;
+    const { id, login, nome, email, papel, ativo, pendente } = u;
+    return { id, login, nome, email, papel, ativo, pendente };
+  }
+
   /** O banco inteiro no formato do arquivo de hoje (o sistema abre igual), com o ponto da fila em `_nuvem.seq`. */
-  tudo() {
+  tudo(quem = null) {
     if (this.vazio()) throw new ErroCofre(404, 'Ainda não há dados na nuvem.');
     const d = { formato: FORMATO, revisao: Number(this.controle('revisao') || 0), atualizado_em: this.controle('atualizado_em'), atualizado_por: this.controle('atualizado_por') };
     for (const r of this.q('SELECT campo, valor FROM raiz')) d[r.campo] = JSON.parse(r.valor);
     d.seq = {}; // o maior código já usado ou reservado em faixa: quem ainda não usa faixa não repete código
     for (const t of this.q('SELECT nome, proximo FROM tabelas ORDER BY nome')) { d[t.nome] = []; d.seq[t.nome] = Number(t.proximo) - 1; }
     for (const r of this.q('SELECT tabela, id, dados FROM registros ORDER BY ordem')) {
-      (d[r.tabela] ||= []).push(JSON.parse(r.dados));
+      (d[r.tabela] ||= []).push(r.tabela === 'usuarios' ? this.usuarioParaAparelho(JSON.parse(r.dados), quem) : JSON.parse(r.dados));
       d.seq[r.tabela] = Math.max(d.seq[r.tabela] || 0, r.id);
     }
     d.historico = this.q('SELECT dados FROM historico ORDER BY n').map((r) => JSON.parse(r.dados));
@@ -169,7 +188,7 @@ export class Cofre {
   }
 
   /** O que mudou desde `desde` (para o aparelho se atualizar). Parado demais: { refazer: true } e ele baixa tudo. */
-  mudancas(desde, limite = 2000) {
+  mudancas(desde, quem = null, limite = 2000) {
     const d = Number(desde);
     if (!Number.isSafeInteger(d) || d < 0) throw new ErroCofre(400, 'Parâmetro "desde" inválido.');
     const menor = Number(this.q('SELECT MIN(seq) AS m FROM log')[0]?.m || 0);
@@ -179,7 +198,11 @@ export class Cofre {
     return {
       seq: linhas.length ? linhas[linhas.length - 1].seq : d,
       mais: linhas.length === limite,
-      mudancas: linhas.map((l) => ({ seq: l.seq, tipo: l.tipo, tabela: l.tabela, id: l.id, dados: l.dados === null ? null : JSON.parse(l.dados), por: l.por, em: l.em })),
+      mudancas: linhas.map((l) => {
+        let dados = l.dados === null ? null : JSON.parse(l.dados);
+        if (l.tipo === 'registro' && l.tabela === 'usuarios') dados = this.usuarioParaAparelho(dados, quem);
+        return { seq: l.seq, tipo: l.tipo, tabela: l.tabela, id: l.id, dados, por: l.por, em: l.em };
+      }),
       conflitos: this.conflitosAbertos(),
       revisao: Number(this.controle('revisao') || 0), atualizado_em: this.controle('atualizado_em'), atualizado_por: this.controle('atualizado_por'),
     };
@@ -238,6 +261,10 @@ export class Cofre {
     if (tabela === 'usuarios' && quem.papel !== 'admin') {
       const soSenha = op.op === 'alterar' && id === quem.id && Object.keys(op.campos || {}).every((c) => USUARIO_PROPRIO.includes(c));
       if (!soSenha) throw new ErroCofre(403, 'Só o administrador muda usuários (cada um pode trocar a própria senha).');
+    }
+    if (quem.papel !== 'admin') {
+      if (SO_ADMIN.tabela.includes(tabela)) throw new ErroCofre(403, `Só o administrador altera ${tabela}.`);
+      if (op.op === 'excluir' && SO_ADMIN.excluir.includes(tabela)) throw new ErroCofre(403, `Só o administrador exclui registros de ${tabela}.`);
     }
     const atual = this.q('SELECT dados, meta FROM registros WHERE tabela = ? AND id = ?', tabela, id)[0];
     if (op.op === 'inserir') {
@@ -325,7 +352,7 @@ export class Cofre {
       this.gravarRaiz(campo, op.depois, email);
       return { ok: true };
     }
-    if (campo === 'ordem_caixas' && quem.papel !== 'admin') throw new ErroCofre(403, 'Só o administrador muda a ordem das caixas.');
+    if (SO_ADMIN.raiz.includes(campo) && quem.papel !== 'admin') throw new ErroCofre(403, `Só o administrador muda ${campo === 'ordem_caixas' ? 'a ordem das caixas' : campo}.`);
     const linha = this.q('SELECT valor, meta FROM raiz WHERE campo = ?', campo)[0];
     const atual = linha ? JSON.parse(linha.valor) : undefined;
     const antes = semSegredos(op.antes); const depois = semSegredos(op.depois);
@@ -493,8 +520,8 @@ export class CofreDO {
       const c = this.cofre; const rota = url.pathname;
       let r;
       if (rota === '/papel' && request.method === 'GET') r = c.exigir(email, url.searchParams.get('nivel') === 'operador' ? 'operador' : 'consulta');
-      else if (rota === '/tudo' && request.method === 'GET') { c.exigir(email, 'consulta'); r = c.tudo(); }
-      else if (rota === '/mudancas' && request.method === 'GET') { c.exigir(email, 'consulta'); r = c.mudancas(url.searchParams.get('desde')); }
+      else if (rota === '/tudo' && request.method === 'GET') r = c.tudo(c.exigir(email, 'consulta'));
+      else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
       else if (rota === '/conflitos' && request.method === 'GET') { c.exigir(email, 'consulta'); r = { conflitos: c.conflitosAbertos() }; }
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);
