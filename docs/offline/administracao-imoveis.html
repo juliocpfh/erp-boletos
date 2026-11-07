@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-LjKZUVyeOahLlSYhHPyFS2lskTwAtDaknsUIwbq4jNo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-XRSer465CMRxLMlwFW7p+JyTRltYmBbo0AndjB8UYJo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a7e0d1d44e696a1a">
+<meta name="fontes" content="1ea3a60863cbea8e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -15459,11 +15459,12 @@ Salvar assim mesmo?`)) {
     const usuarios = [...new Set(d().historico.map((h) => h.usuario))].sort();
     const filtrando = Object.values(q).some(Boolean);
     const desfazer = podeUsuario("admin") ? { pode: alteracoesDesfaziveis(d()), indice: new Map(d().historico.map((h, i) => [h, i])) } : null;
+    const usadas = new Set(d().historico.map((h) => h.tabela));
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista3.length} registro(s)${filtrando ? " com o filtro aplicado" : ""}</span></summary>
     <form class="formulario" data-form="filtroHistorico" style="margin-top:12px">
       <div><label>Usuário</label><select name="usuario"><option value=""></option>${usuarios.map((u) => `<option ${q.usuario === u ? "selected" : ""}>${esc(u)}</option>`).join("")}</select></div>
-      <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(TABELAS).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(TABELAS).filter(([k]) => k === q.tabela || usadas.has(k)).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
       <div><label>De</label><input type="date" name="de" value="${esc(q.de || "")}"></div><div><label>Até</label><input type="date" name="ate" value="${esc(q.ate || "")}"></div>
       <div><label>Contém o texto</label><input name="texto" value="${esc(q.texto || "")}"></div>
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
@@ -16779,7 +16780,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : "";
       if (pc.paga) return `<span class="q ${pc.valorInquilino || pc.avista ? "q-div" : "q-paga"}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
       const titulo2 = `${nome}: sua parte ${reais(pc.valorProprietario)}${inq}${venc} · em aberto`;
-      return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p2.id}" data-n="${pc.n}" data-texto="${esc(titulo2)}" title="${esc(titulo2)} (clique para marcar como paga)"></button>` : `<span class="q q-aberto" title="${esc(titulo2)}"></span>`;
+      return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPago" data-id="${p2.id}" data-n="${pc.n}" data-texto="${esc(titulo2)}" title="${esc(titulo2)} (clique para marcar como paga)"></button>` : `<span class="q q-aberto" title="${esc(titulo2)}"></span>`;
     };
     const rotuloMes = (mes) => `${MESES4[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? "" : `/${mes.slice(2, 4)}`}`;
     const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
@@ -16825,7 +16826,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <td><a href="#/imovel/${g.imovel.id}?ir=iptu">${esc(g.imovel.nome)}</a></td><td>${g.iptu.ano} · ${g.parcela.n === 0 ? "cota única" : `${g.parcela.rotulo} parcela`}</td>
         <td class="suave">${g.parcela.n === 0 ? "pago à vista por você" : g.parcela.valorInquilino ? `entrada ou saída (inquilino paga ${reais(g.parcela.valorInquilino)})` : "imóvel vazio ou contrato sem IPTU"}</td>
         <td class="n nw"><b>${reais(g.parcela.valorProprietario)}</b></td>
-        <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje3}"><button class="pequeno">Paga</button></form>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
+        <td class="n nw">${opera() ? botao("iptuPago", "Marcar como paga", { id: g.iptu.id, n: g.parcela.n, texto: `${g.imovel.nome} · IPTU ${g.iptu.ano} · ${g.parcela.n === 0 ? "cota única" : `${g.parcela.rotulo} parcela`}: sua parte ${reais(g.parcela.valorProprietario)} · vence ${dataBr(g.venc)}` }, "secundario pequeno") : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ""}<span>${rotuloMes(m)}</span>`).join("")}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas2 || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
@@ -17263,7 +17264,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const guia = (pc) => {
       if (pc.paga) return `${etiqueta(`paga em ${dataBr(pc.paga)}`, "ok")} ${opera() ? botao("iptuPago", "desfazer", { id: p2.id, n: pc.n, data: "" }, "link-botao", "Desfazer o pagamento desta guia?") : ""}`;
       const aberta = pc.proprietario ? etiqueta("em aberto", "perigo") : "";
-      return opera() ? `<form data-form="iptuPago" data-id="${p2.id}" data-n="${pc.n}" class="pagamento">${aberta}<input type="date" name="data" value="${hojeIso()}"><button class="pequeno">Paga</button></form>` : aberta;
+      const texto3 = `IPTU ${p2.ano} · ${pc.rotulo}${pc.n === 0 ? "" : " parcela"}: sua parte ${reais(pc.valorProprietario)}${pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : ""}`;
+      return opera() ? `${aberta} ${botao("iptuPago", "Marcar como paga", { id: p2.id, n: pc.n, texto: texto3 }, "secundario pequeno")}` : aberta;
     };
     return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vence na prefeitura</th><th>Boleto do inquilino</th><th class="n">Valor</th><th>Parte do inquilino</th><th>Sua parte</th><th>Guia na prefeitura</th></tr>
     ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr(pc.comp)}</span>` : "-"}</td><td class="n">${reais(pc.valor)}</td>
@@ -18921,20 +18923,26 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso("Registro excluído.");
       await mostrar();
     },
-    async iptuPago({ id, n, data: data2 }) {
-      await alterar((db) => marcarIptuPago(db, Number(id), Number(n), data2 || null, login()));
-      await mostrar();
-    },
-    /** Quadradinho vermelho na tela IPTU do ano: pergunta a data e marca a guia como paga. */
-    async iptuPagoRapido({ id, n, texto: texto3 }) {
-      const r = await janela({
-        titulo: "Marcar a guia do IPTU como paga",
-        sim: "Marcar como paga",
-        nao: "Cancelar",
-        html: `<p>${esc(texto3)}</p><label>Pago em</label><input type="date" name="data" value="${hojeIso()}" required>`
-      });
-      if (!r) return;
-      const data2 = String((r.data || [])[0] || "");
+    /**
+     * Guia do IPTU paga por você: um caminho só para as três telas (caixa do imóvel, lista de guias a pagar e quadradinho do mapa
+     * do ano; C17). Sem ``data``, pergunta a data numa janela; ``data: ''`` desfaz (parcela paga pelo banco não se desfaz aqui).
+     */
+    async iptuPago({ id, n, data: data2, texto: texto3 }) {
+      if (data2 === "") {
+        await alterar((db) => marcarIptuPago(db, Number(id), Number(n), null, login()));
+        await mostrar();
+        return;
+      }
+      if (!data2) {
+        const r = await janela({
+          titulo: "Marcar a guia do IPTU como paga",
+          sim: "Marcar como paga",
+          nao: "Cancelar",
+          html: `<p>${esc(texto3 || "")}</p><label>Pago em</label><input type="date" name="data" value="${hojeIso()}" required>`
+        });
+        if (!r) return;
+        data2 = String((r.data || [])[0] || "");
+      }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
       await alterar((db) => marcarIptuPago(db, Number(id), Number(n), data2, login()));
       aviso("Parcela do IPTU marcada como paga.");
@@ -20094,13 +20102,6 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!motivo) throw new Error("Informe o motivo do ajuste (fica no histórico).");
       await alterar((db) => ajustarBoleto(db, Number(form.dataset.id), f.get("tipo") === "ressarcimento" ? -valor : valor, motivo, login()));
       aviso("Ajuste salvo e registrado no histórico.");
-      await mostrar();
-    },
-    async iptuPago(form) {
-      const data2 = String(new FormData(form).get("data") || "");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
-      await alterar((db) => marcarIptuPago(db, Number(form.dataset.id), Number(form.dataset.n), data2, login()));
-      aviso("Parcela do IPTU marcada como paga.");
       await mostrar();
     },
     async desfazerNumeracao(form) {
