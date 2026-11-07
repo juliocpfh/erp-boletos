@@ -43,8 +43,9 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - Conferir: sem login, `curl -I https://erp.ankjck.com.br/api/saude` dá 302 para `…cloudflareaccess.com`; com login, `{"ok":true,"email":…,"teste":false}`.
 
 ## Próximos passos
-1. Arquivo do aplicativo instalável com o login: `<link rel="manifest" … crossorigin="use-credentials">` em `docs/index.html` (sem isso o Access barra o manifest). Entra na PR do "salvar" de 2026-11-06.
+1. ~~Manifest com `crossorigin="use-credentials"`~~ feito (PR #148, `docs/index.html`).
 2. ~~Cabeçalhos~~ feito em 2026-11-07 (acima).
 3. Testar no celular: instalar o aplicativo, usar sem internet, conflito entre dois aparelhos.
-4. Passagem/"Substituir…" mais rápida: 4 anexos de cada vez (`docs/js/migracao.js`; a de 2026-11-06 levou muito tempo com 283 anexos, 256 MB).
+4. ~~Passagem/"Substituir…" com 4 anexos de cada vez~~ feito em 2026-11-07 (`docs/js/migracao.js`).
+4b. Cloudflare → Caching → Configuration → **Browser Cache TTL**: trocar "4 hours" por "Respect Existing Headers" (o GitHub pede 10 min). Não é obrigatório: o `sw.js` já confere tudo com o site.
 5. Depois de uns dias sem problema: aposentar a pasta do OneDrive como reserva (decisão do usuário).

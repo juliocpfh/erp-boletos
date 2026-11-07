@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-FtUXXe29mNQGf9ulD4whQYbTI2F2SbGbLH4Wjtc0Tw0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-htl7BgAzAcnh2OenQ57GoljaS4hRsynIWyNre230orA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="4a1c4835d0e053c9">
+<meta name="fontes" content="044c6b0e11f97216">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -517,6 +517,24 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   table.responsiva tr.total { display: none; } /* a soma do mês não cabe no formato de cartão (colunas unidas) */
   table.responsiva form.inline, table.responsiva form.inline input { max-width: 100%; }
   .rolagem.tem-rolagem:has(table.responsiva)::before { display: none; }
+  /* cartões automáticos (app.js, cartoesNoCelular): título no meio da tabela vira o título do cartão; nada de largura mínima */
+  table.cartoes-auto { min-width: 0 !important; width: 100% !important; }
+  table.cartoes-auto tr:not(:first-child) > th { display: block; text-align: left; padding: 4px 0; border: 0; white-space: normal; }
+  table.cartoes-auto td { white-space: normal !important; overflow-wrap: anywhere; width: auto !important; }
+  table.cartoes-auto tr.total { display: block; }
+  /* tabela larga sem títulos (listas de tarefas do contrato): cada linha quebra para baixo em vez de esticar para o lado */
+  table.linhas-celular, table.linhas-celular tbody { display: block; min-width: 0 !important; width: 100% !important; }
+  table.linhas-celular tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--borda); }
+  table.linhas-celular td, table.linhas-celular th { display: block; border: 0; padding: 0; white-space: normal !important; width: auto !important; }
+  /* Imóveis: as duas linhas de cada imóvel formam um cartão só (nome e endereço em cima; matrícula, contas e valor embaixo) */
+  table.lista-imoveis.cartoes-auto td::before { display: none; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l1 { margin-bottom: 0; border-bottom: 0; border-radius: 8px 8px 0 0; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 { display: flex; flex-wrap: wrap; gap: 2px 14px; border-top: 0; border-radius: 0 0 8px 8px; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 td { border: 0; padding: 2px 0; }
+  table.lista-imoveis.cartoes-auto tr.imovel-l2 td.anexos { flex-basis: 100%; }
+  table.lista-imoveis.cartoes-auto td.sobra { display: none; }
+  table.lista-imoveis.cartoes-auto td.nome a, table.lista-imoveis.cartoes-auto td.end-imovel { white-space: normal; }
+  table.lista-imoveis.cartoes-auto td.n { text-align: left; }
 }
 
 /* Banco (C6): boleto emitido, QR Code do Pix e botões que ainda não funcionam */
@@ -535,6 +553,15 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .qr-pix { display: flex; align-items: center; gap: 14px; margin: 10px 0; }
 .qr-pix img { width: 180px; height: 180px; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
 #saude-ponte ul { padding-left: 18px; }
+
+/* Visualizador de anexos no celular (visualizador.js): PDF e fotos por cima da tela, sem baixar */
+.visualizador { position: fixed; inset: 0; z-index: 1000; background: #1e293b; display: flex; flex-direction: column; }
+.vis-topo { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #0f172a; color: #fff; }
+.vis-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.vis-corpo { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; -webkit-overflow-scrolling: touch; }
+.vis-corpo canvas, .vis-corpo img { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
+body.com-visualizador { overflow: hidden; }
 </style>
 </head>
 <body>
@@ -9323,7 +9350,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
 
   // docs/js/pasta-nuvem.js
   var RAIZES = ["arquivos", "modelos", "backups"];
-  var VALIDADE_LISTA = 15e3;
+  var VALIDADE_LISTA = 6e4;
   var naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, "NotFoundError");
   var semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
   var codificar = (partes) => partes.map(encodeURIComponent).join("/");
@@ -9334,6 +9361,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       this.buscar = buscar3;
       this.guardar = guardar;
       this.listas = /* @__PURE__ */ new Map();
+      this.buscando = /* @__PURE__ */ new Map();
       this.criadas = /* @__PURE__ */ new Set();
       this.fila = null;
       this.avisos = [];
@@ -9373,7 +9401,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       let l = this.listas.get(chave);
       if (!l || fresca || Date.now() - l.em > VALIDADE_LISTA) {
         try {
-          const r2 = await (await this.pedir("GET", `lista/${codificar(partes)}/`)).json();
+          let pedido = this.buscando.get(chave);
+          if (!pedido) {
+            pedido = this.pedir("GET", `lista/${codificar(partes)}/`).then((resp) => resp.json()).finally(() => this.buscando.delete(chave));
+            this.buscando.set(chave, pedido);
+          }
+          const r2 = await pedido;
           l = { em: Date.now(), pastas: new Set(r2.pastas), arquivos: new Map(r2.arquivos.map((a) => [a.nome, a.tamanho])) };
           this.guardar?.gravar(`lista:${chave}`, { pastas: r2.pastas, arquivos: r2.arquivos }).catch(() => {
           });
@@ -15098,6 +15131,20 @@ Salvar assim mesmo?`)) {
       <p>${botao("desfazerMarcados", "↶ Desfazer os marcados", {}, "secundario pequeno")}</p>` : ""}
     ${tabelaHistorico(lista3.slice(-500).reverse(), desfazer)}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
   }
+  async function versaoDoSistema() {
+    const fmt = (dt) => dt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const emUso = new Date(document.lastModified);
+    if (location.protocol === "file:" || Number.isNaN(emUso.getTime())) return "versão sem internet";
+    let publicada = null;
+    try {
+      const r = await fetch("index.html", { method: "HEAD", cache: "no-store", credentials: "include" });
+      const lm = r.ok && r.headers.get("last-modified");
+      if (lm) publicada = new Date(lm);
+    } catch {
+    }
+    const nova = publicada && publicada.getTime() - emUso.getTime() > 6e4;
+    return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
+  }
   async function telaDados() {
     const conflitos = await copiasEmConflito(E.pasta);
     let modeloProprio = false;
@@ -15111,7 +15158,8 @@ Salvar assim mesmo?`)) {
     <div class="cartao"><div class="grade">
       ${item("Pasta dos dados", E.nuvem ? "na nuvem (Cloudflare)" : esc(E.pasta.name))}${item("Banco criado em", new Date(d().criado_em).toLocaleString("pt-BR"))}
       ${item("Última atualização", d().atualizado_em ? `${new Date(d().atualizado_em).toLocaleString("pt-BR")} por ${esc(d().atualizado_por)}` : "-")}
-      ${item("Versão do arquivo", `revisão ${d().revisao}`)}</div>
+      ${item("Versão do arquivo", `revisão ${d().revisao}`)}
+      ${item("Versão do sistema", await versaoDoSistema())}</div>
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
       ${podeUsuario("admin") ? `<p>${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
@@ -16348,7 +16396,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const registrar2 = (c) => opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : "";
     const resumo = resumoSolicitacoes(d());
     return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link("#/novo/contratos", "Novo contrato", "botao") : ""}</div>
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ""}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
@@ -16947,6 +16995,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
 
   // docs/js/migracao.js
+  var SIMULTANEOS = 4;
   var codificar2 = (partes) => partes.map(encodeURIComponent).join("/");
   async function percorrer(dir, partes, lista3) {
     for await (const [nome, h] of dir.entries()) {
@@ -16955,19 +17004,38 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
     return lista3;
   }
-  async function naNuvem(anexos, cache, pastaPartes) {
+  function naNuvem(anexos, cache, pastaPartes) {
     const k = pastaPartes.join("/");
     if (!cache.has(k)) {
-      let mapa = /* @__PURE__ */ new Map();
-      try {
-        const r = await (await anexos.pedir("GET", `lista/${codificar2(pastaPartes)}/`)).json();
-        mapa = new Map(r.arquivos.map((a) => [a.nome, a.tamanho]));
-      } catch (e) {
-        if (e.status !== 404) throw e;
-      }
-      cache.set(k, mapa);
+      cache.set(k, (async () => {
+        try {
+          const r = await (await anexos.pedir("GET", `lista/${codificar2(pastaPartes)}/`)).json();
+          return new Map(r.arquivos.map((a) => [a.nome, a.tamanho]));
+        } catch (e) {
+          if (e.status === 404) return /* @__PURE__ */ new Map();
+          cache.delete(k);
+          throw e;
+        }
+      })());
     }
     return cache.get(k);
+  }
+  async function emFila(itens, n, fn) {
+    let i = 0;
+    let erro = null;
+    const trabalhador = async () => {
+      while (!erro && i < itens.length) {
+        const item2 = itens[i];
+        i += 1;
+        try {
+          await fn(item2);
+        } catch (e) {
+          erro ||= e;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(n, itens.length) }, trabalhador));
+    if (erro) throw erro;
   }
   async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {
   }, substituir = false }) {
@@ -16990,21 +17058,22 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     let pulados = 0;
     const recusados = [];
     const cache = /* @__PURE__ */ new Map();
-    for (const a of arquivos) {
-      aoAndar({ fase: "anexos", feitos, total, bytes: bytes2, totalBytes, nome: a.partes.join("/") });
-      const la = await naNuvem(anexos, cache, a.partes.slice(0, -1));
-      if (la.get(a.partes.at(-1)) === a.tamanho) pulados += 1;
-      else {
-        try {
-          await anexos.pedir("PUT", codificar2(a.partes), { corpo: await lerConteudo(a.handle) });
-        } catch (e) {
-          if (!e.status || e.status === 401 || e.status >= 500) throw Object.assign(new Error(`A internet caiu no arquivo ${a.partes.join("/")}. Clique de novo: o que já subiu é pulado.`), { esperado: true });
-          recusados.push({ caminho: a.partes.join("/"), motivo: e.message });
-        }
+    await emFila(arquivos, SIMULTANEOS, async (a) => {
+      const caminho = a.partes.join("/");
+      aoAndar({ fase: "anexos", feitos, total, bytes: bytes2, totalBytes, nome: caminho });
+      try {
+        const la = await naNuvem(anexos, cache, a.partes.slice(0, -1));
+        if (la.get(a.partes.at(-1)) === a.tamanho) pulados += 1;
+        else await anexos.pedir("PUT", codificar2(a.partes), { corpo: await lerConteudo(a.handle) });
+      } catch (e) {
+        if (!e.status || e.status === 401 || e.status >= 500) throw Object.assign(new Error(`A internet caiu no arquivo ${caminho}. Clique de novo: o que já subiu é pulado.`), { esperado: true });
+        recusados.push({ caminho, motivo: e.message });
       }
       feitos += 1;
       bytes2 += a.tamanho;
-    }
+      aoAndar({ fase: "anexos", feitos, total, bytes: bytes2, totalBytes, nome: caminho });
+    });
+    recusados.sort((x, y) => x.caminho.localeCompare(y.caminho));
     aoAndar({ fase: "dados", feitos, total, bytes: bytes2, totalBytes, nome: ARQUIVO_BANCO });
     await sinc.importar(dados, { substituir });
     aoAndar({ fase: "conferencia", feitos, total, bytes: bytes2, totalBytes, nome: "" });
@@ -17020,10 +17089,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
     const faltando = [];
     const cache = /* @__PURE__ */ new Map();
-    for (const a of arquivos) {
+    await emFila(arquivos, SIMULTANEOS, async (a) => {
       const la = await naNuvem(anexos, cache, a.partes.slice(0, -1));
       if (la.get(a.partes.at(-1)) !== a.tamanho) faltando.push(a.partes.join("/"));
-    }
+    });
+    faltando.sort();
     const registros = Object.values(dados).filter((v) => Array.isArray(v)).reduce((s, v) => s + v.length, 0);
     return { ok: !diferencas2.length && !faltando.length, diferencas: diferencas2, faltando, registros };
   }
@@ -17388,6 +17458,96 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 - Notificação ao pagador (e-mail/SMS) automática e personalizável por conta e por contrato. Negativação disponível, só pelo administrador, com confirmação dupla.
 - Fechamento do mês ganha a etapa "Banco" (extrato buscado e tudo com destino) e o Painel avisa movimentações sem destino há mais de 7 dias, comprovantes não baixados e pagamentos enviados sem confirmação. O histórico registra tudo; movimentações e pagamentos não se desfazem pelo Histórico.
 `;
+
+  // docs/js/visualizador.js
+  var PDFJS = "vendor/pdf.min.js";
+  var PDFJS_TRABALHO = "vendor/pdf.worker.min.js";
+  var carregando = null;
+  function carregarPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    carregando = carregando || new Promise((ok, erro) => {
+      const s = document.createElement("script");
+      s.src = PDFJS;
+      s.onload = () => window.pdfjsLib ? ok(window.pdfjsLib) : erro(new Error("pdf.js não carregou"));
+      s.onerror = () => {
+        carregando = null;
+        erro(new Error("Não consegui carregar o leitor de PDF."));
+      };
+      document.head.appendChild(s);
+    });
+    return carregando.then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_TRABALHO;
+      return lib;
+    });
+  }
+  function usarVisualizador() {
+    if (location.protocol === "file:") return false;
+    return !!window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
+  }
+  function fechar(janela2, urls2) {
+    janela2.remove();
+    urls2.forEach((u) => URL.revokeObjectURL(u));
+    document.body.classList.remove("com-visualizador");
+    document.removeEventListener("keydown", janela2.teclado);
+  }
+  async function visualizar(blob, nome, tipo, baixar2) {
+    const urls2 = [];
+    const janela2 = document.createElement("div");
+    janela2.className = "visualizador nao-imprimir";
+    janela2.setAttribute("role", "dialog");
+    janela2.setAttribute("aria-modal", "true");
+    janela2.innerHTML = `<div class="vis-topo"><span class="vis-nome"></span><button type="button" class="botao secundario pequeno" data-vis="baixar">Baixar</button><button type="button" class="botao pequeno" data-vis="fechar" aria-label="Fechar">✕ Fechar</button></div><div class="vis-corpo"><p class="vis-aviso">Abrindo…</p></div>`;
+    janela2.querySelector(".vis-nome").textContent = nome;
+    janela2.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-vis]");
+      if (!b) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (b.dataset.vis === "fechar") fechar(janela2, urls2);
+      else baixar2(blob, nome);
+    });
+    janela2.teclado = (ev) => {
+      if (ev.key === "Escape") fechar(janela2, urls2);
+    };
+    document.addEventListener("keydown", janela2.teclado);
+    document.body.appendChild(janela2);
+    document.body.classList.add("com-visualizador");
+    const corpo = janela2.querySelector(".vis-corpo");
+    try {
+      if (tipo.startsWith("image/")) {
+        const u = URL.createObjectURL(new Blob([blob], { type: tipo }));
+        urls2.push(u);
+        const img = document.createElement("img");
+        img.alt = nome;
+        img.src = u;
+        corpo.replaceChildren(img);
+        return;
+      }
+      const lib = await carregarPdfJs();
+      const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
+      corpo.replaceChildren();
+      const largura = Math.max(320, corpo.clientWidth - 16);
+      const nitidez = Math.min(window.devicePixelRatio || 1, 2);
+      for (let n = 1; n <= pdf.numPages; n += 1) {
+        if (!janela2.isConnected) return;
+        const pagina = await pdf.getPage(n);
+        const escala = largura / pagina.getViewport({ scale: 1 }).width;
+        const vista = pagina.getViewport({ scale: escala * nitidez });
+        const tela = document.createElement("canvas");
+        tela.width = Math.floor(vista.width);
+        tela.height = Math.floor(vista.height);
+        tela.style.width = `${Math.floor(vista.width / nitidez)}px`;
+        corpo.appendChild(tela);
+        await pagina.render({ canvasContext: tela.getContext("2d"), viewport: vista }).promise;
+      }
+      pdf.destroy?.();
+    } catch (e) {
+      const p2 = document.createElement("p");
+      p2.className = "vis-aviso";
+      p2.textContent = `Não consegui mostrar o arquivo (${e.message}). Use o botão Baixar.`;
+      corpo.replaceChildren(p2);
+    }
+  }
 
   // docs/js/telas/acoes.js
   async function modeloFatura() {
@@ -18784,7 +18944,15 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const arq = await abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
       const tipo = tipoParaAbrir(nome);
       if (!tipo) return baixar(arq, nome);
+      if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar);
       window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), "_blank", "noopener");
+    },
+    /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
+    async atualizarSistema() {
+      if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+      for (const reg of await navigator.serviceWorker?.getRegistrations?.() || []) await reg.update().catch(() => {
+      });
+      location.reload();
     },
     async baixarArquivo({ escopo, id, nome }) {
       baixar(await abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
@@ -18991,7 +19159,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         const r = await fetch(url, o);
         if (!r.ok) return r;
         const blob = await r.blob();
-        window.open(URL.createObjectURL(blob), "_blank");
+        if (usarVisualizador()) visualizar(blob, "boleto.pdf", "application/pdf", baixar);
+        else window.open(URL.createObjectURL(blob), "_blank");
         return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
       } });
     },
@@ -20156,6 +20325,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     renovarUsuario();
     atualizarFaixa();
     if (!externo) return;
+    E.anexos?.listas?.forEach((l) => {
+      l.em = 0;
+    });
     if (!E.usuario) return mostrar();
     const editando = document.querySelector("main form[data-form]");
     if (editando) aviso("Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.", "info");
@@ -20388,6 +20560,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const s = lerSessao();
     const u = E.usuario;
     E.usuario = null;
+    anexosVistos.clear();
     gravarSessao(null);
     ir("#/");
     if (s && u) await alterar((db) => {
@@ -20448,6 +20621,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     <main><div id="mensagens" class="nao-imprimir"></div>${conteudo}</main>`;
   }
   var paginaDesenhada = null;
+  var anexosVistos = /* @__PURE__ */ new Map();
   async function mostrar(estadoForm = null) {
     const app = document.getElementById("app");
     const rota = rotaAtual();
@@ -20469,7 +20643,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const endereco2 = location.hash.split("?")[0];
       const abertos = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id][open]")].map((el) => el.id) : [];
       const fechados = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id]:not([open])")].map((el) => el.id) : [];
+      const mesma = endereco2 === paginaDesenhada;
+      const rolagem = mesma ? window.scrollY : 0;
+      if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
       app.innerHTML = html;
+      for (const el of app.querySelectorAll("[data-arquivos]")) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
+      if (mesma) window.scrollTo(0, rolagem);
       paginaDesenhada = endereco2;
       for (const id of abertos) {
         const el = document.getElementById(id);
@@ -20491,7 +20670,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       atualizarFaixa();
       desenharMensagens();
       mensagens = [];
-      await montarExtras(app);
+      try {
+        await montarExtras(app);
+      } finally {
+        app.style.minHeight = "";
+      }
       const alvo = rota.q.ir && document.getElementById(rota.q.ir);
       if (alvo?.tagName === "DETAILS") alvo.open = true;
       if (alvo) alvo.scrollIntoView({ block: "start" });
@@ -20502,11 +20685,23 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   }
   async function montarExtras(raiz) {
-    for (const el of raiz.querySelectorAll("[data-arquivos]")) {
-      const [escopo, id, modo] = el.dataset.arquivos.split(":");
-      el.innerHTML = await TELAS._listaArquivos(escopo, Number(id), modo);
-    }
+    arrumarTabelas(raiz);
+    let mudou = false;
+    await Promise.all([...raiz.querySelectorAll("[data-arquivos]")].map(async (el) => {
+      const chave = el.dataset.arquivos;
+      const [escopo, id, modo] = chave.split(":");
+      const html = await TELAS._listaArquivos(escopo, Number(id), modo);
+      if (escopo !== "anuncio") anexosVistos.set(chave, html);
+      if (el.isConnected && el.innerHTML !== html) {
+        el.innerHTML = html;
+        mudou = true;
+      }
+    }));
     TELAS._ligarDesconto(raiz);
+    if (mudou) arrumarTabelas(raiz);
+  }
+  function arrumarTabelas(raiz) {
+    if (window.matchMedia?.("(max-width: 760px)").matches) cartoesNoCelular(raiz);
     for (const tabela of raiz.querySelectorAll("table.responsiva")) {
       const cabecalho = [...tabela.querySelectorAll("tr:first-child th")].map((th) => th.textContent.trim());
       for (const tr of tabela.querySelectorAll("tr")) {
@@ -20518,6 +20713,19 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       }
     }
     for (const caixa of raiz.querySelectorAll(".rolagem")) caixa.classList.toggle("tem-rolagem", caixa.scrollWidth > caixa.clientWidth + 2);
+  }
+  var SEM_CARTOES = ".fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria, .boleto-banco, .carta-tabela, .mapa-iptu, table.responsiva";
+  function cartoesNoCelular(raiz) {
+    for (const t of raiz.querySelectorAll("main table")) {
+      if (t.matches(SEM_CARTOES) || t.closest(".fatura-xls, .demonstrativo")) continue;
+      const primeira = t.rows[0];
+      if (!primeira || !primeira.cells.length) continue;
+      const caixa = t.parentElement;
+      const larga = t.scrollWidth > (caixa?.clientWidth || window.innerWidth) + 2 || t.getBoundingClientRect().right > window.innerWidth + 2;
+      if (!larga) continue;
+      if ([...primeira.cells].every((c) => c.tagName === "TH")) t.classList.add("responsiva", "cartoes-auto");
+      else t.classList.add("linhas-celular");
+    }
   }
   document.addEventListener("submit", async (ev) => {
     const form = ev.target.closest("form[data-form]");
