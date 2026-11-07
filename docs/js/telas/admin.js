@@ -170,8 +170,19 @@ async function versaoDoSistema() {
     : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ''}`;
 }
 
+/** Na nuvem: quando o último ZIP com tudo foi baixado (registro "Exportação" do Histórico) e um lembrete se faz tempo. */
+function lembreteZipNuvem() {
+  const ultimo = d().historico.filter((h) => h.acao === 'Exportação' && /ZIP/.test(h.descricao || '')).at(-1);
+  const dias = ultimo ? Math.floor((Date.now() - new Date(ultimo.quando).getTime()) / 86400000) : null;
+  const texto = ultimo ? `Último ZIP com todos os dados baixado em ${dataBr(ultimo.quando.slice(0, 10))} (há ${dias} dia${dias === 1 ? '' : 's'}).` : 'Nenhum ZIP com todos os dados foi baixado ainda.';
+  const lembrar = !ultimo || dias > LEMBRETE_ZIP_DIAS;
+  return `<p class="suave">${texto} ${lembrar ? etiqueta('vale baixar uma cópia para o seu computador (abaixo, "Exportar tudo em ZIP")', 'aviso') : ''}</p>`;
+}
+const LEMBRETE_ZIP_DIAS = 7;
+
 export async function telaDados() {
-  const conflitos = await S.copiasEmConflito(E.pasta);
+  // cópias em conflito são coisa do OneDrive (modo pasta): na nuvem não existem
+  const conflitos = E.nuvem ? [] : await S.copiasEmConflito(E.pasta);
   let modeloProprio = false;
   try {
     await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
@@ -186,7 +197,11 @@ export async function telaDados() {
       ${item('Versão do sistema', await versaoDoSistema())}</div>
       ${E.nuvem ? '' : `<p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
-      ${podeUsuario('admin') ? `<p>${link('#/backups-nuvem', 'Backups da nuvem (baixar ou voltar para um dia)', 'botao secundario pequeno')} ${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
+      ${lembreteZipNuvem()}
+      ${podeUsuario('admin') ? `<p>${link('#/backups-nuvem', 'Backups da nuvem (baixar ou voltar para um dia)', 'botao secundario pequeno')}</p>
+      <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
+        <div class="alerta perigo" style="margin-top:8px"><b>Só para voltar a uma pasta do computador</b> (ex.: a pasta do OneDrive de antes da nuvem, ou uma pasta aberta de um backup). Tudo o que está na nuvem é trocado pelo que está na pasta: o que foi lançado depois, por qualquer aparelho, <b>se perde</b> (fica uma cópia de antes nos backups da nuvem). Para desfazer um dia ruim, prefira "Backups da nuvem".</div>
+        <p>${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div></details>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro e versão PC (só administrador)</h2>
       <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração, um backup completo (banco + anexos) por semana e a <b>versão PC</b> do sistema (o programa inteiro num arquivo, atualizado sozinho). Se o site ou o Cloudflare caírem, a versão PC abre com os dados da última cópia; o <b>LEIA-ME.txt</b> da pasta explica.${E.nuvem ? ' Na nuvem é a segunda camada, fora do Cloudflare: vale ter.' : ''}</p>
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}

@@ -2,6 +2,7 @@
 // documentos de entrada e termos aditivos.
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
+import * as K from '../contratos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -269,7 +270,7 @@ function caixaSaida(c) {
     ${item('Débitos descontados', reais(e.debitos))}
     ${e.fci_credito ? `${item('💰 FCI corrigido (crédito do inquilino)', reais(e.fci_credito))}${item('Reparos de danos pagos com o FCI', reais(e.fci_usado || 0))}${item('FCI a devolver', reais(e.fci_devolver || 0))}` : ''}
     ${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
-    ${item('Vistoria de saída', esc(e.vistoria_saida || '-'))}</div>
+    ${item('Vistoria de saída', (() => { const v = K.resultadoVistoriaSaida(d(), c); return `${esc(K.textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ''}`; })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
     ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}

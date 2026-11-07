@@ -83,7 +83,8 @@ function caixaRenumerar() {
     <p class="suave">Emitiu NFs com algo errado, ou passou despercebido um pagamento de data intermediária? Volte a última numeração: as NFs daquele ciclo saem da lista, os pagamentos voltam para a fila acima com o que já foi preenchido, você corrige (botão "Corrigir"), inclui o que faltou e clica de novo em "Numerar estas NFs". Os números são reaproveitados, na ordem das datas. Dá para repetir e voltar ciclos anteriores.</p>
     ${ciclo ? `<p>${botao('desfazerUltimaNumeracao', `Voltar a última numeração: nº ${R.numeroFatura(ciclo.de)}${ciclo.ate !== ciclo.de ? ` a ${R.numeroFatura(ciclo.ate)}` : ''} (${ciclo.qtd} NF${ciclo.qtd > 1 ? 's' : ''}, pagamentos de ${dataBr(ciclo.emissoes[0])}${ciclo.emissoes[1] !== ciclo.emissoes[0] ? ` a ${dataBr(ciclo.emissoes[1])}` : ''})`, {}, 'perigo',
       `Voltar a numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)}? Essas NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(ciclo.de)}.`)}</p>` : '<p class="suave">As NFs atuais foram numeradas antes desta função existir: use a opção abaixo.</p>'}
-    <details><summary class="suave">Outra opção: desfazer a partir de um número</summary>
+    <p class="suave">Só uma NF errada? Use "Cancelar" na linha dela: o número fica cancelado e o pagamento recebe um número novo.</p>
+    <details><summary class="suave">Outra opção: desfazer a partir de um número (NFs numeradas antes de existir o ciclo, ou mais de um ciclo de uma vez)</summary>
       <form data-form="desfazerNumeracao" class="acoes" style="margin-top:8px"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ciclo ? ciclo.de : (R.ultimaFatura(d()) || {}).numero || 1}" style="width:120px"><button class="perigo secundario">Desfazer a partir deste número</button></form></details></div>`;
 }
 
