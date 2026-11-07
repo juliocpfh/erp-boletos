@@ -93,8 +93,18 @@ export function aplicarMudanca(d, m) {
   return d;
 }
 
-/** Falha passageira (sem internet, login do Access vencido, nuvem fora do ar): o lote fica na fila e vai depois. */
-const passageiro = (e) => !e.status || e.status === 401 || e.status >= 500;
+/**
+ * Falha passageira (sem internet ou tempo esgotado, login do Access vencido, pedido demorado (408), muitos pedidos (429),
+ * nuvem fora do ar): o lote ou o anexo fica na fila e vai depois. A mesma regra vale para os anexos (pasta-nuvem.js).
+ */
+export const passageiro = (e) => !e.status || e.status === 401 || e.status === 408 || e.status === 429 || e.status >= 500;
+/** Tempo máximo de cada pedido à nuvem (ms): pedido pendurado travaria a fila e a numeração da NF. Anexo (PUT) tem mais. */
+export const TEMPO_LIMITE = 30000;
+export const TEMPO_LIMITE_ANEXO = 120000;
+/** Sinal que cancela o pedido depois de `ms` (navegador sem suporte: sem limite). */
+export const limiteDeTempo = (ms) => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
+/** Erro de rede ou tempo esgotado → ErroNuvem com status 0 (passageiro). */
+export const erroDeRede = (e) => new ErroNuvem(e?.name === 'TimeoutError' ? 'A nuvem demorou demais para responder. Tente de novo.' : 'Sem internet.', 0);
 
 /** Registros e campos que os lotes deste aparelho mexem (para separar o que volta da nuvem do que é de outro). */
 function chavesDosLotes(lotes) {
@@ -383,17 +393,17 @@ export class Sincronia {
 // ---------------------------------------------------------------------------
 // No navegador: chamada à API (mesmo endereço do site) e cópia local no IndexedDB
 // ---------------------------------------------------------------------------
-export function apiDoSite(base = 'api/dados/') {
+export function apiDoSite(base = 'api/dados/', { limite = TEMPO_LIMITE, buscar = (...a) => fetch(...a) } = {}) {
   return async (metodo, rota, corpo) => {
     let r;
     try {
-      r = await fetch(`${base}${rota}`, {
-        method: metodo, cache: 'no-store', credentials: 'same-origin',
+      r = await buscar(`${base}${rota}`, {
+        method: metodo, cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(limite),
         headers: metodo === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Sistema': 'imoveis' },
         body: corpo === undefined ? undefined : JSON.stringify(corpo),
       });
-    } catch {
-      throw new ErroNuvem('Sem internet.', 0);
+    } catch (e) {
+      throw erroDeRede(e);
     }
     // o login do Access venceu: o Cloudflare devolve a página de login (outro endereço) em vez do JSON
     if (r.redirected || r.type === 'opaqueredirect' || !(r.headers.get('content-type') || '').includes('json')) {
@@ -408,7 +418,7 @@ export function apiDoSite(base = 'api/dados/') {
 /** A nuvem está ligada neste endereço? (no GitHub Pages, sem o Worker, /api/ não existe). */
 export async function nuvemDisponivel(base = 'api/') {
   try {
-    const r = await fetch(`${base}saude`, { cache: 'no-store', credentials: 'same-origin' });
+    const r = await fetch(`${base}saude`, { cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(10000) });
     return r.ok && (r.headers.get('content-type') || '').includes('json');
   } catch { return false; }
 }

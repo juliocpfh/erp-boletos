@@ -3,6 +3,8 @@
 // Sem internet: anexo novo fica guardado no aparelho e sobe quando a internet voltar; abrir, apagar e mover pedem internet.
 // A raiz tem as pastas "arquivos", "modelos" e "backups" (só leitura), como a pasta dos dados de hoje.
 
+import { erroDeRede, limiteDeTempo, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO } from './nuvem.js';
+
 const RAIZES = ['arquivos', 'modelos', 'backups'];
 const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por pouco tempo (o painel percorre muitas pastas;
 // a tela se redesenha a cada mudança de outro aparelho). O que este aparelho grava, apaga ou move já atualiza a lista na hora.
@@ -10,19 +12,19 @@ const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por p
 const naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, 'NotFoundError');
 const semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
 const codificar = (partes) => partes.map(encodeURIComponent).join('/');
-const passageiro = (e) => !e.status || e.status === 401 || e.status >= 500;
 
 /**
  * Cliente dos anexos: chama a API, guarda as listas por pouco tempo e a fila de envios feitos sem internet.
  * `guardar` (IndexedDB no navegador) guarda a fila (com os arquivos) e as últimas listas, para ver os nomes sem internet.
+ * Anexo da fila que a nuvem recusa (não é falta de internet) fica em `naoEnviados`, com o arquivo, para baixar pela tela de conflitos.
  */
 export class AnexosNuvem {
-  constructor({ base = 'api/', buscar = (...a) => fetch(...a), guardar }) {
-    this.base = base; this.buscar = buscar; this.guardar = guardar;
+  constructor({ base = 'api/', buscar = (...a) => fetch(...a), guardar, limite = TEMPO_LIMITE, limiteAnexo = TEMPO_LIMITE_ANEXO }) {
+    this.base = base; this.buscar = buscar; this.guardar = guardar; this.limite = limite; this.limiteAnexo = limiteAnexo;
     this.listas = new Map(); // caminho → { em, pastas: Set, arquivos: Map(nome → tamanho) }
     this.buscando = new Map(); // caminho → pedido em andamento (várias caixas da tela pedindo a mesma pasta: um pedido só)
     this.criadas = new Set(); // pastas criadas vazias (o R2 não tem pasta sem arquivo)
-    this.fila = null; this.avisos = []; this.enviando = null;
+    this.fila = null; this.naoEnviados = []; this.avisos = []; this.enviando = null;
   }
 
   async pedir(metodo, rota, { corpo, cabecalhos = {} } = {}) {
@@ -30,10 +32,11 @@ export class AnexosNuvem {
     try {
       r = await this.buscar(`${this.base}${rota}`, {
         method: metodo, cache: 'no-store', credentials: 'same-origin', body: corpo,
+        signal: limiteDeTempo(metodo === 'PUT' ? this.limiteAnexo : this.limite),
         headers: metodo === 'GET' ? cabecalhos : { 'X-Sistema': 'imoveis', ...cabecalhos },
       });
-    } catch {
-      throw Object.assign(new Error('Sem internet.'), { status: 0 });
+    } catch (e) {
+      throw erroDeRede(e);
     }
     if (r.redirected) throw Object.assign(new Error('Seu acesso pela internet venceu. Recarregue a página para entrar de novo.'), { status: 401, esperado: true });
     if (!r.ok) {
@@ -44,11 +47,32 @@ export class AnexosNuvem {
   }
 
   async carregarFila() {
-    if (!this.fila) this.fila = (await this.guardar?.ler('fila-anexos')) || [];
+    if (!this.fila) {
+      this.fila = (await this.guardar?.ler('fila-anexos')) || [];
+      this.naoEnviados = (await this.guardar?.ler('anexos-nao-enviados')) || [];
+    }
     return this.fila;
   }
 
   async gravarFila() { await this.guardar?.gravar('fila-anexos', this.fila); }
+
+  /** Anexo que a nuvem recusou: sai da fila mas o arquivo fica no aparelho até o usuário baixar ou esquecer. */
+  async guardarNaoEnviado(f, erro) {
+    this.naoEnviados.push({ ...f, erro });
+    await this.guardar?.gravar('anexos-nao-enviados', this.naoEnviados);
+  }
+
+  async lerNaoEnviado(id) {
+    const f = this.naoEnviados.find((x) => x.id === id);
+    if (!f) return null;
+    return { nome: f.partes.at(-1), blob: (await this.guardar?.ler(`anexo:${id}`)) || new Blob([]) };
+  }
+
+  async esquecerNaoEnviado(id) {
+    this.naoEnviados = this.naoEnviados.filter((x) => x.id !== id);
+    await this.guardar?.apagar?.(`anexo:${id}`);
+    await this.guardar?.gravar('anexos-nao-enviados', this.naoEnviados);
+  }
 
   /** Lista de uma pasta: { pastas: Set, arquivos: Map(nome → tamanho) }, juntando o que está na fila deste aparelho. */
   async lista(partes, { fresca = false } = {}) {
@@ -176,6 +200,7 @@ export class AnexosNuvem {
       const fila = await this.carregarFila();
       for (const f of [...fila]) {
         const blob = await this.guardar.ler(`anexo:${f.id}`);
+        let recusado = false;
         try {
           if (blob) await this.pedir('PUT', codificar(f.partes), { corpo: blob, cabecalhos: { 'If-None-Match': '*' } });
         } catch (e) {
@@ -185,9 +210,14 @@ export class AnexosNuvem {
             const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
             await this.pedir('PUT', codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
             this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
-          } else this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado: ${e.message}`);
+          } else {
+            // recusado de vez (sem permissão, nome barrado…): o arquivo não se perde, fica para baixar em Conflitos
+            recusado = true;
+            await this.guardarNaoEnviado(f, e.message);
+            this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado (${e.message}). Ele ficou guardado neste aparelho: veja em Conflitos da nuvem.`);
+          }
         }
-        await this.guardar.apagar?.(`anexo:${f.id}`);
+        if (!recusado) await this.guardar.apagar?.(`anexo:${f.id}`);
         this.fila = this.fila.filter((x) => x.id !== f.id);
         await this.gravarFila();
         this.esquecerLista(f.partes.slice(0, -1));

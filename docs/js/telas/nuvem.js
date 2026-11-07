@@ -1,5 +1,5 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
-import { aviso, E, janela, mostrar, podeUsuario } from '../app.js';
+import { aviso, baixar, E, janela, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import { levarParaNuvem } from '../migracao.js';
 import { esc } from '../formularios.js';
@@ -24,6 +24,7 @@ export function telaConflitos() {
   if (!E.nuvem) return '<h1>Conflitos</h1><p class="suave">Só existem com os dados na nuvem.</p>';
   const conflitos = E.nuvem.conflitos;
   const recusas = E.nuvem.recusas;
+  const naoEnviados = E.anexos?.naoEnviados || [];
   const pode = podeUsuario('operador');
   const linhas = conflitos.map((c) => {
     if (c.tipo === 'campo') {
@@ -46,7 +47,11 @@ export function telaConflitos() {
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas mudanças feitas neste aparelho não foram aceitas e não valem. Refaça se ainda precisar.</p>
       <ul>${recusas.map((r) => `<li>${esc(quando(r.em))}: ${esc(r.erro)} (${r.mudancas} mudança(s))</li>`).join('')}</ul>
-      ${botao('esquecerRecusas', 'Já vi, limpar a lista', {}, 'secundario')}</div>` : ''}`;
+      ${botao('esquecerRecusas', 'Já vi, limpar a lista', {}, 'secundario')}</div>` : ''}
+    ${naoEnviados.length ? `<div class="caixa"><h2>Anexos que a nuvem não aceitou</h2>
+      <p class="suave">Foram anexados sem internet e, ao enviar, a nuvem recusou. O arquivo continua neste aparelho: baixe e anexe de novo (ou esqueça).</p>
+      <ul>${naoEnviados.map((f) => `<li>${esc(quando(f.em))}: <b>${esc(f.partes.join(' / '))}</b> · ${esc(f.erro)}
+        ${botao('baixarNaoEnviado', 'Baixar', { id: f.id }, 'secundario pequeno')} ${botao('esquecerNaoEnviado', 'Esquecer', { id: f.id }, 'secundario pequeno')}</li>`).join('')}</ul></div>` : ''}`;
 }
 
 const mb = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
@@ -93,6 +98,16 @@ export const ACOES_NUVEM = {
   },
   async esquecerRecusas() {
     await E.nuvem.esquecerRecusas();
+    await mostrar();
+  },
+  async baixarNaoEnviado(ds) {
+    const f = await E.anexos.lerNaoEnviado(ds.id);
+    if (!f) return aviso('Este anexo não está mais neste aparelho.', 'erro');
+    baixar(f.blob, f.nome);
+  },
+  async esquecerNaoEnviado(ds) {
+    if (!(await janela({ titulo: 'Esquecer este anexo?', html: '<p>O arquivo some deste aparelho e não está na nuvem.</p>', sim: 'Esquecer', forte: true }))) return;
+    await E.anexos.esquecerNaoEnviado(ds.id);
     await mostrar();
   },
 };

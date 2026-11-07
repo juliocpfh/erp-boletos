@@ -241,6 +241,27 @@ test('a mesma pessoa entra em dois aparelhos: as sessões se juntam, sem conflit
   }
 });
 
+test('falhas passageiras (sem internet, tempo esgotado, 401, 408, 429, 5xx) ficam na fila; 403/404/412 são recusas', async () => {
+  for (const s of [0, 401, 408, 429, 500, 503]) assert.equal(N.passageiro(new N.ErroNuvem('x', s)), true, String(s));
+  for (const s of [400, 403, 404, 409, 412]) assert.equal(N.passageiro(new N.ErroNuvem('x', s)), false, String(s));
+  // pedido que nunca responde: o tempo limite cancela e vira erro passageiro (status 0)
+  const pendurado = (url, op) => new Promise((_, erro) => { op.signal.addEventListener('abort', () => erro(op.signal.reason)); });
+  const api = N.apiDoSite('api/dados/', { limite: 30, buscar: pendurado });
+  await assert.rejects(api('GET', 'tudo'), (e) => e.status === 0 && /demorou/.test(e.message));
+  // 429 (muitos pedidos): o lote continua na fila e a tela segue mostrando a mudança
+  const { a } = await cenario();
+  const apiReal = a.sinc.api;
+  a.sinc.api = async (m, rota, corpo) => { if (m === 'POST') throw new N.ErroNuvem('Muitos pedidos.', 429); return apiReal(m, rota, corpo); };
+  await a.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Com 429' }, DONO));
+  await a.sinc.sincronizar();
+  assert.equal(a.sinc.pendentesQtd() > 0, true);
+  assert.equal(a.sinc.recusas.length, 0);
+  assert.equal(imovel(a.sinc).nome, 'Com 429');
+  a.sinc.api = apiReal;
+  await a.sinc.sincronizar();
+  assert.equal(a.sinc.pendentesQtd(), 0);
+});
+
 test('aparelho novo sem internet e sem cópia: avisa que precisa conectar', async () => {
   const { cofre } = await cenario();
   const c = aparelho(cofre, DONO);
