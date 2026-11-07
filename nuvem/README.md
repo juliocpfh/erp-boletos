@@ -1,4 +1,4 @@
-# Dados na nuvem (Cloudflare) — etapas 1 e 2 de 5
+# Dados na nuvem (Cloudflare) — no ar desde 2026-11-06
 
 Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDrive. Estudo, decisões e etapas: `documentacao/ESTUDO_DADOS_NUVEM.md` (e `DECISOES.md`, 2026-11-06).
 
@@ -6,7 +6,7 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - `cofre.mjs`: o cofre dos dados (Durable Object com SQLite). Recebe as filas de mudanças de cada aparelho, uma por vez, e guarda cada registro numa linha.
 - Testes: `tests/nuvem.test.mjs` e `tests/cofre.test.mjs` (o `checar.mjs` roda os dois).
 
-**Situação:** pronto e testado, mas **ainda não publicado**, e o site ainda não usa (etapa 3). Os dados de verdade continuam na pasta.
+**Situação:** publicado em 2026-11-06 (etapa 5) e os dados levados da pasta (conferência ok). O site `erp.ankjck.com.br` abre sempre pela nuvem (vê que `/api/saude` responde); a pasta do OneDrive ficou de reserva.
 
 ## Como funciona
 - O aparelho baixa tudo uma vez (`GET dados/tudo`, no mesmo formato do `imoveis-dados.json`, com `_nuvem.seq` = ponto da fila). Depois pega só o que mudou (`GET dados/mudancas?desde=N`).
@@ -30,11 +30,19 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - As senhas do sistema (hash PBKDF2, 600 mil voltas) vão para cada aparelho, como hoje na pasta, porque o login do sistema é conferido no aparelho. Quem passa pelo Access pode tentar quebrá-las: senhas longas. O Access e os papéis no servidor valem mesmo assim.
 - A cópia no aparelho é cifrada (`docs/js/cofrinho.js`): sem a senha do sistema (ou o login lembrado), não se lê nada dos inquilinos; fica aberta só a lista de usuários (senhas embaralhadas), para o login funcionar sem internet. Sair apaga a chave do aparelho.
 
-## Publicar (etapa 5, junto com o login; não fazer antes)
-1. Cloudflare → **R2** → ativar (pede cartão; o grátis cobre 10 GB) → **Create bucket** `imoveis-dados`. **Não** ligar o acesso público (r2.dev) nem domínio público no bucket. Em **Billing**, criar alerta de gasto.
-2. **Zero Trust** → criar a equipe (ex.: `ankjck`) → **Access → Applications → Add → Self-hosted**: domínio `erp.ankjck.com.br` (o site inteiro), política *Allow* só com os 4 e-mails, login por **código no e-mail**, sessão de **24 horas**. Copiar o **AUD** do aplicativo.
-3. DNS: o `erp` com a **nuvem laranja** (SSL/TLS em **Full (strict)**; ver `PUBLICAR_NO_DOMINIO.md`, etapa 4). Em **Rules → Transform Rules → Response headers**, para `erp.ankjck.com.br`: `Strict-Transport-Security: max-age=15552000`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`.
-4. Na pasta `nuvem/`: `npx wrangler login`, `npx wrangler deploy` e, no fim, `npx wrangler logout` (para não deixar o acesso aberto no computador).
-5. `npx wrangler secret put ACCESS_EQUIPE` (ex.: `ankjck.cloudflareaccess.com`) e `ACCESS_AUD` (`EMAILS` é opcional: se usar, lembre de mantê-la igual à lista do Access). **Nunca** criar `MODO_TESTE` no Cloudflare.
-6. Conta Cloudflare: **verificação em 2 etapas** ligada, sem outros membros, sem chaves de API sobrando.
-7. Conferir: `https://erp.ankjck.com.br/api/saude` pede o código no e-mail e depois mostra `{"ok":true,"email":…}`; numa janela anônima, sem login, `/api/dados/tudo` não abre.
+## Como está publicado (2026-11-06)
+- Conta Cloudflare do e-mail jckadmb@gmail.com, com verificação em 2 etapas (aplicativo) e alerta de gasto.
+- **Worker `erp-boletos`** (nome igual no `wrangler.toml`): Workers Builds ligado ao repositório, raiz `/nuvem`, `npx wrangler deploy` a cada merge na `main` (não precisa `wrangler login`). Rota `erp.ankjck.com.br/api/*`.
+- **Variáveis do Worker** (Settings → Variables and secrets, o quadro de cima, não o de Build): `ACCESS_EQUIPE` = `fragrant-haze-f916.cloudflareaccess.com` e `ACCESS_AUD` (do aplicativo "Sistema de Imoveis"), as duas do tipo **Secret** (tipo Text é apagado no próximo deploy). Nunca `MODO_TESTE`.
+- **R2** `imoveis-dados`, sem endereço público.
+- **Zero Trust** (equipe "Familia", plano Free) → Access → Applications: "Sistema de Imoveis" (`erp.ankjck.com.br` inteiro, política "Familia" com os 4 e-mails, só **One-time PIN**, entrada direta, sessão 24 h) e "Cadeado GitHub" (**Bypass** para todos só em `erp.ankjck.com.br/.well-known/acme-challenge`, para o GitHub Pages renovar o certificado; sem ele o cadeado vence em ~3 meses). O provedor "Cloudflare" que vem pronto pede conta do Cloudflare: não usar.
+- DNS: `erp` CNAME `juliocpfh.github.io` com nuvem laranja; SSL/TLS **Full (strict)**.
+- Usuários: o login de cada um é o próprio e-mail, igual ao "E-mail de acesso" e à lista do Access.
+- Conferir: sem login, `curl -I https://erp.ankjck.com.br/api/saude` dá 302 para `…cloudflareaccess.com`; com login, `{"ok":true,"email":…,"teste":false}`.
+
+## Próximos passos
+1. Arquivo do aplicativo instalável com o login: `<link rel="manifest" … crossorigin="use-credentials">` em `docs/index.html` (sem isso o Access barra o manifest). Entra na PR do "salvar" de 2026-11-06.
+2. Cabeçalhos (Rules → Transform Rules → Response headers, `erp.ankjck.com.br`): `Strict-Transport-Security: max-age=15552000`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+3. Testar no celular: instalar o aplicativo, usar sem internet, conflito entre dois aparelhos.
+4. Passagem/"Substituir…" mais rápida: 4 anexos de cada vez (`docs/js/migracao.js`; a de 2026-11-06 levou muito tempo com 283 anexos, 256 MB).
+5. Depois de uns dias sem problema: aposentar a pasta do OneDrive como reserva (decisão do usuário).

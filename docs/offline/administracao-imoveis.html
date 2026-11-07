@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-6ub/ysRMAV+Sapy+7aWPhmdl0RqKYZ+NJeOMpboYAV4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-FtUXXe29mNQGf9ulD4whQYbTI2F2SbGbLH4Wjtc0Tw0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="5a659f1ece04de7a">
+<meta name="fontes" content="4a1c4835d0e053c9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5806,7 +5806,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} ${data2 ? `perdido (registrado em ${dataBr(data2)}${administrador ? "" : ", aguardando o administrador"})` : "não está mais como perdido"}`
     );
     marcarAditivos(d2, c.id, usuario);
-    if (data2 && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
+    if (data2 && administrador && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
     return a;
   }
   function analisarAditivoPerdido(d2, id, aceitar, usuario) {
@@ -5815,6 +5815,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!aceitar) return marcarAditivoPerdido(d2, id, null, usuario);
     const c = buscar(d2, "contratos", a.contrato_id);
     atualizar(d2, "aditivos", a.id, { perdido_pendente: null }, usuario, `${c.inquilino_nome}: perda do termo aditivo de ${dataBr(a.data)} confirmada pelo administrador`);
+    if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
     return a;
   }
   function marcarAditivos(d2, contratoId, usuario) {
@@ -14108,7 +14109,7 @@ Salvar assim mesmo?`)) {
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
       <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
-        ${a.tipo === "Troca de titular" ? "" : botao("aditivoPerdido", "Perdido", { id: a.id }, "perigo pequeno", `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : " O administrador vai analisar."}`)}` : ""}
+        ${a.tipo === "Troca de titular" ? "" : botao("aditivoPerdido", "Perdido", { id: a.id }, "perigo pequeno", `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? " (a troca do dia só vale depois da confirmação)" : ""}.`}`)}` : ""}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
@@ -17999,7 +18000,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
     async aditivoPerdido({ id }) {
       const a = buscar2("aditivos", id);
       await alterar((db) => marcarAditivoPerdido(db, Number(id), hojeIso(), login(), podeUsuario("admin")));
-      aviso(`Termo aditivo registrado como perdido${a.dia_novo ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`);
+      const adm = podeUsuario("admin");
+      aviso(`Termo aditivo registrado como perdido${a.dia_novo && adm ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? `; a troca para o dia ${a.dia_novo} só vale depois da confirmação` : ""}.`}`);
       await mostrar();
     },
     async desmarcarAditivoPerdido({ id }) {

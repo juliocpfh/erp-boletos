@@ -677,7 +677,8 @@ export const ACOES = {
   async aditivoPerdido({ id }) {
     const a = buscar('aditivos', id);
     await alterar((db) => R.marcarAditivoPerdido(db, Number(id), C.hojeIso(), login(), podeUsuario('admin')));
-    aviso(`Termo aditivo registrado como perdido${a.dia_novo ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${C.dataBr(a.primeiro_vencimento)}` : ''}.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`);
+    const adm = podeUsuario('admin');
+    aviso(`Termo aditivo registrado como perdido${a.dia_novo && adm ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${C.dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? `; a troca para o dia ${a.dia_novo} só vale depois da confirmação` : ''}.`}`);
     await mostrar();
   },
 

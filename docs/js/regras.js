@@ -3140,7 +3140,8 @@ export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdid
 /**
  * Termo aditivo gerado que não voltou assinado (o papel se perdeu): vale como assinado (conta como "Possui termo aditivo" e
  * a troca do dia passa a valer), sem arquivo. Sem data: desfaz (volta a "aguardando assinatura"; o dia do vencimento já
- * mudado não volta sozinho). O termo da troca de titular não pode ser dado como perdido. Quem não é administrador aguarda a análise.
+ * mudado não volta sozinho). O termo da troca de titular não pode ser dado como perdido. Quem não é administrador aguarda a análise
+ * (a troca do dia só vale quando o administrador confirmar).
  * Ex.: troca do dia 10 → 15 a partir de 15/12/2026, gerada em 10/09/2026 e perdida → boletos em aberto desde 12/2026 no dia 15.
  */
 export function marcarAditivoPerdido(d, id, data, usuario, administrador = true) {
@@ -3154,7 +3155,7 @@ export function marcarAditivoPerdido(d, id, data, usuario, administrador = true)
   atualizar(d, 'aditivos', a.id, { perdido_em: data || null, perdido_pendente: data && !administrador ? usuario : null }, usuario,
     `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} ${data ? `perdido (registrado em ${C.dataBr(data)}${administrador ? '' : ', aguardando o administrador'})` : 'não está mais como perdido'}`);
   marcarAditivos(d, c.id, usuario);
-  if (data && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario);
+  if (data && administrador && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario);
   return a;
 }
 
@@ -3165,6 +3166,7 @@ export function analisarAditivoPerdido(d, id, aceitar, usuario) {
   if (!aceitar) return marcarAditivoPerdido(d, id, null, usuario);
   const c = buscar(d, 'contratos', a.contrato_id);
   atualizar(d, 'aditivos', a.id, { perdido_pendente: null }, usuario, `${c.inquilino_nome}: perda do termo aditivo de ${C.dataBr(a.data)} confirmada pelo administrador`);
+  if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario); // a troca do dia só vale agora
   return a;
 }
 

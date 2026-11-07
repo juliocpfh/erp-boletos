@@ -9,7 +9,7 @@
 - Mostra alertas, calendário, fechamento do mês e a página **Financeiro**: visão geral do mês (extratos, movimentações sem destino, NF do Airbnb, impostos), resultado bruto e líquido por imóvel (custos e ganhos do Airbnb lançados ali), guia de impostos esperada por empresa e inadimplência.
 - O administrador muda a ordem das caixas de cada página (ícone ☰, todos veem); Dados e backup baixa todos os dados em planilha e PDF e as regras do sistema em TXT.
 - Banco (C6, por meio da ponte `ponte-c6/` que roda no computador do usuário; aguardando as chaves do banco, já funciona em modo simulado): emite boletos com QR Code Pix pela API (valor cheio com desconto da bonificação até o vencimento), consulta e propõe registrar o pagamento; tela Banco (`#/banco`) com o extrato das duas contas (ANK e JCK), destino de cada movimentação (conta do imóvel, boleto, IPTU…), comprovante em PDF nomeado e guardado na pasta do imóvel e na do contador, e pagamentos de contas preparados pelo operador, aprovados pelo administrador e confirmados de novo no app do C6. Nada é registrado sem confirmação.
-- Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive), sem servidor (a ponte do C6 é um programinha local, opcional). **Em construção (não publicado):** dados na nuvem do Cloudflare (`nuvem/`, `documentacao/ESTUDO_DADOS_NUVEM.md`): celular e PC, como aplicativo instalável, funcionando sem internet (fila de envio), conflitos escolhidos em `#/conflitos`, cópia do aparelho cifrada com a senha; o site usa a nuvem só onde `/api/` responde.
+- Os dados ficam num arquivo JSON numa pasta do computador do usuário (ex.: OneDrive), sem servidor (a ponte do C6 é um programinha local, opcional). **No ar desde 2026-11-06:** dados na nuvem do Cloudflare (`nuvem/`, `documentacao/ESTUDO_DADOS_NUVEM.md`): celular e PC, como aplicativo instalável, funcionando sem internet (fila de envio), conflitos escolhidos em `#/conflitos`, cópia do aparelho cifrada com a senha; o site usa a nuvem onde `/api/` responde (em `erp.ankjck.com.br`, atrás do login por código no e-mail); a pasta do OneDrive ficou de reserva.
 
 ## Módulos (`docs/js/`)
 | Arquivo | Função |
@@ -31,7 +31,7 @@
 | `exportar.js` | Todos os dados numa planilha Excel e num PDF (sem senhas e anexos) |
 | `regras-texto.js` | `REGRAS_TEXTO`: as regras de negócio em texto objetivo, baixado em Dados e backup (TXT) |
 | `auth.js` | Senhas PBKDF2-SHA256 (600 mil iterações, gravadas em `senha_iteracoes`; usuário antigo é reforçado no login: `camposDeSenha`, `reforcarSenha`; mínimo 10 caracteres, `senhaCurta`) e papéis (admin, operador, consulta) |
-| `nuvem.js`, `pasta-nuvem.js`, `cofrinho.js`, `migracao.js`, `telas/nuvem.js` | Dados na nuvem (em construção): `Sincronia` (cópia local, fila, antes/depois a cada `alterar`, faixas de códigos, NF só com internet), `AnexosNuvem` (pasta virtual: `E.pasta` no modo nuvem), `Cofrinho`/`guardarCifrado` (cópia cifrada; a chave abre com a senha), `levarParaNuvem` (passagem da pasta e conferência), tela de conflitos. Servidor: `nuvem/worker.mjs` (Worker: login do Access, anexos no R2) e `nuvem/cofre.mjs` (cofre: Durable Object com SQLite) |
+| `nuvem.js`, `pasta-nuvem.js`, `cofrinho.js`, `migracao.js`, `telas/nuvem.js` | Dados na nuvem: `Sincronia` (cópia local, fila, antes/depois a cada `alterar`, faixas de códigos, NF só com internet), `AnexosNuvem` (pasta virtual: `E.pasta` no modo nuvem), `Cofrinho`/`guardarCifrado` (cópia cifrada; a chave abre com a senha), `levarParaNuvem` (passagem da pasta e conferência), tela de conflitos. Servidor: `nuvem/worker.mjs` (Worker: login do Access, anexos no R2) e `nuvem/cofre.mjs` (cofre: Durable Object com SQLite) |
 | `backup-seguro.js` | Segunda pasta cifrada do administrador (RSA-OAEP + AES-GCM; senha mínima 12; cabeçalho autenticado nos arquivos novos, `protegido: 1`) |
 
 ## Stack
@@ -69,5 +69,5 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 
 | Em andamento |
 |---|
-| Dados na nuvem (Cloudflare): etapas 1 a 4 prontas e testadas (servidor, sistema, anexos, cópia cifrada, aplicativo instalável, passagem com ensaio na pasta real); falta publicar (etapa 5, `nuvem/README.md`) e conferir o aplicativo instalável no celular |
+| Dados na nuvem (Cloudflare): publicada em 2026-11-06 (etapa 5) e dados levados da pasta (conferência ok); falta conferir o aplicativo instalável no celular, cabeçalhos de segurança e envio de anexos 4 por vez (`nuvem/README.md`, "Próximos passos") |
 | Banco (C6): código pronto e testado em modo simulado; falta o C6 liberar as chaves (sandbox e depois produção) para homologar (`GUIA_DE_MODIFICACAO.md` → "Ligar o boleto com Pix do C6", `LIGAR_C6.md`). Pagamentos pelo banco nascem desligados (`permitir_pagamentos` no site e `PAGAMENTOS=1` na ponte). Fora do código: pendências do dono em `SEGURANCA.md` (cap. 7: ponte, GitHub, pasta de dados, rotina) e publicação no domínio (`PUBLICAR_NO_DOMINIO.md`) |

@@ -1305,6 +1305,23 @@ test('termo aditivo perdido: operador aguarda o administrador; termo antigo regi
   assert.equal(R.aditivosValidos(d, c.id).length, 2);
 });
 
+test('termo aditivo perdido pelo operador: a troca do dia só vale depois da confirmação do administrador', () => {
+  const { d, c } = base();
+  c.dia_vencimento = 10;
+  c.cobranca_mes_seguinte = true;
+  for (const m of ['2026-11', '2026-12']) R.gerarCobrancas(d, m, 'julio');
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-09-10', dia_novo: '15', mes: '2026-12', texto: 'texto' }, 'julio');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  assert.equal(c.dia_vencimento, 10, 'pendente: o dia não muda');
+  assert.equal(R.boletoDoMes(d, c.id, '2026-11').vencimento, '2026-12-10');
+  R.analisarAditivoPerdido(d, a.id, false, 'julio');
+  assert.equal(c.dia_vencimento, 10, 'recusado: nada mudou');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  R.analisarAditivoPerdido(d, a.id, true, 'julio');
+  assert.equal(c.dia_vencimento, 15, 'confirmado: o dia muda');
+  assert.equal(R.boletoDoMes(d, c.id, '2026-11').vencimento, '2026-12-15');
+});
+
 test('termo aditivo perdido: o da troca de titular não pode, e o perdido não vale como termo da troca', () => {
   const { d, c } = base();
   const h = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'Ana Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-12-01', ativo: true }, 'julio');
