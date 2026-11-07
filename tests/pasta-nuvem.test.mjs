@@ -150,6 +150,29 @@ test('raiz: só as pastas do sistema; backups não se apagam', async () => {
   await assert.rejects(S.salvarArquivo(bk, arquivo('x.json', '{}')), /backups/);
 });
 
+test('carregarTudo: as listas de todas as pastas vêm numa ida só; depois, abrir pasta por pasta não vai à nuvem', async () => {
+  const { raiz, cliente, estado } = montar();
+  const arquivos = await raiz.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+  for (const [partes, nome] of [[['Apto 604', 'Inquilinos', 'Maria Exemplo'], 'contrato.pdf'], [['Apto 604', 'Inquilinos', 'Maria Exemplo', 'Comprovantes'], 'rec.pdf'], [['Sala 2'], 'matricula.pdf']]) {
+    await S.salvarArquivo(await S.subpasta(arquivos, partes), arquivo(nome, 'x'));
+  }
+  cliente.listas.clear();
+  const buscarAntes = cliente.buscar; const idas = [];
+  cliente.buscar = (url, op) => { idas.push(String(url).replace(BASE, '')); return buscarAntes(url, op); };
+  assert.equal(await cliente.carregarTudo([S.PASTA_ARQUIVOS]), 3);
+  assert.deepEqual(idas, ['lista-tudo/arquivos/']);
+  const maria = await S.subpasta(arquivos, ['Apto 604', 'Inquilinos', 'Maria Exemplo'], false);
+  assert.deepEqual((await S.listar(maria)).map((a) => a.nome), ['contrato.pdf']);
+  assert.deepEqual(await S.subpastas(maria), ['Comprovantes']);
+  await maria.getFileHandle('contrato.pdf');
+  await assert.rejects(maria.getFileHandle('sumiu.pdf'), /não encontrado/);
+  assert.deepEqual((await S.listar(await S.subpasta(arquivos, ['Sala 2'], false))).map((a) => a.nome), ['matricula.pdf']);
+  assert.deepEqual(idas, ['lista-tudo/arquivos/'], 'nenhuma listagem pasta por pasta');
+  // sem internet: não derruba a conferência (as listas que já estavam continuam)
+  estado.internet = false;
+  assert.equal(await cliente.carregarTudo([S.PASTA_ARQUIVOS]), 0);
+});
+
 test('várias caixas pedindo a mesma pasta ao mesmo tempo: um pedido só à nuvem', async () => {
   const { raiz, cliente } = montar();
   const arquivos = await raiz.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });

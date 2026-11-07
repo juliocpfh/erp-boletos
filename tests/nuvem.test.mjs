@@ -100,6 +100,40 @@ test('lista: subpastas e arquivos de uma pasta, em ordem, com mais de 1000 itens
   assert.equal((await (await pedir(env, 'GET', '/api/lista/arquivos/Muitos/')).json()).arquivos.length, 1005);
 });
 
+test('lista-tudo: todos os arquivos de uma pasta com as subpastas numa resposta só, em partes quando é grande', async () => {
+  const env = { MODO_TESTE: '1', DADOS: r2Falso() };
+  for (const k of ['arquivos/Sala 2/a.pdf', 'arquivos/Sala 2/Inquilinos/Ana/c.pdf', 'arquivos/leia.pdf', 'modelos/x.xlsx']) await env.DADOS.put(k, 'x');
+  const tudo = await (await pedir(env, 'GET', '/api/lista-tudo/arquivos/')).json();
+  assert.deepEqual(tudo, { arquivos: [{ caminho: 'Sala 2/Inquilinos/Ana/c.pdf', tamanho: 1 }, { caminho: 'Sala 2/a.pdf', tamanho: 1 }, { caminho: 'leia.pdf', tamanho: 1 }], mais: false });
+  const sala = await (await pedir(env, 'GET', '/api/lista-tudo/arquivos/Sala%202/')).json();
+  assert.deepEqual(sala.arquivos.map((a) => a.caminho), ['Inquilinos/Ana/c.pdf', 'a.pdf']);
+  for (let i = 0; i < 5003; i += 1) await env.DADOS.put(`arquivos/Muitos/f${String(i).padStart(4, '0')}.pdf`, 'x');
+  const p1 = await (await pedir(env, 'GET', '/api/lista-tudo/arquivos/Muitos/')).json();
+  assert.equal(p1.arquivos.length, 5000); assert.equal(p1.mais, true); assert.ok(p1.cursor);
+  const p2 = await (await pedir(env, 'GET', `/api/lista-tudo/arquivos/Muitos/?cursor=${encodeURIComponent(p1.cursor)}`)).json();
+  assert.equal(p2.arquivos.length, 3); assert.equal(p2.mais, false);
+  assert.equal((await pedir(env, 'GET', '/api/lista-tudo/outra/')).status, 404);
+});
+
+test('papel conferido no cofre fica guardado 1 minuto (o Painel pede muitos anexos seguidos); o "não pode" não fica', async () => {
+  W.esquecerPapeis();
+  let consultas = 0; let papel = 'consulta';
+  const NIVEL = { consulta: 1, operador: 2, admin: 3 };
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { consultas += 1; return NIVEL[papel] < NIVEL[new URL(req.url).searchParams.get('nivel')] ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response(`{"papel":"${papel}"}`); } }) };
+  const env = { MODO_TESTE: '1', DADOS: r2Falso(), COFRE };
+  await env.DADOS.put('arquivos/a.pdf', 'x');
+  for (let i = 0; i < 5; i += 1) assert.equal((await pedir(env, 'GET', '/api/lista/arquivos/')).status, 200);
+  assert.equal(consultas, 1, 'cinco listagens, uma consulta ao cofre');
+  assert.equal((await pedir(env, 'PUT', '/api/arquivos/b.pdf', 'x')).status, 403);
+  assert.equal((await pedir(env, 'PUT', '/api/arquivos/b.pdf', 'x')).status, 403);
+  assert.equal(consultas, 3, 'o "não pode" é conferido toda vez');
+  papel = 'operador';
+  assert.equal((await pedir(env, 'PUT', '/api/arquivos/b.pdf', 'x')).status, 200, 'promovido: vale na hora');
+  assert.equal((await pedir(env, 'GET', '/api/lista/arquivos/')).status, 200);
+  assert.equal(consultas, 4, 'leitura ainda guardada');
+  W.esquecerPapeis();
+});
+
 test('mover: renomeia pasta, recusa destino ocupado, junta devolvendo o que sobrou e nunca para dentro dela mesma', async () => {
   const env = { MODO_TESTE: '1', DADOS: r2Falso() };
   for (const k of ['arquivos/Sala 1/Inquilinos/Ana/a.pdf', 'arquivos/Sala 1/Inquilinos/Ana/b.pdf', 'arquivos/Sala 1/Inquilinos/Bia/c.pdf']) await env.DADOS.put(k, k);
@@ -127,6 +161,21 @@ test('mover: renomeia pasta, recusa destino ocupado, junta devolvendo o que sobr
 // ---------------------------------------------------------------------------
 // Login do Access: token assinado com uma chave RSA criada no teste
 // ---------------------------------------------------------------------------
+test('chave de serviço (atualizador-pc): token do Access sem e-mail entra como o usuário ligado a ela em SERVICOS', async () => {
+  const env = { DADOS: r2Falso(), ACCESS_EQUIPE: EQUIPE, ACCESS_AUD: AUD, SERVICOS: ' abc123.access = dono@exemplo.com.br , outra=socia@exemplo.com.br' };
+  const agora = Math.floor(Date.now() / 1000);
+  const servico = { aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, common_name: 'abc123.access', type: 'app' };
+  const saude = async (jwt, e = env) => W.atender(new Request('https://erp.ankjck.com.br/api/saude', { headers: { 'Cf-Access-Jwt-Assertion': jwt } }), e, buscarCerts);
+  const ok = await saude(await token(servico));
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).email, 'dono@exemplo.com.br');
+  assert.equal((await saude(await token({ ...servico, common_name: 'desconhecida' }))).status, 403, 'chave que não está em SERVICOS');
+  assert.equal((await saude(await token(servico), { ...env, SERVICOS: '' })).status, 403, 'sem SERVICOS nenhuma chave entra');
+  assert.equal((await (await saude(await token({ ...servico, email: 'x@exemplo.com.br' }))).json()).email, 'x@exemplo.com.br', 'com e-mail no token, o e-mail manda');
+  assert.equal(W.emailDoServico({ SERVICOS: 'a=b@c' }, 'a'), 'b@c');
+  assert.equal(W.emailDoServico({}, 'a'), '');
+});
+
 const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 const par = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
 const jwkPublica = { ...(await crypto.subtle.exportKey('jwk', par.publicKey)), kid: 'chave1', alg: 'RS256' };

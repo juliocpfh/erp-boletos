@@ -1,0 +1,43 @@
+# Versão PC (docs/offline/administracao-imoveis.html): o programa inteiro num arquivo, gerado SOZINHO pelo GitHub a cada
+# mudança no código que entra na main. Ninguém precisa rodar gerar-offline nem enviar o arquivo nas PRs.
+# O sistema, aberto com internet, baixa a versão nova para a pasta do backup seguro (app.js → atualizarProgramaSeguro),
+# e o atualizador-pc/ faz o mesmo pelo Agendador do Windows.
+name: Versão PC
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/js/**'
+      - 'docs/css/**'
+      - 'docs/vendor/**'
+      - 'docs/modelos/**'
+      - 'tools/gerar-offline.mjs'
+      - 'tools/fontes-offline.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: versao-pc
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Gerar a versão PC
+        run: node tools/gerar-offline.mjs
+      - name: Enviar o arquivo gerado (só se mudou)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/offline/administracao-imoveis.html
+          if git diff --cached --quiet; then echo "Versão PC já estava em dia."; exit 0; fi
+          git commit -m "Versão PC gerada pelo GitHub" -m "Gerada por .github/workflows/versao-pc.yml a partir de ${GITHUB_SHA}."
+          git push

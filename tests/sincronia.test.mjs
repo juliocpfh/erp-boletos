@@ -301,6 +301,45 @@ test('velocidade: a conferência sem novidade não regrava a cópia local, e gra
   assert.equal(imovel(b.sinc).nome, 'Três');
 });
 
+test('desfazer pelo histórico com dois aparelhos: a posição aponta para a mesma entrada em todos (a nuvem guarda a ordem de chegada)', async () => {
+  const { a, b } = await cenario();
+  const mudar = async (ap, quem, dados) => { await ap.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, dados, quem)); await ap.sinc.sincronizar(); };
+  await mudar(a, DONO, { nome: 'Nome do Dono' });
+  await mudar(b, SOCIA, { cep: '80020-000' });
+  await a.sinc.sincronizar();
+  // o dono abre o Histórico (a lista guarda a posição) …
+  const pode = R.alteracoesDesfaziveis(a.sinc.atual());
+  const posNome = a.sinc.atual().historico.findIndex((h) => h.acao === 'Alteração' && h.detalhes?.nome?.para === 'Nome do Dono');
+  assert.ok(pode.has(`${posNome}:nome`));
+  // … enquanto isso a sócia grava mais uma vez (chega antes de o dono clicar em desfazer): a posição continua a mesma
+  await mudar(b, SOCIA, { bairro: 'Centro' });
+  await a.sinc.sincronizar();
+  assert.equal(a.sinc.atual().historico[posNome].detalhes.nome.para, 'Nome do Dono');
+  await a.sinc.alterar((d) => R.desfazerAlteracoes(d, [`${posNome}:nome`], DONO));
+  await a.sinc.sincronizar(); await b.sinc.sincronizar();
+  for (const s of [a.sinc, b.sinc]) {
+    assert.equal(imovel(s).nome, 'Apto 604');
+    assert.equal(imovel(s).bairro, 'Centro');
+    const h = s.atual().historico;
+    assert.equal(h.at(-1).desfaz, posNome, 'a marca "desfaz" aponta para a mesma entrada nos dois aparelhos');
+    assert.equal(h[posNome].detalhes.nome.para, 'Nome do Dono');
+    assert.ok(!R.alteracoesDesfaziveis(s.atual()).has(`${posNome}:nome`));
+  }
+  // o que ainda não foi enviado fica no fim da lista local e muda de posição quando chega coisa dos outros:
+  // por isso a tela (desfazerItens, telas/admin.js) só deixa desfazer entradas já na nuvem (posição < base.historico.length)
+  a.internet = false;
+  await a.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { complemento: 'Fundos' }, DONO));
+  const posPendente = a.sinc.atual().historico.length - 1;
+  assert.ok(posPendente >= a.sinc.base.historico.length, 'entrada pendente: a tela barra o desfazer');
+  a.internet = true;
+  await mudar(b, SOCIA, { cidade: 'Curitiba' });
+  await a.sinc.sincronizar();
+  // a da sócia chegou à nuvem antes: a entrada pendente do dono mudou de posição (por isso a tela barrava o desfazer dela)
+  assert.equal(a.sinc.atual().historico[posPendente].detalhes?.cidade?.para, 'Curitiba');
+  assert.equal(a.sinc.atual().historico[posPendente + 1].detalhes?.complemento?.para, 'Fundos');
+  assert.ok(R.alteracoesDesfaziveis(a.sinc.atual()).has(`${posPendente + 1}:complemento`), 'enviada, já pode ser desfeita pela posição nova');
+});
+
 test('aparelho novo sem internet e sem cópia: avisa que precisa conectar', async () => {
   const { cofre } = await cenario();
   const c = aparelho(cofre, DONO);

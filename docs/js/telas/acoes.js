@@ -13,7 +13,7 @@ import { dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
-import { desfazerItens } from './admin.js';
+import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
 import { htmlSaude } from './banco-c6.js';
@@ -443,6 +443,11 @@ export const ACOES = {
     await S.esquecerPastaSegura();
     E.seguro = null;
     aviso('Backup seguro desligado neste computador.');
+    await mostrar();
+  },
+
+  async dispensarAvisoSeguro() {
+    dispensarAvisoSeguro();
     await mostrar();
   },
 

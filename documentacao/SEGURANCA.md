@@ -30,7 +30,7 @@ Probabilidade e impacto numa escala simples (baixa / média / alta) para uma emp
 | Ponte exposta na internet (Arquitetura C) | Varredura automática da internet acha a porta em horas; força bruta ou falha no Node | Alta (se exposta) | Alto | **Não expor.** Access/Tailscale ou só localhost |
 | Backups (pasta `backups/`, backup seguro, pen drive) | Ransomware cifra também os backups da mesma pasta; pen drive perdido | Média | Alto | Backup seguro em **outra** conta/local; cópia cifrada (já é); teste de restauração trimestral |
 | Sessão do sistema no navegador (token em `localStorage`, 12 h) | PC deixado destravado; malware lê o `localStorage` | Média | Médio (o dano real é na pasta, não no token) | Bloqueio automático de tela; sessão mais curta para administrador (seção 5) |
-| Disponibilidade (Cloudflare/GitHub/internet fora do ar) | Queda do provedor (Cloudflare caiu em 18/11/2025 por ~3 h; incidente de Tunnel de ~6 h em 05/2026) | Média | Baixo | Versão sem internet (arquivo único) já existe; a ponte local continua funcionando |
+| Disponibilidade (Cloudflare/GitHub/internet fora do ar) | Queda do provedor (Cloudflare caiu em 18/11/2025 por ~3 h; incidente de Tunnel de ~6 h em 05/2026) | Média | Baixo | Versão PC (arquivo único na pasta do backup seguro, atualizada sozinha; `atualizador-pc/` traz os dados do dia) e "Restaurar backup seguro → abrir numa pasta"; a ponte local continua funcionando |
 
 ---
 
@@ -171,7 +171,7 @@ Do site, não: o Cloudflare entrega só as telas; inquilinos, valores e boletos 
 Aconteceu (18/11/2025, cerca de 3 horas, por um arquivo de configuração interno; e um incidente de Tunnel em maio/2026). O site não abre durante a queda; na B1 a ponte também fica inacessível de fora. Solução: a **versão sem internet** (arquivo único em Dados e backup) abre no Chrome e usa a mesma pasta; na Arquitetura A a ponte local continua funcionando. Nenhum dado se perde.
 
 **E se o GitHub cair, ou a conta for bloqueada?**
-Mesma resposta: a versão sem internet continua funcionando, e o código também está no computador de quem desenvolve. Guarde uma cópia do arquivo único a cada atualização.
+Mesma resposta: a versão PC continua funcionando (fica na pasta do backup seguro, `programa/`, e é atualizada sozinha pelo sistema e pelo `atualizador-pc/`), e o código também está no computador de quem desenvolve.
 
 **O OneDrive é seguro?**
 Para o que fazemos (sincronizar uma pasta entre 2 a 4 PCs), sim, **desde que** cada conta Microsoft tenha 2FA e os PCs estejam limpos. Os arquivos ficam cifrados nos servidores da Microsoft e em trânsito, mas a Microsoft (e quem tomar a conta) consegue lê-los: por isso o backup seguro cifrado é importante. O OneDrive também é a sua **melhor recuperação de ransomware** (histórico de versões e Restaurar OneDrive de 30 dias com Microsoft 365). O Cofre Pessoal **não** serve para a pasta de dados (tranca sozinho e não compartilha), mas serve para guardar as chaves do banco.
@@ -189,6 +189,11 @@ Com a Arquitetura A ou B e o checklist feito, o que sobra de risco é: uma pesso
 
 ## 5b. Dados na nuvem (Cloudflare, em construção)
 O que o código já faz e o checklist de publicação: `nuvem/README.md`, seções "Segurança" e "Publicar". Em resumo: login pelo Cloudflare Access (4 e-mails) conferido também no Worker; papéis conferidos no servidor; histórico com o e-mail real; entradas e anexos perigosos barrados; backups diários só de leitura. Pendências do dono, na hora de publicar: 2FA no Cloudflare, bucket R2 sem acesso público, Access com sessão de 24 h, cabeçalhos de segurança (HSTS, X-Frame-Options) e `wrangler logout` depois de publicar.
+
+### Cabeçalhos de resposta (rotina B10, 2026-11-07)
+- A CSP do `index.html` vai por `<meta>` (o GitHub Pages não deixa configurar cabeçalhos), e em `<meta>` o `frame-ancestors` **não vale**: o que impede embutir o site em outra página (clickjacking) é o `X-Frame-Options: DENY` da Transform Rule "Cabecalhos de seguranca do sistema" no Cloudflare (feita em 2026-11-07, junto com HSTS e `Referrer-Policy`, ver `nuvem/README.md`).
+- **Falta no Cloudflare (dono):** na mesma regra (Rules → Transform Rules → Modify Response Header → "Cabecalhos de seguranca do sistema" → Edit), acrescentar o cabeçalho `Content-Security-Policy` com o valor `frame-ancestors 'none'` (Set static). É o equivalente moderno do `X-Frame-Options`; os dois juntos cobrem navegadores antigos e novos. Só `erp.ankjck.com.br`, como os outros. Depois de salvar, conferir em uma aba anônima que o site continua abrindo e que `/api/saude` responde.
+- `connect-src` libera `http://localhost:*` e `http://127.0.0.1:*` (qualquer porta) de propósito: o endereço da ponte do C6 é digitado pelo usuário em Dados e backup → Banco C6 (`ponte_url`, padrão `http://localhost:8765`, `docs/js/banco.js`), e em desenvolvimento a nuvem local roda em 8787 e o site em 8000. Restringir à porta 8765 quebraria quem ligou a ponte em outra porta. O risco é pequeno: só vale para pedidos saindo do próprio sistema para o computador do usuário, e a ponte exige a senha combinada e confere a origem (CORS fixo). A mesma lista vale na versão PC (`tools/gerar-offline.mjs`), que precisa dela porque abre do disco.
 
 ## Fontes consultadas (novembro de 2026)
 

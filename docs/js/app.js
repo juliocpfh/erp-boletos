@@ -194,19 +194,31 @@ export async function conectarSeguro(pedir = false) {
   return !!chave;
 }
 
-/** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado, e uma cópia do programa sem internet. */
+/** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado. */
 export function backupCompletoSeguro() {
   return naFilaSegura(async () => {
     if (!E.seguro || !E.seguro.chave || !E.pasta || !E.d) return;
     const JSZip = await jsZip();
     const zip = await S.exportarZip(JSZip, E.pasta, E.d);
     await B.gravarCompleto(E.seguro.dir, E.seguro.chave, new Uint8Array(await zip.arrayBuffer()));
-    if (!window.VERSAO_OFFLINE) {
-      try {
-        const r = await fetch('offline/administracao-imoveis.html', { cache: 'no-store' });
-        if (r.ok) await B.gravarPrograma(E.seguro.dir, await r.text());
-      } catch { /* sem internet: fica a cópia anterior do programa */ }
-    }
+  });
+}
+
+/**
+ * Versão PC na pasta do backup seguro: o programa inteiro num arquivo (gerado pelo GitHub a cada mudança na main), para abrir
+ * o sistema se o site ou o Cloudflare caírem. A cada abertura com internet, confere a data de publicação e baixa só se mudou.
+ */
+export function atualizarProgramaSeguro() {
+  return naFilaSegura(async () => {
+    if (!E.seguro || !E.seguro.chave || window.VERSAO_OFFLINE) return;
+    await B.gravarLeiaMe(E.seguro.dir);
+    try {
+      const cab = await fetch(B.CAMINHO_PROGRAMA, { method: 'HEAD', cache: 'no-cache' });
+      const publicada = cab.ok ? (cab.headers.get('last-modified') || '') : '';
+      if (!publicada || publicada === (await B.versaoDoPrograma(E.seguro.dir))) return;
+      const r = await fetch(B.CAMINHO_PROGRAMA, { cache: 'no-cache' });
+      if (r.ok) await B.gravarPrograma(E.seguro.dir, await r.text(), publicada);
+    } catch { /* sem internet: fica a cópia anterior do programa */ }
   });
 }
 
@@ -215,10 +227,11 @@ function espelharSeguro() {
   if (E.seguro && E.seguro.chave && E.d) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
 }
 
-/** Ao abrir a pasta (ou a nuvem): cópia do banco do dia e, se já passou uma semana, o backup completo. */
+/** Ao abrir a pasta (ou a nuvem): cópia do banco do dia, a versão PC se houver mais nova e, se já passou uma semana, o backup completo. */
 async function rotinaSegura() {
   if (!(await conectarSeguro(false)) || !E.d) return;
   espelharSeguro();
+  atualizarProgramaSeguro();
   if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
 }
 
@@ -659,13 +672,18 @@ const SEM_CARTOES = '.fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria,
  * Só as que têm a 1ª linha de títulos (th), de onde saem os rótulos de cada valor.
  */
 function cartoesNoCelular(raiz) {
+  // primeiro mede todas (leituras), só depois aplica as classes (escritas): mudar uma tabela e medir a seguinte
+  // obrigava o navegador a recalcular a página inteira a cada tabela
+  const largas = [];
   for (const t of raiz.querySelectorAll('main table')) {
     if (t.matches(SEM_CARTOES) || t.closest('.fatura-xls, .demonstrativo')) continue;
     const primeira = t.rows[0];
     if (!primeira || !primeira.cells.length) continue;
     const caixa = t.parentElement;
     const larga = t.scrollWidth > (caixa?.clientWidth || window.innerWidth) + 2 || t.getBoundingClientRect().right > window.innerWidth + 2;
-    if (!larga) continue;
+    if (larga) largas.push({ t, primeira });
+  }
+  for (const { t, primeira } of largas) {
     // com títulos: cartões com o nome da coluna; sem títulos (listas de tarefas): cada linha quebra para baixo
     if ([...primeira.cells].every((c) => c.tagName === 'TH')) t.classList.add('responsiva', 'cartoes-auto');
     else t.classList.add('linhas-celular');

@@ -10,6 +10,8 @@ export const MAX_REGISTRO = 1024 * 1024; // um registro (a logo tem ~270 KB)
 export const MAX_FAIXA = 1000;
 export const DIAS_LOG = 60; // aparelho parado há mais tempo baixa tudo de novo
 export const MANTER_BACKUPS = 30;
+export const MANTER_SUBSTITUICOES = 5; // cópias "antes-da-substituicao" guardadas
+const INTERVALO_FAXINA_MS = 3600000; // sem alarme (testes, nuvem local): a faxina roda no máximo 1× por hora, dentro de um POST
 /** Campos da raiz que só o servidor controla (o aparelho não manda; mudam a cada gravação e dariam conflito à toa). */
 export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualizado_por', 'seq', 'revisao_so_sessao', 'historico', '_nuvem'];
 /**
@@ -91,7 +93,9 @@ export class Cofre {
       CREATE TABLE IF NOT EXISTS conflitos (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL, tabela TEXT NOT NULL, reg_id TEXT NOT NULL, campo TEXT NOT NULL,
         atual TEXT, por_atual TEXT, proposto TEXT, por_proposto TEXT, em TEXT NOT NULL, resolvido_em TEXT, escolha TEXT, resolvido_por TEXT);
       CREATE TABLE IF NOT EXISTS excluidos (tabela TEXT NOT NULL, id INTEGER NOT NULL, dados TEXT NOT NULL, por TEXT, em TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS controle (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS controle (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS log_em ON log (em);
+      CREATE INDEX IF NOT EXISTS lotes_em ON lotes (em);`);
   }
 
   q(consulta, ...p) { return this.sql.exec(consulta, ...p).toArray(); }
@@ -480,35 +484,93 @@ export function hojeBrasilia(agora = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora);
 }
 
-/** Cópia completa no R2 uma vez por dia (horário de Brasília), guardando as 30 mais recentes. */
+/** Próximas HORA_MANUTENCAO h (Brasília) depois de `agora`: quando o alarme diário do cofre roda (backup do dia + faxina). */
+export const HORA_MANUTENCAO = 3;
+export function proximaManutencao(agora = new Date()) {
+  const hoje = new Date(`${hojeBrasilia(agora)}T${String(HORA_MANUTENCAO).padStart(2, '0')}:00:00-03:00`);
+  return hoje > agora ? hoje : new Date(hoje.getTime() + 86400000);
+}
+
+/** Apaga do R2 os backups mais antigos que casam com `padrao`, deixando os `manter` mais recentes (nomes com a data: ordem alfabética = cronológica). */
+async function faxinaDeBackups(r2, padrao, manter) {
+  const nomes = [];
+  let cursor;
+  do {
+    const r = await r2.list({ prefix: 'backups/imoveis-dados-', cursor });
+    nomes.push(...r.objects.map((o) => o.key).filter((k) => padrao.test(k)));
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  nomes.sort();
+  const velhos = nomes.slice(0, Math.max(0, nomes.length - manter));
+  if (velhos.length) await r2.delete(velhos);
+}
+
+/**
+ * Cópia completa no R2 uma vez por dia (horário de Brasília), guardando as MANTER_BACKUPS mais recentes.
+ * `forcarNome` ('antes-da-substituicao'): cópia extra, sempre feita; dessas ficam as MANTER_SUBSTITUICOES mais recentes.
+ */
 export async function backupDoDia(cofre, r2, agora = new Date(), forcarNome = '') {
   const dia = hojeBrasilia(agora);
   if (!forcarNome && cofre.controle('ultimo_backup') === dia) return false;
   if (cofre.vazio()) return false;
   const nome = `backups/imoveis-dados-${forcarNome ? `${dia}-${forcarNome}` : dia}.json`;
   await r2.put(nome, JSON.stringify(cofre.tudo()), { httpMetadata: { contentType: 'application/json' } });
-  if (forcarNome) return true;
+  if (forcarNome) {
+    await faxinaDeBackups(r2, new RegExp(`^backups/imoveis-dados-\\d{4}-\\d{2}-\\d{2}-${forcarNome}\\.json$`), MANTER_SUBSTITUICOES);
+    return true;
+  }
   cofre.controle('ultimo_backup', dia);
-  const nomes = [];
-  let cursor;
-  do {
-    const r = await r2.list({ prefix: 'backups/imoveis-dados-', cursor });
-    nomes.push(...r.objects.map((o) => o.key).filter((k) => /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/.test(k)));
-    cursor = r.truncated ? r.cursor : undefined;
-  } while (cursor);
-  nomes.sort();
-  const velhos = nomes.slice(0, Math.max(0, nomes.length - MANTER_BACKUPS));
-  if (velhos.length) await r2.delete(velhos);
+  await faxinaDeBackups(r2, /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/, MANTER_BACKUPS);
   return true;
 }
 
 const resposta = (status, dados) => new Response(JSON.stringify(dados), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 
-/** Só o Worker chama (binding COFRE); o e-mail vem dele, já conferido no login do Access. */
+/**
+ * Só o Worker chama (binding COFRE); o e-mail vem dele, já conferido no login do Access.
+ * Backup do dia e faxina da fila rodam no alarme diário (HORA_MANUTENCAO, Brasília), fora dos pedidos. Se o alarme não rodou
+ * (ou o ambiente não tem alarme), o primeiro POST do dia ainda faz o backup, e a faxina roda no máximo uma vez por hora.
+ */
 export class CofreDO {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env;
     this.cofre = new Cofre(ctx.storage.sql, (fn) => ctx.storage.transactionSync(fn));
+    this.alarmeMarcado = false;
+  }
+
+  temAlarme() { return typeof this.ctx?.storage?.setAlarm === 'function'; }
+
+  /** Garante o alarme diário (uma vez por instância do objeto; o alarme se remarca ao rodar). */
+  async marcarAlarme(agora = new Date()) {
+    if (this.alarmeMarcado || !this.temAlarme()) return;
+    this.alarmeMarcado = true;
+    try {
+      if (!(await this.ctx.storage.getAlarm?.())) await this.ctx.storage.setAlarm(proximaManutencao(agora));
+    } catch (e) { console.error(e); this.alarmeMarcado = false; }
+  }
+
+  /** Backup do dia (se ainda não há) e faxina. `so` = 'backup' | 'faxina' | 'tudo'. */
+  async manutencao(agora = new Date(), so = 'tudo') {
+    const c = this.cofre;
+    if (so !== 'faxina' && this.env.DADOS) await backupDoDia(c, this.env.DADOS, agora);
+    if (so !== 'backup') { c.limpar(); c.controle('ultima_faxina', agora.toISOString()); }
+  }
+
+  /** Alarme diário do Durable Object (Cloudflare chama). */
+  async alarm() {
+    const agora = new Date();
+    try { await this.manutencao(agora, 'tudo'); } catch (e) { console.error(e); }
+    if (this.temAlarme()) await this.ctx.storage.setAlarm(proximaManutencao(agora));
+  }
+
+  /** Depois de um POST: o que o alarme não cobriu. Barato: uma leitura em `controle` para cada decisão. */
+  async depoisDeGravar(agora = new Date()) {
+    await this.marcarAlarme(agora);
+    const c = this.cofre;
+    if (this.env.DADOS && c.controle('ultimo_backup') !== hojeBrasilia(agora)) await backupDoDia(c, this.env.DADOS, agora);
+    if (this.temAlarme()) return; // a faxina é do alarme
+    const ultima = Date.parse(c.controle('ultima_faxina') || '') || 0;
+    if (agora.getTime() - ultima >= INTERVALO_FAXINA_MS) await this.manutencao(agora, 'faxina');
   }
 
   async fetch(request) {
@@ -529,10 +591,15 @@ export class CofreDO {
       else if (rota === '/contador' && request.method === 'POST') r = c.contador(await corpo(), email);
       else if (rota === '/importar' && request.method === 'POST') {
         const pedido = await corpo();
-        if (!c.vazio()) await backupDoDia(c, this.env.DADOS, new Date(), 'antes-da-substituicao');
+        if (!c.vazio()) {
+          // só o administrador substitui, e a cópia de antes só é feita para quem pode (senão qualquer login encheria o R2)
+          if (pedido.substituir !== true) throw new ErroCofre(409, 'A nuvem já tem dados. Para trocar tudo, confirme a substituição.');
+          c.exigir(email, 'admin');
+          if (this.env.DADOS) await backupDoDia(c, this.env.DADOS, new Date(), 'antes-da-substituicao');
+        }
         r = c.importar(pedido.dados, email, { substituir: pedido.substituir === true });
       } else throw new ErroCofre(404, 'Não encontrado.');
-      if (request.method === 'POST' && this.env.DADOS) { await backupDoDia(c, this.env.DADOS); c.limpar(); }
+      if (request.method === 'POST') await this.depoisDeGravar();
       return resposta(200, r);
     } catch (e) {
       if (e instanceof ErroCofre) return resposta(e.status, { erro: e.message, ...e.extra });

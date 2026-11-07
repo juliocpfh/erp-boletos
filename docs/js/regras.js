@@ -77,8 +77,10 @@ export function normalizar(d) {
   d.config_banco.contas = (Array.isArray(d.config_banco.contas) ? d.config_banco.contas : []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
     notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } }));
   for (const cb of d.cobrancas) if (cb.banco === undefined) cb.banco = null;
+  // normalizar roda a cada gravação (e a cada 30 s na nuvem): os cruzamentos entre tabelas usam Set/Map, não laço dentro de laço
+  const contratoPorId = new Map(d.contratos.map((c) => [c.id, c]));
   // garantia marcada como passada a um contrato que foi excluído: volta a ser deste (senão não passa ao novo titular)
-  for (const c of d.contratos) if (c.garantia_transferida_para && !d.contratos.some((x) => x.id === c.garantia_transferida_para)) c.garantia_transferida_para = null;
+  for (const c of d.contratos) if (c.garantia_transferida_para && !contratoPorId.has(c.garantia_transferida_para)) c.garantia_transferida_para = null;
   // o alerta "Documentos de entrada" passou a fazer parte do "Rotina de entrada": a aparência escolhida vai junto
   if (d.estilos_alertas && d.estilos_alertas['Documentos de entrada']) {
     d.estilos_alertas['Rotina de entrada'] = d.estilos_alertas['Rotina de entrada'] || d.estilos_alertas['Documentos de entrada'];
@@ -128,11 +130,11 @@ export function normalizar(d) {
   // a apólice sem inquilino vai para quem estava no imóvel no início da vigência
   for (const s of d.seguros) {
     if (!s.imovel_id && s.contrato_id) {
-      const c = d.contratos.find((x) => x.id === s.contrato_id);
+      const c = contratoPorId.get(s.contrato_id);
       if (c) s.imovel_id = c.imovel_id;
     }
     if (!s.contrato_id) s.contrato_id = contratoDoSeguro(d, s);
-    const c = s.contrato_id && d.contratos.find((x) => x.id === s.contrato_id);
+    const c = s.contrato_id && contratoPorId.get(s.contrato_id);
     if (c) s.imovel_id = c.imovel_id; // acompanha o imóvel do contrato (ex.: "Corrigir imóvel")
   }
   // cláusulas do FCI (só saem com o FCI ativado) entram nos modelos de contrato já gravados, antes da renovação
@@ -159,16 +161,19 @@ export function normalizar(d) {
   for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
   // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
   // (o termo gerado e ainda não assinado, sem arquivo, não conta; o registrado como perdido conta, desde 2026-11-06)
-  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && (a.arquivo || a.perdido_em));
+  const comAditivo = new Set(d.aditivos.filter((a) => a.arquivo || a.perdido_em).map((a) => a.contrato_id));
+  for (const c of d.contratos) c.possui_aditivos = comAditivo.has(c.id);
   // quem já saiu (ou teve fim do vínculo) e já tem o boleto do último mês fica inativo
   for (const c of d.contratos) desativarSeSaiu(d, c);
   // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
   for (const c of d.contratos) for (const qual of ['caucao', 'deposito']) if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c)) && (d.depositos_garantia || []).length) completarPorDepositos(d, c, qual, null);
   // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
+  const renovados = new Set(d.renovacoes.map((x) => x.contrato_id));
   for (const c of d.contratos) {
+    if (!c.contrato_anterior_id) continue;
     const fim = fimDoPrazoHerdado(d, c);
     if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== 'Indeterminado' && c.vigencia_fim === C.fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses)
-      && !d.renovacoes.some((x) => x.contrato_id === c.id)) c.vigencia_fim = fim;
+      && !renovados.has(c.id)) c.vigencia_fim = fim;
   }
   // Banco (C6), fase 2: extrato, conciliação e pagamentos. Só acrescenta os campos novos da configuração (os da base ficam como estão).
   d.config_banco = d.config_banco || {};
@@ -181,8 +186,9 @@ export function normalizar(d) {
   }
   for (const p of d.pagamentos_banco) if (!p.referencia) p.referencia = `erp-${p.id}`;
   // despesa ou boleto ligado a uma movimentação que sumiu (ex.: importação refeita) perde o vínculo
-  for (const x of d.despesas) if (x.movimentacao_id && !d.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
-  for (const x of d.cobrancas) if (x.movimentacao_id && !d.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
+  const movimentacoes = new Set(d.movimentacoes_banco.map((m) => m.id));
+  for (const x of d.despesas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
+  for (const x of d.cobrancas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
   return d;
 }
 

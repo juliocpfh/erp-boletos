@@ -1,7 +1,7 @@
 // Worker do Cloudflare: guarda o banco (imoveis-dados.json) e os anexos no R2, no lugar da pasta do OneDrive.
 // Só entra quem passou pelo Cloudflare Access (lista de e-mails no painel) e tem usuário ativo com esse e-mail no sistema (o cofre confere). Não fala com o C6 (a ponte continua no computador).
 // Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
-// · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · mover.
+// · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
@@ -10,6 +10,8 @@ const SO_LEITURA = ['backups']; // backups só o cofre grava
 const MAX_DADOS = 30 * 1024 * 1024; // carga inicial do banco inteiro
 const MAX_ARQUIVO = 50 * 1024 * 1024;
 const POR_PEDIDO = 200; // arquivos movidos por pedido (limite de chamadas do plano grátis)
+const LISTA_TUDO_POR_PEDIDO = 5000; // arquivos por resposta de lista-tudo (5 chamadas ao R2 por pedido)
+const VALIDADE_PAPEL = 60 * 1000; // ms: o papel conferido no cofre vale por 1 min (o Painel faz muitos pedidos de anexos seguidos)
 const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i; // igual a nomeAnexavel (docs/js/armazenamento.js)
 const TIPOS_ABRIR = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
 
@@ -82,10 +84,21 @@ export async function conferirLogin(request, env, buscar = fetch) {
   const agora = Math.floor(Date.now() / 1000);
   const auds = Array.isArray(dados.aud) ? dados.aud : [dados.aud];
   if (!ok || !auds.includes(aud) || dados.iss !== `https://${equipe}` || !(dados.exp > agora) || (dados.nbf && dados.nbf > agora + 60)) throw new ErroHttp(401, 'Login inválido ou vencido.');
-  const email = String(dados.email || '').toLowerCase();
+  // Chave de serviço (atualizador-pc/): o Access assina um token sem e-mail, com o Client ID em `common_name`;
+  // SERVICOS (segredo do Worker: "<client id>=<e-mail>,…") diz com qual usuário do sistema ela entra (os papéis valem iguais)
+  const email = String(dados.email || (!dados.email && dados.common_name ? emailDoServico(env, dados.common_name) : '')).toLowerCase();
   // EMAILS é opcional (trava extra): quem manda é a lista do Access e o cadastro de usuários do sistema
   if (!email || (emails.length && !emails.includes(email))) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   return email;
+}
+
+/** E-mail ligado a uma chave de serviço do Access (variável SERVICOS), ou '' se a chave não está cadastrada. */
+export function emailDoServico(env, clientId) {
+  for (const par of String(env.SERVICOS || '').split(',')) {
+    const [id, email] = par.split('=').map((x) => (x || '').trim());
+    if (id && email && id === String(clientId).trim()) return email;
+  }
+  return '';
 }
 
 /** Pedido que grava precisa do cabeçalho X-Sistema (força a checagem do navegador contra outros sites) e da mesma origem. */
@@ -183,6 +196,22 @@ async function listarPasta(env, chave) {
 }
 
 /**
+ * Tudo que há dentro de uma pasta, com as subpastas (caminho relativo e tamanho), numa resposta só: o Painel confere os
+ * arquivos de todos os lançamentos sem pedir pasta por pasta. Pasta grande vai em partes: `mais: true` e `cursor` para continuar.
+ */
+async function listarPastaInteira(env, chave, cursorInicial) {
+  const prefixo = `${chave}/`;
+  const arquivos = [];
+  let cursor = cursorInicial || undefined; let truncado = false;
+  do {
+    const r = await env.DADOS.list({ prefix: prefixo, cursor, limit: 1000 });
+    for (const o of r.objects) arquivos.push({ caminho: o.key.slice(prefixo.length), tamanho: o.size });
+    truncado = !!r.truncated; cursor = truncado ? r.cursor : undefined;
+  } while (cursor && arquivos.length < LISTA_TUDO_POR_PEDIDO);
+  return json(200, { arquivos, mais: truncado, cursor: truncado ? cursor : undefined });
+}
+
+/**
  * Move uma pasta (ou um arquivo) para outro lugar: { de, para, juntar }.
  * Sem "juntar", recusa se o destino já tiver algo; com "juntar", move o que não existe no destino e devolve o que sobrou.
  * O R2 não tem "mover": copia e apaga, um arquivo por vez (se cair no meio, repetir termina o serviço).
@@ -216,12 +245,21 @@ async function mover(request, env) {
   return json(200, { ok: true, movidos, sobraram, mais: itens.length > POR_PEDIDO });
 }
 
-/** Anexos seguem o papel do usuário no sistema (o cofre sabe): ler = qualquer usuário ativo; gravar/apagar/mover = operador ou admin. */
+/**
+ * Anexos seguem o papel do usuário no sistema (o cofre sabe): ler = qualquer usuário ativo; gravar/apagar/mover = operador ou admin.
+ * A resposta "pode" fica guardada por VALIDADE_PAPEL (só neste Worker em memória; o "não pode" não é guardado): um usuário
+ * desativado ou rebaixado continua mexendo nos anexos por até 1 minuto (os dados, pelo cofre, param na hora).
+ */
+const papeisConferidos = new Map(); // "email|nivel" → vale até (ms)
+export const esquecerPapeis = () => papeisConferidos.clear();
 async function exigirPapel(env, email, nivel) {
   if (env.MODO_TESTE === '1' && !env.COFRE) return; // testes dos anexos sem cofre
   if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
+  const chave = `${email}|${nivel}`;
+  if ((papeisConferidos.get(chave) || 0) > Date.now()) return;
   const r = await env.COFRE.get(env.COFRE.idFromName('principal')).fetch(new Request(`https://cofre/papel?nivel=${nivel}`, { headers: { 'X-Email-Conferido': email } }));
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new ErroHttp(r.status, e.erro || 'Sem permissão.'); }
+  papeisConferidos.set(chave, Date.now() + VALIDADE_PAPEL);
 }
 
 /** Apaga uma pasta inteira (todos os arquivos com esse começo), em partes: responde `mais: true` para o site repetir. */
@@ -253,6 +291,11 @@ export async function atender(request, env, buscar = fetch) {
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
     if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
+    if (rota.startsWith('lista-tudo/') && m === 'GET') {
+      const chave = caminhoSeguro(rota.slice(11), { pasta: true });
+      await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta');
+      return await listarPastaInteira(env, chave, url.searchParams.get('cursor'));
+    }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
       // backups têm o banco inteiro (com as senhas de todos): só o administrador lê

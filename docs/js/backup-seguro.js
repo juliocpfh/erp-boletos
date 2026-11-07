@@ -210,10 +210,51 @@ export async function completoPendente(dir) {
   return precisaCompleto(await nomesEm(sub), hoje());
 }
 
-/** Cópia do programa de arquivo único (abre sem internet). Fica sem cifrar: não tem dados. */
-export async function gravarPrograma(dir, html) {
+/** Onde o site publica a versão PC (gerada pelo GitHub, .github/workflows/versao-pc.yml). */
+export const CAMINHO_PROGRAMA = 'offline/administracao-imoveis.html';
+export const ARQUIVO_PROGRAMA = 'administracao-imoveis.html';
+export const ARQUIVO_LEIAME = 'LEIA-ME.txt';
+
+/** Versão PC: o programa inteiro num arquivo (abre sem o site). Fica sem cifrar: não tem dados. `versao` = data de publicação. */
+export async function gravarPrograma(dir, html, versao = '') {
   const sub = await dir.getDirectoryHandle(PASTA_PROGRAMA, { create: true });
-  await gravar(sub, 'administracao-imoveis.html', html);
+  await gravar(sub, ARQUIVO_PROGRAMA, html);
+  await gravar(sub, 'versao.txt', versao);
+}
+
+/** Data de publicação da versão PC que está na pasta ('' se não há). */
+export async function versaoDoPrograma(dir) {
+  try {
+    const sub = await dir.getDirectoryHandle(PASTA_PROGRAMA);
+    return (await (await sub.getFileHandle('versao.txt')).getFile()).text().then((t) => t.trim());
+  } catch { return ''; }
+}
+
+export const TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administracao de Imoveis
+==================================================
+
+O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
+- ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
+- ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
+- ${PASTA_PROGRAMA}/   a VERSAO PC do sistema (${ARQUIVO_PROGRAMA}), atualizada sozinha
+
+SE O SITE OU O CLOUDFLARE CAIREM:
+1. Abra ${PASTA_PROGRAMA}/${ARQUIVO_PROGRAMA} com dois cliques (Chrome ou Edge).
+2. Clique em "restaurar um backup seguro", escolha a copia mais recente de ${PASTA_DIARIO}/ (ou um completo),
+   digite a senha do backup e mande abrir numa pasta nova do computador.
+3. O sistema abre inteiro, com os dados daquela copia. Pode trabalhar normalmente.
+4. Quando o site voltar: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta" leva o que voce fez para a nuvem.
+
+Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: sem ele e sem a senha, nada abre.
+`;
+
+/** LEIA-ME na pasta (sem cifrar, sem dados): como abrir a versão PC quando o site cair. */
+export async function gravarLeiaMe(dir) {
+  try {
+    const atual = await (await (await dir.getFileHandle(ARQUIVO_LEIAME)).getFile()).text();
+    if (atual === TEXTO_LEIAME) return;
+  } catch { /* ainda não existe */ }
+  await gravar(dir, ARQUIVO_LEIAME, TEXTO_LEIAME);
 }
 
 /** Arquivos da pasta segura, do mais novo para o mais antigo. */

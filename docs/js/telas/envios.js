@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
+import { abrirPasta, alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -57,16 +57,27 @@ export const FORMULARIOS = {
     if (!arq || !arq.size) throw new Error('Escolha o arquivo de backup.');
     const { info, dados } = await B.decifrar(await arq.arrayBuffer(), String(f.get('senha') || ''));
     const data = (info.criado_em || '').slice(0, 10);
+    const JSZip = await jsZip();
     let blob;
     if (info.tipo === 'completo') blob = new Blob([dados], { type: 'application/zip' });
     else {
-      const JSZip = await jsZip();
       const zip = new JSZip();
       zip.file(S.ARQUIVO_BANCO, dados);
       blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
     }
-    baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
-    aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+    if (f.get('destino') !== 'pasta') {
+      baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
+      aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+      return;
+    }
+    // abrir numa pasta do computador (versão PC com o site fora do ar): grava o banco e os anexos na pasta escolhida e abre
+    let dir;
+    try { dir = await window.showDirectoryPicker({ id: 'restaurar-backup', mode: 'readwrite' }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
+    if (await S.lerBanco(dir)) throw new Error(`A pasta escolhida já tem um ${S.ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
+    await S.importarZip(JSZip, dir, blob, null);
+    await S.lembrarPasta(dir);
+    await abrirPasta(dir);
+    aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.`);
   },
 
   async modeloVistoria(form) {
@@ -322,7 +333,16 @@ export const FORMULARIOS = {
 
   async login(form) {
     const f = new FormData(form);
-    await entrar(String(f.get('login')).trim().toLowerCase(), String(f.get('senha')));
+    // na nuvem a conferência da senha (PBKDF2, 2-3 vezes) leva segundos no celular: o botão avisa que está trabalhando
+    const botao = form.querySelector('button');
+    const texto = botao ? botao.textContent : '';
+    if (botao) botao.textContent = 'Entrando…';
+    try {
+      await entrar(String(f.get('login')).trim().toLowerCase(), String(f.get('senha')));
+    } catch (e) {
+      if (botao) botao.textContent = texto;
+      throw e;
+    }
     await mostrar();
   },
 

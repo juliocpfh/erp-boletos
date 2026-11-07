@@ -8,7 +8,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 | Para | Rode |
 |---|---|
 | Achar onde mexer (função → linha) | `node tools/mapa.mjs <trecho>` (ex.: `reserva`, `CADASTROS.`, `FORMULARIOS.pag`; só `docs/js`) |
-| Conferir tudo antes do commit | `node tools/checar.mjs` (sintaxe via esbuild + testes de `tests/`; `node --check` NÃO detecta erros nestes módulos); com `--offline` gera também a versão sem internet |
+| Conferir tudo antes do commit | `node tools/checar.mjs` (sintaxe via esbuild + testes de `tests/`; `node --check` NÃO detecta erros nestes módulos); com `--offline` gera também a versão PC (normalmente não precisa: o GitHub gera na `main`) |
 | Testar a ponte do C6 | `node --test tests/ponte-c6.test.mjs` (sobe a ponte em modo simulado) e `node --test "ponte-c6/testes/*.test.mjs"` (módulos da fase 2; `checar.mjs` não os roda) |
 | Rodar a ponte em modo simulado | `cd ponte-c6 && SIMULADO=1 PONTE_SENHA=<frase com 20+ caracteres> CONTAS=ank,jck node servidor.mjs` → `http://127.0.0.1:8765` (ou copie `.env.exemplo` para `.env`); nada vai ao banco |
 | Testar os dados na nuvem (Cloudflare) | `node nuvem/local.mjs` → `http://localhost:8787` (site + `/api` com o cofre em SQLite; `/__internet?ligar=0` simula a queda); detalhes em `nuvem/README.md` e `documentacao/ESTUDO_DADOS_NUVEM.md` |
@@ -23,7 +23,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 2. Toda gravação: na tela, `alterar((db) => …)` (`docs/js/app.js`; é uma fila, uma gravação por vez, `alterarAgora` grava de verdade); nas regras, só `inserir`/`atualizar`/`excluir` (`docs/js/regras.js`), que registram o histórico.
 3. Campo ou tabela nova no banco: `TABELAS` em `regras.js`; dados antigos se ajustam em `normalizar()` (nunca remova passos de migração).
 4. HTML com texto do usuário sempre passa por `esc()`. Parâmetros do endereço (`rota.q`) passam por `sanearParametros` (`calculos.js`): parâmetro novo = entrada em `FORMATOS_PARAMETRO`; mês e data nas telas por `competenciaValida`/`dataValida`.
-5. Mudou `docs/js`, `docs/css`, `docs/vendor` ou o modelo xlsx → a versão offline fica desatualizada e `tests/offline.test.mjs` falha até rodar `node tools/checar.mjs --offline`.
+5. A versão PC (`docs/offline/administracao-imoveis.html`, o programa inteiro num arquivo) é a segunda forma de abrir o sistema se o site cair: fica na pasta do backup seguro (`backup-seguro.js`, `atualizarProgramaSeguro` em `app.js`; `atualizador-pc/` no Windows). O GitHub a gera sozinho; `gerar-offline.mjs` precisa continuar funcionando (CSP por hash, `window.VERSAO_OFFLINE`).
 6. Testes sem dados reais de pessoas (CPF de teste: `529.982.247-25`, CNPJ `11.222.333/0001-81`).
 7. Regras de negócio definidas pelo usuário (reajuste no 13º mês a partir do mês de entrada, reserva, NF com aluguel cheio, boleto no C6 pelo valor cheio com desconto até o vencimento etc.) estão em `documentacao/DECISOES.md`: não mude sem pedido explícito.
 8. Segurança: CSP no `docs/index.html` e em `tools/gerar-offline.mjs` (domínio externo novo = entrar na `connect-src` dos dois); segredos nunca no JSON (`ponte_url`/`senha_ponte` só no navegador, `lembrarPonte`/`ponteLembrada`; `normalizar` apaga se aparecerem; chaves do C6 só na ponte); senhas só por `camposDeSenha` (`auth.js`); anexo só por `salvarArquivo` (`nomeAnexavel` barra página/script) e aberto com `tipoParaAbrir`; campo de arquivo com `accept` (`ACEITA_DOCUMENTOS`).
@@ -32,7 +32,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 ## Fluxo de trabalho com o usuário
 - O usuário é o dono do negócio, fala português e não é programador: respostas curtas, sem jargão, com exemplos de datas e valores.
 - Antes de mudar uma regra de negócio, confirme o entendimento com um exemplo numérico.
-- PR e versão offline: só quando o usuário pedir (depois de mudar o código, lembre-o de baixar de novo a versão sem internet em Dados e backup). Commits em português (título + tópicos `- `).
+- PR só quando o usuário pedir. A versão PC (`docs/offline/`) é gerada pelo GitHub a cada merge na `main` (`.github/workflows/versao-pc.yml`): não a gere nem a envie nas PRs. Commits em português (título + tópicos `- `).
 - Teste no navegador o que mudou na tela (Playwright, se disponível, no modo `?teste`) e diga o resultado.
 
 ## Armadilhas já vistas

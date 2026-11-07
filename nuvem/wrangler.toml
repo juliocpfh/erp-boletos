@@ -1,5 +1,6 @@
 # Configuração do Worker (dados na nuvem). Publicar: na pasta nuvem/, `npx wrangler deploy` (passo a passo em README.md).
 # Os e-mails e os dados do Access NÃO ficam aqui: são cadastrados no painel do Cloudflare (Settings → Variables).
+# O comando de build do Workers Builds (roda os testes antes de publicar) também fica no painel: veja "Testes antes de publicar" no README.md.
 name = "erp-boletos"
 main = "worker.mjs"
 compatibility_date = "2026-10-01"
