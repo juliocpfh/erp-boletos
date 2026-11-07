@@ -664,3 +664,70 @@ test('C3: pagamento enviado que o C6 não confirma nem recusa: o administrador m
   assert.equal(R.alertaBanco(d, '2026-11-20'), null);
   assert.equal(Z.SITUACOES_PAGAMENTO.aguardando_aprovacao, 'Aprovado no sistema, envio ao banco pendente');
 });
+
+// D5: arquivo OFX exportado pelo app do C6 (trecho fictício no formato real: SGML 1.02)
+const OFX_TESTE = `OFXHEADER: 100
+DATA: OFXSGML
+VERSION: 102
+<OFX>
+  <SIGNONMSGSRSV1><SONRS><FI><ORG>BANCO C6 S.A.</ORG><FID>336</FID></FI></SONRS></SIGNONMSGSRSV1>
+  <BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>BRL</CURDEF>
+    <BANKACCTFROM><BANKID>336</BANKID><ACCTID>123456789</ACCTID><ACCTTYPE>CHECKING</ACCTTYPE></BANKACCTFROM>
+    <BANKTRANLIST><DTSTART>20260901071529[-3:BRT]</DTSTART><DTEND>20260930205632[-3:BRT]</DTEND>
+      <STMTTRN>
+        <FITID>111</FITID>
+        <TRNAMT>-215.00</TRNAMT>
+        <DTPOSTED>20260930205632[-3:BRT]</DTPOSTED>
+        <TRNTYPE>DEBIT</TRNTYPE>
+        <REFNUM>E3187249520260930235672592QNCkdA</REFNUM>
+        <MEMO>TRANSF ENVIADA PIX</MEMO>
+      </STMTTRN>
+      <STMTTRN>
+        <FITID>222</FITID>
+        <TRNAMT>1318.50</TRNAMT>
+        <DTPOSTED>20260910083428[-3:BRT]</DTPOSTED>
+        <TRNTYPE>CREDIT</TRNTYPE>
+        <REFNUM>01M25HJ18FY3CKSB2P2B5QJT46</REFNUM>
+        <MEMO>Ref. Liq. Boleto Comp Externo</MEMO>
+      </STMTTRN>
+      <STMTTRN>
+        <FITID>222</FITID>
+        <TRNAMT>1318.50</TRNAMT>
+        <DTPOSTED>20260910083428[-3:BRT]</DTPOSTED>
+        <TRNTYPE>CREDIT</TRNTYPE>
+        <MEMO>repetido no arquivo</MEMO>
+      </STMTTRN>
+    </BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1>
+</OFX>`;
+
+test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançamentos sem repetir', () => {
+  const r = Z.lerOfx(OFX_TESTE);
+  assert.equal(r.banco, 'BANCO C6 S.A.');
+  assert.equal(r.conta, '123456789');
+  assert.equal(r.de, '2026-09-01');
+  assert.equal(r.ate, '2026-09-30');
+  assert.equal(r.lancamentos.length, 2); // o FITID repetido entra uma vez
+  assert.deepEqual(r.lancamentos[0], { id_externo: '111', data: '2026-09-30', valor_centavos: -21500, tipo: 'saida', descricao: 'TRANSF ENVIADA PIX', categoria: 'DEBIT', end_to_end_id: 'E3187249520260930235672592QNCkdA', local_reference: null });
+  assert.equal(r.lancamentos[1].local_reference, '01M25HJ18FY3CKSB2P2B5QJT46');
+  assert.equal(Z.centavosDoOfx('1.234,56'), 123456);
+  assert.throws(() => Z.lerOfx('<html>não é ofx</html>'), /não é um OFX/);
+  const { d } = base();
+  const imp = Z.importarExtrato(d, 'ank', r.lancamentos, 'julio', { de: r.de, ate: r.ate });
+  assert.equal(imp.novas.length, 2);
+  assert.equal(imp.novas[1].valor, 131850);
+  assert.equal(imp.novas[1].tipo, 'entrada');
+  assert.equal(d.config_banco.ultima_importacao.ank, '2026-09-30');
+  // o mesmo arquivo de novo: nada entra em dobro
+  assert.equal(Z.importarExtrato(d, 'ank', Z.lerOfx(OFX_TESTE).lancamentos, 'julio').repetidas, 2);
+  // o texto com acento quebrado em UTF-8 é relido como Windows-1252
+  const bytes = new Uint8Array([69, 77, 73, 83, 83, 195, 79]); // "EMISSÃO" em 1252 (Ã = 0xC3)
+  assert.equal(Z.textoDoOfx(bytes), 'EMISSÃO');
+});
+
+test('D10: descreverDestino descreve o destino em texto puro para a planilha do contador', () => {
+  const { d, loja, cb2 } = base();
+  assert.equal(Z.descreverDestino(d, { classificacao: null }), '');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'boleto', cobranca_id: cb2.id }), 'Aluguel recebido · boleto 07/2026 · Maria Exemplo');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'tarifa', observacoes: 'pacote mensal' }), 'Tarifa do banco · pacote mensal');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'conta_imovel', imovel_id: loja.id }), 'Conta do imóvel · Loja 1');
+});

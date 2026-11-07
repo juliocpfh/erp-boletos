@@ -15,7 +15,7 @@ export const TABELAS = {
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
-  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -4299,13 +4299,14 @@ export function marcarEtapaFechamento(d, mes, etapa, feito, usuario) {
 }
 
 /** Baixa em lote: confirma como "pagou em dia" os boletos escolhidos, com a data em que o dinheiro entrou. */
-export function baixarEmLote(d, ids, dataContabil, usuario) {
+export function baixarEmLote(d, ids, dataContabil, usuario, { pagouEmDia = true, dataPagou = null } = {}) {
   const feitos = [];
   const pulados = [];
   for (const id of ids) {
     const cb = buscar(d, 'cobrancas', id);
     if (!cb || cb.data_pagamento || cb.situacao === 'Carência') { if (cb) pulados.push(cb); continue; }
-    registrarPagamento(d, cb.id, dataContabil, null, usuario, { pagouEmDia: true });
+    // atrasados em lote: todos pagaram no mesmo dia (``dataPagou``); multa e juros saem do cálculo de sempre, pelo valor previsto
+    registrarPagamento(d, cb.id, dataContabil, null, usuario, { pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou });
     feitos.push(cb);
   }
   return { feitos, pulados };
@@ -4500,6 +4501,8 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
       if (!soConferir) completarPorDepositos(d, c, qual, usuario);
     }
   }
+  // adiamentos de alerta vencidos (ou de alerta que já não existe): saem, com histórico
+  for (const x of adiamentosVencidos(d, hoje)) { n += 1; if (!soConferir) excluir(d, 'adiamentos_alerta', x.id, usuario, `Adiamento do alerta "${x.tipo}" encerrado (até ${C.dataBr(x.ate)})`); }
   return n;
 }
 
@@ -4972,4 +4975,233 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
   return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
+}
+
+// --------------------------------------------------------------------------
+// Busca global (campo do cabeçalho): imóvel, inquilino, CPF/CNPJ, telefone, nº da NF e valor de boleto
+// --------------------------------------------------------------------------
+/** Texto para comparar: minúsculas e sem acento ("João" → "joao"). */
+export const textoDeBusca = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+const soDigitosBusca = (t) => String(t || '').replace(/\D/g, '');
+
+/**
+ * Busca em tudo o que o dono procura no dia a dia. Devolve grupos `{ tipo, itens: [{ titulo, detalhe, link, extra }] }`:
+ * imóveis (nome, endereço, matrícula, contas), inquilinos atuais e antigos (nome, apelido, CPF/CNPJ, telefone, e-mail, solidário,
+ * representante, fiador), NF pelo número ("77" ou "0077") e boletos pelo valor ("1.350,00": valor pontual, recebido ou da NF).
+ * Ex.: "529" acha o inquilino cujo CPF começa por 529 e o imóvel cuja matrícula tem 529.
+ */
+export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
+  const q = textoDeBusca(texto);
+  const digitos = soDigitosBusca(texto);
+  if (!q) return [];
+  const bate = (...campos) => campos.some((v) => v && textoDeBusca(v).includes(q));
+  // número: compara também só os dígitos (CPF com ou sem pontos, telefone com ou sem traço)
+  const bateDigitos = (...campos) => digitos.length >= 3 && campos.some((v) => v && soDigitosBusca(v).includes(digitos));
+  const grupos = [];
+  const imoveis = d.imoveis.filter((i) => bate(i.nome, i.endereco, i.complemento, i.cidade, i.matricula, i.sublote) || bateDigitos(i.matricula, i.copel_uc, i.sanepar_matricula, i.gas_relogio, i.cep))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map((i) => {
+      const atual = d.contratos.find((c) => c.imovel_id === i.id && contratoAtivo(c, hoje));
+      return { titulo: i.nome, detalhe: `${enderecoCompleto(i)}${atual ? ` · ${atual.inquilino_nome}` : ' · vago'}`, link: `#/imovel/${i.id}` };
+    });
+  if (imoveis.length) grupos.push({ tipo: 'Imóveis', itens: imoveis });
+  const fiadoresDe = (c) => d.fiadores.filter((f) => f.contrato_id === c.id);
+  const contratos = d.contratos.filter((c) => bate(c.inquilino_nome, c.inquilino_apelido, c.inquilino_email, c.solidario_nome, c.representante_nome, c.responsavel_nome)
+      || bateDigitos(c.inquilino_cpf, c.inquilino_telefone, c.solidario_cpf, c.representante_cpf, c.responsavel_telefone)
+      || fiadoresDe(c).some((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone)))
+    .sort((a, b) => Number(contratoAtivo(b, hoje)) - Number(contratoAtivo(a, hoje)) || a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
+    .map((c) => {
+      const i = buscar(d, 'imoveis', c.imovel_id);
+      const fiador = fiadoresDe(c).find((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone));
+      const porque = fiador ? `fiador ${fiador.nome}` : bate(c.solidario_nome) || bateDigitos(c.solidario_cpf) ? `solidário ${c.solidario_nome}` : bate(c.representante_nome) || bateDigitos(c.representante_cpf) ? `representante ${c.representante_nome}` : '';
+      return { titulo: c.inquilino_nome, detalhe: [i ? i.nome : 'sem imóvel', c.inquilino_cpf, porque].filter(Boolean).join(' · '), link: `#/contrato/${c.id}`,
+        extra: contratoAtivo(c, hoje) ? '' : c.data_saida ? `saiu em ${C.dataBr(c.data_saida)}` : 'inativo' };
+    });
+  if (contratos.length) grupos.push({ tipo: 'Inquilinos', itens: contratos });
+  // NF: só por número, inteiro ("77" acha a 0077, não a 0770)
+  if (/^\d{1,6}$/.test(q)) {
+    const n = Number(q);
+    const nfs = d.faturas.filter((f) => f.numero === n).map((f) => {
+      const e = buscar(d, 'emitentes', f.emitente_id);
+      const cb = f.cobranca_id ? buscar(d, 'cobrancas', f.cobranca_id) : null;
+      const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null;
+      return { titulo: `NF nº ${numeroFatura(f.numero)}${e ? ` · ${e.nome}` : ''}`, detalhe: `${C.dataBr(f.emissao)} · ${C.reais(f.valor)}${c ? ` · ${c.inquilino_nome}` : ''}`, link: `#/imprimir/faturas?numero=${f.numero}`, extra: f.situacao === 'Emitida' ? '' : f.situacao };
+    });
+    if (nfs.length) grupos.push({ tipo: 'Notas fiscais', itens: nfs });
+  }
+  // valor em reais: boletos com esse valor pontual, recebido ou da NF (ex.: "1.350,00" ou "1350")
+  let valor = null;
+  try { valor = /^[\d.,]+$/.test(q) && /[,.]\d{1,2}$|^\d+$/.test(q) ? C.centavos(q) : null; } catch { valor = null; }
+  if (valor > 0) {
+    const boletos = d.cobrancas.filter((cb) => [totais(cb).a_pagar_pontual, totais(cb).a_pagar_sem_desconto, cb.valor_pago, cb.valor_nf].includes(valor))
+      .sort((a, b) => b.competencia.localeCompare(a.competencia)).slice(0, 30).map((cb) => {
+        const c = buscar(d, 'contratos', cb.contrato_id);
+        const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+        return { titulo: `Boleto ${C.compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''}`, detalhe: `${i ? `${i.nome} · ` : ''}vence ${C.dataBr(cb.vencimento)} · pontual ${C.reais(totais(cb).a_pagar_pontual)}${cb.data_pagamento ? ` · recebido ${C.reais(cb.valor_pago)} em ${C.dataBr(cb.data_pagamento)}` : ''}`, link: `#/cobranca/${cb.id}`, extra: cb.situacao };
+      });
+    if (boletos.length) grupos.push({ tipo: 'Boletos com esse valor', itens: boletos });
+  }
+  return grupos;
+}
+
+// --------------------------------------------------------------------------
+// Lembrete ao inquilino (D3): texto pronto para e-mail (canal oficial) ou WhatsApp, conforme a fase do boleto
+// --------------------------------------------------------------------------
+/** Assinatura dos lembretes (decisão do dono, DECISOES.md). */
+export const ASSINATURA_LEMBRETE = 'ANK Administradora';
+
+/**
+ * Texto do lembrete de um boleto em aberto. Fase: ``antes`` (vence depois de hoje), ``dia`` (vence hoje) ou ``atrasado``
+ * (valor de hoje com multa e juros). Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
+ * Ex.: boleto de 10/2026 (R$ 1.218,50 em dia) vencendo em 10/11; em 07/11 → "vence em 10/11/2026 … R$ 1.218,50".
+ */
+export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+  const t = totais(cb);
+  const fase = cb.vencimento > hoje ? 'antes' : cb.vencimento === hoje ? 'dia' : 'atrasado';
+  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
+  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução' : `do aluguel de ${C.compBr(cb.competencia)}`;
+  const onde = i ? ` (${i.nome})` : '';
+  const linhas = [`Olá, ${nome}!`, ''];
+  if (fase === 'antes') {
+    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
+    if (!ehComplementoCaucao(cb)) linhas.push(`Após o vencimento: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+  } else if (fase === 'dia') {
+    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence hoje, ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
+    if (!ehComplementoCaucao(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+  } else {
+    const r = C.liquidar(cb, hoje);
+    linhas.push(`O boleto ${oQue}${onde}, com vencimento em ${C.dataBr(cb.vencimento)}, consta em aberto (${r.dias_atraso} dia(s) de atraso).`);
+    linhas.push(ehComplementoCaucao(cb) ? `Valor: ${C.reais(r.valor_devido)}.` : `Valor para pagamento hoje (${C.dataBr(hoje)}): ${C.reais(r.valor_devido)} (${C.reais(t.a_pagar_sem_desconto)} + multa ${C.reais(r.multa)} + juros ${C.reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
+    linhas.push('Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
+  }
+  const b = cb.banco || null;
+  if (b && b.pix_copia_cola) linhas.push('', 'Pix copia e cola:', b.pix_copia_cola);
+  if (b && b.linha_digitavel) linhas.push('', `Linha digitável do boleto: ${b.linha_digitavel}`);
+  linhas.push('', 'Qualquer dúvida, estamos à disposição.', '', ASSINATURA_LEMBRETE);
+  const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
+  return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
+}
+
+// --------------------------------------------------------------------------
+// Alertas adiáveis (D14): "adiar 7 dias" e "já estou cuidando" (30 dias), com quem marcou; o alerta some do Painel até a data
+// --------------------------------------------------------------------------
+export const DIAS_ADIAR_ALERTA = 7;
+export const DIAS_CUIDANDO_ALERTA = 30;
+
+/** Chave estável de um alerta (tipo + contrato/imóvel + âncora): o texto muda todo dia ("há 12 dias"), a chave não. */
+export const chaveAlerta = (a) => [a.tipo, a.contrato_id || '', a.imovel_id || '', a.ancora || ''].join('|');
+
+/** Adiamento em vigor para a chave (``ate`` >= hoje), ou null. */
+export function adiamentoDe(d, chave, hoje = C.hojeIso()) {
+  return (d.adiamentos_alerta || []).find((x) => x.chave === chave && x.ate >= hoje) || null;
+}
+
+/** Todos os alertas com o campo ``adiamento`` preenchido nos adiados (o Painel mostra os demais e guarda os adiados recolhidos). */
+export function alertasComAdiamento(d, hoje = C.hojeIso()) {
+  return todosAlertas(d, hoje).map((a) => ({ ...a, chave: chaveAlerta(a), adiamento: adiamentoDe(d, chaveAlerta(a), hoje) }));
+}
+
+/**
+ * Adia um alerta: ``modo`` "adiado" (7 dias) ou "cuidando" (30 dias; quem marcou aparece no Painel). Troca o adiamento
+ * anterior da mesma chave. Ex.: em 07/11/2026, "adiar 7 dias" esconde o alerta até 14/11/2026 (volta em 15/11).
+ */
+export function adiarAlerta(d, chave, modo, usuario, { hoje = C.hojeIso(), dias = null, tipo = '', quem = '' } = {}) {
+  if (!['adiado', 'cuidando'].includes(modo)) throw new Error('Modo de adiamento desconhecido.');
+  const n = dias || (modo === 'cuidando' ? DIAS_CUIDANDO_ALERTA : DIAS_ADIAR_ALERTA);
+  const ate = C.somarDias(hoje, n - 1);
+  const atual = (d.adiamentos_alerta || []).find((x) => x.chave === chave);
+  const dados = { chave, tipo: tipo || chave.split('|')[0], modo, ate, quem: quem || usuario, em: hoje };
+  const texto = `Alerta "${dados.tipo}" ${modo === 'cuidando' ? 'em cuidado por' : 'adiado por'} ${dados.quem} até ${C.dataBr(ate)}`;
+  return atual ? atualizar(d, 'adiamentos_alerta', atual.id, dados, usuario, texto) : inserir(d, 'adiamentos_alerta', dados, usuario, texto);
+}
+
+/** Volta a mostrar o alerta (apaga o adiamento). */
+export function voltarAlerta(d, chave, usuario) {
+  const atual = (d.adiamentos_alerta || []).find((x) => x.chave === chave);
+  if (atual) excluir(d, 'adiamentos_alerta', atual.id, usuario, `Alerta "${atual.tipo}" volta a aparecer`);
+  return !!atual;
+}
+
+/** Adiamentos vencidos (``ate`` < hoje) ou de alertas que já não existem: apagados na rotina de abertura. */
+export function adiamentosVencidos(d, hoje = C.hojeIso()) {
+  const chaves = new Set(todosAlertas(d, hoje).map(chaveAlerta));
+  return (d.adiamentos_alerta || []).filter((x) => x.ate < hoje || !chaves.has(x.chave));
+}
+
+// --------------------------------------------------------------------------
+// Roteiro de saída do inquilino (D6): aviso prévio → vistoria → chaves → contas → cálculo final → garantia → último boleto
+// --------------------------------------------------------------------------
+/**
+ * Etapas da saída, na ordem decidida pelo dono, cada uma com ``feito`` e um ``detalhe`` curto. Começa quando a data de saída
+ * é informada (aviso prévio). Ex.: saída em 30/11/2026, hoje 07/11: aviso ✓, chaves ⬜ ("a partir de 30/11"), cálculo final ⬜.
+ */
+export function roteiroSaida(d, c, hoje = C.hojeIso()) {
+  if (!c.data_saida || fimDeVinculo(d, c)) return [];
+  const saiu = c.data_saida <= hoje;
+  const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
+  const leitura = leituraDo(d, c.id, 'Saída do inquilino');
+  const titularidade = alertaTitularidade(d, c, hoje);
+  const contasOk = !titularidade && !!leitura;
+  const e = encerramentoDo(d, c.id);
+  const garantiaAntes = valorGarantia(d, c);
+  const comp = C.competenciaDe(c.data_saida);
+  const ultimo = boletoDoMes(d, c.id, comp);
+  const abertos = d.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && x.situacao !== 'Carência');
+  const garantia = (() => {
+    if (!e) return { feito: false, detalhe: garantiaAntes > 0 ? `${C.reais(garantiaAntes)} a acertar no cálculo final` : 'sem caução ou depósito a devolver (confirma no cálculo final)' };
+    if (e.garantia_devolvida_em) return { feito: true, detalhe: `${e.saldo >= 0 ? 'devolvida' : 'saldo acertado'} em ${C.dataBr(e.garantia_devolvida_em)}` };
+    if (e.saldo > 0) return { feito: false, detalhe: `devolver ${C.reais(e.saldo)} ao inquilino` };
+    if (e.saldo < 0) return { feito: false, detalhe: `cobrar ${C.reais(-e.saldo)} do inquilino (garantia não cobre os débitos)` };
+    return { feito: true, detalhe: 'nada a devolver nem a cobrar' };
+  })();
+  return [
+    { chave: 'aviso', titulo: 'Aviso prévio: data de saída informada', feito: true, detalhe: `saída em ${C.dataBr(c.data_saida)}` },
+    { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vist ? `feita em ${C.dataBr(vist.data)}` : saiu ? 'ainda não registrada' : `a partir de ${C.dataBr(c.data_saida)}` },
+    { chave: 'chaves', titulo: 'Entrega das chaves', feito: saiu, detalhe: saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}` : `prevista para ${C.dataBr(c.data_saida)}` },
+    { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
+      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
+    { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
+    { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
+    { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
+      detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
+  ];
+}
+
+/** Marca a garantia como devolvida (ou o saldo cobrado) no cálculo final; ``data`` vazia desfaz. */
+export function marcarGarantiaDevolvida(d, encerramentoId, data, usuario) {
+  const e = buscar(d, 'encerramentos', encerramentoId);
+  if (!e) throw new Error('Cálculo final não encontrado.');
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data da devolução.');
+  const c = buscar(d, 'contratos', e.contrato_id);
+  atualizar(d, 'encerramentos', e.id, { garantia_devolvida_em: data || null }, usuario,
+    data ? `${c ? `${c.inquilino_nome}: ` : ''}garantia ${e.saldo >= 0 ? 'devolvida' : 'saldo acertado'} em ${C.dataBr(data)}` : `${c ? `${c.inquilino_nome}: ` : ''}devolução da garantia desfeita`);
+  return e;
+}
+
+// --------------------------------------------------------------------------
+// Declaração anual de aluguéis para o IRPF do inquilino (D9): por empresa que emitiu as NFs, o aluguel efetivamente pago no ano
+// --------------------------------------------------------------------------
+/**
+ * Valores que o inquilino pagou de aluguel no ano-calendário, por empresa emitente: as NFs emitidas (não canceladas) dos boletos
+ * do contrato (e dos contratos anteriores da mesma cadeia, quando é continuação), com emissão no ano. A NF é só o aluguel
+ * (sem IPTU, seguro, tarifa e FCI), por isso serve de base. Ex.: 12 NFs de R$ 1.218,50 em 2026 → total R$ 14.622,00.
+ */
+export function declaracaoAnual(d, contratoId, ano) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  const ids = new Set([c.id, ...cadeiaDeContratos(d, c).antes.map((x) => x.id)]);
+  const cobrancas = new Map(d.cobrancas.filter((x) => ids.has(x.contrato_id)).map((x) => [x.id, x]));
+  const nfs = d.faturas.filter((f) => f.situacao === 'Emitida' && f.origem_tipo === 'cobranca' && cobrancas.has(f.origem_id) && String(f.emissao).slice(0, 4) === String(ano))
+    .sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
+  const porEmpresa = new Map();
+  for (const f of nfs) {
+    const cb = cobrancas.get(f.origem_id);
+    if (!porEmpresa.has(f.emitente_id)) porEmpresa.set(f.emitente_id, { emitente: buscar(d, 'emitentes', f.emitente_id), itens: [], total: 0 });
+    const g = porEmpresa.get(f.emitente_id);
+    g.itens.push({ numero: f.numero, emissao: f.emissao, competencia: cb.competencia, valor: f.valor, pago_em: cb.data_pagamento });
+    g.total += f.valor;
+  }
+  return { contrato: c, imovel: buscar(d, 'imoveis', c.imovel_id), ano: Number(ano), empresas: [...porEmpresa.values()].sort((a, b) => a.emitente.nome.localeCompare(b.emitente.nome, 'pt-BR')), total: nfs.reduce((s, f) => s + f.valor, 0) };
 }

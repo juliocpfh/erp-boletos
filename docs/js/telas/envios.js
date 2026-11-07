@@ -96,10 +96,16 @@ export const FORMULARIOS = {
     if (!ids.length) throw new Error('Marque os boletos deste vencimento que foram pagos.');
     const vencs = new Set(ids.map((id) => (buscar('cobrancas', id) || {}).vencimento));
     if (vencs.size > 1) throw new Error('Confirme juntos só boletos do mesmo vencimento.');
+    // atrasados (D7): o grupo informa o dia em que pagaram; multa e juros até esse dia, como na confirmação um a um
+    const atrasado = fd.get('atrasado') === '1';
+    const dataPagou = atrasado ? String(fd.get('pagou') || '') || data : null;
+    if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe o dia em que pagaram.');
+    if (atrasado && dataPagou > data) throw new Error('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
+    if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
     confirmarAvisos([dataNoFuturo(data), dataMuitoAntiga(data)].filter(Boolean));
     let r;
-    await alterar((db) => { r = R.baixarEmLote(db, ids, data, login()); });
-    aviso(`${r.feitos.length} pagamento(s) confirmado(s) em dia, com entrada em ${dataBr(data)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ''}`);
+    await alterar((db) => { r = R.baixarEmLote(db, ids, data, login(), { pagouEmDia: !atrasado, dataPagou }); });
+    aviso(`${r.feitos.length} pagamento(s) confirmado(s) ${atrasado ? `com atraso (pagaram em ${dataBr(dataPagou)}, com multa e juros)` : 'em dia'}, com entrada em ${dataBr(data)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ''}`, atrasado ? 'aviso' : 'ok');
     await mostrar();
   },
 
@@ -426,45 +432,7 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  async pagamento(form) {
-    const f = new FormData(form);
-    const data = String(f.get('data') || '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
-    const valor = String(f.get('valor') || '').trim() ? C.centavos(f.get('valor')) : null;
-    const pagouEmDia = f.get('em_dia') === '1';
-    const dataPagou = String(f.get('pagou') || '') || null;
-    const cb = buscar('cobrancas', form.dataset.id);
-    confirmarAvisos([
-      dataNoFuturo(data, 'A data do pagamento'),
-      dataMuitoAntiga(data, 'A data do pagamento'),
-      cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
-    ].filter(Boolean));
-    // valor recebido diferente do previsto: justificativa e, na página do boleto, o valor da NF digitado à mão
-    const previsto = cb && R.previstoNoPagamento(cb, data, { pagouEmDia, dataPagou });
-    if (cb && valor !== null && valor !== previsto.valor_devido && !R.ehComplementoCaucao(cb) && R.geraNf(buscar('contratos', cb.contrato_id))) {
-      if (dataPagou && dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
-      const dif = valor - previsto.valor_devido;
-      const resp = await janela({ titulo: 'Valor diferente do previsto',
-        html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
-          Diferença: <b class="${dif < 0 ? 'negativo' : ''}">${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b></p>
-          <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
-          <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
-        sim: 'Continuar', nao: 'Cancelar' });
-      const justificativa = resp && String((resp.justificativa || [])[0] || '').trim();
-      if (!resp) return;
-      if (!justificativa) throw new Error('Informe a justificativa da divergência. Nada foi salvo.');
-      memoria.pagamentoDivergente = { id: cb.id, data, valor, pagouEmDia, dataPagou, justificativa };
-      ir(`#/cobranca/${cb.id}?ir=pagamento`);
-      return;
-    }
-    const r = await alterar((db) => R.registrarPagamento(db, Number(form.dataset.id), data, valor, login(), { pagouEmDia, dataPagou }));
-    const pago = buscar('cobrancas', form.dataset.id);
-    if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
-    else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
-      : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
-    avisarImovelSemEmpresa(pago);
-    await mostrar();
-  },
+  pagamento: (form) => confirmarPagamentoBoleto(Number(form.dataset.id), new FormData(form)),
 
   /** Pagamento com valor diferente do previsto: a NF sai com o valor digitado (diferente do calculado) e a justificativa fica no histórico. */
   async pagamentoNf(form) {
@@ -566,6 +534,16 @@ export const FORMULARIOS = {
   },
   irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
   irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
+  /** Tela de Boletos: busca por inquilino ou imóvel dentro do filtro escolhido (mês, em aberto, vencidos…). */
+  buscaBoletos(form) {
+    const f = new FormData(form);
+    const q = new URLSearchParams([...f].filter(([k, v]) => String(v).trim() && !(k === 'filtro' && v === 'todos')));
+    ir(`#/cobrancas?${q}`);
+  },
+  buscaGlobal(form) {
+    const q = String(new FormData(form).get('q') || '').trim().slice(0, 100);
+    ir(q ? `#/buscar?q=${encodeURIComponent(q)}` : '#/buscar');
+  },
   buscaInquilinos(form) {
     const busca = String(new FormData(form).get('busca') || '').trim();
     ir(busca ? `#/inquilinos?busca=${encodeURIComponent(busca)}` : '#/inquilinos');
@@ -673,3 +651,47 @@ export const FORMULARIOS = {
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): formulários em telas/banco.js
 Object.assign(FORMULARIOS, FORMULARIOS_BANCO);
+
+
+/**
+ * Confirma o pagamento de um boleto (linha da tabela, página do boleto ou janela "Confirmar pagamento"). ``f``: FormData com
+ * data (contábil), pagou (se atrasou), valor (opcional) e em_dia. Valor diferente do previsto abre a justificativa e segue na página do boleto.
+ */
+export async function confirmarPagamentoBoleto(id, f) {
+  const data = String(f.get('data') || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
+  const valor = String(f.get('valor') || '').trim() ? C.centavos(f.get('valor')) : null;
+  const pagouEmDia = f.get('em_dia') === '1';
+  const dataPagou = String(f.get('pagou') || '') || null;
+  const cb = buscar('cobrancas', id);
+  confirmarAvisos([
+    dataNoFuturo(data, 'A data do pagamento'),
+    dataMuitoAntiga(data, 'A data do pagamento'),
+    cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
+  ].filter(Boolean));
+  // valor recebido diferente do previsto: justificativa e, na página do boleto, o valor da NF digitado à mão
+  const previsto = cb && R.previstoNoPagamento(cb, data, { pagouEmDia, dataPagou });
+  if (cb && valor !== null && valor !== previsto.valor_devido && !R.ehComplementoCaucao(cb) && R.geraNf(buscar('contratos', cb.contrato_id))) {
+    if (dataPagou && dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+    const dif = valor - previsto.valor_devido;
+    const resp = await janela({ titulo: 'Valor diferente do previsto',
+      html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
+        Diferença: <b class="${dif < 0 ? 'negativo' : ''}">${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b></p>
+        <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
+        <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
+      sim: 'Continuar', nao: 'Cancelar' });
+    const justificativa = resp && String((resp.justificativa || [])[0] || '').trim();
+    if (!resp) return;
+    if (!justificativa) throw new Error('Informe a justificativa da divergência. Nada foi salvo.');
+    memoria.pagamentoDivergente = { id: cb.id, data, valor, pagouEmDia, dataPagou, justificativa };
+    ir(`#/cobranca/${cb.id}?ir=pagamento`);
+    return;
+  }
+  const r = await alterar((db) => R.registrarPagamento(db, id, data, valor, login(), { pagouEmDia, dataPagou }));
+  const pago = buscar('cobrancas', id);
+  if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
+  else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
+    : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+  avisarImovelSemEmpresa(pago);
+  await mostrar();
+}

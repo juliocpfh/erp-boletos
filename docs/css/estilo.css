@@ -17,6 +17,9 @@ header.topo nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
 header.topo nav a { color: #dbe4ff; padding: 6px 10px; border-radius: 6px; }
 header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }
 header.topo .conta { font-size: 13px; color: #dbe4ff; text-align: right; }
+header.topo .busca-topo input { width: 150px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; background: rgba(255,255,255,.12); color: #fff; font-size: 13px; }
+header.topo .busca-topo input::placeholder { color: #c7d2fe; }
+header.topo .busca-topo input:focus { background: #fff; color: var(--texto); outline: none; width: 220px; }
 header.topo .conta a { color: #fff; }
 .faixa { background: #e8edfb; color: var(--primaria-escura); font-size: 13px; padding: 6px 20px; }
 main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
@@ -159,6 +162,23 @@ label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; 
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
+
+/* Alertas adiáveis (Painel): os botões ficam à direita, pequenos */
+.alerta.com-adiar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
+.alerta.com-adiar > a, .alerta.com-adiar > .adiar-alerta { display: inline; }
+.alerta.com-adiar .adiar-alerta { margin-left: auto; }
+
+/* Índice das caixas (páginas do inquilino e do imóvel) e botão de recolher cada caixa */
+.indice-caixas { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 0 0 14px; font-size: 14px; }
+.indice-caixas a { padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: var(--primaria); white-space: nowrap; }
+.indice-caixas a:hover { background: #e0e7ff; text-decoration: none; }
+.recolher-caixa, button.recolher-caixa { background: none; color: var(--suave); border: 0; padding: 0 6px 0 0; font-size: 16px; line-height: 1; cursor: pointer; vertical-align: middle; }
+.recolher-caixa:hover, button.recolher-caixa:hover { color: var(--primaria); filter: none; }
+.cartao > .cabecalho > .recolher-caixa { align-self: center; }
+.cartao > .recolher-caixa { float: left; margin-top: 4px; }
+.cartao.recolhida > *:not(.cabecalho):not(h2):not(.recolher-caixa):not(.alca-caixa) { display: none; }
+.cartao.recolhida > .cabecalho > *:not(h2):not(.recolher-caixa) { display: none; }
+.cartao.recolhida > .cabecalho, .cartao.recolhida > h2 { margin-bottom: 0; }
 
 /* Ordem das caixas: ícone ☰ para o administrador arrastar */
 .caixa-movel { position: relative; }
@@ -385,6 +405,8 @@ input.doc-invalido { border-color: var(--perigo); }
 .fechamento { margin: 0; padding-left: 22px; }
 .fechamento li { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .fechamento li.feito > .cabecalho b { color: var(--suave); }
+.roteiro-saida { list-style: none; padding-left: 0; margin-bottom: 14px; }
+.roteiro-saida li { padding: 7px 0; }
 .baixa-lote { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; }
 .baixa-lote summary { cursor: pointer; }
 .grupo-baixa { border-top: 1px solid #bbf7d0; padding: 8px 0; }
@@ -483,6 +505,8 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   header.topo .marca { flex: 1; font-size: 16px; }
   header.topo .marca img { height: 32px; }
   header.topo .conta { font-size: 12px; order: 3; width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; }
+  header.topo .busca-topo { order: 2; width: 100%; }
+  header.topo .busca-topo input, header.topo .busca-topo input:focus { width: 100%; }
   header.topo .conta br { display: none; }
   .menu-botao { display: inline-block; background: rgba(255,255,255,.15); color: #fff; padding: 6px 10px; font-size: 14px; }
   header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }

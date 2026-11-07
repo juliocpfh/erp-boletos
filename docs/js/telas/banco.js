@@ -89,6 +89,7 @@ export function telaBanco(rota) {
       <form data-form="irMesBanco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       ${link(url({ mes: C.somarMeses(mes, 1) }), `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}`}</div></div>
     <div class="acoes" style="margin-bottom:12px">${opera() ? botaoPonte('buscarExtrato', `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, 'botao') : ''} ${botaoPonte('saldoBanco', 'Ver saldo', { conta })}
+      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX e escolha o arquivo aqui">📄 Importar arquivo OFX do app do C6<input type="file" accept=".ofx,application/x-ofx,text/plain" data-importar-ofx="${esc(conta)}" hidden></label>` : ''}
       ${saldo ? `<span>Saldo em ${esc(nomeConta(conta))}: <b>${reais(saldo.valor)}</b> <span class="suave">(${esc(saldo.quando)})</span></span>` : ''}
       ${importadoAte ? `<span class="suave">extrato importado até ${dataBr(importadoAte)}</span>` : ''}</div>
     <div class="numeros">
@@ -111,6 +112,7 @@ const AJUDA_BANCO = 'Busque o extrato uma vez por mês (ou quando quiser). Cada 
 /** Pasta do contador do mês: os PDFs de "_Contador/<Empresa>/<AAAA-MM>" (abre pelo link "Abrir pasta do contador deste mês"). */
 function caixaPastaContador(e, mes) {
   return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
+    <p class="acoes">${botao('zipContador', `Baixar ZIP de ${compBr(mes)} para o contador`, { emitente: e.id, mes }, 'botao')}<span class="suave">NFs do mês em Excel, planilha das entradas e saídas com o destino de cada uma e os comprovantes desta pasta.</span></p>
     ${caixaArquivos('contador', R.idContador(e.id, mes), 'Comprovantes do mês para o contador', 'arquivos-contador', `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
 }
 
@@ -679,6 +681,31 @@ export const ACOES_BANCO = {
     const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos || [], login(), { de, ate }));
     aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m).`);
     await mostrar();
+  },
+
+  /**
+   * Importa o extrato de um arquivo OFX exportado pelo app do C6 (D5), na conta da aba aberta. Confirma antes mostrando a conta
+   * do arquivo, o período e a quantidade; lançamentos já importados (mesmo FITID) não entram de novo.
+   */
+  async importarOfx({ conta }, el) {
+    if (!opera()) throw new Error('Seu usuário não pode importar o extrato.');
+    const arquivo = el && el.files && el.files[0];
+    if (!arquivo) return;
+    try {
+      const r = Z.lerOfx(Z.textoDoOfx(new Uint8Array(await arquivo.arrayBuffer())));
+      const entradas = r.lancamentos.filter((l) => l.tipo === 'entrada').reduce((s, l) => s + l.valor_centavos, 0);
+      const saidas = r.lancamentos.filter((l) => l.tipo === 'saida').reduce((s, l) => s - l.valor_centavos, 0);
+      const ok = await janela({ titulo: `Importar extrato na conta ${nomeConta(conta)}`, sim: 'Importar',
+        html: `<p>Arquivo <b>${esc(arquivo.name)}</b>${r.banco ? ` · ${esc(r.banco)}` : ''}${r.conta ? ` · conta nº <b>${esc(r.conta)}</b>` : ''}.</p>
+          <p><b>${r.lancamentos.length}</b> lançamento(s) de ${dataBr(r.de)} a ${dataBr(r.ate)}: entradas ${reais(entradas)}, saídas ${reais(saidas)}.</p>
+          <p class="suave">Confira se o arquivo é mesmo da conta <b>${esc(nomeConta(conta))}</b> (aba aberta). O que já foi importado não entra em dobro.</p>` });
+      if (!ok) return;
+      const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate }));
+      aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s) do arquivo OFX, ${res.repetidas} já estava(m).`);
+      ir(`#/banco?conta=${encodeURIComponent(conta)}&mes=${r.ate.slice(0, 7)}`);
+    } finally {
+      if (el) el.value = '';
+    }
   },
 
   async saldoBanco({ conta }) {

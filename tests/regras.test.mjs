@@ -2248,3 +2248,115 @@ test('C7: etapa "Banco" do fechamento avisa comprovantes não baixados e pagamen
   assert.match(banco().detalhe, /ANK: tudo com destino · 1 comprovante\(s\) não baixado\(s\) · 1 pagamento\(s\) pelo banco sem confirmação$/);
   assert.equal(banco().feito, true, 'avisos não seguram a etapa');
 });
+
+test('D1: busca global acha imóvel, inquilino (nome, CPF, fiador), NF pelo número e boleto pelo valor', () => {
+  const { d, c } = base();
+  R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Carlos Fiador', cpf: '529.982.247-25' }, 'julio');
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const cb = d.cobrancas.find((x) => x.competencia === '2026-07');
+  const tipos = (t) => R.buscarGlobal(d, t, '2026-08-01').map((g) => g.tipo);
+  assert.deepEqual(tipos('loja'), ['Imóveis']);
+  assert.deepEqual(tipos('MARIA'), ['Inquilinos']);
+  assert.deepEqual(tipos('52998224725'), ['Inquilinos']); // CPF do fiador, sem pontos
+  assert.match(R.buscarGlobal(d, '529.982', '2026-08-01')[0].itens[0].detalhe, /fiador Carlos Fiador/);
+  assert.deepEqual(tipos('nilo brandao'), ['Imóveis']); // endereço sem acento
+  const valor = C.reais(R.totais(cb).a_pagar_pontual, false);
+  const boletos = R.buscarGlobal(d, valor, '2026-08-01').find((g) => g.tipo === 'Boletos com esse valor');
+  assert.equal(boletos.itens.length, 1);
+  assert.equal(boletos.itens[0].link, `#/cobranca/${cb.id}`);
+  R.inserir(d, 'faturas', { numero: 77, emitente_id: 1, cobranca_id: cb.id, emissao: '2026-07-12', valor: 100000, situacao: 'Emitida' }, 'julio');
+  assert.deepEqual(tipos('0077'), ['Notas fiscais']);
+  assert.deepEqual(tipos('770'), []);
+  assert.deepEqual(tipos('   '), []);
+});
+
+test('D3: texto do lembrete muda com a fase do boleto e traz Pix quando emitido no banco', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const cb = d.cobrancas[0]; // vence 10/08/2026
+  const antes = R.textoLembrete(d, cb, '2026-08-01');
+  assert.equal(antes.fase, 'antes');
+  assert.match(antes.texto, new RegExp(`vence em 10/08/2026, no valor de ${C.reais(R.totais(cb).a_pagar_pontual).replace(/[$.]/g, '\\$&')}`));
+  assert.match(antes.texto, /ANK Administradora$/);
+  assert.equal(antes.email, '');
+  assert.equal(antes.telefone, '41900000000');
+  assert.equal(R.textoLembrete(d, cb, '2026-08-10').fase, 'dia');
+  const tarde = R.textoLembrete(d, cb, '2026-08-20');
+  assert.equal(tarde.fase, 'atrasado');
+  assert.match(tarde.texto, /10 dia\(s\) de atraso/);
+  assert.ok(tarde.texto.includes(`hoje (20/08/2026): ${C.reais(C.liquidar(cb, '2026-08-20').valor_devido)}`));
+  assert.doesNotMatch(tarde.texto, /Pix copia e cola/);
+  cb.banco = { pix_copia_cola: '00020126pixteste', linha_digitavel: '33690.00001 11111.111111 22222.222222 1 00000000012345' };
+  assert.match(R.textoLembrete(d, cb, '2026-08-01').texto, /Pix copia e cola:\n00020126pixteste/);
+});
+
+test('D14: alerta adiado some até a data, "cuidando" vale 30 dias, voltar reaparece e o vencido é limpo na abertura', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08/2026
+  const hoje = '2026-09-01';
+  const inad = R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência');
+  assert.ok(inad && !inad.adiamento);
+  R.adiarAlerta(d, inad.chave, 'adiado', 'julio', { hoje });
+  assert.equal(R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência').adiamento.ate, '2026-09-07');
+  assert.ok(R.alertasComAdiamento(d, '2026-09-08').find((a) => a.tipo === 'Inadimplência').adiamento === null);
+  R.adiarAlerta(d, inad.chave, 'cuidando', 'ana', { hoje });
+  assert.equal(d.adiamentos_alerta.length, 1); // trocou o anterior
+  assert.equal(d.adiamentos_alerta[0].quem, 'ana');
+  assert.equal(d.adiamentos_alerta[0].ate, '2026-09-30');
+  assert.equal(R.adiamentosVencidos(d, '2026-10-01').length, 1);
+  assert.equal(R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01', soConferir: true }) >= 1, true);
+  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01' });
+  assert.equal(d.adiamentos_alerta.length, 0);
+  R.adiarAlerta(d, inad.chave, 'adiado', 'julio', { hoje });
+  assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), true);
+  assert.equal(d.adiamentos_alerta.length, 0);
+  assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), false);
+});
+
+test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registros', () => {
+  const { d, c } = base();
+  assert.deepEqual(R.roteiroSaida(d, c, '2026-11-07'), []); // sem data de saída, não começou
+  R.informarSaida(d, c.id, '2026-11-30', 'julio');
+  let r = R.roteiroSaida(d, c, '2026-11-07');
+  assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto']);
+  assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false]);
+  assert.match(r[2].detalhe, /prevista para 30\/11\/2026/);
+  // saiu: chaves feitas; vistoria registrada; leitura e protocolo da titularidade fecham "contas"
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[2].feito, true);
+  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [] }, 'julio');
+  R.inserir(d, 'leituras', { contrato_id: c.id, imovel_id: c.imovel_id, momento: 'Saída do inquilino', data: '2026-11-30', agua: '100', energia: '200' }, 'julio');
+  R.inserir(d, 'titularidades', { imovel_id: c.imovel_id, contrato_id: c.id, tipo: 'Volta para o proprietário', data: '2026-12-01', concessionaria: 'Copel' }, 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[1].feito, true);
+  assert.equal(r[3].feito, true);
+  assert.equal(r[4].feito, false);
+  const e = R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2026-11-30', garantia_valor: 270000, indice_percentual: 2, debitos: 0, ...R.calcularEncerramento(270000, 2, 0) }, 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[4].feito, true);
+  assert.equal(r[5].feito, false);
+  assert.match(r[5].detalhe, /devolver R\$ 2\.754,00/);
+  R.marcarGarantiaDevolvida(d, e.id, '2026-12-05', 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-06');
+  assert.equal(r[5].feito, true);
+  assert.match(r[5].detalhe, /devolvida em 05\/12\/2026/);
+  assert.equal(r[6].feito, false); // boleto de 11/2026 ainda não gerado
+  assert.match(r[6].detalhe, /não gerado/);
+});
+
+test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago, e inclui o contrato anterior da cadeia', () => {
+  const { d, c } = base();
+  for (const m of ['2026-06', '2026-07', '2026-08']) R.gerarCobrancas(d, m, 'julio');
+  const cbs = d.cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => a.competencia.localeCompare(b.competencia));
+  R.registrarPagamento(d, cbs[0].id, '2026-07-10', null, 'julio', { pagouEmDia: true });
+  R.registrarPagamento(d, cbs[1].id, '2026-08-10', null, 'julio', { pagouEmDia: true });
+  R.registrarPagamento(d, cbs[2].id, '2027-01-05', null, 'julio', {}); // pago só em 2027: fica fora de 2026
+  R.numerarFaturas(d, 'julio');
+  const r = R.declaracaoAnual(d, c.id, 2026);
+  assert.equal(r.empresas.length, 2); // ANK e JCK, 50% cada
+  assert.equal(r.empresas[0].itens.length, 2);
+  assert.equal(r.total, cbs[0].valor_nf + cbs[1].valor_nf);
+  assert.equal(r.empresas[0].total + r.empresas[1].total, r.total);
+  assert.equal(R.declaracaoAnual(d, c.id, 2027).total, cbs[2].valor_nf);
+  assert.equal(R.declaracaoAnual(d, c.id, 2025).empresas.length, 0);
+});

@@ -6,6 +6,7 @@ import * as B from '../backup-seguro.js';
 import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
+import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { faturaExcel, faturaHtml } from '../fatura.js';
@@ -20,7 +21,8 @@ import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
-import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
 import { usarVisualizador, visualizar } from '../visualizador.js';
 
@@ -910,6 +912,19 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
+  async garantiaDevolvida({ id }) {
+    const e = buscar('encerramentos', id);
+    if (!e) throw new Error('Cálculo final não encontrado.');
+    const r = await janela({ titulo: e.saldo >= 0 ? 'Garantia devolvida' : 'Saldo cobrado do inquilino', sim: 'Marcar',
+      html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
+        <label>Data</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+    if (!r) return;
+    await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, String((r.data || [])[0] || ''), login()));
+    aviso('Etapa marcada no roteiro da saída.');
+    await mostrar();
+  },
+
   async desfazerSaida({ id }) {
     await mudarContrato(Number(id), (db) => R.desfazerSaida(db, Number(id), login()));
     aviso('Inquilino ativo de novo (sem data de saída).');
@@ -942,6 +957,79 @@ export const ACOES = {
     const r = await alterar((db) => R.gerarCobrancas(db, comp, login()));
     aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
     await mostrar();
+  },
+
+  /** Painel: adia um alerta por 7 dias ("adiado") ou 30 ("cuidando", com quem marcou). Some do Painel e da página do inquilino até a data. */
+  async adiarAlerta({ chave, modo, tipo }) {
+    const r = await alterar((db) => R.adiarAlerta(db, chave, modo, login(), { tipo, quem: E.usuario.nome }));
+    aviso(modo === 'cuidando' ? `Anotado: ${E.usuario.nome} está cuidando. O alerta volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.` : `Alerta adiado: volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.`);
+    await mostrar();
+  },
+
+  async voltarAlerta({ chave }) {
+    await alterar((db) => R.voltarAlerta(db, chave, login()));
+    await mostrar();
+  },
+
+  /**
+   * Lembrete ao inquilino (D3): janela com o texto pronto (editável) e os botões de e-mail (canal oficial), WhatsApp e copiar.
+   * O texto muda com a fase do boleto (antes do vencimento, no dia, atrasado) e traz o Pix quando o boleto saiu pelo banco.
+   */
+  async lembrete({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    const l = R.textoLembrete(d(), cb, C.hojeIso());
+    const c = buscar('contratos', cb.contrato_id);
+    const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
+    const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
+    await janela({ titulo: `${titulo} · ${esc(c.inquilino_nome)}`, sim: 'Fechar', nao: '',
+      html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
+        <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
+        <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
+        <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : ' (sem e-mail no cadastro)'}</a>
+          <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? '' : ' (sem telefone)'}</a>
+          <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
+      ligar(dlg) {
+        dlg.querySelector('[data-nao]').hidden = true;
+        const assunto = dlg.querySelector('[name=assunto]');
+        const texto = dlg.querySelector('[name=texto]');
+        const email = dlg.querySelector('[data-enviar=email]');
+        const zap = dlg.querySelector('[data-enviar=whatsapp]');
+        const atualizar = () => {
+          email.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(assunto.value)}&body=${encodeURIComponent(texto.value)}`;
+          zap.href = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto.value)}` : '#';
+        };
+        assunto.addEventListener('input', atualizar);
+        texto.addEventListener('input', atualizar);
+        atualizar();
+        if (!tel) zap.addEventListener('click', (ev) => { ev.preventDefault(); aviso('Este inquilino não tem telefone no cadastro.', 'aviso'); });
+        dlg.querySelector('[data-copiar-lembrete]').addEventListener('click', async (ev) => {
+          await navigator.clipboard.writeText(texto.value);
+          ev.target.textContent = 'Copiado ✓';
+          setTimeout(() => { ev.target.textContent = 'Copiar texto'; }, 1500);
+        });
+      } });
+  },
+
+  /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
+  async pagarBoleto({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    const c = buscar('contratos', cb.contrato_id);
+    const i = c ? buscar('imoveis', c.imovel_id) : null;
+    const hoje = C.hojeIso();
+    const sim = C.liquidar(cb, hoje);
+    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ''}`,
+      html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
+        <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
+        <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
+        <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
+      sim: 'Confirmar pagamento' });
+    if (!resp) return;
+    const f = new FormData();
+    for (const [k, v] of Object.entries(resp)) f.set(k, v[0]);
+    await confirmarPagamentoBoleto(cb.id, f);
   },
 
   async estornar({ id }) {
@@ -1128,6 +1216,34 @@ export const ACOES = {
     if (ok) ir(`#/editar/contratos/${id}`);
   },
 
+  /**
+   * Carta de reajuste por e-mail (D4; o e-mail é o canal oficial): baixa o PDF da carta, abre o Gmail (ou o programa de e-mail)
+   * já com destinatário, assunto e o texto da carta, e marca a carta como enviada (guardando o PDF na pasta do inquilino).
+   * O PDF baixado precisa ser anexado à mão (o navegador não anexa arquivo num e-mail sozinho).
+   */
+  async enviarCartaEmail({ contrato, comp }) {
+    const c = buscar('contratos', contrato);
+    if (!c) throw new Error('Inquilino não encontrado.');
+    const carta = await pdfDaCarta(c, comp);
+    if (!carta) throw new Error('A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).');
+    const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar('imoveis', c.imovel_id) || {}).nome || ''}`.trim();
+    const para = c.inquilino_email || '';
+    const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+    const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`, sim: 'Abrir o e-mail e marcar como enviada',
+      html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+        <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
+        <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
+    if (!r) return;
+    baixar(carta.blob, carta.nome);
+    window.open((r.por || [])[0] === 'mailto' ? mailto : gmail, '_blank', 'noopener');
+    if ((r.marcar || [])[0] === '1') {
+      await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1' });
+      return;
+    }
+    aviso('PDF baixado e e-mail aberto. A carta não foi marcada como enviada.');
+  },
+
   /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */
   async cartaEnviada({ contrato, comp, enviada }) {
     if (enviada !== '1') {
@@ -1266,6 +1382,63 @@ export const ACOES = {
     const ExcelJS = await excelJs();
     const { blob, nome } = await excelDoNumero(ExcelJS, await modeloFatura(), numero);
     baixar(blob, nome);
+  },
+
+  /**
+   * ZIP do mês para o contador (D10): por empresa e mês, as NFs emitidas (Excel, uma por número), a planilha das entradas e
+   * saídas do extrato com o destino de cada uma e as cópias dos comprovantes já guardadas na pasta do contador. Baixa no computador.
+   */
+  async zipContador({ emitente, mes }) {
+    const e = buscar('emitentes', emitente);
+    if (!e || !/^\d{4}-\d{2}$/.test(mes || '')) throw new Error('Empresa ou mês inválido.');
+    const [JSZip, ExcelJS] = await Promise.all([jsZip(), excelJs()]);
+    const zip = new JSZip();
+    const avisos = [];
+    // 1) NFs do mês desta empresa, uma planilha por número (o mesmo Excel de "Baixar Excel")
+    const nfs = E.d.faturas.filter((f) => f.emitente_id === e.id && f.situacao === 'Emitida' && String(f.emissao).slice(0, 7) === mes).sort((a, b) => a.numero - b.numero);
+    const numeros = [...new Set(nfs.map((f) => f.numero))];
+    let modelo = null;
+    try { modelo = numeros.length ? await modeloFatura() : null; } catch (err) { avisos.push(`NFs em Excel não geradas: ${err.message}`); }
+    if (modelo) {
+      for (const n of numeros) {
+        const fs = nfs.filter((f) => f.numero === n);
+        zip.file(`NFs/${S.limparNome(`NF ${R.numeroFatura(n)} - ${fs[0].tomador_nome}.xlsx`)}`, await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes));
+      }
+    }
+    // 2) entradas e saídas das contas desta empresa no mês, com o destino de cada uma
+    const contas = (E.d.config_banco.contas || []).filter((c) => c.emitente_id === e.id).map((c) => c.id);
+    const movs = (E.d.movimentacoes_banco || []).filter((m) => contas.includes(m.conta_id) && String(m.data).slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Movimentações');
+    const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+    ws.addRow([`${e.nome} · entradas e saídas de ${compBr(mes)}`]).font = { bold: true, size: 14 };
+    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([]);
+    const cab = ws.addRow(['Data', 'Conta', 'Tipo', 'Valor', 'Descrição do banco', 'Destino', 'Imóvel', 'Comprovante']);
+    cab.font = { bold: true };
+    for (const m of movs) {
+      const i = m.imovel_id ? buscar('imoveis', m.imovel_id) : null;
+      const linha = ws.addRow([new Date(`${m.data}T12:00:00`), R.apelidoDaConta(E.d, m.conta_id), m.tipo === 'saida' ? 'Saída' : 'Entrada', (m.tipo === 'saida' ? -1 : 1) * m.valor / 100,
+        m.titulo || m.descricao || '', Z.descreverDestino(E.d, m) || 'SEM DESTINO', i ? i.nome : '', m.comprovante_contador || m.comprovante || '']);
+      linha.getCell(1).numFmt = 'dd/mm/yyyy';
+      linha.getCell(4).numFmt = moeda;
+    }
+    const soma = (tipo) => movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.valor, 0) / 100;
+    const tot = ws.addRow(['', '', 'Entradas', soma('entrada')]); tot.font = { bold: true }; tot.getCell(4).numFmt = moeda;
+    const tot2 = ws.addRow(['', '', 'Saídas', -soma('saida')]); tot2.font = { bold: true }; tot2.getCell(4).numFmt = moeda;
+    ws.columns = [{ width: 12 }, { width: 10 }, { width: 9 }, { width: 14 }, { width: 44 }, { width: 50 }, { width: 22 }, { width: 50 }];
+    zip.file(S.limparNome(`Movimentacoes ${e.nome} ${mes}.xlsx`), await wb.xlsx.writeBuffer());
+    // 3) comprovantes já guardados na pasta do contador (cópias feitas pela tela Banco)
+    let comprovantes = 0;
+    try {
+      const dir = await pastaDoEscopo('contador', R.idContador(e.id, mes), false);
+      for (const a of await S.listar(dir)) { zip.file(`Comprovantes/${a.nome}`, await S.lerConteudo(await dir.getFileHandle(a.nome))); comprovantes += 1; }
+    } catch { /* pasta ainda não existe: sem comprovantes */ }
+    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${new Date().toLocaleString('pt-BR')}`, '',
+      `NFs: ${numeros.length} número(s) em Excel (pasta NFs).`, `Movimentações bancárias: ${movs.length} (planilha Movimentacoes), ${movs.filter((m) => !m.classificacao).length} ainda sem destino.`,
+      `Comprovantes: ${comprovantes} arquivo(s) (pasta Comprovantes).`, ...(avisos.length ? ['', 'Avisos:', ...avisos] : [])].join('\n'));
+    baixar(await zip.generateAsync({ type: 'blob' }), S.limparNome(`Contador ${e.nome} ${mes}.zip`));
+    aviso(`ZIP do contador gerado: ${numeros.length} NF(s), ${movs.length} movimentação(ões) e ${comprovantes} comprovante(s).${avisos.length ? ` ${avisos.join(' ')}` : ''}`, avisos.length ? 'aviso' : 'ok');
   },
 
   /** Resultados financeiros do período em Excel: uma aba com o ranking e outra com as contas pagas por nós. */

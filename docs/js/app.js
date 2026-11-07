@@ -4,6 +4,7 @@ import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
 import { carregarPonteLocal } from './banco.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
+import { montarIndice } from './indice.js';
 import * as C from './calculos.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
@@ -580,6 +581,7 @@ function layout(conteudo, rota) {
   return `<header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
+      <form data-form="buscaGlobal" class="busca-topo" role="search"><input name="q" type="search" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -628,6 +630,8 @@ export async function mostrar(estadoForm = null) {
       const pagina = rota.partes[0] || 'painel';
       arrumarCaixas(app.querySelector('main'), pagina, (grupo) => R.ordemGuardada(E.d, pagina, grupo),
         podeUsuario('admin') ? (grupo, nomes) => alterar((db) => R.salvarOrdemCaixas(db, pagina, grupo, nomes, login())).catch((e) => aviso(e.message, 'erro')) : null);
+      // páginas longas (inquilino, imóvel): índice embaixo do nome e botão para recolher cada caixa (lembrado neste navegador)
+      montarIndice(app.querySelector('main'), pagina);
     }
     atualizarFaixa();
     desenharMensagens();
@@ -784,11 +788,17 @@ document.addEventListener('click', async (ev) => {
 
 document.addEventListener('change', async (ev) => {
   if (ev.target.matches('select[data-ordem-boletos]')) {
-    ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+    // o atributo traz o endereço da lista atual (mês, filtro e busca) sem a ordem
+    ir(`${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
     return;
   }
   if (ev.target.matches('input[data-marcar-grupo]')) {
     ev.target.closest('form').querySelectorAll('input[name=ids]').forEach((x) => { x.checked = ev.target.checked; });
+    return;
+  }
+  // caixa marcada mostra um campo (ex.: baixa em lote "pagaram atrasado, em" → a data)
+  if (ev.target.matches('input[data-mostra]')) {
+    ev.target.closest('form').querySelectorAll(`[data-grupo-mostra="${ev.target.dataset.mostra}"]`).forEach((x) => { x.hidden = !ev.target.checked; });
     return;
   }
   if (ev.target.matches('input[data-marcar-todas]')) {
@@ -818,6 +828,12 @@ document.addEventListener('change', async (ev) => {
       logarErro(e);
       aviso(e.message, 'erro');
     }
+    return;
+  }
+  // extrato em arquivo OFX (app do C6): tela Banco
+  const ofx = ev.target.closest('input[data-importar-ofx]');
+  if (ofx && ofx.files.length) {
+    try { await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx); } catch (e) { aviso(e.message, 'erro'); }
     return;
   }
   const el = ev.target.closest('input[data-upload]');

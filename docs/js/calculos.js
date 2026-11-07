@@ -379,6 +379,7 @@ const FORMATOS_PARAMETRO = {
   ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
   ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
   ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,
+  q: /^[^\r\n<>]{1,100}$/, // texto da busca global (a tela ainda passa por esc())
 };
 
 /** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */
