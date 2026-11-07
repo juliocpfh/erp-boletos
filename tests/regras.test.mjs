@@ -2312,3 +2312,34 @@ test('D14: alerta adiado some até a data, "cuidando" vale 30 dias, voltar reapa
   assert.equal(d.adiamentos_alerta.length, 0);
   assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), false);
 });
+
+test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registros', () => {
+  const { d, c } = base();
+  assert.deepEqual(R.roteiroSaida(d, c, '2026-11-07'), []); // sem data de saída, não começou
+  R.informarSaida(d, c.id, '2026-11-30', 'julio');
+  let r = R.roteiroSaida(d, c, '2026-11-07');
+  assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto']);
+  assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false]);
+  assert.match(r[2].detalhe, /prevista para 30\/11\/2026/);
+  // saiu: chaves feitas; vistoria registrada; leitura e protocolo da titularidade fecham "contas"
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[2].feito, true);
+  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [] }, 'julio');
+  R.inserir(d, 'leituras', { contrato_id: c.id, imovel_id: c.imovel_id, momento: 'Saída do inquilino', data: '2026-11-30', agua: '100', energia: '200' }, 'julio');
+  R.inserir(d, 'titularidades', { imovel_id: c.imovel_id, contrato_id: c.id, tipo: 'Volta para o proprietário', data: '2026-12-01', concessionaria: 'Copel' }, 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[1].feito, true);
+  assert.equal(r[3].feito, true);
+  assert.equal(r[4].feito, false);
+  const e = R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2026-11-30', garantia_valor: 270000, indice_percentual: 2, debitos: 0, ...R.calcularEncerramento(270000, 2, 0) }, 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[4].feito, true);
+  assert.equal(r[5].feito, false);
+  assert.match(r[5].detalhe, /devolver R\$ 2\.754,00/);
+  R.marcarGarantiaDevolvida(d, e.id, '2026-12-05', 'julio');
+  r = R.roteiroSaida(d, c, '2026-12-06');
+  assert.equal(r[5].feito, true);
+  assert.match(r[5].detalhe, /devolvida em 05\/12\/2026/);
+  assert.equal(r[6].feito, false); // boleto de 11/2026 ainda não gerado
+  assert.match(r[6].detalhe, /não gerado/);
+});

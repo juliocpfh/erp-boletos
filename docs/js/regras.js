@@ -5129,3 +5129,53 @@ export function adiamentosVencidos(d, hoje = C.hojeIso()) {
   const chaves = new Set(todosAlertas(d, hoje).map(chaveAlerta));
   return (d.adiamentos_alerta || []).filter((x) => x.ate < hoje || !chaves.has(x.chave));
 }
+
+// --------------------------------------------------------------------------
+// Roteiro de saída do inquilino (D6): aviso prévio → vistoria → chaves → contas → cálculo final → garantia → último boleto
+// --------------------------------------------------------------------------
+/**
+ * Etapas da saída, na ordem decidida pelo dono, cada uma com ``feito`` e um ``detalhe`` curto. Começa quando a data de saída
+ * é informada (aviso prévio). Ex.: saída em 30/11/2026, hoje 07/11: aviso ✓, chaves ⬜ ("a partir de 30/11"), cálculo final ⬜.
+ */
+export function roteiroSaida(d, c, hoje = C.hojeIso()) {
+  if (!c.data_saida || fimDeVinculo(d, c)) return [];
+  const saiu = c.data_saida <= hoje;
+  const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
+  const leitura = leituraDo(d, c.id, 'Saída do inquilino');
+  const titularidade = alertaTitularidade(d, c, hoje);
+  const contasOk = !titularidade && !!leitura;
+  const e = encerramentoDo(d, c.id);
+  const garantiaAntes = valorGarantia(d, c);
+  const comp = C.competenciaDe(c.data_saida);
+  const ultimo = boletoDoMes(d, c.id, comp);
+  const abertos = d.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && x.situacao !== 'Carência');
+  const garantia = (() => {
+    if (!e) return { feito: false, detalhe: garantiaAntes > 0 ? `${C.reais(garantiaAntes)} a acertar no cálculo final` : 'sem caução ou depósito a devolver (confirma no cálculo final)' };
+    if (e.garantia_devolvida_em) return { feito: true, detalhe: `${e.saldo >= 0 ? 'devolvida' : 'saldo acertado'} em ${C.dataBr(e.garantia_devolvida_em)}` };
+    if (e.saldo > 0) return { feito: false, detalhe: `devolver ${C.reais(e.saldo)} ao inquilino` };
+    if (e.saldo < 0) return { feito: false, detalhe: `cobrar ${C.reais(-e.saldo)} do inquilino (garantia não cobre os débitos)` };
+    return { feito: true, detalhe: 'nada a devolver nem a cobrar' };
+  })();
+  return [
+    { chave: 'aviso', titulo: 'Aviso prévio: data de saída informada', feito: true, detalhe: `saída em ${C.dataBr(c.data_saida)}` },
+    { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vist ? `feita em ${C.dataBr(vist.data)}` : saiu ? 'ainda não registrada' : `a partir de ${C.dataBr(c.data_saida)}` },
+    { chave: 'chaves', titulo: 'Entrega das chaves', feito: saiu, detalhe: saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}` : `prevista para ${C.dataBr(c.data_saida)}` },
+    { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
+      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
+    { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
+    { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
+    { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
+      detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
+  ];
+}
+
+/** Marca a garantia como devolvida (ou o saldo cobrado) no cálculo final; ``data`` vazia desfaz. */
+export function marcarGarantiaDevolvida(d, encerramentoId, data, usuario) {
+  const e = buscar(d, 'encerramentos', encerramentoId);
+  if (!e) throw new Error('Cálculo final não encontrado.');
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data da devolução.');
+  const c = buscar(d, 'contratos', e.contrato_id);
+  atualizar(d, 'encerramentos', e.id, { garantia_devolvida_em: data || null }, usuario,
+    data ? `${c ? `${c.inquilino_nome}: ` : ''}garantia ${e.saldo >= 0 ? 'devolvida' : 'saldo acertado'} em ${C.dataBr(data)}` : `${c ? `${c.inquilino_nome}: ` : ''}devolução da garantia desfeita`);
+  return e;
+}

@@ -241,6 +241,25 @@ function caixaGarantia(c) {
   return `${html}</div>`;
 }
 
+/** Roteiro da saída (D6): as sete etapas na ordem, com ✓ nas feitas e o detalhe de cada uma. */
+function roteiroSaidaHtml(c, e) {
+  const hoje = C.hojeIso();
+  const etapas = R.roteiroSaida(d(), c, hoje);
+  if (!etapas.length) return '';
+  const feitas = etapas.filter((x) => x.feito).length;
+  const acao = (x) => {
+    if (!opera() || x.feito) return '';
+    if (x.chave === 'vistoria') return link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'Registrar vistoria de saída', 'botao pequeno');
+    if (x.chave === 'contas') return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, 'Registrar protocolo', 'botao pequeno') : ''} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, 'Registrar leitura', 'botao pequeno') : ''}`;
+    if (x.chave === 'calculo' && c.data_saida <= hoje) return link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno');
+    if (x.chave === 'garantia' && e) return botao('garantiaDevolvida', e.saldo >= 0 ? 'Marcar garantia devolvida' : 'Marcar saldo cobrado', { id: e.id }, 'pequeno');
+    if (x.chave === 'boleto') return x.cobranca_id ? link(`#/cobranca/${x.cobranca_id}`, 'Ver o boleto', 'botao pequeno') : link(`#/cobrancas?comp=${C.competenciaDe(c.data_saida)}`, 'Gerar na tela Boletos', 'botao pequeno');
+    return '';
+  };
+  return `<p class="suave">Roteiro da saída: <b>${feitas} de ${etapas.length}</b> etapas feitas. A ordem é a do dia a dia; cada etapa fica marcada sozinha quando o registro dela existe.</p>
+    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? 'feito' : ''}"><div class="cabecalho"><div>${x.feito ? '✅' : '⬜'} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)}</div></div></li>`).join('')}</ol>`;
+}
+
 function caixaSaida(c) {
   const e = R.encerramentoDo(d(), c.id);
   const seguinte = R.fimDeVinculo(d(), c) ? R.continuadoPor(d(), c) : null;
@@ -259,11 +278,13 @@ function caixaSaida(c) {
     const temVistoria = R.vistoriasDo(d(), c.id).some((v) => v.tipo === 'Saída');
     return `<div class="cartao" id="saida"><div class="cabecalho"><h2>Saída em ${dataBr(c.data_saida)}</h2>
         <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo.')}</div></div>
+      ${roteiroSaidaHtml(c, null)}
       ${(() => { const s = R.saldoFci(d(), c); return s.depositos.length ? `<div class="alerta info">💰 Crédito do inquilino no FCI: <b>${reais(s.corrigido)}</b>${s.ate ? ` (corrigido até ${compBr(s.ate)})` : ' (sem correção: use "Calcular atualização" na caixa do FCI)'}. Paga só os reparos de danos da vistoria de saída; o que sobrar volta ao inquilino.</div>` : ''; })()}
       <div class="alerta aviso">Falta o cálculo final. ${temVistoria ? '' : `Faça antes a ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'vistoria de saída', '')} (com a leitura dos relógios). `}${link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno')}</div></div>`;
   }
   const lembrete = R.alertaTitularidade(d(), c);
   return `<div class="cartao" id="saida"><h2>Saída em ${dataBr(e.data_saida)}</h2>
+    ${roteiroSaidaHtml(c, e)}
     ${lembrete ? `<div class="alerta aviso"><b>Lembrete</b> ${esc(lembrete.texto)} ${opera() && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, 'Registrar protocolo') : ''}</div>` : ''}
     <div class="grade">
     ${item('Garantia a devolver', reais(e.garantia_valor))}${item('Correção (poupança)', `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}

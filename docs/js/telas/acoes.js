@@ -911,6 +911,19 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
+  async garantiaDevolvida({ id }) {
+    const e = buscar('encerramentos', id);
+    if (!e) throw new Error('Cálculo final não encontrado.');
+    const r = await janela({ titulo: e.saldo >= 0 ? 'Garantia devolvida' : 'Saldo cobrado do inquilino', sim: 'Marcar',
+      html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
+        <label>Data</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+    if (!r) return;
+    await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, String((r.data || [])[0] || ''), login()));
+    aviso('Etapa marcada no roteiro da saída.');
+    await mostrar();
+  },
+
   async desfazerSaida({ id }) {
     await mudarContrato(Number(id), (db) => R.desfazerSaida(db, Number(id), login()));
     aviso('Inquilino ativo de novo (sem data de saída).');
