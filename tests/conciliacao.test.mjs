@@ -723,3 +723,11 @@ test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançame
   const bytes = new Uint8Array([69, 77, 73, 83, 83, 195, 79]); // "EMISSÃO" em 1252 (Ã = 0xC3)
   assert.equal(Z.textoDoOfx(bytes), 'EMISSÃO');
 });
+
+test('D10: descreverDestino descreve o destino em texto puro para a planilha do contador', () => {
+  const { d, loja, cb2 } = base();
+  assert.equal(Z.descreverDestino(d, { classificacao: null }), '');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'boleto', cobranca_id: cb2.id }), 'Aluguel recebido · boleto 07/2026 · Maria Exemplo');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'tarifa', observacoes: 'pacote mensal' }), 'Tarifa do banco · pacote mensal');
+  assert.equal(Z.descreverDestino(d, { classificacao: 'conta_imovel', imovel_id: loja.id }), 'Conta do imóvel · Loja 1');
+});

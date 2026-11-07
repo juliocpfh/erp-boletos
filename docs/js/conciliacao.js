@@ -936,3 +936,32 @@ export function salvarConfigBanco2(d, campos, usuario) {
   registrar(d, usuario, 'Alteração', 'banco', null, 'Configuração do banco (extrato, comprovantes e pagamentos) alterada', novos);
   return d.config_banco;
 }
+
+// --------------------------------------------------------------------------
+// Texto do destino de uma movimentação (planilha do contador, D10)
+// --------------------------------------------------------------------------
+/** Nome curto de cada destino, para planilhas e textos (a tela usa o seu). */
+export const DESTINO_CURTO = { boleto: 'Aluguel recebido', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto da empresa', tarifa: 'Tarifa do banco', transferencia: 'Transferência entre contas', outro: 'Outro', ignorar: 'Não é nosso' };
+
+/**
+ * Descreve o destino dado a uma movimentação em texto puro. Ex.: "Conta do imóvel · Loja 1 · Água de 09/2026",
+ * "Aluguel recebido · boleto 09/2026 · Maria Exemplo", "" (sem destino).
+ */
+export function descreverDestino(d, m) {
+  if (!m.classificacao) return '';
+  const partes = [DESTINO_CURTO[m.classificacao] || m.classificacao];
+  const i = m.imovel_id ? buscar(d, 'imoveis', m.imovel_id) : null;
+  if (i) partes.push(i.nome);
+  const desp = m.despesa_id ? buscar(d, 'despesas', m.despesa_id) : null;
+  if (desp) partes.push(`${desp.tipo} de ${C.compBr(desp.competencia)}`);
+  const cb = m.cobranca_id ? buscar(d, 'cobrancas', m.cobranca_id) : null;
+  if (cb) { const c = buscar(d, 'contratos', cb.contrato_id); partes.push(`boleto ${C.compBr(cb.competencia)}${c ? ` · ${c.inquilino_nome}` : ''}`); }
+  const p = m.iptu_id ? buscar(d, 'iptus', m.iptu_id) : null;
+  if (p) partes.push(`IPTU ${p.ano}${m.iptu_parcela ? ` parcela ${m.iptu_parcela}` : ''}`);
+  const g = m.guia_imposto_id ? buscar(d, 'guias_impostos', m.guia_imposto_id) : null;
+  if (g) partes.push(`${g.imposto} ${g.periodo}`);
+  const ref = m.reforma_id ? buscar(d, 'reformas', m.reforma_id) : null;
+  if (ref) partes.push(ref.descricao || 'reforma');
+  if (m.observacoes) partes.push(m.observacoes);
+  return partes.join(' · ');
+}

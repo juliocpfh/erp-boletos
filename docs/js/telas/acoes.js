@@ -6,6 +6,7 @@ import * as B from '../backup-seguro.js';
 import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
+import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { faturaExcel, faturaHtml } from '../fatura.js';
@@ -1353,6 +1354,63 @@ export const ACOES = {
     const ExcelJS = await excelJs();
     const { blob, nome } = await excelDoNumero(ExcelJS, await modeloFatura(), numero);
     baixar(blob, nome);
+  },
+
+  /**
+   * ZIP do mês para o contador (D10): por empresa e mês, as NFs emitidas (Excel, uma por número), a planilha das entradas e
+   * saídas do extrato com o destino de cada uma e as cópias dos comprovantes já guardadas na pasta do contador. Baixa no computador.
+   */
+  async zipContador({ emitente, mes }) {
+    const e = buscar('emitentes', emitente);
+    if (!e || !/^\d{4}-\d{2}$/.test(mes || '')) throw new Error('Empresa ou mês inválido.');
+    const [JSZip, ExcelJS] = await Promise.all([jsZip(), excelJs()]);
+    const zip = new JSZip();
+    const avisos = [];
+    // 1) NFs do mês desta empresa, uma planilha por número (o mesmo Excel de "Baixar Excel")
+    const nfs = E.d.faturas.filter((f) => f.emitente_id === e.id && f.situacao === 'Emitida' && String(f.emissao).slice(0, 7) === mes).sort((a, b) => a.numero - b.numero);
+    const numeros = [...new Set(nfs.map((f) => f.numero))];
+    let modelo = null;
+    try { modelo = numeros.length ? await modeloFatura() : null; } catch (err) { avisos.push(`NFs em Excel não geradas: ${err.message}`); }
+    if (modelo) {
+      for (const n of numeros) {
+        const fs = nfs.filter((f) => f.numero === n);
+        zip.file(`NFs/${S.limparNome(`NF ${R.numeroFatura(n)} - ${fs[0].tomador_nome}.xlsx`)}`, await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes));
+      }
+    }
+    // 2) entradas e saídas das contas desta empresa no mês, com o destino de cada uma
+    const contas = (E.d.config_banco.contas || []).filter((c) => c.emitente_id === e.id).map((c) => c.id);
+    const movs = (E.d.movimentacoes_banco || []).filter((m) => contas.includes(m.conta_id) && String(m.data).slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Movimentações');
+    const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+    ws.addRow([`${e.nome} · entradas e saídas de ${compBr(mes)}`]).font = { bold: true, size: 14 };
+    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([]);
+    const cab = ws.addRow(['Data', 'Conta', 'Tipo', 'Valor', 'Descrição do banco', 'Destino', 'Imóvel', 'Comprovante']);
+    cab.font = { bold: true };
+    for (const m of movs) {
+      const i = m.imovel_id ? buscar('imoveis', m.imovel_id) : null;
+      const linha = ws.addRow([new Date(`${m.data}T12:00:00`), R.apelidoDaConta(E.d, m.conta_id), m.tipo === 'saida' ? 'Saída' : 'Entrada', (m.tipo === 'saida' ? -1 : 1) * m.valor / 100,
+        m.titulo || m.descricao || '', Z.descreverDestino(E.d, m) || 'SEM DESTINO', i ? i.nome : '', m.comprovante_contador || m.comprovante || '']);
+      linha.getCell(1).numFmt = 'dd/mm/yyyy';
+      linha.getCell(4).numFmt = moeda;
+    }
+    const soma = (tipo) => movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.valor, 0) / 100;
+    const tot = ws.addRow(['', '', 'Entradas', soma('entrada')]); tot.font = { bold: true }; tot.getCell(4).numFmt = moeda;
+    const tot2 = ws.addRow(['', '', 'Saídas', -soma('saida')]); tot2.font = { bold: true }; tot2.getCell(4).numFmt = moeda;
+    ws.columns = [{ width: 12 }, { width: 10 }, { width: 9 }, { width: 14 }, { width: 44 }, { width: 50 }, { width: 22 }, { width: 50 }];
+    zip.file(S.limparNome(`Movimentacoes ${e.nome} ${mes}.xlsx`), await wb.xlsx.writeBuffer());
+    // 3) comprovantes já guardados na pasta do contador (cópias feitas pela tela Banco)
+    let comprovantes = 0;
+    try {
+      const dir = await pastaDoEscopo('contador', R.idContador(e.id, mes), false);
+      for (const a of await S.listar(dir)) { zip.file(`Comprovantes/${a.nome}`, await S.lerConteudo(await dir.getFileHandle(a.nome))); comprovantes += 1; }
+    } catch { /* pasta ainda não existe: sem comprovantes */ }
+    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${new Date().toLocaleString('pt-BR')}`, '',
+      `NFs: ${numeros.length} número(s) em Excel (pasta NFs).`, `Movimentações bancárias: ${movs.length} (planilha Movimentacoes), ${movs.filter((m) => !m.classificacao).length} ainda sem destino.`,
+      `Comprovantes: ${comprovantes} arquivo(s) (pasta Comprovantes).`, ...(avisos.length ? ['', 'Avisos:', ...avisos] : [])].join('\n'));
+    baixar(await zip.generateAsync({ type: 'blob' }), S.limparNome(`Contador ${e.nome} ${mes}.zip`));
+    aviso(`ZIP do contador gerado: ${numeros.length} NF(s), ${movs.length} movimentação(ões) e ${comprovantes} comprovante(s).${avisos.length ? ` ${avisos.join(' ')}` : ''}`, avisos.length ? 'aviso' : 'ok');
   },
 
   /** Resultados financeiros do período em Excel: uma aba com o ranking e outra com as contas pagas por nós. */
