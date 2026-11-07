@@ -1,5 +1,9 @@
 // Datas 'AAAA-MM-DD' sem fuso: soma de dias, validação e divisão de um período em janelas
 // (o C6 limita o extrato a 30 dias e a lista de boletos a 60 dias por consulta).
+// somarDias, janelas e centavosDoTexto vêm de c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js, usado pelo site; C19).
+import { somarDias, janelas as janelasComum, centavosDoTexto } from './c6-comum.mjs';
+
+export { somarDias, centavosDoTexto };
 
 const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -9,13 +13,6 @@ export function validarData(texto, nome = 'data') {
   const d = new Date(`${texto}T00:00:00Z`);
   if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== texto) throw new Error(`A ${nome} "${texto}" não existe no calendário.`);
   return texto;
-}
-
-/** '2026-01-30' + 2 → '2026-02-01' (dias pode ser negativo). */
-export function somarDias(data, dias) {
-  const d = new Date(`${data}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString().slice(0, 10);
 }
 
 /** Dias corridos entre duas datas (ate - de); 0 quando iguais. */
@@ -36,19 +33,7 @@ export function janelas(de, ate, dias) {
   validarData(ate, 'data final');
   if (de > ate) throw new Error(`A data inicial (${de}) não pode ser depois da data final (${ate}).`);
   if (!(dias >= 1)) throw new Error('O tamanho da janela precisa ser de pelo menos 1 dia.');
-  const lista = [];
-  for (let inicio = de; inicio <= ate; inicio = somarDias(inicio, dias)) {
-    const fim = somarDias(inicio, dias - 1);
-    lista.push({ de: inicio, ate: fim < ate ? fim : ate });
-  }
-  return lista;
-}
-
-/** "1500.00" (texto do C6) → 150000 centavos inteiros. Aceita número também. */
-export function centavosDoTexto(valor) {
-  const n = typeof valor === 'number' ? valor : Number(String(valor ?? '').replace(',', '.'));
-  if (!Number.isFinite(n)) throw new Error(`Valor inválido: "${valor}".`);
-  return Math.round(n * 100);
+  return janelasComum(de, ate, dias);
 }
 
 /** 150000 → "1.500,00" (para textos em português). */

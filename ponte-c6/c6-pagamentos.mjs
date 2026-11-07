@@ -25,21 +25,10 @@ const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}$/;
 const RE_TELEFONE = /^\+[1-9][0-9]\d{5,14}$/;
 const RE_EVP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Só os dígitos de uma linha digitável colada com pontos e espaços. */
-export const soDigitos = (texto) => String(texto ?? '').replace(/\D/g, '');
+// Só os dígitos e linha digitável → código de barras: c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js, usado pelo site; C19).
+import { soDigitos, codigoDeBarrasDaLinha } from './c6-comum.mjs';
 
-/**
- * Linha digitável (47 dígitos, boleto bancário; 48, arrecadação/concessionária) → código de barras de 44 dígitos.
- * 47: AAABC.CCCCX DDDDD.DDDDDY EEEEE.EEEEEZ K UUUUVVVVVVVVVV → AAAB K UUUUVVVVVVVVVV CCCCC DDDDDDDDDD EEEEEEEEEE
- * 48: 4 blocos de 11 dígitos + 1 dígito verificador cada → os 4 blocos de 11 seguidos.
- */
-export function codigoDeBarrasDaLinha(linha) {
-  const d = soDigitos(linha);
-  if (d.length === 44) return d;
-  if (d.length === 47) return d.slice(0, 4) + d.slice(32, 33) + d.slice(33, 47) + d.slice(4, 9) + d.slice(10, 20) + d.slice(21, 31);
-  if (d.length === 48) return d.slice(0, 11) + d.slice(12, 23) + d.slice(24, 35) + d.slice(36, 47);
-  throw new Error(`Código de barras ou linha digitável inválido: esperava 44, 47 ou 48 dígitos e recebi ${d.length}.`);
-}
+export { soDigitos, codigoDeBarrasDaLinha };
 
 /** Que tipo de "content" é: 'codigo_barras' | 'br_code' | 'chave_pix' | null. Linhas digitáveis contam como código de barras. */
 export function tipoDoContent(content) {

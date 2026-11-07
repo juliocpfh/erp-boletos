@@ -64,7 +64,7 @@ Autenticação no C6: `POST /v1/auth/` com `grant_type=client_credentials`, `cli
 
 URLs base: sandbox `https://baas-api-sandbox.c6bank.info`, produção `https://baas-api.c6bank.info`.
 
-Fonte do formato: arquivos OpenAPI oficiais enviados pelo dono (`documentacao/c6-openapi/*.yaml`, resumo em `documentacao/C6_CAMPOS_CONFIRMADOS.md`) e o portal `developers.c6bank.com.br/apis/bolepix` (YAML em `developers.c6bank.com.br/yamls/bolepix.yaml`). Os nomes dos campos e caminhos ficam só em `mapa-c6.mjs` (cópia idêntica de `docs/js/mapa-c6.js`, usado pelo site; o teste confere que são iguais).
+Fonte do formato: arquivos OpenAPI oficiais enviados pelo dono (`documentacao/c6-openapi/*.yaml`, resumo em `documentacao/C6_CAMPOS_CONFIRMADOS.md`) e o portal `developers.c6bank.com.br/apis/bolepix` (YAML em `developers.c6bank.com.br/yamls/bolepix.yaml`). Os nomes dos campos e caminhos ficam só em `mapa-c6.mjs` (cópia idêntica de `docs/js/mapa-c6.js`, usado pelo site; o teste confere que são iguais). Do mesmo jeito, `c6-comum.mjs` = `docs/js/c6-comum.js` (datas, janelas, centavos e linha digitável → código de barras): mexeu num, copie para o outro.
 
 ## Para crescer (extrato, comprovantes, pagamento de contas)
 

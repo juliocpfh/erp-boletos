@@ -1,6 +1,7 @@
 // Banco (C6), fase 2 — regras puras (sem DOM nem disco): extrato das contas, destino das movimentações, conciliação de
 // boletos, nome dos comprovantes e pagamentos pelo banco. Recebe ``d`` e grava só via inserir/atualizar/excluir/registrar.
 // Os dados chegam no formato EXATO do C6 (saldo-extrato.yaml, bolepix.yaml, agendamento-de-pagamentos.yaml).
+import * as K from './c6-comum.js';
 import * as C from './calculos.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
@@ -55,29 +56,16 @@ const dataDe = (x) => String(x || '').slice(0, 10);
 // --------------------------------------------------------------------------
 // Dinheiro e datas no formato do C6
 // --------------------------------------------------------------------------
-/** "1500.00" (texto do C6, ponto decimal) → 150000 centavos. Aceita número. Lança se não for valor. */
-export function centavosDoC6(texto) {
-  if (texto === null || texto === undefined || texto === '') throw new Error('Valor do banco em branco.');
-  const n = typeof texto === 'number' ? texto : Number(String(texto).trim().replace(',', '.'));
-  if (!Number.isFinite(n)) throw new Error(`Valor do banco inválido: ${texto}`);
-  return Math.round(Math.abs(n) * 100 + 1e-7);
-}
+/** "1500.00" (texto do C6, ponto decimal) → 150000 centavos, sem sinal (o tipo entrada/saída vem de outro campo). Lança se não for valor. */
+export const centavosDoC6 = (texto) => Math.abs(K.centavosDoTexto(texto));
 /** 150000 centavos → 1500 (número em reais, duas casas, como o C6 pede em ``amount``). */
 export const reaisParaC6 = (centavos) => Number((Number(centavos || 0) / 100).toFixed(2));
 
 /**
- * Divide um período em janelas de até 30 dias (limite do extrato do C6 por consulta), inclusive nas duas pontas.
- * Ex.: 01/10 a 31/10 (31 dias) → [01/10–30/10, 31/10–31/10].
+ * Divide um período em janelas de até 30 dias (limite do extrato do C6 por consulta), inclusive nas duas pontas (``janelas`` de
+ * c6-comum, a mesma da ponte). Ex.: 01/10 a 31/10 (31 dias) → [01/10–30/10, 31/10–31/10].
  */
-export function janelasDe30Dias(de, ate, dias = 30) {
-  const out = [];
-  if (!de || !ate || de > ate) return out;
-  for (let ini = de; ini <= ate; ini = C.somarDias(ini, dias)) {
-    const fim = C.somarDias(ini, dias - 1);
-    out.push({ de: ini, ate: fim < ate ? fim : ate });
-  }
-  return out;
-}
+export const janelasDe30Dias = (de, ate, dias = 30) => K.janelas(de, ate, dias);
 
 // --------------------------------------------------------------------------
 // Contas e empresas
@@ -662,13 +650,8 @@ export function validarCodigoBarras(texto) {
   return dig;
 }
 
-/** Código de barras de 44 dígitos a partir da linha digitável (47 boleto / 48 arrecadação); 44 volta como está. */
-export function codigoDeBarras(texto) {
-  const dig = validarCodigoBarras(texto);
-  if (dig.length === 44) return dig;
-  if (dig.length === 47) return dig.slice(0, 4) + dig.slice(32, 33) + dig.slice(33, 47) + dig.slice(4, 9) + dig.slice(10, 20) + dig.slice(21, 31);
-  return [0, 12, 24, 36].map((i) => dig.slice(i, i + 11)).join('');
-}
+/** Código de barras de 44 dígitos a partir da linha digitável (47 boleto / 48 arrecadação); 44 volta como está (c6-comum, igual à ponte). */
+export const codigoDeBarras = (texto) => K.codigoDeBarrasDaLinha(validarCodigoBarras(texto));
 
 const pagamentosAtivos = (d) => (d.pagamentos_banco || []).filter((p) => !['cancelado', 'erro'].includes(p.situacao));
 
