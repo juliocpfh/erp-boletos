@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-Bf55TRWZ5lY2tu/5sWRBxBK3tq2/Tt5cOkEJ9JghRFY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-yQY5QN65FPiMiQsRP/mJxxRWRREhDHUo0Z5icq52VRQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="299cec4b0729d1c4">
+<meta name="fontes" content="46968e244951ae31">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -27,6 +27,9 @@ header.topo nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
 header.topo nav a { color: #dbe4ff; padding: 6px 10px; border-radius: 6px; }
 header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }
 header.topo .conta { font-size: 13px; color: #dbe4ff; text-align: right; }
+header.topo .busca-topo input { width: 150px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; background: rgba(255,255,255,.12); color: #fff; font-size: 13px; }
+header.topo .busca-topo input::placeholder { color: #c7d2fe; }
+header.topo .busca-topo input:focus { background: #fff; color: var(--texto); outline: none; width: 220px; }
 header.topo .conta a { color: #fff; }
 .faixa { background: #e8edfb; color: var(--primaria-escura); font-size: 13px; padding: 6px 20px; }
 main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
@@ -169,6 +172,23 @@ label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; 
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
+
+/* Alertas adiáveis (Painel): os botões ficam à direita, pequenos */
+.alerta.com-adiar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
+.alerta.com-adiar > a, .alerta.com-adiar > .adiar-alerta { display: inline; }
+.alerta.com-adiar .adiar-alerta { margin-left: auto; }
+
+/* Índice das caixas (páginas do inquilino e do imóvel) e botão de recolher cada caixa */
+.indice-caixas { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 0 0 14px; font-size: 14px; }
+.indice-caixas a { padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: var(--primaria); white-space: nowrap; }
+.indice-caixas a:hover { background: #e0e7ff; text-decoration: none; }
+.recolher-caixa, button.recolher-caixa { background: none; color: var(--suave); border: 0; padding: 0 6px 0 0; font-size: 16px; line-height: 1; cursor: pointer; vertical-align: middle; }
+.recolher-caixa:hover, button.recolher-caixa:hover { color: var(--primaria); filter: none; }
+.cartao > .cabecalho > .recolher-caixa { align-self: center; }
+.cartao > .recolher-caixa { float: left; margin-top: 4px; }
+.cartao.recolhida > *:not(.cabecalho):not(h2):not(.recolher-caixa):not(.alca-caixa) { display: none; }
+.cartao.recolhida > .cabecalho > *:not(h2):not(.recolher-caixa) { display: none; }
+.cartao.recolhida > .cabecalho, .cartao.recolhida > h2 { margin-bottom: 0; }
 
 /* Ordem das caixas: ícone ☰ para o administrador arrastar */
 .caixa-movel { position: relative; }
@@ -395,6 +415,8 @@ input.doc-invalido { border-color: var(--perigo); }
 .fechamento { margin: 0; padding-left: 22px; }
 .fechamento li { padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .fechamento li.feito > .cabecalho b { color: var(--suave); }
+.roteiro-saida { list-style: none; padding-left: 0; margin-bottom: 14px; }
+.roteiro-saida li { padding: 7px 0; }
 .baixa-lote { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; }
 .baixa-lote summary { cursor: pointer; }
 .grupo-baixa { border-top: 1px solid #bbf7d0; padding: 8px 0; }
@@ -493,6 +515,8 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   header.topo .marca { flex: 1; font-size: 16px; }
   header.topo .marca img { height: 32px; }
   header.topo .conta { font-size: 12px; order: 3; width: 100%; text-align: left; display: flex; gap: 10px; align-items: center; }
+  header.topo .busca-topo { order: 2; width: 100%; }
+  header.topo .busca-topo input, header.topo .busca-topo input:focus { width: 100%; }
   header.topo .conta br { display: none; }
   .menu-botao { display: inline-block; background: rgba(255,255,255,.15); color: #fff; padding: 6px 10px; font-size: 14px; }
   header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }
@@ -1443,7 +1467,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     todos: /^[01]$/,
     nf: /^[01]$/,
     ir: /^[\w-]+$/,
-    voltar: /^#\/[\w/?&=.,-]*$/
+    voltar: /^#\/[\w/?&=.,-]*$/,
+    q: /^[^\r\n<>]{1,100}$/
+    // texto da busca global (a tela ainda passa por esc())
   };
   function sanearParametros(q) {
     const limpo = {};
@@ -1457,6 +1483,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // docs/js/regras.js
   var regras_exports = {};
   __export(regras_exports, {
+    ASSINATURA_LEMBRETE: () => ASSINATURA_LEMBRETE,
     CAMPOS_MODELO_AIRBNB: () => CAMPOS_MODELO_AIRBNB,
     CANAIS_NOTIFICACAO: () => CANAIS_NOTIFICACAO,
     CARTA_COM_BOLETO_CORRIGIDO_DESDE: () => CARTA_COM_BOLETO_CORRIGIDO_DESDE,
@@ -1465,7 +1492,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     CONFIG_BANCO_PADRAO: () => CONFIG_BANCO_PADRAO,
     CONTA_BANCO_PADRAO: () => CONTA_BANCO_PADRAO,
     CORES_ALERTA: () => CORES_ALERTA,
+    DIAS_ADIAR_ALERTA: () => DIAS_ADIAR_ALERTA,
     DIAS_ALERTA_BANCO: () => DIAS_ALERTA_BANCO,
+    DIAS_CUIDANDO_ALERTA: () => DIAS_CUIDANDO_ALERTA,
     DIAS_EXTRATO_RECENTE: () => DIAS_EXTRATO_RECENTE,
     DIAS_SEM_IMOVEL: () => DIAS_SEM_IMOVEL,
     DIAS_VERMELHO: () => DIAS_VERMELHO,
@@ -1496,6 +1525,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     TIPOS_CHAVE_PIX: () => TIPOS_CHAVE_PIX2,
     TIPOS_DESPESA: () => TIPOS_DESPESA,
     acertarGarantiaDepositada: () => acertarGarantiaDepositada,
+    adiamentoDe: () => adiamentoDe,
+    adiamentosVencidos: () => adiamentosVencidos,
+    adiarAlerta: () => adiarAlerta,
     aditivoPerdido: () => aditivoPerdido,
     aditivosAguardando: () => aditivosAguardando,
     aditivosDo: () => aditivosDo,
@@ -1511,6 +1543,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     alertaReservaParada: () => alertaReservaParada,
     alertaSeguroImovel: () => alertaSeguroImovel,
     alertaTitularidade: () => alertaTitularidade,
+    alertasComAdiamento: () => alertasComAdiamento,
     alertasContrato: () => alertasContrato,
     alertasIptu: () => alertasIptu,
     aliquotaImpostos: () => aliquotaImpostos,
@@ -1538,6 +1571,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     boletosCaucaoDa: () => boletosCaucaoDa,
     boletosParaEmitir: () => boletosParaEmitir,
     buscar: () => buscar,
+    buscarGlobal: () => buscarGlobal,
     cadeiaDeContratos: () => cadeiaDeContratos,
     calcularEncerramento: () => calcularEncerramento,
     calcularReajuste: () => calcularReajuste,
@@ -1553,6 +1587,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     caucaoSugerida: () => caucaoSugerida,
     caucoesACompletar: () => caucoesACompletar,
     centavosParaReais: () => centavosParaReais,
+    chaveAlerta: () => chaveAlerta,
     cobrancasEmAberto: () => cobrancasEmAberto,
     competenciaDaParcela: () => competenciaDaParcela,
     competenciaDoAbatimento: () => competenciaDoAbatimento,
@@ -1592,6 +1627,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     dadosDaPessoa: () => dadosDaPessoa,
     dataApagarSemImovel: () => dataApagarSemImovel,
     dataBaseCorrecao: () => dataBaseCorrecao,
+    declaracaoAnual: () => declaracaoAnual,
     decodificarIdContador: () => decodificarIdContador,
     depositosFci: () => depositosFci,
     depositosGarantiaDo: () => depositosGarantiaDo,
@@ -1688,6 +1724,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     marcarDocumentoPerdido: () => marcarDocumentoPerdido,
     marcarEtapaEntrada: () => marcarEtapaEntrada,
     marcarEtapaFechamento: () => marcarEtapaFechamento,
+    marcarGarantiaDevolvida: () => marcarGarantiaDevolvida,
     marcarGeradoNaRotina: () => marcarGeradoNaRotina,
     marcarIptuPago: () => marcarIptuPago,
     marcarReservaAbatida: () => marcarReservaAbatida,
@@ -1766,6 +1803,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     resultadosFinanceiros: () => resultadosFinanceiros,
     resumoRotinaEntrada: () => resumoRotinaEntrada,
     resumoSolicitacoes: () => resumoSolicitacoes,
+    roteiroSaida: () => roteiroSaida,
     rotinaDeAbertura: () => rotinaDeAbertura,
     rotinaEntrada: () => rotinaEntrada,
     rotinaRecente: () => rotinaRecente,
@@ -1795,7 +1833,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     temDeposito: () => temDeposito,
     temFci: () => temFci,
     temFiador: () => temFiador,
+    textoDeBusca: () => textoDeBusca,
     textoLeitura: () => textoLeitura,
+    textoLembrete: () => textoLembrete,
     textoParte: () => textoParte,
     tirarArquivoSeguro: () => tirarArquivoSeguro,
     todosAlertas: () => todosAlertas,
@@ -1820,7 +1860,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     vencimentoDoReajuste: () => vencimentoDoReajuste,
     vencimentoGuia: () => vencimentoGuia,
     vincularInquilino: () => vincularInquilino,
-    vistoriasDo: () => vistoriasDo
+    vistoriasDo: () => vistoriasDo,
+    voltarAlerta: () => voltarAlerta
   });
 
   // docs/js/alertas.js
@@ -3080,6 +3121,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     guias_impostos: "Guia de imposto",
     movimentacoes_banco: "Movimentação bancária",
     pagamentos_banco: "Pagamento pelo banco",
+    adiamentos_alerta: "Adiamento de alerta",
     arquivos: "Arquivo",
     banco: "Banco de dados",
     listas: "Lista de opções"
@@ -6852,7 +6894,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (feito && !atual) inserir(d2, "fechamentos", { competencia: mes, etapa, feito_em: hojeIso() }, usuario, `Fechamento de ${compBr(mes)}: etapa "${etapa}" feita`);
     if (!feito && atual) excluir(d2, "fechamentos", atual.id, usuario, `Fechamento de ${compBr(mes)}: etapa "${etapa}" desmarcada`);
   }
-  function baixarEmLote(d2, ids, dataContabil, usuario) {
+  function baixarEmLote(d2, ids, dataContabil, usuario, { pagouEmDia = true, dataPagou = null } = {}) {
     const feitos = [];
     const pulados = [];
     for (const id of ids) {
@@ -6861,7 +6903,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         if (cb) pulados.push(cb);
         continue;
       }
-      registrarPagamento(d2, cb.id, dataContabil, null, usuario, { pagouEmDia: true });
+      registrarPagamento(d2, cb.id, dataContabil, null, usuario, { pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou });
       feitos.push(cb);
     }
     return { feitos, pulados };
@@ -7039,6 +7081,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         n += 1;
         if (!soConferir) completarPorDepositos(d2, c, qual, usuario);
       }
+    }
+    for (const x of adiamentosVencidos(d2, hoje3)) {
+      n += 1;
+      if (!soConferir) excluir(d2, "adiamentos_alerta", x.id, usuario, `Adiamento do alerta "${x.tipo}" encerrado (até ${dataBr(x.ate)})`);
     }
     return n;
   }
@@ -7447,6 +7493,186 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
     if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
     return { nivel: enviados.length || erros.length ? "aviso" : "info", tipo: "Banco", imovel: "", inquilino: "", ancora: null, link: "#/banco", texto: `${partes.join("; ")}.` };
+  }
+  var textoDeBusca = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
+  var soDigitosBusca = (t) => String(t || "").replace(/\D/g, "");
+  function buscarGlobal(d2, texto3, hoje3 = hojeIso()) {
+    const q = textoDeBusca(texto3);
+    const digitos = soDigitosBusca(texto3);
+    if (!q) return [];
+    const bate = (...campos) => campos.some((v) => v && textoDeBusca(v).includes(q));
+    const bateDigitos = (...campos) => digitos.length >= 3 && campos.some((v) => v && soDigitosBusca(v).includes(digitos));
+    const grupos = [];
+    const imoveis = d2.imoveis.filter((i) => bate(i.nome, i.endereco, i.complemento, i.cidade, i.matricula, i.sublote) || bateDigitos(i.matricula, i.copel_uc, i.sanepar_matricula, i.gas_relogio, i.cep)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((i) => {
+      const atual = d2.contratos.find((c) => c.imovel_id === i.id && contratoAtivo(c, hoje3));
+      return { titulo: i.nome, detalhe: `${enderecoCompleto(i)}${atual ? ` · ${atual.inquilino_nome}` : " · vago"}`, link: `#/imovel/${i.id}` };
+    });
+    if (imoveis.length) grupos.push({ tipo: "Imóveis", itens: imoveis });
+    const fiadoresDe = (c) => d2.fiadores.filter((f) => f.contrato_id === c.id);
+    const contratos = d2.contratos.filter((c) => bate(c.inquilino_nome, c.inquilino_apelido, c.inquilino_email, c.solidario_nome, c.representante_nome, c.responsavel_nome) || bateDigitos(c.inquilino_cpf, c.inquilino_telefone, c.solidario_cpf, c.representante_cpf, c.responsavel_telefone) || fiadoresDe(c).some((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone))).sort((a, b) => Number(contratoAtivo(b, hoje3)) - Number(contratoAtivo(a, hoje3)) || a.inquilino_nome.localeCompare(b.inquilino_nome, "pt-BR")).map((c) => {
+      const i = buscar(d2, "imoveis", c.imovel_id);
+      const fiador = fiadoresDe(c).find((f) => bate(f.nome) || bateDigitos(f.cpf, f.telefone));
+      const porque = fiador ? `fiador ${fiador.nome}` : bate(c.solidario_nome) || bateDigitos(c.solidario_cpf) ? `solidário ${c.solidario_nome}` : bate(c.representante_nome) || bateDigitos(c.representante_cpf) ? `representante ${c.representante_nome}` : "";
+      return {
+        titulo: c.inquilino_nome,
+        detalhe: [i ? i.nome : "sem imóvel", c.inquilino_cpf, porque].filter(Boolean).join(" · "),
+        link: `#/contrato/${c.id}`,
+        extra: contratoAtivo(c, hoje3) ? "" : c.data_saida ? `saiu em ${dataBr(c.data_saida)}` : "inativo"
+      };
+    });
+    if (contratos.length) grupos.push({ tipo: "Inquilinos", itens: contratos });
+    if (/^\d{1,6}$/.test(q)) {
+      const n = Number(q);
+      const nfs = d2.faturas.filter((f) => f.numero === n).map((f) => {
+        const e = buscar(d2, "emitentes", f.emitente_id);
+        const cb = f.cobranca_id ? buscar(d2, "cobrancas", f.cobranca_id) : null;
+        const c = cb ? buscar(d2, "contratos", cb.contrato_id) : null;
+        return { titulo: `NF nº ${numeroFatura(f.numero)}${e ? ` · ${e.nome}` : ""}`, detalhe: `${dataBr(f.emissao)} · ${reais(f.valor)}${c ? ` · ${c.inquilino_nome}` : ""}`, link: `#/imprimir/faturas?numero=${f.numero}`, extra: f.situacao === "Emitida" ? "" : f.situacao };
+      });
+      if (nfs.length) grupos.push({ tipo: "Notas fiscais", itens: nfs });
+    }
+    let valor = null;
+    try {
+      valor = /^[\d.,]+$/.test(q) && /[,.]\d{1,2}$|^\d+$/.test(q) ? centavos(q) : null;
+    } catch {
+      valor = null;
+    }
+    if (valor > 0) {
+      const boletos = d2.cobrancas.filter((cb) => [totais(cb).a_pagar_pontual, totais(cb).a_pagar_sem_desconto, cb.valor_pago, cb.valor_nf].includes(valor)).sort((a, b) => b.competencia.localeCompare(a.competencia)).slice(0, 30).map((cb) => {
+        const c = buscar(d2, "contratos", cb.contrato_id);
+        const i = c ? buscar(d2, "imoveis", c.imovel_id) : null;
+        return { titulo: `Boleto ${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ""}`, detalhe: `${i ? `${i.nome} · ` : ""}vence ${dataBr(cb.vencimento)} · pontual ${reais(totais(cb).a_pagar_pontual)}${cb.data_pagamento ? ` · recebido ${reais(cb.valor_pago)} em ${dataBr(cb.data_pagamento)}` : ""}`, link: `#/cobranca/${cb.id}`, extra: cb.situacao };
+      });
+      if (boletos.length) grupos.push({ tipo: "Boletos com esse valor", itens: boletos });
+    }
+    return grupos;
+  }
+  var ASSINATURA_LEMBRETE = "ANK Administradora";
+  function textoLembrete(d2, cb, hoje3 = hojeIso()) {
+    const c = buscar(d2, "contratos", cb.contrato_id);
+    const i = c ? buscar(d2, "imoveis", c.imovel_id) : null;
+    const t = totais(cb);
+    const fase = cb.vencimento > hoje3 ? "antes" : cb.vencimento === hoje3 ? "dia" : "atrasado";
+    const nome = c && (c.inquilino_apelido || c.inquilino_nome.split(" ")[0]) || "";
+    const oQue = ehComplementoCaucao(cb) ? "do complemento da caução" : `do aluguel de ${compBr(cb.competencia)}`;
+    const onde = i ? ` (${i.nome})` : "";
+    const linhas2 = [`Olá, ${nome}!`, ""];
+    if (fase === "antes") {
+      linhas2.push(`Lembrete: o boleto ${oQue}${onde} vence em ${dataBr(cb.vencimento)}, no valor de ${reais(t.a_pagar_pontual)}${cb.desconto ? " (já com a bonificação de pontualidade)" : ""}.`);
+      if (!ehComplementoCaucao(cb)) linhas2.push(`Após o vencimento: ${reais(t.a_pagar_sem_desconto)} mais multa de ${pct(cb.multa_percentual)} e juros de ${pct(cb.juros_mensal_percentual)} ao mês.`);
+    } else if (fase === "dia") {
+      linhas2.push(`Lembrete: o boleto ${oQue}${onde} vence hoje, ${dataBr(cb.vencimento)}, no valor de ${reais(t.a_pagar_pontual)}${cb.desconto ? " (já com a bonificação de pontualidade)" : ""}.`);
+      if (!ehComplementoCaucao(cb)) linhas2.push(`A partir de amanhã: ${reais(t.a_pagar_sem_desconto)} mais multa de ${pct(cb.multa_percentual)} e juros de ${pct(cb.juros_mensal_percentual)} ao mês.`);
+    } else {
+      const r = liquidar(cb, hoje3);
+      linhas2.push(`O boleto ${oQue}${onde}, com vencimento em ${dataBr(cb.vencimento)}, consta em aberto (${r.dias_atraso} dia(s) de atraso).`);
+      linhas2.push(ehComplementoCaucao(cb) ? `Valor: ${reais(r.valor_devido)}.` : `Valor para pagamento hoje (${dataBr(hoje3)}): ${reais(r.valor_devido)} (${reais(t.a_pagar_sem_desconto)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
+      linhas2.push("Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.");
+    }
+    const b = cb.banco || null;
+    if (b && b.pix_copia_cola) linhas2.push("", "Pix copia e cola:", b.pix_copia_cola);
+    if (b && b.linha_digitavel) linhas2.push("", `Linha digitável do boleto: ${b.linha_digitavel}`);
+    linhas2.push("", "Qualquer dúvida, estamos à disposição.", "", ASSINATURA_LEMBRETE);
+    const assunto = fase === "atrasado" ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${dataBr(cb.vencimento)}`;
+    return { fase, assunto, texto: linhas2.join("\n"), email: c && c.inquilino_email || "", telefone: (c && c.inquilino_telefone || "").replace(/\D/g, "") };
+  }
+  var DIAS_ADIAR_ALERTA = 7;
+  var DIAS_CUIDANDO_ALERTA = 30;
+  var chaveAlerta = (a) => [a.tipo, a.contrato_id || "", a.imovel_id || "", a.ancora || ""].join("|");
+  function adiamentoDe(d2, chave, hoje3 = hojeIso()) {
+    return (d2.adiamentos_alerta || []).find((x) => x.chave === chave && x.ate >= hoje3) || null;
+  }
+  function alertasComAdiamento(d2, hoje3 = hojeIso()) {
+    return todosAlertas(d2, hoje3).map((a) => ({ ...a, chave: chaveAlerta(a), adiamento: adiamentoDe(d2, chaveAlerta(a), hoje3) }));
+  }
+  function adiarAlerta(d2, chave, modo, usuario, { hoje: hoje3 = hojeIso(), dias = null, tipo = "", quem = "" } = {}) {
+    if (!["adiado", "cuidando"].includes(modo)) throw new Error("Modo de adiamento desconhecido.");
+    const n = dias || (modo === "cuidando" ? DIAS_CUIDANDO_ALERTA : DIAS_ADIAR_ALERTA);
+    const ate = somarDias(hoje3, n - 1);
+    const atual = (d2.adiamentos_alerta || []).find((x) => x.chave === chave);
+    const dados = { chave, tipo: tipo || chave.split("|")[0], modo, ate, quem: quem || usuario, em: hoje3 };
+    const texto3 = `Alerta "${dados.tipo}" ${modo === "cuidando" ? "em cuidado por" : "adiado por"} ${dados.quem} até ${dataBr(ate)}`;
+    return atual ? atualizar(d2, "adiamentos_alerta", atual.id, dados, usuario, texto3) : inserir(d2, "adiamentos_alerta", dados, usuario, texto3);
+  }
+  function voltarAlerta(d2, chave, usuario) {
+    const atual = (d2.adiamentos_alerta || []).find((x) => x.chave === chave);
+    if (atual) excluir(d2, "adiamentos_alerta", atual.id, usuario, `Alerta "${atual.tipo}" volta a aparecer`);
+    return !!atual;
+  }
+  function adiamentosVencidos(d2, hoje3 = hojeIso()) {
+    const chaves = new Set(todosAlertas(d2, hoje3).map(chaveAlerta));
+    return (d2.adiamentos_alerta || []).filter((x) => x.ate < hoje3 || !chaves.has(x.chave));
+  }
+  function roteiroSaida(d2, c, hoje3 = hojeIso()) {
+    if (!c.data_saida || fimDeVinculo(d2, c)) return [];
+    const saiu = c.data_saida <= hoje3;
+    const vist = vistoriasDo(d2, c.id).find((v) => v.tipo === "Saída") || null;
+    const leitura = leituraDo(d2, c.id, "Saída do inquilino");
+    const titularidade = alertaTitularidade(d2, c, hoje3);
+    const contasOk = !titularidade && !!leitura;
+    const e = encerramentoDo(d2, c.id);
+    const garantiaAntes = valorGarantia(d2, c);
+    const comp = competenciaDe(c.data_saida);
+    const ultimo = boletoDoMes(d2, c.id, comp);
+    const abertos = d2.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && x.situacao !== "Carência");
+    const garantia = (() => {
+      if (!e) return { feito: false, detalhe: garantiaAntes > 0 ? `${reais(garantiaAntes)} a acertar no cálculo final` : "sem caução ou depósito a devolver (confirma no cálculo final)" };
+      if (e.garantia_devolvida_em) return { feito: true, detalhe: `${e.saldo >= 0 ? "devolvida" : "saldo acertado"} em ${dataBr(e.garantia_devolvida_em)}` };
+      if (e.saldo > 0) return { feito: false, detalhe: `devolver ${reais(e.saldo)} ao inquilino` };
+      if (e.saldo < 0) return { feito: false, detalhe: `cobrar ${reais(-e.saldo)} do inquilino (garantia não cobre os débitos)` };
+      return { feito: true, detalhe: "nada a devolver nem a cobrar" };
+    })();
+    return [
+      { chave: "aviso", titulo: "Aviso prévio: data de saída informada", feito: true, detalhe: `saída em ${dataBr(c.data_saida)}` },
+      { chave: "vistoria", titulo: "Vistoria de saída (com a leitura dos relógios)", feito: !!vist, detalhe: vist ? `feita em ${dataBr(vist.data)}` : saiu ? "ainda não registrada" : `a partir de ${dataBr(c.data_saida)}` },
+      { chave: "chaves", titulo: "Entrega das chaves", feito: saiu, detalhe: saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}` : `prevista para ${dataBr(c.data_saida)}` },
+      {
+        chave: "contas",
+        titulo: "Contas: titularidade de volta ao proprietário e leitura final",
+        feito: contasOk,
+        detalhe: [titularidade ? "falta o protocolo da volta da titularidade" : "titularidade de volta ✓", leitura ? "leitura da saída ✓" : "falta a leitura dos relógios na saída"].join(" · ")
+      },
+      { chave: "calculo", titulo: "Cálculo final (garantia corrigida, débitos, FCI)", feito: !!e, detalhe: e ? `${e.saldo >= 0 ? "a devolver" : "a cobrar"} ${reais(Math.abs(e.saldo))}` : saiu ? "pendente" : "depois da saída" },
+      { chave: "garantia", titulo: "Devolução da garantia (ou cobrança do saldo)", ...garantia },
+      {
+        chave: "boleto",
+        titulo: `Último boleto (aluguel de ${compBr(comp)}, proporcional)`,
+        feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
+        detalhe: !ultimo ? "ainda não gerado (tela Boletos)" : ultimo.data_pagamento ? abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${dataBr(ultimo.data_pagamento)}` : `em aberto, vence ${dataBr(ultimo.vencimento)}`,
+        cobranca_id: ultimo ? ultimo.id : null
+      }
+    ];
+  }
+  function marcarGarantiaDevolvida(d2, encerramentoId, data2, usuario) {
+    const e = buscar(d2, "encerramentos", encerramentoId);
+    if (!e) throw new Error("Cálculo final não encontrado.");
+    if (data2 && !/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data da devolução.");
+    const c = buscar(d2, "contratos", e.contrato_id);
+    atualizar(
+      d2,
+      "encerramentos",
+      e.id,
+      { garantia_devolvida_em: data2 || null },
+      usuario,
+      data2 ? `${c ? `${c.inquilino_nome}: ` : ""}garantia ${e.saldo >= 0 ? "devolvida" : "saldo acertado"} em ${dataBr(data2)}` : `${c ? `${c.inquilino_nome}: ` : ""}devolução da garantia desfeita`
+    );
+    return e;
+  }
+  function declaracaoAnual(d2, contratoId, ano) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new Error("Inquilino não encontrado.");
+    const ids = /* @__PURE__ */ new Set([c.id, ...cadeiaDeContratos(d2, c).antes.map((x) => x.id)]);
+    const cobrancas = new Map(d2.cobrancas.filter((x) => ids.has(x.contrato_id)).map((x) => [x.id, x]));
+    const nfs = d2.faturas.filter((f) => f.situacao === "Emitida" && f.origem_tipo === "cobranca" && cobrancas.has(f.origem_id) && String(f.emissao).slice(0, 4) === String(ano)).sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
+    const porEmpresa = /* @__PURE__ */ new Map();
+    for (const f of nfs) {
+      const cb = cobrancas.get(f.origem_id);
+      if (!porEmpresa.has(f.emitente_id)) porEmpresa.set(f.emitente_id, { emitente: buscar(d2, "emitentes", f.emitente_id), itens: [], total: 0 });
+      const g = porEmpresa.get(f.emitente_id);
+      g.itens.push({ numero: f.numero, emissao: f.emissao, competencia: cb.competencia, valor: f.valor, pago_em: cb.data_pagamento });
+      g.total += f.valor;
+    }
+    return { contrato: c, imovel: buscar(d2, "imoveis", c.imovel_id), ano: Number(ano), empresas: [...porEmpresa.values()].sort((a, b) => a.emitente.nome.localeCompare(b.emitente.nome, "pt-BR")), total: nfs.reduce((s, f) => s + f.valor, 0) };
   }
 
   // docs/js/armazenamento.js
@@ -9062,6 +9288,95 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       partes[k] = "";
     }
     return `<div class="formulario${compacto ? " compacto" : ""}">${partes.join("")}</div>`;
+  }
+
+  // docs/js/indice.js
+  var PAGINAS = /* @__PURE__ */ new Set(["contrato", "imovel"]);
+  var CHAVE = (pagina) => `caixas-recolhidas:${pagina}`;
+  function lerRecolhidas(pagina) {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(CHAVE(pagina)) || "[]"));
+    } catch {
+      return /* @__PURE__ */ new Set();
+    }
+  }
+  function guardarRecolhidas(pagina, conjunto) {
+    try {
+      localStorage.setItem(CHAVE(pagina), JSON.stringify([...conjunto]));
+    } catch {
+    }
+  }
+  var tituloDa = (cx) => {
+    const t = cx.matches("details") ? cx.querySelector(":scope > summary") : cx.querySelector(":scope > .cabecalho > h2, :scope > h2") || cx.querySelector("h2");
+    return t ? t.textContent.replace(/☰/g, "").replace(/\s*\([^)]*\)\s*$/, "").split(" · ")[0].replace(/\s+/g, " ").trim() : "";
+  };
+  var idDe = (texto3) => texto3.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  function caixasDe(raiz) {
+    const lista3 = [];
+    for (const cx of raiz.querySelectorAll(".cartao, details.cartao")) {
+      if (cx.closest("form") || cx.closest(".cartao:not(:scope)") || cx.matches("a") || cx.classList.contains("login")) continue;
+      const titulo2 = tituloDa(cx);
+      if (!titulo2) continue;
+      lista3.push({ cx, titulo: titulo2 });
+    }
+    return lista3;
+  }
+  function montarIndice(raiz, pagina) {
+    if (!raiz || !PAGINAS.has(pagina)) return;
+    const caixas = caixasDe(raiz);
+    if (caixas.length < 4) return;
+    const recolhidas = lerRecolhidas(pagina);
+    const usados = /* @__PURE__ */ new Set();
+    for (const x of caixas) {
+      if (!x.cx.id) {
+        let id = idDe(x.titulo) || "caixa";
+        while (usados.has(id) || raiz.querySelector(`#${CSS.escape(id)}`)) id = `${id}-2`;
+        x.cx.id = id;
+      }
+      usados.add(x.cx.id);
+      x.nome = idDe(x.titulo);
+      if (x.cx.matches("details")) continue;
+      const cab2 = x.cx.querySelector(":scope > .cabecalho") || x.cx.querySelector(":scope > h2");
+      if (!cab2) continue;
+      const fechada = recolhidas.has(x.nome);
+      x.cx.classList.toggle("recolhida", fechada);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "recolher-caixa";
+      b.title = fechada ? "Mostrar esta caixa" : "Recolher esta caixa";
+      b.setAttribute("aria-expanded", String(!fechada));
+      b.textContent = fechada ? "▸" : "▾";
+      b.addEventListener("click", () => {
+        const agora = !x.cx.classList.contains("recolhida");
+        x.cx.classList.toggle("recolhida", agora);
+        b.textContent = agora ? "▸" : "▾";
+        b.title = agora ? "Mostrar esta caixa" : "Recolher esta caixa";
+        b.setAttribute("aria-expanded", String(!agora));
+        if (agora) recolhidas.add(x.nome);
+        else recolhidas.delete(x.nome);
+        guardarRecolhidas(pagina, recolhidas);
+      });
+      (cab2.tagName === "H2" ? x.cx : cab2).insertBefore(b, cab2.tagName === "H2" ? cab2 : cab2.firstChild);
+    }
+    const nav = document.createElement("nav");
+    nav.className = "indice-caixas nao-imprimir";
+    nav.setAttribute("aria-label", "Partes desta página");
+    nav.innerHTML = `<span class="suave">Nesta página:</span> ${caixas.map((x) => `<a href="#" data-ir-caixa="${esc(x.cx.id)}">${esc(x.titulo)}</a>`).join(" ")}`;
+    nav.addEventListener("click", (ev) => {
+      const a = ev.target.closest("a[data-ir-caixa]");
+      if (!a) return;
+      ev.preventDefault();
+      const cx = document.getElementById(a.dataset.irCaixa);
+      if (!cx) return;
+      if (cx.matches("details")) cx.open = true;
+      if (cx.classList.contains("recolhida")) cx.querySelector(".recolher-caixa")?.click();
+      cx.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    const cab = raiz.querySelector(".cabecalho");
+    let depois = cab;
+    while (depois && depois.nextElementSibling && depois.nextElementSibling.matches(".endereco, .atalhos-docs, .selos")) depois = depois.nextElementSibling;
+    if (depois) depois.insertAdjacentElement("afterend", nav);
+    else raiz.prepend(nav);
   }
 
   // docs/js/nuvem.js
@@ -11679,6 +11994,54 @@ ${xref}
     );
     return { novas, repetidas, conta };
   }
+  var dataOfx = (t) => {
+    const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(t || "").trim());
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+  };
+  function centavosDoOfx(t) {
+    let s = String(t || "").trim().replace(/\s/g, "");
+    if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+    const n = Number(s);
+    if (!Number.isFinite(n)) throw new Error(`Valor inválido no arquivo OFX: "${t}".`);
+    return Math.round(n * 100);
+  }
+  var marca = (bloco, tag) => {
+    const m = new RegExp(`<${tag}>([^<\\r\\n]*)`, "i").exec(bloco);
+    return m ? m[1].trim() : "";
+  };
+  function lerOfx(texto3) {
+    const s = String(texto3 || "");
+    if (!/<OFX>/i.test(s)) throw new Error('Este arquivo não é um OFX (não achei a marca <OFX>). Exporte o extrato no app do C6 em "OFX".');
+    const lancamentos = [];
+    const vistos = /* @__PURE__ */ new Set();
+    for (const m of s.matchAll(/<STMTTRN>([\s\S]*?)(?=<STMTTRN>|<\/STMTTRN>|<\/BANKTRANLIST>)/gi)) {
+      const b = m[1];
+      const id = marca(b, "FITID");
+      const data2 = dataOfx(marca(b, "DTPOSTED"));
+      if (!id || !data2) throw new Error("Lançamento do OFX sem FITID ou sem data.");
+      if (vistos.has(id)) continue;
+      vistos.add(id);
+      const valor = centavosDoOfx(marca(b, "TRNAMT"));
+      const ref = marca(b, "REFNUM");
+      lancamentos.push({
+        id_externo: id,
+        data: data2,
+        valor_centavos: valor,
+        tipo: valor < 0 ? "saida" : "entrada",
+        descricao: marca(b, "MEMO") || marca(b, "NAME") || "",
+        categoria: marca(b, "TRNTYPE") || null,
+        end_to_end_id: /^E\d{8}/.test(ref) ? ref : null,
+        local_reference: ref && !/^E\d{8}/.test(ref) ? ref : null
+      });
+    }
+    if (!lancamentos.length) throw new Error("O arquivo OFX não tem lançamentos (período sem movimentação ou arquivo incompleto).");
+    const datas = lancamentos.map((l) => l.data).sort();
+    return { banco: marca(s, "ORG") || "", conta: marca(s, "ACCTID") || "", de: dataOfx(marca(s, "DTSTART")) || datas[0], ate: dataOfx(marca(s, "DTEND")) || datas[datas.length - 1], lancamentos };
+  }
+  function textoDoOfx(bytes2) {
+    const u8 = new TextDecoder("utf-8").decode(bytes2);
+    return u8.includes("�") ? new TextDecoder("windows-1252").decode(bytes2) : u8;
+  }
   var nomeSemAcento = (texto3) => String(texto3 || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[<>:"/\\|?*\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "");
   function tipoDoComprovante(d2, mov2) {
     if (mov2.origem) return mov2.tipo_conta || "Conta";
@@ -12360,6 +12723,28 @@ ${xref}
     registrar(d2, usuario, "Alteração", "banco", null, "Configuração do banco (extrato, comprovantes e pagamentos) alterada", novos);
     return d2.config_banco;
   }
+  var DESTINO_CURTO = { boleto: "Aluguel recebido", airbnb: "Airbnb", reforma: "Reforma", conta_imovel: "Conta do imóvel", iptu: "IPTU", imposto: "Imposto da empresa", tarifa: "Tarifa do banco", transferencia: "Transferência entre contas", outro: "Outro", ignorar: "Não é nosso" };
+  function descreverDestino(d2, m) {
+    if (!m.classificacao) return "";
+    const partes = [DESTINO_CURTO[m.classificacao] || m.classificacao];
+    const i = m.imovel_id ? buscar(d2, "imoveis", m.imovel_id) : null;
+    if (i) partes.push(i.nome);
+    const desp = m.despesa_id ? buscar(d2, "despesas", m.despesa_id) : null;
+    if (desp) partes.push(`${desp.tipo} de ${compBr(desp.competencia)}`);
+    const cb = m.cobranca_id ? buscar(d2, "cobrancas", m.cobranca_id) : null;
+    if (cb) {
+      const c = buscar(d2, "contratos", cb.contrato_id);
+      partes.push(`boleto ${compBr(cb.competencia)}${c ? ` · ${c.inquilino_nome}` : ""}`);
+    }
+    const p2 = m.iptu_id ? buscar(d2, "iptus", m.iptu_id) : null;
+    if (p2) partes.push(`IPTU ${p2.ano}${m.iptu_parcela ? ` parcela ${m.iptu_parcela}` : ""}`);
+    const g = m.guia_imposto_id ? buscar(d2, "guias_impostos", m.guia_imposto_id) : null;
+    if (g) partes.push(`${g.imposto} ${g.periodo}`);
+    const ref = m.reforma_id ? buscar(d2, "reformas", m.reforma_id) : null;
+    if (ref) partes.push(ref.descricao || "reforma");
+    if (m.observacoes) partes.push(m.observacoes);
+    return partes.join(" · ");
+  }
 
   // docs/js/telas/banco.js
   var TITULO_AGUARDANDO = "Aguardando as chaves da API do C6";
@@ -12441,6 +12826,7 @@ ${xref}
       <form data-form="irMesBanco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       ${link(url({ mes: somarMeses(mes, 1) }), `${compBr(somarMeses(mes, 1))} →`, "botao secundario")}`}</div></div>
     <div class="acoes" style="margin-bottom:12px">${opera() ? botaoPonte("buscarExtrato", `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, "botao") : ""} ${botaoPonte("saldoBanco", "Ver saldo", { conta })}
+      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX e escolha o arquivo aqui">📄 Importar arquivo OFX do app do C6<input type="file" accept=".ofx,application/x-ofx,text/plain" data-importar-ofx="${esc(conta)}" hidden></label>` : ""}
       ${saldo ? `<span>Saldo em ${esc(nomeConta(conta))}: <b>${reais(saldo.valor)}</b> <span class="suave">(${esc(saldo.quando)})</span></span>` : ""}
       ${importadoAte ? `<span class="suave">extrato importado até ${dataBr(importadoAte)}</span>` : ""}</div>
     <div class="numeros">
@@ -12460,6 +12846,7 @@ ${xref}
   var AJUDA_BANCO = "Busque o extrato uma vez por mês (ou quando quiser). Cada linha precisa de um destino: um imóvel e a conta dele (água, luz, gás, condomínio, IPTU), um boleto de aluguel recebido, um imposto, tarifa do banco ou transferência entre as nossas contas. O comprovante é guardado em PDF com um nome padrão (data, empresa, imóvel, conta e valor) na pasta do imóvel (Contas pagas/ano) e numa cópia para o contador (_Contador/Empresa/AAAA-MM).";
   function caixaPastaContador(e, mes) {
     return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador3())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
+    <p class="acoes">${botao("zipContador", `Baixar ZIP de ${compBr(mes)} para o contador`, { emitente: e.id, mes }, "botao")}<span class="suave">NFs do mês em Excel, planilha das entradas e saídas com o destino de cada uma e os comprovantes desta pasta.</span></p>
     ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
   }
   function descreverSugestao(s) {
@@ -12981,6 +13368,33 @@ ${xref}
       const res = await alterar((db) => importarExtrato(db, conta, r.lancamentos || [], login(), { de, ate }));
       aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m).`);
       await mostrar();
+    },
+    /**
+     * Importa o extrato de um arquivo OFX exportado pelo app do C6 (D5), na conta da aba aberta. Confirma antes mostrando a conta
+     * do arquivo, o período e a quantidade; lançamentos já importados (mesmo FITID) não entram de novo.
+     */
+    async importarOfx({ conta }, el) {
+      if (!opera()) throw new Error("Seu usuário não pode importar o extrato.");
+      const arquivo = el && el.files && el.files[0];
+      if (!arquivo) return;
+      try {
+        const r = lerOfx(textoDoOfx(new Uint8Array(await arquivo.arrayBuffer())));
+        const entradas = r.lancamentos.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor_centavos, 0);
+        const saidas = r.lancamentos.filter((l) => l.tipo === "saida").reduce((s, l) => s - l.valor_centavos, 0);
+        const ok = await janela({
+          titulo: `Importar extrato na conta ${nomeConta(conta)}`,
+          sim: "Importar",
+          html: `<p>Arquivo <b>${esc(arquivo.name)}</b>${r.banco ? ` · ${esc(r.banco)}` : ""}${r.conta ? ` · conta nº <b>${esc(r.conta)}</b>` : ""}.</p>
+          <p><b>${r.lancamentos.length}</b> lançamento(s) de ${dataBr(r.de)} a ${dataBr(r.ate)}: entradas ${reais(entradas)}, saídas ${reais(saidas)}.</p>
+          <p class="suave">Confira se o arquivo é mesmo da conta <b>${esc(nomeConta(conta))}</b> (aba aberta). O que já foi importado não entra em dobro.</p>`
+        });
+        if (!ok) return;
+        const res = await alterar((db) => importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate }));
+        aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s) do arquivo OFX, ${res.repetidas} já estava(m).`);
+        ir(`#/banco?conta=${encodeURIComponent(conta)}&mes=${r.ate.slice(0, 7)}`);
+      } finally {
+        if (el) el.value = "";
+      }
     },
     async saldoBanco({ conta }) {
       if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
@@ -14155,6 +14569,23 @@ Salvar assim mesmo?`)) {
     }
     return `${html}</div>`;
   }
+  function roteiroSaidaHtml(c, e) {
+    const hoje3 = hojeIso();
+    const etapas = roteiroSaida(d(), c, hoje3);
+    if (!etapas.length) return "";
+    const feitas = etapas.filter((x) => x.feito).length;
+    const acao = (x) => {
+      if (!opera() || x.feito) return "";
+      if (x.chave === "vistoria") return link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, "Registrar vistoria de saída", "botao pequeno");
+      if (x.chave === "contas") return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, "Registrar protocolo", "botao pequeno") : ""} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, "Registrar leitura", "botao pequeno") : ""}`;
+      if (x.chave === "calculo" && c.data_saida <= hoje3) return link(`#/novo/encerramentos?contrato=${c.id}`, "Fazer cálculo final", "botao pequeno");
+      if (x.chave === "garantia" && e) return botao("garantiaDevolvida", e.saldo >= 0 ? "Marcar garantia devolvida" : "Marcar saldo cobrado", { id: e.id }, "pequeno");
+      if (x.chave === "boleto") return x.cobranca_id ? link(`#/cobranca/${x.cobranca_id}`, "Ver o boleto", "botao pequeno") : link(`#/cobrancas?comp=${competenciaDe(c.data_saida)}`, "Gerar na tela Boletos", "botao pequeno");
+      return "";
+    };
+    return `<p class="suave">Roteiro da saída: <b>${feitas} de ${etapas.length}</b> etapas feitas. A ordem é a do dia a dia; cada etapa fica marcada sozinha quando o registro dela existe.</p>
+    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? "feito" : ""}"><div class="cabecalho"><div>${x.feito ? "✅" : "⬜"} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)}</div></div></li>`).join("")}</ol>`;
+  }
   function caixaSaida(c) {
     const e = encerramentoDo(d(), c.id);
     const seguinte = fimDeVinculo(d(), c) ? continuadoPor(d(), c) : null;
@@ -14172,6 +14603,7 @@ Salvar assim mesmo?`)) {
       const temVistoria = vistoriasDo(d(), c.id).some((v) => v.tipo === "Saída");
       return `<div class="cartao" id="saida"><div class="cabecalho"><h2>Saída em ${dataBr(c.data_saida)}</h2>
         <div class="acoes">${botao("informarSaida", "Mudar a data", { id: c.id }, "secundario pequeno")} ${botao("desfazerSaida", "Desfazer a saída", { id: c.id }, "perigo pequeno", "Tirar a data de saída? O inquilino volta a ativo.")}</div></div>
+      ${roteiroSaidaHtml(c, null)}
       ${(() => {
         const s = saldoFci(d(), c);
         return s.depositos.length ? `<div class="alerta info">💰 Crédito do inquilino no FCI: <b>${reais(s.corrigido)}</b>${s.ate ? ` (corrigido até ${compBr(s.ate)})` : ' (sem correção: use "Calcular atualização" na caixa do FCI)'}. Paga só os reparos de danos da vistoria de saída; o que sobrar volta ao inquilino.</div>` : "";
@@ -14180,6 +14612,7 @@ Salvar assim mesmo?`)) {
     }
     const lembrete = alertaTitularidade(d(), c);
     return `<div class="cartao" id="saida"><h2>Saída em ${dataBr(e.data_saida)}</h2>
+    ${roteiroSaidaHtml(c, e)}
     ${lembrete ? `<div class="alerta aviso"><b>Lembrete</b> ${esc(lembrete.texto)} ${opera() && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, "Registrar protocolo") : ""}</div>` : ""}
     <div class="grade">
     ${item("Garantia a devolver", reais(e.garantia_valor))}${item("Correção (poupança)", `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}
@@ -14313,13 +14746,15 @@ Salvar assim mesmo?`)) {
       const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : "";
       return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta("carência", "aviso")}` : ""}${ehComplementoCaucao(x) ? ` ${etiqueta("caução", "info")}` : ""}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(totais(x).a_pagar_pontual)}</td>
-      <td>${situacaoBoleto(x, hoje3)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ""}${atraso}</td>
+      <td>${situacaoBoleto(x, hoje3)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ""}${atraso}${!x.data_pagamento && x.situacao !== "Carência" && opera() ? ` ${botao("lembrete", x.vencimento < hoje3 ? "Cobrar" : "Lembrete", { id: x.id }, "secundario mini")}` : ""}</td>
       <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : "-"}</td><td class="nw">${fs.length ? `Nº ${numeroFatura(fs[0].numero)}` : c.gerar_nf === false ? etiqueta("controle", "controle") : "-"}</td></tr>`;
     };
     const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
     const recentes = cobs.slice(0, BOLETOS_INQUILINO);
     const antigos = cobs.slice(BOLETOS_INQUILINO);
-    return `<div class="cartao"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
+    const anoDecl = (/* @__PURE__ */ new Date()).getFullYear() - 1;
+    return `<div class="cartao"><div class="cabecalho"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
+      ${geraNf(c) && cobs.some((x) => x.data_pagamento) ? link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, "Declaração anual de aluguéis (IRPF)", "botao secundario pequeno") : ""}</div>
     <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join("") || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
     ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join("")}</table></div></details>` : ""}
     ${cadeiaDeContratos(d(), c).antes.reverse().map((x) => {
@@ -14491,7 +14926,7 @@ Salvar assim mesmo?`)) {
     const aluguel = aluguelAtual(d(), c);
     const pctBonif = percentualBonificacao(c);
     const desconto = descontoPorPercentual(aluguel, pctBonif);
-    const alertas = contratoAtivo(c, hoje3) ? alertasContrato(d(), c, hoje3).filter((a) => !["A verificar", "Rotina de entrada"].includes(a.tipo)) : [];
+    const alertas = contratoAtivo(c, hoje3) ? alertasContrato(d(), c, hoje3).filter((a) => !["A verificar", "Rotina de entrada"].includes(a.tipo) && !adiamentoDe(d(), chaveAlerta({ ...a, contrato_id: c.id }), hoje3)) : [];
     const rotina = caixaRotinaEntrada(c, hoje3);
     const agendada = herancaAgendada(d(), c, hoje3);
     const anteriorAgendado = agendada && contratoHerdado(d(), c);
@@ -15697,6 +16132,7 @@ Salvar assim mesmo?`)) {
   var dataExtenso = (iso2) => `${Number(iso2.slice(8, 10))} de ${MESES3[Number(iso2.slice(5, 7)) - 1]} de ${iso2.slice(0, 4)}`;
   function partesReajuste(c, r, naCarta = false) {
     const carta = !r.comCarta || !r.faltaCarta && !r.carta ? "" : `${naCarta ? "" : link(`#/imprimir/carta?contrato=${c.id}&comp=${r.competencia}`, "Gerar carta", "botao pequeno")}
+    ${opera() && !r.carta && r.corrigido ? botao("enviarCartaEmail", "✉ Enviar por e-mail", { contrato: c.id, comp: r.competencia }, "pequeno") : ""}
     ${opera() ? botao("cartaEnviada", r.carta ? `carta enviada em ${dataBr(r.carta.enviada_em)} ✓` : "Marcar carta enviada", { contrato: c.id, comp: r.competencia, enviada: r.carta ? "" : "1" }, r.carta ? "link-botao" : "secundario pequeno", r.carta ? "Desfazer o envio da carta?" : "") : ""}`;
     if (r.corrigido) return { carta, correcao: etiqueta(`corrigido: ${reais(r.corrigido.valor_novo)}`, "ok") };
     if (!opera()) return { carta, correcao: "" };
@@ -15881,6 +16317,16 @@ Salvar assim mesmo?`)) {
       ${tipo === "chaves" && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ""}
       ${contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
     }
+    if (tipo === "declaracao") {
+      const c = buscar2("contratos", rota.q.contrato);
+      if (!c) return naoEncontrado("Inquilino não encontrado", "#/inquilinos", "Ver os inquilinos");
+      const ano = Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear() - 1;
+      const r = declaracaoAnual(d(), c.id, ano);
+      const anos = [...new Set(d().faturas.map((f) => Number(String(f.emissao).slice(0, 4))))].sort((a, b) => b - a);
+      const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? "" : "secundario "}pequeno`)).join(" ")}</div>`;
+      return `<div class="impressao">${voltar(r.empresas.length ? { seletor: ".impressao .declaracoes", nome: nomeArquivoDoc("Declaracao anual aluguel", c, String(ano)) } : null)}${abas}
+      ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join("")}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
+    }
     if (tipo === "demonstrativos") {
       const ids = rota.q.ids ? new Set(rota.q.ids.split(",").map(Number)) : null;
       const nomeImovel = (cb) => (buscar2("imoveis", (buscar2("contratos", cb.contrato_id) || {}).imovel_id) || {}).nome || "";
@@ -15981,6 +16427,12 @@ Salvar assim mesmo?`)) {
     return pdf.output("blob");
   }
   async function guardarCartaNaPasta(c, comp) {
+    const carta = await pdfDaCarta(c, comp);
+    if (!carta) return null;
+    await escreverTexto(await pastaDoEscopo("aditivos", c.id), carta.nome, carta.blob);
+    return carta.nome;
+  }
+  async function pdfDaCarta(c, comp) {
     const html = cartaReajuste(c, comp);
     if (!html.includes('class="carta"')) return null;
     const caixa = document.createElement("div");
@@ -15989,10 +16441,11 @@ Salvar assim mesmo?`)) {
     caixa.innerHTML = html;
     document.body.append(caixa);
     try {
-      const blob = await pdfDoDocumento(caixa.querySelector(".carta"), [], { margemLado: 15 });
-      const nome = `${nomeArquivoDoc("Carta reajuste", c, comp)}.pdf`;
-      await escreverTexto(await pastaDoEscopo("aditivos", c.id), nome, blob);
-      return nome;
+      const el = caixa.querySelector(".carta");
+      const blob = await pdfDoDocumento(el, [], { margemLado: 15 });
+      el.querySelectorAll(".ct-capa, .ct-marca, .ct-marcas").forEach((x) => x.remove());
+      const texto3 = [...el.querySelectorAll("p, tr")].map((x) => x.tagName === "TR" ? [...x.children].map((td) => td.textContent.trim()).filter(Boolean).join(" · ") : x.innerText.replace(/\s*\n\s*/g, "\n").trim()).filter(Boolean).join("\n\n");
+      return { blob, nome: `${nomeArquivoDoc("Carta reajuste", c, comp)}.pdf`, texto: texto3 };
     } finally {
       caixa.remove();
     }
@@ -16009,6 +16462,26 @@ Salvar assim mesmo?`)) {
       if (nome) feitas.push([x.id, nome]);
     }
     if (feitas.length) await alterar((db) => feitas.forEach(([id, arquivo]) => atualizar(db, "cartas_reajuste", id, { arquivo }, login(), "Carta de reajuste guardada na pasta do inquilino")));
+  }
+  var MESES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  var dataPorExtenso2 = (iso2) => `${Number(iso2.slice(8, 10))} de ${MESES_EXTENSO[Number(iso2.slice(5, 7)) - 1]} de ${iso2.slice(0, 4)}`;
+  function declaracaoHtml(r, g) {
+    const { contrato: c, imovel: i, ano } = r;
+    const e = g.emitente;
+    const pj = c.inquilino_tipo === "Pessoa jurídica (empresa)";
+    return `<div class="carta declaracao">
+    ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
+    <p style="text-align:center"><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ""}${e.endereco ? `<br>${esc(e.endereco)}` : ""}</p>
+    <h2 style="text-align:center;margin:18px 0">DECLARAÇÃO DE RENDIMENTOS DE ALUGUEL · ANO-CALENDÁRIO ${ano}</h2>
+    <p>Declaramos, para fins de comprovação junto à Receita Federal (Imposto de Renda), que recebemos de <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? `, ${pj ? "CNPJ" : "CPF"} <b>${esc(c.inquilino_cpf)}</b>` : ""},
+      locatário(a) do imóvel <b>${esc(i ? `${i.nome} - ${enderecoCompleto(i)}${i.cidade ? `, ${i.cidade}` : ""}` : "sem imóvel")}</b>, no ano-calendário de <b>${ano}</b>, os valores abaixo a título de <b>aluguel</b>, conforme as notas fiscais emitidas:</p>
+    <table class="carta-tabela" style="width:100%"><tr><th>Aluguel de</th><th>NF nº</th><th>Emissão</th><th class="n">Valor</th></tr>
+      ${g.itens.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${numeroFatura(x.numero)}</td><td>${dataBr(x.emissao)}</td><td class="n">${reais(x.valor)}</td></tr>`).join("")}
+      <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${reais(g.total)}</b></td></tr></table>
+    ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ""}
+    <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
+    <p class="carta-data">${esc(i && i.cidade || e.municipio || "Curitiba")}, ${dataPorExtenso2(hojeIso())}.</p>
+    <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ""}</p></div>`;
   }
   function nomeArquivoDoc(documento, c, fim = String(c.data_entrada || c.vigencia_inicio || "").slice(0, 4)) {
     const i = buscar2("imoveis", c.imovel_id);
@@ -16551,21 +17024,50 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const abertos = lista3.filter((x) => !x.cb.data_pagamento && x.cb.situacao !== "Carência");
     if (!abertos.length) return "";
     const grupos = [...new Set(abertos.map((x) => x.cb.vencimento))].sort().map((v) => [v, abertos.filter((x) => x.cb.vencimento === v)]);
-    return `<details class="cartao baixa-lote"><summary><b>Baixa em lote (pagos em dia)</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
+    return `<details class="cartao baixa-lote"><summary><b>Baixa em lote</b> <span class="suave">· ${abertos.length} em aberto, separada por vencimento · clique para expandir</span></summary>
     ${grupos.map(([v, xs]) => `<form data-form="baixaLote" class="grupo-baixa">
       <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${v < hoje3 ? etiqueta("vencido", "perigo") : ""} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
         <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
       <div class="lista-baixa">${xs.map((x) => `<label class="check-mini"><input type="checkbox" name="ids" value="${x.cb.id}"> ${esc(x.i.nome)} · ${esc(x.c.inquilino_nome)} · ${reais(x.t.a_pagar_pontual)}</label>`).join("")}</div>
-      <div class="acoes">entraram em <input type="date" name="data" value="${hoje3}" style="width:auto"><button class="pequeno">Confirmar os marcados como pagos em dia</button></div></form>`).join("")}
-    <p class="suave">Sem multa e juros. Quem pagou atrasado, confirme na própria linha da tabela.</p></details>`;
+      <div class="acoes">entraram em <input type="date" name="data" value="${hoje3}" style="width:auto">
+        ${v < hoje3 ? `<label class="check-mini" title="Pagaram depois do vencimento: multa e juros até o dia em que pagaram"><input type="checkbox" name="atrasado" value="1" data-mostra="pagou-${v}"> pagaram atrasado, em</label> <input type="date" name="pagou" value="${hoje3}" style="width:auto" data-grupo-mostra="pagou-${v}" hidden>` : ""}
+        <button class="pequeno">Confirmar os marcados</button></div></form>`).join("")}
+    <p class="suave">Sem "pagaram atrasado", a baixa é como pagos em dia (sem multa e juros). Valor recebido diferente do previsto: confirme um a um, pelo botão da linha.</p></details>`;
   }
-  function telaCobrancas(comp, ordemPedida = "vencimento") {
+  var FILTROS_BOLETO = {
+    todos: { titulo: "", todosMeses: false, f: () => true },
+    abertos: { titulo: "Boletos em aberto", todosMeses: true, f: (x) => !x.cb.data_pagamento && x.cb.situacao !== "Carência" },
+    vencidos: { titulo: "Boletos vencidos e não pagos", todosMeses: true, f: (x, hoje3) => !x.cb.data_pagamento && x.cb.situacao !== "Carência" && x.cb.vencimento < hoje3 },
+    semnf: { titulo: "Boletos pagos ainda sem NF", todosMeses: true, f: (x) => x.cb.data_pagamento && geraNf(x.c) && !ehComplementoCaucao(x.cb) && !x.fs.length },
+    pagos: { titulo: "Boletos pagos", todosMeses: false, f: (x) => !!x.cb.data_pagamento }
+  };
+  function telaCobrancas(comp, ordemPedida = "vencimento", filtroPedido = "todos", buscaPedida = "") {
     const ordem = ORDENS_BOLETO[ordemPedida] ? ordemPedida : "vencimento";
+    const filtro = FILTROS_BOLETO[filtroPedido] ? filtroPedido : "todos";
+    const F_ = FILTROS_BOLETO[filtro];
+    const busca = textoDeBusca(String(buscaPedida || "").slice(0, 80));
     const hoje3 = hojeIso();
-    const lista3 = d().cobrancas.filter((x) => x.competencia === comp).map((cb) => {
+    const url = (q) => `#/cobrancas?${new URLSearchParams({ comp, ordem, ...filtro !== "todos" ? { filtro } : {}, ...busca ? { busca: String(buscaPedida).trim() } : {}, ...q })}`;
+    const montar = (cb) => {
       const c = buscar2("contratos", cb.contrato_id);
       return { cb, c, i: buscar2("imoveis", c.imovel_id), t: totais(cb), fs: faturasDe(d(), "cobranca", cb.id) };
-    }).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
+    };
+    const todas = d().cobrancas.filter((x) => F_.todosMeses || x.competencia === comp).map(montar);
+    const lista3 = todas.filter((x) => F_.f(x, hoje3) && (!busca || [x.c.inquilino_nome, x.c.inquilino_apelido, x.i && x.i.nome].some((t) => textoDeBusca(t).includes(busca)))).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
+    const doMes = d().cobrancas.filter((x) => x.competencia === comp).map(montar);
+    const todasMontadas = d().cobrancas.map(montar);
+    const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje3)).length;
+    const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? "" : "secundario"} pequeno" href="${url({ filtro: k })}">${k === "todos" ? `Todos de ${compBr(comp)}` : `${x.titulo.replace("Boletos ", "").replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(" ")}
+    <form data-form="buscaBoletos" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}"><input type="hidden" name="filtro" value="${esc(filtro)}"><input name="busca" value="${esc(String(buscaPedida || ""))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: "" }).replace(/&busca=[^&]*/, "")}">Limpar</a>` : ""}</form></div>`;
+    if (filtro !== "todos") {
+      const soma2 = (f) => lista3.filter((x) => geraNf(x.c)).reduce((s, x) => s + f(x), 0);
+      return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
+        <div class="acoes">${link(url({ filtro: "todos" }), `← Boletos de ${compBr(comp)}`, "botao secundario")}</div></div>
+      ${filtros}
+      ${filtro === "semnf" && lista3.length && opera() ? `<div class="alerta info">${lista3.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
+      ${opera() && ["abertos", "vencidos"].includes(filtro) ? caixaBaixaLote(lista3, hoje3) : ""}
+      ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: true, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma2((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma2((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
+    }
     const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista3.some((x) => x.c.id === c.id && !ehComplementoCaucao(x.cb)));
     const caucoes = complementosCaucaoPendentes(d(), comp);
     const pend = pendentesDeFatura(d());
@@ -16573,14 +17075,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const controle = lista3.filter((x) => !geraNf(x.c)).length;
     const reajustes = new Map(lista3.filter((x) => !ehComplementoCaucao(x.cb)).map((x) => [x.c.id, reajusteNaCompetencia(d(), x.c, comp)]).filter(([, r]) => r && r.faltaCarta));
     const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
-    const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
-      <a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>
-      ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
     return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
-      <div class="acoes"><a class="botao secundario" href="#/cobrancas?comp=${esc(somarMeses(comp, -1))}&ordem=${esc(ordem)}">← ${compBr(somarMeses(comp, -1))}</a>
+      <div class="acoes"><a class="botao secundario" href="${url({ comp: somarMeses(comp, -1) })}">← ${compBr(somarMeses(comp, -1))}</a>
       <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
-      <a class="botao secundario" href="#/cobrancas?comp=${esc(somarMeses(comp, 1))}&ordem=${esc(ordem)}">${compBr(somarMeses(comp, 1))} →</a></div></div>
-    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, informe a data do pagamento e clique em Confirmar. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+      <a class="botao secundario" href="${url({ comp: somarMeses(comp, 1) })}">${compBr(somarMeses(comp, 1))} →</a></div></div>
+    <p class="suave">Competência é o mês de uso do imóvel. Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
+    ${filtros}
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ""} ${link("#/reajustes", "Ver reajustes")}</div>` : ""}
     ${faltando.length && opera() ? `<div class="alerta aviso">${faltando.length} contrato(s) ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(", ")}. ${botao("gerarCobrancas", `Gerar boletos de ${compBr(comp)}`, { comp }, "pequeno")}</div>` : ""}
     ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido) ainda sem boleto: gere na tela Reajustes, em "Caução a completar" (boleto separado, sem tarifa e sem NF).
@@ -16590,29 +17090,37 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
     ${opera() ? caixaBaixaLote(lista3, hoje3) : ""}
     ${lista3.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ""}
-    ${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
-      <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(comp)}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${ordem === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
+    ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: false, reajustes, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
+  }
+  function tabelaBoletos(lista3, hoje3, ordem, url, opcoes2 = {}) {
+    const { reajustes = /* @__PURE__ */ new Map(), totalLinha = "" } = opcoes2;
+    const comp = lista3.length ? lista3[0].cb.competencia : competenciaDe(hoje3);
+    const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
+      ${opcoes2.comp ? "" : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
+      ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
+    return `${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
+      <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: "" }).replace(/&ordem=&?/, "&").replace(/[?&]$/, ""))}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${ordem === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
       ${lista3.map(({ cb, c, i, t, fs }) => `<tr class="${geraNf(c) ? "" : "linha-controle"}">
         <td><input type="checkbox" data-boleto="${cb.id}" title="Selecionar (imprimir o demonstrativo ou excluir)"></td>
-        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a><br>${esc(c.inquilino_nome)}${geraNf(c) ? "" : `<br>${seloControle()}`}
+        <td><a href="#/cobranca/${cb.id}"><b>${esc(i.nome)}</b></a>${opcoes2.comp ? ` <span class="suave nw">${compBr(cb.competencia)}</span>` : ""}<br>${esc(c.inquilino_nome)}${geraNf(c) ? "" : `<br>${seloControle()}`}
           ${cb.dias_cobrados < cb.dias_mes ? `<br>${etiqueta(`proporcional ${cb.dias_cobrados}/${cb.dias_mes} dias`, "info")}` : ""}
           ${cb.reserva_utilizada > 0 ? `<br>${etiqueta(`usa reserva ${reais(cb.reserva_utilizada)}`, "aviso")}` : ""}
           ${cb.carencia ? `<br>${etiqueta("carência", "aviso")}` : ""}
           ${ehComplementoCaucao(cb) ? `<br>${etiqueta("complemento da caução · sem NF", "info")}` : ""}
-          ${reajustes.has(c.id) && !ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? "reajuste: mandar a carta com este boleto" : "reajuste: falta aplicar a correção", reajustes.get(c.id).corrigido ? "aviso" : "perigo")} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(comp)}`, "Gerar carta", "botao pequeno")}` : ""}</td>
+          ${reajustes.has(c.id) && !ehComplementoCaucao(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? "reajuste: mandar a carta com este boleto" : "reajuste: falta aplicar a correção", reajustes.get(c.id).corrigido ? "aviso" : "perigo")} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(cb.competencia)}`, "Gerar carta", "botao pequeno")}` : ""}</td>
         <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao("copiar", "Copiar texto do boleto", { texto: dadosBoleto(d(), cb).descricao })}` : ""}
           ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ""}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>${ehComplementoCaucao(cb) ? "sem multa e juros" : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
-        <td>${cb.data_pagamento || cb.situacao === "Carência" ? situacaoBoleto(cb, hoje3) : `${situacaoBoleto(cb, hoje3)}${opera() ? `<br>${formPagamento(cb, true)}` : ""}`}</td>
+        <td>${situacaoBoleto(cb, hoje3)}${!cb.data_pagamento && cb.situacao !== "Carência" && opera() ? `<br>${botao("pagarBoleto", "Confirmar pagamento", { id: cb.id }, "pequeno")}<br>${botao("lembrete", cb.vencimento < hoje3 ? "Cobrar" : "Lembrete", { id: cb.id }, "secundario pequeno")}` : ""}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : "-"}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${numeroFatura(fs[0].numero)}`) : !geraNf(c) || ehComplementoCaucao(cb) ? etiqueta("sem NF", "controle") : cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : "-"}
-          ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ""}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao("estornar", "Desfazer pagamento", { id: cb.id }, "secundario pequeno", "Desfazer este pagamento?")}` : ""}` : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">Nenhum boleto gerado para ${compBr(comp)}.</td></tr>`}
-      ${lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : ""}
+          ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ""}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao("estornar", "Desfazer pagamento", { id: cb.id }, "secundario pequeno", "Desfazer este pagamento?")}` : ""}` : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">${opcoes2.comp ? "Nenhum boleto nesta situação." : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`}
+      ${totalLinha}
     </table></div>
     ${lista3.length ? `<div class="acoes">${impressao}</div>` : ""}`;
   }
@@ -16698,7 +17206,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${item("Valor recebido", reais(cb.valor_pago))}${ehComplementoCaucao(cb) ? "" : item("Valor da nota fiscal", `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta("digitado à mão", "aviso")}` : ""}`)}</div>
         ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao("estornar", "Desfazer pagamento", { id: cb.id }, "perigo pequeno", validas.length ? "Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado." : "Desfazer o pagamento?") : ""}` : `<p>Se for pago hoje (${dataBr(hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? "" : ehComplementoCaucao(cb) ? ` (${sim.dias_atraso} dias de atraso, sem multa e juros)` : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${ehComplementoCaucao(cb) ? " · sem NF (complemento da caução)" : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
-        ${opera() && cb.situacao !== "Carência" ? formPagamento(cb, false) : ""}`}</div>
+        ${opera() && cb.situacao !== "Carência" ? formPagamento(cb, false) : ""}
+        ${opera() ? `<p class="acoes" style="margin-top:10px">${botao("lembrete", cb.vencimento < hojeIso() ? "Cobrar o inquilino (texto pronto)" : "Lembrar o inquilino (texto pronto)", { id: cb.id }, "secundario")}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ""}`}</div>
     ${caixaBancoC6(cb)}
     ${caixaBoleto(cb)}
     <div class="cartao rolagem"><h2>NFs</h2><table class="responsiva"><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
@@ -16708,6 +17217,23 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
 
   // docs/js/telas/consultas.js
+  var TIPOS_BUSCA = [["inquilinos", "Inquilinos"], ["imoveis", "Imóveis"], ["boletos", "Boletos com esse valor"], ["nfs", "Notas fiscais"]];
+  function telaBusca(q) {
+    const texto3 = String(q.q || "").trim();
+    const grupos = texto3 ? buscarGlobal(d(), texto3) : [];
+    const filtro = TIPOS_BUSCA.find(([k]) => k === q.tipo);
+    const vistos = filtro ? grupos.filter((g) => g.tipo === filtro[1]) : grupos;
+    const total = grupos.reduce((s, g) => s + g.itens.length, 0);
+    const url = (tipo) => `#/buscar?q=${encodeURIComponent(texto3)}${tipo ? `&tipo=${tipo}` : ""}`;
+    return `<h1>Busca</h1>
+    <form data-form="buscaGlobal" class="acoes" style="margin-bottom:12px"><input name="q" value="${esc(texto3)}" placeholder="Imóvel, inquilino, CPF, telefone, nº da NF ou valor" style="width:420px;max-width:100%" autofocus><button>Buscar</button></form>
+    ${texto3 ? `<div class="abas"><a href="${url("")}" class="${filtro ? "" : "ativo"}">Tudo (${total})</a>${TIPOS_BUSCA.map(([k, t]) => {
+      const g = grupos.find((x) => x.tipo === t);
+      return `<a href="${url(k)}" class="${filtro && filtro[0] === k ? "ativo" : ""}">${t.replace(" com esse valor", "")} (${g ? g.itens.length : 0})</a>`;
+    }).join("")}</div>` : ""}
+    ${vistos.map((g) => `<div class="cartao"><h2>${esc(g.tipo)} <span class="suave">(${g.itens.length})</span></h2>
+      ${g.itens.map((x) => `<p style="margin:6px 0"><a href="${x.link}"><b>${esc(x.titulo)}</b></a>${x.extra ? ` ${etiqueta(x.extra, "neutra")}` : ""}<br><span class="suave">${esc(x.detalhe)}</span></p>`).join("")}</div>`).join("") || (texto3 ? `<div class="alerta info">Nada encontrado para "<b>${esc(texto3)}</b>"${filtro ? ` em ${filtro[1].toLocaleLowerCase("pt-BR")}` : ""}. Tente parte do nome, só os números do CPF ou telefone, o número da NF (ex.: 77) ou o valor do boleto (ex.: 1.350,00).</div>` : '<p class="suave">Digite parte do nome do imóvel ou do inquilino, CPF/CNPJ, telefone, e-mail, o número da NF ou o valor de um boleto.</p>')}`;
+  }
   var SITUACOES_SOLICITACAO = [
     { nome: "Aberta", simbolo: "🟢", texto: "abertas" },
     { nome: "Em andamento", simbolo: "➡️", texto: "em andamento" },
@@ -16930,9 +17456,22 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return out;
   }
   function telaPendencias() {
+    const hoje3 = hojeIso();
+    const mesAtual = competenciaDe(hoje3);
+    const alertas = alertasComAdiamento(d(), hoje3);
+    const ativos = alertas.filter((a) => !a.adiamento);
+    const etapas = [...etapasAtrasadas(d(), mesAtual, hoje3), ...etapasFechamento(d(), mesAtual, hoje3).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
     const lista3 = cadastrosIncompletos();
     const grupos = ["Inquilino", "Imóvel", "Empresa"].map((t) => [t, lista3.filter((x) => x.tipo === t)]).filter(([, l]) => l.length);
-    return `<p class="suave"><a href="#/">← Painel</a></p><h1>Cadastros incompletos</h1>
+    const total = ativos.length + etapas.length + lista3.length;
+    return `<p class="suave"><a href="#/">← Painel</a></p><h1>Pendências <span class="suave">(${total})</span></h1>
+    <p class="suave">Tudo o que espera uma ação, num lugar só: os alertas em vigor, as etapas do fechamento do mês ainda não feitas e os cadastros incompletos.</p>
+    <div class="cartao" id="alertas"><h2>Alertas <span class="suave">(${ativos.length}${alertas.length > ativos.length ? ` em vigor, ${alertas.length - ativos.length} adiado(s)` : ""})</span></h2>
+      ${gruposDeAlertas(ativos).map(([tipo, l]) => `<h3>${esc(tipo)} <span class="suave">(${l.length})</span></h3>${l.map((a) => `<div class="${classeAlerta(a)}">${a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`}</div>`).join("")}`).join("") || '<p class="suave">Nenhum alerta em vigor.</p>'}
+      <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel.</p></div>
+    <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
+      ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ""}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ""}</div>`).join("") || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>
+    <h2>Cadastros incompletos <span class="suave">(${lista3.length})</span></h2>
     <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
     ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === "Imóvel" ? "Imóveis" : t === "Empresa" ? "Empresas" : "Inquilinos"} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
       ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ""}</td><td>${x.falta.map((f) => typeof f === "string" ? etiqueta(f, "aviso") : etiqueta(f.texto, f.nivel)).join(" ")}</td>
@@ -18831,6 +19370,21 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso(`Saída em ${dataBr(data2)}. Depois que ele sair: vistoria de saída e cálculo final.`);
       await mostrar();
     },
+    /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
+    async garantiaDevolvida({ id }) {
+      const e = buscar2("encerramentos", id);
+      if (!e) throw new Error("Cálculo final não encontrado.");
+      const r = await janela({
+        titulo: e.saldo >= 0 ? "Garantia devolvida" : "Saldo cobrado do inquilino",
+        sim: "Marcar",
+        html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
+        <label>Data</label><input type="date" name="data" value="${hojeIso()}" required>`
+      });
+      if (!r) return;
+      await alterar((db) => marcarGarantiaDevolvida(db, e.id, String((r.data || [])[0] || ""), login()));
+      aviso("Etapa marcada no roteiro da saída.");
+      await mostrar();
+    },
     async desfazerSaida({ id }) {
       await mudarContrato(Number(id), (db) => desfazerSaida(db, Number(id), login()));
       aviso("Inquilino ativo de novo (sem data de saída).");
@@ -18866,6 +19420,86 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const r = await alterar((db) => gerarCobrancas(db, comp, login()));
       aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
       await mostrar();
+    },
+    /** Painel: adia um alerta por 7 dias ("adiado") ou 30 ("cuidando", com quem marcou). Some do Painel e da página do inquilino até a data. */
+    async adiarAlerta({ chave, modo, tipo }) {
+      const r = await alterar((db) => adiarAlerta(db, chave, modo, login(), { tipo, quem: E.usuario.nome }));
+      aviso(modo === "cuidando" ? `Anotado: ${E.usuario.nome} está cuidando. O alerta volta em ${dataBr(somarDias(r.ate, 1))} se ainda estiver pendente.` : `Alerta adiado: volta em ${dataBr(somarDias(r.ate, 1))} se ainda estiver pendente.`);
+      await mostrar();
+    },
+    async voltarAlerta({ chave }) {
+      await alterar((db) => voltarAlerta(db, chave, login()));
+      await mostrar();
+    },
+    /**
+     * Lembrete ao inquilino (D3): janela com o texto pronto (editável) e os botões de e-mail (canal oficial), WhatsApp e copiar.
+     * O texto muda com a fase do boleto (antes do vencimento, no dia, atrasado) e traz o Pix quando o boleto saiu pelo banco.
+     */
+    async lembrete({ id }) {
+      const cb = buscar2("cobrancas", id);
+      if (!cb || cb.data_pagamento) throw new Error("Boleto não encontrado ou já pago.");
+      const l = textoLembrete(d(), cb, hojeIso());
+      const c = buscar2("contratos", cb.contrato_id);
+      const tel = l.telefone ? l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone : "";
+      const titulo2 = { antes: "Lembrete antes do vencimento", dia: "Lembrete: vence hoje", atrasado: "Cobrança de boleto em atraso" }[l.fase];
+      await janela({
+        titulo: `${titulo2} · ${esc(c.inquilino_nome)}`,
+        sim: "Fechar",
+        nao: "",
+        html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
+        <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
+        <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
+        <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : " (sem e-mail no cadastro)"}</a>
+          <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? "" : " (sem telefone)"}</a>
+          <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
+        ligar(dlg) {
+          dlg.querySelector("[data-nao]").hidden = true;
+          const assunto = dlg.querySelector("[name=assunto]");
+          const texto3 = dlg.querySelector("[name=texto]");
+          const email = dlg.querySelector("[data-enviar=email]");
+          const zap = dlg.querySelector("[data-enviar=whatsapp]");
+          const atualizar2 = () => {
+            email.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(assunto.value)}&body=${encodeURIComponent(texto3.value)}`;
+            zap.href = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto3.value)}` : "#";
+          };
+          assunto.addEventListener("input", atualizar2);
+          texto3.addEventListener("input", atualizar2);
+          atualizar2();
+          if (!tel) zap.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            aviso("Este inquilino não tem telefone no cadastro.", "aviso");
+          });
+          dlg.querySelector("[data-copiar-lembrete]").addEventListener("click", async (ev) => {
+            await navigator.clipboard.writeText(texto3.value);
+            ev.target.textContent = "Copiado ✓";
+            setTimeout(() => {
+              ev.target.textContent = "Copiar texto";
+            }, 1500);
+          });
+        }
+      });
+    },
+    /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
+    async pagarBoleto({ id }) {
+      const cb = buscar2("cobrancas", id);
+      if (!cb || cb.data_pagamento) throw new Error("Boleto não encontrado ou já pago.");
+      const c = buscar2("contratos", cb.contrato_id);
+      const i = c ? buscar2("imoveis", c.imovel_id) : null;
+      const hoje3 = hojeIso();
+      const sim = liquidar(cb, hoje3);
+      const resp = await janela({
+        titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ""}`,
+        html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ""}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? "" : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
+        <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje3}" required></p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
+        <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
+        <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
+        sim: "Confirmar pagamento"
+      });
+      if (!resp) return;
+      const f = new FormData();
+      for (const [k, v] of Object.entries(resp)) f.set(k, v[0]);
+      await confirmarPagamentoBoleto(cb.id, f);
     },
     async estornar({ id }) {
       await alterar((db) => estornarPagamento(db, Number(id), login()));
@@ -19045,6 +19679,36 @@ ${MODELO_COMODOS[comodo].join("\n")}
       });
       if (ok) ir(`#/editar/contratos/${id}`);
     },
+    /**
+     * Carta de reajuste por e-mail (D4; o e-mail é o canal oficial): baixa o PDF da carta, abre o Gmail (ou o programa de e-mail)
+     * já com destinatário, assunto e o texto da carta, e marca a carta como enviada (guardando o PDF na pasta do inquilino).
+     * O PDF baixado precisa ser anexado à mão (o navegador não anexa arquivo num e-mail sozinho).
+     */
+    async enviarCartaEmail({ contrato, comp }) {
+      const c = buscar2("contratos", contrato);
+      if (!c) throw new Error("Inquilino não encontrado.");
+      const carta = await pdfDaCarta(c, comp);
+      if (!carta) throw new Error("A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).");
+      const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar2("imoveis", c.imovel_id) || {}).nome || ""}`.trim();
+      const para = c.inquilino_email || "";
+      const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+      const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
+      const r = await janela({
+        titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`,
+        sim: "Abrir o e-mail e marcar como enviada",
+        html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : "<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário."} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+        <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
+        <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>`
+      });
+      if (!r) return;
+      baixar(carta.blob, carta.nome);
+      window.open((r.por || [])[0] === "mailto" ? mailto : gmail, "_blank", "noopener");
+      if ((r.marcar || [])[0] === "1") {
+        await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: "1" });
+        return;
+      }
+      aviso("PDF baixado e e-mail aberto. A carta não foi marcada como enviada.");
+    },
     /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */
     async cartaEnviada({ contrato, comp, enviada }) {
       if (enviada !== "1") {
@@ -19177,6 +19841,85 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const ExcelJS = await excelJs();
       const { blob, nome } = await excelDoNumero(ExcelJS, await modeloFatura(), numero2);
       baixar(blob, nome);
+    },
+    /**
+     * ZIP do mês para o contador (D10): por empresa e mês, as NFs emitidas (Excel, uma por número), a planilha das entradas e
+     * saídas do extrato com o destino de cada uma e as cópias dos comprovantes já guardadas na pasta do contador. Baixa no computador.
+     */
+    async zipContador({ emitente, mes }) {
+      const e = buscar2("emitentes", emitente);
+      if (!e || !/^\d{4}-\d{2}$/.test(mes || "")) throw new Error("Empresa ou mês inválido.");
+      const [JSZip, ExcelJS] = await Promise.all([jsZip(), excelJs()]);
+      const zip = new JSZip();
+      const avisos = [];
+      const nfs = E.d.faturas.filter((f) => f.emitente_id === e.id && f.situacao === "Emitida" && String(f.emissao).slice(0, 7) === mes).sort((a, b) => a.numero - b.numero);
+      const numeros = [...new Set(nfs.map((f) => f.numero))];
+      let modelo = null;
+      try {
+        modelo = numeros.length ? await modeloFatura() : null;
+      } catch (err) {
+        avisos.push(`NFs em Excel não geradas: ${err.message}`);
+      }
+      if (modelo) {
+        for (const n of numeros) {
+          const fs = nfs.filter((f) => f.numero === n);
+          zip.file(`NFs/${limparNome(`NF ${numeroFatura(n)} - ${fs[0].tomador_nome}.xlsx`)}`, await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes));
+        }
+      }
+      const contas2 = (E.d.config_banco.contas || []).filter((c) => c.emitente_id === e.id).map((c) => c.id);
+      const movs2 = (E.d.movimentacoes_banco || []).filter((m) => contas2.includes(m.conta_id) && String(m.data).slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Movimentações");
+      const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+      ws.addRow([`${e.nome} · entradas e saídas de ${compBr(mes)}`]).font = { bold: true, size: 14 };
+      ws.addRow([`Gerado em ${(/* @__PURE__ */ new Date()).toLocaleString("pt-BR")} · ${movs2.length} movimentação(ões) · ${movs2.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: "FF666666" } };
+      ws.addRow([]);
+      const cab = ws.addRow(["Data", "Conta", "Tipo", "Valor", "Descrição do banco", "Destino", "Imóvel", "Comprovante"]);
+      cab.font = { bold: true };
+      for (const m of movs2) {
+        const i = m.imovel_id ? buscar2("imoveis", m.imovel_id) : null;
+        const linha = ws.addRow([
+          /* @__PURE__ */ new Date(`${m.data}T12:00:00`),
+          apelidoDaConta(E.d, m.conta_id),
+          m.tipo === "saida" ? "Saída" : "Entrada",
+          (m.tipo === "saida" ? -1 : 1) * m.valor / 100,
+          m.titulo || m.descricao || "",
+          descreverDestino(E.d, m) || "SEM DESTINO",
+          i ? i.nome : "",
+          m.comprovante_contador || m.comprovante || ""
+        ]);
+        linha.getCell(1).numFmt = "dd/mm/yyyy";
+        linha.getCell(4).numFmt = moeda;
+      }
+      const soma = (tipo) => movs2.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.valor, 0) / 100;
+      const tot = ws.addRow(["", "", "Entradas", soma("entrada")]);
+      tot.font = { bold: true };
+      tot.getCell(4).numFmt = moeda;
+      const tot2 = ws.addRow(["", "", "Saídas", -soma("saida")]);
+      tot2.font = { bold: true };
+      tot2.getCell(4).numFmt = moeda;
+      ws.columns = [{ width: 12 }, { width: 10 }, { width: 9 }, { width: 14 }, { width: 44 }, { width: 50 }, { width: 22 }, { width: 50 }];
+      zip.file(limparNome(`Movimentacoes ${e.nome} ${mes}.xlsx`), await wb.xlsx.writeBuffer());
+      let comprovantes = 0;
+      try {
+        const dir = await pastaDoEscopo("contador", idContador(e.id, mes), false);
+        for (const a of await listar(dir)) {
+          zip.file(`Comprovantes/${a.nome}`, await lerConteudo(await dir.getFileHandle(a.nome)));
+          comprovantes += 1;
+        }
+      } catch {
+      }
+      zip.file("LEIA-ME.txt", [
+        `${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ""}`,
+        `Mês: ${compBr(mes)} · gerado em ${(/* @__PURE__ */ new Date()).toLocaleString("pt-BR")}`,
+        "",
+        `NFs: ${numeros.length} número(s) em Excel (pasta NFs).`,
+        `Movimentações bancárias: ${movs2.length} (planilha Movimentacoes), ${movs2.filter((m) => !m.classificacao).length} ainda sem destino.`,
+        `Comprovantes: ${comprovantes} arquivo(s) (pasta Comprovantes).`,
+        ...avisos.length ? ["", "Avisos:", ...avisos] : []
+      ].join("\n"));
+      baixar(await zip.generateAsync({ type: "blob" }), limparNome(`Contador ${e.nome} ${mes}.zip`));
+      aviso(`ZIP do contador gerado: ${numeros.length} NF(s), ${movs2.length} movimentação(ões) e ${comprovantes} comprovante(s).${avisos.length ? ` ${avisos.join(" ")}` : ""}`, avisos.length ? "aviso" : "ok");
     },
     /** Resultados financeiros do período em Excel: uma aba com o ranking e outra com as contas pagas por nós. */
     async excelResultados({ de, ate }) {
@@ -19696,12 +20439,17 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!ids.length) throw new Error("Marque os boletos deste vencimento que foram pagos.");
       const vencs = new Set(ids.map((id) => (buscar2("cobrancas", id) || {}).vencimento));
       if (vencs.size > 1) throw new Error("Confirme juntos só boletos do mesmo vencimento.");
+      const atrasado = fd.get("atrasado") === "1";
+      const dataPagou = atrasado ? String(fd.get("pagou") || "") || data2 : null;
+      if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error("Informe o dia em que pagaram.");
+      if (atrasado && dataPagou > data2) throw new Error("O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.");
+      if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
       confirmarAvisos([dataNoFuturo(data2), dataMuitoAntiga(data2)].filter(Boolean));
       let r;
       await alterar((db) => {
-        r = baixarEmLote(db, ids, data2, login());
+        r = baixarEmLote(db, ids, data2, login(), { pagouEmDia: !atrasado, dataPagou });
       });
-      aviso(`${r.feitos.length} pagamento(s) confirmado(s) em dia, com entrada em ${dataBr(data2)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ""}`);
+      aviso(`${r.feitos.length} pagamento(s) confirmado(s) ${atrasado ? `com atraso (pagaram em ${dataBr(dataPagou)}, com multa e juros)` : "em dia"}, com entrada em ${dataBr(data2)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ""}`, atrasado ? "aviso" : "ok");
       await mostrar();
     },
     async lancarContas(form) {
@@ -20043,46 +20791,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       });
       await mostrar();
     },
-    async pagamento(form) {
-      const f = new FormData(form);
-      const data2 = String(f.get("data") || "");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
-      const valor = String(f.get("valor") || "").trim() ? centavos(f.get("valor")) : null;
-      const pagouEmDia = f.get("em_dia") === "1";
-      const dataPagou = String(f.get("pagou") || "") || null;
-      const cb = buscar2("cobrancas", form.dataset.id);
-      confirmarAvisos([
-        dataNoFuturo(data2, "A data do pagamento"),
-        dataMuitoAntiga(data2, "A data do pagamento"),
-        cb && data2 < somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data2)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : ""
-      ].filter(Boolean));
-      const previsto = cb && previstoNoPagamento(cb, data2, { pagouEmDia, dataPagou });
-      if (cb && valor !== null && valor !== previsto.valor_devido && !ehComplementoCaucao(cb) && geraNf(buscar2("contratos", cb.contrato_id))) {
-        if (dataPagou && dataPagou > data2) throw new Error("O dia em que pagou não pode ser depois da data contábil.");
-        const dif = valor - previsto.valor_devido;
-        const resp = await janela({
-          titulo: "Valor diferente do previsto",
-          html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data2)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
-          Diferença: <b class="${dif < 0 ? "negativo" : ""}">${dif > 0 ? "+" : "−"}${reais(Math.abs(dif))}</b></p>
-          <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
-          <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
-          sim: "Continuar",
-          nao: "Cancelar"
-        });
-        const justificativa = resp && String((resp.justificativa || [])[0] || "").trim();
-        if (!resp) return;
-        if (!justificativa) throw new Error("Informe a justificativa da divergência. Nada foi salvo.");
-        memoria.pagamentoDivergente = { id: cb.id, data: data2, valor, pagouEmDia, dataPagou, justificativa };
-        ir(`#/cobranca/${cb.id}?ir=pagamento`);
-        return;
-      }
-      const r = await alterar((db) => registrarPagamento(db, Number(form.dataset.id), data2, valor, login(), { pagouEmDia, dataPagou }));
-      const pago = buscar2("cobrancas", form.dataset.id);
-      if (pago && ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? "" : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, "ok");
-      else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? " (sem multa e juros)" : ""}. Data da NF: ${dataBr(data2)}. Valor da nota: ${reais(r.valor_nf)}.` : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data2)}.`, r.pontual ? "ok" : "aviso");
-      avisarImovelSemEmpresa(pago);
-      await mostrar();
-    },
+    pagamento: (form) => confirmarPagamentoBoleto(Number(form.dataset.id), new FormData(form)),
     /** Pagamento com valor diferente do previsto: a NF sai com o valor digitado (diferente do calculado) e a justificativa fica no histórico. */
     async pagamentoNf(form) {
       const p2 = memoria.pagamentoDivergente;
@@ -20176,6 +20885,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get("comp")}`),
     irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get("mes")}`),
+    /** Tela de Boletos: busca por inquilino ou imóvel dentro do filtro escolhido (mês, em aberto, vencidos…). */
+    buscaBoletos(form) {
+      const f = new FormData(form);
+      const q = new URLSearchParams([...f].filter(([k, v]) => String(v).trim() && !(k === "filtro" && v === "todos")));
+      ir(`#/cobrancas?${q}`);
+    },
+    buscaGlobal(form) {
+      const q = String(new FormData(form).get("q") || "").trim().slice(0, 100);
+      ir(q ? `#/buscar?q=${encodeURIComponent(q)}` : "#/buscar");
+    },
     buscaInquilinos(form) {
       const busca = String(new FormData(form).get("busca") || "").trim();
       ir(busca ? `#/inquilinos?busca=${encodeURIComponent(busca)}` : "#/inquilinos");
@@ -20272,6 +20991,45 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   };
   Object.assign(FORMULARIOS, FORMULARIOS_BANCO);
+  async function confirmarPagamentoBoleto(id, f) {
+    const data2 = String(f.get("data") || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
+    const valor = String(f.get("valor") || "").trim() ? centavos(f.get("valor")) : null;
+    const pagouEmDia = f.get("em_dia") === "1";
+    const dataPagou = String(f.get("pagou") || "") || null;
+    const cb = buscar2("cobrancas", id);
+    confirmarAvisos([
+      dataNoFuturo(data2, "A data do pagamento"),
+      dataMuitoAntiga(data2, "A data do pagamento"),
+      cb && data2 < somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data2)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : ""
+    ].filter(Boolean));
+    const previsto = cb && previstoNoPagamento(cb, data2, { pagouEmDia, dataPagou });
+    if (cb && valor !== null && valor !== previsto.valor_devido && !ehComplementoCaucao(cb) && geraNf(buscar2("contratos", cb.contrato_id))) {
+      if (dataPagou && dataPagou > data2) throw new Error("O dia em que pagou não pode ser depois da data contábil.");
+      const dif = valor - previsto.valor_devido;
+      const resp = await janela({
+        titulo: "Valor diferente do previsto",
+        html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data2)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
+        Diferença: <b class="${dif < 0 ? "negativo" : ""}">${dif > 0 ? "+" : "−"}${reais(Math.abs(dif))}</b></p>
+        <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
+        <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
+        sim: "Continuar",
+        nao: "Cancelar"
+      });
+      const justificativa = resp && String((resp.justificativa || [])[0] || "").trim();
+      if (!resp) return;
+      if (!justificativa) throw new Error("Informe a justificativa da divergência. Nada foi salvo.");
+      memoria.pagamentoDivergente = { id: cb.id, data: data2, valor, pagouEmDia, dataPagou, justificativa };
+      ir(`#/cobranca/${cb.id}?ir=pagamento`);
+      return;
+    }
+    const r = await alterar((db) => registrarPagamento(db, id, data2, valor, login(), { pagouEmDia, dataPagou }));
+    const pago = buscar2("cobrancas", id);
+    if (pago && ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? "" : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, "ok");
+    else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? " (sem multa e juros)" : ""}. Data da NF: ${dataBr(data2)}. Valor da nota: ${reais(r.valor_nf)}.` : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data2)}.`, r.pontual ? "ok" : "aviso");
+    avisarImovelSemEmpresa(pago);
+    await mostrar();
+  }
 
   // docs/js/telas.js
   var LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
@@ -20455,7 +21213,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso")).then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, "aviso")).then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, "aviso"));
       trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
       const hoje3 = hojeIso();
-      const alertas = todosAlertas(d(), hoje3);
+      const todosOsAlertas = alertasComAdiamento(d(), hoje3);
+      const alertas = todosOsAlertas.filter((a) => !a.adiamento);
+      const adiados = todosOsAlertas.filter((a) => a.adiamento);
+      const nomeAlerta = (a) => a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`;
+      const adiar = (a) => opera() ? `<span class="adiar-alerta nw">${botao("adiarAlerta", `Adiar ${DIAS_ADIAR_ALERTA} dias`, { chave: a.chave, modo: "adiado", tipo: a.tipo }, "secundario mini")} ${botao("adiarAlerta", "Já estou cuidando", { chave: a.chave, modo: "cuidando", tipo: a.tipo }, "secundario mini")}</span>` : "";
       const pend = pendentesDeFatura(d());
       const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
       const mesAtual = competenciaDe(hoje3);
@@ -20468,12 +21230,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const porTipo = {};
       for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
       const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ["", 0];
-      return `<h1>Painel</h1>
+      return `<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link("#/cobrancas?filtro=abertos", "Registrar pagamento", "botao")} ${link("#/cobrancas", "Acompanhar boletos", "botao secundario")}</div>` : ""}</div>
       <div class="numeros">
         ${n(d().imoveis.length, "imóveis", "#/imoveis")}
         ${n(d().contratos.filter((c) => contratoAtivo(c, hoje3)).length, "contratos ativos", "#/inquilinos")}
         ${n(pend.length, "pagamentos aguardando NF", "#/faturas")}
-        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total)</span>` : '<div class="grande">0</div>alertas ativos'}</a>
+        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total${adiados.length ? `, ${adiados.length} adiado(s)` : ""})</span>` : `<div class="grande">0</div>alertas ativos${adiados.length ? `<br><span class="suave">${adiados.length} adiado(s)</span>` : ""}`}</a>
         ${(() => {
         const r = resumoSolicitacoes(d());
         return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
@@ -20493,7 +21255,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${calendarioDoPainel(competenciaValida(rota.q.mes, competenciaDe(hoje3)), hoje3)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
         ${gruposDeAlertas(alertas).map(([tipo, lista3]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista3.length})</span></h3>
-          ${lista3.map((a) => `<div class="${classeAlerta(a)}">${a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`}</div>`).join("")}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
+          ${lista3.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join("")}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
+          ${adiados.map((a) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === "cuidando" ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} até ${dataBr(a.adiamento.ate)}</span> ${opera() ? botao("voltarAlerta", "Voltar a mostrar", { chave: a.chave }, "secundario mini") : ""}</div>`).join("")}</details>` : ""}
+        <p class="suave" style="margin:10px 0 0">${link("#/pendencias", "Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só", "")}</p>
       </div>
       ${caixaHistorico("Últimas alterações", `${tabelaHistorico(ultimos(() => true, 12))}
         <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString("pt-BR")}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
@@ -20542,7 +21307,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       return telaFormulario(rota.partes[1], r, rota.q, estado2);
     },
     // mês e ordem vêm do endereço: só valem no formato esperado (a validação final da ordem é em telaCobrancas)
-    cobrancas: (rota) => telaCobrancas(competenciaValida(rota.q.comp, competenciaPadrao()), rota.q.ordem),
+    cobrancas: (rota) => telaCobrancas(competenciaValida(rota.q.comp, competenciaPadrao()), rota.q.ordem, rota.q.filtro, rota.q.busca),
     cobranca(rota) {
       const cb = buscar2("cobrancas", rota.partes[1]);
       return cb ? telaCobranca(cb) : naoEncontrado("Boleto não encontrado", "#/cobrancas", "Ver os boletos");
@@ -20582,6 +21347,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     "modelo-contrato": (rota) => telaModelo(rota),
     empresas: () => telaEmpresas(),
     inquilinos: (rota) => telaInquilinos(rota.q),
+    buscar: (rota) => telaBusca(rota.q),
     solicitacoes: (rota) => telaSolicitacoes(rota.q),
     iptu: (rota) => telaIptu(Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear()),
     historico: (rota) => telaHistorico(rota.q),
@@ -21111,6 +21877,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     return `<header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ""}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
+      <form data-form="buscaGlobal" class="busca-topo" role="search"><input name="q" type="search" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === "buscar" ? esc(rota.q.q || "") : ""}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -21162,6 +21929,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           (grupo2) => ordemGuardada(E.d, pagina, grupo2),
           podeUsuario("admin") ? (grupo2, nomes) => alterar((db) => salvarOrdemCaixas(db, pagina, grupo2, nomes, login())).catch((e) => aviso(e.message, "erro")) : null
         );
+        montarIndice(app.querySelector("main"), pagina);
       }
       atualizarFaixa();
       desenharMensagens();
@@ -21299,12 +22067,18 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   });
   document.addEventListener("change", async (ev) => {
     if (ev.target.matches("select[data-ordem-boletos]")) {
-      ir(`#/cobrancas?comp=${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
+      ir(`${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
       return;
     }
     if (ev.target.matches("input[data-marcar-grupo]")) {
       ev.target.closest("form").querySelectorAll("input[name=ids]").forEach((x) => {
         x.checked = ev.target.checked;
+      });
+      return;
+    }
+    if (ev.target.matches("input[data-mostra]")) {
+      ev.target.closest("form").querySelectorAll(`[data-grupo-mostra="${ev.target.dataset.mostra}"]`).forEach((x) => {
+        x.hidden = !ev.target.checked;
       });
       return;
     }
@@ -21335,6 +22109,15 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
       } catch (e) {
         logarErro(e);
+        aviso(e.message, "erro");
+      }
+      return;
+    }
+    const ofx = ev.target.closest("input[data-importar-ofx]");
+    if (ofx && ofx.files.length) {
+      try {
+        await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx);
+      } catch (e) {
         aviso(e.message, "erro");
       }
       return;
