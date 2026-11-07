@@ -115,3 +115,16 @@ test('raiz: só as pastas do sistema; backups não se apagam', async () => {
   const bk = await raiz.getDirectoryHandle('backups');
   await assert.rejects(S.salvarArquivo(bk, arquivo('x.json', '{}')), /backups/);
 });
+
+test('várias caixas pedindo a mesma pasta ao mesmo tempo: um pedido só à nuvem', async () => {
+  const { raiz, cliente } = montar();
+  const arquivos = await raiz.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+  const dir = await S.subpasta(arquivos, ['Apto 604', 'Inquilinos', 'Maria Exemplo']);
+  await S.salvarArquivo(dir, arquivo('contrato.pdf', '%PDF-1'));
+  cliente.listas.clear();
+  const buscarAntes = cliente.buscar; let listas = 0;
+  cliente.buscar = (url, op) => { if (String(url).includes('/lista/')) listas += 1; return buscarAntes(url, op); };
+  const resultados = await Promise.all([1, 2, 3, 4].map(() => S.listar(dir)));
+  assert.ok(resultados.every((r) => r.map((a) => a.nome).join() === 'contrato.pdf'));
+  assert.equal(listas, 1, 'as 4 caixas esperam o mesmo pedido');
+});
