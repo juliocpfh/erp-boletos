@@ -140,6 +140,25 @@ export function telaHistorico(q) {
     ${tabelaHistorico(lista.slice(-500).reverse(), desfazer)}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
 }
 
+/**
+ * Data da versão do sistema em uso (a página guardada no aparelho) e, com internet, a publicada no site.
+ * Se a publicada for mais nova, mostra o botão "Atualizar agora" (o aplicativo instalado guarda as telas no aparelho).
+ */
+async function versaoDoSistema() {
+  const fmt = (dt) => dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const emUso = new Date(document.lastModified);
+  if (location.protocol === 'file:' || Number.isNaN(emUso.getTime())) return 'versão sem internet';
+  let publicada = null;
+  try {
+    const r = await fetch('index.html', { method: 'HEAD', cache: 'no-store', credentials: 'include' });
+    const lm = r.ok && r.headers.get('last-modified');
+    if (lm) publicada = new Date(lm);
+  } catch { /* sem internet: mostra só a em uso */ }
+  const nova = publicada && publicada.getTime() - emUso.getTime() > 60000;
+  return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao('atualizarSistema', 'Atualizar agora')}`
+    : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ''}`;
+}
+
 export async function telaDados() {
   const conflitos = await S.copiasEmConflito(E.pasta);
   let modeloProprio = false;
@@ -152,7 +171,8 @@ export async function telaDados() {
     <div class="cartao"><div class="grade">
       ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', new Date(d().criado_em).toLocaleString('pt-BR'))}
       ${item('Última atualização', d().atualizado_em ? `${new Date(d().atualizado_em).toLocaleString('pt-BR')} por ${esc(d().atualizado_por)}` : '-')}
-      ${item('Versão do arquivo', `revisão ${d().revisao}`)}</div>
+      ${item('Versão do arquivo', `revisão ${d().revisao}`)}
+      ${item('Versão do sistema', await versaoDoSistema())}</div>
       ${E.nuvem ? '' : `<p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
       ${podeUsuario('admin') ? `<p>${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
