@@ -830,6 +830,12 @@ document.addEventListener('change', async (ev) => {
     }
     return;
   }
+  // extrato em arquivo OFX (app do C6): tela Banco
+  const ofx = ev.target.closest('input[data-importar-ofx]');
+  if (ofx && ofx.files.length) {
+    try { await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx); } catch (e) { aviso(e.message, 'erro'); }
+    return;
+  }
   const el = ev.target.closest('input[data-upload]');
   if (!el || !el.files.length) return;
   try {

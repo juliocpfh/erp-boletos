@@ -146,6 +146,56 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
 }
 
 // --------------------------------------------------------------------------
+// Arquivo OFX exportado pelo app do C6 (D5): enquanto a ponte não tem as chaves, o extrato entra por aqui
+// --------------------------------------------------------------------------
+/** Data do OFX ("20260930205632[-3:BRT]") → 'AAAA-MM-DD'. */
+const dataOfx = (t) => { const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(t || '').trim()); return m ? `${m[1]}-${m[2]}-${m[3]}` : ''; };
+/** Valor do OFX ("-215.00", "3298.53", ou "1.234,56" em arquivos antigos) → centavos com sinal. */
+export function centavosDoOfx(t) {
+  let s = String(t || '').trim().replace(/\s/g, '');
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  if (!Number.isFinite(n)) throw new Error(`Valor inválido no arquivo OFX: "${t}".`);
+  return Math.round(n * 100);
+}
+/** Valor de uma marca SGML/XML (<TAG>valor até a próxima marca ou fim da linha). */
+const marca = (bloco, tag) => { const m = new RegExp(`<${tag}>([^<\\r\\n]*)`, 'i').exec(bloco); return m ? m[1].trim() : ''; };
+
+/**
+ * Lê o texto de um arquivo OFX (versão 1.x SGML, como o do app do C6, ou 2.x XML) e devolve
+ * { banco, conta, de, ate, lancamentos } com os lançamentos já no formato normalizado de ``importarExtrato``
+ * (id_externo = FITID, data = DTPOSTED, valor_centavos com sinal, tipo, descricao = MEMO). Lança erro se não houver lançamentos.
+ * Ex.: <TRNAMT>-215.00 em 30/09/2026 → { data: '2026-09-30', valor_centavos: -21500, tipo: 'saida' }.
+ */
+export function lerOfx(texto) {
+  const s = String(texto || '');
+  if (!/<OFX>/i.test(s)) throw new Error('Este arquivo não é um OFX (não achei a marca <OFX>). Exporte o extrato no app do C6 em "OFX".');
+  const lancamentos = [];
+  const vistos = new Set();
+  for (const m of s.matchAll(/<STMTTRN>([\s\S]*?)(?=<STMTTRN>|<\/STMTTRN>|<\/BANKTRANLIST>)/gi)) {
+    const b = m[1];
+    const id = marca(b, 'FITID');
+    const data = dataOfx(marca(b, 'DTPOSTED'));
+    if (!id || !data) throw new Error('Lançamento do OFX sem FITID ou sem data.');
+    if (vistos.has(id)) continue; // o app às vezes repete o lançamento no mesmo arquivo
+    vistos.add(id);
+    const valor = centavosDoOfx(marca(b, 'TRNAMT'));
+    const ref = marca(b, 'REFNUM');
+    lancamentos.push({ id_externo: id, data, valor_centavos: valor, tipo: valor < 0 ? 'saida' : 'entrada', descricao: marca(b, 'MEMO') || marca(b, 'NAME') || '',
+      categoria: marca(b, 'TRNTYPE') || null, end_to_end_id: /^E\d{8}/.test(ref) ? ref : null, local_reference: ref && !/^E\d{8}/.test(ref) ? ref : null });
+  }
+  if (!lancamentos.length) throw new Error('O arquivo OFX não tem lançamentos (período sem movimentação ou arquivo incompleto).');
+  const datas = lancamentos.map((l) => l.data).sort();
+  return { banco: marca(s, 'ORG') || '', conta: marca(s, 'ACCTID') || '', de: dataOfx(marca(s, 'DTSTART')) || datas[0], ate: dataOfx(marca(s, 'DTEND')) || datas[datas.length - 1], lancamentos };
+}
+
+/** Texto de um arquivo OFX: UTF-8 e, se vier com caracteres quebrados, Windows-1252 (CHARSET: 1252 do cabeçalho). */
+export function textoDoOfx(bytes) {
+  const u8 = new TextDecoder('utf-8').decode(bytes);
+  return u8.includes('�') ? new TextDecoder('windows-1252').decode(bytes) : u8;
+}
+
+// --------------------------------------------------------------------------
 // Consulta
 // --------------------------------------------------------------------------
 /** Precisa de comprovante toda movimentação com destino, menos a ignorada (a transferência entre as nossas contas também: um PDF só, na pasta do contador da conta de origem). */
