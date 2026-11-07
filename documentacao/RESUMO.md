@@ -14,7 +14,7 @@
 ## Módulos (`docs/js/`)
 | Arquivo | Função |
 |---|---|
-| `app.js` | Estado global `E`, login/sessão (token em `usuarios[].sessoes`; 12 h sem uso e no máximo 7 dias; em `file://` só na aba), gravação em fila (`alterar`), rotas (parâmetros saneados por `C.sanearParametros`), menu (recolhido no celular), eventos de formulário e botão, backup seguro na fila |
+| `app.js` | Estado global `E`, login/sessão (token em `usuarios[].sessoes`; 12 h sem uso e no máximo 7 dias; em `file://` só na aba), gravação em fila (`alterar`), rotas (parâmetros saneados por `C.sanearParametros`), menu (recolhido no celular), eventos de formulário e botão, backup seguro na fila; `mostrar` guarda a rolagem e as listas de anexos já vistas (`anexosVistos`); no celular, tabela que não cabe vira cartões (`cartoesNoCelular`) |
 | `telas.js` + `telas/` | Rotas das telas (`TELAS`, em `telas.js`) e um arquivo por assunto em `telas/`: `comum`, `campos` (preenchimento automático), `imovel`, `contrato`, `cadastros` (`CADASTROS`), `avisos`, `fechamento`, `cobrancas`, `faturas`, `consultas`, `reajustes`, `financeiro`, `documentos`, `admin`, `banco-c6` (boleto no C6: caixas de configuração e do boleto), `banco` (extrato, destino, comprovantes, pagamentos: `telaBanco`, `ACOES_BANCO`, `FORMULARIOS_BANCO`), `envios` (`FORMULARIOS`), `acoes` (`ACOES`) |
 | `regras.js` | Regras de negócio sobre o banco em memória: inserir/atualizar/excluir com histórico, boletos, NFs, reajuste, alertas, resultados |
 | `calculos.js` | Funções puras: dinheiro em centavos, datas, competências, proporcional, multa/juros, valor da NF; parâmetros do endereço (`sanearParametros`, `FORMATOS_PARAMETRO`, `competenciaValida`, `dataValida`) |
@@ -31,7 +31,7 @@
 | `exportar.js` | Todos os dados numa planilha Excel e num PDF (sem senhas e anexos) |
 | `regras-texto.js` | `REGRAS_TEXTO`: as regras de negócio em texto objetivo, baixado em Dados e backup (TXT) |
 | `auth.js` | Senhas PBKDF2-SHA256 (600 mil iterações, gravadas em `senha_iteracoes`; usuário antigo é reforçado no login: `camposDeSenha`, `reforcarSenha`; mínimo 10 caracteres, `senhaCurta`) e papéis (admin, operador, consulta) |
-| `nuvem.js`, `pasta-nuvem.js`, `cofrinho.js`, `migracao.js`, `telas/nuvem.js` | Dados na nuvem: `Sincronia` (cópia local, fila, antes/depois a cada `alterar`, faixas de códigos, NF só com internet), `AnexosNuvem` (pasta virtual: `E.pasta` no modo nuvem), `Cofrinho`/`guardarCifrado` (cópia cifrada; a chave abre com a senha), `levarParaNuvem` (passagem da pasta e conferência), tela de conflitos. Servidor: `nuvem/worker.mjs` (Worker: login do Access, anexos no R2) e `nuvem/cofre.mjs` (cofre: Durable Object com SQLite) |
+| `nuvem.js`, `pasta-nuvem.js`, `cofrinho.js`, `migracao.js`, `telas/nuvem.js` | Dados na nuvem: `Sincronia` (cópia local, fila, antes/depois a cada `alterar`, faixas de códigos, NF só com internet), `AnexosNuvem` (pasta virtual: `E.pasta` no modo nuvem), `Cofrinho`/`guardarCifrado` (cópia cifrada; a chave abre com a senha), `levarParaNuvem` (passagem da pasta e conferência, 4 anexos ao mesmo tempo), tela de conflitos. `visualizador.js`: PDF e foto abertos na tela no celular (pdf.js). `sw.js`: aplicativo instalável, sempre confere os arquivos com o site; Dados e backup mostra a "Versão do sistema" e "Atualizar agora". Servidor: `nuvem/worker.mjs` (Worker: login do Access, anexos no R2) e `nuvem/cofre.mjs` (cofre: Durable Object com SQLite) |
 | `backup-seguro.js` | Segunda pasta cifrada do administrador (RSA-OAEP + AES-GCM; senha mínima 12; cabeçalho autenticado nos arquivos novos, `protegido: 1`) |
 
 ## Stack
@@ -40,7 +40,7 @@
 | Linguagem | JavaScript (ES modules), HTML, CSS — sem framework, sem etapa de build no site |
 | "Banco" | Um arquivo `imoveis-dados.json` na pasta escolhida (objeto com uma lista por tabela) |
 | Navegador | Chrome ou Edge no computador (usa `showDirectoryPicker`) |
-| Bibliotecas (cópias locais em `docs/vendor/`) | `exceljs.min.js`, `jszip.min.js`, `html2canvas.min.js`, `jspdf.umd.min.js` (jsPDF 3.0.2, pelo cabeçalho do arquivo; as outras versões: NÃO CONFIRMADO, minificadas sem registro) |
+| Bibliotecas (cópias locais em `docs/vendor/`) | `exceljs.min.js`, `jszip.min.js`, `html2canvas.min.js`, `jspdf.umd.min.js` (jsPDF 3.0.2, pelo cabeçalho do arquivo; as outras versões: NÃO CONFIRMADO, minificadas sem registro); `pdf.min.js` e `pdf.worker.min.js` (pdf.js 3.11.174, do cdnjs em 2026-11-07; fora da versão sem internet) |
 | Ferramentas | Node 22 (testes `node:test`; a ponte exige 20+), `esbuild@0.24.0` via `npx` só para gerar a versão offline; a ponte não tem dependências |
 
 ## Rodar, testar e publicar
@@ -69,5 +69,5 @@ Atenção: `docs/` é a raiz do site publicado; tudo o que estiver lá fica aces
 
 | Em andamento |
 |---|
-| Dados na nuvem (Cloudflare): publicada em 2026-11-06 (etapa 5) e dados levados da pasta (conferência ok); falta conferir o aplicativo instalável no celular, cabeçalhos de segurança e envio de anexos 4 por vez (`nuvem/README.md`, "Próximos passos") |
+| Dados na nuvem (Cloudflare): publicada em 2026-11-06 (etapa 5) e dados levados da pasta (conferência ok); em 2026-11-07: cabeçalhos de segurança, login de 1 mês, anexos 4 por vez, celular (cartões, visualizador, ícone da logo, atualização na hora); falta o teste no celular de verdade e aposentar a pasta (`nuvem/README.md`, "Próximos passos") |
 | Banco (C6): código pronto e testado em modo simulado; falta o C6 liberar as chaves (sandbox e depois produção) para homologar (`GUIA_DE_MODIFICACAO.md` → "Ligar o boleto com Pix do C6", `LIGAR_C6.md`). Pagamentos pelo banco nascem desligados (`permitir_pagamentos` no site e `PAGAMENTOS=1` na ponte). Fora do código: pendências do dono em `SEGURANCA.md` (cap. 7: ponte, GitHub, pasta de dados, rotina) e publicação no domínio (`PUBLICAR_NO_DOMINIO.md`) |
