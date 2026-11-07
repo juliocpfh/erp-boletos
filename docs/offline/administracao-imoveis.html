@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-+IuKunsJfrb1gESJ8i+AFyOfP1KQiGT8Xw9Lhq0a4rg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-FtUXXe29mNQGf9ulD4whQYbTI2F2SbGbLH4Wjtc0Tw0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="0d82cf9b1443335d">
+<meta name="fontes" content="4a1c4835d0e053c9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1472,8 +1472,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     TIPOS_CHAVE_PIX: () => TIPOS_CHAVE_PIX2,
     TIPOS_DESPESA: () => TIPOS_DESPESA,
     acertarGarantiaDepositada: () => acertarGarantiaDepositada,
+    aditivoPerdido: () => aditivoPerdido,
     aditivosAguardando: () => aditivosAguardando,
     aditivosDo: () => aditivosDo,
+    aditivosValidos: () => aditivosValidos,
     aguardandoCredito: () => aguardandoCredito,
     airbnbDoMes: () => airbnbDoMes,
     ajustarBoleto: () => ajustarBoleto,
@@ -1491,6 +1493,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     alteracaoBoletoC6: () => alteracaoBoletoC6,
     alteracoesDesfaziveis: () => alteracoesDesfaziveis,
     aluguelAtual: () => aluguelAtual,
+    analisarAditivoPerdido: () => analisarAditivoPerdido,
     analisarDocumento: () => analisarDocumento,
     anexarComprovante: () => anexarComprovante,
     anexarDocumentoParcial: () => anexarDocumentoParcial,
@@ -1648,6 +1651,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     leiturasDoImovel: () => leiturasDoImovel,
     ligarArquivoSeguro: () => ligarArquivoSeguro,
     lista: () => lista2,
+    marcarAditivoPerdido: () => marcarAditivoPerdido,
     marcarAditivos: () => marcarAditivos,
     marcarCartaEnviada: () => marcarCartaEnviada,
     marcarCondominioConferido: () => marcarCondominioConferido,
@@ -3163,7 +3167,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const i of d2.imoveis) if (!i.uf && ufDoCep(i.cep)) i.uf = ufDoCep(i.cep);
     for (const c of d2.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = hojeIso();
     for (const c of d2.contratos) if (c.garantia_tipo === "Caução") completarCaucao(c);
-    for (const c of d2.contratos) c.possui_aditivos = d2.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
+    for (const c of d2.contratos) c.possui_aditivos = d2.aditivos.some((a) => a.contrato_id === c.id && (a.arquivo || a.perdido_em));
     for (const c of d2.contratos) desativarSeSaiu(d2, c);
     for (const c of d2.contratos) for (const qual of ["caucao", "deposito"]) if ((qual === "caucao" ? temCaucao(c) : temDeposito(c)) && (d2.depositos_garantia || []).length) completarPorDepositos(d2, c, qual, null);
     for (const c of d2.contratos) {
@@ -4920,10 +4924,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       alertaRotinaEntrada(d2, contrato, hoje3),
       alertaAssinaturaFaltante(d2, contrato, hoje3),
       alertaPerdaAConfirmar(d2, contrato, hoje3),
+      alertaAditivoPerdidoAConfirmar(d2, contrato),
       alertaAditivoHerdeiro(d2, contrato),
       alertaAditivoAguardando(d2, contrato),
       alertaCondominio(contrato, hoje3)
     ].filter(Boolean);
+  }
+  function alertaAditivoPerdidoAConfirmar(d2, c) {
+    const l = d2.aditivos.filter((a) => a.contrato_id === c.id && aditivoPerdido(a) && a.perdido_pendente);
+    if (!l.length) return null;
+    return {
+      nivel: "aviso",
+      tipo: "Documento perdido a confirmar",
+      ancora: "aditivos",
+      texto: `${l.map((a) => `termo aditivo de ${dataBr(a.data)} (${a.assunto}) registrado como perdido por ${a.perdido_pendente} em ${dataBr(a.perdido_em)}`).join("; ")}. O administrador confirma ou recusa.`
+    };
   }
   function alertaAditivoAguardando(d2, c) {
     const naTroca = !!alertaAditivoHerdeiro(d2, c);
@@ -5662,8 +5677,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   var porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
   var aditivosDo = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
-  var aditivosAguardando = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo).sort(porDataAditivo);
-  var aditivosDeVencimento = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo && a.dia_novo && a.primeiro_vencimento).sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
+  var aditivoPerdido = (a) => !a.arquivo && !!a.perdido_em;
+  var aditivosValidos = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em)).sort(porDataAditivo);
+  var aditivosAguardando = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo && !a.perdido_em).sort(porDataAditivo);
+  var aditivosDeVencimento = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em) && a.dia_novo && a.primeiro_vencimento).sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
   function vencimentoDoContrato(d2, c, comp) {
     const mesSeguinte = c.cobranca_mes_seguinte !== false;
     const mesVenc = mesSeguinte ? somarMeses(comp, 1) : comp;
@@ -5751,30 +5768,60 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const c = buscar(d2, "contratos", a.contrato_id);
     if (!data2) throw new Error("Informe a data da assinatura.");
     if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
-    atualizar(d2, "aditivos", a.id, { arquivo, assinado_em: data2 }, usuario, `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} assinado em ${dataBr(data2)}`);
+    atualizar(d2, "aditivos", a.id, { arquivo, assinado_em: data2, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} assinado em ${dataBr(data2)}`);
     marcarAditivos(d2, c.id, usuario);
     if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
     return a;
   }
-  function registrarAditivo(d2, contratoId, { data: data2, assunto, arquivo }, usuario) {
+  function registrarAditivo(d2, contratoId, { data: data2, assunto, arquivo, perdido = false }, usuario, administrador = true, hoje3 = hojeIso()) {
     const c = buscar(d2, "contratos", contratoId);
     if (!data2) throw new Error("Informe a data do termo aditivo.");
     if (!String(assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
-    if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+    if (!arquivo && !perdido) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+    const perda = perdido && !arquivo ? { perdido_em: hoje3, perdido_pendente: administrador ? null : usuario } : {};
     const a = inserir(
       d2,
       "aditivos",
-      { contrato_id: c.id, imovel_id: c.imovel_id || null, data: data2, assunto: String(assunto).trim(), arquivo },
+      { contrato_id: c.id, imovel_id: c.imovel_id || null, data: data2, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda },
       usuario,
-      `${c.inquilino_nome}: termo aditivo de ${dataBr(data2)}`
+      `${c.inquilino_nome}: termo aditivo de ${dataBr(data2)}${perda.perdido_em ? ` (perdido, registrado em ${dataBr(hoje3)}${administrador ? "" : ", aguardando o administrador"})` : ""}`
     );
     marcarAditivos(d2, c.id, usuario);
+    return a;
+  }
+  function marcarAditivoPerdido(d2, id, data2, usuario, administrador = true) {
+    const a = buscar(d2, "aditivos", id);
+    if (!a) throw new Error("Termo aditivo não encontrado.");
+    const c = buscar(d2, "contratos", a.contrato_id);
+    if (data2) {
+      if (a.arquivo) throw new Error("Este termo aditivo já tem o arquivo assinado.");
+      if (a.tipo === "Troca de titular") throw new Error("O termo aditivo da troca de titular não pode ser marcado como perdido: anexe o arquivo assinado.");
+    }
+    atualizar(
+      d2,
+      "aditivos",
+      a.id,
+      { perdido_em: data2 || null, perdido_pendente: data2 && !administrador ? usuario : null },
+      usuario,
+      `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} ${data2 ? `perdido (registrado em ${dataBr(data2)}${administrador ? "" : ", aguardando o administrador"})` : "não está mais como perdido"}`
+    );
+    marcarAditivos(d2, c.id, usuario);
+    if (data2 && administrador && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
+    return a;
+  }
+  function analisarAditivoPerdido(d2, id, aceitar, usuario) {
+    const a = buscar(d2, "aditivos", id);
+    if (!a || !a.perdido_em) return null;
+    if (!aceitar) return marcarAditivoPerdido(d2, id, null, usuario);
+    const c = buscar(d2, "contratos", a.contrato_id);
+    atualizar(d2, "aditivos", a.id, { perdido_pendente: null }, usuario, `${c.inquilino_nome}: perda do termo aditivo de ${dataBr(a.data)} confirmada pelo administrador`);
+    if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d2, a, c, usuario);
     return a;
   }
   function marcarAditivos(d2, contratoId, usuario) {
     const c = buscar(d2, "contratos", contratoId);
     if (!c) return;
-    const tem = aditivosDo(d2, c.id).length > 0;
+    const tem = aditivosValidos(d2, c.id).length > 0;
     if (!!c.possui_aditivos !== tem) atualizar(d2, "contratos", c.id, { possui_aditivos: tem }, usuario, `${c.inquilino_nome}: ${tem ? "possui" : "não possui mais"} termo aditivo`);
   }
   var porDataVistoria = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
@@ -13560,7 +13607,7 @@ Salvar assim mesmo?`)) {
     return `<div class="selos">${prazo}
     ${c.inquilino_tipo === "Pessoa jurídica (empresa)" ? etiqueta("Empresa (PJ)", "info") : ""}
     ${c.solidario_nome ? etiqueta(`Solidário: ${c.solidario_nome}`, "neutra") : ""}
-    ${aditivosDo(d(), c.id).length ? etiqueta("Possui termo aditivo", "aviso") : ""}
+    ${aditivosValidos(d(), c.id).length ? etiqueta("Possui termo aditivo", "aviso") : ""}
     ${(() => {
       const n = solicitacoesDo(d(), c.id).filter((x) => ["Aberta", "Em andamento"].includes(x.situacao || "Aberta")).length;
       return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, "perigo")}</a>` : "";
@@ -14047,30 +14094,37 @@ Salvar assim mesmo?`)) {
     ${caixaAditivos(c)}</div>`;
   }
   function caixaAditivos(c) {
-    const lista3 = aditivosDo(d(), c.id);
-    const abrir = (a) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`;
-    const anteriores = cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, aditivosDo(d(), x.id)]).filter(([, l]) => l.length);
+    const lista3 = aditivosValidos(d(), c.id);
+    const adm = podeUsuario("admin");
+    const perdido = (a) => a.perdido_pendente ? etiqueta(`perdido? aguardando o administrador (${a.perdido_pendente}, ${dataBr(a.perdido_em)})`, "aviso") : etiqueta(`perdido (registrado em ${dataBr(a.perdido_em)})`, "perigo");
+    const abrir = (a) => aditivoPerdido(a) ? perdido(a) : `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${a.contrato_id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.arquivo)}</a>`;
+    const acoesPerdido = (a) => `${adm && a.perdido_pendente ? `${botao("analisarAditivoPerdido", "Confirmar perda", { id: a.id, aceitar: 1 }, "pequeno")}
+    ${botao("analisarAditivoPerdido", "Recusar", { id: a.id, aceitar: 0 }, "perigo pequeno", 'Recusar a perda? O termo aditivo volta a "aguardando assinatura".')} ` : ""}${opera() ? botao("desmarcarAditivoPerdido", 'Desfazer "perdido"', { id: a.id }, "link-botao", 'Tirar o registro de perdido? O termo aditivo volta a "aguardando assinatura" (o dia do vencimento já mudado não volta sozinho).') : ""}`;
+    const anteriores = cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, aditivosValidos(d(), x.id)]).filter(([, l]) => l.length);
     const ant = contratoHerdado(d(), c);
     const aguardando = aditivosAguardando(d(), c.id);
     const ver = (a) => a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, "Ver / PDF") : "";
     return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, "Gerar termo aditivo") : ""}</div>
-    ${ant && !lista3.length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? "Colha as assinaturas e anexe o arquivo assinado." : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', "") : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ""}
+    ${ant && !aditivosDo(d(), c.id).length ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? "Colha as assinaturas e anexe o arquivo assinado." : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', "") : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ""}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}` : ""}
+      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
+        ${a.tipo === "Troca de titular" ? "" : botao("aditivoPerdido", "Perdido", { id: a.id }, "perigo pequeno", `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? " (a troca do dia só vale depois da confirmação)" : ""}.`}`)}` : ""}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ""}</td></tr>`).join("")}</table></div></div>` : ""}
-    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${abrir(a)}${xAnexo("removerArquivoAditivo", { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)}? O arquivo assinado também é apagado.`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
+    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo("removerArquivoAditivo", { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
+      <td class="n nw">${ver(a)} ${opera() ? botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? " O arquivo assinado também é apagado." : ""}`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join("")}</table></div></details>`).join("")}
     ${opera() ? `<form data-form="aditivo" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
       <input type="date" name="data" value="${hojeIso()}" style="width:auto">
       <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
       <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
-      <button class="secundario pequeno">Registrar aditivo</button></form>` : ""}`;
+      <button class="secundario pequeno">Registrar aditivo</button>
+      ${botao("registrarAditivoPerdido", "Registrar como perdido", { contrato: c.id }, "perigo pequeno")}</form>
+      <p class="suave">Termo assinado cujo papel se perdeu: "Perdido" (nos que aguardam assinatura) ou "Registrar como perdido" (termo antigo, sem o arquivo) vale como assinado. O termo da troca de titular não pode ser dado como perdido.</p>` : ""}`;
   }
   function telaContrato(c) {
     const i = buscar2("imoveis", c.imovel_id);
@@ -17940,6 +17994,35 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const nome = await salvarAssinado("assinados", c.id, el.files[0], `${doc[1]} ${doc[2]} ${c[campo2]}`);
       await alterar((db) => arquivoDocumento(db, c.id, campo2, nome, login()));
       aviso("Arquivo anexado.");
+      await mostrar();
+    },
+    /** Termo aditivo gerado que não voltou assinado: vale como assinado, sem arquivo (quem não é administrador aguarda a análise). */
+    async aditivoPerdido({ id }) {
+      const a = buscar2("aditivos", id);
+      await alterar((db) => marcarAditivoPerdido(db, Number(id), hojeIso(), login(), podeUsuario("admin")));
+      const adm = podeUsuario("admin");
+      aviso(`Termo aditivo registrado como perdido${a.dia_novo && adm ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? `; a troca para o dia ${a.dia_novo} só vale depois da confirmação` : ""}.`}`);
+      await mostrar();
+    },
+    async desmarcarAditivoPerdido({ id }) {
+      await alterar((db) => marcarAditivoPerdido(db, Number(id), null, login()));
+      await mostrar();
+    },
+    async analisarAditivoPerdido({ id, aceitar }) {
+      if (!podeUsuario("admin")) throw new Error("Só o administrador analisa.");
+      await alterar((db) => analisarAditivoPerdido(db, Number(id), aceitar === "1", login()));
+      await mostrar();
+    },
+    /** Termo aditivo antigo, assinado, cujo papel se perdeu: registra com data e assunto, sem o arquivo. */
+    async registrarAditivoPerdido({ contrato }, el) {
+      const form = el.closest("form");
+      const data2 = form.querySelector("[name=data]").value;
+      const assunto = form.querySelector("[name=assunto]").value;
+      if (!data2) throw new Error("Informe a data do termo aditivo.");
+      if (!String(assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
+      if (!confirm(`Registrar o termo aditivo de ${dataBr(data2)} como perdido (assinado, mas sem o arquivo)? Passa a valer como assinado.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`)) return;
+      await alterar((db) => registrarAditivo(db, Number(contrato), { data: data2, assunto, perdido: true }, login(), podeUsuario("admin")));
+      aviso("Termo aditivo registrado como perdido.");
       await mostrar();
     },
     /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */

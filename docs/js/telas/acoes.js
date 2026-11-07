@@ -673,6 +673,39 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Termo aditivo gerado que não voltou assinado: vale como assinado, sem arquivo (quem não é administrador aguarda a análise). */
+  async aditivoPerdido({ id }) {
+    const a = buscar('aditivos', id);
+    await alterar((db) => R.marcarAditivoPerdido(db, Number(id), C.hojeIso(), login(), podeUsuario('admin')));
+    const adm = podeUsuario('admin');
+    aviso(`Termo aditivo registrado como perdido${a.dia_novo && adm ? `: o vencimento passou ao dia ${a.dia_novo} a partir de ${C.dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? `; a troca para o dia ${a.dia_novo} só vale depois da confirmação` : ''}.`}`);
+    await mostrar();
+  },
+
+  async desmarcarAditivoPerdido({ id }) {
+    await alterar((db) => R.marcarAditivoPerdido(db, Number(id), null, login()));
+    await mostrar();
+  },
+
+  async analisarAditivoPerdido({ id, aceitar }) {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador analisa.');
+    await alterar((db) => R.analisarAditivoPerdido(db, Number(id), aceitar === '1', login()));
+    await mostrar();
+  },
+
+  /** Termo aditivo antigo, assinado, cujo papel se perdeu: registra com data e assunto, sem o arquivo. */
+  async registrarAditivoPerdido({ contrato }, el) {
+    const form = el.closest('form');
+    const data = form.querySelector('[name=data]').value;
+    const assunto = form.querySelector('[name=assunto]').value;
+    if (!data) throw new Error('Informe a data do termo aditivo.');
+    if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+    if (!confirm(`Registrar o termo aditivo de ${C.dataBr(data)} como perdido (assinado, mas sem o arquivo)? Passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`)) return;
+    await alterar((db) => R.registrarAditivo(db, Number(contrato), { data, assunto, perdido: true }, login(), podeUsuario('admin')));
+    aviso('Termo aditivo registrado como perdido.');
+    await mostrar();
+  },
+
   /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */
   async removerArquivoAditivo({ id }) {
     await alterarApagandoAnexos((db) => R.removerArquivoAditivo(db, Number(id), login()));

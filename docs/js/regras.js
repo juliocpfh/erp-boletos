@@ -158,8 +158,8 @@ export function normalizar(d) {
   // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
   for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
   // "Possui termo aditivo" passou a valer só com um termo registrado (antes era marcado ao mudar o vencimento ou a garantia)
-  // (o termo gerado e ainda não assinado, sem arquivo, não conta)
-  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && a.arquivo);
+  // (o termo gerado e ainda não assinado, sem arquivo, não conta; o registrado como perdido conta, desde 2026-11-06)
+  for (const c of d.contratos) c.possui_aditivos = d.aditivos.some((a) => a.contrato_id === c.id && (a.arquivo || a.perdido_em));
   // quem já saiu (ou teve fim do vínculo) e já tem o boleto do último mês fica inativo
   for (const c of d.contratos) desativarSeSaiu(d, c);
   // caução em depósitos: o valor a completar era o corrigido pelos reajustes; passou a ser o inicial (os reajustes vêm depois)
@@ -2083,10 +2083,19 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaRotinaEntrada(d, contrato, hoje),
     alertaAssinaturaFaltante(d, contrato, hoje),
     alertaPerdaAConfirmar(d, contrato, hoje),
+    alertaAditivoPerdidoAConfirmar(d, contrato),
     alertaAditivoHerdeiro(d, contrato),
     alertaAditivoAguardando(d, contrato),
     alertaCondominio(contrato, hoje),
   ].filter(Boolean);
+}
+
+/** Termo aditivo registrado como perdido por quem não é administrador: aguarda o administrador confirmar ou recusar. */
+function alertaAditivoPerdidoAConfirmar(d, c) {
+  const l = d.aditivos.filter((a) => a.contrato_id === c.id && aditivoPerdido(a) && a.perdido_pendente);
+  if (!l.length) return null;
+  return { nivel: 'aviso', tipo: 'Documento perdido a confirmar', ancora: 'aditivos',
+    texto: `${l.map((a) => `termo aditivo de ${C.dataBr(a.data)} (${a.assunto}) registrado como perdido por ${a.perdido_pendente} em ${C.dataBr(a.perdido_em)}`).join('; ')}. O administrador confirma ou recusa.` };
 }
 
 /**
@@ -2997,12 +3006,19 @@ export function renomearReferencias(d, contratoId, antigo, novo, usuario) {
 }
 
 const porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
-/** Termos aditivos assinados do contrato (posteriores a ele, com o arquivo anexado), do mais recente ao mais antigo. */
+/**
+ * Termos aditivos assinados do contrato (posteriores a ele, com o arquivo anexado), do mais recente ao mais antigo.
+ * É o que vale para a troca de titular (o termo dela não pode ser dado como perdido).
+ */
 export const aditivosDo = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
-/** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo). */
-export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo).sort(porDataAditivo);
+/** Termo assinado, mas o papel se perdeu (sem arquivo): vale como assinado, salvo para a troca de titular. */
+export const aditivoPerdido = (a) => !a.arquivo && !!a.perdido_em;
+/** Termos que valem: assinados com o arquivo ou registrados como perdidos. Contam para "Possui termo aditivo" e para a troca do dia. */
+export const aditivosValidos = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em)).sort(porDataAditivo);
+/** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo e sem registro de perda). */
+export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo && !a.perdido_em).sort(porDataAditivo);
 
-const aditivosDeVencimento = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo && a.dia_novo && a.primeiro_vencimento)
+const aditivosDeVencimento = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em) && a.dia_novo && a.primeiro_vencimento)
   .sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
 
 /**
@@ -3098,29 +3114,67 @@ export function assinarAditivo(d, id, { data, arquivo }, usuario) {
   const c = buscar(d, 'contratos', a.contrato_id);
   if (!data) throw new Error('Informe a data da assinatura.');
   if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
-  atualizar(d, 'aditivos', a.id, { arquivo, assinado_em: data }, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} assinado em ${C.dataBr(data)}`);
+  atualizar(d, 'aditivos', a.id, { arquivo, assinado_em: data, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} assinado em ${C.dataBr(data)}`);
   marcarAditivos(d, c.id, usuario);
   if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario);
   return a;
 }
 
-/** Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo". */
-export function registrarAditivo(d, contratoId, { data, assunto, arquivo }, usuario) {
+/**
+ * Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo".
+ * ``perdido``: termo antigo assinado cujo papel se perdeu (sem arquivo; ``hoje`` = data do registro da perda). Quem não é
+ * administrador fica aguardando a análise. Não vale como o termo da troca de titular.
+ */
+export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdido = false }, usuario, administrador = true, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   if (!data) throw new Error('Informe a data do termo aditivo.');
   if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
-  if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
-  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo }, usuario,
-    `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}`);
+  if (!arquivo && !perdido) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+  const perda = perdido && !arquivo ? { perdido_em: hoje, perdido_pendente: administrador ? null : usuario } : {};
+  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda }, usuario,
+    `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}${perda.perdido_em ? ` (perdido, registrado em ${C.dataBr(hoje)}${administrador ? '' : ', aguardando o administrador'})` : ''}`);
   marcarAditivos(d, c.id, usuario);
   return a;
 }
 
-/** "Possui termo aditivo" só vale com algum termo registrado (com o arquivo assinado): acerta a marca depois de incluir ou excluir. */
+/**
+ * Termo aditivo gerado que não voltou assinado (o papel se perdeu): vale como assinado (conta como "Possui termo aditivo" e
+ * a troca do dia passa a valer), sem arquivo. Sem data: desfaz (volta a "aguardando assinatura"; o dia do vencimento já
+ * mudado não volta sozinho). O termo da troca de titular não pode ser dado como perdido. Quem não é administrador aguarda a análise
+ * (a troca do dia só vale quando o administrador confirmar).
+ * Ex.: troca do dia 10 → 15 a partir de 15/12/2026, gerada em 10/09/2026 e perdida → boletos em aberto desde 12/2026 no dia 15.
+ */
+export function marcarAditivoPerdido(d, id, data, usuario, administrador = true) {
+  const a = buscar(d, 'aditivos', id);
+  if (!a) throw new Error('Termo aditivo não encontrado.');
+  const c = buscar(d, 'contratos', a.contrato_id);
+  if (data) {
+    if (a.arquivo) throw new Error('Este termo aditivo já tem o arquivo assinado.');
+    if (a.tipo === 'Troca de titular') throw new Error('O termo aditivo da troca de titular não pode ser marcado como perdido: anexe o arquivo assinado.');
+  }
+  atualizar(d, 'aditivos', a.id, { perdido_em: data || null, perdido_pendente: data && !administrador ? usuario : null }, usuario,
+    `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} ${data ? `perdido (registrado em ${C.dataBr(data)}${administrador ? '' : ', aguardando o administrador'})` : 'não está mais como perdido'}`);
+  marcarAditivos(d, c.id, usuario);
+  if (data && administrador && a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario);
+  return a;
+}
+
+/** Análise do administrador da perda registrada por outro usuário: aceitar confirma; recusar desfaz (volta a aguardar assinatura). */
+export function analisarAditivoPerdido(d, id, aceitar, usuario) {
+  const a = buscar(d, 'aditivos', id);
+  if (!a || !a.perdido_em) return null;
+  if (!aceitar) return marcarAditivoPerdido(d, id, null, usuario);
+  const c = buscar(d, 'contratos', a.contrato_id);
+  atualizar(d, 'aditivos', a.id, { perdido_pendente: null }, usuario, `${c.inquilino_nome}: perda do termo aditivo de ${C.dataBr(a.data)} confirmada pelo administrador`);
+  if (a.dia_novo && a.primeiro_vencimento) aplicarAditivoVencimento(d, a, c, usuario); // a troca do dia só vale agora
+  return a;
+}
+
+/** "Possui termo aditivo" só vale com algum termo registrado (assinado ou perdido): acerta a marca depois de incluir ou excluir. */
 export function marcarAditivos(d, contratoId, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
-  const tem = aditivosDo(d, c.id).length > 0;
+  const tem = aditivosValidos(d, c.id).length > 0;
   if (!!c.possui_aditivos !== tem) atualizar(d, 'contratos', c.id, { possui_aditivos: tem }, usuario, `${c.inquilino_nome}: ${tem ? 'possui' : 'não possui mais'} termo aditivo`);
 }
 
