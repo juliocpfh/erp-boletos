@@ -1255,6 +1255,83 @@ test('termo aditivo de vencimento assinado: boletos em aberto a partir do 1º ve
   assert.equal(R.vencimentoDoContrato(d, c, '2026-10'), '2026-11-10', 'mês antes do termo continua no dia antigo');
 });
 
+test('termo aditivo perdido: vale como assinado (sem alerta, "possui termo aditivo", dia novo) e dá para desfazer', () => {
+  const { d, c } = base();
+  c.dia_vencimento = 10;
+  c.cobranca_mes_seguinte = true;
+  for (const m of ['2026-11', '2026-12']) R.gerarCobrancas(d, m, 'julio');
+  const doMes = (m) => R.boletoDoMes(d, c.id, m);
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-09-10', dia_novo: '15', mes: '2026-12', texto: 'texto' }, 'julio');
+  const tipos = () => R.alertasContrato(d, c, '2026-11-06').map((x) => x.tipo);
+  assert.ok(tipos().includes('Aditivo aguardando assinatura'));
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'julio');
+  assert.ok(!tipos().includes('Aditivo aguardando assinatura'), 'perdido: some o alerta');
+  assert.equal(R.aditivosAguardando(d, c.id).length, 0);
+  assert.equal(R.aditivosValidos(d, c.id).length, 1);
+  assert.equal(R.aditivosDo(d, c.id).length, 0, 'sem arquivo');
+  assert.equal(c.possui_aditivos, true);
+  assert.equal(c.dia_vencimento, 15, 'a troca do dia passa a valer');
+  assert.equal(doMes('2026-11').vencimento, '2026-12-15');
+  R.normalizar(d);
+  assert.equal(c.possui_aditivos, true, 'normalizar mantém a marca');
+  R.marcarAditivoPerdido(d, a.id, null, 'julio');
+  assert.equal(R.aditivosAguardando(d, c.id).length, 1, 'desfeito: volta a aguardar assinatura');
+  assert.equal(c.possui_aditivos, false);
+  // achou o papel: assinar tira o registro de perda
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'julio');
+  R.assinarAditivo(d, a.id, { data: '2026-11-07', arquivo: 'termo.pdf' }, 'julio');
+  assert.equal(a.perdido_em, null);
+  assert.throws(() => R.marcarAditivoPerdido(d, a.id, '2026-11-08', 'julio'), /já tem o arquivo/);
+});
+
+test('termo aditivo perdido: operador aguarda o administrador; termo antigo registrado sem arquivo', () => {
+  const { d, c } = base();
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-09-10', dia_novo: '20', mes: '2026-12', texto: 'texto' }, 'julio');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  const alerta = () => R.alertasContrato(d, c, '2026-11-06').find((x) => x.tipo === 'Documento perdido a confirmar');
+  assert.match(alerta().texto, /termo aditivo de 10\/09\/2026 .* registrado como perdido por ana em 06\/11\/2026/);
+  R.analisarAditivoPerdido(d, a.id, false, 'julio');
+  assert.equal(alerta(), undefined);
+  assert.equal(R.aditivosAguardando(d, c.id).length, 1, 'recusado: volta a aguardar assinatura');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  R.analisarAditivoPerdido(d, a.id, true, 'julio');
+  assert.equal(alerta(), undefined);
+  assert.equal(a.perdido_em, '2026-11-06', 'confirmado: continua perdido');
+  // termo antigo: data e assunto, sem arquivo
+  assert.throws(() => R.registrarAditivo(d, c.id, { data: '2024-03-01', assunto: 'Troca de garantia' }, 'julio'), /Anexe/);
+  const v = R.registrarAditivo(d, c.id, { data: '2024-03-01', assunto: 'Troca de garantia', perdido: true }, 'julio', true, '2026-11-06');
+  assert.equal(v.perdido_em, '2026-11-06');
+  assert.equal(v.arquivo, null);
+  assert.equal(R.aditivosValidos(d, c.id).length, 2);
+});
+
+test('termo aditivo perdido pelo operador: a troca do dia só vale depois da confirmação do administrador', () => {
+  const { d, c } = base();
+  c.dia_vencimento = 10;
+  c.cobranca_mes_seguinte = true;
+  for (const m of ['2026-11', '2026-12']) R.gerarCobrancas(d, m, 'julio');
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-09-10', dia_novo: '15', mes: '2026-12', texto: 'texto' }, 'julio');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  assert.equal(c.dia_vencimento, 10, 'pendente: o dia não muda');
+  assert.equal(R.boletoDoMes(d, c.id, '2026-11').vencimento, '2026-12-10');
+  R.analisarAditivoPerdido(d, a.id, false, 'julio');
+  assert.equal(c.dia_vencimento, 10, 'recusado: nada mudou');
+  R.marcarAditivoPerdido(d, a.id, '2026-11-06', 'ana', false);
+  R.analisarAditivoPerdido(d, a.id, true, 'julio');
+  assert.equal(c.dia_vencimento, 15, 'confirmado: o dia muda');
+  assert.equal(R.boletoDoMes(d, c.id, '2026-11').vencimento, '2026-12-15');
+});
+
+test('termo aditivo perdido: o da troca de titular não pode, e o perdido não vale como termo da troca', () => {
+  const { d, c } = base();
+  const h = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'Ana Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-12-01', ativo: true }, 'julio');
+  const t = R.salvarAditivoTroca(d, h.id, { data: '2026-11-06', texto: 'texto' }, 'julio');
+  assert.throws(() => R.marcarAditivoPerdido(d, t.id, '2026-11-06', 'julio'), /troca de titular não pode/);
+  R.registrarAditivo(d, h.id, { data: '2026-11-06', assunto: 'Outro', perdido: true }, 'julio');
+  assert.equal(R.trocaAguardaAditivo(d, h), true, 'continua exigindo o termo assinado');
+  assert.ok(R.alertasContrato(d, h, '2026-11-06').some((x) => x.tipo === 'Aditivo da troca de titular'));
+});
+
 test('reserva já abatida em aluguel antigo (fora do sistema): sai dos boletos em aberto; excluir o registro devolve', () => {
   const { d, c } = base();
   R.gerarCobrancas(d, '2026-06', 'julio');
