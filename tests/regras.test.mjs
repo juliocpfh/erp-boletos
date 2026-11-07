@@ -556,6 +556,9 @@ test('IPTU pelo mês de vencimento do boleto: cada contrato acha o seu mês de u
 test('documentos de entrada: alerta para todo inquilino ativo, até marcar os três com o arquivo assinado', () => {
   const { d, c } = base();
   assert.match(R.alertaDocumentosEntrada(c).texto, /contrato de locação, vistoria de entrada, recibo de entrega das chaves/, 'inquilino antigo também gera alerta');
+  // fonte única do que falta (alerta, cadastros incompletos e faixa da página do inquilino)
+  assert.deepEqual(R.documentosPendentes(d, c).map((x) => [x.campo, x.situacao]), [['doc_contrato_em', 'falta'], ['doc_vistoria_em', 'falta'], ['doc_chaves_em', 'falta']]);
+  assert.equal(R.documentosPendentes(d, c)[1].feito, 'assinada');
   assert.throws(() => R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio'), /Anexe o arquivo do contrato de locação assinado/);
   assert.throws(() => R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-09-04', 'julio'), /Anexe o arquivo da vistoria de entrada assinada/);
   R.marcarDocumento(d, c.id, 'doc_contrato_em', '2026-09-04', 'julio', 'contrato-assinado.pdf');
@@ -573,6 +576,7 @@ test('documentos de entrada: alerta para todo inquilino ativo, até marcar os tr
   R.marcarDocumentoPerdido(d, c.id, 'doc_chaves_em', '2026-10-15', 'julio');
   assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), '2026-10-15');
   assert.equal(R.alertaDocumentosEntrada(c), null, 'documento perdido não gera alerta');
+  assert.deepEqual(R.documentosPendentes(d, c), [], 'perdido não fica pendente');
   R.marcarDocumento(d, c.id, 'doc_chaves_em', '2026-10-16', 'julio', 'chaves.jpg');
   assert.equal(R.documentoPerdido(d, c, 'doc_chaves_em'), null, 'assinar limpa o "perdido"');
   R.marcarDocumento(d, c.id, 'doc_chaves_em', null, 'julio');
@@ -912,6 +916,17 @@ test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pe
   assert.throws(() => R.salvarEstilosAlertas(d, { Fiador: { cor: 'Rosa', enfase: 'Forte', prioridade: 1 } }, 'julio'), /Confira/);
   R.salvarEstilosAlertas(d, {}, 'julio');
   assert.deepEqual(d.estilos_alertas, {});
+  // só tipos que algum alerta gera: "Devolver garantia" entrou; "Correção do aluguel" (nunca gerou alerta) saiu
+  assert.ok(R.TIPOS_ALERTA.includes('Devolver garantia'));
+  assert.ok(!R.TIPOS_ALERTA.includes('Correção do aluguel'));
+  assert.deepEqual(R.estiloAlerta(d, 'Devolver garantia'), { cor: 'Padrão', enfase: 'Normal', prioridade: 3 });
+  // dados antigos: a aparência escolhida para "Correção do aluguel" passa a "Reajuste do aluguel" (se este ficou no padrão)
+  d.estilos_alertas = { 'Correção do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } };
+  R.normalizar(d);
+  assert.deepEqual(d.estilos_alertas, { 'Reajuste do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 } });
+  d.estilos_alertas = { 'Correção do aluguel': { cor: 'Roxo', enfase: 'Forte', prioridade: 1 }, 'Reajuste do aluguel': { cor: 'Verde', enfase: 'Discreta', prioridade: 5 } };
+  R.normalizar(d);
+  assert.deepEqual(d.estilos_alertas, { 'Reajuste do aluguel': { cor: 'Verde', enfase: 'Discreta', prioridade: 5 } }, 'a escolha do reajuste prevalece');
 });
 
 test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF, corrige a caução ao pagar', () => {

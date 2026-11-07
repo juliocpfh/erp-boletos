@@ -86,6 +86,12 @@ export function normalizar(d) {
     d.estilos_alertas['Rotina de entrada'] = d.estilos_alertas['Rotina de entrada'] || d.estilos_alertas['Documentos de entrada'];
     delete d.estilos_alertas['Documentos de entrada'];
   }
+  // "Correção do aluguel" nunca gerou alerta (o aviso do reajuste é "Reajuste do aluguel", mesmo padrão): a aparência
+  // escolhida passa ao reajuste, se este ficou no padrão; o tipo saiu da lista (entrou "Devolver garantia")
+  if (d.estilos_alertas && d.estilos_alertas['Correção do aluguel']) {
+    d.estilos_alertas['Reajuste do aluguel'] = d.estilos_alertas['Reajuste do aluguel'] || d.estilos_alertas['Correção do aluguel'];
+    delete d.estilos_alertas['Correção do aluguel'];
+  }
   // o anúncio passou a ser só uma descrição (o link antigo vira o texto)
   for (const i of d.imoveis) {
     if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -2605,12 +2611,20 @@ export function partesDoContrato(d, c) {
 export const textoParte = (p) => `${p.nome} (${p.papel})`;
 
 /**
- * Todo inquilino ativo (antigo ou novo): o que falta dos três documentos assinados (próprio ou herdado).
- * Faz parte do alerta único "Rotina de entrada" (alertaRotinaEntrada).
+ * Fonte única do que falta dos três documentos de entrada do inquilino ativo (antigo ou novo; próprio ou herdado):
+ * [{ campo, nome, feito, situacao }], situacao 'falta' (não assinado) ou 'parcial' (anexado, falta assinatura de alguém).
+ * Quem saiu, está inativo ou herdou de um titular anterior (marca-se lá) não tem pendência. Usada pelo alerta
+ * "Rotina de entrada", pela faixa de cadastros incompletos e pela faixa no topo da página do inquilino.
  */
+export function documentosPendentes(d, c) {
+  if (c.ativo === false || c.data_saida) return [];
+  return DOCUMENTOS_ENTRADA.map(([campo, nome, feito]) => ({ campo, nome, feito,
+    situacao: documentoFalta(d, c, campo) ? 'falta' : documentoParcial(d, c, campo) ? 'parcial' : null })).filter((x) => x.situacao);
+}
+
+/** Alerta do que falta dos três documentos assinados; faz parte do alerta único "Rotina de entrada" (alertaRotinaEntrada). */
 export function alertaDocumentosEntrada(c, d = null) {
-  if (c.ativo === false || c.data_saida) return null;
-  const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d, c, k)).map(([, t]) => t.toLocaleLowerCase('pt-BR'));
+  const falta = documentosPendentes(d, c).filter((x) => x.situacao === 'falta').map((x) => x.nome.toLocaleLowerCase('pt-BR'));
   return falta.length ? { nivel: 'aviso', tipo: 'Rotina de entrada', texto: `falta ${falta.join(', ')}.`, ancora: 'rotina' } : null;
 }
 
@@ -3274,8 +3288,8 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 // Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
 // --------------------------------------------------------------------------
-export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Correção do aluguel', 'Inadimplência',
-  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução',
+export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
+  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
   'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
@@ -3285,7 +3299,6 @@ const PADRAO_ALERTA = { cor: 'Padrão', enfase: 'Normal', prioridade: 3 };
 export const ESTILOS_ALERTA_PADRAO = {
   'Vigência do contrato': { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 },
   'Reajuste do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
-  'Correção do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
   'A verificar': { cor: 'Amarelo', enfase: 'Normal', prioridade: 3 },
 };
 export const estiloAlerta = (d, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...((d && d.estilos_alertas) || {})[tipo] });
