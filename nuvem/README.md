@@ -14,7 +14,7 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - **Conflito** (mesmo campo mudado em dois aparelhos sem se verem): o campo volta ao valor anterior e nada vale até alguém escolher (`POST dados/resolver`). Excluir um registro que outro mudou, ou mudar um que outro excluiu, também espera a escolha.
 - **Códigos novos sem internet:** cada aparelho pede uma faixa (`POST dados/faixa`, até 1000 por vez) e nunca repete código com outro aparelho.
 - **NF:** o número só sai com internet, pelo contador (`POST dados/contador`, `proxima_fatura`). O lote não consegue mudar esse número.
-- **Backups:** uma cópia completa por dia no R2 (`backups/`, horário de Brasília, 30 guardadas, só leitura) e outra antes de qualquer "substituir tudo". Os registros excluídos ficam guardados no cofre.
+- **Backups:** uma cópia completa por dia no R2 (`backups/`, horário de Brasília, 30 guardadas, só leitura e só o administrador baixa) e outra antes de qualquer "substituir tudo". Dados e backup → **Backups da nuvem** lista, baixa e "volta para um dia" (substitui os dados; os anexos ficam). O backup seguro (pasta cifrada no computador do administrador) continua funcionando na nuvem: segunda camada, fora do Cloudflare. Os registros excluídos ficam guardados no cofre.
 - **Anexos:** `GET/PUT/DELETE arquivos/<caminho>`, `GET lista/<pasta>/`, `POST mover` e `POST apagar` (pasta inteira; pastas grandes vão em partes, `mais: true`). No site, `docs/js/pasta-nuvem.js` imita a pasta do computador por cima dessas rotas.
 
 ## Segurança (o que o código já faz)

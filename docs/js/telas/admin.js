@@ -19,7 +19,7 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Arquivo de backup (.bkp)</label><input type="file" name="arquivo" accept="${B.EXTENSAO}"></div>
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
     <div class="check"><button>Abrir e baixar o ZIP</button></div></form>
-  <p class="suave">O backup aberto vira um ZIP igual ao do "Exportar tudo". Para voltar os dados: escolha a pasta dos dados (pode ser uma pasta nova e vazia), crie o administrador se pedir e use <b>Dados e backup → Importar ZIP</b>.
+  <p class="suave">O backup aberto vira um ZIP igual ao do "Exportar tudo". Para voltar os dados: descompacte o ZIP numa pasta e, na nuvem, use <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples). Na pasta do computador: escolha a pasta dos dados (pode ser uma pasta nova e vazia), crie o administrador se pedir e use <b>Dados e backup → Importar ZIP</b>.
     Os usuários e senhas antigos voltam junto. Se o programa também deu problema, abra a cópia dele que fica na pasta do backup seguro, em <b>${B.PASTA_PROGRAMA}</b>.</p>`;
 
 export function telaRestaurarBackup() {
@@ -59,7 +59,7 @@ export async function telaBackupSeguro() {
       ${item('Última cópia do banco', quando(ultimo(B.PASTA_DIARIO)))}
       ${item('Último backup completo', quando(ultimo(B.PASTA_SEMANAL)))}
       ${item('Guarda', `${B.MANTER_DIARIOS} cópias diárias, ${B.MANTER_SEMANAIS} completos semanais e 1 completo por mês durante ${B.MANTER_MENSAIS} meses`)}</div>
-      <p class="suave">A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.
+      <p class="suave">${E.nuvem ? 'A cada alteração que chega a <b>este computador</b> (feita aqui ou em outro aparelho), a cópia do dia é atualizada: é a segunda camada do backup, fora do Cloudflare.' : 'A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.'}
         O completo semanal é feito sozinho quando o sistema é aberto e já passou uma semana do último. Os arquivos são cifrados: sem a senha do backup ninguém consegue abrir.</p>
       <div class="acoes">${botao('backupCompletoAgora', 'Fazer backup completo agora', {}, '')}
         ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div></div>
@@ -175,14 +175,14 @@ export async function telaDados() {
       ${item('Versão do sistema', await versaoDoSistema())}</div>
       ${E.nuvem ? '' : `<p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
-      ${podeUsuario('admin') ? `<p>${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
+      ${podeUsuario('admin') ? `<p>${link('#/backups-nuvem', 'Backups da nuvem (baixar ou voltar para um dia)', 'botao secundario pequeno')} ${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
     <div class="cartao"><h2>Versão para usar sem internet</h2>
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão sem internet de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}
       <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
       <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
       ${window.VERSAO_OFFLINE ? '' : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
-      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.</p>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.${E.nuvem ? ' Na nuvem é a segunda camada, fora do Cloudflare: vale ter.' : ''}</p>
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
     ${caixaConfigBanco()}
@@ -192,7 +192,7 @@ export async function telaDados() {
       ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', {}, 'secundario') : ''}
       <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto.</p>
       ${botao('baixarRegras', 'Baixar regras do sistema (TXT)', {}, 'secundario')}</div>
-    ${podeUsuario('admin') ? `<div class="cartao"><h2>Importar ZIP</h2>
+    ${podeUsuario('admin') && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ''}
     ${opera() ? `<div class="cartao"><h2>Conferir arquivos</h2><p>Ao abrir o Painel, o sistema confere se cada arquivo ligado a um lançamento (comprovantes, documentos assinados, aditivos, cartas, apólices, fotos da vistoria) está na pasta.
