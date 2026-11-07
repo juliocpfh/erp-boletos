@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-8S82d5jjXuLZmT26YWf8Yd21L7iYgPWpn7tgYzUYhBA=' 'sha256-nB5WXb0Vso39lUYnHkb4axcSjJ5NC2WqmrttrnNM3xo=' 'sha256-SRexWsgp91RqscBTsGSZeGtFoFMWnzH0NsFsjrghQU4=' 'sha256-eQhxC88p73fxxPWknJy8OhOjZi2eUfWsPbVXrrrvwPw=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-htl7BgAzAcnh2OenQ57GoljaS4hRsynIWyNre230orA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-dYpKFxTAtCF+dVzY+pCkppdbK+LMQOVZ5Unfuvw+10k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="044c6b0e11f97216">
+<meta name="fontes" content="7c50edc12f5e79b6">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -567,7 +567,7 @@ body.com-visualizador { overflow: hidden; }
 <body>
 <div id="app"><main><p class="suave">Carregando…</p></main></div>
 <noscript>Ative o JavaScript para usar o sistema.</noscript>
-<!-- Versão para usar sem internet, gerada em 2026-11-07 por tools/gerar-offline.mjs. Não edite: gere de novo. -->
+<!-- Versão PC, gerada em 2026-11-07 por tools/gerar-offline.mjs (pelo GitHub a cada mudança na main). Não edite: gere de novo. -->
 <script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -3116,7 +3116,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...x && x.negativacao || {} }
     }));
     for (const cb of d2.cobrancas) if (cb.banco === void 0) cb.banco = null;
-    for (const c of d2.contratos) if (c.garantia_transferida_para && !d2.contratos.some((x) => x.id === c.garantia_transferida_para)) c.garantia_transferida_para = null;
+    const contratoPorId = new Map(d2.contratos.map((c) => [c.id, c]));
+    for (const c of d2.contratos) if (c.garantia_transferida_para && !contratoPorId.has(c.garantia_transferida_para)) c.garantia_transferida_para = null;
     if (d2.estilos_alertas && d2.estilos_alertas["Documentos de entrada"]) {
       d2.estilos_alertas["Rotina de entrada"] = d2.estilos_alertas["Rotina de entrada"] || d2.estilos_alertas["Documentos de entrada"];
       delete d2.estilos_alertas["Documentos de entrada"];
@@ -3168,11 +3169,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     for (const s of d2.seguros) {
       if (!s.imovel_id && s.contrato_id) {
-        const c2 = d2.contratos.find((x) => x.id === s.contrato_id);
+        const c2 = contratoPorId.get(s.contrato_id);
         if (c2) s.imovel_id = c2.imovel_id;
       }
       if (!s.contrato_id) s.contrato_id = contratoDoSeguro(d2, s);
-      const c = s.contrato_id && d2.contratos.find((x) => x.id === s.contrato_id);
+      const c = s.contrato_id && contratoPorId.get(s.contrato_id);
       if (c) s.imovel_id = c.imovel_id;
     }
     for (const m of d2.modelos_contrato || []) {
@@ -3194,12 +3195,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const i of d2.imoveis) if (!i.uf && ufDoCep(i.cep)) i.uf = ufDoCep(i.cep);
     for (const c of d2.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = hojeIso();
     for (const c of d2.contratos) if (c.garantia_tipo === "Caução") completarCaucao(c);
-    for (const c of d2.contratos) c.possui_aditivos = d2.aditivos.some((a) => a.contrato_id === c.id && (a.arquivo || a.perdido_em));
+    const comAditivo = new Set(d2.aditivos.filter((a) => a.arquivo || a.perdido_em).map((a) => a.contrato_id));
+    for (const c of d2.contratos) c.possui_aditivos = comAditivo.has(c.id);
     for (const c of d2.contratos) desativarSeSaiu(d2, c);
     for (const c of d2.contratos) for (const qual of ["caucao", "deposito"]) if ((qual === "caucao" ? temCaucao(c) : temDeposito(c)) && (d2.depositos_garantia || []).length) completarPorDepositos(d2, c, qual, null);
+    const renovados = new Set(d2.renovacoes.map((x) => x.contrato_id));
     for (const c of d2.contratos) {
+      if (!c.contrato_anterior_id) continue;
       const fim = fimDoPrazoHerdado(d2, c);
-      if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== "Indeterminado" && c.vigencia_fim === fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses) && !d2.renovacoes.some((x) => x.contrato_id === c.id)) c.vigencia_fim = fim;
+      if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== "Indeterminado" && c.vigencia_fim === fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses) && !renovados.has(c.id)) c.vigencia_fim = fim;
     }
     d2.config_banco = d2.config_banco || {};
     for (const [k, v] of Object.entries(CONFIG_BANCO_FASE2)) if (d2.config_banco[k] === void 0) d2.config_banco[k] = typeof v === "object" && v ? { ...v } : v;
@@ -3213,8 +3217,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       for (const k of ["imovel_id", "despesa_id", "cobranca_id", "iptu_id", "iptu_parcela", "guia_imposto_id", "pagamento_banco_id", "par_movimentacao_id", "nome_arquivo", "comprovante", "comprovante_contador", "comprovante_origem"]) if (m[k] === void 0) m[k] = null;
     }
     for (const p2 of d2.pagamentos_banco) if (!p2.referencia) p2.referencia = `erp-${p2.id}`;
-    for (const x of d2.despesas) if (x.movimentacao_id && !d2.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
-    for (const x of d2.cobrancas) if (x.movimentacao_id && !d2.movimentacoes_banco.some((m) => m.id === x.movimentacao_id)) x.movimentacao_id = null;
+    const movimentacoes = new Set(d2.movimentacoes_banco.map((m) => m.id));
+    for (const x of d2.despesas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
+    for (const x of d2.cobrancas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
     return d2;
   }
   function contratoDoSeguro(d2, s) {
@@ -8068,9 +8073,46 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const sub2 = await dir.getDirectoryHandle(PASTA_SEMANAL, { create: true });
     return precisaCompleto(await nomesEm(sub2), hoje());
   }
-  async function gravarPrograma(dir, html) {
+  var CAMINHO_PROGRAMA = "offline/administracao-imoveis.html";
+  var ARQUIVO_PROGRAMA = "administracao-imoveis.html";
+  var ARQUIVO_LEIAME = "LEIA-ME.txt";
+  async function gravarPrograma(dir, html, versao = "") {
     const sub2 = await dir.getDirectoryHandle(PASTA_PROGRAMA, { create: true });
-    await gravar(sub2, "administracao-imoveis.html", html);
+    await gravar(sub2, ARQUIVO_PROGRAMA, html);
+    await gravar(sub2, "versao.txt", versao);
+  }
+  async function versaoDoPrograma(dir) {
+    try {
+      const sub2 = await dir.getDirectoryHandle(PASTA_PROGRAMA);
+      return (await (await sub2.getFileHandle("versao.txt")).getFile()).text().then((t) => t.trim());
+    } catch {
+      return "";
+    }
+  }
+  var TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administracao de Imoveis
+==================================================
+
+O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
+- ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
+- ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
+- ${PASTA_PROGRAMA}/   a VERSAO PC do sistema (${ARQUIVO_PROGRAMA}), atualizada sozinha
+
+SE O SITE OU O CLOUDFLARE CAIREM:
+1. Abra ${PASTA_PROGRAMA}/${ARQUIVO_PROGRAMA} com dois cliques (Chrome ou Edge).
+2. Clique em "restaurar um backup seguro", escolha a copia mais recente de ${PASTA_DIARIO}/ (ou um completo),
+   digite a senha do backup e mande abrir numa pasta nova do computador.
+3. O sistema abre inteiro, com os dados daquela copia. Pode trabalhar normalmente.
+4. Quando o site voltar: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta" leva o que voce fez para a nuvem.
+
+Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: sem ele e sem a senha, nada abre.
+`;
+  async function gravarLeiaMe(dir) {
+    try {
+      const atual = await (await (await dir.getFileHandle(ARQUIVO_LEIAME)).getFile()).text();
+      if (atual === TEXTO_LEIAME) return;
+    } catch {
+    }
+    await gravar(dir, ARQUIVO_LEIAME, TEXTO_LEIAME);
   }
   async function listarBackups(dir) {
     const lista3 = [];
@@ -8914,6 +8956,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   // docs/js/nuvem.js
   var RAIZ_DO_SERVIDOR = ["formato", "revisao", "atualizado_em", "atualizado_por", "seq", "revisao_so_sessao", "historico", "_nuvem"];
   var CONTADORES = ["proxima_fatura"];
+  var MAX_SESSOES = 10;
   var FAIXA = 1e3;
   var RESERVA_MINIMA = 200;
   var ErroNuvem = class extends Error {
@@ -8930,8 +8973,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (Array.isArray(v)) return `[${v.map(canon).join(",")}]`;
     return `{${Object.keys(v).sort().filter((k) => v[k] !== void 0).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(",")}}`;
   }
-  var igual = (a, b) => canon(a) === canon(b);
+  var igual = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b) || canon(a) === canon(b);
   var ehTabela = (v) => Array.isArray(v) && v.every((r) => r && typeof r === "object" && Number.isSafeInteger(r.id));
+  var AGRUPAR_ENVIO = 300;
   function diferencas(antes, depois) {
     const ops = [];
     const chaves = /* @__PURE__ */ new Set([...Object.keys(antes || {}), ...Object.keys(depois || {})]);
@@ -8945,6 +8989,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (RAIZ_DO_SERVIDOR.includes(k)) continue;
       const va = antes?.[k];
       const vb = depois?.[k];
+      if (igual(va, vb)) continue;
       if (ehTabela(va ?? []) && ehTabela(vb ?? []) && (Array.isArray(va) || Array.isArray(vb))) {
         const porId = new Map((va || []).map((r) => [r.id, r]));
         const novos = /* @__PURE__ */ new Set();
@@ -8966,7 +9011,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         for (const r of va || []) if (!novos.has(r.id)) ops.push({ op: "excluir", tabela: k, id: r.id, base: r });
         continue;
       }
-      if (!igual(va, vb)) ops.push({ op: "raiz", campo: k, antes: va, depois: vb });
+      ops.push({ op: "raiz", campo: k, antes: va, depois: vb });
     }
     return ops;
   }
@@ -9004,7 +9049,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     } else if (m.tipo === "historico") (d2.historico ||= []).push(m.dados);
     return d2;
   }
-  var passageiro = (e) => !e.status || e.status === 401 || e.status >= 500;
+  var passageiro = (e) => !e.status || e.status === 401 || e.status === 408 || e.status === 429 || e.status >= 500;
+  var TEMPO_LIMITE = 3e4;
+  var TEMPO_LIMITE_ANEXO = 12e4;
+  var limiteDeTempo = (ms) => typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(ms) : void 0;
+  var erroDeRede = (e) => new ErroNuvem(e?.name === "TimeoutError" ? "A nuvem demorou demais para responder. Tente de novo." : "Sem internet.", 0);
   function chavesDosLotes(lotes) {
     const chaves = /* @__PURE__ */ new Set();
     let historico = 0;
@@ -9019,11 +9068,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var Sincronia = class {
     /** `trava(fn)`: uma aba de cada vez mexe na fila (navigator.locks no navegador); sem ela, roda direto. */
     constructor({ api, guardar, aoMudar = () => {
-    }, trava = (fn) => fn() }) {
+    }, trava = (fn) => fn(), normalizar: normalizar2 = (d2) => d2, agrupar = AGRUPAR_ENVIO }) {
       this.api = api;
       this.guardar = guardar;
       this.aoMudar = aoMudar;
       this.trava = trava;
+      this.normalizar = normalizar2;
+      this.agrupar = agrupar;
       this.base = null;
       this.pendentes = [];
       this.faixas = {};
@@ -9035,6 +9086,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       this.enviando = null;
       this.vista = null;
       this.externo = false;
+      this.envioMarcado = null;
       this.aba = aleatorio2().slice(0, 6);
     }
     async iniciar() {
@@ -9059,17 +9111,32 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       });
       return this.atual();
     }
-    /** O banco que a tela usa (base + o que ainda não foi enviado). */
+    /** O banco que a tela usa (base + o que ainda não foi enviado), já com `normalizar` (campos e tabelas novos). */
     atual() {
       if (!this.base) return null;
-      if (!this.vista) {
-        const d2 = structuredClone(this.base);
-        for (const l of this.pendentes) aplicarOps(d2, l.ops);
-        d2.seq = { ...d2.seq || {} };
-        for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) d2.seq[t] = f.proximo - 1;
-        this.vista = d2;
-      }
+      if (!this.vista) this.vista = this.normalizar(this.montar());
       return this.vista;
+    }
+    /** Base + fila deste aparelho, como está na nuvem (sem `normalizar`). */
+    montar() {
+      const d2 = structuredClone(this.base);
+      for (const l of this.pendentes) aplicarOps(d2, l.ops);
+      d2.seq = { ...d2.seq || {} };
+      for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) d2.seq[t] = f.proximo - 1;
+      return d2;
+    }
+    /**
+     * As correções que `normalizar` fez (campo novo, tabela nova, migração) vão à nuvem como uma gravação deste aparelho,
+     * senão só existiriam na tela. Chamar depois de entrar, por quem pode gravar (usuário de consulta teria a mudança recusada).
+     * Dois aparelhos mandando a mesma correção não dão conflito (a nuvem ignora o que "já está assim"). Devolve quantas mudanças foram.
+     */
+    async enviarAjustes() {
+      if (!this.base) return 0;
+      const ops = diferencas(this.montar(), this.atual()).filter((o) => !(o.op === "raiz" && CONTADORES.includes(o.campo)));
+      if (!ops.length) return 0;
+      await this.enfileirar(ops);
+      this.enviarDepois();
+      return ops.length;
     }
     pendentesQtd() {
       return this.pendentes.reduce((s, l) => s + l.ops.length, 0);
@@ -9160,15 +9227,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         if (f && Number(n) >= f.proximo) f.proximo = Number(n) + 1;
       }
     }
+    /**
+     * Marca uma sincronia para daqui a pouco: gravações seguidas (duplo clique, arrumações do Painel ao abrir) vão numa passada
+     * só, em vez de uma ida à nuvem por gravação. Cada gravação continua sendo um lote (um recusado não leva os outros).
+     */
     enviarDepois() {
-      setTimeout(() => this.sincronizar().catch(() => {
-      }), 0);
+      if (this.envioMarcado) return;
+      this.envioMarcado = setTimeout(() => {
+        this.envioMarcado = null;
+        this.sincronizar().catch(() => {
+        });
+      }, this.agrupar);
+      this.envioMarcado.unref?.();
     }
     /**
      * Envia a fila (em ordem) e traz o que os outros mudaram. Sem internet: para e tenta de novo depois (nada se perde).
      * Lote recusado pela nuvem (sem permissão, código repetido…) sai da fila e vira aviso em `recusas`.
      */
     async sincronizar({ exigirInternet = false } = {}) {
+      if (this.envioMarcado) {
+        clearTimeout(this.envioMarcado);
+        this.envioMarcado = null;
+      }
       while (this.enviando) await this.enviando.catch(() => {
       });
       this.enviando = this.trava(async () => {
@@ -9214,18 +9294,25 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         this.aoMudar(externo);
       }
     }
-    /** Traz da nuvem o que mudou desde a última vez (ou tudo de novo, se o aparelho ficou parado demais). */
-    /** Devolve true se chegou algo de outro aparelho (fora das chaves `meus`, que são deste). */
+    /**
+     * Traz da nuvem o que mudou desde a última vez (ou tudo de novo, se o aparelho ficou parado demais).
+     * Devolve true se chegou algo de outro aparelho (fora das chaves `meus`, que são deste).
+     * A cópia local (cifrada, o banco inteiro) só é regravada se chegou alguma coisa: a conferência de 30 em 30 s quase sempre volta vazia.
+     */
     async puxar(meus = { chaves: /* @__PURE__ */ new Set(), historico: 0 }) {
       let externo = false;
       let historicoMeu = meus.historico;
+      let mudou = false;
       for (let volta = 0; volta < 1e3; volta += 1) {
-        const r = await this.api("GET", `mudancas?desde=${Number(this.base._nuvem?.seq || 0)}`);
+        const desde = Number(this.base._nuvem?.seq || 0);
+        const r = await this.api("GET", `mudancas?desde=${desde}`);
         if (r.refazer) {
           await this.baixarTudo();
           externo = true;
+          mudou = false;
           break;
         }
+        if (r.mudancas.length || Number(r.seq) !== desde) mudou = true;
         for (const m of r.mudancas) {
           aplicarMudanca(this.base, m);
           if (m.tipo === "historico") {
@@ -9242,6 +9329,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         this.conflitos = r.conflitos || [];
         if (!r.mais) break;
       }
+      if (!mudou) return externo;
       this.vista = null;
       await this.guardar.gravar("base", this.base);
       return externo;
@@ -9288,19 +9376,20 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return this.atual();
     }
   };
-  function apiDoSite(base = "api/dados/") {
+  function apiDoSite(base = "api/dados/", { limite = TEMPO_LIMITE, buscar: buscar3 = (...a) => fetch(...a) } = {}) {
     return async (metodo, rota, corpo) => {
       let r;
       try {
-        r = await fetch(`${base}${rota}`, {
+        r = await buscar3(`${base}${rota}`, {
           method: metodo,
           cache: "no-store",
           credentials: "same-origin",
+          signal: limiteDeTempo(limite),
           headers: metodo === "GET" ? {} : { "Content-Type": "application/json", "X-Sistema": "imoveis" },
           body: corpo === void 0 ? void 0 : JSON.stringify(corpo)
         });
-      } catch {
-        throw new ErroNuvem("Sem internet.", 0);
+      } catch (e) {
+        throw erroDeRede(e);
       }
       if (r.redirected || r.type === "opaqueredirect" || !(r.headers.get("content-type") || "").includes("json")) {
         throw new ErroNuvem("Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail).", 401);
@@ -9311,35 +9400,58 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   async function nuvemDisponivel(base = "api/") {
+    return await saudeDaNuvem(base) !== null;
+  }
+  async function saudeDaNuvem(base = "api/") {
     try {
-      const r = await fetch(`${base}saude`, { cache: "no-store", credentials: "same-origin" });
-      return r.ok && (r.headers.get("content-type") || "").includes("json");
+      const r = await fetch(`${base}saude`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(1e4) });
+      if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return null;
+      return await r.json();
     } catch {
-      return false;
+      return null;
     }
   }
   var travaDoNavegador = (fn) => globalThis.navigator?.locks ? navigator.locks.request("imoveis-nuvem-fila", fn) : fn();
-  function guardarNoNavegador(nome = "imoveis-nuvem") {
-    const abrir = () => new Promise((ok, erro) => {
-      const req = indexedDB.open(nome, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore("dados");
-      req.onsuccess = () => ok(req.result);
-      req.onerror = () => erro(req.error);
-    });
-    const op = async (modo, fn) => {
-      const db = await abrir();
-      return new Promise((ok, erro) => {
-        const tx = db.transaction("dados", modo);
-        const req = fn(tx.objectStore("dados"));
-        tx.oncomplete = () => {
-          db.close();
-          ok(req?.result);
+  function guardarNoNavegador(nome = "imoveis-nuvem", { indexedDB: idb2 = globalThis.indexedDB } = {}) {
+    let aberto = null;
+    const abrir = () => {
+      if (aberto) return aberto;
+      aberto = new Promise((ok, erro) => {
+        const req = idb2.open(nome, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("dados");
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onversionchange = () => {
+            db.close();
+            aberto = null;
+          };
+          db.onclose = () => {
+            aberto = null;
+          };
+          ok(db);
         };
-        tx.onerror = () => {
-          db.close();
-          erro(tx.error);
+        req.onerror = () => {
+          aberto = null;
+          erro(req.error);
         };
       });
+      return aberto;
+    };
+    const transacao = (db, modo, fn) => new Promise((ok, erro) => {
+      const tx = db.transaction("dados", modo);
+      const req = fn(tx.objectStore("dados"));
+      tx.oncomplete = () => ok(req?.result);
+      tx.onerror = () => erro(tx.error);
+      tx.onabort = () => erro(tx.error);
+    });
+    const op = async (modo, fn) => {
+      try {
+        return await transacao(await abrir(), modo, fn);
+      } catch (e) {
+        if (e?.name !== "InvalidStateError") throw e;
+        aberto = null;
+        return transacao(await abrir(), modo, fn);
+      }
     };
     return {
       ler: (k) => op("readonly", (s) => s.get(k)),
@@ -9354,16 +9466,18 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, "NotFoundError");
   var semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
   var codificar = (partes) => partes.map(encodeURIComponent).join("/");
-  var passageiro2 = (e) => !e.status || e.status === 401 || e.status >= 500;
   var AnexosNuvem = class {
-    constructor({ base = "api/", buscar: buscar3 = (...a) => fetch(...a), guardar }) {
+    constructor({ base = "api/", buscar: buscar3 = (...a) => fetch(...a), guardar, limite = TEMPO_LIMITE, limiteAnexo = TEMPO_LIMITE_ANEXO }) {
       this.base = base;
       this.buscar = buscar3;
       this.guardar = guardar;
+      this.limite = limite;
+      this.limiteAnexo = limiteAnexo;
       this.listas = /* @__PURE__ */ new Map();
       this.buscando = /* @__PURE__ */ new Map();
       this.criadas = /* @__PURE__ */ new Set();
       this.fila = null;
+      this.naoEnviados = [];
       this.avisos = [];
       this.enviando = null;
     }
@@ -9375,10 +9489,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           cache: "no-store",
           credentials: "same-origin",
           body: corpo,
+          signal: limiteDeTempo(metodo === "PUT" ? this.limiteAnexo : this.limite),
           headers: metodo === "GET" ? cabecalhos : { "X-Sistema": "imoveis", ...cabecalhos }
         });
-      } catch {
-        throw Object.assign(new Error("Sem internet."), { status: 0 });
+      } catch (e) {
+        throw erroDeRede(e);
       }
       if (r.redirected) throw Object.assign(new Error("Seu acesso pela internet venceu. Recarregue a página para entrar de novo."), { status: 401, esperado: true });
       if (!r.ok) {
@@ -9388,11 +9503,29 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return r;
     }
     async carregarFila() {
-      if (!this.fila) this.fila = await this.guardar?.ler("fila-anexos") || [];
+      if (!this.fila) {
+        this.fila = await this.guardar?.ler("fila-anexos") || [];
+        this.naoEnviados = await this.guardar?.ler("anexos-nao-enviados") || [];
+      }
       return this.fila;
     }
     async gravarFila() {
       await this.guardar?.gravar("fila-anexos", this.fila);
+    }
+    /** Anexo que a nuvem recusou: sai da fila mas o arquivo fica no aparelho até o usuário baixar ou esquecer. */
+    async guardarNaoEnviado(f, erro) {
+      this.naoEnviados.push({ ...f, erro });
+      await this.guardar?.gravar("anexos-nao-enviados", this.naoEnviados);
+    }
+    async lerNaoEnviado(id) {
+      const f = this.naoEnviados.find((x) => x.id === id);
+      if (!f) return null;
+      return { nome: f.partes.at(-1), blob: await this.guardar?.ler(`anexo:${id}`) || new Blob([]) };
+    }
+    async esquecerNaoEnviado(id) {
+      this.naoEnviados = this.naoEnviados.filter((x) => x.id !== id);
+      await this.guardar?.apagar?.(`anexo:${id}`);
+      await this.guardar?.gravar("anexos-nao-enviados", this.naoEnviados);
     }
     /** Lista de uma pasta: { pastas: Set, arquivos: Map(nome → tamanho) }, juntando o que está na fila deste aparelho. */
     async lista(partes, { fresca = false } = {}) {
@@ -9411,7 +9544,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           this.guardar?.gravar(`lista:${chave}`, { pastas: r2.pastas, arquivos: r2.arquivos }).catch(() => {
           });
         } catch (e) {
-          if (!passageiro2(e)) throw e;
+          if (!passageiro(e)) throw e;
           const salva = l || await this.guardar?.ler(`lista:${chave}`);
           l = salva?.pastas instanceof Set ? salva : { em: 0, pastas: new Set(salva?.pastas || []), arquivos: new Map((salva?.arquivos || []).map((a) => [a.nome, a.tamanho])) };
         }
@@ -9428,6 +9561,48 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         else r.pastas.add(f.partes[partes.length]);
       }
       return r;
+    }
+    /**
+     * Carrega de uma vez as listas de todas as pastas dentro de `partes` (uma ida à nuvem, em partes se for grande), para a
+     * conferência dos arquivos do Painel não pedir pasta por pasta. Depois, `lista` de cada pasta sai da memória por VALIDADE_LISTA.
+     * Sem internet: não faz nada (as listas guardadas continuam valendo). Devolve quantos arquivos vieram.
+     */
+    async carregarTudo(partes) {
+      const raiz = partes.join("/");
+      const arvore = /* @__PURE__ */ new Map([[raiz, { pastas: /* @__PURE__ */ new Set(), arquivos: /* @__PURE__ */ new Map() }]]);
+      const pasta = (chave) => {
+        let l = arvore.get(chave);
+        if (!l) {
+          l = { pastas: /* @__PURE__ */ new Set(), arquivos: /* @__PURE__ */ new Map() };
+          arvore.set(chave, l);
+        }
+        return l;
+      };
+      let total = 0;
+      try {
+        let cursor;
+        for (let n = 0; n < 1e3; n += 1) {
+          const r = await (await this.pedir("GET", `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`)).json();
+          for (const a of r.arquivos) {
+            const p2 = a.caminho.split("/");
+            let chave = raiz;
+            for (let i = 0; i < p2.length - 1; i += 1) {
+              pasta(chave).pastas.add(p2[i]);
+              chave = `${chave}/${p2[i]}`;
+            }
+            pasta(chave).arquivos.set(p2.at(-1), a.tamanho);
+            total += 1;
+          }
+          if (!r.mais) break;
+          cursor = r.cursor;
+        }
+      } catch (e) {
+        if (passageiro(e)) return 0;
+        throw e;
+      }
+      const em = Date.now();
+      for (const [chave, l] of arvore) this.listas.set(chave, { em, pastas: l.pastas, arquivos: l.arquivos });
+      return total;
     }
     /** A lista dessas pastas precisa ser buscada de novo (mas fica guardada para quando estiver sem internet). */
     esquecerLista(partes) {
@@ -9453,7 +9628,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       try {
         return await (await this.pedir("GET", codificar(partes))).blob();
       } catch (e) {
-        if (passageiro2(e)) throw semInternet("abrir o arquivo");
+        if (passageiro(e)) throw semInternet("abrir o arquivo");
         throw e;
       }
     }
@@ -9463,7 +9638,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         await this.pedir("PUT", codificar(partes), { corpo: blob });
         this.anotarNaLista(partes, blob.size);
       } catch (e) {
-        if (!passageiro2(e) || !this.guardar) throw e;
+        if (!passageiro(e) || !this.guardar) throw e;
         const fila = await this.carregarFila();
         const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
         await this.guardar.gravar(`anexo:${id}`, blob);
@@ -9489,7 +9664,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           }
         } else await this.pedir("DELETE", codificar(partes));
       } catch (e) {
-        if (passageiro2(e)) throw semInternet("apagar");
+        if (passageiro(e)) throw semInternet("apagar");
         if (e.status !== 404) throw e;
       }
       this.esquecerLista(pasta ? partes : partes.slice(0, -1));
@@ -9501,7 +9676,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           if (!r.mais) break;
         }
       } catch (e) {
-        if (passageiro2(e)) throw semInternet("mover a pasta");
+        if (passageiro(e)) throw semInternet("mover a pasta");
         if (e.status !== 404) throw e;
       }
       const fila = await this.carregarFila();
@@ -9525,19 +9700,24 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const fila = await this.carregarFila();
         for (const f of [...fila]) {
           const blob = await this.guardar.ler(`anexo:${f.id}`);
+          let recusado = false;
           try {
             if (blob) await this.pedir("PUT", codificar(f.partes), { corpo: blob, cabecalhos: { "If-None-Match": "*" } });
           } catch (e) {
-            if (passageiro2(e)) break;
+            if (passageiro(e)) break;
             if (e.status === 412 && blob) {
               const nome = f.partes.at(-1);
               const ponto = nome.lastIndexOf(".");
               const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
               await this.pedir("PUT", codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
               this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
-            } else this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado: ${e.message}`);
+            } else {
+              recusado = true;
+              await this.guardarNaoEnviado(f, e.message);
+              this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado (${e.message}). Ele ficou guardado neste aparelho: veja em Conflitos da nuvem.`);
+            }
           }
-          await this.guardar.apagar?.(`anexo:${f.id}`);
+          if (!recusado) await this.guardar.apagar?.(`anexo:${f.id}`);
           this.fila = this.fila.filter((x) => x.id !== f.id);
           await this.gravarFila();
           this.esquecerLista(f.partes.slice(0, -1));
@@ -9724,8 +9904,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     pendente: u.pendente,
     senha_sal: u.senha_sal,
     senha_hash: u.senha_hash,
-    senha_iteracoes: u.senha_iteracoes,
-    sessoes: u.sessoes
+    senha_iteracoes: u.senha_iteracoes
   }));
   function guardarCifrado(cru, obterChave) {
     return {
@@ -10095,6 +10274,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   async function conferirArquivos() {
     if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };
+    if (E.nuvem && E.anexos?.carregarTudo) await E.anexos.carregarTudo([PASTA_ARQUIVOS]);
     const rotulos = rotulosDosArquivos(d());
     const vistos = /* @__PURE__ */ new Set();
     const sumidos = [];
@@ -10288,7 +10468,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var motivoDisco = (e) => ["InvalidStateError", "NotReadableError", "NoModificationAllowedError"].includes(e && e.name) ? "um arquivo estava sendo usado ou sincronizado (OneDrive); nada foi perdido, e a organização continua na próxima vez que abrir o Painel" : e.message;
   var pastasOrganizadas = false;
   async function organizarPastasUmaVez() {
-    if (pastasOrganizadas || !opera() || !E.pasta) return;
+    if (pastasOrganizadas || !opera() || !E.pasta || E.nuvem) return;
     pastasOrganizadas = true;
     const avisos = await organizarPastas();
     if (avisos.length) aviso(`Organização das pastas, confira: ${avisos.join("; ")}.`, "aviso");
@@ -15025,13 +15205,14 @@ Salvar assim mesmo?`)) {
   var FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Arquivo de backup (.bkp)</label><input type="file" name="arquivo" accept="${EXTENSAO}"></div>
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
-    <div class="check"><button>Abrir e baixar o ZIP</button></div></form>
-  <p class="suave">O backup aberto vira um ZIP igual ao do "Exportar tudo". Para voltar os dados: escolha a pasta dos dados (pode ser uma pasta nova e vazia), crie o administrador se pedir e use <b>Dados e backup → Importar ZIP</b>.
-    Os usuários e senhas antigos voltam junto. Se o programa também deu problema, abra a cópia dele que fica na pasta do backup seguro, em <b>${PASTA_PROGRAMA}</b>.</p>`;
+    ${suportado() ? '<div><label>O que fazer</label><select name="destino"><option value="pasta">Abrir numa pasta nova do computador (o sistema abre com esses dados)</option><option value="zip">Só baixar o ZIP</option></select></div>' : '<input type="hidden" name="destino" value="zip">'}
+    <div class="check"><button>Abrir o backup</button></div></form>
+  <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. É o caminho quando o site está fora do ar: você trabalha na pasta e, quando o site voltar, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
+    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
   function telaRestaurarBackup() {
     return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
     <h1>Restaurar backup seguro</h1>
-    <p>Use em caso de erro geral: escolha um arquivo da pasta do backup seguro (<b>${PASTA_SEMANAL}</b> tem os completos, com anexos; <b>${PASTA_DIARIO}</b> tem a cópia do banco de cada dia) e digite a senha do backup.</p>
+    <p>Use quando o site estiver fora do ar ou em caso de erro geral: escolha um arquivo da pasta do backup seguro (<b>${PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
     ${FORM_RESTAURAR}
     <p><a href="#/">Voltar</a></p></div></main>`;
   }
@@ -15063,7 +15244,7 @@ Salvar assim mesmo?`)) {
       ${item("Última cópia do banco", quando3(ultimo(PASTA_DIARIO)))}
       ${item("Último backup completo", quando3(ultimo(PASTA_SEMANAL)))}
       ${item("Guarda", `${MANTER_DIARIOS} cópias diárias, ${MANTER_SEMANAIS} completos semanais e 1 completo por mês durante ${MANTER_MENSAIS} meses`)}</div>
-      <p class="suave">A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.
+      <p class="suave">${E.nuvem ? "A cada alteração que chega a <b>este computador</b> (feita aqui ou em outro aparelho), a cópia do dia é atualizada: é a segunda camada do backup, fora do Cloudflare." : "A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui."}
         O completo semanal é feito sozinho quando o sistema é aberto e já passou uma semana do último. Os arquivos são cifrados: sem a senha do backup ninguém consegue abrir.</p>
       <div class="acoes">${botao("backupCompletoAgora", "Fazer backup completo agora", {}, "")}
         ${botao("desconectarSeguro", "Desligar neste computador", {}, "perigo pequeno", "Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.")}</div></div>
@@ -15071,6 +15252,22 @@ Salvar assim mesmo?`)) {
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista3.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${new Date(x.alterado).toLocaleString("pt-BR")}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
   }
+  var AVISO_SEGURO_DISPENSADO = "imoveis-aviso-backup-seguro";
+  function avisoBackupSeguro() {
+    if (!podeUsuario("admin") || E.seguro || !suportado() || window.VERSAO_OFFLINE) return "";
+    try {
+      if (localStorage.getItem(AVISO_SEGURO_DISPENSADO)) return "";
+    } catch {
+    }
+    return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, este computador não tem a cópia dos dados nem a versão PC para abrir o sistema se o site cair.
+    ${link("#/backup-seguro", "Ligar o backup seguro", "botao pequeno")} ${botao("dispensarAvisoSeguro", "Não avisar neste computador", {}, "secundario pequeno")}</div>`;
+  }
+  var dispensarAvisoSeguro = () => {
+    try {
+      localStorage.setItem(AVISO_SEGURO_DISPENSADO, "1");
+    } catch {
+    }
+  };
   function telaEmpresas() {
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario("admin") ? link("#/novo/emitentes", "Nova empresa", "botao") : ""}</div>
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
@@ -15134,7 +15331,7 @@ Salvar assim mesmo?`)) {
   async function versaoDoSistema() {
     const fmt = (dt) => dt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
     const emUso = new Date(document.lastModified);
-    if (location.protocol === "file:" || Number.isNaN(emUso.getTime())) return "versão sem internet";
+    if (location.protocol === "file:" || Number.isNaN(emUso.getTime())) return `versão PC${window.VERSAO_OFFLINE ? ` de ${dataBr(window.VERSAO_OFFLINE)}` : ""}`;
     let publicada = null;
     try {
       const r = await fetch("index.html", { method: "HEAD", cache: "no-store", credentials: "include" });
@@ -15162,16 +15359,12 @@ Salvar assim mesmo?`)) {
       ${item("Versão do sistema", await versaoDoSistema())}</div>
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
-      ${podeUsuario("admin") ? `<p>${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
-    <div class="cartao"><h2>Versão para usar sem internet</h2>
-      ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão sem internet de ${dataBr(window.VERSAO_OFFLINE)}`, "info")}</p>` : ""}
-      <p>Um único arquivo com o programa inteiro. Guarde no computador (por exemplo, junto da pasta dos dados) e abra com dois cliques no Chrome ou no Edge: funciona sem internet e mesmo se o site do programa sair do ar. Os dados são os mesmos: escolha a mesma pasta.</p>
-      <p class="suave">Quando o programa receber melhorias, baixe o arquivo de novo para ter a versão nova.</p>
-      ${window.VERSAO_OFFLINE ? "" : '<p><a class="botao secundario" href="offline/administracao-imoveis.html" download="Administração de Imóveis.html">Baixar a versão sem internet</a></p>'}</div>
-    ${podeUsuario("admin") ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
-      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana.</p>
+      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")} ${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
+    ${podeUsuario("admin") ? `<div class="cartao"><h2>Backup seguro e versão PC (só administrador)</h2>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração, um backup completo (banco + anexos) por semana e a <b>versão PC</b> do sistema (o programa inteiro num arquivo, atualizado sozinho). Se o site ou o Cloudflare caírem, a versão PC abre com os dados da última cópia; o <b>LEIA-ME.txt</b> da pasta explica.${E.nuvem ? " Na nuvem é a segunda camada, fora do Cloudflare: vale ter." : ""}</p>
+      ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, "info")}</p>` : ""}
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, "ok") : E.seguro && E.seguro.desconectado ? etiqueta("Desconectado: falta liberar a pasta", "aviso") : etiqueta("Não configurado neste computador", "neutra")}
-      ${link("#/backup-seguro", "Abrir o backup seguro")}</p></div>` : ""}
+      ${link("#/backup-seguro", "Abrir o backup seguro")}${window.VERSAO_OFFLINE || E.nuvem ? "" : ` · <a href="${CAMINHO_PROGRAMA}" download="Administração de Imóveis.html">baixar a versão PC agora</a>`}</p></div>` : ""}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao("exportar", "Baixar ZIP com todos os dados", {}, "") : ""}
@@ -15179,7 +15372,7 @@ Salvar assim mesmo?`)) {
       ${opera() ? botao("exportarPlanilhaPdf", "Baixar todos os dados em planilha e PDF", {}, "secundario") : ""}
       <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto.</p>
       ${botao("baixarRegras", "Baixar regras do sistema (TXT)", {}, "secundario")}</div>
-    ${podeUsuario("admin") ? `<div class="cartao"><h2>Importar ZIP</h2>
+    ${podeUsuario("admin") && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ""}
     ${opera() ? `<div class="cartao"><h2>Conferir arquivos</h2><p>Ao abrir o Painel, o sistema confere se cada arquivo ligado a um lançamento (comprovantes, documentos assinados, aditivos, cartas, apólices, fotos da vistoria) está na pasta.
@@ -17116,6 +17309,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (!E.nuvem) return '<h1>Conflitos</h1><p class="suave">Só existem com os dados na nuvem.</p>';
     const conflitos = E.nuvem.conflitos;
     const recusas = E.nuvem.recusas;
+    const naoEnviados = E.anexos?.naoEnviados || [];
     const pode2 = podeUsuario("operador");
     const linhas2 = conflitos.map((c) => {
       if (c.tipo === "campo") {
@@ -17136,9 +17330,35 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas mudanças feitas neste aparelho não foram aceitas e não valem. Refaça se ainda precisar.</p>
       <ul>${recusas.map((r) => `<li>${esc(quando2(r.em))}: ${esc(r.erro)} (${r.mudancas} mudança(s))</li>`).join("")}</ul>
-      ${botao("esquecerRecusas", "Já vi, limpar a lista", {}, "secundario")}</div>` : ""}`;
+      ${botao("esquecerRecusas", "Já vi, limpar a lista", {}, "secundario")}</div>` : ""}
+    ${naoEnviados.length ? `<div class="caixa"><h2>Anexos que a nuvem não aceitou</h2>
+      <p class="suave">Foram anexados sem internet e, ao enviar, a nuvem recusou. O arquivo continua neste aparelho: baixe e anexe de novo (ou esqueça).</p>
+      <ul>${naoEnviados.map((f) => `<li>${esc(quando2(f.em))}: <b>${esc(f.partes.join(" / "))}</b> · ${esc(f.erro)}
+        ${botao("baixarNaoEnviado", "Baixar", { id: f.id }, "secundario pequeno")} ${botao("esquecerNaoEnviado", "Esquecer", { id: f.id }, "secundario pequeno")}</li>`).join("")}</ul></div>` : ""}`;
   }
   var mb = (b) => `${(b / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
+  var diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+))?\.json$/) || []).slice(1);
+  var pastaBackups = () => E.pasta.getDirectoryHandle(PASTA_BACKUPS);
+  async function telaBackupsNuvem() {
+    if (!E.nuvem) return '<h1>Backups da nuvem</h1><p class="suave">Só existem com os dados na nuvem.</p>';
+    if (!podeUsuario("admin")) return "<h1>Acesso só para administradores</h1>";
+    let lista3;
+    try {
+      lista3 = (await listar(await pastaBackups())).filter((a) => diaDoBackup(a.nome).length);
+    } catch (e) {
+      return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
+    }
+    lista3.sort((a, b) => b.nome.localeCompare(a.nome));
+    const linhas2 = lista3.map((a) => {
+      const [dia, , motivo] = diaDoBackup(a.nome);
+      return `<tr><td>${dataBr(dia)}</td><td>${motivo ? "cópia feita antes de substituir os dados" : "backup do dia"}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
+      <td>${botao("baixarBackupNuvem", "Baixar", { nome: a.nome }, "secundario pequeno")} ${botao("restaurarBackupNuvem", "Voltar para este dia", { nome: a.nome }, "perigo pequeno")}</td></tr>`;
+    }).join("");
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
+    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita na primeira gravação de cada dia. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele dia (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
+      <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito na primeira gravação do dia).</td></tr>'}</table></div></div>`;
+  }
   function relatorio(r) {
     const itens = [
       `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(", "))}</b>` : "conferidos: iguais à pasta ✓"}`,
@@ -17184,6 +17404,42 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     },
     async esquecerRecusas() {
       await E.nuvem.esquecerRecusas();
+      await mostrar();
+    },
+    async baixarNaoEnviado(ds) {
+      const f = await E.anexos.lerNaoEnviado(ds.id);
+      if (!f) return aviso("Este anexo não está mais neste aparelho.", "erro");
+      baixar(f.blob, f.nome);
+    },
+    async baixarBackupNuvem({ nome }) {
+      if (!podeUsuario("admin")) throw new Error("Só o administrador baixa backups.");
+      const [dia] = diaDoBackup(nome);
+      if (!dia) throw new Error("Backup desconhecido.");
+      baixar(await abrirArquivo(await pastaBackups(), nome), nome);
+    },
+    /** Volta os dados da nuvem para os de um dia (o servidor guarda antes uma cópia "antes-da-substituicao"). */
+    async restaurarBackupNuvem({ nome }) {
+      if (!podeUsuario("admin")) throw new Error("Só o administrador restaura backups.");
+      const [dia] = diaDoBackup(nome);
+      if (!dia) throw new Error("Backup desconhecido.");
+      if (E.nuvem.pendentesQtd()) throw Object.assign(new Error("Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de voltar para um backup."), { esperado: true });
+      const ok = await janela({
+        titulo: `Voltar os dados para ${dataBr(dia)}?`,
+        forte: true,
+        sim: "Voltar para este dia",
+        html: `<p>Os dados da nuvem passam a ser os do backup de <b>${dataBr(dia)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois desse dia se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita antes de substituir").</p>`
+      });
+      if (!ok) return;
+      const dados = JSON.parse(await (await abrirArquivo(await pastaBackups(), nome)).text());
+      if (!dados || dados.formato !== "imoveis-v1" || !Array.isArray(dados.usuarios)) throw new Error("Este backup não está no formato esperado.");
+      E.d = await E.nuvem.importar(dados, { substituir: true });
+      await reabrirSessao();
+      aviso(`Dados voltaram para ${dataBr(dia)}. Os outros aparelhos recebem a versão nova sozinhos.`);
+      ir("#/");
+    },
+    async esquecerNaoEnviado(ds) {
+      if (!await janela({ titulo: "Esquecer este anexo?", html: "<p>O arquivo some deste aparelho e não está na nuvem.</p>", sim: "Esquecer", forte: true })) return;
+      await E.anexos.esquecerNaoEnviado(ds.id);
       await mostrar();
     }
   };
@@ -17445,7 +17701,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 15. USUÁRIOS E SEGURANÇA
 - Papéis: administrador (tudo, desfaz alterações de cadastro, backup seguro), operador (lança e edita) e consulta (só vê).
 - Senhas guardadas com PBKDF2-SHA256. Todas as alterações ficam no histórico.
-- Backup diário, ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador.
+- Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).
 
 16. BANCO E CONCILIAÇÃO (C6)
 - As duas contas (ANK e JCK) têm extrato separado, buscado pelo programa "Ponte C6" no computador. Cada lançamento do banco entra uma vez só (pela chave "reference" do C6); buscar de novo não duplica. O extrato é pedido em janelas de até 30 dias.
@@ -17945,6 +18201,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       await esquecerPastaSegura();
       E.seguro = null;
       aviso("Backup seguro desligado neste computador.");
+      await mostrar();
+    },
+    async dispensarAvisoSeguro() {
+      dispensarAvisoSeguro();
       await mostrar();
     },
     /** CPF já cadastrado: copia nome, contato e qualificação da pessoa para os campos deste formulário. */
@@ -19220,16 +19480,31 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!arq || !arq.size) throw new Error("Escolha o arquivo de backup.");
       const { info, dados } = await decifrar(await arq.arrayBuffer(), String(f.get("senha") || ""));
       const data2 = (info.criado_em || "").slice(0, 10);
+      const JSZip = await jsZip();
       let blob;
       if (info.tipo === "completo") blob = new Blob([dados], { type: "application/zip" });
       else {
-        const JSZip = await jsZip();
         const zip = new JSZip();
         zip.file(ARQUIVO_BANCO, dados);
         blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
       }
-      baixar(blob, `backup-restaurado-${info.tipo === "completo" ? "completo" : "banco"}-${data2}.zip`);
-      aviso(`Backup de ${new Date(info.criado_em).toLocaleString("pt-BR")} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+      if (f.get("destino") !== "pasta") {
+        baixar(blob, `backup-restaurado-${info.tipo === "completo" ? "completo" : "banco"}-${data2}.zip`);
+        aviso(`Backup de ${new Date(info.criado_em).toLocaleString("pt-BR")} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+        return;
+      }
+      let dir;
+      try {
+        dir = await window.showDirectoryPicker({ id: "restaurar-backup", mode: "readwrite" });
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        throw e;
+      }
+      if (await lerBanco(dir)) throw new Error(`A pasta escolhida já tem um ${ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
+      await importarZip(JSZip, dir, blob, null);
+      await lembrarPasta(dir);
+      await abrirPasta(dir);
+      aviso(`Backup de ${new Date(info.criado_em).toLocaleString("pt-BR")} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.`);
     },
     async modeloVistoria(form) {
       const f = Object.fromEntries(new FormData(form));
@@ -19502,7 +19777,15 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     async login(form) {
       const f = new FormData(form);
-      await entrar(String(f.get("login")).trim().toLowerCase(), String(f.get("senha")));
+      const botao2 = form.querySelector("button");
+      const texto3 = botao2 ? botao2.textContent : "";
+      if (botao2) botao2.textContent = "Entrando…";
+      try {
+        await entrar(String(f.get("login")).trim().toLowerCase(), String(f.get("senha")));
+      } catch (e) {
+        if (botao2) botao2.textContent = texto3;
+        throw e;
+      }
       await mostrar();
     },
     async pedirAcesso(form) {
@@ -19832,6 +20115,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     _naoEncontrado: naoEncontrado,
     restaurarBackup: () => telaRestaurarBackup(),
     "backup-seguro": () => telaBackupSeguro(),
+    "backups-nuvem": () => telaBackupsNuvem(),
     _ligarDesconto(raiz) {
       ligarCamposAutomaticos(raiz);
       ligarIndiceBancoCentral(raiz);
@@ -20038,6 +20322,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, "Abrir o fechamento do mês", "botao pequeno")}</div>
       ${podeUsuario("admin") && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao("reconectarSeguro", "Reconectar o backup seguro", {}, "secundario pequeno")}</div>` : ""}
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
+      ${avisoBackupSeguro()}
       ${calendarioDoPainel(competenciaValida(rota.q.mes, competenciaDe(hoje3)), hoje3)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
         ${gruposDeAlertas(alertas).map(([tipo, lista3]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista3.length})</span></h3>
@@ -20183,7 +20468,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   var SESSAO = "imoveis-sessao";
   var DURACAO_SESSAO = 12 * 3600 * 1e3;
   var LIMITE_SESSAO = 7 * 24 * 3600 * 1e3;
-  var MAX_SESSOES = 10;
+  var MAX_SESSOES2 = MAX_SESSOES;
   var deposito = () => location.protocol === "file:" ? sessionStorage : localStorage;
   function lerSessao() {
     try {
@@ -20206,6 +20491,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   }
   var novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  var usuarioDoEmail = (u, email) => [u.login, u.email].some((v) => String(v || "").toLowerCase() === String(email || "").toLowerCase());
   var usuarioDaSessao = () => {
     const s = lerSessao();
     return E.d && s && E.d.usuarios.find((u) => u.login === s.login && u.ativo && !u.pendente && (u.sessoes || []).includes(s.token)) || null;
@@ -20214,10 +20500,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const token = novoToken();
     await alterar((db) => {
       const x = db.usuarios.find((y) => y.id === u.id);
-      if (x) x.sessoes = [...x.sessoes || [], token].slice(-MAX_SESSOES);
+      if (x) x.sessoes = [...x.sessoes || [], token].slice(-MAX_SESSOES2);
     }, { soSessao: true });
     E.usuario = E.d.usuarios.find((y) => y.id === u.id) || u;
     gravarSessao(u.login, token);
+    ajustesParaNuvem();
   }
   window.addEventListener("storage", async (ev) => {
     if (ev.key !== SESSAO || !E.d) return;
@@ -20240,12 +20527,23 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     });
     return minha;
   }
+  function ajustesParaNuvem() {
+    if (!E.nuvem || !pode(E.usuario, "admin")) return;
+    filaGravacao = filaGravacao.then(async () => {
+      if (await E.nuvem.enviarAjustes()) {
+        E.d = E.nuvem.atual();
+        atualizarFaixa();
+      }
+    }).catch(() => {
+    });
+  }
   var ERRO_ARQUIVO_SUMIU = `O arquivo ${ARQUIVO_BANCO} não está mais na pasta dos dados. Se o OneDrive criou uma cópia com outro nome (ex.: "imoveis-dados-NOME-DO-PC.json"), renomeie-a de volta para ${ARQUIVO_BANCO} e recarregue a página. Nada foi gravado.`;
   var soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
   async function alterarAgora(fn, { soSessao = false } = {}) {
     if (E.nuvem) {
       const resultado2 = await E.nuvem.alterar(fn);
       E.d = E.nuvem.atual();
+      espelharSeguro();
       atualizarFaixa();
       return resultado2;
     }
@@ -20305,18 +20603,29 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const JSZip = await jsZip();
       const zip = await exportarZip(JSZip, E.pasta, E.d);
       await gravarCompleto(E.seguro.dir, E.seguro.chave, new Uint8Array(await zip.arrayBuffer()));
-      if (!window.VERSAO_OFFLINE) {
-        try {
-          const r = await fetch("offline/administracao-imoveis.html", { cache: "no-store" });
-          if (r.ok) await gravarPrograma(E.seguro.dir, await r.text());
-        } catch {
-        }
+    });
+  }
+  function atualizarProgramaSeguro() {
+    return naFilaSegura(async () => {
+      if (!E.seguro || !E.seguro.chave || window.VERSAO_OFFLINE) return;
+      await gravarLeiaMe(E.seguro.dir);
+      try {
+        const cab = await fetch(CAMINHO_PROGRAMA, { method: "HEAD", cache: "no-cache" });
+        const publicada = cab.ok ? cab.headers.get("last-modified") || "" : "";
+        if (!publicada || publicada === await versaoDoPrograma(E.seguro.dir)) return;
+        const r = await fetch(CAMINHO_PROGRAMA, { cache: "no-cache" });
+        if (r.ok) await gravarPrograma(E.seguro.dir, await r.text(), publicada);
+      } catch {
       }
     });
   }
+  function espelharSeguro() {
+    if (E.seguro && E.seguro.chave && E.d) naFilaSegura(() => espelhar(E.seguro.dir, E.seguro.chave, E.d));
+  }
   async function rotinaSegura() {
     if (!await conectarSeguro(false) || !E.d) return;
-    naFilaSegura(() => espelhar(E.seguro.dir, E.seguro.chave, E.d));
+    espelharSeguro();
+    atualizarProgramaSeguro();
     if (await completoPendente(E.seguro.dir)) backupCompletoSeguro();
   }
   function aoMudarNuvem(externo) {
@@ -20325,6 +20634,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     renovarUsuario();
     atualizarFaixa();
     if (!externo) return;
+    espelharSeguro();
     E.anexos?.listas?.forEach((l) => {
       l.em = 0;
     });
@@ -20483,10 +20793,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.cofrinho = new Cofrinho(cru);
     await E.cofrinho.daSessao(!!lerSessao());
     const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
-    E.nuvem = new Sincronia({ api: apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: travaDoNavegador });
+    E.nuvem = new Sincronia({ api: apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: travaDoNavegador, normalizar });
     E.anexos = new AnexosNuvem({ guardar });
     E.pasta = E.anexos.raiz();
     await E.anexos.carregarFila();
+    E.emailNuvem = (await saudeDaNuvem())?.email || null;
     try {
       localStorage.setItem(MODO_NUVEM, "1");
     } catch {
@@ -20499,7 +20810,19 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       E.d = { ...bancoVazio(), usuarios: acesso };
     }
     E.usuario = E.cofrinho.chave ? usuarioDaSessao() : null;
+    ajustesParaNuvem();
     await mostrar();
+    if (E.d) rotinaSegura().catch((e) => {
+      E.seguroErro = e.message;
+    });
+  }
+  async function reabrirSessao() {
+    const u = E.usuario && E.d.usuarios.find((x) => x.login === E.usuario.login && x.ativo && !x.pendente);
+    if (u) await abrirSessao(u);
+    else {
+      E.usuario = null;
+      gravarSessao(null);
+    }
   }
   async function destrancarNuvem(loginTexto, senha) {
     await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
@@ -20538,6 +20861,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
     E.d = disco;
     const u = E.d.usuarios.find((x) => x.login === loginTexto);
+    if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
     if (!await conferirSenha(u, senha)) throw new ErroUsuario("Login ou senha incorretos.");
     if (u.pendente) throw new Error("Seu pedido de acesso ainda não foi aprovado pelo administrador.");
     if (!u.ativo) throw new Error("Este usuário está bloqueado. Fale com o administrador.");
@@ -20590,7 +20914,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0);
       const cf = E.nuvem.conflitos.length;
       const rc = E.nuvem.recusas.length;
-      el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? "envio" : "internet"}</b>` : E.nuvem.online ? "✓ tudo enviado" : "sem internet"}${cf || rc ? ` · <a href="#/conflitos"><b>⚠ ${cf ? `${cf} conflito(s) para escolher` : ""}${cf && rc ? " e " : ""}${rc ? `${rc} mudança(s) recusada(s)` : ""}</b></a>` : ""} · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString("pt-BR") : "nenhuma ainda"}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ""}`;
+      const avisos = [cf && `${cf} conflito(s) para escolher`, rc && `${rc} mudança(s) recusada(s)`, E.anexos?.naoEnviados?.length && `${E.anexos.naoEnviados.length} anexo(s) não enviado(s)`].filter(Boolean);
+      el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? "envio" : "internet"}</b>` : E.nuvem.online ? "✓ tudo enviado" : "sem internet"}${avisos.length ? ` · <a href="#/conflitos"><b>⚠ ${avisos.join(" e ")}</b></a>` : ""} · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString("pt-BR") : "nenhuma ainda"}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ""}`;
       return;
     }
     el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString("pt-BR") : "nenhuma ainda"}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ""} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split("-").reverse().join("/")}` : ""}`;
@@ -20716,13 +21041,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   var SEM_CARTOES = ".fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria, .boleto-banco, .carta-tabela, .mapa-iptu, table.responsiva";
   function cartoesNoCelular(raiz) {
+    const largas = [];
     for (const t of raiz.querySelectorAll("main table")) {
       if (t.matches(SEM_CARTOES) || t.closest(".fatura-xls, .demonstrativo")) continue;
       const primeira = t.rows[0];
       if (!primeira || !primeira.cells.length) continue;
       const caixa = t.parentElement;
       const larga = t.scrollWidth > (caixa?.clientWidth || window.innerWidth) + 2 || t.getBoundingClientRect().right > window.innerWidth + 2;
-      if (!larga) continue;
+      if (larga) largas.push({ t, primeira });
+    }
+    for (const { t, primeira } of largas) {
       if ([...primeira.cells].every((c) => c.tagName === "TH")) t.classList.add("responsiva", "cartoes-auto");
       else t.classList.add("linhas-celular");
     }
