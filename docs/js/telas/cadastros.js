@@ -5,6 +5,7 @@ import * as S from '../armazenamento.js';
 import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
+import { resultadoVistoriaSaida } from '../contratos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -666,7 +667,13 @@ export const CADASTROS = {
         debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n'),
       };
     },
-    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`; },
+    aviso: (r, q) => {
+      const c = buscar('contratos', q.contrato);
+      // o "Vistoria de saída" não é digitado: vem da vistoria registrada (fonte única) e é guardado ao salvar
+      const v = resultadoVistoriaSaida(d(), c);
+      const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): confira os débitos` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
+    },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
     fixos: (r, q) => ({ data_saida: buscar('contratos', q.contrato).data_saida }),
     voltar: (r, q) => `#/contrato/${q.contrato}`,
@@ -675,6 +682,7 @@ export const CADASTROS = {
       if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
       for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos']) if (!dados[k]) dados[k] = 0;
       for (const k of R.relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
+      dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
     },
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
   },

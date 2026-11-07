@@ -694,6 +694,34 @@ const GRAU = { Novo: 0, 'Ótimo': 1, Bom: 2, 'Marcas de uso': 3, Avaria: 4, 'Nã
 /** Na saída, o item piorou em relação à entrada? */
 export const piorou = (entrada, saida) => GRAU[saida] !== undefined && GRAU[entrada] !== undefined && GRAU[saida] > GRAU[entrada];
 
+/**
+ * Resultado da vistoria de saída registrada (fonte única do "Vistoria de saída" do cálculo final):
+ * { texto: 'Não feita' | 'Sem pendências' | 'Com pendências', vistoria, pendencias: ['Sala – Teto (Avaria: infiltração)'] }.
+ * Pendência = item pior que na entrada (ou, sem o item na entrada, "Avaria"/"Não funciona"); sem grade, as linhas "DIFERENÇA:" do descritivo.
+ */
+export function resultadoVistoriaSaida(d, c) {
+  const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+  const doContrato = (d.vistorias || []).filter((v) => v.contrato_id === c.id).sort(porData);
+  const vistoria = doContrato.find((v) => v.tipo === 'Saída') || null;
+  if (!vistoria) return { texto: 'Não feita', vistoria: null, pendencias: [] };
+  const entrada = doContrato.find((v) => v.tipo === 'Entrada');
+  const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
+  let pendencias = (vistoria.itens || []).filter((x) => {
+    const ent = naEntrada.get(`${x.comodo}|${x.item}`);
+    return ent ? piorou(ent, x.situacao) : ['Avaria', 'Não funciona'].includes(x.situacao);
+  }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ''})`);
+  if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ''));
+  return { texto: pendencias.length ? 'Com pendências' : 'Sem pendências', vistoria, pendencias };
+}
+
+/** Texto do "Vistoria de saída" no cálculo final: vale a vistoria registrada; sem ela, o que foi guardado antes (dados antigos). */
+export function textoVistoriaSaida(d, c, encerramento) {
+  const r = resultadoVistoriaSaida(d, c);
+  const guardado = encerramento && encerramento.vistoria_saida;
+  if (!r.vistoria) return guardado || r.texto;
+  return guardado === 'Contestada' ? `${r.texto} (contestada pelo inquilino)` : r.texto;
+}
+
 export const FOTOS_VISTORIA = [['fachada', 'Fachada'], ['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás'], ['disjuntores', 'Quadro de disjuntores']];
 
 /** Modelo de vistoria do imóvel (texto): "## Cômodo" e um item por linha. Linha terminada em ":" (ex.: "Móvel:") fica de fora. */

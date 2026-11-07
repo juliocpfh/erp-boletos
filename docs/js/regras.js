@@ -1491,27 +1491,26 @@ export function ultimoCicloDeNumeracao(d) {
 export function desfazerUltimaNumeracao(d, usuario) {
   const ciclo = ultimoCicloDeNumeracao(d);
   if (!ciclo) throw new Error('Não há numeração para desfazer.');
-  const fs = d.faturas.filter((f) => f.lote === ciclo.lote);
   if (d.faturas.some((f) => f.lote !== ciclo.lote && f.numero >= ciclo.de)) {
     throw new Error(`Há NFs de outra numeração com número ${numeroFatura(ciclo.de)} ou maior. Use "a partir do nº".`);
   }
-  for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-  registrar(d, usuario, 'Alteração', 'faturas', null, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`, { proxima_fatura: { de: d.proxima_fatura, para: ciclo.de } });
-  d.proxima_fatura = ciclo.de;
+  // com a conferência acima, as NFs de nº >= ciclo.de são exatamente as do ciclo: o mesmo caminho de "a partir do nº"
+  desfazerNumeracao(d, ciclo.de, usuario, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`);
   return ciclo;
 }
 
 /**
  * Desfaz a numeração a partir de um número: apaga todas as NFs com número igual ou maior (emitidas ou canceladas),
  * os pagamentos voltam para a fila e o próximo número volta a ser este. Serve para corrigir e numerar de novo.
+ * É o único caminho que apaga NFs para renumerar ("Voltar a última numeração" passa por aqui).
  */
-export function desfazerNumeracao(d, aPartirDe, usuario) {
+export function desfazerNumeracao(d, aPartirDe, usuario, descricao = null) {
   const n = Number(aPartirDe);
   if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
   const fs = d.faturas.filter((f) => f.numero >= n);
   if (!fs.length) throw new Error(`Não há NF com número ${numeroFatura(n)} ou maior.`);
   for (const f of fs) excluir(d, 'faturas', f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-  registrar(d, usuario, 'Alteração', 'faturas', null, `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d.proxima_fatura, para: n } });
+  registrar(d, usuario, 'Alteração', 'faturas', null, descricao || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d.proxima_fatura, para: n } });
   d.proxima_fatura = n;
   return new Set(fs.map((f) => f.numero)).size;
 }

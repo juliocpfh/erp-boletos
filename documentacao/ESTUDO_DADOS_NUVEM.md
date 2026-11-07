@@ -23,7 +23,7 @@
 - **Dados**: o `imoveis-dados.json` vira um arquivo no **R2** (o "HD" do Cloudflare), e os anexos ficam lá também, com os mesmos nomes de pasta de hoje (imóvel / Inquilinos / …).
 - **Worker** (programinha pequeno no Cloudflare): lê e grava o arquivo, só aceita gravar se ninguém mudou antes (senão o sistema recarrega e refaz) e guarda um backup por dia (30 dias).
 - **Cloudflare Access** na frente de `erp.ankjck.com.br` (site e `/api` juntos): só e-mails autorizados entram (código no e-mail). A senha do sistema continua valendo por cima.
-- **Cópia no computador**: botão em Dados e backup + aviso semanal para baixar o ZIP para o OneDrive (o dono continua com uma cópia própria).
+- **Cópia no computador**: botão em Dados e backup + lembrete, na própria tela, quando o último ZIP foi baixado há mais de 7 dias (feito em 2026-11-07, rotina C14; o dono continua com uma cópia própria, além do backup seguro).
 - **O que fica igual**: as telas, as regras, a ponte do C6 e a versão sem internet (esta continua usando a pasta, como hoje).
 
 ### Etapas (cada uma testável sozinha)
