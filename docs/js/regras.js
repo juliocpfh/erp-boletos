@@ -1034,21 +1034,38 @@ export function parcelasIptu(d, p) {
 }
 
 /**
+ * IPTU quitado à vista pelo proprietário: o que os inquilinos pagam nos boletos, mês a mês (o mesmo cálculo do boleto,
+ * conforme "Inquilino que entrar": parcelas normais ou 1/12 nos meses ocupados). Um item por mês de vencimento do boleto:
+ * { mesBoleto, comp, n, rotulo, valor (soma dos inquilinos), inquilinos: [{ contrato, comp, dias, diasMes, valor }] }.
+ * Vazio quando não é à vista ou "Não cobrar do inquilino".
+ */
+export function mesesIptuAvista(d, p) {
+  if (!p.pago_avista) return [];
+  const porMes = new Map();
+  const umDoze = p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1];
+  for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+    for (let k = 0, comp = `${p.ano - 1}-01`; k < 36; k += 1, comp = C.somarMeses(comp, 1)) {
+      const [n, v] = iptuNaCompetencia(p, comp, c);
+      const dias = n ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+      if (!dias || (emCarencia(c, comp) && !c.carencia_cobrar_iptu)) continue;
+      const mesBoleto = c.cobranca_mes_seguinte === false ? comp : C.somarMeses(comp, 1);
+      const item = porMes.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? '1/12 (você pagou à vista)' : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
+      const valor = C.aluguelProporcional(v, dias, C.diasNoMes(comp));
+      item.valor += valor;
+      item.inquilinos.push({ contrato: c, comp, dias, diasMes: C.diasNoMes(comp), valor });
+      porMes.set(mesBoleto, item);
+    }
+  }
+  return [...porMes.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+}
+
+/**
  * Totais do IPTU no ano: quanto os inquilinos pagam nos boletos e quanto fica com o proprietário (e quanto dessa parte
  * ainda está em guia não paga). À vista: o inquilino paga conforme "Inquilino que entrar" (1/12 ou parcelas) nos meses ocupados.
  */
 export function totaisIptu(d, p) {
   const ps = parcelasIptu(d, p);
-  let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
-  if (p.pago_avista) {
-    for (const c of d.contratos.filter((x) => x.imovel_id === p.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
-      for (let k = 0, comp = `${p.ano - 1}-01`; k < 36; k += 1, comp = C.somarMeses(comp, 1)) {
-        const [n, v] = iptuNaCompetencia(p, comp, c);
-        const dias = n ? C.diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
-        if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += C.aluguelProporcional(v, dias, C.diasNoMes(comp));
-      }
-    }
-  }
+  const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d, p).reduce((s, x) => s + x.valor, 0);
   const custo = ps.reduce((s, x) => s + x.valor, 0);
   return { custo, inquilino, proprietario: custo - inquilino,
     emAberto: ps.filter((x) => x.proprietario && !x.paga).reduce((s, x) => s + x.valorProprietario, 0) };

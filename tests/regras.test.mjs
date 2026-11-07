@@ -477,6 +477,32 @@ test('IPTU: parcelas de imóvel vazio ficam com o proprietário, com alerta até
   assert.equal(R.alertasIptu(d, '2026-02-10').length, 0);
 });
 
+test('IPTU pago à vista pelo proprietário: o mapa mostra os meses em que o inquilino paga nos boletos', () => {
+  const { d, c } = base();
+  // IPTU 2026 de R$ 1.200 em 10x de R$ 120 (boletos de março a dezembro); o proprietário pagou à vista R$ 1.080 em 10/02
+  const p = d.iptus[0];
+  Object.assign(p, { valor_total: 120000, num_parcelas: 10, primeira_competencia: null, primeiro_vencimento_boleto: '2026-03',
+    pago_avista: true, valor_avista: 108000, data_quitacao: '2026-02-10', cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[0] });
+  c.data_entrada = '2026-01-01'; c.vigencia_inicio = '2026-01-01';
+  const meses = R.mesesIptuAvista(d, p);
+  assert.deepEqual(meses.map((m) => m.mesBoleto), ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']);
+  assert.deepEqual(meses.map((m) => m.valor), Array(10).fill(12000));
+  assert.deepEqual([meses[0].n, meses[0].rotulo, meses[0].comp, meses[0].inquilinos[0].contrato.id], [1, '1ª parcela (você pagou à vista)', '2026-02', c.id]);
+  // totais: inquilino paga os R$ 1.200 parcelados; a cota única (R$ 1.080) é o custo do proprietário, já paga
+  assert.deepEqual(R.totaisIptu(d, p), { custo: 108000, inquilino: 120000, proprietario: -12000, emAberto: 0 });
+  // 1/12 por mês ocupado: entrada em 07/06 paga proporcional em junho e cheio até dezembro (boletos de julho a janeiro)
+  Object.assign(c, { data_entrada: '2026-06-07', vigencia_inicio: '2026-06-07' });
+  p.cobranca_inquilino = R.COBRANCA_IPTU_QUITADO[1];
+  const doze = R.mesesIptuAvista(d, p);
+  assert.deepEqual(doze.map((m) => m.mesBoleto), ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01']);
+  assert.deepEqual([doze[0].valor, doze[1].valor, doze[0].rotulo], [8000, 10000, '1/12 (você pagou à vista)']);
+  // "Não cobrar do inquilino" e IPTU parcelado: nada
+  p.cobranca_inquilino = R.COBRANCA_IPTU_QUITADO[2];
+  assert.deepEqual(R.mesesIptuAvista(d, p), []);
+  p.pago_avista = false;
+  assert.deepEqual(R.mesesIptuAvista(d, p), []);
+});
+
 test('fiador com fim de vínculo vai para anteriores e gera alerta antes de terminar', () => {
   const d = R.bancoVazio();
   const c = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'X', data_entrada: '2026-01-01', garantia_tipo: 'Fiador', aluguel_inicial: 100000 }, 'julio');

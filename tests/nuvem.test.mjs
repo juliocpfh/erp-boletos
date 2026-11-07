@@ -158,6 +158,23 @@ test('mover: renomeia pasta, recusa destino ocupado, junta devolvendo o que sobr
   assert.equal([...env.DADOS.m.keys()].filter((k) => k.startsWith('arquivos/Nova/')).length, 450);
 });
 
+
+const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
+const par = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+const jwkPublica = { ...(await crypto.subtle.exportKey('jwk', par.publicKey)), kid: 'chave1', alg: 'RS256' };
+const EQUIPE = 'exemplo.cloudflareaccess.com';
+const AUD = 'aud-de-teste';
+async function token(dados, kid = 'chave1') {
+  const cab = b64(Buffer.from(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT' })));
+  const corpo = b64(Buffer.from(JSON.stringify(dados)));
+  const ass = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', par.privateKey, new TextEncoder().encode(`${cab}.${corpo}`));
+  return `${cab}.${corpo}.${b64(new Uint8Array(ass))}`;
+}
+const buscarCerts = async (url) => {
+  assert.equal(url, `https://${EQUIPE}/cdn-cgi/access/certs`);
+  return new Response(JSON.stringify({ keys: [jwkPublica] }));
+};
+
 // ---------------------------------------------------------------------------
 // Login do Access: token assinado com uma chave RSA criada no teste
 // ---------------------------------------------------------------------------
@@ -175,22 +192,6 @@ test('chave de serviço (atualizador-pc): token do Access sem e-mail entra como 
   assert.equal(W.emailDoServico({ SERVICOS: 'a=b@c' }, 'a'), 'b@c');
   assert.equal(W.emailDoServico({}, 'a'), '');
 });
-
-const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
-const par = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
-const jwkPublica = { ...(await crypto.subtle.exportKey('jwk', par.publicKey)), kid: 'chave1', alg: 'RS256' };
-const EQUIPE = 'exemplo.cloudflareaccess.com';
-const AUD = 'aud-de-teste';
-async function token(dados, kid = 'chave1') {
-  const cab = b64(Buffer.from(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT' })));
-  const corpo = b64(Buffer.from(JSON.stringify(dados)));
-  const ass = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', par.privateKey, new TextEncoder().encode(`${cab}.${corpo}`));
-  return `${cab}.${corpo}.${b64(new Uint8Array(ass))}`;
-}
-const buscarCerts = async (url) => {
-  assert.equal(url, `https://${EQUIPE}/cdn-cgi/access/certs`);
-  return new Response(JSON.stringify({ keys: [jwkPublica] }));
-};
 
 test('login: só com token do Access válido, da equipe e do aplicativo certos, não vencido e de e-mail da lista', async () => {
   const env = { DADOS: r2Falso(), ACCESS_EQUIPE: EQUIPE, ACCESS_AUD: AUD, EMAILS: 'dono@exemplo.com.br, Socio@Exemplo.com.br' };
