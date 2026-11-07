@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-1q9OwUf20zPq7Vpy1KBZvU6epseUR/2lvaEx4JiTQe0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-DBfB1nggnXBWQX3Db7Wd/svMpdPTpSXwoW2w7MM5EOo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3ba8af9ab220391f">
+<meta name="fontes" content="71bdfb66c2e9037c">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1420,8 +1420,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   var FORMATOS_PARAMETRO = {
     comp: COMPETENCIA_RE,
     mes: COMPETENCIA_RE,
-    competencia: COMPETENCIA_RE,
-    mes_ref: COMPETENCIA_RE,
     data: DATA_RE,
     de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/,
     ate: DATA_RE,
@@ -1434,11 +1432,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     numero: /^\d+$/,
     ano: /^\d{4}$/,
     vincular: /^\d+$/,
-    seguro: /^\d+$/,
     custo: /^\d+$/,
     airbnb: /^\d+$/,
-    empresa: /^\d+$/,
-    vistoria: /^\d+$/,
     id: /^\d+$/,
     ids: /^\d+(,\d+)*$/,
     numeros: /^\d+(,\d+)*$/,
@@ -1674,6 +1669,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     inquilinoPagaCondominio: () => inquilinoPagaCondominio,
     inserir: () => inserir,
     iptuNaCompetencia: () => iptuNaCompetencia,
+    iptuPagoPeloBanco: () => iptuPagoPeloBanco,
     juntarOrdem: () => juntarOrdem,
     lancarDespesas: () => lancarDespesas,
     lancarGanhoAirbnb: () => lancarGanhoAirbnb,
@@ -1702,6 +1698,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     modeloAirbnb: () => modeloAirbnb,
     montarCobranca: () => montarCobranca,
     motivoBancoInativo: () => motivoBancoInativo,
+    motivoNaoDesfazer: () => motivoNaoDesfazer,
     nfAirbnbDe: () => nfAirbnbDe,
     nomeBate: () => nomeBate,
     normalizar: () => normalizar,
@@ -3405,7 +3402,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   var SEM_DESFAZER = /* @__PURE__ */ new Set(["cobrancas", "faturas", "recebimentos", "avulsas", "usuarios", "banco", "listas", "fechamentos", "arquivos", "movimentacoes_banco", "pagamentos_banco"]);
   var CAMPOS_SEM_DESFAZER = /* @__PURE__ */ new Set(["pasta"]);
+  var CAMPOS_PAGAMENTO_BANCO = { despesas: ["data_pagamento", "movimentacao_id", "pagamento_banco_id", "comprovante"], guias_impostos: ["paga_em", "movimentacao_id", "pagamento_banco_id"], iptus: ["pagas", "data_quitacao"] };
   var textoComparar = (x) => x === void 0 || x === null ? "" : typeof x === "object" ? JSON.stringify(x) : String(x);
+  function iptuPagoPeloBanco(d2, iptuId, n) {
+    const id = Number(iptuId);
+    const parc = Number(n);
+    return (d2.movimentacoes_banco || []).some((m) => m.classificacao === "iptu" && m.iptu_id === id && Number(m.iptu_parcela) === parc) || (d2.pagamentos_banco || []).some((p2) => p2.origem && p2.origem.tipo === "iptu" && Number(p2.origem.id) === id && Number(p2.origem.n) === parc && !["cancelado", "erro"].includes(p2.situacao));
+  }
+  function motivoNaoDesfazer(d2, tabela, r, campo2, anterior = void 0) {
+    const campos = CAMPOS_PAGAMENTO_BANCO[tabela];
+    if (!campos || !r || !campos.includes(campo2)) return null;
+    if (tabela === "iptus") {
+      const atual = r.pagas || {};
+      const volta = anterior && typeof anterior === "object" ? anterior : {};
+      const parcelas2 = campo2 === "data_quitacao" ? [0] : [.../* @__PURE__ */ new Set([...Object.keys(atual), ...Object.keys(volta)])].filter((n) => atual[n] !== volta[n]).map(Number);
+      return parcelas2.some((n) => iptuPagoPeloBanco(d2, r.id, n)) ? `IPTU ${r.ano}: parcela paga pelo banco. Desfaça o destino da movimentação na tela Banco.` : null;
+    }
+    if (r.pagamento_banco_id) return `${tabela === "despesas" ? "Esta conta" : "Esta guia"} foi paga pelo banco (pagamento nº ${r.pagamento_banco_id}): o pagamento não se desfaz pelo Histórico.`;
+    if (r.movimentacao_id) return `${tabela === "despesas" ? "Esta conta" : "Esta guia"} está ligada ao extrato do banco: desfaça o destino da movimentação na tela Banco.`;
+    return null;
+  }
   function alteracoesDesfaziveis(d2) {
     const desfeitos = /* @__PURE__ */ new Set();
     d2.historico.forEach((h) => {
@@ -3424,7 +3440,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const k = chave.split(":").slice(2).join(":");
       if (SEM_DESFAZER.has(h.tabela) || CAMPOS_SEM_DESFAZER.has(k) || !Array.isArray(d2[h.tabela])) continue;
       const r = buscar(d2, h.tabela, h.registro_id);
-      if (r && textoComparar(r[k]) === textoComparar(h.detalhes[k].para)) out.add(`${i}:${k}`);
+      if (r && textoComparar(r[k]) === textoComparar(h.detalhes[k].para) && !motivoNaoDesfazer(d2, h.tabela, r, k, h.detalhes[k].de)) out.add(`${i}:${k}`);
     }
     return out;
   }
@@ -3438,10 +3454,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const mudados = [];
     for (const i of [...porIndice.keys()].sort((a, b) => b - a)) {
       const pode2 = alteracoesDesfaziveis(d2);
+      const h = d2.historico[i];
+      const r = h ? buscar(d2, h.tabela, h.registro_id) : null;
+      for (const k of porIndice.get(i)) {
+        const motivo = h && h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d2, h.tabela, r, k, h.detalhes[k].de) : null;
+        if (motivo) throw new ErroUsuario(motivo);
+      }
       const campos = porIndice.get(i).filter((k) => pode2.has(`${i}:${k}`));
       if (!campos.length) throw new Error("Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).");
-      const h = d2.historico[i];
-      const r = buscar(d2, h.tabela, h.registro_id);
       const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
       for (const k of campos) r[k] = h.detalhes[k].de ?? null;
       registrar(
@@ -4009,8 +4029,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return lista3;
   }
-  function marcarIptuPago(d2, iptuId, n, data2, usuario) {
+  function marcarIptuPago(d2, iptuId, n, data2, usuario, { peloBanco = false } = {}) {
     const p2 = buscar(d2, "iptus", iptuId);
+    if (!p2) throw new ErroUsuario("IPTU não encontrado.");
+    if (!data2 && !peloBanco && iptuPagoPeloBanco(d2, p2.id, n)) {
+      throw new ErroUsuario(`IPTU ${p2.ano} ${Number(n) === 0 ? "cota única" : `${n}ª parcela`}: paga pelo banco. Para desfazer, desfaça o destino da movimentação na tela Banco.`);
+    }
     if (Number(n) === 0) {
       atualizar(d2, "iptus", p2.id, { data_quitacao: data2 || null }, usuario, data2 ? `IPTU ${p2.ano} quitado em ${dataBr(data2)}` : `IPTU ${p2.ano}: quitação desfeita`);
       return;
@@ -7837,6 +7861,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (typeof indexedDB !== "undefined") await lembrarPonte({ ...local });
     return { ...local };
   }
+  async function esquecerPonteLocal() {
+    local = { ponte_url: "", senha_ponte: "" };
+    if (typeof indexedDB !== "undefined") await esquecerPonte();
+  }
   var ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url, configurada: !!local.ponte_url });
   var configuracaoBanco = (d2) => ({ ...configBanco(d2), ...local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: "", senha_ponte: "" } });
   var pontePronta = (d2) => bancoAtivo(d2) && !!local.ponte_url;
@@ -10774,7 +10802,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
       <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
       <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg2.ativo)} ${cfg2.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
-      <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}</div></form>
+      <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}${ponteLocal().configurada ? ` ${botao("esquecerPonteC6", "Esquecer a ponte neste computador", {}, "perigo", "Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.")}` : ""}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
@@ -12011,7 +12039,7 @@ ${xref}
       for (const g of ganhos) excluir(d2, "ganhos_airbnb", g.id, usuario, "Ganho do Airbnb excluído (destino da movimentação desfeito)");
     }
     if (mov2.reforma_id && buscar(d2, "reformas", mov2.reforma_id)) excluir(d2, "reformas", mov2.reforma_id, usuario, "Reforma excluída (destino da movimentação desfeito)");
-    if (mov2.iptu_id && mov2.iptu_parcela !== null && buscar(d2, "iptus", mov2.iptu_id)) marcarIptuPago(d2, mov2.iptu_id, mov2.iptu_parcela, "", usuario);
+    if (mov2.iptu_id && mov2.iptu_parcela !== null && buscar(d2, "iptus", mov2.iptu_id)) marcarIptuPago(d2, mov2.iptu_id, mov2.iptu_parcela, "", usuario, { peloBanco: true });
     if (mov2.guia_imposto_id && buscar(d2, "guias_impostos", mov2.guia_imposto_id)) atualizar(d2, "guias_impostos", mov2.guia_imposto_id, { paga_em: null, movimentacao_id: null }, usuario, "Guia solta da movimentação do extrato");
     if (mov2.par_movimentacao_id) {
       const par = buscar(d2, "movimentacoes_banco", mov2.par_movimentacao_id);
@@ -18204,7 +18232,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function documentoDaTela() {
     const [caminho, consulta2] = location.hash.replace(/^#\/?/, "").split("?");
-    return [caminho.split("/")[1], Object.fromEntries(new URLSearchParams(consulta2 || ""))];
+    return [caminho.split("/")[1], sanearParametros(Object.fromEntries(new URLSearchParams(consulta2 || "")))];
   }
   async function marcarGeradoNaRotina2(tipo, m) {
     const chave = { contrato: "contrato_gerado", chaves: "chaves_gerado" }[tipo];
@@ -18771,11 +18799,6 @@ ${MODELO_COMODOS[comodo].join("\n")}
         el.textContent = antes;
       }, 1500);
     },
-    async cancelarAvulsa({ id }) {
-      await alterar((db) => cancelarFaturas(db, "avulsa", Number(id), login()));
-      aviso("NF cancelada. O número não será reaproveitado.");
-      await mostrar();
-    },
     async gerarCobrancas({ comp }) {
       const r = await alterar((db) => gerarCobrancas(db, comp, login()));
       aviso(`${r.geradas} boleto(s) gerado(s) para ${compBr(comp)}.`);
@@ -18899,9 +18922,6 @@ ${MODELO_COMODOS[comodo].join("\n")}
       await alterar((db) => apagarCanceladas(db, Number(numero2), login()));
       aviso(`NF nº ${numeroFatura(numero2)} apagada da lista.`);
       await mostrar();
-    },
-    async aplicarReajuste({ contrato, comp }) {
-      await aplicarReajusteNaTela(Number(contrato), comp);
     },
     /** Tela Reajustes: desfaz a correção (só a mais recente do inquilino, sem boleto da caução pago). */
     async desfazerReajuste({ id }) {
@@ -19300,6 +19320,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
     // ------------------------------------------------------------------------
     /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
+    /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
+    async esquecerPonteC6() {
+      if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+      await esquecerPonteLocal();
+      aviso("Ponte esquecida neste computador. Para usar o banco aqui de novo, informe o endereço e a senha e salve.");
+      await mostrar();
+    },
     async testarPonteC6() {
       const alvo = document.getElementById("saude-ponte");
       if (alvo) alvo.innerHTML = '<p class="suave">Falando com a ponte…</p>';
@@ -20467,11 +20494,6 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     banco: (rota) => telaBanco(rota),
     inadimplencia: () => telaInadimplencia(),
     reajustes: (rota) => telaReajustes(rota.q),
-    calendario: (rota) => {
-      const mes = competenciaValida(rota.q.mes, "");
-      ir(`#/${mes ? `?mes=${mes}` : ""}`);
-      return "";
-    },
     imprimir: (rota) => telaImprimir(rota),
     "contrato-gerar": (rota) => telaGerarContrato(rota),
     aditivo: (rota) => telaAditivo(rota),
