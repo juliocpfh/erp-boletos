@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-dYpKFxTAtCF+dVzY+pCkppdbK+LMQOVZ5Unfuvw+10k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-PUK+zGePRA5insHLChQVrIxQ97NcFQV6ezuQKyNL5V4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7c50edc12f5e79b6">
+<meta name="fontes" content="2246ca17f6a42517">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1693,6 +1693,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     mesDeAniversario: () => mesDeAniversario,
     mesDoDinheiro: () => mesDoDinheiro,
     mesesDoTrimestre: () => mesesDoTrimestre,
+    mesesIptuAvista: () => mesesIptuAvista,
     mesesUsoReserva: () => mesesUsoReserva,
     modeloAirbnb: () => modeloAirbnb,
     montarCobranca: () => montarCobranca,
@@ -3920,18 +3921,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       };
     });
   }
-  function totaisIptu(d2, p2) {
-    const ps = parcelasIptu(d2, p2);
-    let inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0);
-    if (p2.pago_avista) {
-      for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
-        for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
-          const [n, v] = iptuNaCompetencia(p2, comp, c);
-          const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
-          if (dias && !(emCarencia(c, comp) && !c.carencia_cobrar_iptu)) inquilino += aluguelProporcional(v, dias, diasNoMes(comp));
-        }
+  function mesesIptuAvista(d2, p2) {
+    if (!p2.pago_avista) return [];
+    const porMes = /* @__PURE__ */ new Map();
+    const umDoze = p2.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1];
+    for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
+      for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
+        const [n, v] = iptuNaCompetencia(p2, comp, c);
+        const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
+        if (!dias || emCarencia(c, comp) && !c.carencia_cobrar_iptu) continue;
+        const mesBoleto = c.cobranca_mes_seguinte === false ? comp : somarMeses(comp, 1);
+        const item2 = porMes.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? "1/12 (você pagou à vista)" : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
+        const valor = aluguelProporcional(v, dias, diasNoMes(comp));
+        item2.valor += valor;
+        item2.inquilinos.push({ contrato: c, comp, dias, diasMes: diasNoMes(comp), valor });
+        porMes.set(mesBoleto, item2);
       }
     }
+    return [...porMes.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+  }
+  function totaisIptu(d2, p2) {
+    const ps = parcelasIptu(d2, p2);
+    const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d2, p2).reduce((s, x) => s + x.valor, 0);
     const custo = ps.reduce((s, x) => s + x.valor, 0);
     return {
       custo,
@@ -16617,11 +16628,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     };
     const quadradoDoMes = (pc, p2, mes) => {
       if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
-      const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? "cota única" : `${pc.rotulo} parcela`}`;
+      const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? "cota única" : pc.avista ? pc.rotulo : `${pc.rotulo} parcela`}`;
       if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
-      const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : "";
+      const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : pc.avista ? ` · inquilino paga ${reais(pc.avista.valor)} no boleto (${pc.avista.rotulo})` : "";
       const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : "";
-      if (pc.paga) return `<span class="q ${pc.valorInquilino ? "q-div" : "q-paga"}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
+      if (pc.paga) return `<span class="q ${pc.valorInquilino || pc.avista ? "q-div" : "q-paga"}" title="${nome}: sua parte ${reais(pc.valorProprietario)}${inq} · paga em ${dataBr(pc.paga)}"></span>`;
       const titulo2 = `${nome}: sua parte ${reais(pc.valorProprietario)}${inq}${venc} · em aberto`;
       return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPagoRapido" data-id="${p2.id}" data-n="${pc.n}" data-texto="${esc(titulo2)}" title="${esc(titulo2)} (clique para marcar como paga)"></button>` : `<span class="q q-aberto" title="${esc(titulo2)}"></span>`;
     };
@@ -16629,12 +16640,19 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
     const mapas = new Map(imoveis.filter(doAno).map((i) => {
       const p2 = doAno(i);
-      return [i.id, new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]))];
+      const mapa = new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]));
+      for (const m of mesesIptuAvista(d(), p2)) {
+        const cota = mapa.get(m.mesBoleto);
+        if (cota) cota.avista = m;
+        else mapa.set(m.mesBoleto, { n: null, rotulo: m.rotulo, avista: m, valor: m.valor, proprietario: false });
+      }
+      return [i.id, mapa];
     }));
     const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
     const meses = [];
     for (let m = `${ano}-01`; m <= ultimo; m = somarMeses(m, 1)) meses.push(m);
     const soma = { inquilino: 0, sua: 0, aberto: 0 };
+    const suaParte = (v, aberto) => !v ? "-" : v < 0 ? `<span class="suave">sobra ${reais(-v)} para você</span>` : `<b class="${aberto ? "texto-perigo" : ""}">${reais(v)}</b>`;
     const linhas2 = imoveis.map((i) => {
       const p2 = doAno(i);
       const idGuias = idGuiasDoAno(i.id, ano);
@@ -16647,12 +16665,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       soma.sua += t.proprietario;
       soma.aberto += t.emAberto;
       return `<tr><td>${nome}</td><td class="nw">${valor(p2)}${primeira(p2)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p2, m)).join("")}</td>
-      <td class="n nw">${t.inquilino ? reais(t.inquilino) : "-"}</td><td class="n nw">${t.proprietario ? `<b class="${t.emAberto ? "texto-perigo" : ""}">${reais(t.proprietario)}</b>` : "-"}</td>
+      <td class="n nw">${t.inquilino ? reais(t.inquilino) : "-"}</td><td class="n nw">${suaParte(t.proprietario, t.emAberto)}</td>
       <td class="n">${opera() ? link(`#/editar/iptus/${p2.id}?de=iptu`, "Editar") : ""}</td></tr>`;
     }).join("");
     const faltam = imoveis.filter((i) => !doAno(i)).length;
     const guias = guiasIptuAPagar(d(), hoje3, 60);
-    const legenda = [["q-inq", "inquilino paga no boleto"], ["q-div", "dividido (mês de entrada ou saída), sua parte paga"], ["q-aberto", "sua parte, em aberto"], ["q-paga", "sua parte, paga"], ["q-vazio", "sem parcela"]].map(([c, t]) => `<span><span class="q ${c}"></span> ${t}</span>`).join("");
+    const legenda = [["q-inq", "inquilino paga no boleto"], ["q-div", "dividido (mês de entrada ou saída, ou cota única paga no mês de um boleto), sua parte paga"], ["q-aberto", "sua parte, em aberto"], ["q-paga", "sua parte, paga"], ["q-vazio", "sem parcela"]].map(([c, t]) => `<span><span class="q ${c}"></span> ${t}</span>`).join("");
     return `<p class="suave"><a href="#/imoveis">← Imóveis</a></p>
     <div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, "botao secundario")} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, "botao secundario")}</div></div>
     ${faltam ? `<div class="alerta aviso">${faltam} imóvel(is) ainda sem o IPTU de ${ano} (em amarelo).</div>` : ""}
@@ -16665,9 +16683,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <td class="n nw">${opera() ? `<form data-form="iptuPago" data-id="${g.iptu.id}" data-n="${g.parcela.n}" class="pagamento"><input type="date" name="data" value="${hoje3}"><button class="pequeno">Paga</button></form>` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ""}<span>${rotuloMes(m)}</span>`).join("")}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas2 || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
-      ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${reais(soma.sua)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
+      ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
     <div class="legenda-iptu">${legenda}</div>
-    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
+    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto: o cinza é a sua cota única, os verdes são os boletos dele); no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
   }
   function calendarioDoPainel(mes, hoje3) {
     const eventos = eventosDoMes(d(), mes, hoje3);
@@ -17109,7 +17127,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function resumoIptu(p2) {
     const t = totaisIptu(d(), p2);
-    return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · sua parte <b>${reais(t.proprietario)}</b>${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, "perigo")}` : ""}</p>`;
+    return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · ${t.proprietario < 0 ? `sobra <b>${reais(-t.proprietario)}</b> para você (desconto do pagamento à vista)` : `sua parte <b>${reais(t.proprietario)}</b>`}${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, "perigo")}` : ""}</p>`;
   }
   function caixaIptu(i) {
     const iptus = d().iptus.filter((p2) => p2.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
