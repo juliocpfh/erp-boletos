@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-PUK+zGePRA5insHLChQVrIxQ97NcFQV6ezuQKyNL5V4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-VFti39M6AE0g1sql8dAf7rFT+TtbQP1oGV6uSJEfwZ4=' 'sha256-ecU12hvYax40+moDHHJMz3g0bU5dd1zWewonUFePfHk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="2246ca17f6a42517">
+<meta name="fontes" content="1b669e8eb89c0968">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1614,6 +1614,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     documentoFalta: () => documentoFalta,
     documentoParcial: () => documentoParcial,
     documentoPerdido: () => documentoPerdido,
+    documentosPendentes: () => documentosPendentes,
     donoArquivoSeguro: () => donoArquivoSeguro,
     editarDepositoGarantia: () => editarDepositoGarantia,
     ehComplementoCaucao: () => ehComplementoCaucao,
@@ -3122,6 +3123,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (d2.estilos_alertas && d2.estilos_alertas["Documentos de entrada"]) {
       d2.estilos_alertas["Rotina de entrada"] = d2.estilos_alertas["Rotina de entrada"] || d2.estilos_alertas["Documentos de entrada"];
       delete d2.estilos_alertas["Documentos de entrada"];
+    }
+    if (d2.estilos_alertas && d2.estilos_alertas["Correção do aluguel"]) {
+      d2.estilos_alertas["Reajuste do aluguel"] = d2.estilos_alertas["Reajuste do aluguel"] || d2.estilos_alertas["Correção do aluguel"];
+      delete d2.estilos_alertas["Correção do aluguel"];
     }
     for (const i of d2.imoveis) {
       if (i.anuncio_link && !i.anuncio_descricao) i.anuncio_descricao = i.anuncio_link;
@@ -5345,9 +5350,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ].filter((p2) => p2.nome);
   }
   var textoParte = (p2) => `${p2.nome} (${p2.papel})`;
+  function documentosPendentes(d2, c) {
+    if (c.ativo === false || c.data_saida) return [];
+    return DOCUMENTOS_ENTRADA.map(([campo2, nome, feito]) => ({
+      campo: campo2,
+      nome,
+      feito,
+      situacao: documentoFalta(d2, c, campo2) ? "falta" : documentoParcial(d2, c, campo2) ? "parcial" : null
+    })).filter((x) => x.situacao);
+  }
   function alertaDocumentosEntrada(c, d2 = null) {
-    if (c.ativo === false || c.data_saida) return null;
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d2, c, k)).map(([, t]) => t.toLocaleLowerCase("pt-BR"));
+    const falta = documentosPendentes(d2, c).filter((x) => x.situacao === "falta").map((x) => x.nome.toLocaleLowerCase("pt-BR"));
     return falta.length ? { nivel: "aviso", tipo: "Rotina de entrada", texto: `falta ${falta.join(", ")}.`, ancora: "rotina" } : null;
   }
   var anterioresEncerrados = (d2, c, hoje3) => c.contrato_anterior_id ? cadeiaDeContratos(d2, c).antes.filter((a) => !contratoAtivo(a, hoje3)) : [];
@@ -5944,7 +5957,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var TIPOS_ALERTA = [
     "Vigência do contrato",
     "Reajuste do aluguel",
-    "Correção do aluguel",
     "Inadimplência",
     "Seguro obrigatório",
     "IPTU do proprietário",
@@ -5953,6 +5965,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     "Fiador",
     "Aplicação da garantia",
     "Correção da caução",
+    "Devolver garantia",
     "Titularidade",
     "Rotina de entrada",
     "Comprovante a buscar no banco",
@@ -5969,7 +5982,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var ESTILOS_ALERTA_PADRAO = {
     "Vigência do contrato": { cor: "Vermelho", enfase: "Forte", prioridade: 1 },
     "Reajuste do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
-    "Correção do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
     "A verificar": { cor: "Amarelo", enfase: "Normal", prioridade: 3 }
   };
   var estiloAlerta = (d2, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...(d2 && d2.estilos_alertas || {})[tipo] });
@@ -14206,11 +14218,11 @@ Salvar assim mesmo?`)) {
   }
   function faixaDocumentosEntrada(c) {
     if (!contratoAtivo(c)) return "";
-    const falta = DOCUMENTOS_ENTRADA.filter(([k]) => documentoFalta(d(), c, k));
+    const falta = documentosPendentes(d(), c).filter((x) => x.situacao === "falta");
     if (!falta.length) return "";
     const g = geradoresDocumentos(c, "botao pequeno");
-    return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map(([, t]) => t.toLocaleLowerCase("pt-BR")).join(", "))}.
-    <div class="acoes" style="margin-top:6px">${falta.map(([k]) => g[k]).join(" ")} ${link(`#/contrato/${c.id}?ir=documentos`, "Marcar como assinado", "botao secundario pequeno")}</div></div>`;
+    return `<div class="alerta aviso"><b>Rotina de entrada:</b> falta ${esc(falta.map((x) => x.nome.toLocaleLowerCase("pt-BR")).join(", "))}.
+    <div class="acoes" style="margin-top:6px">${falta.map((x) => g[x.campo]).join(" ")} ${link(`#/contrato/${c.id}?ir=documentos`, "Marcar como assinado", "botao secundario pequeno")}</div></div>`;
   }
   var rotinaAberta = (c, hoje3) => contratoAtivo(c, hoje3) && !resumoRotinaEntrada(d(), c, hoje3).concluida && rotinaRecente(c, hoje3);
   function formMarcarDocumento(c, k, feito, comParcial = true) {
@@ -14255,7 +14267,7 @@ Salvar assim mesmo?`)) {
         if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
         if (e.situacao === "andamento") return link(ir2("documentos"), "Anexar o arquivo completo", mini);
         const ver = e.chave === "vistoria_assinada" && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, "Ver vistoria", mini)} ` : "";
-        return `${ver}${formMarcarDocumento(c, e.doc, doc[e.chave], false)}`;
+        return `${ver}${link(ir2("documentos"), `Marcar ${doc[e.chave]}`, mini)}`;
       }
       const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ""))();
       return `<div class="acoes" style="justify-content:flex-end">${atalho}
@@ -16748,9 +16760,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
       if (!c.inquilino_telefone) falta.push("telefone");
       if (!c.inquilino_email) falta.push("e-mail");
-      for (const [k, nome, feito] of DOCUMENTOS_ENTRADA) {
-        if (documentoFalta(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (não ${feito})`, nivel: "perigo", doc: true });
-        else if (documentoParcial(d(), c, k)) falta.push({ texto: `${nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
+      for (const x of documentosPendentes(d(), c)) {
+        falta.push(x.situacao === "falta" ? { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (não ${x.feito})`, nivel: "perigo", doc: true } : { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
       }
       const temDados = falta.some((f) => !f.doc);
       if (falta.length) out.push({
