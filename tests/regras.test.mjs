@@ -677,6 +677,69 @@ test('fechamento do mês, baixa em lote e condições do inquilino anterior', ()
   assert.deepEqual(ev, ['2026-08-01', '2026-08-20', '2026-08-31'], 'NFs de 07/2026 no dia 1º, boletos no dia 20, o que falta no último dia');
 });
 
+test('fechamento: o boleto do complemento da caução não conta como aluguel (gerados nem pagamentos) — rotina C8', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio'); // aluguel de 07/2026, vence 10/08/2026
+  const por = (k, hoje = '2026-08-20') => R.etapasFechamento(d, '2026-08', hoje).find((e) => e.chave === k);
+  // complemento da caução em aberto nas competências 07/2026 e 08/2026 (vence 05/09/2026)
+  R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-07', vencimento: '2026-08-05', aluguel: 0, desconto: 0, outros: 20000, caucao_complemento: 20000, situacao: 'Em aberto' }, 'julio');
+  R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-08', vencimento: '2026-09-05', aluguel: 0, desconto: 0, outros: 20000, caucao_complemento: 20000, situacao: 'Em aberto' }, 'julio');
+  assert.equal(por('boletos').pendentes, 1, 'o complemento de 08/2026 não vale como boleto do aluguel de 08/2026');
+  assert.equal(por('pagamentos').pendentes, 1, 'só o aluguel de 07/2026 em aberto; o complemento não entra');
+  R.baixarEmLote(d, [d.cobrancas.find((x) => x.competencia === '2026-07' && !R.ehComplementoCaucao(x)).id], '2026-08-10', 'julio');
+  assert.deepEqual([por('pagamentos').feito, por('pagamentos').detalhe], [true, 'todos pagos'], 'complemento em aberto não segura a etapa');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  assert.deepEqual([por('boletos').feito, por('boletos').detalhe], [true, '1 boleto(s) gerado(s)'], 'o complemento não entra na contagem');
+});
+
+test('fechamento: etapas atrasadas dos meses anteriores no Painel, desde a criação do banco — rotina C6', () => {
+  const { d, c } = base();
+  d.criado_em = '2026-07-15T12:00:00.000Z';
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  // em 07/11/2026: aluguéis de 07, 08 e 09/2026 em aberto (pagamentos de 08, 09 e 10/2026), boletos de 10/2026 não gerados, contas de 07 e 08/2026 não marcadas
+  const at = R.etapasAtrasadas(d, '2026-11', '2026-11-07');
+  assert.deepEqual(at.map((e) => `${e.mes} ${e.chave}`), ['2026-07 contas', '2026-08 pagamentos', '2026-08 contas', '2026-09 pagamentos', '2026-10 boletos', '2026-10 pagamentos'],
+    'do mais antigo ao mais novo; 06/2026 (antes da criação do banco) não entra');
+  assert.ok(at.every((e) => e.titulo && e.link && !e.prevista));
+  for (const m of ['2026-07', '2026-08']) R.marcarEtapaFechamento(d, m, 'contas', true, 'julio');
+  R.baixarEmLote(d, d.cobrancas.map((x) => x.id), '2026-10-10', 'julio');
+  R.gerarCobrancas(d, '2026-10', 'julio');
+  assert.deepEqual(R.etapasAtrasadas(d, '2026-11', '2026-11-07').map((e) => `${e.mes} ${e.chave}`), ['2026-10 nfs'], 'pagos em 10/10/2026: só falta numerar as NFs de 10/2026 (depois da virada)');
+  R.marcarEtapaFechamento(d, '2026-10', 'nfs', true, 'julio');
+  assert.deepEqual(R.etapasAtrasadas(d, '2026-11', '2026-11-07'), [], 'tudo resolvido: nada atrasado');
+  // limite de 12 meses para trás, mesmo com o banco criado antes
+  d.criado_em = '2024-01-01T00:00:00.000Z';
+  c.data_entrada = '2024-06-07'; c.vigencia_inicio = '2024-06-07';
+  const meses = [...new Set(R.etapasAtrasadas(d, '2026-11', '2026-11-07').map((e) => e.mes))];
+  assert.equal(meses[0], '2025-11', 'começa 12 meses antes de 11/2026');
+  assert.equal(meses.at(-1), '2026-06');
+});
+
+test('fechamento: no mês corrente a etapa "Banco" aceita o extrato buscado nos últimos dias — rotina C5', () => {
+  const { d } = base();
+  const ank = d.emitentes[0];
+  d.config_banco = { ...R.CONFIG_BANCO_PADRAO, ativo: true, provedor: 'c6', conta_padrao_id: 'ank', contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id, ambiente: 'sandbox' }] };
+  R.normalizar(d);
+  const banco = (hoje, mes = '2026-11') => R.etapasFechamento(d, mes, hoje).find((e) => e.chave === 'banco');
+  assert.equal(R.DIAS_EXTRATO_RECENTE, 7);
+  assert.deepEqual([banco('2026-11-07').pendentes, banco('2026-11-07').feito], [1, false]);
+  assert.match(banco('2026-11-07').detalhe, /^ANK: extrato ainda não buscado \(no mês corrente, a etapa fica feita com o extrato buscado nos últimos 7 dias/);
+  d.config_banco.ultima_importacao.ank = '2026-10-30';
+  assert.equal(banco('2026-11-07').feito, false, 'buscado há 8 dias: ainda pendente');
+  assert.match(banco('2026-11-07').detalhe, /ANK: extrato buscado em 30\/10\/2026, há mais de 7 dias: busque de novo/);
+  d.config_banco.ultima_importacao.ank = '2026-11-01';
+  assert.deepEqual([banco('2026-11-07').feito, banco('2026-11-08').feito, banco('2026-11-09').feito], [true, true, false], 'buscado em 01/11: vale até 08/11');
+  assert.match(banco('2026-11-07').detalhe, /ANK: tudo com destino/);
+  // mês já fechado: o extrato precisa chegar ao fim do mês
+  assert.equal(banco('2026-12-02').feito, false);
+  assert.match(banco('2026-12-02').detalhe, /ANK: extrato buscado só até 01\/11\/2026, falta até o fim do mês$/);
+  d.config_banco.ultima_importacao.ank = '2026-11-30';
+  assert.equal(banco('2026-12-02').feito, true);
+  assert.equal(R.pendenciasBancoDoMes(d, '2026-11', '2026-12-02').mesFechado, true);
+});
+
 test('reserva: começa no aluguel marcado, nunca pula para um mês depois, e muda de mês ao recalcular', () => {
   const novo = (comp) => {
     const d = R.bancoVazio();

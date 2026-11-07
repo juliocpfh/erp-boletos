@@ -45,10 +45,10 @@ Análise feita um dia depois de a nuvem entrar no ar. Cada item traz a evidênci
 - [ ] **C4.** "Cancelar"/"Descartar" dizem "Nada foi enviado ao banco", mas os códigos já foram ao C6 para leitura (`banco.js:318`, `:399`). Chamar `removerItensDoGrupo` ou corrigir o texto.
 
 **Fechamento e Painel** (`regras.js` ~4130-4200, 4810-4835; `telas.js`)
-- [ ] **C5.** Etapa "Banco" nunca fica feita no mês corrente (extrato precisa chegar até hoje). Cobrar "buscado há mais de X dias".
-- [ ] **C6.** Ao virar o mês, só a etapa das NFs do mês anterior fica no Painel (`telas.js:206`). Trazer todas as pendentes.
+- [x] **C5.** Etapa "Banco" nunca fica feita no mês corrente (extrato precisa chegar até hoje). Cobrar "buscado há mais de X dias". Feito em 2026-11-07 (branch claude/rotina-c5-c6-c8): `pendenciasBancoDoMes` (`regras.js`) devolve `mesFechado`; no mês corrente o extrato vale se buscado há até `DIAS_EXTRATO_RECENTE` (7) dias (ex.: em 07/11 vale o buscado em 01/11; o de 30/10 pede busca nova); mês fechado continua exigindo até o fim do mês; o detalhe da etapa explica. Teste em `tests/regras.test.mjs`.
+- [x] **C6.** Ao virar o mês, só a etapa das NFs do mês anterior fica no Painel (`telas.js:206`). Trazer todas as pendentes. Feito em 2026-11-07 (branch claude/rotina-c5-c6-c8): `etapasAtrasadas(d, mesAtual, hoje)` (`regras.js`) junta as etapas não feitas de todos os meses anteriores desde o mês de criação do banco de dados (`criado_em`), no máximo `MESES_FECHAMENTO_ATRASADO` (12); o Painel mostra cada uma com "(de 09/2026)" e "Abrir o fechamento do mês" abre o mês mais antigo pendente. Teste em `tests/regras.test.mjs`.
 - [ ] **C7.** `manual: true` que ninguém lê; `semComprovante`/`pagamentosPendentes` calculados e sem uso. Decidir ou apagar.
-- [ ] **C8.** Fechamento conta o boleto do complemento da caução como aluguel (`gerados`/`doMes` só filtram pelo mês; `boletoDoMes` exclui). Excluir `ehComplementoCaucao`.
+- [x] **C8.** Fechamento conta o boleto do complemento da caução como aluguel (`gerados`/`doMes` só filtram pelo mês; `boletoDoMes` exclui). Excluir `ehComplementoCaucao`. Feito em 2026-11-07 (branch claude/rotina-c5-c6-c8): `gerados` e `doMes` em `etapasFechamento` pulam `ehComplementoCaucao`; o complemento em aberto não segura a etapa "Conferir os pagamentos" nem conta como boleto gerado. Teste em `tests/regras.test.mjs`.
 
 **Dados ao abrir / Desfazer**
 - [ ] **C9.** `normalizar` aplica regras de negócio sem histórico: desativar quem saiu (`desativarSeSaiu` sem usuário), recalcular "possui aditivo", completar caução por depósitos (`regras.js` ~162-166). Na nuvem vira mudança enviada por quem abrir. Passar para rotina com usuário e histórico (manter as migrações).
