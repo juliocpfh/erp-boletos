@@ -169,7 +169,7 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
           ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}</td>
         <td class="n">${reais(t.a_pagar_pontual)}</td>
         <td class="n suave">${reais(t.a_pagar_sem_desconto)}<br>${R.ehComplementoCaucao(cb) ? 'sem multa e juros' : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
-        <td>${situacaoBoleto(cb, hoje)}${!cb.data_pagamento && cb.situacao !== 'Carência' && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}` : ''}</td>
+        <td>${situacaoBoleto(cb, hoje)}${!cb.data_pagamento && cb.situacao !== 'Carência' && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', cb.vencimento < hoje ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}
@@ -267,7 +267,8 @@ export function telaCobranca(cb) {
         ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : R.ehComplementoCaucao(cb) ? ` (${sim.dias_atraso} dias de atraso, sem multa e juros)` : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${R.ehComplementoCaucao(cb) ? ' · sem NF (complemento da caução)' : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
-        ${opera() && cb.situacao !== 'Carência' ? formPagamento(cb, false) : ''}`}</div>
+        ${opera() && cb.situacao !== 'Carência' ? formPagamento(cb, false) : ''}
+        ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', cb.vencimento < C.hojeIso() ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
     ${caixaBancoC6(cb)}
     ${caixaBoleto(cb)}
     <div class="cartao rolagem"><h2>NFs</h2><table class="responsiva"><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>

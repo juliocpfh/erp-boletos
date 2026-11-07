@@ -418,7 +418,7 @@ function caixaBoletosInquilino(c, cobs, hoje) {
     const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : '';
     return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('caução', 'info')}` : ''}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td>
-      <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}</td>
+      <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}${!x.data_pagamento && x.situacao !== 'Carência' && opera() ? ` ${botao('lembrete', x.vencimento < hoje ? 'Cobrar' : 'Lembrete', { id: x.id }, 'secundario mini')}` : ''}</td>
       <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
   };
   const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';

@@ -2269,3 +2269,23 @@ test('D1: busca global acha imóvel, inquilino (nome, CPF, fiador), NF pelo núm
   assert.deepEqual(tipos('770'), []);
   assert.deepEqual(tipos('   '), []);
 });
+
+test('D3: texto do lembrete muda com a fase do boleto e traz Pix quando emitido no banco', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const cb = d.cobrancas[0]; // vence 10/08/2026
+  const antes = R.textoLembrete(d, cb, '2026-08-01');
+  assert.equal(antes.fase, 'antes');
+  assert.match(antes.texto, new RegExp(`vence em 10/08/2026, no valor de ${C.reais(R.totais(cb).a_pagar_pontual).replace(/[$.]/g, '\\$&')}`));
+  assert.match(antes.texto, /ANK Administradora$/);
+  assert.equal(antes.email, '');
+  assert.equal(antes.telefone, '41900000000');
+  assert.equal(R.textoLembrete(d, cb, '2026-08-10').fase, 'dia');
+  const tarde = R.textoLembrete(d, cb, '2026-08-20');
+  assert.equal(tarde.fase, 'atrasado');
+  assert.match(tarde.texto, /10 dia\(s\) de atraso/);
+  assert.ok(tarde.texto.includes(`hoje (20/08/2026): ${C.reais(C.liquidar(cb, '2026-08-20').valor_devido)}`));
+  assert.doesNotMatch(tarde.texto, /Pix copia e cola/);
+  cb.banco = { pix_copia_cola: '00020126pixteste', linha_digitavel: '33690.00001 11111.111111 22222.222222 1 00000000012345' };
+  assert.match(R.textoLembrete(d, cb, '2026-08-01').texto, /Pix copia e cola:\n00020126pixteste/);
+});

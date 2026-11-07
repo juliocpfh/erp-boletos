@@ -5041,3 +5041,43 @@ export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
   }
   return grupos;
 }
+
+// --------------------------------------------------------------------------
+// Lembrete ao inquilino (D3): texto pronto para e-mail (canal oficial) ou WhatsApp, conforme a fase do boleto
+// --------------------------------------------------------------------------
+/** Assinatura dos lembretes (decisão do dono, DECISOES.md). */
+export const ASSINATURA_LEMBRETE = 'ANK Administradora';
+
+/**
+ * Texto do lembrete de um boleto em aberto. Fase: ``antes`` (vence depois de hoje), ``dia`` (vence hoje) ou ``atrasado``
+ * (valor de hoje com multa e juros). Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
+ * Ex.: boleto de 10/2026 (R$ 1.218,50 em dia) vencendo em 10/11; em 07/11 → "vence em 10/11/2026 … R$ 1.218,50".
+ */
+export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+  const t = totais(cb);
+  const fase = cb.vencimento > hoje ? 'antes' : cb.vencimento === hoje ? 'dia' : 'atrasado';
+  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
+  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução' : `do aluguel de ${C.compBr(cb.competencia)}`;
+  const onde = i ? ` (${i.nome})` : '';
+  const linhas = [`Olá, ${nome}!`, ''];
+  if (fase === 'antes') {
+    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
+    if (!ehComplementoCaucao(cb)) linhas.push(`Após o vencimento: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+  } else if (fase === 'dia') {
+    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence hoje, ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
+    if (!ehComplementoCaucao(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+  } else {
+    const r = C.liquidar(cb, hoje);
+    linhas.push(`O boleto ${oQue}${onde}, com vencimento em ${C.dataBr(cb.vencimento)}, consta em aberto (${r.dias_atraso} dia(s) de atraso).`);
+    linhas.push(ehComplementoCaucao(cb) ? `Valor: ${C.reais(r.valor_devido)}.` : `Valor para pagamento hoje (${C.dataBr(hoje)}): ${C.reais(r.valor_devido)} (${C.reais(t.a_pagar_sem_desconto)} + multa ${C.reais(r.multa)} + juros ${C.reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
+    linhas.push('Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
+  }
+  const b = cb.banco || null;
+  if (b && b.pix_copia_cola) linhas.push('', 'Pix copia e cola:', b.pix_copia_cola);
+  if (b && b.linha_digitavel) linhas.push('', `Linha digitável do boleto: ${b.linha_digitavel}`);
+  linhas.push('', 'Qualquer dúvida, estamos à disposição.', '', ASSINATURA_LEMBRETE);
+  const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
+  return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
+}

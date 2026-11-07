@@ -945,6 +945,46 @@ export const ACOES = {
     await mostrar();
   },
 
+  /**
+   * Lembrete ao inquilino (D3): janela com o texto pronto (editável) e os botões de e-mail (canal oficial), WhatsApp e copiar.
+   * O texto muda com a fase do boleto (antes do vencimento, no dia, atrasado) e traz o Pix quando o boleto saiu pelo banco.
+   */
+  async lembrete({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    const l = R.textoLembrete(d(), cb, C.hojeIso());
+    const c = buscar('contratos', cb.contrato_id);
+    const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
+    const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
+    await janela({ titulo: `${titulo} · ${esc(c.inquilino_nome)}`, sim: 'Fechar', nao: '',
+      html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
+        <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
+        <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
+        <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : ' (sem e-mail no cadastro)'}</a>
+          <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? '' : ' (sem telefone)'}</a>
+          <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
+      ligar(dlg) {
+        dlg.querySelector('[data-nao]').hidden = true;
+        const assunto = dlg.querySelector('[name=assunto]');
+        const texto = dlg.querySelector('[name=texto]');
+        const email = dlg.querySelector('[data-enviar=email]');
+        const zap = dlg.querySelector('[data-enviar=whatsapp]');
+        const atualizar = () => {
+          email.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(assunto.value)}&body=${encodeURIComponent(texto.value)}`;
+          zap.href = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto.value)}` : '#';
+        };
+        assunto.addEventListener('input', atualizar);
+        texto.addEventListener('input', atualizar);
+        atualizar();
+        if (!tel) zap.addEventListener('click', (ev) => { ev.preventDefault(); aviso('Este inquilino não tem telefone no cadastro.', 'aviso'); });
+        dlg.querySelector('[data-copiar-lembrete]').addEventListener('click', async (ev) => {
+          await navigator.clipboard.writeText(texto.value);
+          ev.target.textContent = 'Copiado ✓';
+          setTimeout(() => { ev.target.textContent = 'Copiar texto'; }, 1500);
+        });
+      } });
+  },
+
   /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
   async pagarBoleto({ id }) {
     const cb = buscar('cobrancas', id);

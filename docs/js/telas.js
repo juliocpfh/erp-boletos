@@ -211,7 +211,7 @@ export const TELAS = {
     const porTipo = {};
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
-    return `<h1>Painel</h1>
+    return `<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Registrar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/inquilinos')}
