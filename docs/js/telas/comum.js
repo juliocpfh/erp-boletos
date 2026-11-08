@@ -685,11 +685,17 @@ export async function listaArquivos(escopo, id, modo = '') {
   let dir;
   try { dir = await pastaDoEscopo(escopo, id, false); } catch { dir = null; } // pasta ainda não existe: nada anexado
   const todos = dir ? await S.listar(dir) : [];
-  // matrícula na lista de imóveis (embaixo do endereço): 📎1, 📎2… com o nome no "title" e o "×" para excluir
-  // guias do IPTU na página IPTU (ao lado do nome do imóvel): igual, com todos os arquivos da pasta do ano
+  // matrícula na lista de imóveis (embaixo do nome) e guias do IPTU na página IPTU (ao lado do nome do imóvel): clipes
+  // 📎1, 📎2… (nome no "title") que quebram linha, sem "×" ao lado (o dedo errava). Para apagar, "✎ Editar": os clipes viram
+  // 🗑1, 🗑2… vermelhos e o toque apaga (com a pergunta); "Pronto" volta. A troca é só no navegador (caixinha + CSS :has).
   if (escopo === 'matricula' || modo === 'clipe') {
     const tipo = escopo === 'matricula' ? 'da matrícula' : 'da guia';
-    return todos.filter((a) => escopo !== 'matricula' || ehMatricula(a.nome)).map((a, n) => `<span class="nw clipe-item"><a href="#" class="clipe-abrir" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="Abrir ${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir x-pequeno', `Excluir o arquivo ${tipo} "${a.nome}"?`) : ''}</span>`).join(' ');
+    const lista = todos.filter((a) => escopo !== 'matricula' || ehMatricula(a.nome));
+    if (!lista.length) return '';
+    const clipes = lista.map((a, n) => `<a href="#" class="clipe-abrir" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="Abrir ${esc(a.nome)}">📎${n + 1}</a>${opera()
+      ? botao('excluirArquivo', `🗑${n + 1}`, { escopo, id, nome: a.nome }, 'clipe-apagar', `Excluir o arquivo ${tipo} "${a.nome}"?`) : ''}`).join('');
+    const editar = opera() ? '<label class="clipe-editar" title="Apagar algum arquivo"><input type="checkbox"><span class="ed-nao">✎ Editar</span><span class="ed-sim">✓ Pronto</span></label>' : '';
+    return `<span class="clipes">${clipes}${editar}</span>`;
   }
   const itens = todos;
   if (!itens.length && escopo !== 'contrato') return `<p class="suave">${escopo === 'anuncio' ? 'Nenhuma foto ainda.' : 'Nenhum arquivo ainda.'}</p>`;
@@ -709,7 +715,7 @@ export async function listaArquivos(escopo, id, modo = '') {
     // arquivo de lançamento: o aviso de onde apagar fica embaixo do nome (curto), para a coluna dos botões não roubar a largura do nome
     return `<tr><td class="nome-arquivo"><a href="#" data-acao="abrirArquivo" data-escopo="${esc2}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${dono ? ` ${etiqueta(`🔗 ${dono}`, 'info')}` : ''}${opera() && escopo !== 'imovel' && esc2 !== 'seguro' && dono ? '<br><span class="suave mini" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">para apagar, use o × do lançamento</span>' : ''}</td>
     <td class="n suave nw">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
-    <td class="n nw">${botao('baixarArquivo', 'Baixar', { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === 'imovel' ? '' : esc2 === 'seguro' ? acaoArquivoSeguro(id, a.nome)
+    <td class="n nw">${!opera() || escopo === 'imovel' ? '' : esc2 === 'seguro' ? acaoArquivoSeguro(id, a.nome)
     : dono ? '' : botao('excluirArquivo', '×', { escopo: esc2, id, nome: a.nome }, 'x-excluir', 'Excluir este arquivo?')}</td></tr>`; }).join('')}</table>`;
   let html = itens.length ? linhas(escopo, itens) : '<p class="suave">Nenhum arquivo ainda.</p>';
   // pasta do inquilino: também os documentos assinados e os aditivos, correções e comunicação (subpastas)
