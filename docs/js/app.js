@@ -592,6 +592,26 @@ function layout(conteudo, rota) {
 let paginaDesenhada = null;
 /** Últimas listas de anexos mostradas (chave = data-arquivos), para a tela já abrir com elas. Fotos do anúncio ficam de fora (endereços temporários). */
 const anexosVistos = new Map();
+// clipes da matrícula e das guias do IPTU (listas curtas): guardados neste aparelho, para Imóveis e IPTU's já abrirem com eles
+// mesmo logo depois de abrir o sistema (a conferência com a pasta ou a nuvem vem por trás e troca se mudou)
+const CLIPES_GUARDADOS = 'clipes-vistos';
+const ehClipe = (chave) => chave.startsWith('matricula:') || chave.endsWith(':clipe');
+let clipesCarregados = null;
+function carregarClipes() {
+  const quem = E.usuario?.login || '';
+  if (clipesCarregados === quem) return;
+  clipesCarregados = quem;
+  try {
+    const salvo = JSON.parse(localStorage.getItem(CLIPES_GUARDADOS) || 'null');
+    if (salvo?.quem === quem) for (const [k, v] of Object.entries(salvo.listas || {})) if (ehClipe(k) && !anexosVistos.has(k)) anexosVistos.set(k, v);
+  } catch { /* navegador sem localStorage: abre como antes */ }
+}
+function guardarClipes() {
+  try {
+    const listas = Object.fromEntries([...anexosVistos].filter(([k]) => ehClipe(k)));
+    localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
+  } catch { /* sem espaço ou bloqueado: só não guarda */ }
+}
 export async function mostrar(estadoForm = null) {
   const app = document.getElementById('app');
   const rota = rotaAtual();
@@ -621,6 +641,7 @@ export async function mostrar(estadoForm = null) {
     if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
     app.innerHTML = html;
     // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
+    if (E.usuario) carregarClipes();
     for (const el of app.querySelectorAll('[data-arquivos]')) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
     if (mesma) window.scrollTo(0, rolagem);
     paginaDesenhada = endereco;
@@ -655,7 +676,7 @@ async function montarExtras(raiz) {
   // primeiro arruma as tabelas (cartões no celular) com o que já está na tela: não espera os anexos
   arrumarTabelas(raiz);
   // todas as listas de anexos ao mesmo tempo (na nuvem, uma de cada vez deixava a tela aparecendo aos poucos)
-  let mudou = false;
+  let mudou = false; let clipesMudaram = false;
   const listas = [...raiz.querySelectorAll('[data-arquivos]')];
   // nuvem, tela com muitas listas (Imóveis, IPTU's): a árvore inteira dos anexos numa ida só, em vez de várias por imóvel
   if (E.nuvem && E.anexos?.carregarSeVelho && listas.filter((el) => !el.dataset.arquivos.startsWith('anuncio')).length >= 6) {
@@ -665,9 +686,10 @@ async function montarExtras(raiz) {
     const chave = el.dataset.arquivos;
     const [escopo, id, modo] = chave.split(':');
     const html = await TELAS._listaArquivos(escopo, Number(id), modo);
-    if (escopo !== 'anuncio') anexosVistos.set(chave, html);
+    if (escopo !== 'anuncio') { if (ehClipe(chave) && anexosVistos.get(chave) !== html) clipesMudaram = true; anexosVistos.set(chave, html); }
     if (el.isConnected && el.innerHTML !== html) { el.innerHTML = html; mudou = true; }
   }));
+  if (clipesMudaram) guardarClipes();
   TELAS._ligarDesconto(raiz);
   if (mudou) arrumarTabelas(raiz); // a lista de anexos dentro de uma tabela pode ter deixado ela larga
 }

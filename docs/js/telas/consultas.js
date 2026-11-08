@@ -74,9 +74,11 @@ export function telaInquilinos(q) {
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : `${etiqueta('Sem imóvel', 'aviso')}${podeUsuario('admin') ? ` ${botao('excluir', '×', { tabela: 'contratos', id: x.c.id }, 'x-excluir', `Apagar o contrato sem imóvel de ${x.c.inquilino_nome}? (Para alugar um imóvel, faça um novo contrato.)`)}` : ''}`);
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta(R.fimDeVinculo(d(), c) ? 'Fim do vínculo' : 'Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
   // ao lado do envelope (registrar solicitação), o botão que abre o contrato assinado; sem o arquivo, fica apagado
-  const botaoContrato = (c) => (c.doc_contrato_arquivo
-    ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(c.doc_contrato_arquivo)}" title="Abrir o contrato assinado de ${esc(c.inquilino_nome)}">📄 Contrato</a>`
-    : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`);
+  // troca de titular: o contrato assinado é o do titular anterior (documentoEntrada procura na cadeia)
+  const botaoContrato = (c) => { const doc = R.documentoEntrada(d(), c, 'doc_contrato_em');
+    return doc && doc.arquivo
+      ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">📄 Contrato</a>`
+      : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`; };
   const registrar = (c) => `<td class="centro nw">${opera() ? `<a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a> ` : ''}${botaoContrato(c)}</td>`;
   // ao lado do imóvel, o botão que abre o arquivo da matrícula
   const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');

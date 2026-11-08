@@ -1666,10 +1666,6 @@ export const ACOES = {
     location.reload();
   },
 
-  async baixarArquivo({ escopo, id, nome }) {
-    baixar(await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
-  },
-
   // ------------------------------------------------------------------------
   // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
   // ------------------------------------------------------------------------
