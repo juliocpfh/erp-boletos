@@ -24,6 +24,8 @@ export class AnexosNuvem {
     this.listas = new Map(); // caminho → { em, pastas: Set, arquivos: Map(nome → tamanho) }
     this.buscando = new Map(); // caminho → pedido em andamento (várias caixas da tela pedindo a mesma pasta: um pedido só)
     this.criadas = new Set(); // pastas criadas vazias (o R2 não tem pasta sem arquivo)
+    this.tudo = null; // { raiz, em }: a árvore inteira veio de uma vez (carregarTudo); pasta fora dela = vazia, sem pedir à nuvem
+    this.carregandoTudo = null;
     this.fila = null; this.naoEnviados = []; this.avisos = []; this.enviando = null;
   }
 
@@ -79,6 +81,8 @@ export class AnexosNuvem {
     const chave = partes.join('/');
     const fila = await this.carregarFila();
     let l = this.listas.get(chave);
+    // a árvore inteira chegou há pouco e esta pasta não estava nela: não tem arquivo (pasta vazia ou que nem existe)
+    if (!l && !fresca && this.tudoFresco(chave)) { l = { em: this.tudo.em, pastas: new Set(), arquivos: new Map() }; this.listas.set(chave, l); }
     if (!l || fresca || Date.now() - l.em > VALIDADE_LISTA) {
       try {
         let pedido = this.buscando.get(chave);
@@ -139,17 +143,36 @@ export class AnexosNuvem {
     }
     const em = Date.now();
     for (const [chave, l] of arvore) this.listas.set(chave, { em, pastas: l.pastas, arquivos: l.arquivos });
+    this.tudo = { raiz, em };
     return total;
+  }
+
+  /** A árvore de ``raiz`` (ou acima dela) veio por inteiro há menos de VALIDADE_LISTA? */
+  tudoFresco(chave) {
+    return !!this.tudo && Date.now() - this.tudo.em <= VALIDADE_LISTA && (chave === this.tudo.raiz || chave.startsWith(`${this.tudo.raiz}/`));
+  }
+
+  /**
+   * Telas com muitas listas de anexos (ex.: Imóveis, uma matrícula por imóvel; IPTU's, as guias de cada um): carrega a árvore
+   * inteira numa ida (como a conferência do Painel) em vez de duas ou três idas por imóvel. Só se a última tiver passado da validade;
+   * várias caixas pedindo ao mesmo tempo esperam o mesmo pedido.
+   */
+  async carregarSeVelho(partes) {
+    if (this.tudoFresco(partes.join('/'))) return 0;
+    if (!this.carregandoTudo) this.carregandoTudo = this.carregarTudo(partes).finally(() => { this.carregandoTudo = null; });
+    return this.carregandoTudo;
   }
 
   /** A lista dessas pastas precisa ser buscada de novo (mas fica guardada para quando estiver sem internet). */
   esquecerLista(partes) {
     for (let i = partes.length; i >= 1; i -= 1) { const l = this.listas.get(partes.slice(0, i).join('/')); if (l) l.em = 0; }
+    this.tudo = null; // a árvore inteira deixou de valer (algo mudou neste aparelho)
   }
 
   /** Acrescenta à lista guardada o arquivo que acabou de subir (para aparecer mesmo se a internet cair logo depois). */
   anotarNaLista(partes, tamanho) {
     const chave = partes.slice(0, -1).join('/');
+    this.tudo = null; // pasta que ganhou arquivo não pode mais sair "vazia" da árvore antiga
     const l = this.listas.get(chave);
     if (!l) return;
     l.arquivos.set(partes.at(-1), tamanho); l.em = 0;

@@ -959,10 +959,10 @@ export const ACOES = {
     await mostrar();
   },
 
-  /** Painel: adia um alerta por 7 dias ("adiado") ou 30 ("cuidando", com quem marcou). Some do Painel e da página do inquilino até a data. */
+  /** Painel: adia um alerta por 7 dias ("adiado") ou só hoje ("cuidando", com quem marcou; volta amanhã). Some do Painel e da página do inquilino até a data. */
   async adiarAlerta({ chave, modo, tipo }) {
     const r = await alterar((db) => R.adiarAlerta(db, chave, modo, login(), { tipo, quem: E.usuario.nome }));
-    aviso(modo === 'cuidando' ? `Anotado: ${E.usuario.nome} está cuidando. O alerta volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.` : `Alerta adiado: volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.`);
+    aviso(modo === 'cuidando' ? `Anotado: ${E.usuario.nome} está cuidando. O alerta volta amanhã (${dataBr(C.somarDias(r.ate, 1))}) se ainda estiver pendente.` : `Alerta adiado: volta em ${dataBr(C.somarDias(r.ate, 1))} se ainda estiver pendente.`);
     await mostrar();
   },
 
@@ -1639,6 +1639,24 @@ export const ACOES = {
     if (!tipo) return baixar(arq, nome);
     if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar); // celular: mostra na tela em vez de baixar
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
+  },
+
+  /**
+   * Página Inquilinos: botão "Matrícula" ao lado do imóvel. Abre o arquivo da matrícula (pasta "Matrículas" do imóvel);
+   * com mais de um, pergunta qual. Sem arquivo, explica onde anexar (lista de Imóveis, coluna Matrícula).
+   */
+  async abrirMatricula({ imovel }) {
+    const i = buscar('imoveis', Number(imovel));
+    let lista = [];
+    try { lista = (await S.listar(await pastaDoEscopo('matricula', i.id, false))).filter((a) => ehMatricula(a.nome)); } catch { lista = []; }
+    if (!lista.length) throw new C.ErroUsuario(`${i.nome}: nenhum arquivo da matrícula anexado. Anexe na lista de Imóveis (📎 Anexar, embaixo do nome).`);
+    let nome = lista[0].nome;
+    if (lista.length > 1) {
+      const r = await janela({ titulo: `Matrícula · ${i.nome}`, sim: 'Abrir', html: `<p>Qual arquivo?</p>${lista.map((a, n) => `<label style="display:block;margin:6px 0"><input type="radio" name="nome" value="${esc(a.nome)}"${n ? '' : ' checked'}> ${esc(a.nome)}</label>`).join('')}` });
+      if (!r || !r.nome) return;
+      [nome] = r.nome;
+    }
+    return ACOES.abrirArquivo({ escopo: 'matricula', id: i.id, nome });
   },
 
   /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */

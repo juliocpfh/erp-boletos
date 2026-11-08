@@ -3,6 +3,13 @@
 Análise feita um dia depois de a nuvem entrar no ar. Cada item traz a evidência (arquivo:linha na data da análise; confira com
 `node tools/mapa.mjs <trecho>` antes de mexer) e o que fazer. Marque `[x]` ao concluir e anote a PR.
 
+## Próximos passos do dono (fora do sistema)
+1. **Cloudflare:** acrescentar `Content-Security-Policy: frame-ancestors 'none'` na Transform Rule "Cabecalhos de seguranca do sistema" (passo a passo em `SEGURANCA.md` 5b; item B10).
+2. **Cloudflare:** ligar os testes antes de publicar o Worker (Build command em `nuvem/README.md`, "Testes antes de publicar").
+3. **PC:** instalar o atualizador da versão PC: chave de serviço do Access + política "Atualizador" + secret `SERVICOS`, depois `.env` e `instalar-tarefa.cmd` (passo a passo em `atualizador-pc/README.md`).
+4. **E2 (OneDrive):** decidir por volta de 21/11/2026 se a pasta do OneDrive deixa de ser a reserva.
+- Feito: teste do celular sem internet (07/11/2026).
+
 ## Como usar esta rotina
 - Uma PR por item (ou por grupo pequeno do mesmo assunto). Antes de cada item: `node tools/checar.mjs`; teste no navegador em `?teste` e, para a nuvem, `node nuvem/local.mjs`.
 - Ordem: bloco A inteiro primeiro (risco real, correções pequenas); depois B; C e D conforme o tempo. E são decisões do dono.
