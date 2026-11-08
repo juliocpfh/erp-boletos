@@ -258,6 +258,7 @@ function aoMudarNuvem(externo) {
   if (!externo) return;
   espelharSeguro(); // o que os outros aparelhos mudaram também entra na cópia segura deste computador
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
+  if (E.anexos) E.anexos.tudo = null;
   if (!E.usuario) return mostrar();
   const editando = document.querySelector('main form[data-form]');
   if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
@@ -655,7 +656,12 @@ async function montarExtras(raiz) {
   arrumarTabelas(raiz);
   // todas as listas de anexos ao mesmo tempo (na nuvem, uma de cada vez deixava a tela aparecendo aos poucos)
   let mudou = false;
-  await Promise.all([...raiz.querySelectorAll('[data-arquivos]')].map(async (el) => {
+  const listas = [...raiz.querySelectorAll('[data-arquivos]')];
+  // nuvem, tela com muitas listas (Imóveis, IPTU's): a árvore inteira dos anexos numa ida só, em vez de várias por imóvel
+  if (E.nuvem && E.anexos?.carregarSeVelho && listas.filter((el) => !el.dataset.arquivos.startsWith('anuncio')).length >= 6) {
+    await E.anexos.carregarSeVelho([S.PASTA_ARQUIVOS]).catch(() => {});
+  }
+  await Promise.all(listas.map(async (el) => {
     const chave = el.dataset.arquivos;
     const [escopo, id, modo] = chave.split(':');
     const html = await TELAS._listaArquivos(escopo, Number(id), modo);

@@ -173,6 +173,26 @@ test('carregarTudo: as listas de todas as pastas vêm numa ida só; depois, abri
   assert.equal(await cliente.carregarTudo([S.PASTA_ARQUIVOS]), 0);
 });
 
+test('carregarSeVelho: tela com muitas listas (Imóveis) busca a árvore uma vez; pasta vazia não vai à nuvem; gravar invalida', async () => {
+  const { raiz, cliente } = montar();
+  const arquivos = await raiz.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+  await S.salvarArquivo(await S.subpasta(arquivos, ['Sala 2', 'Matrículas']), arquivo('matricula.pdf', 'x'));
+  await S.subpasta(arquivos, ['Loja 1']); // pasta sem arquivo (o R2 não guarda pasta vazia)
+  cliente.listas.clear(); cliente.criadas.clear(); cliente.tudo = null;
+  const buscarAntes = cliente.buscar; const idas = [];
+  cliente.buscar = (url, op) => { idas.push(String(url).replace(BASE, '')); return buscarAntes(url, op); };
+  await Promise.all([cliente.carregarSeVelho([S.PASTA_ARQUIVOS]), cliente.carregarSeVelho([S.PASTA_ARQUIVOS])]);
+  await cliente.carregarSeVelho([S.PASTA_ARQUIVOS]); // ainda vale: não busca de novo
+  assert.deepEqual(idas, ['lista-tudo/arquivos/']);
+  assert.deepEqual((await S.listar(await S.subpasta(arquivos, ['Sala 2', 'Matrículas'], false))).map((a) => a.nome), ['matricula.pdf']);
+  assert.deepEqual((await cliente.lista([S.PASTA_ARQUIVOS, 'Loja 1', 'Matrículas'])).arquivos.size, 0);
+  assert.deepEqual(idas, ['lista-tudo/arquivos/'], 'pastas fora da árvore: vazias, sem ir à nuvem');
+  // anexo novo neste aparelho: a árvore deixa de valer e a pasta aparece com o arquivo
+  await S.salvarArquivo(await S.subpasta(arquivos, ['Loja 1', 'Matrículas']), arquivo('matricula-loja.pdf', 'y'));
+  assert.equal(cliente.tudo, null);
+  assert.deepEqual((await S.listar(await S.subpasta(arquivos, ['Loja 1', 'Matrículas'], false))).map((a) => a.nome), ['matricula-loja.pdf']);
+});
+
 test('várias caixas pedindo a mesma pasta ao mesmo tempo: um pedido só à nuvem', async () => {
   const { raiz, cliente } = montar();
   const arquivos = await raiz.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });

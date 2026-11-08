@@ -73,13 +73,19 @@ export function telaInquilinos(q) {
   // contrato sem imóvel (de antes do imóvel obrigatório): pode ser apagado (o vínculo é só no contrato novo)
   const imovel = (x) => (x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : `${etiqueta('Sem imóvel', 'aviso')}${podeUsuario('admin') ? ` ${botao('excluir', '×', { tabela: 'contratos', id: x.c.id }, 'x-excluir', `Apagar o contrato sem imóvel de ${x.c.inquilino_nome}? (Para alugar um imóvel, faça um novo contrato.)`)}` : ''}`);
   const situacao = (c) => (c.data_saida && c.data_saida < hoje ? etiqueta(R.fimDeVinculo(d(), c) ? 'Fim do vínculo' : 'Saiu', 'neutra') : c.ativo === false ? etiqueta('Inativo', 'neutra') : '');
-  const registrar = (c) => (opera() ? `<td class="centro"><a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a></td>` : '');
+  // ao lado do envelope (registrar solicitação), o botão que abre o contrato assinado; sem o arquivo, fica apagado
+  const botaoContrato = (c) => (c.doc_contrato_arquivo
+    ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(c.doc_contrato_arquivo)}" title="Abrir o contrato assinado de ${esc(c.inquilino_nome)}">📄 Contrato</a>`
+    : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`);
+  const registrar = (c) => `<td class="centro nw">${opera() ? `<a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a> ` : ''}${botaoContrato(c)}</td>`;
+  // ao lado do imóvel, o botão que abre o arquivo da matrícula
+  const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');
   const resumo = R.resumoSolicitacoes(d());
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th>${opera() ? '<th class="centro">Registrar solicitação</th>' : ''}<th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}</td><td>${nome(x)}</td>${registrar(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro">${opera() ? 'Solicitação · ' : ''}Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${matricula(x)}</td><td>${nome(x)}</td>${registrar(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
@@ -104,6 +110,7 @@ export function telaIptu(ano) {
     return sep + quadradoDoMes(pc, p, mes);
   };
   const quadradoDoMes = (pc, p, mes) => {
+    if (pc && pc.avistaMes !== undefined) return quadradoAvista(pc, p, mes);
     if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
     const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? 'cota única' : pc.avista ? pc.rotulo : `${pc.rotulo} parcela`}`;
     if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
@@ -115,10 +122,34 @@ export function telaIptu(ano) {
     return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPago" data-id="${p.id}" data-n="${pc.n}" data-texto="${esc(titulo)}" title="${esc(titulo)} (clique para marcar como paga)"></button>`
       : `<span class="q q-aberto" title="${esc(titulo)}"></span>`;
   };
+  // IPTU pago à vista por você: cada mês do esquema mostra quem arcou (verde inquilino, cinza você porque estava vazio,
+  // azul dividido); o mês em que você pagou a cota única leva o risco azul
+  const quadradoAvista = (pc, p, mes) => {
+    const x = pc.avistaMes;
+    const cota = pc.cota;
+    if (cota && !cota.paga) {
+      const titulo = `${rotuloMes(mes)} · cota única (IPTU à vista)${cota.vencimento ? ` · vence ${dataBr(cota.vencimento)}` : ''} · ${reais(cota.valor)} em aberto`;
+      return opera() ? `<button type="button" class="q q-aberto" data-acao="iptuPago" data-id="${p.id}" data-n="0" data-texto="${esc(titulo)}" title="${esc(titulo)} (clique para marcar como paga)"></button>`
+        : `<span class="q q-aberto" title="${esc(titulo)}"></span>`;
+    }
+    const quitou = cota ? ` · você pagou o IPTU à vista (${reais(cota.valor)}) em ${dataBr(cota.paga)}` : '';
+    if (!x) return `<span class="q q-vazio q-quitado" title="${esc(`${rotuloMes(mes)}${quitou}`)}"></span>`;
+    const cls = !x.valorProprietario ? 'q-inq' : !x.valorInquilino ? (p.data_quitacao ? 'q-paga' : 'q-aberto') : 'q-div';
+    const partes = [x.valorInquilino ? `inquilino paga ${reais(x.valorInquilino)} no boleto` : '',
+      x.valorProprietario ? `sua parte ${reais(x.valorProprietario)} (${x.valorInquilino ? 'mês de entrada ou saída' : 'sem inquilino'})` : ''].filter(Boolean).join(' · ');
+    return `<span class="q ${cls}${cota ? ' q-quitado' : ''}" title="${esc(`${rotuloMes(mes)} · ${x.rotulo}: ${partes}${quitou}`)}"></span>`;
+  };
   const rotuloMes = (mes) => `${MESES[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? '' : `/${mes.slice(2, 4)}`}`;
   const mesDaParcela = (pc, p) => (pc.n === 0 ? (p.data_quitacao || p.vencimento_primeira || '').slice(0, 7) : pc.mesBoleto || (pc.comp && C.somarMeses(pc.comp, 1)) || '');
   const mapas = new Map(imoveis.filter(doAno).map((i) => {
     const p = doAno(i);
+    if (p.pago_avista) {
+      const mapa = new Map(R.mapaIptuAvista(d(), p).map((x) => [x.mesBoleto, { avistaMes: x }]));
+      const cota = R.parcelasIptu(d(), p)[0];
+      const mq = mesDaParcela(cota, p);
+      if (mq) mapa.set(mq, { avistaMes: null, ...mapa.get(mq), cota });
+      return [i.id, mapa];
+    }
     const mapa = new Map(R.parcelasIptu(d(), p).map((pc) => [mesDaParcela(pc, p), pc]));
     // IPTU pago à vista por você e repassado nos boletos: um verde em cada mês em que o inquilino paga (o cinza da
     // cota única fica no mês da quitação; se cair no mesmo mês, o quadradinho mostra os dois)
@@ -152,7 +183,7 @@ export function telaIptu(ano) {
   }).join('');
   const faltam = imoveis.filter((i) => !doAno(i)).length;
   const guias = R.guiasIptuAPagar(d(), hoje, 60);
-  const legenda = [['q-inq', 'inquilino paga no boleto'], ['q-div', 'dividido (mês de entrada ou saída, ou cota única paga no mês de um boleto), sua parte paga'], ['q-aberto', 'sua parte, em aberto'], ['q-paga', 'sua parte, paga'], ['q-vazio', 'sem parcela']]
+  const legenda = [['q-inq', 'inquilino paga no boleto'], ['q-div', 'dividido (mês de entrada ou saída, ou cota única paga no mês de um boleto), sua parte paga'], ['q-aberto', 'sua parte, em aberto'], ['q-paga', 'sua parte, paga (no IPTU à vista: mês sem inquilino, que você arcou)'], ['q-paga q-quitado', 'mês em que você pagou o IPTU à vista (risco azul)'], ['q-vazio', 'sem parcela']]
     .map(([c, t]) => `<span><span class="q ${c}"></span> ${t}</span>`).join('');
   return `<p class="suave"><a href="#/imoveis">← Imóveis</a></p>
     <div class="cabecalho"><h1>IPTU ${ano}</h1><div class="acoes">${link(`#/iptu?ano=${ano - 1}`, `← ${ano - 1}`, 'botao secundario')} ${link(`#/iptu?ano=${ano + 1}`, `${ano + 1} →`, 'botao secundario')}</div></div>
@@ -165,11 +196,11 @@ export function telaIptu(ano) {
         <td class="n nw"><b>${reais(g.parcela.valorProprietario)}</b></td>
         <td class="n nw">${opera() ? botao('iptuPago', 'Marcar como paga', { id: g.iptu.id, n: g.parcela.n, texto: `${g.imovel.nome} · IPTU ${g.iptu.ano} · ${g.parcela.n === 0 ? 'cota única' : `${g.parcela.rotulo} parcela`}: sua parte ${reais(g.parcela.valorProprietario)} · vence ${dataBr(g.venc)}` }, 'secundario pequeno') : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
-    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${rotuloMes(m)}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
+    <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${m.startsWith(String(ano)) ? rotuloMes(m) : `${rotuloMes(m).split('/')[0]}<br>/${m.slice(2, 4)}`}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ''}</td><td></td></tr>` : ''}</table>
     <div class="legenda-iptu">${legenda}</div>
-    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto: o cinza é a sua cota única, os verdes são os boletos dele); no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
+    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
 }
 
 /**

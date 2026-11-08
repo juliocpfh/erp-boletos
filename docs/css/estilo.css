@@ -426,6 +426,16 @@ th.centro, td.centro { text-align: center; }
 .x-excluir, button.x-excluir { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; margin: 0 2px;
   background: var(--perigo); color: #fff; border: 0; border-radius: 4px; font-size: 22px; font-weight: 400; line-height: 1; padding-bottom: 2px; box-sizing: border-box; text-decoration: none; cursor: pointer; vertical-align: middle; }
 .x-excluir:hover { background: #991b1b; }
+/* Clipes de anexo (matrícula, guias do IPTU): o 📎 é maior que o × e fica afastado dele, para o dedo acertar o arquivo e não o excluir */
+.clipe-item { display: inline-flex; align-items: center; gap: 10px; margin-right: 8px; vertical-align: middle; }
+a.clipe-abrir { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 34px; padding: 2px 8px; font-size: 20px; font-weight: 600;
+  color: var(--texto); background: #eef3fa; border: 1px solid #c9d6ea; border-radius: 8px; text-decoration: none; box-sizing: border-box; }
+a.clipe-abrir:hover { background: #dde8f6; }
+.x-excluir.x-pequeno, button.x-excluir.x-pequeno { width: 18px; height: 18px; font-size: 16px; opacity: .85; }
+/* Lista de arquivos (pasta do inquilino, documentos assinados): o nome fica com a largura; tamanho e botões só o necessário */
+table.lista-arquivos { width: 100%; }
+table.lista-arquivos td.nome-arquivo { width: 100%; word-break: break-word; }
+.suave.mini { font-size: 11px; }
 .abas { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
 @media (max-width: 760px) { .abas a { padding: 6px 10px; font-size: 14px; } }
 .abas a { padding: 8px 16px; border-radius: 6px 6px 0 0; text-decoration: none; color: inherit; margin-bottom: -2px; border-bottom: 2px solid transparent; }
@@ -476,10 +486,11 @@ form input.travado, form select.travado { background: #eceff3 !important; color:
 button.q-aberto { cursor: pointer; }
 button.q-aberto:hover { outline: 2px solid #791F1F; }
 .q-vazio { background: transparent !important; border: 1px dashed #c4c7cc !important; }
-.meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; text-transform: none; }
-.meses-iptu span:not(.sep-ano) + span { white-space: nowrap; }
+.meses-iptu span { display: inline-block; width: 23px; text-align: center; font-size: 11px; line-height: 1.15; text-transform: none; vertical-align: bottom; white-space: nowrap; overflow: hidden; }
 .mapa-iptu .sep-ano, .meses-iptu .sep-ano { display: inline-block; width: 2px; height: 20px; background: #888780; margin: 0 5px 0 2px; vertical-align: middle; }
-.mapa-iptu .meses-iptu .sep-ano + span, .mapa-iptu .meses-iptu .sep-ano ~ span { font-size: 9px; }
+.meses-iptu .sep-ano { vertical-align: bottom; }
+/* mês em que o IPTU foi pago à vista: risco azul atravessando o quadradinho */
+.q.q-quitado { background-image: linear-gradient(135deg, transparent 38%, #185FA5 38%, #185FA5 62%, transparent 62%) !important; }
 .clipes-iptu { white-space: nowrap; }
 .clipes-iptu .clipe-anexar { display: inline-block; margin: 0 0 0 2px; cursor: pointer; filter: grayscale(1); opacity: .55; }
 .clipes-iptu .clipe-anexar:hover { opacity: 1; }
@@ -576,3 +587,15 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .vis-corpo canvas, .vis-corpo img { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
 .vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
 body.com-visualizador { overflow: hidden; }
+/* botão sem destino (ex.: "Contrato" sem o arquivo assinado anexado): apagado, só com a explicação ao passar o mouse */
+.botao.desligado { opacity: .45; cursor: default; pointer-events: auto; filter: grayscale(1); }
+/* Celular: texto que não quebra (nomes compridos, opções com explicação) esticava a página e o telefone "abria" a tela:
+   os cartões ficavam à esquerda e uma linha de texto perdida à direita. Fora das tabelas, tudo quebra em linhas. */
+@media (max-width: 760px) {
+  main { overflow-wrap: break-word; }
+  .check-mini { white-space: normal; align-items: flex-start; }
+  .check-mini input { flex: none; margin-top: 1px; }
+  main :not(td):not(th):not(.etiqueta).nw { white-space: normal; }
+  main input, main select, main textarea { max-width: 100%; }
+  main pre { white-space: pre-wrap; }
+}

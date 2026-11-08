@@ -1110,6 +1110,30 @@ export function mesesIptuAvista(d, p) {
 }
 
 /**
+ * Mapa do IPTU quitado à vista (tela IPTU's): um item por mês do esquema de cobrança (as parcelas normais, ou os 12 meses
+ * no 1/12 e quando não há esquema), com a parte do inquilino (o que ele paga no boleto) e a do proprietário (o que ele
+ * arcou porque o imóvel estava vazio). Ex.: 10 × R$ 100 a partir do boleto de 03/2026, inquilino até 31/05: boletos de
+ * 03 a 06 verdes (R$ 100 do inquilino), 07 a 12/2026 = R$ 100 do proprietário cada. Item: { mesBoleto, rotulo, valor,
+ * valorInquilino, valorProprietario }.
+ */
+export function mapaIptuAvista(d, p) {
+  if (!p.pago_avista) return [];
+  const n = Number(p.num_parcelas) || 0;
+  const primeiro = p.primeiro_vencimento_boleto || (p.primeira_competencia && C.somarMeses(p.primeira_competencia, 1));
+  const esquema = p.cobranca_inquilino !== COBRANCA_IPTU_QUITADO[1] && n && primeiro
+    ? valoresIptu(p).map((valor, k) => ({ mesBoleto: C.somarMeses(primeiro, k), rotulo: `${k + 1}ª parcela`, valor }))
+    : C.parcelas(p.valor_total, 12).map((valor, k) => ({ mesBoleto: C.somarMeses(`${p.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, '0')}/${p.ano})`, valor }));
+  const porMes = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
+  for (const m of mesesIptuAvista(d, p)) {
+    const it = porMes.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(' (você pagou à vista)', ''), valor: m.valor, valorInquilino: 0 };
+    it.valorInquilino += m.valor;
+    porMes.set(m.mesBoleto, it);
+  }
+  return [...porMes.values()].map((x) => ({ ...x, valorProprietario: Math.max(0, x.valor - x.valorInquilino) }))
+    .sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+}
+
+/**
  * Totais do IPTU no ano: quanto os inquilinos pagam nos boletos e quanto fica com o proprietário (e quanto dessa parte
  * ainda está em guia não paga). À vista: o inquilino paga conforme "Inquilino que entrar" (1/12 ou parcelas) nos meses ocupados.
  */
@@ -5195,10 +5219,10 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
 }
 
 // --------------------------------------------------------------------------
-// Alertas adiáveis (D14): "adiar 7 dias" e "já estou cuidando" (30 dias), com quem marcou; o alerta some do Painel até a data
+// Alertas adiáveis (D14): "adiar 7 dias" e "já estou cuidando" (só hoje: volta amanhã, pedido do dono), com quem marcou; o alerta some do Painel até a data
 // --------------------------------------------------------------------------
 export const DIAS_ADIAR_ALERTA = 7;
-export const DIAS_CUIDANDO_ALERTA = 30;
+export const DIAS_CUIDANDO_ALERTA = 1; // 2026-11-07: o dono quer o alerta de volta no dia seguinte para resolver
 
 /** Chave estável de um alerta (tipo + contrato/imóvel + âncora): o texto muda todo dia ("há 12 dias"), a chave não. */
 export const chaveAlerta = (a) => [a.tipo, a.contrato_id || '', a.imovel_id || '', a.ancora || ''].join('|');
@@ -5214,7 +5238,7 @@ export function alertasComAdiamento(d, hoje = C.hojeIso()) {
 }
 
 /**
- * Adia um alerta: ``modo`` "adiado" (7 dias) ou "cuidando" (30 dias; quem marcou aparece no Painel). Troca o adiamento
+ * Adia um alerta: ``modo`` "adiado" (7 dias) ou "cuidando" (só hoje, volta amanhã; quem marcou aparece no Painel). Troca o adiamento
  * anterior da mesma chave. Ex.: em 07/11/2026, "adiar 7 dias" esconde o alerta até 14/11/2026 (volta em 15/11).
  */
 export function adiarAlerta(d, chave, modo, usuario, { hoje = C.hojeIso(), dias = null, tipo = '', quem = '' } = {}) {

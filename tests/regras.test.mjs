@@ -2290,7 +2290,7 @@ test('D3: texto do lembrete muda com a fase do boleto e traz Pix quando emitido 
   assert.match(R.textoLembrete(d, cb, '2026-08-01').texto, /Pix copia e cola:\n00020126pixteste/);
 });
 
-test('D14: alerta adiado some até a data, "cuidando" vale 30 dias, voltar reaparece e o vencido é limpo na abertura', () => {
+test('D14: alerta adiado some até a data, "cuidando" vale só o dia (volta amanhã), voltar reaparece e o vencido é limpo na abertura', () => {
   const { d } = base();
   R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08/2026
   const hoje = '2026-09-01';
@@ -2302,15 +2302,29 @@ test('D14: alerta adiado some até a data, "cuidando" vale 30 dias, voltar reapa
   R.adiarAlerta(d, inad.chave, 'cuidando', 'ana', { hoje });
   assert.equal(d.adiamentos_alerta.length, 1); // trocou o anterior
   assert.equal(d.adiamentos_alerta[0].quem, 'ana');
-  assert.equal(d.adiamentos_alerta[0].ate, '2026-09-30');
-  assert.equal(R.adiamentosVencidos(d, '2026-10-01').length, 1);
-  assert.equal(R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01', soConferir: true }) >= 1, true);
-  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-10-01' });
+  assert.equal(d.adiamentos_alerta[0].ate, '2026-09-01'); // some hoje, volta amanhã
+  assert.ok(R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência').adiamento);
+  assert.ok(R.alertasComAdiamento(d, '2026-09-02').find((a) => a.tipo === 'Inadimplência').adiamento === null);
+  assert.equal(R.adiamentosVencidos(d, '2026-09-02').length, 1);
+  assert.equal(R.rotinaDeAbertura(d, 'julio', { hoje: '2026-09-02', soConferir: true }) >= 1, true);
+  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-09-02' });
   assert.equal(d.adiamentos_alerta.length, 0);
   R.adiarAlerta(d, inad.chave, 'adiado', 'julio', { hoje });
   assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), true);
   assert.equal(d.adiamentos_alerta.length, 0);
   assert.equal(R.voltarAlerta(d, inad.chave, 'julio'), false);
+});
+
+test('IPTU à vista no mapa: meses sem inquilino ficam com o proprietário, os ocupados com o inquilino', () => {
+  const { d } = base(); // entrada 07/06/2026, cobra IPTU no mês seguinte
+  const p = d.iptus[0];
+  Object.assign(p, { pago_avista: true, valor_avista: 95000, data_quitacao: '2026-02-15', primeiro_vencimento_boleto: '2026-03', primeira_competencia: null, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[0] });
+  const m = new Map(R.mapaIptuAvista(d, p).map((x) => [x.mesBoleto, x]));
+  assert.equal(m.size, 10); // 10 parcelas, boletos de 03/2026 a 12/2026
+  assert.deepEqual([m.get('2026-03').valorInquilino, m.get('2026-03').valorProprietario], [0, 10000]); // vazio: você arcou
+  assert.equal(m.get('2026-07').valorProprietario > 0 && m.get('2026-07').valorInquilino > 0, true); // junho: entrou dia 7, dividido
+  assert.deepEqual([m.get('2026-08').valorInquilino, m.get('2026-08').valorProprietario], [10000, 0]);
+  assert.deepEqual(R.mapaIptuAvista(d, { ...p, pago_avista: false }), []);
 });
 
 test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registros', () => {
