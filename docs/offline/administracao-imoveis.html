@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-O/POGaNpoI3BJZI0CSJowhwO/CEwnY9Tuw36xuYcQQE=' 'sha256-ri1TEbPOO70VXh7GcTZ3LuWEjNkyGzTcQGSnKn9EYsc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-O/POGaNpoI3BJZI0CSJowhwO/CEwnY9Tuw36xuYcQQE=' 'sha256-5XwybWkJSmdWYTQOKLJcwxmiO6/4AYmgvPDvaQtNluQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b88040405b49315e">
+<meta name="fontes" content="8bdb01ef61c74eda">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -168,7 +168,8 @@ textarea { min-height: 80px; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
 label.enviar input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .acoes label.enviar { margin-top: 0; }
-.contas.matricula label.enviar { margin: 2px 0 0 6px; display: inline-block; border-radius: 12px; }
+.contas.matricula { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: normal; }
+.contas.matricula label.enviar { margin: 0; display: inline-block; border-radius: 12px; }
 .cobrancas td { font-size: 14px; }
 a.cartao { color: inherit; display: block; }
 a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
@@ -436,12 +437,22 @@ th.centro, td.centro { text-align: center; }
 .x-excluir, button.x-excluir { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; margin: 0 2px;
   background: var(--perigo); color: #fff; border: 0; border-radius: 4px; font-size: 22px; font-weight: 400; line-height: 1; padding-bottom: 2px; box-sizing: border-box; text-decoration: none; cursor: pointer; vertical-align: middle; }
 .x-excluir:hover { background: #991b1b; }
-/* Clipes de anexo (matrícula, guias do IPTU): o 📎 é maior que o × e fica afastado dele, para o dedo acertar o arquivo e não o excluir */
-.clipe-item { display: inline-flex; align-items: center; gap: 10px; margin-right: 8px; vertical-align: middle; }
-a.clipe-abrir { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 34px; padding: 2px 8px; font-size: 20px; font-weight: 600;
-  color: var(--texto); background: #eef3fa; border: 1px solid #c9d6ea; border-radius: 8px; text-decoration: none; box-sizing: border-box; }
+/* Clipes de anexo (matrícula, guias do IPTU): botões grandes que quebram linha; apagar só em "✎ Editar" (os clipes viram 🗑, vermelhos) */
+.clipes { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; vertical-align: middle; white-space: normal; max-width: 100%; }
+a.clipe-abrir, button.clipe-apagar { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 36px; padding: 2px 8px; margin: 0; font-size: 18px; font-weight: 600;
+  color: var(--texto); background: #eef3fa; border: 1px solid #c9d6ea; border-radius: 8px; text-decoration: none; box-sizing: border-box; cursor: pointer; }
 a.clipe-abrir:hover { background: #dde8f6; }
-.x-excluir.x-pequeno, button.x-excluir.x-pequeno { width: 18px; height: 18px; font-size: 16px; opacity: .85; }
+button.clipe-apagar { display: none; color: #fff; background: var(--perigo); border-color: var(--perigo); }
+button.clipe-apagar:hover { background: #991b1b; }
+.clipe-editar { display: inline-flex; align-items: center; min-height: 32px; padding: 2px 10px; font-size: 13px; color: var(--suave); border: 1px dashed #c9d6ea; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.clipe-editar input { position: absolute; opacity: 0; width: 0; height: 0; }
+.clipe-editar .ed-sim { display: none; }
+.clipes:has(.clipe-editar input:checked) a.clipe-abrir { display: none; }
+.clipes:has(.clipe-editar input:checked) button.clipe-apagar { display: inline-flex; }
+.clipes:has(.clipe-editar input:checked) .clipe-editar { color: var(--texto); border-style: solid; font-weight: 600; }
+.clipe-editar input:checked ~ .ed-nao { display: none; }
+.clipe-editar input:checked ~ .ed-sim { display: inline; }
+.clipe-editar:has(input:focus-visible) { outline: 2px solid var(--primaria); }
 /* Lista de arquivos (pasta do inquilino, documentos assinados): o nome fica com a largura; tamanho e botões só o necessário */
 table.lista-arquivos { width: 100%; }
 table.lista-arquivos td.nome-arquivo { width: 100%; word-break: break-word; }
@@ -11162,7 +11173,11 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const todos = dir ? await listar(dir) : [];
     if (escopo === "matricula" || modo === "clipe") {
       const tipo = escopo === "matricula" ? "da matrícula" : "da guia";
-      return todos.filter((a) => escopo !== "matricula" || ehMatricula(a.nome)).map((a, n) => `<span class="nw clipe-item"><a href="#" class="clipe-abrir" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="Abrir ${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao("excluirArquivo", "×", { escopo, id, nome: a.nome }, "x-excluir x-pequeno", `Excluir o arquivo ${tipo} "${a.nome}"?`) : ""}</span>`).join(" ");
+      const lista3 = todos.filter((a) => escopo !== "matricula" || ehMatricula(a.nome));
+      if (!lista3.length) return "";
+      const clipes = lista3.map((a, n) => `<a href="#" class="clipe-abrir" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(a.nome)}" title="Abrir ${esc(a.nome)}">📎${n + 1}</a>${opera() ? botao("excluirArquivo", `🗑${n + 1}`, { escopo, id, nome: a.nome }, "clipe-apagar", `Excluir o arquivo ${tipo} "${a.nome}"?`) : ""}`).join("");
+      const editar = opera() ? '<label class="clipe-editar" title="Apagar algum arquivo"><input type="checkbox"><span class="ed-nao">✎ Editar</span><span class="ed-sim">✓ Pronto</span></label>' : "";
+      return `<span class="clipes">${clipes}${editar}</span>`;
     }
     const itens = todos;
     if (!itens.length && escopo !== "contrato") return `<p class="suave">${escopo === "anuncio" ? "Nenhuma foto ainda." : "Nenhum arquivo ainda."}</p>`;
@@ -11179,7 +11194,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       const dono = rotulos.get(`${esc2}:${id}|${a.nome}`);
       return `<tr><td class="nome-arquivo"><a href="#" data-acao="abrirArquivo" data-escopo="${esc2}" data-id="${id}" data-nome="${esc(a.nome)}">${esc(a.nome)}</a>${dono ? ` ${etiqueta(`🔗 ${dono}`, "info")}` : ""}${opera() && escopo !== "imovel" && esc2 !== "seguro" && dono ? '<br><span class="suave mini" title="Para apagar, use o × ao lado do lançamento: o aviso para anexar volta">para apagar, use o × do lançamento</span>' : ""}</td>
     <td class="n suave nw">${Math.max(1, Math.round(a.tamanho / 1024))} KB</td>
-    <td class="n nw">${botao("baixarArquivo", "Baixar", { escopo: esc2, id, nome: a.nome })} ${!opera() || escopo === "imovel" ? "" : esc2 === "seguro" ? acaoArquivoSeguro(id, a.nome) : dono ? "" : botao("excluirArquivo", "×", { escopo: esc2, id, nome: a.nome }, "x-excluir", "Excluir este arquivo?")}</td></tr>`;
+    <td class="n nw">${!opera() || escopo === "imovel" ? "" : esc2 === "seguro" ? acaoArquivoSeguro(id, a.nome) : dono ? "" : botao("excluirArquivo", "×", { escopo: esc2, id, nome: a.nome }, "x-excluir", "Excluir este arquivo?")}</td></tr>`;
     }).join("")}</table>`;
     let html = itens.length ? linhas2(escopo, itens) : '<p class="suave">Nenhum arquivo ainda.</p>';
     if (escopo === "contrato") {
@@ -17495,7 +17510,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const nome = ({ c }) => `<a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a>${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ""}${geraNf(c) ? "" : ` ${etiqueta("boleto de controle", "controle")}`}${anterior(c) ? `<br><span class="suave">continua ${esc(anterior(c).inquilino_nome)}</span>` : ""}`;
     const imovel = (x) => x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : `${etiqueta("Sem imóvel", "aviso")}${podeUsuario("admin") ? ` ${botao("excluir", "×", { tabela: "contratos", id: x.c.id }, "x-excluir", `Apagar o contrato sem imóvel de ${x.c.inquilino_nome}? (Para alugar um imóvel, faça um novo contrato.)`)}` : ""}`;
     const situacao2 = (c) => c.data_saida && c.data_saida < hoje3 ? etiqueta(fimDeVinculo(d(), c) ? "Fim do vínculo" : "Saiu", "neutra") : c.ativo === false ? etiqueta("Inativo", "neutra") : "";
-    const botaoContrato = (c) => c.doc_contrato_arquivo ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(c.doc_contrato_arquivo)}" title="Abrir o contrato assinado de ${esc(c.inquilino_nome)}">📄 Contrato</a>` : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`;
+    const botaoContrato = (c) => {
+      const doc = documentoEntrada(d(), c, "doc_contrato_em");
+      return doc && doc.arquivo ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">📄 Contrato</a>` : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`;
+    };
     const registrar2 = (c) => `<td class="centro nw">${opera() ? `<a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a> ` : ""}${botaoContrato(c)}</td>`;
     const matricula = (x) => x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : "";
     const resumo = resumoSolicitacoes(d());
@@ -20483,9 +20501,6 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       });
       location.reload();
     },
-    async baixarArquivo({ escopo, id, nome }) {
-      baixar(await abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome), nome);
-    },
     // ------------------------------------------------------------------------
     // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
     // ------------------------------------------------------------------------
@@ -22244,6 +22259,28 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   var paginaDesenhada = null;
   var anexosVistos = /* @__PURE__ */ new Map();
+  var CLIPES_GUARDADOS = "clipes-vistos";
+  var ehClipe = (chave) => chave.startsWith("matricula:") || chave.endsWith(":clipe");
+  var clipesCarregados = null;
+  function carregarClipes() {
+    const quem = E.usuario?.login || "";
+    if (clipesCarregados === quem) return;
+    clipesCarregados = quem;
+    try {
+      const salvo = JSON.parse(localStorage.getItem(CLIPES_GUARDADOS) || "null");
+      if (salvo?.quem === quem) {
+        for (const [k, v] of Object.entries(salvo.listas || {})) if (ehClipe(k) && !anexosVistos.has(k)) anexosVistos.set(k, v);
+      }
+    } catch {
+    }
+  }
+  function guardarClipes() {
+    try {
+      const listas = Object.fromEntries([...anexosVistos].filter(([k]) => ehClipe(k)));
+      localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || "", listas }));
+    } catch {
+    }
+  }
   async function mostrar(estadoForm = null) {
     const app = document.getElementById("app");
     const rota = rotaAtual();
@@ -22269,6 +22306,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const rolagem = mesma ? window.scrollY : 0;
       if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
       app.innerHTML = html;
+      if (E.usuario) carregarClipes();
       for (const el of app.querySelectorAll("[data-arquivos]")) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
       if (mesma) window.scrollTo(0, rolagem);
       paginaDesenhada = endereco2;
@@ -22310,6 +22348,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   async function montarExtras(raiz) {
     arrumarTabelas(raiz);
     let mudou = false;
+    let clipesMudaram = false;
     const listas = [...raiz.querySelectorAll("[data-arquivos]")];
     if (E.nuvem && E.anexos?.carregarSeVelho && listas.filter((el) => !el.dataset.arquivos.startsWith("anuncio")).length >= 6) {
       await E.anexos.carregarSeVelho([PASTA_ARQUIVOS]).catch(() => {
@@ -22319,12 +22358,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const chave = el.dataset.arquivos;
       const [escopo, id, modo] = chave.split(":");
       const html = await TELAS._listaArquivos(escopo, Number(id), modo);
-      if (escopo !== "anuncio") anexosVistos.set(chave, html);
+      if (escopo !== "anuncio") {
+        if (ehClipe(chave) && anexosVistos.get(chave) !== html) clipesMudaram = true;
+        anexosVistos.set(chave, html);
+      }
       if (el.isConnected && el.innerHTML !== html) {
         el.innerHTML = html;
         mudou = true;
       }
     }));
+    if (clipesMudaram) guardarClipes();
     TELAS._ligarDesconto(raiz);
     if (mudou) arrumarTabelas(raiz);
   }
