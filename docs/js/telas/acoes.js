@@ -822,9 +822,10 @@ export const ACOES = {
     if (cfg.admin && !podeUsuario('admin')) throw new Error('Só administradores podem excluir.');
     const r = buscar(tabela, id);
     const destino = cfg.voltar ? cfg.voltar(r) : null;
-    // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato e imóvel guardam a pasta.
+    // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato: saem os arquivos
+    // dos registros dele (os documentos postos à mão na pasta ficam, e a pasta com eles). Imóvel guarda a pasta.
     const pastaFicha = tabela === 'fichas' && r ? r.pasta || nomePastaFicha(r) : null;
-    await (['contratos', 'imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
+    await (['imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);

@@ -2,7 +2,7 @@
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato } from './contratos.js';
+import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA } from './modelos-contrato.js';
 
@@ -168,10 +168,11 @@ export function normalizar(d) {
   // "Possui termo aditivo" só com termo registrado, inativar quem saiu e completar a caução pelos depósitos eram feitos aqui,
   // calados: desde 2026-11-07 (rotina C9) ficam em `rotinaDeAbertura`, que roda com o usuário logado e passa pelo histórico.
   // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
+  // (o fim sai de `fimDoContrato`, o mesmo do cadastro: sem renovação, o do contrato assumido)
   const renovados = new Set(d.renovacoes.map((x) => x.contrato_id));
   for (const c of d.contratos) {
     if (!c.contrato_anterior_id) continue;
-    const fim = fimDoPrazoHerdado(d, c);
+    const fim = fimDoContrato(d, c);
     if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== 'Indeterminado' && c.vigencia_fim === C.fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses)
       && !renovados.has(c.id)) c.vigencia_fim = fim;
   }
@@ -1654,14 +1655,21 @@ export function desfazerNumeracao(d, aPartirDe, usuario, descricao = null) {
 // Renovação, novo valor negociado e saída do inquilino
 // --------------------------------------------------------------------------
 
-/** Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). */
+/**
+ * Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). A nova data de término
+ * leva junto o prazo em meses (ex.: 05/03/2024, renovado até 05/09/2028 → 54 meses), para o cadastro não ter duas datas de fim.
+ */
 export function registrarRenovacao(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   exigirAditivoDaTroca(d, c);
   const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados }, usuario, dados.tipo);
   const mud = {};
   if (dados.tipo === 'Passou a prazo indeterminado') mud.prazo_tipo = 'Indeterminado';
-  if (dados.nova_vigencia_fim) Object.assign(mud, { vigencia_fim: dados.nova_vigencia_fim, prazo_tipo: 'Determinado' });
+  if (dados.nova_vigencia_fim) {
+    Object.assign(mud, { vigencia_fim: dados.nova_vigencia_fim, prazo_tipo: 'Determinado' });
+    const meses = prazoDoContrato(d, c);
+    if (meses > 0 && meses !== c.prazo_meses) mud.prazo_meses = meses;
+  }
   if (Object.keys(mud).length) atualizar(d, 'contratos', c.id, mud, usuario, dados.tipo);
   if (dados.novo_valor > 0) {
     const anterior = aluguelAtual(d, c, C.somarDias(dados.data, -1));
@@ -1919,12 +1927,20 @@ export function dadosDaFicha(d, f) {
   return { ...dadosDaPessoa(f), ...(primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data } : {}) };
 }
 
-/** Exclui o contrato e tudo o que pertence a ele (boletos, fiadores, garantia, vistorias...). */
+/** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */
+const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_banco', 'pagamentos_banco']);
+
+/**
+ * Exclui o contrato e tudo o que pertence a ele: os registros de todas as tabelas (TABELAS) com o contrato_id dele (boletos,
+ * fiadores, garantia e depósitos, vistorias, aditivos, cartas de reajuste, titularidades, acordos...). Os arquivos desses
+ * registros deixam de ser usados (`arquivosReferenciados`) e a tela os apaga da pasta (`alterarApagandoAnexos`).
+ */
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
-  for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
-    d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
+  for (const t of Object.keys(TABELAS)) {
+    if (FICAM_SEM_O_CONTRATO.has(t) || !Array.isArray(d[t])) continue;
+    d[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
   }
   // a garantia que tinha passado a este contrato volta a ser do anterior (senão não passa a um novo titular)
   for (const a of d.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d, 'contratos', a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
@@ -2355,6 +2371,34 @@ export function fimDoPrazoHerdado(d, c) {
   const a = contratoHerdado(d, c);
   return a && a.prazo_tipo !== 'Indeterminado' && a.vigencia_fim ? a.vigencia_fim : null;
 }
+/** Última renovação que mexeu no prazo do contrato (nova data de término ou prazo indeterminado), ou null. */
+const renovacaoDoPrazo = (d, c) => (c && c.id ? (d.renovacoes || [])
+  .filter((r) => r.contrato_id === c.id && (r.nova_vigencia_fim || r.tipo === 'Passou a prazo indeterminado'))
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id)[0] || null : null);
+/** Data da renovação que fixou o fim do contrato (a última, com nova data de término), ou null. */
+export const fimRenovado = (d, c) => { const r = renovacaoDoPrazo(d, c); return (r && r.nova_vigencia_fim) || null; };
+/**
+ * Fim do contrato de prazo determinado, num lugar só (cadastro, normalizar e troca de titular):
+ * 1º renovado com nova data de término: a da última renovação (ex.: 05/03/2024 + 30 meses = 05/09/2026, renovado até
+ *    05/09/2028 → 05/09/2028, também ao editar o telefone no cadastro);
+ * 2º troca de titular: o do contrato assumido (o prazo não recomeça, `fimDoPrazoHerdado`);
+ * 3º senão: data de vigência inicial (sem ela, a do contrato) + prazo em meses. Null se não dá para calcular.
+ */
+export function fimDoContrato(d, c) {
+  const renovado = fimRenovado(d, c);
+  if (renovado) return renovado;
+  const herdado = fimDoPrazoHerdado(d, c);
+  if (herdado) return herdado;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  return inicio && c.prazo_meses > 0 ? C.fimDoPrazo(inicio, c.prazo_meses) : null;
+}
+/** Prazo em meses do contrato: renovado, do início até o fim da renovação (05/03/2024 a 05/09/2028 = 54); senão, o gravado. */
+export function prazoDoContrato(d, c) {
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const renovado = fimRenovado(d, c);
+  if (renovado && inicio && renovado > inicio) return C.mesesDoPrazo(inicio, renovado);
+  return c.prazo_meses || C.mesesDoPrazo(inicio, c.vigencia_fim) || C.mesesDoPrazo(c.vigencia_inicio, c.vigencia_fim);
+}
 export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anterior_id === c.id) || null;
 /**
  * Fim do vínculo (e não saída): o contrato passou para outro titular, que continua com as mesmas regras e documentos.
@@ -2369,14 +2413,21 @@ export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
  */
 export function herancaAgendada(d, c, hoje = C.hojeIso()) {
   const data = c.data_entrada || c.vigencia_inicio;
-  return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje || !aditivosDo(d, c.id).length) && contratoHerdado(d, c) ? data : null;
+  return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje || !aditivoDaTroca(d, c)) && contratoHerdado(d, c) ? data : null;
 }
+
+/**
+ * Termo aditivo da troca de titular assinado (com o arquivo) no contrato do novo titular, ou null. Vale o gerado pelo sistema
+ * (tipo "Troca de titular") ou o registrado à mão como o da troca; o registrado antes de 09/11/2026 (sem tipo) também vale,
+ * como valia. Outro termo assinado (ex.: troca do vencimento, tipo "Vencimento"; à mão, "Outro") não faz o contrato passar.
+ */
+export const aditivoDaTroca = (d, c) => aditivosDo(d, c.id).find((a) => !a.tipo || a.tipo === TIPO_ADITIVO_TROCA) || null;
 
 /**
  * Troca de titular sem o termo aditivo assinado: o contrato ainda é do anterior, mesmo passada a data da troca. O novo não tem
  * boleto nem correção do aluguel e o anterior continua ativo. Ex.: troca em 01/11/2026, assinado em 10/11/2026 → só então passa.
  */
-export const trocaAguardaAditivo = (d, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d, c) && !aditivosDo(d, c.id).length);
+export const trocaAguardaAditivo = (d, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d, c) && !aditivoDaTroca(d, c));
 /** Barra correção do aluguel no novo titular enquanto o termo não está assinado. */
 function exigirAditivoDaTroca(d, c) {
   if (trocaAguardaAditivo(d, c)) throw new Error(`O contrato ainda é de ${contratoHerdado(d, c).inquilino_nome}: lance a correção lá. Passa para ${c.inquilino_nome} com o termo aditivo assinado.`);
@@ -2412,7 +2463,7 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   const passa = (tabela, x, texto) => atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
   // troca numa data futura ou sem o termo assinado: o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
   // agora só a data-base do reajuste e, com o termo assinado, o fim do vínculo dele (o último boleto sai proporcional). O resto passa depois.
-  const assinado = aditivosDo(d, n.id).length > 0;
+  const assinado = !!aditivoDaTroca(d, n);
   if (data > hoje || !assinado) {
     if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
     if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
@@ -2756,8 +2807,8 @@ export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !docume
 /** Troca de titular: o termo aditivo que coloca o novo titular no contrato é obrigatório (alerta até registrar um aditivo neste contrato). */
 export function alertaAditivoHerdeiro(d, c) {
   const ant = contratoHerdado(d, c);
-  if (!ant || c.ativo === false || c.data_saida || aditivosDo(d, c.id).length) return null;
-  const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === 'Troca de titular');
+  if (!ant || c.ativo === false || c.data_saida || aditivoDaTroca(d, c)) return null;
+  const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === TIPO_ADITIVO_TROCA);
   return { nivel: 'perigo', tipo: 'Aditivo da troca de titular', ancora: 'aditivos',
     texto: gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${C.dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").`
       : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
@@ -2982,9 +3033,10 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     contrato_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_contrato_em', 'contrato já assinado')),
     contrato_assinado: () => docAssinado('doc_contrato_em', 'contrato_assinado'),
     aditivo: () => {
-      const l = aditivosDo(d, c.id);
-      if (l.length) return feita(l[0].data, l[0].assunto);
-      return aditivosAguardando(d, c.id).length ? andamento('gerado, aguardando assinatura') : undefined;
+      // só o termo da troca de titular (outro termo assinado não conta)
+      const t = aditivoDaTroca(d, c);
+      if (t) return feita(t.data, t.assunto);
+      return aditivosAguardando(d, c.id).some((a) => a.tipo === TIPO_ADITIVO_TROCA) ? andamento('gerado, aguardando assinatura') : undefined;
     },
     garantia: () => {
       if (anterior && !garantiaNova(c) && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) {
@@ -3002,8 +3054,9 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       return undefined;
     },
     vistoria_gerada: () => {
-      const v = vistoriasDo(d, c.id).find((x) => x.tipo === 'Entrada');
-      if (v) return feita(v.data);
+      // a vistoria de entrada que vale (própria ou, na troca de titular, a do contrato anterior: aparece como herdada)
+      const v = vistoriaDeEntrada(d, c);
+      if (v && v.contrato_id === c.id) return feita(v.data);
       return anterior ? feita(null, herdou) : jaGerado('doc_vistoria_em', 'vistoria já assinada');
     },
     chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),
@@ -3230,6 +3283,18 @@ export const aditivosValidos = (d, contratoId) => d.aditivos.filter((a) => a.con
 /** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo e sem registro de perda). */
 export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo && !a.perdido_em).sort(porDataAditivo);
 
+/**
+ * Número do próximo termo aditivo: conta os termos de todos os contratos da cadeia (na troca de titular o contrato é o mesmo).
+ * Ex.: o contrato de Pedro tem o 1º termo (troca do vencimento); Lúcia assume → o termo da troca é o 2º. Um termo excluído
+ * não faz repetir o número de outro (vale o maior já usado).
+ */
+function proximoNumeroAditivo(d, c) {
+  const { antes, depois } = cadeiaDeContratos(d, c);
+  const ids = new Set([c, ...antes, ...depois].map((x) => x.id));
+  const l = d.aditivos.filter((a) => ids.has(a.contrato_id));
+  return Math.max(l.length, ...l.map((a) => Number(a.numero) || 0)) + 1;
+}
+
 const aditivosDeVencimento = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em) && a.dia_novo && a.primeiro_vencimento)
   .sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
 
@@ -3289,7 +3354,7 @@ export function salvarAditivoVencimento(d, contratoId, f, usuario, id = null) {
     atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
     return atual;
   }
-  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  dados.numero = proximoNumeroAditivo(d, c);
   return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de vencimento gerado (aguardando assinatura)`);
 }
 
@@ -3316,7 +3381,7 @@ export function salvarAditivoTroca(d, contratoId, f, usuario, id = null) {
     atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
     return atual;
   }
-  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  dados.numero = proximoNumeroAditivo(d, c);
   return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de troca de inquilino gerado (aguardando assinatura)`);
 }
 
@@ -3336,14 +3401,16 @@ export function assinarAditivo(d, id, { data, arquivo }, usuario) {
  * Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo".
  * ``perdido``: termo antigo assinado cujo papel se perdeu (sem arquivo; ``hoje`` = data do registro da perda). Quem não é
  * administrador fica aguardando a análise. Não vale como o termo da troca de titular.
+ * ``tipo``: "Troca de titular" quando é o termo da troca (o novo titular assume o contrato com ele assinado); "Outro" para
+ * outro assunto no contrato de quem ainda espera o termo da troca (não faz o contrato passar). Sem tipo: como antes.
  */
-export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdido = false }, usuario, administrador = true, hoje = C.hojeIso()) {
+export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdido = false, tipo = null }, usuario, administrador = true, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   if (!data) throw new Error('Informe a data do termo aditivo.');
   if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
   if (!arquivo && !perdido) throw new Error('Anexe o arquivo do termo aditivo assinado.');
   const perda = perdido && !arquivo ? { perdido_em: hoje, perdido_pendente: administrador ? null : usuario } : {};
-  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda }, usuario,
+  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, ...(tipo ? { tipo } : {}), data, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda }, usuario,
     `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}${perda.perdido_em ? ` (perdido, registrado em ${C.dataBr(hoje)}${administrador ? '' : ', aguardando o administrador'})` : ''}`);
   marcarAditivos(d, c.id, usuario);
   return a;
@@ -4617,6 +4684,23 @@ export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
 }
 
 /**
+ * Contrato renovado com nova data de término: o fim e o prazo são os da renovação. Até 09/11/2026 a edição do cadastro
+ * gravava de volta o início + prazo (ex.: 05/03/2024, 30 meses, renovado até 05/09/2028 e editado o telefone → 05/09/2026)
+ * e a renovação não mudava o prazo em meses. Devolve o que acertar ({ vigencia_fim, prazo_meses }) ou null. O fim só volta
+ * quando é o início + prazo (o que a edição gravava). Só nos contratos ativos (os encerrados ficam como estão, no histórico).
+ */
+function acertoDaRenovacao(d, c) {
+  const fim = c.ativo !== false && fimRenovado(d, c);
+  if (!fim || c.prazo_tipo === 'Indeterminado') return null;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const mud = {};
+  if (c.vigencia_fim !== fim && inicio && c.prazo_meses > 0 && c.vigencia_fim === C.fimDoPrazo(inicio, c.prazo_meses)) mud.vigencia_fim = fim;
+  const meses = prazoDoContrato(d, c);
+  if ((mud.vigencia_fim || c.vigencia_fim) === fim && meses > 0 && meses !== c.prazo_meses) mud.prazo_meses = meses;
+  return Object.keys(mud).length ? mud : null;
+}
+
+/**
  * Rotina de abertura (C9, 2026-11-07): regras de negócio que antes rodavam caladas em ``normalizar`` passam pelo histórico com o
  * usuário que abriu o sistema. Ex.: Maria saiu em 15/07 e o boleto de julho já existe → em 01/08 o contrato fica inativo
  * "por julio"; os depósitos da caução chegaram a R$ 4.050,00 → a caução fica registrada como depositada. Com
@@ -4628,6 +4712,13 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
     // "possui termo aditivo" só com termo registrado (assinado ou perdido): a marca antiga (vencimento/garantia) sai
     if (!!c.possui_aditivos !== (aditivosValidos(d, c.id).length > 0)) { n += 1; if (!soConferir) marcarAditivos(d, c.id, usuario); }
     if (deveDesativar(d, c, hoje)) { n += 1; if (!soConferir) desativarSeSaiu(d, c, usuario, hoje); }
+    const renovacao = acertoDaRenovacao(d, c);
+    if (renovacao) {
+      n += 1;
+      const fim = C.dataBr(fimRenovado(d, c));
+      if (!soConferir) atualizar(d, 'contratos', c.id, renovacao, usuario, `${c.inquilino_nome}: ${[renovacao.vigencia_fim && `fim do contrato volta ao da renovação (${fim})`,
+        renovacao.prazo_meses && `prazo de ${renovacao.prazo_meses} meses, como na renovação até ${fim}`].filter(Boolean).join('; ')}`);
+    }
     if (!(d.depositos_garantia || []).length) continue;
     for (const qual of ['caucao', 'deposito']) {
       if (!(qual === 'caucao' ? temCaucao(c) : temDeposito(c)) || !depositosCompletam(d, c, qual)) continue;

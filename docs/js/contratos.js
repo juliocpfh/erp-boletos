@@ -35,8 +35,9 @@ export function numeroPorExtenso(n) {
     if (i > 0) t = `${t} ${nomes[i][g === 1 ? 0 : 1]}`.trim();
     partes.unshift({ t, g, i });
   });
-  // "e" antes do último grupo quando ele é menor que 100 ou é centena redonda (mil e quinhentos; mil trezentos e cinquenta)
-  return partes.map((p, k) => (k === 0 ? p.t : `${partes[k].i === 0 && (p.g < 100 || p.g % 100 === 0) ? 'e ' : ''}${p.t}`)).join(' ');
+  // "e" antes do último grupo quando ele é menor que 100 ou é centena redonda (mil e quinhentos; mil trezentos e cinquenta;
+  // um milhão e mil; um milhão e cem mil; um milhão duzentos e trinta e quatro mil)
+  return partes.map((p, k) => (k === 0 ? p.t : `${k === partes.length - 1 && (p.g < 100 || p.g % 100 === 0) ? 'e ' : ''}${p.t}`)).join(' ');
 }
 
 /** Valor em centavos por extenso: 388889 → "três mil, oitocentos e oitenta e oito reais e oitenta e nove centavos". */
@@ -53,18 +54,32 @@ export function reaisPorExtenso(centavos) {
 export const valorComExtenso = (centavos) => `R$ ${C.reais(centavos, false)} (${reaisPorExtenso(centavos)})`;
 /** "30 (trinta)" */
 export const numeroComExtenso = (n) => `${n} (${numeroPorExtenso(n)})`;
-/** "2% (dois por cento)" */
-export function percentualComExtenso(p) {
-  const n = Number(p) || 0;
-  const inteiro = Math.trunc(n);
-  const dec = Math.round((n - inteiro) * 100);
-  const extenso = dec ? `${numeroPorExtenso(inteiro)} vírgula ${numeroPorExtenso(dec)}` : numeroPorExtenso(inteiro);
-  return `${C.pct(n)} (${extenso} por cento)`;
+/**
+ * Número escrito como no documento ("9,0909") por extenso: as casas depois da vírgula são lidas como estão escritas, com os
+ * zeros da frente ("9,0909" → "nove vírgula zero novecentos e nove"; "1,05" → "um vírgula zero cinco"; "4,5" → "quatro vírgula cinco").
+ */
+function decimalPorExtenso(escrito) {
+  const [inteiro, dec = ''] = String(escrito).split(',');
+  const texto = numeroPorExtenso(Number(inteiro.replace(/\D/g, '')) || 0);
+  if (!/[1-9]/.test(dec)) return texto;
+  return [texto, 'vírgula', ...Array(dec.match(/^0*/)[0].length).fill('zero'), numeroPorExtenso(Number(dec))].join(' ');
 }
 
-const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-/** "05 de setembro de 2026" */
-export const dataPorExtenso = (iso) => (iso ? `${iso.slice(8, 10)} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}` : '');
+/** "2% (dois por cento)"; o extenso sai do número como aparece no documento: "9,0909% (nove vírgula zero novecentos e nove por cento)" */
+export function percentualComExtenso(p) {
+  const escrito = C.pct(Number(p) || 0);
+  return `${escrito} (${decimalPorExtenso(escrito.replace('%', ''))} por cento)`;
+}
+
+/** Os meses por extenso (lista única do sistema: contratos, termos, cartas e declarações). */
+export const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+/** Mês por extenso: '2026-09' → "setembro de 2026". */
+export const mesPorExtenso = (comp) => (comp ? `${MESES_EXTENSO[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}` : '');
+/**
+ * Data por extenso: "05 de setembro de 2026" (contrato, vistoria, termos e recibo). ``zero: false``: "5 de setembro de 2026"
+ * (carta de reajuste e declaração de aluguéis), como cada documento sempre saiu.
+ */
+export const dataPorExtenso = (iso, { zero = true } = {}) => (iso ? `${zero ? iso.slice(8, 10) : Number(iso.slice(8, 10))} de ${mesPorExtenso(iso.slice(0, 7))}` : '');
 
 const ORD_UNID = ['', 'primeira', 'segunda', 'terceira', 'quarta', 'quinta', 'sexta', 'sétima', 'oitava', 'nona'];
 const ORD_DEZ = ['', 'décima', 'vigésima', 'trigésima', 'quadragésima', 'quinquagésima', 'sexagésima', 'septuagésima', 'octogésima', 'nonagésima'];
@@ -162,9 +177,13 @@ export function locadorasDoContrato(d, c) {
   return partes.length ? partes : d.emitentes.filter((e) => e.ativo);
 }
 
+/** Fiadores do contrato que ainda valem na data (sem fim do vínculo antes dela e sem substituto). */
+const fiadoresNaData = (d, contratoId, data) => d.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data || C.hojeIso())));
+
 /**
  * Monta tudo que o modelo usa: campos de texto ({campo}), condições ([se x]) e quantidades (singular/plural).
- * ``extra``: data da assinatura e testemunhas informadas na hora de gerar.
+ * ``extra``: data da assinatura e testemunhas informadas na hora de gerar; ``fiadores``: os fiadores que entram no
+ * documento, quando não são os do próprio contrato (termo da troca de titular, `fiadoresDaTroca`).
  */
 export function dadosDoContrato(d, c, extra = {}) {
   const R = { buscar: (t, id) => d[t].find((x) => x.id === Number(id)) };
@@ -174,7 +193,7 @@ export function dadosDoContrato(d, c, extra = {}) {
   const locatarios = [];
   if (pj) locatarios.push(qualificarEmpresa(c.inquilino_nome, c.inquilino_cpf, c.inquilino_endereco, pessoaDe(c, 'representante_'), c.representante_cargo));
   else locatarios.push(qualificarPessoa(pessoaDe(c, 'inquilino_')));
-  const fiadores = d.fiadores.filter((f) => f.contrato_id === c.id && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (extra.data || C.hojeIso())));
+  const fiadores = extra.fiadores || fiadoresNaData(d, c.id, extra.data);
   const temFiador = ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && fiadores.length > 0;
   const aluguel = c.aluguel_inicial || 0;
   const pctBonif = c.bonificacao === false ? 0 : (c.desconto_pontualidade_percentual || 0);
@@ -261,7 +280,9 @@ export function pendenciasDoContrato(d, c) {
   if (c.garantia_tipo === 'Caução' && !(c.caucao_valor > 0) && !(c.caucao_meses > 0)) falta.push('caução: valor ou quantos aluguéis');
   if (!c.vigencia_inicio || (c.prazo_tipo !== 'Indeterminado' && !c.vigencia_fim)) falta.push('datas do contrato');
   if (!c.indice_correcao) falta.push('índice de correção');
-  if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)) falta.push('fiador');
+  // troca de titular com a garantia que continua: o fiador ainda está no contrato de quem sai (vai ao termo, `fiadoresDaTroca`)
+  if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)
+    && !(c.contrato_anterior_id && fiadoresDaTroca(d, c).length)) falta.push('fiador');
   for (const e of locadorasDoContrato(d, c)) {
     if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
     if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
@@ -584,13 +605,24 @@ export function dadosDoAditivo(d, c, a) {
     dia_vencimento_anterior: numeroComExtenso(a.dia_anterior),
     dia_vencimento_novo: numeroComExtenso(a.dia_novo),
     primeiro_vencimento: dataPorExtenso(a.primeiro_vencimento),
-    mes_referencia: `${MESES[Number(ref.slice(5, 7)) - 1]} de ${ref.slice(0, 4)}`,
+    mes_referencia: mesPorExtenso(ref),
   });
   dados.condicoes.mes_seguinte = mesSeguinte;
   return dados;
 }
 
 export const TIPO_ADITIVO_TROCA = 'Troca de titular';
+
+/**
+ * Fiadores do termo da troca de titular: os do contrato de quem entra; com a garantia que continua e quem entra ainda sem
+ * fiador, os de agora do contrato de quem sai (eles só passam ao novo com o termo assinado, em `transferirHeranca`, e
+ * precisam assinar concordando). Ex.: Pedro tem o fiador José; Lúcia assume com a garantia que continua → José no termo.
+ */
+export function fiadoresDaTroca(d, c, data) {
+  const proprios = fiadoresNaData(d, c.id, data);
+  const ant = c.contrato_anterior_id && d.contratos.find((x) => x.id === c.contrato_anterior_id);
+  return proprios.length || !ant || c.garantia_na_troca === 'nova' ? proprios : fiadoresNaData(d, ant.id, data);
+}
 
 /**
  * Termo aditivo de troca de inquilino (herança do contrato). ``c``: o contrato do novo titular (continua o anterior);
@@ -605,7 +637,8 @@ function dadosDoAditivoTroca(d, c, a) {
     vistos.add(original.id);
     original = d.contratos.find((x) => x.id === original.contrato_anterior_id) || original;
   }
-  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
+  // fiadores: com a garantia que continua, os do contrato (ainda no de quem sai até o termo ser assinado)
+  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [], fiadores: fiadoresDaTroca(d, c, a.data) });
   const saiu = ant.id ? dadosDoContrato(d, ant, { data: a.data }) : { campos: { locatarios: '', solidario: '' }, assinaturas: [] };
   const saintes = [saiu.campos.locatarios, saiu.campos.solidario].filter(Boolean);
   const entrantes = [dados.campos.locatarios, dados.campos.solidario].filter(Boolean);
@@ -694,17 +727,34 @@ const GRAU = { Novo: 0, 'Ótimo': 1, Bom: 2, 'Marcas de uso': 3, Avaria: 4, 'Nã
 /** Na saída, o item piorou em relação à entrada? */
 export const piorou = (entrada, saida) => GRAU[saida] !== undefined && GRAU[entrada] !== undefined && GRAU[saida] > GRAU[entrada];
 
+const maisRecente = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+/**
+ * Vistoria de entrada que vale para o contrato (fonte única: comparação da saída, chaves do recibo, rotina e telas).
+ * A do próprio contrato (a mais recente, se foi refeita); sem ela, troca de titular: sobe a cadeia e vale a do titular
+ * anterior mais próximo que tem uma. Ex.: Pedro entrou em 10/01/2025 com vistoria; Lúcia assumiu em 01/04/2026 sem fazer
+ * outra → a saída de Lúcia compara com a de Pedro (é a que integra o contrato, como diz o termo da troca). Se Lúcia fez a
+ * dela na troca, vale a dela: é o estado em que ela recebeu o imóvel (o que piorou antes fica com quem saiu). Null se não há.
+ */
+export function vistoriaDeEntrada(d, c) {
+  const vistos = new Set();
+  for (let x = c; x && !vistos.has(x.id); x = x.contrato_anterior_id ? d.contratos.find((y) => y.id === x.contrato_anterior_id) : null) {
+    vistos.add(x.id);
+    const v = (d.vistorias || []).filter((y) => y.contrato_id === x.id && y.tipo === 'Entrada'
+      && (x === c || !c.imovel_id || !y.imovel_id || y.imovel_id === c.imovel_id)).sort(maisRecente)[0];
+    if (v) return v;
+  }
+  return null;
+}
+
 /**
  * Resultado da vistoria de saída registrada (fonte única do "Vistoria de saída" do cálculo final):
  * { texto: 'Não feita' | 'Sem pendências' | 'Com pendências', vistoria, pendencias: ['Sala – Teto (Avaria: infiltração)'] }.
  * Pendência = item pior que na entrada (ou, sem o item na entrada, "Avaria"/"Não funciona"); sem grade, as linhas "DIFERENÇA:" do descritivo.
  */
 export function resultadoVistoriaSaida(d, c) {
-  const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
-  const doContrato = (d.vistorias || []).filter((v) => v.contrato_id === c.id).sort(porData);
-  const vistoria = doContrato.find((v) => v.tipo === 'Saída') || null;
+  const vistoria = (d.vistorias || []).filter((v) => v.contrato_id === c.id && v.tipo === 'Saída').sort(maisRecente)[0] || null;
   if (!vistoria) return { texto: 'Não feita', vistoria: null, pendencias: [] };
-  const entrada = doContrato.find((v) => v.tipo === 'Entrada');
+  const entrada = vistoriaDeEntrada(d, c);
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
   let pendencias = (vistoria.itens || []).filter((x) => {
     const ent = naEntrada.get(`${x.comodo}|${x.item}`);

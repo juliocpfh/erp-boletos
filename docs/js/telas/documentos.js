@@ -215,8 +215,6 @@ export async function guardarCartasAntigas() {
 }
 
 /** Nome dos arquivos baixados: "Documento Imóvel - Inquilino - ano de entrada" (ex.: "Contrato locação Loja 1 - Maria - 2026"). */
-const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-const dataPorExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES_EXTENSO[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
 
 /**
  * Declaração anual de aluguéis (D9): uma folha por empresa que emitiu as NFs, para o IRPF do inquilino. Só o aluguel pago
@@ -237,7 +235,7 @@ function declaracaoHtml(r, g) {
       <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${C.reais(g.total)}</b></td></tr></table>
     ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ''}
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
-    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${dataPorExtenso(C.hojeIso())}.</p>
+    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
 }
 
@@ -258,7 +256,8 @@ export async function documentoMontado(tipo, q) {
     if (!c) return null;
     const momento = v.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = R.leiturasDo(d(), c.id).find((l) => l.momento === momento) || null;
-    const entrada = v.tipo === 'Saída' ? R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada') : null;
+    // na saída, compara com a vistoria de entrada do contrato (na troca de titular, a do titular anterior)
+    const entrada = v.tipo === 'Saída' ? K.vistoriaDeEntrada(d(), c) : null;
     const fotos = await fotosDaVistoria(v);
     const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
     const arquivo = nomeArquivoDoc(`Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')}`, c, String(c.data_entrada || v.data || '').slice(0, 4));
@@ -280,7 +279,7 @@ export async function documentoMontado(tipo, q) {
 
 /** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
 function chavesDoContrato(c) {
-  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  const entrada = K.vistoriaDeEntrada(d(), c);
   return (entrada && entrada.chaves) || ((i) => (i.sem_chaves ? '' : i.chaves))(buscar('imoveis', c.imovel_id) || {}) || '';
 }
 
@@ -312,8 +311,10 @@ export function telaVistoria(rota) {
   if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
   const i = buscar('imoveis', c.imovel_id) || {};
-  const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
-  // ponto de partida: na saída, a vistoria de entrada deste inquilino; na entrada, a última vistoria do imóvel
+  // vistoria de entrada do contrato: a deste inquilino ou, se ele continua o contrato de outro, a do titular anterior
+  const entrada = K.vistoriaDeEntrada(d(), c);
+  const deQuem = entrada && entrada.contrato_id !== c.id ? buscar('contratos', entrada.contrato_id) : null;
+  // ponto de partida: na saída, a vistoria de entrada do contrato; na entrada, a última vistoria do imóvel
   const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
   const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
   const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
@@ -326,7 +327,7 @@ export function telaVistoria(rota) {
   const textoFinal = (v ? v.texto_final : base.texto_final) || K.vistoriaFinal((v && v.prazo_dias) || 3);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
-    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
+    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? (deQuem ? `vistoria de entrada do contrato, feita com ${esc(deQuem.inquilino_nome)} em ${dataBr(entrada.data)} (troca de titular)` : 'vistoria de entrada deste inquilino') : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
     ${tipo === 'Saída' && !grade ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
     ${grade ? '' : `<div class="alerta info">Este imóvel ainda não tem <b>modelo de vistoria</b>. ${linkModelo('Montar o modelo do imóvel')} Montado uma vez, a vistoria vira só marcar a situação de cada item.</div>`}
     <form class="cartao" data-form="vistoria" data-rascunho="vistoria-${c.id}-${tipo === 'Saída' ? 'saida' : 'entrada'}-${v ? v.id : 'nova'}">
