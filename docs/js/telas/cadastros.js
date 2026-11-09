@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, memoria, naoEncontrado, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -57,6 +57,10 @@ const COMPROVANTE_APLICACAO = [{ campo: 'comprovante', valor: 'valor', data: 'da
 const comprovanteDoDeposito = (r) => [{ campo: 'comprovante', valor: 'valor', data: 'data', nome: r.qual === 'caucao' ? 'caucao' : 'deposito-garantia', texto: 'do depósito', vale: () => true }];
 
 const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
+const COMPROVANTES_FICHA = [
+  { campo: 'comprovante_reserva', valor: 'reserva_valor', data: 'reserva_data', nome: 'reserva', texto: 'da reserva', vale: () => true },
+  { campo: 'comprovante_devolucao', valor: 'devolucao_valor', data: 'devolucao_data', nome: 'devolucao-reserva', texto: 'da devolução da reserva', vale: (x) => x.situacao === 'Reprovada' },
+];
 const COMPROVANTE_DEVOLUCAO = [{ campo: 'comprovante', valor: 'garantia_valor', data: 'data', nome: 'devolucao-garantia', texto: 'da devolução da garantia', vale: () => true }];
 
 const arquivoEscolhido = (form, campo) => { const el = form.querySelector(`[name="${campo}"]`); return (el && el.files && el.files[0]) || null; };
@@ -198,7 +202,8 @@ export const CADASTROS = {
     },
     // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
-    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
+    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(q.ficha && buscar('fichas', q.ficha) ? R.dadosDaFicha(d(), buscar('fichas', q.ficha)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
@@ -206,7 +211,8 @@ export const CADASTROS = {
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
-    aviso: (r, q) => (!r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
+    aviso: (r, q) => (!r && q && q.ficha && buscar('fichas', q.ficha) ? `Contrato a partir da ficha aprovada de ${buscar('fichas', q.ficha).inquilino_nome}: os dados da pessoa${R.dadosDaFicha(d(), buscar('fichas', q.ficha)).reserva_valor ? ' e a reserva' : ''} já vieram preenchidos. Complete garantia, fiador, o que está incluso, valores, datas e vencimento.${buscar('fichas', q.ficha).documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`
+      : !r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
       : r ? `Imóvel: ${(buscar('imoveis', r.imovel_id) || {}).nome || 'sem imóvel'} (não muda aqui; lançado errado: "Corrigir imóvel" na página do inquilino). Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).` : ''),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
@@ -280,6 +286,12 @@ export const CADASTROS = {
         else fiadoresMudancas.novos.push(f);
       }
       conferirComprovantes(COMPROVANTES_CONTRATO, dados, r, form);
+      // contrato a partir da ficha: fica ligado a ela; o comprovante da reserva da ficha vale (vai para a pasta do inquilino em "depois")
+      const ficha = !r && q.ficha ? buscar('fichas', q.ficha) : null;
+      if (ficha) {
+        dados.ficha_id = ficha.id;
+        if (!dados.comprovante_reserva && ficha.comprovante_reserva && !ficha.documentos_no_contrato && dados.reserva_valor === ficha.reserva_valor) dados.comprovante_reserva = ficha.comprovante_reserva;
+      }
       avisoAditivo = '';
       // "Possui termo aditivo" só aparece quando um termo assinado é anexado
       if (r && (dados.dia_vencimento !== r.dia_vencimento || (r.garantia_tipo && dados.garantia_tipo !== r.garantia_tipo))) {
@@ -325,6 +337,10 @@ export const CADASTROS = {
     },
     recalcular: (salvo) => (cb) => cb.contrato_id === salvo.id,
     async depois(salvo, antigo) {
+      if (!antigo && salvo.ficha_id) {
+        const n = await levarDocumentosDaFicha(salvo.ficha_id, salvo.id);
+        if (n) aviso(`${n} documento(s) da ficha foram para a pasta do inquilino.`);
+      }
       if (avisoAditivo) aviso(avisoAditivo, 'aviso');
       avisoAditivo = '';
       // troca de titular com o termo aditivo já assinado: vai para "Termos aditivos" do novo contrato
@@ -355,6 +371,67 @@ export const CADASTROS = {
       }
     },
     destino: (salvo) => `#/contrato/${salvo.id}`,
+  },
+  fichas: {
+    titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Nova ficha em análise'),
+    // imóveis de interesse: uma caixa de marcar por imóvel (o que já tem outra ficha aberta aparece avisado)
+    campos: (r) => {
+      const hoje = C.hojeIso();
+      const vago = (i) => !d().contratos.some((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje));
+      const imoveis = ordenar(d().imoveis, 'nome').map((i) => {
+        const outra = R.fichaAbertaDoImovel(d(), i.id, r && r.id);
+        return { nome: `imovel_${i.id}`, rotulo: `${i.nome}${vago(i) ? ' · vago' : ''}${outra ? ` · já tem a ficha de ${outra.inquilino_nome}` : ''}`, tipo: 'simnao' };
+      });
+      return [...F.FICHA_INICIO,
+        { secao: 'Imóveis de interesse' },
+        { nome: 'modo_imoveis', rotulo: 'A ficha é para', tipo: 'opcao', obrig: true, padrao: R.MODOS_FICHA[0], opcoes: R.MODOS_FICHA, largo: true,
+          ajuda: 'Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada)' },
+        { quebra: true }, ...imoveis,
+        ...F.camposDaPessoa(R.CAMPOS_PESSOA), ...F.FICHA_FIM];
+    },
+    padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
+    valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', ...Object.fromEntries((r.imoveis_ids || []).map((id) => [`imovel_${id}`, true])) }),
+    compacto: true,
+    voltar: (r) => (r ? `#/ficha/${r.id}` : '#/inquilinos'),
+    destino: (salvo) => `#/ficha/${salvo.id}`,
+    descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
+    ajustar(dados, erros, r, form) {
+      const hoje = C.hojeIso();
+      const ids = d().imoveis.filter((i) => dados[`imovel_${i.id}`]).map((i) => i.id);
+      for (const k of Object.keys(dados)) if (/^imovel_\d+$/.test(k)) delete dados[k];
+      dados.imoveis_ids = ids;
+      if (!ids.length) erros.modo_imoveis = 'Marque pelo menos um imóvel de interesse';
+      const comContrato = r ? Object.keys(R.contratosDaFicha(d(), r)).map(Number) : [];
+      if (comContrato.some((id) => !ids.includes(id))) erros.modo_imoveis = 'Um imóvel desmarcado já tem contrato feito a partir desta ficha';
+      // cada imóvel tem no máximo uma ficha aberta (em análise ou aprovada sem contrato)
+      if (dados.situacao !== 'Reprovada') {
+        for (const id of ids.filter((x) => !comContrato.includes(x))) {
+          const outra = R.fichaAbertaDoImovel(d(), id, r && r.id);
+          if (outra) { erros.modo_imoveis = `${buscar('imoveis', id).nome} já tem a ficha de ${outra.inquilino_nome} em aberto. Cada imóvel fica com uma ficha por vez: decida aquela antes, ou desmarque o imóvel.`; break; }
+        }
+      }
+      if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = 'Esta ficha já virou contrato: a situação fica "Aprovada"';
+      // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
+      if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
+        dados.decisao_data = dados.decisao_data || hoje;
+        dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
+        if (dados.decisao_data > hoje) erros.decisao_data = 'A decisão não pode ser numa data futura';
+      }
+      if (dados.situacao !== 'Reprovada') { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
+        if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
+        if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
+        if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
+      }
+      if (!dados.solidario_nome) for (const k of Object.keys(dados)) if (k.startsWith('solidario_')) dados[k] = null;
+      // a pasta é escolhida ao criar e não muda (o nome pode ser corrigido depois)
+      dados.pasta = r ? (r.pasta || nomePastaFicha(r)) : nomePastaFicha(dados);
+      conferirComprovantes(COMPROVANTES_FICHA, dados, r, form);
+    },
+    async ajustarAsync(dados, erros, r, form) {
+      const pasta = r ? () => pastaDoEscopo('ficha', r.id)
+        : async () => S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, dados.pasta]);
+      await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta);
+    },
   },
   correcoes: {
     titulo: (r, q) => `Correção do aluguel - ${buscar('contratos', q.contrato).inquilino_nome}`,

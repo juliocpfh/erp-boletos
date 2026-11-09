@@ -13,7 +13,7 @@ export const TABELAS = {
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução', depositos_garantia: 'Depósito da caução / garantia',
   devolucoes_garantia: 'Devolução da garantia (troca de titular)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
-  reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino',
+  reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', acordos: 'Acordo de dívida', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
@@ -1770,7 +1770,7 @@ export const leiturasDoImovel = (d, imovelId) => d.leituras.filter((l) => l.imov
 export const leiturasDo = (d, contratoId) => d.leituras.filter((l) => l.contrato_id === contratoId).sort(porData);
 
 /** Dados da pessoa (não do contrato), copiados quando o mesmo inquilino aluga outro imóvel. */
-const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_apelido', 'inquilino_telefone', 'inquilino_whatsapp', 'inquilino_email',
+export const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_apelido', 'inquilino_telefone', 'inquilino_whatsapp', 'inquilino_email',
   'inquilino_cpf', 'inquilino_rg', 'responsavel_nome', 'responsavel_telefone', 'responsavel_email',
   'representante_nome', 'representante_cpf', 'representante_rg', 'representante_cargo', 'representante_telefone', 'representante_email',
   'solidario_nome', 'solidario_cpf', 'solidario_rg', 'solidario_telefone', 'solidario_email',
@@ -1825,6 +1825,68 @@ export function dataApagarSemImovel(c) {
 /** Contratos sem imóvel há 7 dias ou mais e sem boleto: são apagados ao abrir o sistema. */
 export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
   return d.contratos.filter((c) => { const data = dataApagarSemImovel(c); return data && data <= hoje && !d.cobrancas.some((x) => x.contrato_id === c.id); });
+}
+
+// --------------------------------------------------------------------------
+// Fichas em análise (pedido do dono, 2026-11-09): o interessado manda os dados, a reserva e os documentos; a equipe analisa
+// e aprova ou reprova. Aprovada, vira o contrato (Novo contrato já preenchido). Uma ficha pode ser para vários imóveis
+// (só um deles, ou todos juntos), mas cada imóvel tem no máximo uma ficha aberta. Reprovada: a reserva é devolvida (data e
+// comprovante) e os documentos pessoais são apagados 3 meses depois da decisão.
+// --------------------------------------------------------------------------
+export const SITUACOES_FICHA = ['Em análise', 'Aprovada', 'Reprovada'];
+export const MODOS_FICHA = ['Apenas um dos imóveis', 'Todos juntos'];
+export const MESES_DOCUMENTOS_REPROVADA = 3;
+/** Campos de arquivo da ficha ligados a um lançamento (os demais documentos ficam soltos na pasta da ficha). */
+export const CAMPOS_ARQUIVO_FICHA = ['comprovante_reserva', 'comprovante_devolucao'];
+
+/** Imóveis da ficha que já têm contrato feito a partir dela: { imovel_id: contrato_id }. */
+export function contratosDaFicha(d, f) {
+  const out = {};
+  for (const c of d.contratos) if (c.ficha_id === f.id && c.imovel_id) out[c.imovel_id] = c.id;
+  return out;
+}
+
+/** Imóveis que ainda podem virar contrato desta ficha aprovada ("apenas um": nenhum depois do primeiro contrato). */
+export function imoveisParaContrato(d, f) {
+  if (f.situacao !== 'Aprovada') return [];
+  const feitos = contratosDaFicha(d, f);
+  if (f.modo_imoveis !== 'Todos juntos' && Object.keys(feitos).length) return [];
+  return (f.imoveis_ids || []).filter((id) => !feitos[id]);
+}
+
+/** Ficha ainda aberta: em análise, ou aprovada com contrato por fazer. Ocupa os imóveis dela. */
+export const fichaAberta = (d, f) => f.situacao === 'Em análise' || (f.situacao === 'Aprovada' && imoveisParaContrato(d, f).length > 0);
+
+/** Outra ficha aberta para o imóvel (cada imóvel tem no máximo uma). */
+export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas || []).find((f) => f.id !== excetoId && fichaAberta(d, f) && (f.imoveis_ids || []).includes(Number(imovelId))) || null;
+
+/** Reserva de ficha reprovada que ainda não teve a devolução registrada. */
+export const devolucaoPendente = (f) => f.situacao === 'Reprovada' && f.reserva_valor > 0 && !f.devolucao_data;
+
+/** Data em que os documentos da ficha reprovada são apagados (3 meses depois da decisão), ou null. */
+export const dataApagarDocumentosFicha = (f) => (f.situacao === 'Reprovada' && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, MESES_DOCUMENTOS_REPROVADA) : null);
+
+/** Fichas reprovadas com os documentos para apagar hoje. */
+export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
+
+/** O que falta fazer nas fichas, para o Painel: [{ ficha, texto }]. */
+export function pendenciasDasFichas(d) {
+  const out = [];
+  for (const f of d.fichas || []) {
+    if (f.situacao === 'Em análise') out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} em análise desde ${C.dataBr(f.data_recebida)}` });
+    else if (imoveisParaContrato(d, f).length) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} aprovada: falta fazer o contrato` });
+    if (devolucaoPendente(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} reprovada: registrar a devolução da reserva de ${C.reais(f.reserva_valor)}` });
+  }
+  return out;
+}
+
+/**
+ * Dados da ficha para o Novo contrato (#/novo/contratos?ficha=ID): os da pessoa e, no primeiro contrato feito a partir
+ * dela, a reserva (valor, data e o comprovante, que vai para a pasta do inquilino ao salvar).
+ */
+export function dadosDaFicha(d, f) {
+  const primeiro = !Object.keys(contratosDaFicha(d, f)).length;
+  return { ...dadosDaPessoa(f), ...(primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data } : {}) };
 }
 
 /** Exclui o contrato e tudo o que pertence a ele (boletos, fiadores, garantia, vistorias...). */
@@ -3033,6 +3095,7 @@ export function arquivosReferenciados(d) {
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
+  for (const f of d.fichas || []) for (const k of CAMPOS_ARQUIVO_FICHA) usa('ficha', f.id, f[k]);
   // comprovantes do banco: na pasta do imóvel (Contas pagas/<ano> ou IPTU (guias)/<ano>) e na pasta do contador
   for (const t of ['movimentacoes_banco', 'pagamentos_banco']) {
     for (const m of d[t] || []) {
@@ -3091,6 +3154,10 @@ export function rotulosDosArquivos(d) {
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
   for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
+  for (const f of d.fichas || []) {
+    poe('ficha', f.id, f.comprovante_reserva, `comprovante da reserva (${C.dataBr(f.reserva_data)})`);
+    poe('ficha', f.id, f.comprovante_devolucao, `comprovante da devolução da reserva (${C.dataBr(f.devolucao_data)})`);
+  }
   for (const s of d.seguros) {
     poe('seguro', s.contrato_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
     for (const nome of s.outros_arquivos || []) poe('seguro', s.contrato_id, nome, `outro arquivo da apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);

@@ -236,14 +236,19 @@ export const TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administracao de Imoveis
 O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
 - ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
-- ${PASTA_PROGRAMA}/   a VERSAO PC do sistema (${ARQUIVO_PROGRAMA}), atualizada sozinha
+- ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 
-SE O SITE OU O CLOUDFLARE CAIREM:
+SE O SITE OU O CLOUDFLARE CAIREM (ou sem internet):
+Abra o sistema pelo icone do aplicativo instalado (ou pelo endereco de sempre no Chrome). Ele abre com os dados da
+ultima vez que este computador esteve conectado; trabalhe normalmente: o que voce fizer sobe sozinho quando o site voltar.
+Nao precisa desta pasta.
+
+SO EM CASO DE DESASTRE (dados da nuvem perdidos, ex.: conta do Cloudflare perdida), com ajuda:
 1. Abra ${PASTA_PROGRAMA}/${ARQUIVO_PROGRAMA} com dois cliques (Chrome ou Edge).
 2. Clique em "restaurar um backup seguro", escolha a copia mais recente de ${PASTA_DIARIO}/ (ou um completo),
    digite a senha do backup e mande abrir numa pasta nova do computador.
 3. O sistema abre inteiro, com os dados daquela copia. Pode trabalhar normalmente.
-4. Quando o site voltar: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta" leva o que voce fez para a nuvem.
+4. Para levar de volta a uma nuvem nova: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta".
 
 Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: sem ele e sem a senha, nada abre.
 `;

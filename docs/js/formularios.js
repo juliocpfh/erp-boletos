@@ -323,6 +323,48 @@ export const CONTRATO = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/**
+ * Ficha em análise (pré-cadastro do interessado): só os dados da pessoa, os mesmos do inquilino no contrato (Inquilino,
+ * Representante da empresa e Inquilino solidário), sem o que é do contrato. Os imóveis de interesse (caixas de marcar) são
+ * montados na tela (CADASTROS.fichas), porque dependem dos imóveis cadastrados.
+ */
+const PARTES_DA_PESSOA = ['Inquilino (responsável pelo contrato)', 'Representante da empresa (pessoa física)', 'Inquilino solidário'];
+const RENOMEAR_PARTE = { 'Inquilino (responsável pelo contrato)': 'Interessado (quem vai assinar o contrato)' };
+export function camposDaPessoa(nomesDaPessoa) {
+  let parte = null;
+  return CONTRATO.filter((c) => {
+    if (c.secao) parte = PARTES_DA_PESSOA.includes(c.secao) ? c.secao : null;
+    if (!parte) return false;
+    return c.secao || c.quebra || nomesDaPessoa.includes(c.nome) || /cep_busca$/.test(c.nome || '');
+  }).map((c) => (RENOMEAR_PARTE[c.secao] ? { ...c, secao: RENOMEAR_PARTE[c.secao] } : c));
+}
+
+export const FICHA_INICIO = [
+  secao('Ficha'),
+  campo('data_recebida', 'Ficha recebida em', 'data', { obrig: true }),
+  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato' }),
+  campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada'), ajuda: 'Em branco: hoje' }),
+  campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada') }),
+];
+
+export const FICHA_FIM = [
+  secao('Documentos recebidos'),
+  campo('doc_ficha', 'Ficha cadastral', 'simnao'),
+  campo('doc_pessoais', 'Documentos pessoais (RG, CPF, CNH)', 'simnao'),
+  campo('doc_renda', 'Comprovante de renda', 'simnao'),
+  campo('doc_residencia', 'Comprovante de residência', 'simnao'),
+  secao('Reserva'),
+  campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
+  campo('reserva_data', 'Data da reserva', 'data'),
+  comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino' }),
+  { secao: 'Devolução da reserva (ficha reprovada)', ...quando('situacao', 'Reprovada') },
+  campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada')),
+  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada'), ajuda: 'Em branco: o valor da reserva' }),
+  comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada'), ajuda: 'PDF ou foto do comprovante da devolução' }),
+  secao('Observações'),
+  campo('observacoes', 'Observações da análise', 'area'),
+];
+
 export const CORRECAO = [
   campo('data_vigencia', 'Vale a partir de', 'data', { obrig: true, ajuda: 'O boleto de um mês usa o valor vigente no dia 1º daquele mês' }),
   campo('indice', 'Índice usado nesta correção', 'opcao', { obrig: true, lista: 'indices', ajuda: 'O índice previsto no contrato fica guardado junto, no histórico' }),

@@ -20,13 +20,13 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
     ${S.suportado() ? '<div><label>O que fazer</label><select name="destino"><option value="pasta">Abrir numa pasta nova do computador (o sistema abre com esses dados)</option><option value="zip">Só baixar o ZIP</option></select></div>' : '<input type="hidden" name="destino" value="zip">'}
     <div class="check"><button>Abrir o backup</button></div></form>
-  <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. É o caminho quando o site está fora do ar: você trabalha na pasta e, quando o site voltar, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
+  <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
     <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
 
 export function telaRestaurarBackup() {
   return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
     <h1>Restaurar backup seguro</h1>
-    <p>Use quando o site estiver fora do ar ou em caso de erro geral: escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
+    <p>Use só em caso de desastre (dados perdidos). Site fora do ar ou sem internet: abra pelo aplicativo instalado, que guarda os dados neste aparelho e envia sozinho quando voltar. Para restaurar, escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
     ${FORM_RESTAURAR}
     <p><a href="#/">Voltar</a></p></div></main>`;
 }
@@ -75,7 +75,7 @@ const AVISO_SEGURO_DISPENSADO = 'imoveis-aviso-backup-seguro';
 export function avisoBackupSeguro() {
   if (!podeUsuario('admin') || E.seguro || !S.suportado() || window.VERSAO_OFFLINE) return '';
   try { if (localStorage.getItem(AVISO_SEGURO_DISPENSADO)) return ''; } catch { /* sem armazenamento */ }
-  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, este computador não tem a cópia dos dados nem a versão PC para abrir o sistema se o site cair.
+  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, este computador não guarda a cópia dos dados fora do Cloudflare (reserva para um desastre).
     ${link('#/backup-seguro', 'Ligar o backup seguro', 'botao pequeno')} ${botao('dispensarAvisoSeguro', 'Não avisar neste computador', {}, 'secundario pequeno')}</div>`;
 }
 export const dispensarAvisoSeguro = () => { try { localStorage.setItem(AVISO_SEGURO_DISPENSADO, '1'); } catch { /* sem armazenamento */ } };
@@ -204,11 +204,12 @@ export async function telaDados() {
       <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
         <div class="alerta perigo" style="margin-top:8px"><b>Só para voltar a uma pasta do computador</b> (ex.: a pasta do OneDrive de antes da nuvem, ou uma pasta aberta de um backup). Tudo o que está na nuvem é trocado pelo que está na pasta: o que foi lançado depois, por qualquer aparelho, <b>se perde</b> (fica uma cópia de antes nos backups da nuvem). Para desfazer um dia ruim, prefira "Backups da nuvem".</div>
         <p>${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div></details>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
-    ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro e versão PC (só administrador)</h2>
-      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração, um backup completo (banco + anexos) por semana e a <b>versão PC</b> do sistema (o programa inteiro num arquivo, atualizado sozinho). Se o site ou o Cloudflare caírem, a versão PC abre com os dados da última cópia; o <b>LEIA-ME.txt</b> da pasta explica.${E.nuvem ? ' Na nuvem é a segunda camada, fora do Cloudflare: vale ter.' : ''}</p>
+    ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana, sozinha, sem pedir nada. É a reserva para um desastre (ex.: perder a conta do Cloudflare).${E.nuvem ? ' Na nuvem é a segunda camada, fora do Cloudflare: vale ter.' : ''}</p>
+      ${E.nuvem ? '<p><b>Sem internet ou com o site fora do ar:</b> abra o sistema pelo ícone do aplicativo instalado (ou pelo endereço de sempre no Chrome). Ele abre com os dados da última vez que este aparelho esteve conectado, você trabalha normalmente e as alterações sobem sozinhas quando a conexão voltar.</p>' : ''}
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
-      ${link('#/backup-seguro', 'Abrir o backup seguro')}${window.VERSAO_OFFLINE || E.nuvem ? '' : ` · <a href="${B.CAMINHO_PROGRAMA}" download="Administração de Imóveis.html">baixar a versão PC agora</a>`}</p></div>` : ''}
+      ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}

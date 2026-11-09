@@ -12,7 +12,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = 'Sat, 07 Nov 2026 
   const origem = `https://${hostname}`;
   const armazem = new Map(); // nome do cache → Map(url → Response)
   const pedidos = []; // o que foi ao site
-  const site = { publicada, internet: true };
+  const site = { publicada, internet: true, erro: 0 }; // erro: o site responde com página de erro (ex.: 502 do Cloudflare)
   const chave = (k) => (k instanceof Request ? k.url : new URL(k, `${origem}/`).href);
   const cacheFalso = (nome) => {
     if (!armazem.has(nome)) armazem.set(nome, new Map());
@@ -42,7 +42,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = 'Sat, 07 Nov 2026 
     const metodo = init.method || (req instanceof Request ? req.method : 'GET');
     pedidos.push(`${metodo} ${new URL(url).pathname}${init.cache ? ` (${init.cache})` : ''}`);
     if (!site.internet) throw new TypeError('Failed to fetch');
-    const r = new Response(`conteudo de ${new URL(url).pathname} @ ${site.publicada}`, { status: 200, headers: { 'last-modified': site.publicada } });
+    const r = site.erro ? new Response('Bad gateway', { status: site.erro }) : new Response(`conteudo de ${new URL(url).pathname} @ ${site.publicada}`, { status: 200, headers: { 'last-modified': site.publicada } });
     Object.defineProperty(r, 'type', { value: 'basic' });
     Object.defineProperty(r, 'url', { value: url });
     return r;
@@ -100,6 +100,18 @@ test('sem internet: a página e os arquivos vêm da cópia', async () => {
   const textos = await m.abrir();
   assert.match(textos[2], /css\/estilo\.css/);
   assert.match(await m.pedir('', 'navigate'), /conteudo de \//);
+});
+
+test('site fora do ar respondendo com página de erro (502): abre a cópia guardada, como sem internet', async () => {
+  const m = mundo();
+  await m.abrir();
+  m.site.erro = 502;
+  const textos = await m.abrir();
+  assert.match(textos[0], /js\/app\.js/, 'arquivo da cópia');
+  assert.match(await m.pedir('', 'navigate'), /conteudo de \//, 'página da cópia, não a de erro');
+  // sem cópia guardada (primeira vez), mostra o erro do site
+  const novo = mundo(); novo.site.erro = 502;
+  assert.equal(await novo.pedir('', 'navigate'), 'Bad gateway');
 });
 
 test('em localhost (desenvolvimento) cada arquivo é conferido com o servidor, como antes', async () => {
