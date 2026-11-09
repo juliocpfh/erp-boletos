@@ -211,9 +211,11 @@ export const TELAS = {
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
     const mesAtual = C.competenciaDe(hoje);
     // tudo o que ficou para trás nos meses anteriores (ex.: NFs de 10/2026 numeradas depois da virada, contas de 09/2026), mais as etapas do mês já liberadas e não feitas
-    const faltamEtapas = [...R.etapasAtrasadas(d(), mesAtual, hoje),
-      ...R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
-    const previstas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => e.prevista && e.chave !== 'cartas');
+    // os pagamentos sem NF (pend) servem a todos os meses; as etapas do mês atual são calculadas uma vez
+    const etapasDoMes = R.etapasFechamento(d(), mesAtual, hoje, { pendentes: pend });
+    const faltamEtapas = [...R.etapasAtrasadas(d(), mesAtual, hoje, { pendentes: pend }),
+      ...etapasDoMes.filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
+    const previstas = etapasDoMes.filter((e) => e.prevista && e.chave !== 'cartas');
     const incompletos = cadastrosIncompletos();
     // o tipo de alerta com mais avisos ativos (ex.: 4 de "Reajuste do aluguel")
     const porTipo = {};

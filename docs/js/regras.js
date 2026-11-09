@@ -1367,6 +1367,25 @@ export const faturasDe = (d, tipo, id, soValidas = true) => d.faturas
   .filter((f) => f.origem_tipo === tipo && f.origem_id === id && (!soValidas || f.situacao === 'Emitida'))
   .sort((a, b) => a.id - b.id);
 
+/**
+ * Índice das NFs emitidas por origem, numa passada só: ``nfs(tipo, id)`` dá o mesmo que ``faturasDe(d, tipo, id)``.
+ * Para telas e rotinas que procuram as NFs de muitos boletos: monte uma vez por desenho (as NFs mudam a cada gravação).
+ * A origem é comparada como está gravada (número ou texto, em dados antigos), como em ``faturasDe``.
+ */
+export function indiceFaturas(d) {
+  const porTipo = new Map();
+  for (const f of d.faturas) {
+    if (f.situacao !== 'Emitida') continue;
+    let m = porTipo.get(f.origem_tipo);
+    if (!m) porTipo.set(f.origem_tipo, (m = new Map()));
+    const l = m.get(f.origem_id);
+    if (l) l.push(f); else m.set(f.origem_id, [f]);
+  }
+  for (const m of porTipo.values()) for (const l of m.values()) l.sort((a, b) => a.id - b.id);
+  // a lista devolvida é a do índice: só para ler
+  return { nfs: (tipo, id) => (porTipo.get(tipo) && porTipo.get(tipo).get(id)) || [] };
+}
+
 export const participacoesDo = (d, imovelId) => d.participacoes.filter((p) => p.imovel_id === imovelId);
 
 export function cancelarFaturas(d, tipo, id, usuario) {
@@ -1392,16 +1411,16 @@ export function imovelSoControle(d, imovelId, hoje = C.hojeIso()) {
   return atuais.length > 0 && atuais.every((c) => !geraNf(c));
 }
 
-/** Cobranças pagas e NFs avulsas que ainda não têm NF, na ordem do pagamento. */
-export function pendentesDeFatura(d) {
+/** Cobranças pagas e NFs avulsas que ainda não têm NF, na ordem do pagamento. ``indice``: ``indiceFaturas(d)``, se já montado. */
+export function pendentesDeFatura(d, indice = indiceFaturas(d)) {
   const lista = [];
   for (const cb of d.cobrancas) {
-    if (!cb.data_pagamento || !(cb.valor_nf > 0) || faturasDe(d, 'cobranca', cb.id).length) continue;
+    if (!cb.data_pagamento || !(cb.valor_nf > 0) || indice.nfs('cobranca', cb.id).length) continue;
     if (!geraNf(buscar(d, 'contratos', cb.contrato_id))) continue;
     lista.push({ tipo: 'cobranca', registro: cb, data: cb.data_pagamento });
   }
   for (const r of d.avulsas) {
-    if (!faturasDe(d, 'avulsa', r.id).length) lista.push({ tipo: 'avulsa', registro: r, data: r.data_pagamento });
+    if (!indice.nfs('avulsa', r.id).length) lista.push({ tipo: 'avulsa', registro: r, data: r.data_pagamento });
   }
   return lista.sort((a, b) => a.data.localeCompare(b.data) || a.tipo.localeCompare(b.tipo) || a.registro.id - b.registro.id);
 }
@@ -4122,15 +4141,18 @@ export function situacaoCustos(d, imovelId, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const aliquotaImpostos = () => Math.round(IMPOSTOS.reduce((t, x) => t + x.aliquota, 0) * 100) / 100;
 
-/** Fração do faturamento da empresa que vai para impostos no mês: { taxa, confirmado } (confirmado = as 3 guias do contador informadas). */
+/**
+ * Fração do faturamento da empresa que vai para impostos no mês: { taxa, confirmado } (confirmado = as 3 guias do contador informadas).
+ * ``cache``: { taxas: Map, faturamento: indiceFaturamento(d), nfs: indiceFaturas(d) }, montado a cada cálculo dos resultados.
+ */
 function taxaImpostos(d, emitenteId, mes, cache) {
   const chave = `${emitenteId}|${mes}`;
-  if (cache.has(chave)) return cache.get(chave);
+  if (cache.taxas.has(chave)) return cache.taxas.get(chave);
   const e = buscar(d, 'emitentes', emitenteId);
-  const fatMes = e ? faturamentoNf(d, e.id, mes).valor : 0;
+  const fatMes = e ? faturamentoNf(d, e.id, mes, cache.faturamento).valor : 0;
   let r = { taxa: aliquotaImpostos() / 100, confirmado: false };
   if (fatMes) {
-    const tri = guiasDaEmpresa(d, e, mesesDoTrimestre(mes)[2]);
+    const tri = guiasDaEmpresa(d, e, mesesDoTrimestre(mes)[2], cache.faturamento);
     let taxa = 0;
     let confirmado = true;
     for (const x of IMPOSTOS) {
@@ -4144,13 +4166,13 @@ function taxaImpostos(d, emitenteId, mes, cache) {
     }
     r = { taxa, confirmado };
   }
-  cache.set(chave, r);
+  cache.taxas.set(chave, r);
   return r;
 }
 
 /** Imposto das NFs de uma origem (boleto ou avulsa): { valor, confirmado }. Sem NF ainda: estimado sobre ``valorSemNf``. */
 function impostoDaOrigem(d, tipo, id, valorSemNf, cache) {
-  const fs = faturasDe(d, tipo, id);
+  const fs = cache.nfs.nfs(tipo, id);
   if (!fs.length) return { valor: Math.round((valorSemNf * aliquotaImpostos()) / 100), confirmado: false };
   let v = 0;
   let ok = true;
@@ -4172,7 +4194,7 @@ function impostoDaOrigem(d, tipo, id, valorSemNf, cache) {
 export function resultadosFinanceiros(d, de, ate) {
   const meses = Math.max(1, C.mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
   const dentro = (x) => x && x >= de && x <= ate;
-  const cache = new Map();
+  const cache = { taxas: new Map(), faturamento: indiceFaturamento(d), nfs: indiceFaturas(d) };
   return d.imoveis.map((i) => {
     // boleto de controle (inquilino sem NF) não entra no resultado financeiro
     const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
@@ -4229,6 +4251,22 @@ export function ultimosValores(d, imovelId) {
 /** Contrato ocupando o imóvel no dia (pela entrada e saída). */
 const ocupadoEm = (d, imovelId, dia) => d.contratos.some((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= dia
   && (c.data_saida ? c.data_saida >= dia : c.ativo !== false));
+
+/**
+ * Algum dia de ``ini`` a ``fim`` sem contrato ocupando o imóvel (o mesmo que perguntar ``ocupadoEm`` dia a dia): junta os
+ * períodos de entrada a saída dos contratos (sem saída: até o fim, se ativo) e procura um buraco.
+ */
+function vagoNoPeriodo(d, imovelId, ini, fim) {
+  const periodos = d.contratos.filter((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= fim && (c.data_saida ? c.data_saida >= ini : c.ativo !== false))
+    .map((c) => [c.data_entrada, c.data_saida || fim]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  let dia = ini; // primeiro dia ainda não coberto
+  for (const [entrada, saida] of periodos) {
+    if (entrada > dia) return true;
+    if (saida >= dia) dia = C.somarDias(saida, 1);
+    if (dia > fim) return false;
+  }
+  return dia <= fim;
+}
 export const MESES_DEPOIS_DE_ALUGAR = 2;
 const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
 
@@ -4241,9 +4279,7 @@ const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'G�
  */
 export function contasPermitidas(d, imovelId, comp) {
   const [ini, fim] = C.limitesCompetencia(comp);
-  for (let dia = ini; dia <= fim; dia = C.somarDias(dia, 1)) {
-    if (!ocupadoEm(d, imovelId, dia)) return { tipos: [...TIPOS_DESPESA], motivo: 'vago' };
-  }
+  if (vagoNoPeriodo(d, imovelId, ini, fim)) return { tipos: [...TIPOS_DESPESA], motivo: 'vago' };
   const limite = C.limitesCompetencia(C.somarMeses(comp, -MESES_DEPOIS_DE_ALUGAR))[0];
   const recente = d.contratos.find((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada >= limite && c.data_entrada <= fim
     && !ocupadoEm(d, imovelId, C.somarDias(c.data_entrada, -1)));
@@ -4346,9 +4382,10 @@ export const DIA_GERAR_BOLETOS = 20;
  * - a partir de 01/11 (depois da virada): lançar as NFs avulsas e do Airbnb de outubro e numerar as NFs de outubro.
  * Cada etapa: { chave, titulo, pendentes, detalhe, link, feito, marcado, aPartirDe, prevista }. Toda etapa fica feita sozinha
  * quando não há pendência e também quando alguém marca (as duas valem para todas, inclusive "contas": decisão do dono E4,
- * 2026-11-07). Antes de ``aPartirDe``, a etapa pendente é só prevista.
+ * 2026-11-07). Antes de ``aPartirDe``, a etapa pendente é só prevista. ``pendentes``: a lista de ``pendentesDeFatura(d)``,
+ * quando já calculada no mesmo desenho (o Painel e os meses atrasados usam a mesma).
  */
-export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
+export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null } = {}) {
   const comp = C.somarMeses(mes, -1); // aluguel do mês anterior: boletos que vencem neste mês
   const seguinte = C.somarMeses(mes, 1);
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
@@ -4364,7 +4401,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso()) {
   const air = airbnbDoMes(d, mes);
   // ganhos do Airbnb lançados sem a NF do mês (ou com a soma mudada): conta como 1 pendência da etapa das NFs
   const airPendente = air.total > 0 && !air.numerada && (!air.nf || air.divergente) ? 1 : 0;
-  const nfs = pendentesDeFatura(d).filter((x) => String(x.data).slice(0, 7) <= mes).length + airPendente;
+  const nfs = (pendentes || pendentesDeFatura(d)).filter((x) => String(x.data).slice(0, 7) <= mes).length + airPendente;
   const dia20 = `${mes}-${String(DIA_GERAR_BOLETOS).padStart(2, '0')}`;
   // basta uma conta lançada no imóvel (do mês, ou paga no mês): nem todo imóvel tem todas as contas
   const lancou = (i) => d.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || '').slice(0, 7) === mes));
@@ -4416,11 +4453,13 @@ export const MESES_FECHAMENTO_ATRASADO = 12;
  * ``mes``. Ex.: em 07/11/2026, as NFs de 10/2026 e as contas de 09/2026 ainda não lançadas. Olha os meses desde a criação
  * do banco de dados (no máximo MESES_FECHAMENTO_ATRASADO), para não cobrar meses de antes do sistema.
  */
-export function etapasAtrasadas(d, mesAtual, hoje = C.hojeIso()) {
+export function etapasAtrasadas(d, mesAtual, hoje = C.hojeIso(), { pendentes = null } = {}) {
   const inicio = [String(d.criado_em || '').slice(0, 7), C.somarMeses(mesAtual, -MESES_FECHAMENTO_ATRASADO)].sort().pop();
   const out = [];
+  // os pagamentos à espera de NF são os mesmos em todos os meses: procurados uma vez só
+  const pend = pendentes || pendentesDeFatura(d);
   for (let mes = inicio; mes < mesAtual; mes = C.somarMeses(mes, 1)) {
-    out.push(...etapasFechamento(d, mes, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
+    out.push(...etapasFechamento(d, mes, hoje, { pendentes: pend }).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes })));
   }
   return out;
 }
@@ -4520,12 +4559,13 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
   // fechamento do mês: no dia 20, gerar os boletos (vencem no mês seguinte); no dia 1º, as NFs do mês anterior (depois da
   // virada); no último dia, quantas etapas faltam (as ainda previstas não contam)
   if (fim >= `${hoje.slice(0, 7)}-01`) {
-    const etapas = etapasFechamento(d, mes, hoje);
+    const pendentes = pendentesDeFatura(d);
+    const etapas = etapasFechamento(d, mes, hoje, { pendentes });
     const passo = (e, fech) => ({ situacao: e.feito ? 'ok' : e.prevista ? 'neutra' : 'aviso', estado: e.feito ? 'feito' : e.prevista ? 'previsto' : 'a fazer', fechamento: fech });
     const bol = etapas.find((e) => e.chave === 'boletos');
     ev.push({ data: bol.aPartirDe, tipo: 'Fechamento', texto: `gerar os boletos de ${C.compBr(mes)} (vencem em ${C.compBr(C.somarMeses(mes, 1))})`, ...passo(bol, mes) });
     const anterior = C.somarMeses(mes, -1);
-    const nf = etapasFechamento(d, anterior, hoje).find((e) => e.chave === 'nfs');
+    const nf = etapasFechamento(d, anterior, hoje, { pendentes }).find((e) => e.chave === 'nfs');
     ev.push({ data: `${mes}-01`, tipo: 'Fechamento', texto: `NFs avulsas/Airbnb e numerar as NFs de ${C.compBr(anterior)}`, ...passo(nf, anterior) });
     const faltam = etapas.filter((e) => !e.feito && !e.prevista).length;
     ev.push({ data: fim, tipo: 'Fechamento', texto: faltam ? `faltam ${faltam} de ${etapas.length} etapas` : 'concluído',
@@ -4939,8 +4979,31 @@ export const trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(co
 /** Meses do trimestre de uma competência (ex.: 2026-05 → 2026-04, 2026-05, 2026-06). */
 export const mesesDoTrimestre = (comp) => { const t = Number(trimestreDe(comp).slice(-1)); return [0, 1, 2].map((k) => `${comp.slice(0, 4)}-${String((t - 1) * 3 + 1 + k).padStart(2, '0')}`); };
 
-/** Faturamento de NFs emitidas (não canceladas) de uma empresa num mês, pela data de emissão. */
-export function faturamentoNf(d, emitenteId, comp) {
+/**
+ * Faturamento das NFs não canceladas por empresa e mês de emissão, numa passada só: Map empresa → Map mês → { valor, numeros }.
+ * Montado a cada cálculo (impostos do mês, resultados), nunca guardado entre desenhos: as NFs mudam a cada gravação.
+ */
+export function indiceFaturamento(d) {
+  const porEmpresa = new Map();
+  for (const f of d.faturas) {
+    if (f.situacao === 'Cancelada') continue;
+    const comp = String(f.emissao || '').slice(0, 7);
+    let e = porEmpresa.get(f.emitente_id);
+    if (!e) porEmpresa.set(f.emitente_id, (e = new Map()));
+    let x = e.get(comp);
+    if (!x) e.set(comp, (x = { valor: 0, numeros: new Set() }));
+    x.valor += f.valor;
+    x.numeros.add(f.numero);
+  }
+  return porEmpresa;
+}
+
+/** Faturamento de NFs emitidas (não canceladas) de uma empresa num mês, pela data de emissão. ``indice``: ``indiceFaturamento(d)``. */
+export function faturamentoNf(d, emitenteId, comp, indice = null) {
+  if (indice) {
+    const x = (indice.get(emitenteId) || new Map()).get(comp);
+    return x ? { valor: x.valor, notas: x.numeros.size } : { valor: 0, notas: 0 };
+  }
   const fs = d.faturas.filter((f) => f.emitente_id === emitenteId && f.situacao !== 'Cancelada' && String(f.emissao || '').slice(0, 7) === comp);
   return { valor: fs.reduce((t, f) => t + f.valor, 0), notas: new Set(fs.map((f) => f.numero)).size };
 }
@@ -4977,10 +5040,10 @@ export function vencimentoGuia(mensal, periodo) {
  * igual à receita do ano acima de R$ 5 milhões (pode dar negativo: devolve o que foi acrescido a mais).
  * Trimestres antes do início da regra (CSLL em 2026: só desde abril) ficam fora da conta, com o limite proporcional.
  */
-function excedenteLc224(d, emitenteId, comp, inicio) {
+function excedenteLc224(d, emitenteId, comp, inicio, indice = null) {
   const ano = comp.slice(0, 4);
   const t = Number(trimestreDe(comp).slice(-1));
-  const receita = (q) => mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, '0')}`).filter((m) => m <= comp).reduce((v, m) => v + faturamentoNf(d, emitenteId, m).valor, 0);
+  const receita = (q) => mesesDoTrimestre(`${ano}-${String(q * 3).padStart(2, '0')}`).filter((m) => m <= comp).reduce((v, m) => v + faturamentoNf(d, emitenteId, m, indice).valor, 0);
   let sobra = 0;
   let considerado = 0;
   let total = 0;
@@ -5006,14 +5069,14 @@ export const MINIMO_GUIA = 1000;
  * Valor que vem de períodos anteriores do mesmo imposto: guias abaixo de R$ 10,00 não pagas, somadas até o total
  * chegar a R$ 10,00. Mensal: meses anteriores; trimestral: trimestres anteriores (guias completas).
  */
-function transportado(d, e, x, comp) {
+function transportado(d, e, x, comp, indice = null) {
   const primeira = d.faturas.filter((f) => f.emitente_id === e.id && f.situacao !== 'Cancelada' && f.emissao).map((f) => f.emissao.slice(0, 7)).sort()[0];
   if (!primeira) return 0;
   const passo = x.mensal ? 1 : 3;
   const atual = x.mensal ? comp : mesesDoTrimestre(comp)[2];
   let saldo = 0;
   for (let m = x.mensal ? primeira : mesesDoTrimestre(primeira)[2]; m < atual; m = C.somarMeses(m, passo)) {
-    const total = saldo + guiasDoPeriodo(d, e, m).find((g) => g.imposto === x.imposto).esperado;
+    const total = saldo + guiasDoPeriodo(d, e, m, indice).find((g) => g.imposto === x.imposto).esperado;
     saldo = total > 0 && total < MINIMO_GUIA ? total : 0;
   }
   return saldo;
@@ -5025,10 +5088,11 @@ function transportado(d, e, x, comp) {
  * "aPagar" soma o que veio de guias abaixo de R$ 10,00; se ainda ficar abaixo, "abaixoDoMinimo" (passa adiante).
  */
 export function impostosDoMes(d, comp) {
+  const indice = indiceFaturamento(d);
   return d.emitentes.filter((e) => e.ativo || d.faturas.some((f) => f.emitente_id === e.id)).map((e) => {
-    const r = guiasDaEmpresa(d, e, comp);
+    const r = guiasDaEmpresa(d, e, comp, indice);
     r.guias = r.guias.map((g) => {
-      const anterior = transportado(d, e, g, comp);
+      const anterior = transportado(d, e, g, comp, indice);
       const aPagar = g.esperado + anterior;
       return { ...g, transportado: anterior, aPagar, abaixoDoMinimo: aPagar > 0 && aPagar < MINIMO_GUIA };
     });
@@ -5036,18 +5100,18 @@ export function impostosDoMes(d, comp) {
   });
 }
 
-const guiasDoPeriodo = (d, e, comp) => guiasDaEmpresa(d, e, comp).guias;
+const guiasDoPeriodo = (d, e, comp, indice = null) => guiasDaEmpresa(d, e, comp, indice).guias;
 
-/** Cálculo das guias de uma empresa no mês, sem o que vem de períodos anteriores. */
-function guiasDaEmpresa(d, e, comp) {
+/** Cálculo das guias de uma empresa no mês, sem o que vem de períodos anteriores. ``indice``: ``indiceFaturamento(d)``. */
+function guiasDaEmpresa(d, e, comp, indice = null) {
   const meses = mesesDoTrimestre(comp).filter((m) => m <= comp);
   const tri = trimestreDe(comp);
-  const mes = faturamentoNf(d, e.id, comp);
-  const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m) }));
+  const mes = faturamentoNf(d, e.id, comp, indice);
+  const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d, e.id, m, indice) }));
   const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
   // lucro presumido do trimestre: 32% do faturamento + 3,2% (10% de 32%) da parte acima do limite da LC 224
   const presumido = (imposto) => {
-    const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d, e.id, comp, INICIO_LC224[imposto]) : 0;
+    const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d, e.id, comp, INICIO_LC224[imposto], indice) : 0;
     return { base: Math.round((trimestre * PRESUNCAO) / 100) + Math.round((extra * PRESUNCAO) / 1000), lc224: extra };
   };
   return { empresa: e, faturamento: mes, trimestre, porMes, fechado: meses.length === 3,

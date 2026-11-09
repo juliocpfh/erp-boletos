@@ -90,16 +90,18 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   const busca = R.textoDeBusca(String(buscaPedida || '').slice(0, 80));
   const hoje = C.hojeIso();
   const url = (q) => `#/cobrancas?${new URLSearchParams({ comp, ordem, ...(filtro !== 'todos' ? { filtro } : {}), ...(busca ? { busca: String(buscaPedida).trim() } : {}), ...q })}`;
+  // as NFs de cada boleto saem de um índice montado uma vez por desenho, e cada boleto é montado uma vez só
+  const nfs = R.indiceFaturas(d());
   const montar = (cb) => {
     const c = buscar('contratos', cb.contrato_id);
-    return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: R.faturasDe(d(), 'cobranca', cb.id) };
+    return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: nfs.nfs('cobranca', cb.id) };
   };
-  const todas = d().cobrancas.filter((x) => F_.todosMeses || x.competencia === comp).map(montar);
+  const todasMontadas = d().cobrancas.map(montar);
+  const doMes = todasMontadas.filter((x) => x.cb.competencia === comp);
+  const todas = F_.todosMeses ? todasMontadas : doMes;
   const lista = todas.filter((x) => F_.f(x, hoje) && (!busca || [x.c.inquilino_nome, x.c.inquilino_apelido, x.i && x.i.nome].some((t) => R.textoDeBusca(t).includes(busca))))
     .sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
   // contagem de cada filtro (todos os meses nos três primeiros, o mês nos outros) para os botões
-  const doMes = d().cobrancas.filter((x) => x.competencia === comp).map(montar);
-  const todasMontadas = d().cobrancas.map(montar);
   const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje)).length;
   const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${k === 'todos' ? `Todos de ${compBr(comp)}` : `${x.titulo.replace('Boletos ', '').replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(' ')}
     <form data-form="buscaBoletos" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}"><input type="hidden" name="filtro" value="${esc(filtro)}"><input name="busca" value="${esc(String(buscaPedida || ''))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: '' }).replace(/&busca=[^&]*/, '')}">Limpar</a>` : ''}</form></div>`;
@@ -115,7 +117,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   }
   const faltando = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !lista.some((x) => x.c.id === c.id && !R.ehBoletoAvulso(x.cb)));
   const caucoes = R.complementosCaucaoPendentes(d(), comp);
-  const pend = R.pendentesDeFatura(d());
+  const pend = R.pendentesDeFatura(d(), nfs);
   // boleto de controle (inquilino sem NF) não entra nas somas
   const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
   const controle = lista.filter((x) => !R.geraNf(x.c)).length;

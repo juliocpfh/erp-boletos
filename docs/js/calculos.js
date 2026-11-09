@@ -48,14 +48,19 @@ export function numero(texto) {
   return n;
 }
 
+// formatadores criados uma vez (criar um a cada chamada custa ~60 vezes mais); a saída é a mesma do toLocaleString
+const FMT_REAIS = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const FMT_PCT = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
+
 export function reais(c, comSimbolo = true) {
-  const v = (c || 0) / 100;
-  const t = v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const t = FMT_REAIS.format((c || 0) / 100);
   return comSimbolo ? `R$ ${t}` : t;
 }
 
 export function pct(n) {
-  return `${(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
+  const x = n || 0;
+  // número: o formatador; outro tipo (texto em dado antigo) fica como o toLocaleString dele devolvia
+  return `${typeof x === 'number' ? FMT_PCT.format(x) : x.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
 }
 
 // --------------------------------------------------------------------------
