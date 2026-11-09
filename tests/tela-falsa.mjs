@@ -85,9 +85,13 @@ export function bancoComUsuarios(R, E) {
   R.inserir(d, 'usuarios', { login: 'dono@exemplo.com.br', nome: 'Dono', papel: 'admin', ativo: true }, 'teste');
   R.inserir(d, 'usuarios', { login: 'operador@exemplo.com.br', nome: 'Operador', papel: 'operador', ativo: true }, 'teste');
   E.d = d;
-  E.pasta = new PastaDisco(fs.mkdtempSync(path.join(os.tmpdir(), 'imoveis-telas-')));
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'imoveis-telas-'));
+  if (!pastasTemporarias.length) process.once('exit', () => pastasTemporarias.forEach((p) => fs.rmSync(p, { recursive: true, force: true })));
+  pastasTemporarias.push(pasta);
+  E.pasta = new PastaDisco(pasta);
   return d;
 }
+const pastasTemporarias = [];
 
 export function entrarComo(E, papel) {
   E.usuario = E.d.usuarios.find((u) => u.papel === papel);
