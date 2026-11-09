@@ -659,15 +659,9 @@ export function complementosCaucaoPendentes(d, comp) {
 }
 
 /**
- * Gera o boleto do complemento da caução, com o vencimento do primeiro aluguel corrigido (sem tarifa e sem NF).
+ * Boleto(s) do complemento da caução, com o vencimento do primeiro aluguel corrigido (sem tarifa e sem NF).
  * ``comp``: competência em que está sendo gerado (ao gerar os boletos de um mês depois do aluguel corrigido, vai com o desse mês).
- */
-export function gerarBoletoCaucao(d, contratoId, usuario, comp = null, opcoes = {}) {
-  return gerarBoletosCaucao(d, contratoId, usuario, comp, opcoes)[0];
-}
-
-/**
- * Boleto(s) do complemento da caução. ``vencimento``: outra data (mais prazo); ``parcelas``: boletos mensais
+ * ``vencimento``: outra data (mais prazo); ``parcelas``: boletos mensais
  * (ex.: R$ 270,00 em 2 × R$ 135,00, vencendo em 10/12 e 10/01). Cada parcela paga soma na caução.
  * ``plano``: parcelamento negociado, cada boleto com a sua data e o seu valor ([{ vencimento, valor }]; a soma é o complemento).
  */
@@ -1978,11 +1972,6 @@ export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
     : x.inquilino_nome.trim().toLocaleLowerCase('pt-BR') === c.inquilino_nome.trim().toLocaleLowerCase('pt-BR')));
 }
 
-/**
- * Vincula ao imóvel um inquilino cadastrado e grava a leitura dos relógios na entrada.
- * Se o inquilino já está em outro imóvel, cria um contrato novo para este imóvel com os dados da pessoa
- * (o mesmo inquilino pode alugar mais de um imóvel). Devolve o contrato vinculado.
- */
 /** Dias que um contrato pode ficar sem imóvel; depois disso ele é apagado sozinho (pedido do usuário). */
 export const DIAS_SEM_IMOVEL = 7;
 
@@ -2002,7 +1991,6 @@ export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
 // (só um deles, ou todos juntos), mas cada imóvel tem no máximo uma ficha aberta. Reprovada: a reserva é devolvida (data e
 // comprovante) e os documentos pessoais são apagados 3 meses depois da decisão.
 // --------------------------------------------------------------------------
-export const SITUACOES_FICHA = ['Em análise', 'Aprovada', 'Reprovada'];
 export const MODOS_FICHA = ['Apenas um dos imóveis', 'Todos juntos'];
 export const MESES_DOCUMENTOS_REPROVADA = 3;
 /** Campos de arquivo da ficha ligados a um lançamento (os demais documentos ficam soltos na pasta da ficha). */
@@ -2076,19 +2064,6 @@ export function excluirContrato(d, contratoId, usuario, descricao) {
   // a garantia que tinha passado a este contrato volta a ser do anterior (senão não passa a um novo titular)
   for (const a of d.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d, 'contratos', a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
   excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
-}
-
-export function vincularInquilino(d, imovelId, dados, usuario) {
-  let c = buscar(d, 'contratos', dados.contrato_id);
-  if (!c) throw new Error('Inquilino não encontrado.');
-  const i = buscar(d, 'imoveis', imovelId);
-  if (c.imovel_id === i.id) throw new Error('Este inquilino já está vinculado a este imóvel.');
-  const leitura = separarLeitura(dados);
-  // quem já aluga outro imóvel precisa de um contrato novo, com condições próprias: é feito pelo cadastro do inquilino
-  if (c.imovel_id) throw new Error(`${c.inquilino_nome} já aluga outro imóvel: cadastre um contrato novo para este imóvel (os dados da pessoa vêm preenchidos).`);
-  atualizar(d, 'contratos', c.id, { imovel_id: i.id, data_entrada: dados.data_entrada, ativo: true, docs_entrada: true, sem_imovel_desde: null }, usuario, `Vinculado ao imóvel ${i.nome}`);
-  if (leitura) registrarLeitura(d, { imovel_id: i.id, contrato_id: c.id, data: dados.data_entrada, momento: 'Entrada do inquilino', ...leitura, observacoes: '' }, usuario);
-  return c;
 }
 
 /** Relógios que o contrato tem: o que está como "Não tem" fica de fora; sem a informação, água e energia (gás só se tiver). */
@@ -3800,9 +3775,6 @@ export function dadosBoleto(d, cb) {
 /** Situações do boleto no banco guardadas em ``cobrancas[].banco.situacao``. */
 export const SITUACOES_BANCO = ['emitido', 'pago', 'cancelado', 'erro'];
 
-/** Tipos de chave Pix aceitos pela API (campo ``payment_method.pix.type``). */
-export const TIPOS_CHAVE_PIX = M.TIPOS_CHAVE_PIX;
-
 /** Carteira do boleto (``billing_scheme``) de uma conta: a configurada ou a do ambiente. */
 export const carteiraDaConta = (conta) => String(conta.carteira || M.CARTEIRAS[conta.ambiente] || M.CARTEIRAS.sandbox);
 
@@ -5097,8 +5069,6 @@ export const passoDaRegua = (dias) => (REGUA_COBRANCA.find((x) => dias >= x.dias
 // --------------------------------------------------------------------------
 // Acordo de dívida (rotina D8): boletos vencidos viram boletos novos; não existe "baixar como perda"
 // --------------------------------------------------------------------------
-/** Acordos do contrato, do mais novo ao mais antigo. */
-export const acordosDo = (d, contratoId) => (d.acordos || []).filter((a) => a.contrato_id === contratoId).sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id);
 /** Boletos das parcelas do acordo, pela ordem de vencimento. */
 export const parcelasDoAcordo = (d, a) => d.cobrancas.filter((cb) => cb.acordo_parcela_de === a.id).sort((x, y) => x.vencimento.localeCompare(y.vencimento) || x.id - y.id);
 /** Boletos que o acordo substituiu. */
