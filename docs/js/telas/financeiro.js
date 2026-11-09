@@ -16,7 +16,7 @@ function caixaAcordos(hoje) {
   return `<div class="cartao rolagem"><h2>Acordos em andamento</h2><table><tr><th>Inquilino</th><th>Acordo</th><th>Boletos</th><th class="n">Falta pagar</th></tr>
     ${ativos.map(({ a, parcelas }) => { const c = buscar('contratos', a.contrato_id) || {}; const abertos = parcelas.filter((cb) => !cb.data_pagamento);
       return `<tr><td><a href="#/contrato/${c.id}">${esc(c.inquilino_nome || '')}</a></td><td>${dataBr(a.data)} · ${esc(a.referente)}<br><span class="suave">total ${reais(a.valor_total)} em ${a.parcelas}</span></td>
-        <td>${parcelas.map((cb) => `<a href="#/cobranca/${cb.id}">${esc(cb.acordo_parcela || 'boleto')}</a> ${dataBr(cb.vencimento)} ${cb.data_pagamento ? etiqueta('pago', 'ok') : cb.vencimento < hoje ? etiqueta('vencido', 'perigo') : ''}`).join('<br>')}</td>
+        <td>${parcelas.map((cb) => `<a href="#/cobranca/${cb.id}">${esc(cb.acordo_parcela || 'boleto')}</a> ${dataBr(cb.vencimento)} ${cb.data_pagamento ? etiqueta('pago', 'ok') : C.vencido(cb.vencimento, hoje) ? etiqueta('vencido', 'perigo') : ''}`).join('<br>')}</td>
         <td class="n">${reais(abertos.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0))}</td></tr>`; }).join('')}</table></div>`;
 }
 
@@ -181,7 +181,8 @@ function periodo(q, base) {
 }
 
 const pctTxt = (v) => (v === null ? '<span class="suave">informe o valor do imóvel</span>' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`);
-const menos = (v) => (v ? `- ${reais(v)}` : '<span class="suave">-</span>');
+// custo negativo é sobra (ex.: IPTU pago à vista com desconto e devolvido pelo inquilino pelo valor parcelado)
+const menos = (v) => (v > 0 ? `- ${reais(v)}` : v < 0 ? `+ ${reais(-v)}` : '<span class="suave">-</span>');
 
 /** Quadro para lançar um custo (conta paga por nós) num imóvel, com os últimos lançamentos. */
 function painelCusto(i, voltar) {

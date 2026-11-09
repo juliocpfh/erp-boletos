@@ -557,14 +557,18 @@ export const COBRANCA = [
 ];
 
 // --------------------------------------------------------------------------
+// formatadores criados uma vez (criar um a cada chamada custa ~60 vezes mais); a saída é a mesma do toLocaleString
+const FMT_DINHEIRO = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const FMT_PCT = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4, useGrouping: false });
+
 export function dinheiroTexto(c) {
   if (c === null || c === undefined || c === '') return '';
-  return (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return FMT_DINHEIRO.format(c / 100);
 }
 
 export function pctTexto(n) {
   if (n === null || n === undefined || n === '') return '';
-  return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 4, useGrouping: false });
+  return FMT_PCT.format(Number(n));
 }
 
 /** Valores de um registro no formato que aparece nos campos da tela. */
