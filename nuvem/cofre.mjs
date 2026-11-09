@@ -581,7 +581,12 @@ export class CofreDO {
       if (!email) throw new ErroCofre(401, 'Sem login.');
       const c = this.cofre; const rota = url.pathname;
       let r;
-      if (rota === '/papel' && request.method === 'GET') r = c.exigir(email, url.searchParams.get('nivel') === 'operador' ? 'operador' : 'consulta');
+      if (rota === '/papel' && request.method === 'GET') {
+        // o Worker pede 'admin' para os backups (banco inteiro, com as senhas de todos): nível desconhecido é recusado, nunca vira 'consulta'
+        const nivel = url.searchParams.get('nivel');
+        if (!Object.hasOwn(NIVEL, nivel || '')) throw new ErroCofre(400, 'Nível de acesso desconhecido.');
+        r = c.exigir(email, nivel);
+      }
       else if (rota === '/tudo' && request.method === 'GET') r = c.tudo(c.exigir(email, 'consulta'));
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
       else if (rota === '/conflitos' && request.method === 'GET') { c.exigir(email, 'consulta'); r = { conflitos: c.conflitosAbertos() }; }

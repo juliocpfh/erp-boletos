@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { Cofre, CofreDO, backupDoDia, canon, MANTER_SUBSTITUICOES, MAX_FAIXA, proximaManutencao, SO_ADMIN } from '../nuvem/cofre.mjs';
+import * as W from '../nuvem/worker.mjs';
 import { r2Falso } from './r2-falso.mjs';
 
 /** Mesmo formato do ctx.storage.sql do Cloudflare: exec(consulta, ...valores).toArray(). */
@@ -298,4 +299,32 @@ test('B6: backup do dia e faxina rodam no alarme diário (3h de Brasília); sem 
   await chamar2('/lote', lote([{ op: 'historico', entrada: { a: 3 } }]));
   assert.equal(limpezas2, 2, 'passada uma hora, roda de novo');
   assert.ok(sql2.db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'log_em'").all().length, 'índice em log(em)');
+});
+
+test('backups (banco inteiro, com as senhas e sessões de todos): pelo Worker com o cofre de verdade, só o administrador baixa', async () => {
+  const sql = sqlFalso();
+  const r2 = r2Falso();
+  const dobj = new CofreDO({ storage: { sql, transactionSync: transacaoDe(sql) } }, { DADOS: r2 });
+  dobj.cofre.importar(bancoExemplo(), DONO);
+  await r2.put('backups/imoveis-dados-2026-11-08.json', JSON.stringify(dobj.cofre.tudo()));
+  await r2.put('arquivos/Sala 101/contrato.pdf', 'x');
+  const BASE = 'http://localhost:8787';
+  for (const [email, esperado] of [[CONSULTA, 403], [OPERADOR, 403], [DONO, 200]]) {
+    W.esquecerPapeis();
+    const env = { MODO_TESTE: '1', EMAIL_TESTE: email, ORIGEM: BASE, DADOS: r2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => dobj.fetch(req) }) } };
+    const pedir = (caminho) => W.atender(new Request(`${BASE}/api/${caminho}`), env);
+    const backup = await pedir('backups/imoveis-dados-2026-11-08.json');
+    assert.equal(backup.status, esperado, `${email}: baixar um backup`);
+    if (esperado !== 200) assert.doesNotMatch(await backup.text(), /senha_hash/);
+    assert.equal((await pedir('lista-tudo/backups/')).status, esperado, `${email}: lista-tudo dos backups`);
+    assert.equal((await pedir('arquivos/Sala%20101/contrato.pdf')).status, 200, `${email}: anexos todos leem`);
+    assert.equal((await pedir('lista-tudo/arquivos/')).status, 200, `${email}: lista-tudo dos anexos`);
+  }
+  // nível que o cofre não conhece (ou nenhum) é recusado, em vez de virar "consulta"
+  const papel = (q, email = DONO) => dobj.fetch(new Request(`https://cofre/papel${q}`, { headers: { 'X-Email-Conferido': email } }));
+  assert.equal((await papel('?nivel=admin', CONSULTA)).status, 403);
+  assert.equal((await papel('?nivel=admin', OPERADOR)).status, 403);
+  assert.equal((await papel('?nivel=admin')).status, 200);
+  assert.equal((await papel('?nivel=dono')).status, 400);
+  assert.equal((await papel('')).status, 400);
 });
