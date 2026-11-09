@@ -6,10 +6,10 @@ import * as C from './calculos.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  pendenciasBancoDoMes, CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte,
+  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte,
 } from './regras.js';
 
-export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, contaBancaria as contaDo, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
+export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
 
 export const CLASSIFICACOES = {
   conta_imovel: 'Conta do imóvel (água, luz, gás, condomínio, internet, outra)',
@@ -60,12 +60,6 @@ const dataDe = (x) => String(x || '').slice(0, 10);
 export const centavosDoC6 = (texto) => Math.abs(K.centavosDoTexto(texto));
 /** 150000 centavos → 1500 (número em reais, duas casas, como o C6 pede em ``amount``). */
 export const reaisParaC6 = (centavos) => Number((Number(centavos || 0) / 100).toFixed(2));
-
-/**
- * Divide um período em janelas de até 30 dias (limite do extrato do C6 por consulta), inclusive nas duas pontas (``janelas`` de
- * c6-comum, a mesma da ponte). Ex.: 01/10 a 31/10 (31 dias) → [01/10–30/10, 31/10–31/10].
- */
-export const janelasDe30Dias = (de, ate, dias = 30) => K.janelas(de, ate, dias);
 
 // --------------------------------------------------------------------------
 // Contas e empresas
@@ -255,15 +249,6 @@ export function movimentacoesDo(d, { conta_id = null, mes = null, imovel_id = nu
       || (filtro === 'saidas' && m.tipo === 'saida') || (filtro === 'sem_comprovante' && semComprovante(m))))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
 }
-
-export function resumoBanco(d, contaId, mes) {
-  const movs = movimentacoesDo(d, { conta_id: contaId, mes });
-  const soma = (tipo) => movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.valor, 0);
-  return { entradas: soma('entrada'), saidas: soma('saida'), total: movs.length, pendentes: movs.filter((m) => !m.classificacao).length,
-    semComprovante: movs.filter(semComprovante).length, importadoAte: extratoImportadoAte(d, contaId) };
-}
-
-export const pendenciasBanco = (d, mes, dia) => pendenciasBancoDoMes(d, mes, dia);
 
 // --------------------------------------------------------------------------
 // Nome do comprovante
@@ -479,8 +464,6 @@ export function confirmarPagamentoPeloBanco(d, cobrancaId, origem, usuario, { pa
   }
   return { divergente: false, previsto: previsto.valor_devido, recebido: valor, resultado: r, cobranca: cb };
 }
-/** Mesmo que confirmarPagamentoPeloBanco, com a ordem (mov, boleto) do plano. */
-export const confirmarPagamentoPeloExtrato = (d, movId, cobrancaId, usuario, opts) => confirmarPagamentoPeloBanco(d, cobrancaId, Number(movId), usuario, opts);
 
 /**
  * Liga a entrada do extrato a um boleto JÁ PAGO (pago à mão na tela Boletos, ou pelo fluxo de divergência, FORMULARIOS.pagamentoNf):
@@ -634,7 +617,6 @@ function comContaLancada(d, mov, s) {
   const de = contaJaLancada(d, s.imovel_id, s.tipo_despesa, mov);
   return de ? { ...s, despesa_id: de.id, motivo: `${s.motivo} · conta já lançada em Contas pagas por nós (${de.tipo} de ${C.compBr(de.competencia)}): só ligar` } : s;
 }
-export const sugerirClassificacao = sugerirDestino;
 
 const classificacaoDaOrigem = (origem) => ({ despesa: 'conta_imovel', avulso: 'conta_imovel', iptu: 'iptu', guia_imposto: 'imposto' }[(origem || {}).tipo] || 'outro');
 
@@ -1038,8 +1020,6 @@ export function registrarGrupoEnviado(d, ids, grupoId, itensC6, usuario) {
   });
   return out;
 }
-/** Enviado à ponte/C6 fora de um lote: marca agendado (ou a situação informada). */
-export const marcarPagamentoEnviado = (d, pagId, { id_externo = null, situacao = 'agendado', erro = null, grupo_id = null } = {}, usuario) => atualizarPagamento(d, pagId, { situacao, erro, id_externo, grupo_id }, usuario);
 
 /** Situações do item no C6 depois do envio para aprovação (o banco já tem o pagamento na fila do app). */
 const ENVIADO_C6 = ['SCHEDULED', 'PROCESSING', 'PROCESSED', 'SCHEDULING_CANCELLED'];
@@ -1098,7 +1078,6 @@ export function marcarPagoPeloExtrato(d, pagamentoId, movId, usuario) {
   if (atual.despesa_id && buscar(d, 'despesas', atual.despesa_id)) atualizar(d, 'despesas', atual.despesa_id, { movimentacao_id: mov.id }, usuario, 'Conta ligada à movimentação do extrato');
   return atual;
 }
-export const conciliarPagamentoComExtrato = marcarPagoPeloExtrato;
 
 /** Cancela um pagamento: só rascunho, aguardando aprovação ou erro. Agendado: só com ``{ noBanco: true }`` (depois de excluído do lote no C6). */
 export function cancelarPagamento(d, pagId, usuario, { noBanco = false, motivo = '' } = {}) {
@@ -1108,11 +1087,6 @@ export function cancelarPagamento(d, pagId, usuario, { noBanco = false, motivo =
   if (p.situacao === 'agendado' && !noBanco) throw new Error('Este pagamento já foi enviado ao banco: cancele o item no lote do C6 (ou no app) antes de cancelar aqui.');
   atualizar(d, 'pagamentos_banco', p.id, { situacao: 'cancelado', erro: motivo || null }, usuario, `Pagamento de ${C.reais(p.valor)} cancelado${motivo ? `: ${motivo}` : ''}`);
   return p;
-}
-
-export function pagamentosDo(d, { imovel_id = null, situacao = null, conta_id = null } = {}) {
-  return (d.pagamentos_banco || []).filter((p) => (!imovel_id || p.imovel_id === Number(imovel_id)) && (!situacao || p.situacao === situacao) && (!conta_id || p.conta_id === conta_id))
-    .sort((a, b) => String(b.data_pagamento).localeCompare(String(a.data_pagamento)) || b.id - a.id);
 }
 
 // --------------------------------------------------------------------------
