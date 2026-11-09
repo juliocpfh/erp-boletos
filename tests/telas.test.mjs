@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { esc } from '../docs/js/formularios.js';
-import { bancoComUsuarios, carregarSite, elemento, entrarComo, janelas, ouvintes, pagina, porId } from './tela-falsa.mjs';
+import { bancoComUsuarios, carregarSite, elemento, entrarComo, internet, janelas, ouvintes, pagina, pedidos, porId } from './tela-falsa.mjs';
 
 const T = await carregarSite();
 const { E, R } = T;
@@ -167,5 +167,34 @@ test('formulário que só leva a outra tela (data-form="ir"): endereço com os c
   const pasta = fileURLToPath(new URL('../docs/js/', import.meta.url));
   for (const arq of fs.readdirSync(pasta, { recursive: true }).filter((x) => x.endsWith('.js') && !x.startsWith('offline'))) {
     for (const m of fs.readFileSync(path.join(pasta, arq), 'utf8').matchAll(/<form[^>]*data-form="(\w+)"/g)) assert.ok(T.FORMULARIOS[m[1]], `${arq}: data-form="${m[1]}" sem FORMULARIOS.${m[1]}`);
+  }
+});
+
+test('Reajustes: o acumulado do Banco Central é guardado na sessão por índice e mês; falha ou mês sem índice pergunta de novo', async () => {
+  const { acumuladoNoBancoCentral } = await import('../docs/js/telas/campos.js');
+  const IGPM = 189;
+  // série mensal de nov/2025 a out/2026 (1% ao mês); `faltaOutubro` = o índice do último mês ainda não saiu
+  const serie = (faltaOutubro) => Array.from({ length: faltaOutubro ? 11 : 12 }, (_, k) => {
+    const m = T.C.somarMeses('2025-11', k);
+    return { data: `01/${m.slice(5, 7)}/${m.slice(0, 4)}`, valor: '1.00' };
+  });
+  let resposta = () => { throw new TypeError('sem internet'); };
+  internet.responder = (url) => resposta(url);
+  const pedidosAntes = pedidos.length;
+  const perguntas = () => pedidos.length - pedidosAntes;
+  try {
+    await assert.rejects(acumuladoNoBancoCentral(IGPM, '2026-10'), TypeError);
+    resposta = () => new Response(JSON.stringify(serie(true)));
+    assert.deepEqual(await acumuladoNoBancoCentral(IGPM, '2026-10'), { falta: ['2026-10'] }, 'sem internet antes: pergunta de novo');
+    resposta = () => new Response(JSON.stringify(serie(false)));
+    const r = await acumuladoNoBancoCentral(IGPM, '2026-10');
+    assert.equal(r.de, '2025-11');
+    assert.equal(perguntas(), 3, 'faltava outubro: perguntou de novo');
+    assert.deepEqual(await acumuladoNoBancoCentral(IGPM, '2026-10'), r, 'a tela desenhada de novo usa o que já veio');
+    assert.equal(perguntas(), 3);
+    await acumuladoNoBancoCentral(433, '2026-10'); // outro índice (IPCA): pergunta
+    assert.equal(perguntas(), 4);
+  } finally {
+    internet.responder = () => { throw new TypeError('sem internet'); };
   }
 });
