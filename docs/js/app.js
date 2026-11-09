@@ -385,7 +385,12 @@ export function carregarScript(url, global) {
     const s = document.createElement('script');
     s.src = url;
     s.onload = () => ok(window[global]);
-    s.onerror = () => erro(new Error('Não consegui carregar um componente do programa. Recarregue a página.'));
+    s.onerror = () => {
+      // esquece a tentativa que falhou (ex.: sem internet): o próximo uso tenta de novo, sem precisar recarregar a página
+      delete scripts[url];
+      s.remove();
+      erro(new Error('Não consegui carregar um componente do programa: confira a internet e tente de novo.'));
+    };
     document.head.appendChild(s);
   });
   return scripts[url];
