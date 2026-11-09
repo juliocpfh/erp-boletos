@@ -247,7 +247,11 @@ test('falhas passageiras (sem internet, tempo esgotado, 401, 408, 429, 5xx) fica
   // pedido que nunca responde: o tempo limite cancela e vira erro passageiro (status 0)
   const pendurado = (url, op) => new Promise((_, erro) => { op.signal.addEventListener('abort', () => erro(op.signal.reason)); });
   const api = N.apiDoSite('api/dados/', { limite: 30, buscar: pendurado });
-  await assert.rejects(api('GET', 'tudo'), (e) => e.status === 0 && /demorou/.test(e.message));
+  // AbortSignal.timeout não segura o Node aberto (no Node 22 o teste era cancelado antes do limite): um relógio mantém vivo
+  const vivo = setInterval(() => {}, 1000);
+  try {
+    await assert.rejects(api('GET', 'tudo'), (e) => e.status === 0 && /demorou/.test(e.message));
+  } finally { clearInterval(vivo); }
   // 429 (muitos pedidos): o lote continua na fila e a tela segue mostrando a mudança
   const { a } = await cenario();
   const apiReal = a.sinc.api;
