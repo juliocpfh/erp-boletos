@@ -189,6 +189,27 @@ test('papéis: consulta só lê; operador não mexe em usuários (só a própria
   assert.throws(() => c.exigir(OPERADOR, 'consulta'), (e) => e.status === 403);
 });
 
+test('tabela e campo da raiz não se trocam: "raiz" com nome de tabela (usuários, empresas…) e tabela com nome de campo da raiz são recusados', () => {
+  const c = carregado();
+  const antes = c.tudo();
+  const usuariosFalsos = antes.usuarios.map((u) => ({ ...u, ativo: u.login === OPERADOR }));
+  for (const email of [OPERADOR, DONO]) {
+    for (const [campo, depois] of [['usuarios', usuariosFalsos], ['contratos', []], ['recebimentos', undefined], ['emitentes', [{ id: 1, nome: 'Empresa trocada' }]]]) {
+      assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo, antes: antes[campo], depois }]), email), (e) => e.status === 400, `raiz "${campo}" por ${email}`);
+    }
+    for (const tabela of ['config_banco', 'logo', 'proxima_fatura', 'listas']) {
+      assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela, id: 1, dados: { id: 1 } }]), email), (e) => e.status === 400, `inserir em "${tabela}" por ${email}`);
+      assert.throws(() => c.faixa({ tabela }, email), (e) => e.status === 400, `faixa de "${tabela}" por ${email}`);
+    }
+  }
+  const depois = c.tudo();
+  assert.deepEqual(depois.usuarios, antes.usuarios, 'ninguém foi desativado');
+  assert.deepEqual([depois.contratos.length, depois.config_banco, depois.listas, depois.proxima_fatura], [2, { ativo: false }, { tipos: ['Condomínio'] }, 157]);
+  assert.equal(depois.emitentes, undefined);
+  // o normal continua: campo da raiz que não é tabela e registro novo em tabela nova
+  assert.equal(c.aplicar(lote([{ op: 'raiz', campo: 'listas', antes: antes.listas, depois: { tipos: ['Água'] } }, { op: 'inserir', tabela: 'tabela_nova', id: 1, dados: { id: 1 } }]), OPERADOR).ok, true);
+});
+
 test('entradas perigosas: segredos removidos, nomes que mexem no JavaScript barrados, tamanho limitado', () => {
   const c = carregado();
   c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 20, campos: { obs: { antes: undefined, depois: { texto: 'ok', ponte_url: 'http://x', senha_ponte: 's' } } } }]), DONO);

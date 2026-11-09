@@ -36,6 +36,8 @@ export const SO_ADMIN = {
   tabela: ['emitentes'],
 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
+/** Tabelas que existem sempre (mesmo antes do primeiro registro): uma mudança "raiz" com esse nome trocaria a tabela inteira. */
+const TABELAS_SEMPRE = ['usuarios', ...SO_ADMIN.tabela];
 
 export class ErroCofre extends Error {
   constructor(status, mensagem, extra = {}) { super(mensagem); this.status = status; this.extra = extra; }
@@ -106,6 +108,21 @@ export class Cofre {
     if (valor === undefined) return this.q('SELECT valor FROM controle WHERE chave = ?', chave)[0]?.valor ?? null;
     this.sql.exec('INSERT INTO controle (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor', chave, String(valor));
     return valor;
+  }
+  /**
+   * Tabela e campo da raiz não se misturam: "raiz" com nome de tabela trocaria a tabela inteira nos outros aparelhos (passando
+   * por cima das regras de usuários e de SO_ADMIN), e tabela com nome de campo da raiz (config_banco, logo…) o apagaria no `tudo()`.
+   */
+  ehTabela(nome) {
+    return TABELAS_SEMPRE.includes(nome) || this.q('SELECT 1 AS x FROM tabelas WHERE nome = ?', nome).length > 0
+      || this.q('SELECT 1 AS x FROM registros WHERE tabela = ? LIMIT 1', nome).length > 0;
+  }
+  tabelaDeRegistros(t) {
+    const nome = nomeTabela(t);
+    if (CONTADORES.includes(nome) || SO_ADMIN.raiz.includes(nome) || this.q('SELECT 1 AS x FROM raiz WHERE campo = ?', nome).length) {
+      throw new ErroCofre(400, `"${nome}" é um campo da configuração geral, não uma tabela.`);
+    }
+    return nome;
   }
   registrarLog(tipo, tabela, id, dados, por) {
     this.sql.exec('INSERT INTO log (tipo, tabela, id, dados, por, em) VALUES (?, ?, ?, ?, ?, ?)', tipo, tabela, id, dados === undefined ? null : texto(dados), por, this.agora());
@@ -260,7 +277,7 @@ export class Cofre {
       return { ok: true };
     }
     if (op.op === 'raiz') return this.mudarRaiz(op, email, quem, novosConflitos);
-    const tabela = nomeTabela(op.tabela);
+    const tabela = this.tabelaDeRegistros(op.tabela);
     const id = codigo(op.id);
     if (tabela === 'usuarios' && quem.papel !== 'admin') {
       const soSenha = op.op === 'alterar' && id === quem.id && Object.keys(op.campos || {}).every((c) => USUARIO_PROPRIO.includes(c));
@@ -350,6 +367,7 @@ export class Cofre {
   mudarRaiz(op, email, quem, novosConflitos) {
     const campo = nomeCampo(op.campo);
     if (RAIZ_DO_SERVIDOR.includes(campo)) return { ok: true, ignorado: true };
+    if (this.ehTabela(campo)) throw new ErroCofre(400, `"${campo}" é uma tabela: as mudanças vão registro a registro (a tabela inteira não pode ser trocada de uma vez).`);
     if (CONTADORES.includes(campo)) {
       const linha = this.q('SELECT valor FROM raiz WHERE campo = ?', campo)[0];
       if (!igual(linha ? JSON.parse(linha.valor) : undefined, op.antes)) throw new ErroCofre(409, 'O número da NF mudou em outro aparelho: refaça com o número novo.', { contador: true });
@@ -447,7 +465,7 @@ export class Cofre {
   /** Faixa de códigos novos de uma tabela para um aparelho usar mesmo sem internet (nunca repete entre aparelhos). */
   faixa({ tabela, quantidade = 200 } = {}, email) {
     this.exigir(email, 'operador');
-    const t = nomeTabela(tabela);
+    const t = this.tabelaDeRegistros(tabela);
     const qtd = Math.min(MAX_FAIXA, Math.max(1, Math.floor(Number(quantidade) || 0)));
     return this.transacao(() => {
       const maior = Number(this.q('SELECT MAX(id) AS m FROM registros WHERE tabela = ?', t)[0]?.m || 0);
