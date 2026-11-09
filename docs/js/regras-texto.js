@@ -22,6 +22,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Duas etapas: 1) informar a data de saída quando ele avisa (o último boleto sai proporcional); 2) fazer o cálculo final.
 - O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe.
 - Leitura dos relógios (água e energia) é obrigatória na vistoria de entrada e na de saída.
+- A vistoria de saída é comparada com a vistoria de entrada do contrato (pendência = item pior que na entrada). Quem continua o contrato de outro (troca de titular) é comparado com a vistoria de entrada do titular anterior; se fez a própria vistoria de entrada na troca, vale a dele.
 
 4. REAJUSTE DO ALUGUEL
 - O mês de entrada conta como 1º mês, qualquer que seja o dia. O aluguel do 13º mês já vem corrigido.

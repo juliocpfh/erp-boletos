@@ -2,7 +2,7 @@
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato } from './contratos.js';
+import { locadorasDoContrato, vistoriaDeEntrada } from './contratos.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA } from './modelos-contrato.js';
 
@@ -3038,8 +3038,9 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       return undefined;
     },
     vistoria_gerada: () => {
-      const v = vistoriasDo(d, c.id).find((x) => x.tipo === 'Entrada');
-      if (v) return feita(v.data);
+      // a vistoria de entrada que vale (própria ou, na troca de titular, a do contrato anterior: aparece como herdada)
+      const v = vistoriaDeEntrada(d, c);
+      if (v && v.contrato_id === c.id) return feita(v.data);
       return anterior ? feita(null, herdou) : jaGerado('doc_vistoria_em', 'vistoria já assinada');
     },
     chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),

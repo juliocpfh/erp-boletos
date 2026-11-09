@@ -231,7 +231,8 @@ export const FORMULARIOS = {
       }
     }
     if (f.tipo === 'Saída') {
-      const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
+      // a vistoria de entrada do contrato (na troca de titular, a do titular anterior)
+      const entrada = K.vistoriaDeEntrada(d(), c);
       dados.comparar_com = entrada ? entrada.data : null;
     }
     let id = Number(f.id) || null;

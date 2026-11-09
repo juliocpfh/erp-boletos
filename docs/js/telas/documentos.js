@@ -258,7 +258,8 @@ export async function documentoMontado(tipo, q) {
     if (!c) return null;
     const momento = v.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = R.leiturasDo(d(), c.id).find((l) => l.momento === momento) || null;
-    const entrada = v.tipo === 'Saída' ? R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada') : null;
+    // na saída, compara com a vistoria de entrada do contrato (na troca de titular, a do titular anterior)
+    const entrada = v.tipo === 'Saída' ? K.vistoriaDeEntrada(d(), c) : null;
     const fotos = await fotosDaVistoria(v);
     const semSituacao = (v.itens || []).filter((x) => !x.situacao).length;
     const arquivo = nomeArquivoDoc(`Vistoria ${v.tipo.toLocaleLowerCase('pt-BR')}`, c, String(c.data_entrada || v.data || '').slice(0, 4));
@@ -280,7 +281,7 @@ export async function documentoMontado(tipo, q) {
 
 /** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
 function chavesDoContrato(c) {
-  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  const entrada = K.vistoriaDeEntrada(d(), c);
   return (entrada && entrada.chaves) || ((i) => (i.sem_chaves ? '' : i.chaves))(buscar('imoveis', c.imovel_id) || {}) || '';
 }
 
@@ -312,8 +313,10 @@ export function telaVistoria(rota) {
   if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
   const i = buscar('imoveis', c.imovel_id) || {};
-  const entrada = R.vistoriasDo(d(), c.id).find((x) => x.tipo === 'Entrada');
-  // ponto de partida: na saída, a vistoria de entrada deste inquilino; na entrada, a última vistoria do imóvel
+  // vistoria de entrada do contrato: a deste inquilino ou, se ele continua o contrato de outro, a do titular anterior
+  const entrada = K.vistoriaDeEntrada(d(), c);
+  const deQuem = entrada && entrada.contrato_id !== c.id ? buscar('contratos', entrada.contrato_id) : null;
+  // ponto de partida: na saída, a vistoria de entrada do contrato; na entrada, a última vistoria do imóvel
   const base = v || (tipo === 'Saída' ? entrada : R.ultimaVistoriaDoImovel(d(), i.id)) || {};
   const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
   const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
@@ -326,7 +329,7 @@ export function telaVistoria(rota) {
   const textoFinal = (v ? v.texto_final : base.texto_final) || K.vistoriaFinal((v && v.prazo_dias) || 3);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
-    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? 'vistoria de entrada deste inquilino' : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
+    ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? (deQuem ? `vistoria de entrada do contrato, feita com ${esc(deQuem.inquilino_nome)} em ${dataBr(entrada.data)} (troca de titular)` : 'vistoria de entrada deste inquilino') : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
     ${tipo === 'Saída' && !grade ? '<div class="alerta aviso">Na saída, compare item por item com a entrada. Onde houver dano ou falta, escreva <b>DIFERENÇA:</b> e o que mudou (ex.: "DIFERENÇA: parede da sala com furos de quadro"). Esses pontos são os que o inquilino paga.</div>' : ''}
     ${grade ? '' : `<div class="alerta info">Este imóvel ainda não tem <b>modelo de vistoria</b>. ${linkModelo('Montar o modelo do imóvel')} Montado uma vez, a vistoria vira só marcar a situação de cada item.</div>`}
     <form class="cartao" data-form="vistoria" data-rascunho="vistoria-${c.id}-${tipo === 'Saída' ? 'saida' : 'entrada'}-${v ? v.id : 'nova'}">

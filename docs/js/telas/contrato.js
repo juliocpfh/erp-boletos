@@ -415,10 +415,11 @@ export function caixaSeguros(c) {
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
 /** Botões para gerar cada documento de entrada (contrato, vistoria de entrada, recibo das chaves). */
 function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
-  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  // a vistoria de entrada do contrato (na troca de titular, a do anterior: só se vê aqui, edita-se lá)
+  const entrada = K.vistoriaDeEntrada(d(), c);
   return {
     doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', cls),
-    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria', cls)} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar vistoria', cls) : ''}`
+    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria', cls)} ${opera() && entrada.contrato_id === c.id ? link(`#/vistoria/${entrada.id}`, 'Editar vistoria', cls) : ''}`
       : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada', cls) : ''),
     doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar termo de entrega das chaves', cls),
   };
@@ -504,7 +505,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
   const anterior = R.contratoHerdado(d(), c);
   const ir = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
   const mini = 'botao secundario mini';
-  const vistoria = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  const vistoria = K.vistoriaDeEntrada(d(), c);
   const doc = { contrato_assinado: 'assinado', vistoria_assinada: 'assinada', chaves_assinado: 'assinado' };
   const atalhos = {
     reserva: () => (c.reserva_valor > 0 ? link(ir('reserva'), 'Anexar o comprovante', mini) : link(`#/editar/contratos/${c.id}`, 'Informar a reserva', mini)),

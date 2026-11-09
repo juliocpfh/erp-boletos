@@ -149,3 +149,50 @@ test('termo da troca com garantia nova: o fiador de quem sai não entra (só o d
   assert.match(t, /ANA LIMA/);
   assert.doesNotMatch(t, /JOSÉ FIADOR/);
 });
+
+// --------------------------------------------------------------------------
+// 3. Vistoria de saída de quem herdou o contrato: compara com a vistoria de entrada do contrato (no titular anterior)
+// --------------------------------------------------------------------------
+function herdeiroQueSai() {
+  const { d, i } = casa();
+  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', data_entrada: '2025-01-10', vigencia_inicio: '2025-01-10', vigencia_fim: '2027-07-10',
+    aluguel_inicial: 300000, garantia_tipo: 'Sem garantia', data_saida: '2026-03-31' }, 'j');
+  const entrada = R.inserir(d, 'vistorias', { contrato_id: a.id, imovel_id: i.id, tipo: 'Entrada', data: '2025-01-10', chaves: '2 chaves da porta', itens: [
+    { comodo: 'Sala', item: 'Piso', situacao: 'Avaria', obs: 'piso trincado (já estava)' },
+    { comodo: 'Sala', item: 'Paredes', situacao: 'Novo' }] }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: a.id, inquilino_nome: 'Lúcia Prado', data_entrada: '2026-04-01', vigencia_inicio: '2026-04-01',
+    vigencia_fim: '2027-07-10', aluguel_inicial: 300000, garantia_tipo: 'Sem garantia', heranca_transferida: '2026-04-01', data_saida: '2026-10-31' }, 'j');
+  const saida = R.inserir(d, 'vistorias', { contrato_id: n.id, imovel_id: i.id, tipo: 'Saída', data: '2026-10-31', itens: [
+    { comodo: 'Sala', item: 'Piso', situacao: 'Avaria', obs: 'piso trincado' },
+    { comodo: 'Sala', item: 'Paredes', situacao: 'Marcas de uso', obs: 'furos' }] }, 'j');
+  return { d, i, a, n, entrada, saida };
+}
+
+test('vistoria de saída de quem herdou: compara com a de entrada do contrato (Pedro, 10/01/2025)', () => {
+  const { d, n, entrada } = herdeiroQueSai();
+  assert.equal(K.vistoriaDeEntrada(d, n).id, entrada.id, 'sobe a cadeia até a vistoria de entrada do contrato');
+  const r = K.resultadoVistoriaSaida(d, n);
+  assert.equal(r.texto, 'Com pendências');
+  assert.deepEqual(r.pendencias, ['Sala – Paredes (Marcas de uso: furos)'], 'as paredes pioraram; o piso já estava trincado');
+  // documento da saída com a tabela "Na entrada / Na saída"
+  const t = texto(K.vistoriaBlocos(d, n, r.vistoria, null, {}, K.vistoriaDeEntrada(d, n).itens).blocos);
+  assert.match(t, /\[tabela\]/);
+  assert.match(t, /Os itens destacados pioraram em relação à vistoria de entrada\./);
+});
+
+test('vistoria de entrada própria feita na troca de titular: vale ela (é o estado em que o novo titular recebeu)', () => {
+  const { d, i, n } = herdeiroQueSai();
+  const propria = R.inserir(d, 'vistorias', { contrato_id: n.id, imovel_id: i.id, tipo: 'Entrada', data: '2026-04-01', itens: [
+    { comodo: 'Sala', item: 'Piso', situacao: 'Avaria', obs: 'piso trincado' },
+    { comodo: 'Sala', item: 'Paredes', situacao: 'Marcas de uso', obs: 'furos do Pedro' }] }, 'j');
+  assert.equal(K.vistoriaDeEntrada(d, n).id, propria.id);
+  assert.equal(K.resultadoVistoriaSaida(d, n).texto, 'Sem pendências');
+  // terceiro titular sem vistoria própria: vale a mais recente da cadeia (a de Lúcia, feita na troca)
+  const x = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: n.id, inquilino_nome: 'Rita Alves', data_entrada: '2026-11-01', vigencia_inicio: '2026-11-01',
+    vigencia_fim: '2027-07-10', aluguel_inicial: 300000, garantia_tipo: 'Sem garantia' }, 'j');
+  assert.equal(K.vistoriaDeEntrada(d, x).id, propria.id);
+  // sem nenhuma vistoria de entrada na cadeia: nenhuma
+  const { d: d2, i: i2 } = casa();
+  const s = R.inserir(d2, 'contratos', { imovel_id: i2.id, inquilino_nome: 'Ana', data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01' }, 'j');
+  assert.equal(K.vistoriaDeEntrada(d2, s), null);
+});

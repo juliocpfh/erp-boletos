@@ -710,17 +710,34 @@ const GRAU = { Novo: 0, 'Ótimo': 1, Bom: 2, 'Marcas de uso': 3, Avaria: 4, 'Nã
 /** Na saída, o item piorou em relação à entrada? */
 export const piorou = (entrada, saida) => GRAU[saida] !== undefined && GRAU[entrada] !== undefined && GRAU[saida] > GRAU[entrada];
 
+const maisRecente = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+/**
+ * Vistoria de entrada que vale para o contrato (fonte única: comparação da saída, chaves do recibo, rotina e telas).
+ * A do próprio contrato (a mais recente, se foi refeita); sem ela, troca de titular: sobe a cadeia e vale a do titular
+ * anterior mais próximo que tem uma. Ex.: Pedro entrou em 10/01/2025 com vistoria; Lúcia assumiu em 01/04/2026 sem fazer
+ * outra → a saída de Lúcia compara com a de Pedro (é a que integra o contrato, como diz o termo da troca). Se Lúcia fez a
+ * dela na troca, vale a dela: é o estado em que ela recebeu o imóvel (o que piorou antes fica com quem saiu). Null se não há.
+ */
+export function vistoriaDeEntrada(d, c) {
+  const vistos = new Set();
+  for (let x = c; x && !vistos.has(x.id); x = x.contrato_anterior_id ? d.contratos.find((y) => y.id === x.contrato_anterior_id) : null) {
+    vistos.add(x.id);
+    const v = (d.vistorias || []).filter((y) => y.contrato_id === x.id && y.tipo === 'Entrada'
+      && (x === c || !c.imovel_id || !y.imovel_id || y.imovel_id === c.imovel_id)).sort(maisRecente)[0];
+    if (v) return v;
+  }
+  return null;
+}
+
 /**
  * Resultado da vistoria de saída registrada (fonte única do "Vistoria de saída" do cálculo final):
  * { texto: 'Não feita' | 'Sem pendências' | 'Com pendências', vistoria, pendencias: ['Sala – Teto (Avaria: infiltração)'] }.
  * Pendência = item pior que na entrada (ou, sem o item na entrada, "Avaria"/"Não funciona"); sem grade, as linhas "DIFERENÇA:" do descritivo.
  */
 export function resultadoVistoriaSaida(d, c) {
-  const porData = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
-  const doContrato = (d.vistorias || []).filter((v) => v.contrato_id === c.id).sort(porData);
-  const vistoria = doContrato.find((v) => v.tipo === 'Saída') || null;
+  const vistoria = (d.vistorias || []).filter((v) => v.contrato_id === c.id && v.tipo === 'Saída').sort(maisRecente)[0] || null;
   if (!vistoria) return { texto: 'Não feita', vistoria: null, pendencias: [] };
-  const entrada = doContrato.find((v) => v.tipo === 'Entrada');
+  const entrada = vistoriaDeEntrada(d, c);
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
   let pendencias = (vistoria.itens || []).filter((x) => {
     const ent = naEntrada.get(`${x.comodo}|${x.item}`);
