@@ -613,7 +613,9 @@ function guardarClipes() {
     localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
+let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
 export async function mostrar(estadoForm = null) {
+  desenhos += 1;
   const app = document.getElementById('app');
   const rota = rotaAtual();
   try {
@@ -748,6 +750,8 @@ document.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const botao = form.querySelector('button[type=submit],button:not([type])');
   if (botao) botao.disabled = true;
+  const endereco = location.hash;
+  const desenhosAntes = desenhos;
   try {
     const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
     if (resposta && resposta.erros) {
@@ -758,6 +762,10 @@ document.addEventListener('submit', async (ev) => {
     logarErro(e);
     aviso(e.message, 'erro');
     if (botao) botao.disabled = false;
+  } finally {
+    // saiu sem trocar de tela (ex.: "Cancelar" numa confirmação, arquivo só baixado): o botão volta a funcionar.
+    // Se a tela vai ser desenhada de novo (ir/mostrar), fica apagado até a nova aparecer: não dá para enviar duas vezes.
+    if (botao?.isConnected && location.hash === endereco && desenhos === desenhosAntes) botao.disabled = false;
   }
 });
 
