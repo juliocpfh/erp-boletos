@@ -351,8 +351,12 @@ function negritos(s) {
 // --------------------------------------------------------------------------
 // HTML (tela, imprimir e salvar em PDF)
 // --------------------------------------------------------------------------
-const escH = (v) => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-const runsHtml = (runs) => runs.map((r) => (r.b ? `<b>${escH(r.t)}</b>` : escH(r.t))).join('');
+/**
+ * Escapa o texto do contrato para o HTML (tela, PDF) e para o XML do Word (.docx). É o esc() de formularios.js sem trocar o
+ * apóstrofo: os atributos aqui usam sempre aspas duplas, e o "D'Ávila" sai como está (sem &#39;) no HTML e no Word.
+ */
+const escDoc = (v) => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const runsHtml = (runs) => runs.map((r) => (r.b ? `<b>${escDoc(r.t)}</b>` : escDoc(r.t))).join('');
 
 /**
  * Marca-d'água (logo bem suave) em todas as páginas. Na tela: um fundo que repete a logo a cada altura de folha A4.
@@ -361,9 +365,9 @@ const runsHtml = (runs) => runs.map((r) => (r.b ? `<b>${escH(r.t)}</b>` : escH(r
 export function marcaDagua(logo) {
   if (!logo) return '';
   // tamanho grande (10 px por mm): o navegador desenha o fundo nessa resolução, sem serrilhar ao ampliar
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="2970" viewBox="0 0 210 297"><image href="${escH(logo)}" x="42" y="98" width="126" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="2970" viewBox="0 0 210 297"><image href="${escDoc(logo)}" x="42" y="98" width="126" height="100" preserveAspectRatio="xMidYMid meet"/></svg>`;
   const fundo = `data:image/svg+xml;base64,${btoa(svg)}`;
-  return `<div class="ct-marcas" style="background-image:url('${fundo}')"></div><img class="ct-marca" src="${escH(logo)}" alt="">`;
+  return `<div class="ct-marcas" style="background-image:url('${fundo}')"></div><img class="ct-marca" src="${escDoc(logo)}" alt="">`;
 }
 
 /**
@@ -382,7 +386,7 @@ export function gruposAssinatura(pessoas) {
   return [...grupos, outros].filter((g) => g.length);
 }
 
-const assinaHtml = (p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escH(p.nome)}</b>${p.doc ? `<br>${escH(p.doc)}` : ''}${p.extra ? `<br>${escH(p.extra)}` : ''}<br>${escH(p.papel)}</div>`;
+const assinaHtml = (p) => `<div class="ct-assina"><div class="ct-linha"></div><b>${escDoc(p.nome)}</b>${p.doc ? `<br>${escDoc(p.doc)}` : ''}${p.extra ? `<br>${escDoc(p.extra)}` : ''}<br>${escDoc(p.papel)}</div>`;
 
 /**
  * Rodapé da impressão, em todas as folhas (caixas da margem da página): "Página X de Y" no canto direito, acima da linha;
@@ -404,8 +408,8 @@ export function contratoHtml(blocos, { logo, rodape }) {
   return `<div class="contrato">
     ${estiloRodape(rodape)}
     ${marcaDagua(logo)}
-    <div class="ct-rodape">${rodape.map(escH).join('<br>')}</div>
-    ${logo ? `<p class="ct-capa"><img src="${escH(logo)}" alt="Logo"></p>` : ''}
+    <div class="ct-rodape">${rodape.map(escDoc).join('<br>')}</div>
+    ${logo ? `<p class="ct-capa"><img src="${escDoc(logo)}" alt="Logo"></p>` : ''}
     <table class="ct-pagina"><tbody><tr><td>${corpo}</td></tr></tbody><tfoot><tr><td><div class="ct-espaco-rodape"></div></td></tr></tfoot></table></div>`;
 }
 
@@ -416,12 +420,12 @@ function blocoHtml(b) {
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
     if (b.tipo === 'subsecao') return `<h3 class="ct-subsecao">${runsHtml(b.runs)}</h3>`;
     if (b.tipo === 'item') return `<p class="ct-item">${runsHtml(b.runs)}</p>`;
-    if (b.tipo === 'link') return `<p class="ct-item ct-link"><a href="${escH(b.url)}" target="_blank" rel="noopener noreferrer">${escH(b.url)}</a></p>`;
+    if (b.tipo === 'link') return `<p class="ct-item ct-link"><a href="${escDoc(b.url)}" target="_blank" rel="noopener noreferrer">${escDoc(b.url)}</a></p>`;
     if (b.tipo === 'tabela') {
-      return `<table class="ct-tabela"><tr>${b.cabecalho.map((h) => `<th>${escH(h)}</th>`).join('')}</tr>${b.linhas.map((l, i) => `<tr class="${b.destaques && b.destaques[i] ? 'ct-destaque' : ''}">${l.map((x) => `<td>${escH(x)}</td>`).join('')}</tr>`).join('')}</table>`;
+      return `<table class="ct-tabela"><tr>${b.cabecalho.map((h) => `<th>${escDoc(h)}</th>`).join('')}</tr>${b.linhas.map((l, i) => `<tr class="${b.destaques && b.destaques[i] ? 'ct-destaque' : ''}">${l.map((x) => `<td>${escDoc(x)}</td>`).join('')}</tr>`).join('')}</table>`;
     }
     if (b.tipo === 'fotos') {
-      return `<div class="ct-fotos ${b.grande ? 'ct-fotos-grande' : ''}">${b.fotos.map((f) => `<figure><img src="${escH(f.src)}" alt="${escH(f.legenda)}"><figcaption>${escH(f.legenda)}</figcaption></figure>`).join('')}</div>`;
+      return `<div class="ct-fotos ${b.grande ? 'ct-fotos-grande' : ''}">${b.fotos.map((f) => `<figure><img src="${escDoc(f.src)}" alt="${escDoc(f.legenda)}"><figcaption>${escDoc(f.legenda)}</figcaption></figure>`).join('')}</div>`;
     }
     if (b.tipo === 'assinaturas') {
       return `<div class="ct-assinaturas">${gruposAssinatura(b.pessoas).map((g) => `<div class="ct-grupo-assina${g.length === 1 ? ' um' : ''}">${g.map(assinaHtml).join('')}</div>`).join('')}</div>`;
@@ -433,7 +437,6 @@ function blocoHtml(b) {
 // --------------------------------------------------------------------------
 // Word (.docx): logo de fundo bem suave, logo na capa, rodapé com as empresas e CNPJs
 // --------------------------------------------------------------------------
-const escX = (v) => String(v ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
   + 'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
   + 'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
@@ -444,7 +447,7 @@ const EMU_CM = 360000;
  */
 export const LOGO = { larguraCm: 6, topoCm: 1, espacoCm: 0.3 };
 
-const runX = (r, extra = '') => `<w:r><w:rPr>${r.b ? '<w:b/>' : ''}${extra}</w:rPr><w:t xml:space="preserve">${escX(r.t)}</w:t></w:r>`;
+const runX = (r, extra = '') => `<w:r><w:rPr>${r.b ? '<w:b/>' : ''}${extra}</w:rPr><w:t xml:space="preserve">${escDoc(r.t)}</w:t></w:r>`;
 const parX = (runs, { alinhar = 'both', antes = 0, depois = 120, recuo = 0, rPr = '' } = {}) => `<w:p><w:pPr><w:spacing w:before="${antes}" w:after="${depois}" w:line="300" w:lineRule="auto"/>${recuo ? `<w:ind w:firstLine="${recuo}"/>` : ''}<w:jc w:val="${alinhar}"/></w:pPr>${runs.map((r) => runX(r, rPr)).join('')}</w:p>`;
 
 function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo = null, transparencia = 0 } = {}) {
@@ -493,7 +496,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     else if (b.tipo === 'item') corpo.push(parX(b.runs, { alinhar: 'left', depois: 40 }));
     else if (b.tipo === 'link') {
       links.push(b.url);
-      corpo.push(`<w:p><w:pPr><w:spacing w:after="120"/></w:pPr><w:hyperlink r:id="rIdLink${links.length}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escX(b.url)}</w:t></w:r></w:hyperlink></w:p>`);
+      corpo.push(`<w:p><w:pPr><w:spacing w:after="120"/></w:pPr><w:hyperlink r:id="rIdLink${links.length}" w:history="1"><w:r><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">${escDoc(b.url)}</w:t></w:r></w:hyperlink></w:p>`);
     }
     else if (b.tipo === 'assinaturas') {
       // um conjunto por linha da tabela (dois lado a lado; um só, centralizado), tudo preso na mesma página
@@ -542,7 +545,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
   const campoX = (instr) => `<w:r>${cinza}<w:fldChar w:fldCharType="begin"/></w:r><w:r>${cinza}<w:instrText xml:space="preserve"> ${instr} </w:instrText></w:r><w:r>${cinza}<w:fldChar w:fldCharType="separate"/></w:r><w:r>${cinza}<w:t>1</w:t></w:r><w:r>${cinza}<w:fldChar w:fldCharType="end"/></w:r>`;
   // "Página X de Y" à direita, acima da linha; as empresas centralizadas embaixo da linha
   const paginas = `<w:p><w:pPr><w:spacing w:after="40"/><w:jc w:val="right"/></w:pPr><w:r>${cinza}<w:t xml:space="preserve">Página </w:t></w:r>${campoX('PAGE')}<w:r>${cinza}<w:t xml:space="preserve"> de </w:t></w:r>${campoX('NUMPAGES')}</w:p>`;
-  const rodapeX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}>${paginas}${rodape.map((linha, i) => `<w:p><w:pPr>${i === 0 ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>' : ''}<w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr><w:r>${cinza}<w:t xml:space="preserve">${escX(linha)}</w:t></w:r></w:p>`).join('')}</w:ftr>`;
+  const rodapeX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}>${paginas}${rodape.map((linha, i) => `<w:p><w:pPr>${i === 0 ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>' : ''}<w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr><w:r>${cinza}<w:t xml:space="preserve">${escDoc(linha)}</w:t></w:r></w:p>`).join('')}</w:ftr>`;
   const estilos = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
     + '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault>'
     + '<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
@@ -558,7 +561,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
   zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
     + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>');
-  zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escX(titulo || 'Contrato de locação')}</dc:title></cp:coreProperties>`);
+  zip.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escDoc(titulo || 'Contrato de locação')}</dc:title></cp:coreProperties>`);
   const img = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
   zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + '<Relationship Id="rIdEstilos" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
@@ -566,7 +569,7 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     + '<Relationship Id="rIdRod" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
     + `${logo ? `<Relationship Id="rIdLogo" Type="${img}" Target="media/logo.png"/>` : ''}`
     + `${midias.map((m, i) => `<Relationship Id="rIdFoto${i + 1}" Type="${img}" Target="media/foto${i + 1}.jpeg"/>`).join('')}`
-    + `${links.map((u, i) => `<Relationship Id="rIdLink${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escX(u)}" TargetMode="External"/>`).join('')}</Relationships>`);
+    + `${links.map((u, i) => `<Relationship Id="rIdLink${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escDoc(u)}" TargetMode="External"/>`).join('')}</Relationships>`);
   zip.file('word/_rels/header1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + `${logo ? `<Relationship Id="rIdMarca" Type="${img}" Target="media/marca.png"/>` : ''}</Relationships>`);
   zip.file('word/document.xml', documento);
