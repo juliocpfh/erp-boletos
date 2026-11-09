@@ -237,3 +237,26 @@ test('valores por extenso: "um milhão e mil"; os que já saíam certos continua
     [1200300, 'um milhão duzentos mil e trezentos'], [21000, 'vinte e um mil']]) assert.equal(K.numeroPorExtenso(n), t, String(n));
   for (const [n, t] of [[1, 'primeira'], [11, 'décima primeira'], [21, 'vigésima primeira'], [99, 'nonagésima nona']]) assert.equal(K.ordinalPorExtenso(n), t);
 });
+
+// --------------------------------------------------------------------------
+// 5. Numeração dos termos aditivos: continua na troca de titular (é o mesmo contrato)
+// --------------------------------------------------------------------------
+test('numeração do termo aditivo conta os termos de todos os contratos da cadeia', () => {
+  const { d, i } = casa();
+  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', data_entrada: '2025-01-10', vigencia_inicio: '2025-01-10', vigencia_fim: '2027-07-10',
+    aluguel_inicial: 300000, dia_vencimento: 10, garantia_tipo: 'Sem garantia' }, 'j');
+  const v = R.salvarAditivoVencimento(d, a.id, { data: '2025-06-01', dia_novo: 15, mes: '2025-07', texto: K.modelosDe(d, 'aditivo')[0].texto }, 'j');
+  R.assinarAditivo(d, v.id, { data: '2025-06-02', arquivo: 'x.pdf' }, 'j');
+  assert.equal(v.numero, 1);
+  const n = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: a.id, inquilino_nome: 'Lúcia Prado', data_entrada: '2026-12-01', vigencia_inicio: '2026-12-01',
+    vigencia_fim: '2027-07-10', aluguel_inicial: 300000, dia_vencimento: 15, garantia_tipo: 'Sem garantia' }, 'j');
+  const t = R.salvarAditivoTroca(d, n.id, { data: '2026-11-20', texto: K.modelosDe(d, 'aditivo_troca')[0].texto }, 'j');
+  assert.equal(t.numero, 2);
+  assert.match(texto(K.montarContrato(t.texto, K.dadosDoAditivo(d, n, t))), /^2º TERMO ADITIVO/);
+  R.assinarAditivo(d, t.id, { data: '2026-11-21', arquivo: 'troca.pdf' }, 'j');
+  const v2 = R.salvarAditivoVencimento(d, n.id, { data: '2027-01-05', dia_novo: 20, mes: '2027-02', texto: K.modelosDe(d, 'aditivo')[0].texto }, 'j');
+  assert.equal(v2.numero, 3);
+  // termo excluído antes de assinar não faz repetir o número do seguinte
+  R.excluir(d, 'aditivos', v.id, 'j');
+  assert.equal(R.salvarAditivoVencimento(d, n.id, { data: '2027-02-05', dia_novo: 25, mes: '2027-03', texto: 'x' }, 'j').numero, 4);
+});

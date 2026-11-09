@@ -3267,6 +3267,18 @@ export const aditivosValidos = (d, contratoId) => d.aditivos.filter((a) => a.con
 /** Termos aditivos gerados pelo sistema que aguardam a assinatura (sem arquivo e sem registro de perda). */
 export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && !a.arquivo && !a.perdido_em).sort(porDataAditivo);
 
+/**
+ * Número do próximo termo aditivo: conta os termos de todos os contratos da cadeia (na troca de titular o contrato é o mesmo).
+ * Ex.: o contrato de Pedro tem o 1º termo (troca do vencimento); Lúcia assume → o termo da troca é o 2º. Um termo excluído
+ * não faz repetir o número de outro (vale o maior já usado).
+ */
+function proximoNumeroAditivo(d, c) {
+  const { antes, depois } = cadeiaDeContratos(d, c);
+  const ids = new Set([c, ...antes, ...depois].map((x) => x.id));
+  const l = d.aditivos.filter((a) => ids.has(a.contrato_id));
+  return Math.max(l.length, ...l.map((a) => Number(a.numero) || 0)) + 1;
+}
+
 const aditivosDeVencimento = (d, contratoId) => d.aditivos.filter((a) => a.contrato_id === contratoId && (a.arquivo || a.perdido_em) && a.dia_novo && a.primeiro_vencimento)
   .sort((a, b) => a.primeiro_vencimento.localeCompare(b.primeiro_vencimento));
 
@@ -3326,7 +3338,7 @@ export function salvarAditivoVencimento(d, contratoId, f, usuario, id = null) {
     atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
     return atual;
   }
-  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  dados.numero = proximoNumeroAditivo(d, c);
   return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de vencimento gerado (aguardando assinatura)`);
 }
 
@@ -3353,7 +3365,7 @@ export function salvarAditivoTroca(d, contratoId, f, usuario, id = null) {
     atualizar(d, 'aditivos', atual.id, dados, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(f.data)} alterado`);
     return atual;
   }
-  dados.numero = d.aditivos.filter((a) => a.contrato_id === c.id).length + 1;
+  dados.numero = proximoNumeroAditivo(d, c);
   return inserir(d, 'aditivos', dados, usuario, `${c.inquilino_nome}: termo aditivo de troca de inquilino gerado (aguardando assinatura)`);
 }
 
