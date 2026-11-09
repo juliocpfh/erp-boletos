@@ -40,9 +40,9 @@ function linhas(f, emitente) {
     7: [vazio(13, 'be bd bt bb')],
     8: [[1, '', 'be bt'], [9, 'TOMADOR DE SERVIÇO', 'bt bd f-11'], [1, '', 'be bd bt'], [2, '', 'bt bd']],
     9: [[1, '', 'be'], [9, '', 'bd'], [1, '', 'be bd'], [2, '', 'bd']],
-    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, 60)))}</b>`, 'bd f-12 f-light'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
+    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, 60)))}</b>`, 'bd f-12 f-light duas-linhas'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
     11: [[1, '', 'be'], [3, '<b>CPF</b>', 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
-    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, 70)))}</b>`, 'bd bb f-12 f-light'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
+    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, 70)))}</b>`, 'bd bb f-12 f-light duas-linhas'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
     13: [vazio(13, 'be bd bt bb')],
     14: [vazio(13, 'be bd bt bb')],
     15: [vazio(13, 'be bd bt preto')],
@@ -80,23 +80,31 @@ export function faturaHtml(f, emitente) {
  * Chame depois que a fatura estiver na página (precisa medir).
  */
 export function encaixarFaturas(raiz) {
+  const diminuir = (td, fator) => {
+    // mede tudo antes de mudar: o texto de dentro herda a letra da célula e encolheria duas vezes
+    const els = [td, ...td.querySelectorAll('*')];
+    const tamanhos = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
+    els.forEach((el, k) => { el.style.fontSize = `${(tamanhos[k] * fator * 0.99).toFixed(2)}px`; });
+  };
   for (const tabela of raiz.querySelectorAll('.fatura-xls table')) {
     for (const tr of tabela.rows) {
       const altura = parseFloat(tr.style.height) || 0;
       for (const td of tr.cells) {
         if (!td.textContent.trim()) continue;
-        const quebra = getComputedStyle(td).whiteSpace !== 'nowrap'; // o canhoto quebra linha: cuida da altura
         const faixa = document.createRange();
         faixa.selectNodeContents(td);
-        for (let i = 0; i < 10; i += 1) {
+        const livre = td.clientWidth - 6; // 3px de margem de cada lado
+        // nome e endereço compridos: se numa linha a letra ficaria pequena demais, passam a ocupar duas linhas
+        if (td.classList.contains('duas-linhas') && faixa.getBoundingClientRect().width * 0.75 > livre) {
+          td.style.whiteSpace = 'normal';
+          td.style.lineHeight = '1.05';
+        }
+        const quebra = getComputedStyle(td).whiteSpace !== 'nowrap'; // texto em mais de uma linha: cuida da altura
+        for (let i = 0; i < 12; i += 1) {
           const cx = faixa.getBoundingClientRect();
-          const livre = td.clientWidth - 6; // 3px de margem de cada lado
-          const fator = quebra ? (altura && cx.height > altura ? 0.93 : 1) : (cx.width > livre ? Math.max(0.6, livre / cx.width) : 1);
+          const fator = quebra ? (altura && cx.height > altura - 2 ? 0.94 : 1) : (cx.width > livre ? Math.max(0.6, livre / cx.width) : 1);
           if (fator >= 1) break;
-          // mede tudo antes de mudar: o texto de dentro herda a letra da célula e encolheria duas vezes
-          const els = [td, ...td.querySelectorAll('*')];
-          const tamanhos = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
-          els.forEach((el, k) => { el.style.fontSize = `${(tamanhos[k] * fator * 0.99).toFixed(2)}px`; });
+          diminuir(td, fator);
         }
       }
     }
