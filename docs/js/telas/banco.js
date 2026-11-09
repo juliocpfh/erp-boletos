@@ -120,7 +120,7 @@ function descreverSugestao(s) {
   const i = s.imovel_id ? buscar('imoveis', s.imovel_id) : null;
   const cb = s.cobranca_id ? buscar('cobrancas', s.cobranca_id) : null;
   const c = cb ? buscar('contratos', cb.contrato_id) : null;
-  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}` : '',
+  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}${s.ligar ? ' (já pago: só ligar)' : ''}` : '',
     s.classificacao === 'boleto' && !cb && s.candidatos ? `${s.candidatos.length} boletos com este valor` : ''].filter(Boolean).join(' · ');
 }
 
@@ -287,13 +287,14 @@ function caixaConferirBoletos(conta, mes) {
     const c = cb ? buscar('contratos', cb.contrato_id) : null;
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     if (!cb) return '';
-    return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${cb.data_pagamento ? 'disabled' : 'checked'}></td>
+    const travada = !!cb.data_pagamento || s.jaPago || s.aguardandoCredito;
+    return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${travada ? 'disabled' : Z.prontoParaRegistrar(d(), s) ? 'checked' : ''}></td>
       <td><a href="#/cobranca/${cb.id}"><b>${esc(i ? i.nome : '')}</b> · ${esc(c ? c.inquilino_nome : '')}</a><br><span class="suave">boleto ${compBr(cb.competencia)} · vence ${dataBr(cb.vencimento)}${s.certeza === 'provavel' ? ' · casado só pelo valor e pela data: confira' : ''}</span></td>
       <td class="nw">${dataBr(s.data_credito)}${s.data_pagamento && s.data_pagamento !== s.data_credito ? `<br><span class="suave">pagou ${dataBr(s.data_pagamento)}</span>` : ''}</td><td class="n">${reais(s.valor)}${s.previsto !== s.valor ? `<br><span class="texto-aviso">previsto ${reais(s.previsto)}</span>` : ''}</td>
-      <td>${cb.data_pagamento ? etiqueta('já estava pago', 'neutra') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}</td></tr>`;
+      <td>${cb.data_pagamento || s.jaPago ? etiqueta('já estava pago', 'neutra') : s.aguardandoCredito ? etiqueta('pago, aguardando crédito no banco', 'aviso') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}${s.alternativas > 1 && !s.jaPago ? `<br>${etiqueta(`este pagamento casa com ${s.alternativas} boletos: marque só o certo`, 'aviso')}` : ''}</td></tr>`;
   };
   return `<div class="cartao" id="conferir-boletos" data-caixa="conferir-boletos"><h2>Conferir boletos pagos no banco</h2>
-    <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
+    <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou (a linha do extrato desse dinheiro, se já foi buscada, fica ligada ao boleto). Um pagamento que casa com mais de um boleto (mesmo valor) não vem marcado: marque só o certo. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
     ${opera() ? `<p class="acoes">${botaoPonte('conferirBoletosBanco', `Buscar boletos pagos em ${compBr(mes)}`, { conta, mes })}</p>` : ''}
     ${conf ? (conf.sugestoes.length ? `<form data-form="registrarPagamentosBanco"><input type="hidden" name="conta" value="${esc(conta)}"><input type="hidden" name="mes" value="${mes}">
       <div class="rolagem"><table class="responsiva"><tr><th></th><th>Boleto</th><th>Crédito em</th><th class="n">Valor recebido</th><th>Conferência</th></tr>${conf.sugestoes.map(linha).join('')}</table></div>
@@ -460,12 +461,17 @@ const opcoes = (lista, atual, vazio = '') => `${vazio ? `<option value="">${esc(
 const despesasSemExtrato = (imovelId, m) => R.despesasDo(d(), imovelId).filter((x) => x.valor > 0 && !x.movimentacao_id && !movs().some((y) => y.despesa_id === x.id))
   .sort((a, b) => (a.valor === m.valor ? -1 : b.valor === m.valor ? 1 : 0)).slice(0, 24);
 
-/** Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. */
+/**
+ * Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. Entram também os já pagos à
+ * mão com o mesmo valor até 5 dias antes, ainda sem linha do extrato (escolher um deles só liga a entrada: nada é pago de novo).
+ */
 function boletosAbertos(imovelId, m) {
   const cs = d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id);
-  return d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
+  const ligaveis = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && !cb.movimentacao_id && cb.valor_pago === m.valor
+    && cb.data_pagamento <= m.data && cb.data_pagamento >= C.somarDias(m.data, -5)).map((cb) => ({ cb, previsto: cb.valor_pago, jaPago: true }));
+  return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
     .map((cb) => ({ cb, previsto: R.previstoNoPagamento(cb, m.data).valor_devido }))
-    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))).slice(0, 30);
+    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento)))].slice(0, 30);
 }
 
 /** Guias de imposto da empresa da conta ainda não pagas (as de mesmo valor primeiro). */
@@ -536,8 +542,8 @@ async function janelaDestino(m, inicialDe = null) {
       const ds = imovelId ? despesasSemExtrato(imovelId, m) : [];
       sel('despesa').innerHTML = opcoes(ds.map((x) => [x.id, `${x.tipo} de ${compBr(x.competencia)} · ${reais(x.valor)} · paga em ${dataBr(x.data_pagamento)}${x.valor === m.valor ? ' ★ mesmo valor' : ''}`]), s.despesa_id || (ds.find((x) => x.valor === m.valor) || {}).id, '— lançar agora');
       const bs = boletosAbertos(imovelId, m);
-      sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · vence ${dataBr(cb.vencimento)} · ${reais(previsto)}${previsto === m.valor ? ' ★ mesmo valor' : ''}`]; }),
-        s.cobranca_id || (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id, '— nenhum');
+      sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto, jaPago }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · ${jaPago ? `já pago em ${dataBr(cb.data_pagamento)}: só ligar esta entrada` : `vence ${dataBr(cb.vencimento)}`} · ${reais(previsto)}${previsto === m.valor && !jaPago ? ' ★ mesmo valor' : ''}`]; }),
+        s.cobranca_id || (bs.length && !bs.some((x) => x.jaPago) ? (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id : null), '— nenhum');
       const ips = d().iptus.filter((p) => !imovelId || p.imovel_id === imovelId).sort((a, b) => b.ano - a.ano || b.id - a.id);
       sel('iptu').innerHTML = opcoes(ips.map((p) => { const i = buscar('imoveis', p.imovel_id); return [p.id, `${p.ano}${!imovelId && i ? ` · ${i.nome}` : ''}`]; }), s.iptu ? s.iptu.id : (ips[0] || {}).id, ips.length ? '' : '— nenhum IPTU cadastrado');
       encherTipos();
@@ -594,7 +600,7 @@ function abrirDivergencia(r, m) {
 async function salvarDestino(m, destino) {
   const r = await alterar((db) => Z.vincularMovimentacao(db, m.id, destino, login()));
   if (r && r.divergente) return abrirDivergencia(r, m);
-  if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(`Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
+  if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(r && r.ligada ? `Entrada ligada ao boleto de ${compBr(cb.competencia)}, que já estava pago (${dataBr(cb.data_pagamento)}). Nada foi pago de novo.` : `Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
   return mostrar();
 }
 
@@ -613,17 +619,6 @@ function destinoDaSugestao(s) {
 // --------------------------------------------------------------------------
 // Pagamentos: o banco lê os códigos (decode) e o lote é enviado para aprovação
 // --------------------------------------------------------------------------
-/** Casa os itens que o banco devolveu com os pagamentos (content + valor; senão pela ordem). */
-function casarItens(pags, items) {
-  const usados = new Set();
-  return pags.map((p, k) => {
-    let idx = items.findIndex((it, j) => !usados.has(j) && (String(it.id) === String(p.id_externo) || (it.content === p.content && centavosDoBanco(it.amount) === p.valor)));
-    if (idx < 0 && items[k] && !usados.has(k)) idx = k;
-    if (idx >= 0) usados.add(idx);
-    return idx >= 0 ? items[idx] : null;
-  });
-}
-
 /** Manda os códigos ao banco (decode), guarda o grupo e o que o banco leu em cada pagamento (erro de leitura → situação "erro"). */
 async function lerNoBanco(conta, pags) {
   const itensC6 = pags.map((p) => ({ content: p.content, amount: p.amount, description: p.description, transaction_date: p.transaction_date }));
@@ -635,7 +630,7 @@ async function lerNoBanco(conta, pags) {
   } catch (e) {
     throw new Error(`Os pagamentos ficaram como rascunho, mas o banco não respondeu: ${e.message} Use "Mandar o banco ler os códigos" quando a ponte voltar.`);
   }
-  const casados = casarItens(pags, items || []);
+  const casados = Z.casarItensDoGrupo(pags, items || []);
   await alterar((db) => pags.forEach((p, k) => {
     const it = casados[k];
     if (!it) return;
@@ -823,7 +818,8 @@ export const ACOES_BANCO = {
     const r = await P.boletosPagos(conta, de, fim < C.hojeIso() ? fim : C.hojeIso());
     const pagos = Array.isArray(r) ? r : (r && (r.boletos || r.content)) || [];
     estado.conferencia = { conta, mes, recebidos: pagos.length, sugestoes: Z.conciliarBoletos(d(), conta, pagos) };
-    aviso(`${pagos.length} boleto(s) pago(s) segundo o banco; ${estado.conferencia.sugestoes.length} correspondem a boletos em aberto aqui.`, 'info');
+    const marcaveis = estado.conferencia.sugestoes.filter((s) => Z.prontoParaRegistrar(d(), s)).length;
+    aviso(`${pagos.length} boleto(s) pago(s) segundo o banco; ${estado.conferencia.sugestoes.length} correspondem a boletos daqui (${marcaveis} já marcado(s) para registrar).`, 'info');
     await mostrar();
   },
 
@@ -946,20 +942,22 @@ export const FORMULARIOS_BANCO = {
     if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
     let n = 0;
     const divergentes = [];
+    const repetidos = [];
     await alterar((db) => {
+      const usados = new Set();
       for (const s of marcados) {
         const cb = R.buscar(db, 'cobrancas', s.cobranca_id);
         if (!cb || cb.data_pagamento) continue;
-        // a entrada correspondente no extrato (mesmo valor e data de crédito, ainda sem destino) fica ligada ao boleto
-        const m = (db.movimentacoes_banco || []).find((x) => x.conta_id === conf.conta && x.tipo === 'entrada' && x.valor === s.valor && x.data === s.data_credito && !x.classificacao);
-        const origem = m ? m.id : { amount: s.valor / 100, payment_date: s.data_pagamento, credit_date: s.data_credito, external_payment_id: s.external_payment_id, payment_type: s.payment_type };
-        const r = Z.confirmarPagamentoPeloBanco(db, cb.id, origem, login(), { pagouEmDia: s.pagouEmDia || null });
+        // o mesmo pagamento do banco nunca paga dois boletos (ex.: dois boletos de mesmo valor marcados)
+        if (s.pagamento !== undefined && usados.has(s.pagamento)) { repetidos.push(compBr(cb.competencia)); continue; }
+        // a entrada desse dinheiro no extrato, se já importada, fica ligada ao boleto (Z.registrarPagamentoDoBanco, o mesmo da tela Boletos)
+        const r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login());
         if (r.divergente) divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`);
-        else n += 1;
+        else { n += 1; usados.add(s.pagamento); }
       }
     });
     estado.conferencia = null;
-    aviso(`${n} pagamento(s) registrado(s).${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length ? 'aviso' : 'ok');
+    aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length || repetidos.length ? 'aviso' : 'ok');
     await mostrar();
   },
 

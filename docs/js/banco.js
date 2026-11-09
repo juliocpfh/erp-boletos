@@ -180,14 +180,23 @@ export function listarBoletos(d, contaId, filtros, opcoes = {}) {
   return chamarPonte(contaId, 'GET', `/boletos?${new URLSearchParams(filtros)}`, null, opcoes);
 }
 
-/** Todas as páginas da listagem (``content[]``; ``total_pages``), até 10 páginas de 100. */
+/** Páginas da listagem lidas no máximo (100 boletos cada). A ponte nova já devolve tudo numa página só. */
+export const MAX_PAGINAS_LISTA = 10;
+
+/**
+ * Todas as páginas da listagem (``content[]``; ``total_pages``), até MAX_PAGINAS_LISTA páginas de 100. Se o banco tiver mais, a lista
+ * vem com ``incompleto: true`` e ``total`` (quantos o banco tem), para a tela avisar em vez de concluir com metade.
+ */
 export async function listarTodosBoletos(d, contaId, filtros, opcoes = {}) {
   const itens = [];
-  for (let pagina = 0; pagina < 10; pagina += 1) {
-    const r = await listarBoletos(d, contaId, { ...filtros, page: pagina, size: 100 }, opcoes);
+  let r = null;
+  for (let pagina = 0; pagina < MAX_PAGINAS_LISTA; pagina += 1) {
+    r = await listarBoletos(d, contaId, { ...filtros, page: pagina, size: 100 }, opcoes);
     itens.push(...(Array.isArray(r.content) ? r.content : Array.isArray(r.bank_slips) ? r.bank_slips : []));
-    if (!(Number(r.total_pages) > pagina + 1)) break;
+    if (!(Number(r.total_pages) > pagina + 1)) return itens;
   }
+  itens.incompleto = true;
+  itens.total = Number(r && r.total_elements) || null;
   return itens;
 }
 

@@ -37,6 +37,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as M from './mapa-c6.mjs';
 import { c6SimuladoDaConta } from './c6-simulado.mjs';
+import { listarPaginas } from './c6-boletos-listar.mjs';
 import { rotasFase2 } from './rotas-fase2.mjs';
 
 export const VERSAO = '0.1.0';
@@ -518,11 +519,13 @@ export const SERVICOS = {
           return { status: 200, dados: { content: itens.slice(page * size, page * size + size), total_elements: itens.length, total_pages: Math.ceil(itens.length / size), page, size, ambiente: conta.ambiente } };
         }
         exigirConfigurada(conta);
-        const q = new URLSearchParams();
-        for (const k of M.FILTROS_LISTA) if (query.get(k)) q.set(k, query.get(k));
-        if (![...q.keys()].some((k) => /_from$/.test(k))) throw new ErroHttp(400, 'Informe um intervalo de datas (ex.: payment_date_from e payment_date_to, até 60 dias).');
-        const r = await chamarC6(cfg, conta, 'GET', `${M.CAMINHOS.boletos(versao(conta))}?${q}`);
-        return { status: 200, dados: { ...(Array.isArray(r.dados) ? { content: r.dados } : r.dados), ambiente: conta.ambiente } };
+        const filtros = {};
+        for (const k of M.FILTROS_LISTA) if (k !== 'page' && k !== 'size' && query.get(k)) filtros[k] = query.get(k);
+        if (!Object.keys(filtros).some((k) => /_from$/.test(k))) throw new ErroHttp(400, 'Informe um intervalo de datas (ex.: payment_date_from e payment_date_to, até 60 dias).');
+        // a listagem do C6 é uma só (c6-boletos-listar.mjs, a mesma da conferência da fase 2): todas as páginas de uma vez, sem repetir
+        const c6 = { conta: conta.id, async chamar(metodo, caminho, { query: q = {} } = {}) { const r = await chamarC6(cfg, conta, metodo, `${caminho}?${new URLSearchParams(q)}`); return { status: r.status, corpo: r.dados }; } };
+        const content = await listarPaginas(c6, filtros, { caminho: M.CAMINHOS.boletos(versao(conta)) });
+        return { status: 200, dados: { content, total_elements: content.length, total_pages: 1, page: 0, size: content.length, ambiente: conta.ambiente } };
       } },
       // BP_03 consultar
       { metodo: 'GET', padrao: /^\/boletos\/([A-Za-z0-9_-]+)\/?$/, async executar({ cfg, conta, params }) {

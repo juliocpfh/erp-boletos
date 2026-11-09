@@ -203,3 +203,112 @@ test('item 7: sem referência em comum, OFX × API casa por conta + data + valor
   // o mesmo valor e a mesma data em outra conta não é o mesmo lançamento
   assert.equal(Z.importarExtrato(d, 'jck', [api[2]], 'julio', { hoje: '2026-11-20' }).novas.length, 1);
 });
+
+// --------------------------------------------------------------------------
+// Itens 1 e 9: um pagamento quitava dois boletos; as duas conferências de boletos pagos passam a usar a mesma regra
+// --------------------------------------------------------------------------
+test('item 1: entrada de um boleto já pago à mão é LIGADA a ele (não vira o pagamento do boleto do mês seguinte)', () => {
+  const { d, cb2 } = base();
+  // boleto 07/2026 (vence 10/08, R$ 1.318,50) pago à mão na tela Boletos em 10/08/2026
+  R.registrarPagamento(d, cb2.id, '2026-08-10', 131850, 'julio');
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const cb3 = d.cobrancas.find((x) => x.competencia === '2026-08'); // vence 10/09, mesmo valor
+  // o extrato de agosto, buscado depois, traz a entrada de 10/08
+  const { novas: [mov] } = Z.importarExtrato(d, 'ank', [entrada('r1', '2026-08-10', '1318.50')], 'julio', { hoje: '2026-09-01' });
+  const s = Z.sugerirDestino(d, mov);
+  assert.deepEqual([s.classificacao, s.cobranca_id, s.ligar], ['boleto', cb2.id, true], 'propõe ligar ao boleto 07/2026 já pago');
+  assert.match(s.motivo, /já está pago/);
+  const r = Z.vincularMovimentacao(d, mov.id, { classificacao: 'boleto', cobranca_id: s.cobranca_id }, 'julio');
+  assert.equal(r.ligada, true);
+  assert.deepEqual([cb2.movimentacao_id, R.buscar(d, 'movimentacoes_banco', mov.id).cobranca_id, cb3.data_pagamento], [mov.id, cb2.id, null], 'só liga: o de 08/2026 continua em aberto');
+  assert.equal(cb2.valor_pago, 131850);
+  // outra entrada igual em 10/08 não liga ao mesmo boleto de novo
+  const { novas: [outra] } = Z.importarExtrato(d, 'ank', [entrada('r2', '2026-08-10', '1318.50')], 'julio', { hoje: '2026-09-01' });
+  assert.notEqual((Z.sugerirDestino(d, outra) || {}).ligar, true);
+  assert.throws(() => Z.ligarMovimentacaoAoBoleto(d, outra.id, cb2.id, 'julio'), /já está ligado a outra entrada/);
+});
+
+test('item 1: só casa boleto que vence até 45 dias depois da entrada', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  const cb3 = d.cobrancas.find((x) => x.competencia === '2026-08'); // vence 10/09
+  const cb4 = d.cobrancas.find((x) => x.competencia === '2026-09'); // vence 10/10
+  const { novas: [mov] } = Z.importarExtrato(d, 'ank', [entrada('r1', '2026-08-20', '1318.50')], 'julio', { hoje: '2026-09-01' });
+  const casa = Z.conciliarMovimentacoes(d, [mov]).map((x) => x.cobranca_id);
+  assert.deepEqual(casa, [cb3.id], `20/08: o de 10/09 (21 dias) casa; o de 10/10 (51 dias) não (era ${cb4.id})`);
+  assert.equal(Z.DIAS_ANTECIPACAO, 45);
+});
+
+test('item 1/9: listagem do banco — um pagamento que casa com dois boletos não vem marcado; boleto já pago à mão não chama outro', () => {
+  const { d, cb2 } = base();
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const cb3 = d.cobrancas.find((x) => x.competencia === '2026-08');
+  // boleto 07/2026 emitido fora do sistema (referência desconhecida aqui), pago em 10/08
+  const listagem = [{ external_reference_id: 'ABC123EMITIDONOSITEC6XXXXX', payments: [{ amount: '1318.50', payment_date: '2026-08-10', credit_date: '2026-08-11', external_payment_id: 'p1', payment_type: 'PIX' }] }];
+  const sug = Z.conciliarBoletos(d, 'ank', listagem);
+  assert.deepEqual(sug.map((s) => [s.cobranca_id, s.alternativas]), [[cb2.id, 2], [cb3.id, 2]]);
+  assert.ok(sug.every((s) => !Z.prontoParaRegistrar(d, s)), 'nenhuma caixa marcada: quem escolhe é o usuário');
+  // pago à mão com a data do crédito: a listagem só confirma (já estava pago) e não propõe o de 08/2026
+  R.registrarPagamento(d, cb2.id, '2026-08-11', 131850, 'julio');
+  const sug2 = Z.conciliarBoletos(d, 'ank', listagem);
+  assert.deepEqual(sug2.map((s) => [s.cobranca_id, s.jaPago]), [[cb2.id, true]]);
+  assert.equal(Z.prontoParaRegistrar(d, sug2[0]), false);
+  // ainda sem crédito (WAITING_CONFIRMATION, sem credit_date): não vem marcado
+  const espera = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'X', status: 'WAITING_CONFIRMATION', payments: [{ amount: '1318.50', payment_date: '2026-09-09' }] }]);
+  assert.deepEqual(espera.map((s) => [s.cobranca_id, s.aguardandoCredito]), [[cb3.id, true]]);
+  assert.equal(Z.prontoParaRegistrar(d, espera[0]), false);
+});
+
+test('item 1/9: registrar o pagamento informado pelo banco liga a linha do extrato quando ela existe (as duas conferências usam esta)', () => {
+  const { d, cb2 } = base();
+  cb2.banco = { conta_id: 'ank', id_externo: 'B00000002REF0000000000000', situacao: 'pago' };
+  const { novas: [mov] } = Z.importarExtrato(d, 'ank', [entrada('r1', '2026-08-11', '1318.50')], 'julio', { hoje: '2026-09-01' });
+  const [s] = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'B00000002REF0000000000000', payments: [{ amount: '1318.50', payment_date: '2026-08-10', credit_date: '2026-08-11', external_payment_id: 'p1', payment_type: 'PIX' }] }]);
+  assert.deepEqual([s.cobranca_id, s.certeza, s.alternativas, Z.prontoParaRegistrar(d, s)], [cb2.id, 'exata', 1, true]);
+  const r = Z.registrarPagamentoDoBanco(d, 'ank', s, 'julio');
+  assert.equal(r.divergente, false);
+  assert.deepEqual([cb2.data_pagamento, cb2.movimentacao_id, R.buscar(d, 'movimentacoes_banco', mov.id).classificacao], ['2026-08-11', mov.id, 'boleto']);
+  // sem a linha do extrato: registra e guarda o pagamento do C6 no boleto
+  const { d: d2, cb2: b2 } = base();
+  const [s2] = Z.conciliarBoletos(d2, 'ank', [{ external_reference_id: 'X', payments: [{ amount: '1318.50', payment_date: '2026-08-10', credit_date: '2026-08-11', external_payment_id: 'p2', payment_type: 'PIX' }] }]);
+  Z.registrarPagamentoDoBanco(d2, 'ank', s2, 'julio');
+  assert.deepEqual([b2.data_pagamento, b2.movimentacao_id || null, b2.pagamento_c6.external_payment_id], ['2026-08-11', null, 'p2']);
+  // a data em que pagou vale também com a linha do extrato: pagou atrasado em 12/08, crédito em 13/08 → multa e juros até 12/08
+  const { d: d3, cb2: b3 } = base();
+  const previsto = R.previstoNoPagamento(b3, '2026-08-12').valor_devido;
+  Z.importarExtrato(d3, 'ank', [entrada('r9', '2026-08-13', (previsto / 100).toFixed(2))], 'julio', { hoje: '2026-09-01' });
+  const r3 = Z.registrarPagamentoDoBanco(d3, 'ank', { cobranca_id: b3.id, valor: previsto, data_pagamento: '2026-08-12', data_credito: '2026-08-13' }, 'julio');
+  assert.equal(r3.divergente, false, 'previsto calculado até o dia em que pagou');
+  assert.ok(b3.movimentacao_id);
+});
+
+test('item 9: itens do lote casados com os pagamentos por uma função só (id, código + valor, ordem)', () => {
+  const pags = [{ id: 1, id_externo: 'it-b', content: 'AAA', valor: 1999 }, { id: 2, id_externo: null, content: 'BBB', valor: 500 }, { id: 3, id_externo: null, content: 'CCC', valor: 700 }];
+  const itens = [{ id: 'it-a', content: 'BBB', amount: 5 }, { id: 'it-b', content: 'outro', amount: 19.99 }, { id: 'it-c', content: 'CCC-lido', amount: 7 }];
+  assert.deepEqual(Z.casarItensDoGrupo(pags, itens).map((it) => it && it.id), ['it-b', 'it-a', 'it-c']);
+  assert.deepEqual(Z.casarItensDoGrupo([{ id: 9, content: 'Z', valor: 100 }], []), [null]);
+});
+
+test('item 1/9: confirmado na janela da tela Boletos, o pagamento liga a linha do extrato que já estava importada', () => {
+  const { d, cb2 } = base();
+  const { novas: [mov] } = Z.importarExtrato(d, 'ank', [entrada('r1', '2026-08-11', '1318.50')], 'julio', { hoje: '2026-09-01' });
+  assert.equal(Z.ligarEntradaDoBoleto(d, cb2.id, 'ank', 'julio'), null, 'em aberto: nada a ligar');
+  R.registrarPagamento(d, cb2.id, '2026-08-11', 131850, 'julio', { pagouEmDia: true });
+  assert.equal(Z.ligarEntradaDoBoleto(d, cb2.id, 'jck', 'julio'), null, 'outra conta: não é este dinheiro');
+  assert.equal(Z.ligarEntradaDoBoleto(d, cb2.id, 'ank', 'julio').id, mov.id);
+  assert.deepEqual([cb2.movimentacao_id, R.buscar(d, 'movimentacoes_banco', mov.id).classificacao], [mov.id, 'boleto']);
+});
+
+test('item 9: a listagem de boletos lida pelo site avisa quando o banco tem mais do que as 10 páginas lidas', async () => {
+  const B = await import('../docs/js/banco.js');
+  const { d } = base();
+  await B.salvarPonteLocal({ ponte_url: 'http://localhost:8765', senha_ponte: 'frase longa combinada com a ponte' });
+  const f = async (url) => { const p = Number(new URL(url).searchParams.get('page')); return new Response(JSON.stringify({ content: Array.from({ length: 100 }, (_, i) => ({ id: `p${p}-${i}` })), total_pages: 12, total_elements: 1150 }), { status: 200 }); };
+  const todos = await B.listarTodosBoletos(d, 'ank', { payment_date_from: '2026-11-01', payment_date_to: '2026-11-30' }, { fetch: f });
+  assert.deepEqual([todos.length, todos.incompleto, todos.total], [1000, true, 1150]);
+  const uma = async () => new Response(JSON.stringify({ content: [{ id: 'a' }], total_pages: 1 }), { status: 200 });
+  const curta = await B.listarTodosBoletos(d, 'ank', { payment_date_from: '2026-11-01', payment_date_to: '2026-11-30' }, { fetch: uma });
+  assert.deepEqual([curta.length, curta.incompleto], [1, undefined]);
+  await B.esquecerPonteLocal();
+});
