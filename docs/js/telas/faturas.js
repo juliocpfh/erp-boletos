@@ -75,7 +75,7 @@ export function telaFaturas(mes) {
       ${[...new Set(doMes.filter((f) => f.situacao === 'Emitida').map((f) => f.emitente_id))].map((id) => buscar('emitentes', id)).filter(Boolean)
     .map((e) => botao('pdfMes', `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(' ')}
       ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
-    ${opera() && ultima ? caixaRenumerar() : ''}`;
+    ${podeUsuario('admin') && ultima ? caixaRenumerar() : ''}`;
 }
 
 /** Fila de NF separada por mês do pagamento: [['AAAA-MM', [pendentes]]], do mais antigo ao mais novo. */
@@ -111,7 +111,7 @@ function caixaAirbnb(pend) {
     ${link(`#/financeiro?mes=${C.somarMeses(C.competenciaDe(hoje), -1)}`, 'Ir ao Financeiro')}</div>`;
 }
 
-/** Voltar a última numeração (ciclo) para corrigir, incluir um pagamento esquecido e numerar de novo. */
+/** Voltar a última numeração (ciclo) para corrigir, incluir um pagamento esquecido e numerar de novo. Só o administrador (as NFs do ciclo são apagadas). */
 function caixaRenumerar() {
   const ciclo = R.ultimoCicloDeNumeracao(d());
   return `<div class="cartao"><h2>Corrigir e numerar de novo</h2>

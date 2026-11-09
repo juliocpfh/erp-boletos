@@ -6,10 +6,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { esc } from '../docs/js/formularios.js';
-import { bancoComUsuarios, carregarSite, elemento, entrarComo, janelas, ouvintes } from './tela-falsa.mjs';
+import { bancoComUsuarios, carregarSite, elemento, entrarComo, janelas, ouvintes, pagina, porId } from './tela-falsa.mjs';
 
 const T = await carregarSite();
 const { E, R } = T;
+const COMUM = await import('../docs/js/telas/comum.js');
 
 /** Envia o formulário falso como o Enter/botão faria (o ouvinte de submit de app.js) e devolve o botão dele. */
 async function enviar(nome, campos = [], dataset = {}) {
@@ -84,4 +85,51 @@ test('janelas com o nome do inquilino no título: o nome aparece uma vez escapad
     const texto = fs.readFileSync(path.join(pasta, arq), 'utf8');
     for (const m of texto.matchAll(/janela\(\{\s*titulo:\s*(`[^`]*`|'[^']*')/g)) assert.doesNotMatch(m[1], /esc\(/, `${arq}: ${m[1]}`);
   }
+});
+
+test('tarefa em segundo plano do Painel: só desenha a tela de novo na mesma página e sem formulário aberto', async () => {
+  bancoComUsuarios(R, E);
+  entrarComo(E, 'admin');
+  const redesenhou = async (comecou, agora, formulario) => {
+    location.hash = agora;
+    pagina.formulario = formulario;
+    porId.app.innerHTML = 'tela de antes';
+    await COMUM.redesenharSeLivre(comecou);
+    pagina.formulario = false;
+    return porId.app.innerHTML !== 'tela de antes';
+  };
+  try {
+    assert.equal(await redesenhou('#/', '#/', false), true, 'continua no Painel: mostra o que mudou');
+    assert.equal(await redesenhou('#/', '#/', true), false, 'abriu um formulário: o que ele digita não some');
+    assert.equal(await redesenhou('#/', '#/novo/contratos', false), false, 'foi para outra página: não mexe');
+  } finally { location.hash = '#/'; }
+});
+
+test('operador abre o Painel: contrato sem imóvel há 7 dias fica (excluir contrato é do administrador; a nuvem recusaria)', async () => {
+  const d = bancoComUsuarios(R, E);
+  const c = R.inserir(d, 'contratos', { imovel_id: null, inquilino_nome: 'Fulano Teste', sem_imovel_desde: '2026-01-05', data_entrada: '2026-01-05' }, 'teste');
+  assert.equal(R.contratosSemImovelVencidos(d).length, 1, 'o contrato está vencido para a limpeza');
+  entrarComo(E, 'operador');
+  porId.mensagens = elemento('div');
+  await COMUM.limparSemImovel();
+  assert.ok(R.buscar(E.d, 'contratos', c.id), 'o contrato continua');
+  assert.doesNotMatch(porId.mensagens.innerHTML, /Apagado/, 'sem o aviso falso de "Apagado(s)…"');
+});
+
+test('NF: "Corrigir e numerar de novo" só para o administrador (desfazer a numeração apaga NFs)', async () => {
+  const { d, c } = comInquilino('Maria Exemplo');
+  R.registrarPagamento(d, R.boletoDoMes(d, c.id, '2026-06').id, '2026-07-10', null, 'teste');
+  R.numerarFaturas(d, 'teste');
+  assert.ok(R.ultimaFatura(d), 'há NF numerada');
+  const rota = { partes: ['faturas'], q: { mes: '2026-07' } };
+  entrarComo(E, 'admin');
+  assert.match(await T.TELAS.faturas(rota), /Corrigir e numerar de novo/);
+  entrarComo(E, 'operador');
+  const html = await T.TELAS.faturas(rota);
+  assert.doesNotMatch(html, /Corrigir e numerar de novo|desfazerUltimaNumeracao|data-form="desfazerNumeracao"/);
+  assert.match(html, /cancelarNumero/, 'o operador continua cancelando uma NF (o número fica cancelado, nada é apagado)');
+  await assert.rejects(T.ACOES.desfazerUltimaNumeracao({}), T.C.ErroUsuario);
+  await assert.rejects(T.FORMULARIOS.desfazerNumeracao({ campos: [['numero', '1']] }), T.C.ErroUsuario);
+  assert.equal(d.faturas.length, E.d.faturas.length);
+  assert.ok(E.d.faturas.every((f) => f.situacao === 'Emitida'), 'nenhuma NF desfeita');
 });

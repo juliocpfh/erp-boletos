@@ -32,11 +32,13 @@ export function elemento(tag = 'div', extra = {}) {
 export const janelas = [];
 /** Ouvintes do documento: { submit: [fn], change: [fn], … }. */
 export const ouvintes = {};
-/** Pedidos à internet (fetch): [url]; `respostas` decide o que volta (função url → Response, ou erro). */
+/** Pedidos à internet (fetch): [url]; `internet.responder(url)` decide o que volta (Response, ou erro = sem internet). */
 export const pedidos = [];
 export const internet = { responder: () => { throw new TypeError('sem internet'); } };
-/** Elementos que o site procura pelo id (app, mensagens, faixa). */
-const porId = {};
+/** A página "na tela": `formulario` = há um formulário aberto (main form[data-form]). */
+export const pagina = { formulario: false };
+/** Elementos que o site procura pelo id: `porId.app.innerHTML` é a tela desenhada; `porId.mensagens.innerHTML`, os avisos. */
+export const porId = {};
 
 /** FormData do Node não lê formulário: aqui o "formulário" falso traz os campos em `campos` ([[nome, valor]]). */
 class FormDataFalso extends FormData {
@@ -53,7 +55,7 @@ export async function carregarSite() {
     hidden: false,
     addEventListener: (t, f) => (ouvintes[t] ||= []).push(f),
     getElementById: (id) => (porId[id] ||= elemento('div')),
-    querySelector: () => null,
+    querySelector: (sel) => (sel === 'main form[data-form]' && pagina.formulario ? elemento('form') : null),
     querySelectorAll: () => [],
     createElement: (tag) => elemento(tag),
     body: elemento('body'),

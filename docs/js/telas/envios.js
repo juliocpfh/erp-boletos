@@ -16,7 +16,7 @@ import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { FORMULARIOS_BANCO } from './banco.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
-import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, trazerHerancaAssinada } from './comum.js';
+import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 /** Pagamento confirmado num imóvel sem empresa emitente: avisa agora, para não descobrir só na hora de numerar a NF. */
@@ -465,6 +465,7 @@ export const FORMULARIOS = {
   },
 
   async desfazerNumeracao(form) {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const n = Number(new FormData(form).get('numero'));
     if (!confirm(`Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`)) return;
     const qtd = await alterar((db) => R.desfazerNumeracao(db, n, login()));
