@@ -224,3 +224,11 @@ Proteções recomendadas (todas fora do código):
 2. M2 + M3 + M4 + M6 na ponte antes de qualquer exposição por túnel; Cloudflare Access como pré-requisito do túnel.
 3. M7 + M8 (senhas e sessão), B2 (backup), B1 (jsPDF), B5 no merge.
 4. Decidir sobre a cifra do JSON (seção 3) depois dos itens acima.
+
+## 7. Achados da revisão de 2026-11-09 (nuvem, já corrigidos)
+
+### N1 — Backups da nuvem abertos a qualquer usuário logado — ALTA (corrigido)
+A rota interna `/papel` do cofre (`nuvem/cofre.mjs`) conferia o nível `admin` pedido pelo Worker como `consulta`: consulta e operador baixavam `backups/…` e `lista-tudo/backups/`, com o resumo das senhas e as sessões de todos (justamente o que A8 da rotina de 07/11 tirou dos aparelhos). O teste antigo usava um cofre falso que entendia `admin`. Correção: `/papel` aceita só `consulta`, `operador` e `admin` (outro nível: 400); teste com o Worker e o `CofreDO` de verdade em `tests/cofre.test.mjs`.
+
+### N2 — Mudança `raiz` trocava uma tabela inteira — MÉDIA (corrigido)
+O operador podia mandar `{ op: 'raiz', campo: 'usuarios' }` (ou `emitentes`) e os aparelhos dos outros trocavam a tabela inteira (ex.: todos inativos, o dono sem entrar). Correção: o cofre recusa `raiz` com nome de tabela e registro em "tabela" com nome de campo da raiz (`ehTabela`, `tabelaDeRegistros`); o aparelho ignora as duas (`aplicarMudanca`, `docs/js/nuvem.js`).
