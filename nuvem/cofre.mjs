@@ -158,8 +158,10 @@ export class Cofre {
       this.exigir(email, 'admin');
     }
     return this.transacao(() => {
+      // `tabelas` (o próximo código de cada uma) fica: as faixas já entregues aos aparelhos continuam valendo depois de
+      // "Voltar para este dia" ou "Substituir…", senão dois aparelhos ganhariam os mesmos códigos (o próximo nunca volta)
       if (!this.vazio()) {
-        for (const t of ['registros', 'tabelas', 'raiz', 'historico', 'conflitos', 'excluidos']) this.sql.exec(`DELETE FROM ${t}`);
+        for (const t of ['registros', 'raiz', 'historico', 'conflitos', 'excluidos']) this.sql.exec(`DELETE FROM ${t}`);
       }
       let n = 0;
       for (const [chave, valor] of Object.entries(d)) {
@@ -172,7 +174,7 @@ export class Cofre {
             this.sql.exec('INSERT INTO registros (tabela, id, dados, ordem) VALUES (?, ?, ?, ?)', t, codigo(r.id), texto(semSegredos(r)), n += 1);
             maior = Math.max(maior, r.id);
           }
-          this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?)', t, maior + 1);
+          this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?) ON CONFLICT(nome) DO UPDATE SET proximo = MAX(proximo, excluded.proximo)', t, maior + 1);
         } else if (!RAIZ_DO_SERVIDOR.includes(chave)) {
           this.sql.exec('INSERT INTO raiz (campo, valor) VALUES (?, ?)', nomeCampo(chave), texto(semSegredos(valor)));
         }

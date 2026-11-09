@@ -146,6 +146,23 @@ test('faixas de códigos: dois aparelhos sem internet nunca repetem; código rep
   assert.equal(contrato(c, a.inicio).valor, 1, 'lote com erro não aplica nada (tudo ou nada)');
 });
 
+test('voltar para um backup (ou substituir pelos dados de uma pasta) não reemite faixas de códigos já entregues', () => {
+  const c = carregado();
+  const backup = c.tudo(); // o backup de 01/11
+  const celular = c.faixa({ tabela: 'contratos', quantidade: 100 }, SOCIO); // 05/11: celular novo pega a faixa dele
+  const nova = c.faixa({ tabela: 'tabela_nova', quantidade: 10 }, SOCIO); // tabela que não existe no backup
+  assert.deepEqual([celular.inicio, celular.fim, nova.inicio, nova.fim], [26, 125, 1, 10]);
+  c.importar(backup, DONO, { substituir: true }); // 09/11: "Voltar para este dia"
+  const pc = c.faixa({ tabela: 'contratos', quantidade: 100 }, DONO);
+  assert.ok(pc.inicio > celular.fim, `faixa do PC (${pc.inicio}–${pc.fim}) não pode cruzar a do celular (${celular.inicio}–${celular.fim})`);
+  assert.ok(c.faixa({ tabela: 'tabela_nova' }, DONO).inicio > nova.fim, 'nem na tabela que o backup não tinha');
+  assert.ok(c.tudo().seq.contratos >= pc.fim, 'quem ainda não usa faixa também começa depois');
+  // pasta com códigos maiores que os já entregues: vale o maior dos dois
+  const pasta = bancoExemplo(); pasta.contratos.push({ id: 900, valor: 1 });
+  c.importar(pasta, DONO, { substituir: true });
+  assert.equal(c.faixa({ tabela: 'contratos', quantidade: 1 }, DONO).inicio, 901);
+});
+
 test('número da NF: só pelo contador, um de cada vez, nunca repete', () => {
   const c = carregado();
   assert.deepEqual([c.contador({ nome: 'proxima_fatura' }, DONO).numero, c.contador({ nome: 'proxima_fatura' }, SOCIO).numero], [157, 158]);
