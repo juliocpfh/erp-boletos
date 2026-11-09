@@ -156,3 +156,9 @@ test('POST /pagamentos/decodificar aceita R$ 19,99 e R$ 1,15 (revisão 09/11: "n
   }
   assert.equal((await pedir('POST', '/contas/ank/pagamentos/decodificar', { items: [{ content: BARRAS, amount: 1.234 }] })).status, 400);
 });
+
+test('GET /comprovante: a linha que só veio do arquivo OFX do app é achada pela referência local (local_reference)', async () => {
+  const r = await pedir('GET', '/contas/ank/comprovante/01JGHAN2K3P7Q9R1S5T7V9W1X3?data=2026-11-05&formato=json');
+  assert.equal(r.status, 200);
+  assert.equal(r.corpo.lancamento.reference, '019aeec1-0b2c-7d3e-8f40-1a2b3c4d5e6f');
+});

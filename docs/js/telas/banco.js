@@ -180,10 +180,10 @@ function descreverPasta(p) {
   return `${i ? i.nome : '?'} › ${p.escopo === 'iptuano' ? 'IPTU (guias)' : 'Contas pagas'} › ${Number(p.id) % 10000}`;
 }
 
-/** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência; o pagamento, só se já foi confirmado pelo extrato. */
+/** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência (Z.referenciaNoBanco); o pagamento, só se já foi confirmado pelo extrato. */
 function lancamentoDaPonte(x, tabela) {
-  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: m.id_externo, data: m.data } : null; }
-  return x.id_externo ? { conta: x.conta_id, referencia: x.id_externo, data: x.data } : null;
+  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: Z.referenciaNoBanco(m), data: m.data } : null; }
+  return x.id_externo ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
 }
 
 function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
@@ -787,7 +787,7 @@ export const ACOES_BANCO = {
     const falhas = [];
     for (const m of faltam) {
       try {
-        const blob = await P.baixarComprovantePonte(m.conta_id, m.id_externo, m.data);
+        const blob = await P.baixarComprovantePonte(m.conta_id, Z.referenciaNoBanco(m), m.data);
         await guardarComprovante(mov(m.id), 'movimentacoes_banco', Z.nomePadraoComprovante(d(), m), blob, 'ponte', { avisar: false });
         gerados += 1;
       } catch (e) {

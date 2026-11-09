@@ -167,7 +167,7 @@ async function ponteSimulada(contaId, metodo, caminho, corpo) {
   if (m === 'GET' && partes[0] === 'comprovante') {
     const ref = decodeURIComponent(partes[1] || '');
     const dia = q.data || new Date().toISOString().slice(0, 10);
-    const l = extratoTeste(contaId, `${dia.slice(0, 7)}-01`, `${dia.slice(0, 7)}-31`).find((x) => x.reference === ref);
+    const l = extratoTeste(contaId, `${dia.slice(0, 7)}-01`, `${dia.slice(0, 7)}-31`).find((x) => x.reference === ref || (x.local_reference && x.local_reference === ref));
     if (!l) erroTeste(`Não achei o lançamento ${ref} no extrato (modo de teste).`);
     const pdf = pdfDeTexto(['Comprovante de movimentacao bancaria (TESTE, sem valor)', `Conta: ${contaId.toUpperCase()} (C6 Bank)`, `Data do lancamento: ${l.entry_date}`,
       `Tipo: ${l.operation_type === 'INCOMING' ? 'Entrada' : 'Saida'} - ${l.transaction_type}`, `Valor: R$ ${l.amount}`, `Titulo: ${l.title || ''}`, `Descricao: ${l.description || ''}`, `Referencia (C6): ${l.reference}`]);

@@ -30,6 +30,7 @@
 //   GET    /comprovante/:reference?data|de&ate[&formato=json]
 //          → PDF gerado pela ponte com os dados do lançamento do extrato (cabeçalho X-Comprovante-Origem: ponte; nome comprovante-<ref>.pdf)
 //            `data` = dia do lançamento (procura ±1 dia); sem ela procura em de..ate (padrão: últimos 90 dias). 404 se não achar.
+//            :reference = o reference do C6 ou, para a linha que só veio do arquivo OFX do app, a referência local (local_reference).
 //            formato=json → { conta_id, reference, nome, origem: 'ponte', pdf_base64, lancamento } (para o site, que só fala JSON com a ponte)
 
 import { extrato, saldo } from './c6-extrato.mjs';
@@ -162,7 +163,8 @@ export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, ago
       if (query.data) { const d = validarData(String(query.data), 'data'); de = somarDias(d, -1); ate = somarDias(d, 1); }
       else ({ de, ate } = periodo(query, 90));
       const { lancamentos } = await extrato(c6, { de, ate });
-      const l = lancamentos.find((x) => x.reference === reference);
+      // pelo reference; linha que só veio do arquivo OFX do app chega com a referência local (local_reference)
+      const l = lancamentos.find((x) => x.reference === reference) || lancamentos.find((x) => x.local_reference && x.local_reference === reference);
       if (!l) return erro(404, `Não achei o lançamento ${reference} no extrato de ${dataBr(de)} a ${dataBr(ate)}. Informe a data (?data=AAAA-MM-DD).`, 'nao_encontrado');
       const pdf = montarPdfComprovante(l, { conta, empresa: empresas[conta], agora: agora() });
       const nome = `comprovante-${String(reference).replace(/[^A-Za-z0-9_-]/g, '')}.pdf`;

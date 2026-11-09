@@ -707,7 +707,7 @@ test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançame
   assert.equal(r.de, '2026-09-01');
   assert.equal(r.ate, '2026-09-30');
   assert.equal(r.lancamentos.length, 2); // o FITID repetido entra uma vez
-  assert.deepEqual(r.lancamentos[0], { id_externo: '111', data: '2026-09-30', valor_centavos: -21500, tipo: 'saida', descricao: 'TRANSF ENVIADA PIX', categoria: 'DEBIT', end_to_end_id: 'E3187249520260930235672592QNCkdA', local_reference: null });
+  assert.deepEqual(r.lancamentos[0], { id_externo: '111', data: '2026-09-30', valor_centavos: -21500, tipo: 'saida', descricao: 'TRANSF ENVIADA PIX', categoria: 'DEBIT', end_to_end_id: 'E3187249520260930235672592QNCkdA', local_reference: null, fonte: 'ofx' });
   assert.equal(r.lancamentos[1].local_reference, '01M25HJ18FY3CKSB2P2B5QJT46');
   assert.equal(Z.centavosDoOfx('1.234,56'), 123456);
   assert.throws(() => Z.lerOfx('<html>não é ofx</html>'), /não é um OFX/);

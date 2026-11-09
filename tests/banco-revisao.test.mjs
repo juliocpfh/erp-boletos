@@ -149,4 +149,57 @@ test('item 5: buscar o extrato até hoje grava "importado até" = ontem (o que e
   // arquivo OFX que vai até hoje: o mesmo cuidado
   Z.importarExtrato(d, 'jck', [], 'julio', { de: '2026-12-01', ate: '2026-12-03', hoje: '2026-12-03' });
   assert.equal(R.extratoImportadoAte(d, 'jck'), '2026-12-02');
+  // só o dia de hoje (ex.: dezembro buscado em 01/12): nenhum dia completo, nada muda
+  Z.importarExtrato(d, 'ank', [], 'julio', { de: '2026-12-01', ate: '2026-12-01', hoje: '2026-12-01' });
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-30');
+});
+
+// --------------------------------------------------------------------------
+// Item 7: o mesmo lançamento pelo arquivo OFX e depois pela API entrava em dobro (o FITID não é o reference da API)
+// --------------------------------------------------------------------------
+const ofx = (stmttrns) => `<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKACCTFROM><ACCTID>123</ACCTID></BANKACCTFROM><BANKTRANLIST><DTSTART>20261101</DTSTART><DTEND>20261115</DTEND>
+${stmttrns.map(([fitid, valor, data, memo, refnum]) => `<STMTTRN><FITID>${fitid}</FITID><TRNAMT>${valor}</TRNAMT><DTPOSTED>${data.replace(/-/g, '')}100000[-3:BRT]</DTPOSTED><TRNTYPE>${valor.startsWith('-') ? 'DEBIT' : 'CREDIT'}</TRNTYPE>${refnum ? `<REFNUM>${refnum}</REFNUM>` : ''}<MEMO>${memo}</MEMO></STMTTRN>`).join('\n')}
+</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>`;
+
+test('item 7: OFX e depois a API do mesmo lançamento: não entra em dobro; a linha fica com o reference da API (o comprovante pela ponte acha)', () => {
+  const { d, sobre } = base();
+  const r1 = Z.importarExtrato(d, 'ank', Z.lerOfx(ofx([['7781234', '-123.45', '2026-11-05', 'PAGAMENTO BOLETO SANEPAR', '01JGHAMYWRSAW41GAMFKEG17VA']])).lancamentos, 'julio', { de: '2026-11-01', ate: '2026-11-15', hoje: '2026-11-20' });
+  assert.equal(r1.novas[0].fonte, 'ofx');
+  Z.vincularMovimentacao(d, r1.novas[0].id, { classificacao: 'conta_imovel', imovel_id: sobre.id, tipo_despesa: 'Água', competencia: '2026-10' }, 'julio');
+  // chaves do C6 chegam: "Buscar extrato de 11/2026 no banco" traz o mesmo lançamento pela API
+  const api = [saida('019aeec0-a61a-8043-4a46-2f191aebdf9a', '2026-11-05', '123.45', 'PAGAMENTO BOLETO SANEPAR', { local_reference: '01JGHAMYWRSAW41GAMFKEG17VA' })];
+  const r2 = Z.importarExtrato(d, 'ank', api, 'julio', { de: '2026-11-01', ate: '2026-11-30', hoje: '2026-12-01' });
+  assert.deepEqual([r2.novas.length, r2.repetidas], [0, 1]);
+  assert.equal(d.movimentacoes_banco.length, 1, 'o mesmo dinheiro numa linha só');
+  const m = d.movimentacoes_banco[0];
+  assert.deepEqual([m.id_externo, m.id_ofx, m.classificacao], ['019aeec0-a61a-8043-4a46-2f191aebdf9a', '7781234', 'conta_imovel'], 'o destino continua; o identificador passa a ser o da API');
+  assert.equal(Z.referenciaNoBanco(m), '019aeec0-a61a-8043-4a46-2f191aebdf9a');
+  assert.equal(d.despesas.filter((x) => x.imovel_id === sobre.id).length, 1, 'uma conta de água só');
+  // o mesmo arquivo OFX de novo, ou a API de novo: nada entra
+  assert.equal(Z.importarExtrato(d, 'ank', Z.lerOfx(ofx([['7781234', '-123.45', '2026-11-05', 'PAGAMENTO BOLETO SANEPAR', '01JGHAMYWRSAW41GAMFKEG17VA']])).lancamentos, 'julio', { hoje: '2026-12-01' }).repetidas, 1);
+  assert.equal(Z.importarExtrato(d, 'ank', api, 'julio', { hoje: '2026-12-01' }).repetidas, 1);
+  assert.equal(d.movimentacoes_banco.length, 1);
+});
+
+test('item 7: sem referência em comum, OFX × API casa por conta + data + valor + descrição; dois lançamentos iguais de verdade continuam dois', () => {
+  const { d } = base();
+  // dois Pix iguais no mesmo dia (dois inquilinos pagando R$ 50,00): no OFX e depois na API
+  Z.importarExtrato(d, 'ank', Z.lerOfx(ofx([['f1', '50.00', '2026-11-05', 'PIX RECEBIDO JOAO TESTE'], ['f2', '50.00', '2026-11-05', 'PIX RECEBIDO JOAO TESTE'], ['f3', '-210.80', '2026-11-05', 'PAGAMENTO BOLETO COPEL']])).lancamentos, 'julio', { hoje: '2026-11-20' });
+  assert.equal(d.movimentacoes_banco.length, 3);
+  // o que ainda só veio pelo OFX: o comprovante pela ponte procura pela referência local, se houver, senão pelo FITID
+  assert.equal(Z.referenciaNoBanco(d.movimentacoes_banco[0]), 'f1');
+  const api = [entrada('019a0000-0000-7000-8000-000000000001', '2026-11-05', '50.00', { description: 'PIX RECEBIDO JOAO TESTE', local_reference: null, end_to_end_id: null }),
+    entrada('019a0000-0000-7000-8000-000000000002', '2026-11-05', '50.00', { description: 'PIX RECEBIDO JOAO TESTE', local_reference: null, end_to_end_id: null }),
+    saida('019a0000-0000-7000-8000-000000000003', '2026-11-05', '210.80', 'PAGAMENTO BOLETO COPEL UC 7654321'),
+    saida('019a0000-0000-7000-8000-000000000004', '2026-11-06', '210.80', 'PAGAMENTO BOLETO COPEL UC 7654321')];
+  const r = Z.importarExtrato(d, 'ank', api, 'julio', { hoje: '2026-11-20' });
+  assert.deepEqual([r.novas.length, r.repetidas], [1, 3], 'só o de 06/11 é novo');
+  assert.equal(d.movimentacoes_banco.length, 4);
+  assert.ok(d.movimentacoes_banco.slice(0, 3).every((m) => /^019a0000-/.test(m.id_externo) && m.id_ofx), 'cada linha do OFX ganhou o reference de uma da API');
+  // dois lançamentos iguais da mesma origem nunca se juntam
+  const { d: d2 } = base();
+  const r3 = Z.importarExtrato(d2, 'ank', [api[0], api[1]], 'julio', { hoje: '2026-11-20' });
+  assert.equal(r3.novas.length, 2);
+  // o mesmo valor e a mesma data em outra conta não é o mesmo lançamento
+  assert.equal(Z.importarExtrato(d, 'jck', [api[2]], 'julio', { hoje: '2026-11-20' }).novas.length, 1);
 });

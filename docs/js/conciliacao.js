@@ -95,21 +95,63 @@ function exigirConta(d, contaId) {
 // --------------------------------------------------------------------------
 // Importação do extrato (entries[] de saldo-extrato.yaml)
 // --------------------------------------------------------------------------
-/** Converte um lançamento do extrato do C6 (ou da ponte, se já normalizado) nos campos de movimentacoes_banco. */
+/**
+ * Converte um lançamento do extrato do C6 (ou já normalizado: arquivo OFX, lerOfx) nos campos de movimentacoes_banco.
+ * ``fonte``: 'api' (extrato pela ponte, com o ``reference`` do C6) ou 'ofx' (arquivo do app; ``id_externo`` = FITID).
+ */
 export function movimentacaoDoC6(contaId, e) {
   if (e.reference === undefined && e.id_externo !== undefined) {
-    // formato já normalizado pela ponte: { id_externo, data, valor_centavos, tipo, descricao, contrapartida, categoria, nosso_numero, saldo_apos_centavos }
+    // formato já normalizado (lerOfx; a ponte antiga também mandava assim): { id_externo, data, valor_centavos, tipo, descricao, contrapartida, categoria, nosso_numero, saldo_apos_centavos, fonte }
     const v = Number(e.valor_centavos ?? e.valor);
     return { conta_id: contaId, id_externo: String(e.id_externo), data: dataDe(e.data), valor: Math.abs(v), tipo: e.tipo || (v < 0 ? 'saida' : 'entrada'),
       descricao: e.descricao || '', titulo: e.titulo || null, contrapartida: e.contrapartida || null, categoria_banco: e.categoria || e.categoria_banco || null,
-      nosso_numero: e.nosso_numero || null, saldo_apos: e.saldo_apos_centavos ?? e.saldo_apos ?? null, end_to_end_id: e.end_to_end_id || null, local_reference: e.local_reference || null, criado_em_banco: e.created_at || null };
+      nosso_numero: e.nosso_numero || null, saldo_apos: e.saldo_apos_centavos ?? e.saldo_apos ?? null, end_to_end_id: e.end_to_end_id || null, local_reference: e.local_reference || null, criado_em_banco: e.created_at || null,
+      fonte: e.fonte || null };
   }
   if (!e.reference) throw new Error('Lançamento do extrato sem "reference" (chave única do C6).');
   return { conta_id: contaId, id_externo: String(e.reference), data: dataDe(e.entry_date || e.created_at), valor: centavosDoC6(e.amount),
     tipo: e.operation_type === 'OUTGOING' ? 'saida' : 'entrada', descricao: e.description || e.title || '', titulo: e.title || null, contrapartida: null,
     categoria_banco: e.transaction_type || null, nosso_numero: null, saldo_apos: null, end_to_end_id: e.end_to_end_id || null,
-    local_reference: e.local_reference || null, criado_em_banco: e.created_at || null };
+    local_reference: e.local_reference || null, criado_em_banco: e.created_at || null, fonte: 'api' };
 }
+
+/** De onde veio a movimentação: 'api', 'ofx' ou 'ofx+api' (as duas, juntadas). Antiga sem o campo: pelo jeito do id (o reference da API é um UUID). */
+const fonteDe = (m) => m.fonte || (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id_externo || '')) ? 'api' : 'ofx');
+/** Descrição para comparar: sem acento, só letras e números. Iguais, ou uma contém a outra (o OFX pode cortar a do banco). */
+const descricaoComparavel = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+function mesmaDescricao(a, b) {
+  const x = descricaoComparavel(a);
+  const y = descricaoComparavel(b);
+  return !!x && !!y && (x === y || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x))));
+}
+
+/**
+ * A movimentação já importada que é o mesmo lançamento de ``m`` (que veio com outro identificador): mesma referência local ou
+ * mesmo id do Pix (end to end), com o mesmo valor e tipo; ou, entre fontes diferentes (OFX × API), mesma data, valor, tipo e
+ * descrição, ainda não juntada a outra. ``usadas``: as já casadas nesta importação (dois Pix iguais no mesmo dia são dois).
+ */
+function mesmoLancamento(daConta, m, usadas) {
+  const livre = (x) => !usadas.has(x.id) && x.valor === m.valor && x.tipo === m.tipo;
+  const porRef = daConta.find((x) => livre(x) && ((m.local_reference && x.local_reference === m.local_reference) || (m.end_to_end_id && x.end_to_end_id === m.end_to_end_id)));
+  if (porRef) return porRef;
+  const fonte = fonteDe(m);
+  return daConta.find((x) => livre(x) && x.data === m.data && fonteDe(x) !== fonte && fonteDe(x) !== 'ofx+api' && mesmaDescricao(x.descricao, m.descricao)) || null;
+}
+
+/** Junta os identificadores das duas origens na movimentação que já existe: o ``reference`` da API passa a ser o id (é por ele que a ponte acha o lançamento) e o FITID fica em ``id_ofx``. */
+function juntarIdentificadores(d, x, m, usuario) {
+  const fx = fonteDe(x);
+  const fm = fonteDe(m);
+  if (fx === fm || fx === 'ofx+api') return;
+  const api = fm === 'api' ? m : x;
+  const doOfx = fm === 'ofx' ? m : x;
+  atualizar(d, 'movimentacoes_banco', x.id, { id_externo: api.id_externo, id_ofx: doOfx.id_ofx || doOfx.id_externo, fonte: 'ofx+api',
+    local_reference: x.local_reference || m.local_reference || null, end_to_end_id: x.end_to_end_id || m.end_to_end_id || null }, usuario,
+  'Mesmo lançamento no arquivo OFX e no extrato pela API: identificadores juntados');
+}
+
+/** Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local (se houver) ou o FITID. */
+export const referenciaNoBanco = (m) => (fonteDe(m) === 'ofx' && m.local_reference ? m.local_reference : m.id_externo);
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
   pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
@@ -123,7 +165,9 @@ const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null,
  */
 export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, ate = null, hoje: dia = hoje() } = {}) {
   const conta = exigirConta(d, contaId);
-  const existentes = new Set((d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId).map((m) => m.id_externo));
+  const daConta = (d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId);
+  const existentes = new Set(daConta.flatMap((m) => [m.id_externo, m.id_ofx].filter(Boolean)));
+  const usadas = new Set();
   const novas = [];
   let repetidas = 0;
   let maior = null;
@@ -132,6 +176,9 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
     if (!m.data) throw new Error(`Lançamento ${m.id_externo} sem data.`);
     if (existentes.has(m.id_externo)) { repetidas += 1; continue; }
     existentes.add(m.id_externo);
+    // o mesmo lançamento com outro identificador (OFX × API): não entra de novo, só junta os identificadores
+    const igual = mesmoLancamento(daConta, m, usadas);
+    if (igual) { usadas.add(igual.id); juntarIdentificadores(d, igual, m, usuario); repetidas += 1; continue; }
     if (!maior || m.data > maior) maior = m.data;
     novas.push(inserir(d, 'movimentacoes_banco', { ...m, importada_em: new Date().toISOString(), ...CAMPOS_DESTINO }, usuario,
       `Extrato ${apelidoDaConta(d, contaId)}: ${C.dataBr(m.data)} · ${m.tipo} ${C.reais(m.valor)} · ${m.descricao}`.slice(0, 200)));
@@ -182,7 +229,7 @@ export function lerOfx(texto) {
     const valor = centavosDoOfx(marca(b, 'TRNAMT'));
     const ref = marca(b, 'REFNUM');
     lancamentos.push({ id_externo: id, data, valor_centavos: valor, tipo: valor < 0 ? 'saida' : 'entrada', descricao: marca(b, 'MEMO') || marca(b, 'NAME') || '',
-      categoria: marca(b, 'TRNTYPE') || null, end_to_end_id: /^E\d{8}/.test(ref) ? ref : null, local_reference: ref && !/^E\d{8}/.test(ref) ? ref : null });
+      categoria: marca(b, 'TRNTYPE') || null, end_to_end_id: /^E\d{8}/.test(ref) ? ref : null, local_reference: ref && !/^E\d{8}/.test(ref) ? ref : null, fonte: 'ofx' });
   }
   if (!lancamentos.length) throw new Error('O arquivo OFX não tem lançamentos (período sem movimentação ou arquivo incompleto).');
   const datas = lancamentos.map((l) => l.data).sort();
