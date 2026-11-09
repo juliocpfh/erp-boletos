@@ -3822,6 +3822,20 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   if (b.desconto > 0) Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
   void t;
   // instruções: as fixas da conta e depois a descrição do boleto, até 4 linhas de 80
+  // dados do pagador nos limites da API (decisão de 2026-10-16): nome, rua e número, bairro e cidade até 40, e-mail até 70, sem "/"
+  // no endereço. Nada é cortado: o campo que passa barra a emissão com o nome do campo e quantas letras tem, para abreviar no cadastro.
+  const doInquilino = partesDoEndereco(c.inquilino_endereco) || {};
+  const ondeEndereco = (k) => (doInquilino[k] ? 'no endereço do cadastro do inquilino' : `no cadastro do imóvel${imovel ? ` ${imovel.nome}` : ''}`);
+  const pagador = { nome: String(c.inquilino_nome || '').trim(), rua: String(endereco.address || '').trim(), cidade: String(endereco.city || '').trim(), email: String(c.inquilino_email || '').trim(),
+    bairro: String(endereco.neighborhood || '').trim() || String((imovel && imovel.bairro) || '').trim() || 'Centro' };
+  const problemas = [];
+  for (const [k, rotulo, verbo, max, onde, semBarra] of [['nome', 'O nome do pagador', 'tem', L.nome, 'no cadastro do inquilino', false], ['rua', 'A rua e o número', 'têm', L.endereco, ondeEndereco('address'), true],
+    ['bairro', 'O bairro', 'tem', L.bairro, ondeEndereco('neighborhood'), true], ['cidade', 'A cidade', 'tem', L.cidade, ondeEndereco('city'), true], ['email', 'O e-mail', 'tem', L.email, 'no cadastro do inquilino', false]]) {
+    const v = pagador[k];
+    if (v.length > max) problemas.push(`${rotulo} ${verbo} ${v.length} letras e o banco aceita até ${max} ("${v}"): abrevie ${onde}`);
+    if (semBarra && v.includes('/')) problemas.push(`${rotulo} ${verbo} uma barra "/", que o banco não aceita ("${v}"): troque por espaço ou "-" ${onde}`);
+  }
+  if (problemas.length) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: ${problemas.join('; ')}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
   const instrucoes = [...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')].map((x) => x.trim().slice(0, L.instrucao)).filter(Boolean).slice(0, L.instrucoes);
   const boleto = { [K.carteira]: carteiraDaConta(conta), [K.seu_numero]: String(cb.id).slice(-L.seu_numero) };
   if (instrucoes.length) boleto[K.instrucoes] = instrucoes;
@@ -3830,11 +3844,11 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
     [K.valor]: centavosParaReais(b.valor),
     [K.vencimento]: b.vencimento,
     [K.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, L.descricao),
-    // limites da API: nome, endereço, bairro e cidade com 40 caracteres, e-mail 70, CEP com 8 dígitos
-    [K.pagador]: { [K.pagador_nome]: corta(c.inquilino_nome, L.nome), [K.pagador_documento]: taxId,
-      [K.pagador_endereco]: { [K.endereco_rua]: corta(endereco.address, L.endereco), [K.endereco_bairro]: corta(endereco.neighborhood, L.bairro) || corta(imovel && imovel.bairro, L.bairro) || 'Centro',
-        [K.endereco_cidade]: corta(endereco.city, L.cidade), [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
-      ...(c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {}),
+    // limites da API (nome, endereço, bairro e cidade 40, e-mail 70) conferidos acima, sem cortar; CEP com 8 dígitos, UF com 2 letras
+    [K.pagador]: { [K.pagador_nome]: pagador.nome, [K.pagador_documento]: taxId,
+      [K.pagador_endereco]: { [K.endereco_rua]: pagador.rua, [K.endereco_bairro]: pagador.bairro,
+        [K.endereco_cidade]: pagador.cidade, [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
+      ...(pagador.email ? { [K.pagador_email]: pagador.email } : {}),
       // "phone" não é campo da API: a ponte usa só para conferir o destino dos SMS e o descarta antes de mandar ao banco
       ...(String(c.inquilino_telefone || '').replace(/\D/g, '') ? { phone: String(c.inquilino_telefone || '').replace(/\D/g, '') } : {}) },
     [K.forma]: { [K.boleto]: boleto },

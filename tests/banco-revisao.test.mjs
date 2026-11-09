@@ -392,3 +392,31 @@ test('item 3: separarParaEnvio — prontos (lidos), já no banco e com erro', ()
   const r = Z.separarParaEnvio(pags, items);
   assert.deepEqual([r.prontos.map((p) => p.id), r.jaNoBanco.map((p) => p.id), r.comErro.map((it) => it.id)], [[1], [2], ['c', 'd']]);
 });
+
+// --------------------------------------------------------------------------
+// Item 6: nome e endereço do boleto eram cortados em 40 letras sem aviso ("…Oliveira Ferr", "…1234/")
+// --------------------------------------------------------------------------
+test('item 6: campo do pagador acima do limite do C6 (ou com "/") barra a emissão dizendo qual campo e quantas letras (não corta)', async () => {
+  const { d, c, cb2 } = base();
+  const conta = { id: 'ank', apelido: 'ANK', ambiente: 'sandbox', chave_pix: '' };
+  R.atualizar(d, 'contratos', c.id, { inquilino_nome: 'Maria Aparecida dos Santos Oliveira Ferreira', inquilino_endereco: 'Avenida Presidente Getulio Vargas, 1234/Sala 5, Agua Verde, Curitiba/PR, CEP 80240-040' }, 'julio');
+  const C = await import('../docs/js/calculos.js');
+  assert.throws(() => R.pedidoBoletoC6(d, cb2, conta), (e) => e instanceof C.ErroUsuario
+    && /O nome do pagador tem 44 letras e o banco aceita até 40/.test(e.message) && /cadastro do inquilino/.test(e.message)
+    && /A rua e o número têm 46 letras e o banco aceita até 40/.test(e.message) && /barra "\/"/.test(e.message));
+  // abreviado no cadastro: sai inteiro, sem corte
+  R.atualizar(d, 'contratos', c.id, { inquilino_nome: 'Maria Aparecida dos S. Oliveira Ferreira', inquilino_endereco: 'Av. Pres. Getulio Vargas, 1234 Sala 5, Agua Verde, Curitiba/PR, CEP 80240-040' }, 'julio');
+  const p = R.pedidoBoletoC6(d, cb2, conta);
+  assert.deepEqual([p.payer.name, p.payer.address.address, p.payer.address.neighborhood], ['Maria Aparecida dos S. Oliveira Ferreira', 'Av. Pres. Getulio Vargas, 1234 Sala 5', 'Agua Verde']);
+  // e-mail acima de 70
+  R.atualizar(d, 'contratos', c.id, { inquilino_email: `${'a'.repeat(62)}@exemplo.com` }, 'julio');
+  assert.throws(() => R.pedidoBoletoC6(d, cb2, conta), /O e-mail tem 74 letras e o banco aceita até 70/);
+  // a ponte também recusa em vez de cortar (o lugar de confiança)
+  const S = await import('../ponte-c6/servidor.mjs');
+  R.atualizar(d, 'contratos', c.id, { inquilino_email: '' }, 'julio');
+  const ok = R.pedidoBoletoC6(d, cb2, conta);
+  const contaPonte = { id: 'ank', ambiente: 'sandbox', valor_maximo: 50000, chave_pix: '' };
+  assert.equal(S.montarPedidoSeguro(ok, contaPonte).payer.name, 'Maria Aparecida dos S. Oliveira Ferreira');
+  assert.throws(() => S.montarPedidoSeguro({ ...ok, payer: { ...ok.payer, name: 'Maria Aparecida dos Santos Oliveira Ferreira' } }, contaPonte), (e) => e.status === 400 && /nome do pagador tem 44 caracteres; o banco aceita até 40/.test(e.message));
+  assert.throws(() => S.montarPedidoSeguro({ ...ok, payer: { ...ok.payer, address: { ...ok.payer.address, address: 'Rodovia BR 277/Curitiba, 10' } } }, contaPonte), (e) => e.status === 400 && /barra/.test(e.message));
+});

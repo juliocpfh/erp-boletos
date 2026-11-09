@@ -385,6 +385,16 @@ export function documentoValido(digitos) {
 }
 
 const texto = (v, max) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));
+/**
+ * Dado do pagador nos limites da API: passou do limite (ou tem "/" no endereço, que o C6 recusa) → 400 com o campo e o tamanho.
+ * Nunca corta (decisão de 2026-10-16): o site já confere antes; aqui é a segunda barreira.
+ */
+const textoNoLimite = (v, max, rotulo, { semBarra = false } = {}) => {
+  const t = v === undefined || v === null ? '' : String(v).trim();
+  if (t.length > max) throw new ErroHttp(400, `${rotulo} tem ${t.length} caracteres; o banco aceita até ${max}. Abrevie no cadastro.`);
+  if (semBarra && t.includes('/')) throw new ErroHttp(400, `${rotulo} tem uma barra "/", que o banco não aceita. Corrija no cadastro.`);
+  return t;
+};
 const numero2 = (v) => { const n = Number(v); if (!Number.isFinite(n)) return null; return Number(n.toFixed(2)); };
 const inteiro = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 ? n : null; };
 const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -409,17 +419,18 @@ export function montarPedidoSeguro(pedido, conta) {
   if (!descricao) throw new ErroHttp(400, `Falta o campo "${K.descricao}" no pedido.`);
   const pg = pedido[K.pagador];
   if (!pg || typeof pg !== 'object') throw new ErroHttp(400, `Falta o campo "${K.pagador}" no pedido.`);
-  const nome = texto(pg[K.pagador_nome], L.nome);
+  const nome = textoNoLimite(pg[K.pagador_nome], L.nome, 'O nome do pagador');
   if (!nome) throw new ErroHttp(400, 'Falta o nome do pagador.');
   const doc = String(pg[K.pagador_documento] || '').replace(/\D/g, '');
   if (!documentoValido(doc)) throw new ErroHttp(400, 'CPF/CNPJ do pagador inválido (confira os dígitos no cadastro do inquilino).');
   const end = pg[K.pagador_endereco] && typeof pg[K.pagador_endereco] === 'object' ? pg[K.pagador_endereco] : {};
-  const endereco = { [K.endereco_rua]: texto(end[K.endereco_rua], L.endereco), [K.endereco_bairro]: texto(end[K.endereco_bairro], L.bairro), [K.endereco_cidade]: texto(end[K.endereco_cidade], L.cidade),
+  const endereco = { [K.endereco_rua]: textoNoLimite(end[K.endereco_rua], L.endereco, 'A rua e o número do pagador', { semBarra: true }), [K.endereco_bairro]: textoNoLimite(end[K.endereco_bairro], L.bairro, 'O bairro do pagador', { semBarra: true }),
+    [K.endereco_cidade]: textoNoLimite(end[K.endereco_cidade], L.cidade, 'A cidade do pagador', { semBarra: true }),
     [K.endereco_uf]: texto(end[K.endereco_uf], 2).toUpperCase(), [K.endereco_cep]: String(end[K.endereco_cep] || '').replace(/\D/g, '').slice(0, 8) };
   for (const [k, v] of Object.entries(endereco)) if (!v) throw new ErroHttp(400, `Falta o campo "${k}" no endereço do pagador.`);
   if (endereco[K.endereco_cep].length !== 8) throw new ErroHttp(400, 'CEP do pagador precisa ter 8 dígitos.');
   if (!/^[A-Z]{2}$/.test(endereco[K.endereco_uf])) throw new ErroHttp(400, 'UF do pagador precisa ter 2 letras.');
-  const email = texto(pg[K.pagador_email], L.email);
+  const email = textoNoLimite(pg[K.pagador_email], L.email, 'O e-mail do pagador');
   if (email && !RE_EMAIL.test(email)) throw new ErroHttp(400, 'E-mail do pagador inválido.');
   const telefone = String(pg.phone || '').replace(/\D/g, '').slice(0, 13); // não vai ao banco: só confere o destino dos SMS
   const pagador = { [K.pagador_nome]: nome, [K.pagador_documento]: doc, [K.pagador_endereco]: endereco, ...(email ? { [K.pagador_email]: email } : {}) };
