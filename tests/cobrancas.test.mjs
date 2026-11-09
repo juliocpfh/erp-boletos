@@ -283,3 +283,35 @@ test('IPTU pago à vista e repassado nos boletos: o Financeiro mostra a parte do
   assert.equal(R.mapaIptuAvista(d, p).find((x) => x.mesBoleto === '2026-12').valorProprietario, 10000);
   assert.equal(iptuNoFinanceiro(d, loja), 0);
 });
+
+test('acordo sobre boleto com reserva: a NF do acordo soma o mesmo que o pagamento atrasado normal (aluguel cheio)', () => {
+  // junho com a reserva de R$ 500,00 abatida, não pago; pago atrasado em 20/07 seria R$ 937,80 com NF de R$ 1.437,80
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', cobrar_iptu: false, taxa_boleto: 0 });
+  R.gerarCobrancas(d, '2026-06', 'julio');
+  const jun = doMes(d, c, '2026-06');
+  assert.equal(jun.reserva_utilizada, 50000);
+  const normal = C.liquidar(jun, '2026-07-20');
+  assert.deepEqual([normal.valor_devido, normal.valor_nf], [93780, 143780]);
+  const dados = { contrato_id: c.id, ids: [jun.id], total: normal.valor_devido, parcelas: 1, primeiro_vencimento: '2026-07-25' };
+  const p = R.previaAcordo(d, dados, '2026-07-20');
+  assert.deepEqual([p.boletos[0].valor, p.boletos[0].nf], [93780, 143780], 'antes: NF de R$ 937,80 (a reserva ficava fora de toda NF)');
+  // em 2 parcelas: a soma das NFs é a mesma
+  const p2 = R.previaAcordo(d, { ...dados, parcelas: 2 }, '2026-07-20');
+  assert.equal(p2.boletos.reduce((s, b) => s + b.nf, 0), 143780);
+  assert.equal(p2.boletos.reduce((s, b) => s + b.valor, 0), 93780);
+  // feito e pago em dia: o boleto cobra o combinado e a NF sai com o aluguel cheio
+  const { parcelas } = R.fazerAcordo(d, dados, 'julio', '2026-07-20');
+  assert.equal(R.totais(parcelas[0]).a_pagar_pontual, 93780);
+  R.registrarPagamento(d, parcelas[0].id, '2026-07-25', null, 'julio');
+  assert.deepEqual([parcelas[0].valor_pago, parcelas[0].valor_nf], [93780, 143780]);
+});
+
+test('acordo: ressarcimento do condomínio maior que os encargos também entra na NF como no pagamento normal', () => {
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', cobrar_iptu: false, reserva_valor: 0 });
+  R.gerarCobrancas(d, '2026-07', 'julio');
+  const jul = doMes(d, c, '2026-07');
+  R.atualizar(d, 'cobrancas', jul.id, { ressarcimento: 20000, ressarcimento_descricao: 'Fundo de obras', ressarcimento_na_nf: false }, 'julio');
+  const normal = C.liquidar(jul, '2026-09-01');
+  const p = R.previaAcordo(d, { contrato_id: c.id, ids: [jul.id], total: normal.valor_devido, parcelas: 1, primeiro_vencimento: '2026-09-10' }, '2026-09-01');
+  assert.equal(p.boletos[0].nf, normal.valor_nf);
+});

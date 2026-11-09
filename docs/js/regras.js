@@ -5000,7 +5000,9 @@ const nomeNoAcordo = (cb) => (ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela 
 /**
  * Prévia do acordo: dívida de hoje (com multa e juros), o que vai na NF e os boletos novos.
  * Na NF vai a parte do aluguel mais a multa e os juros do acordo (``total`` − IPTU, seguro, tarifa e FCI dos boletos
- * originais), como no pagamento atrasado; o resto vai no boleto como "encargos do acordo".
+ * originais), como no pagamento atrasado; o resto vai no boleto como "encargos do acordo". A reserva já abatida no boleto
+ * original (e o ressarcimento que não sai da NF) entra na NF, como no pagamento normal (NF com o aluguel cheio): ex.
+ * aluguel R$ 1.350,00 com R$ 500,00 de reserva, acordo de R$ 937,80 → NF de R$ 1.437,80.
  * Ex.: boleto de ago/2026 de R$ 1.350,00 (aluguel R$ 1.200,00 + IPTU R$ 100,00 + seguro R$ 50,00), acordo de
  * R$ 1.500,00 em 3 vencendo 10/12, 10/01 e 10/02: 3 boletos de R$ 500,00, cada um com R$ 450,00 na NF.
  */
@@ -5023,7 +5025,9 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   if (!/^\d{4}-\d{2}-\d{2}$/.test(primeiro_vencimento || '') || primeiro_vencimento < hoje) throw new Error('Informe o vencimento do primeiro boleto do acordo (hoje ou depois).');
   const original = lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto, 0);
   const divida = lista.reduce((s, cb) => s + C.liquidar(cb, hoje).valor_devido, 0);
-  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + Math.max(totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0), 0), 0));
+  // o que separa o pago da NF no pagamento atrasado normal (``C.liquidar``): IPTU, seguro, tarifa e FCI ficam fora; a reserva
+  // já abatida e o ressarcimento que não sai da NF entram (NF com o aluguel cheio): pode dar negativo (NF maior que o pago)
+  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0), 0));
   const valores = C.parcelas(total, n);
   const fora = C.parcelas(foraDaNf, n);
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
@@ -5048,7 +5052,8 @@ export function fazerAcordo(d, dados, usuario, hoje = C.hojeIso()) {
   const parcelas = p.boletos.map((b) => inserir(d, 'cobrancas', {
     contrato_id: c.id, competencia: b.competencia, vencimento: b.vencimento,
     dias_cobrados: C.diasNoMes(b.competencia), dias_mes: C.diasNoMes(b.competencia), aluguel_mensal: 0, aluguel: b.nf, desconto: 0,
-    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: 0, outros: b.outros, outros_descricao: b.outros ? 'Encargos do acordo' : '',
+    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: 0, outros: b.outros,
+    outros_descricao: b.outros > 0 ? 'Encargos do acordo' : b.outros < 0 ? 'Reserva ou ressarcimento já abatido (entra na NF)' : '',
     reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
     multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0,
     acordo_parcela_de: a.id, acordo_parcela: b.parcela, acordo_referente: p.referente, acordo_periodo: p.periodo,

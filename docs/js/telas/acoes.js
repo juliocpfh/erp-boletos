@@ -1022,7 +1022,9 @@ export const ACOES = {
             const p = R.previaAcordo(d(), { contrato_id: c.id, ids: marcados().map((el) => el.value), total: C.centavos(total.value || '0'),
               parcelas: dlg.querySelector('[name=parcelas]').value, primeiro_vencimento: dlg.querySelector('[name=vencimento]').value }, hoje);
             previa.innerHTML = `<b>Boletos novos:</b><br>${p.boletos.map((b) => `${b.parcela || 'único'} · vence ${dataBr(b.vencimento)} · <b>${reais(b.valor)}</b> (NF ${reais(b.nf)})`).join('<br>')}
-              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`;
+              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; ${p.foraDaNf < 0
+    ? `a reserva (ou o ressarcimento) já abatida no boleto também entra (${reais(-p.foraDaNf)} a mais na NF), como no pagamento normal.`
+    : `IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`}`;
           } catch (e) { previa.innerHTML = `<span class="texto-perigo">${esc(e.message)}</span>`; }
         };
         total.addEventListener('input', () => { mexeu = true; });
