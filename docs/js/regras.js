@@ -4687,10 +4687,10 @@ export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
  * Contrato renovado com nova data de término: o fim e o prazo são os da renovação. Até 09/11/2026 a edição do cadastro
  * gravava de volta o início + prazo (ex.: 05/03/2024, 30 meses, renovado até 05/09/2028 e editado o telefone → 05/09/2026)
  * e a renovação não mudava o prazo em meses. Devolve o que acertar ({ vigencia_fim, prazo_meses }) ou null. O fim só volta
- * quando é o início + prazo (o que a edição gravava).
+ * quando é o início + prazo (o que a edição gravava). Só nos contratos ativos (os encerrados ficam como estão, no histórico).
  */
 function acertoDaRenovacao(d, c) {
-  const fim = fimRenovado(d, c);
+  const fim = c.ativo !== false && fimRenovado(d, c);
   if (!fim || c.prazo_tipo === 'Indeterminado') return null;
   const inicio = c.data_entrada || c.vigencia_inicio;
   const mud = {};
