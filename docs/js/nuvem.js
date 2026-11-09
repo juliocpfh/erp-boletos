@@ -627,6 +627,9 @@ export class Sincronia {
     for (let volta = 0; volta < 1000; volta += 1) {
       const desde = seqDe(this.base);
       const r = await this.api('GET', `mudancas?desde=${desde}`);
+      // no meio do pedido, a base desta aba foi trocada pela mais nova que outra aba gravou (releBase): o que veio já está nela
+      // (aplicar de novo repetiria o histórico); pede outra vez a partir dela
+      if (seqDe(this.base) !== desde) continue;
       if (r.refazer) { await this.baixarTudoAgora(); externo = true; mudou = false; break; } // baixarTudo já gravou a cópia
       // a base muda aqui: a vista deixa de valer já (uma gravação no meio deste puxar não pode virar a vista)
       if (r.mudancas.length || Number(r.seq) !== desde) { mudou = true; this.invalidar(); }

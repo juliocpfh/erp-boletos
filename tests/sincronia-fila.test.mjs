@@ -279,6 +279,21 @@ test('item 6: duas abas enviando ao mesmo tempo (fora da trava): nada aplica dua
   assert.equal((await guardar.ler('pendentes')).length, 0);
 });
 
+test('item 6: a base desta aba trocada no meio do puxar pela mais nova que outra aba gravou: nada se aplica duas vezes', async () => {
+  const cofre = await nuvemCom();
+  const outro = sincronia(apiPara(cofre, SOCIA), guardarMemoria()); await outro.iniciar();
+  const real = apiPara(cofre, DONO);
+  let trocar = null;
+  const s = sincronia(async (m, rota, c) => { const r = await real(m, rota, c); if (trocar && rota.startsWith('mudancas')) { trocar(); trocar = null; } return r; }, guardarMemoria());
+  await s.iniciar(); await s.sincronizar();
+  await outro.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Da sócia' }, SOCIA)); await outro.sincronizar();
+  const nova = cofre.cofre.tudo(); // a base que a outra aba puxou e gravou (releBase a traz para esta)
+  trocar = () => { s.base = nova; s.invalidar(); };
+  await s.sincronizar();
+  assert.equal(s.atual().historico.filter((h) => h.detalhes?.nome?.para === 'Da sócia').length, 1);
+  assert.equal(s.atual().imoveis[0].nome, 'Da sócia');
+});
+
 test('item 7: a gravação não copia as entradas do histórico, e a tela usa o "depois" sem remontar o banco', async () => {
   const d = R.normalizar(bancoInicial());
   const c = N.copiar(d);
