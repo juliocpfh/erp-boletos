@@ -150,13 +150,10 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
 // --------------------------------------------------------------------------
 /** Data do OFX ("20260930205632[-3:BRT]") → 'AAAA-MM-DD'. */
 const dataOfx = (t) => { const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(t || '').trim()); return m ? `${m[1]}-${m[2]}-${m[3]}` : ''; };
-/** Valor do OFX ("-215.00", "3298.53", ou "1.234,56" em arquivos antigos) → centavos com sinal. */
+/** Valor do OFX ("-215.00", "3298.53", ou "1.234,56" em arquivos antigos) → centavos com sinal (o mesmo leitor do C6, em c6-comum; vazio = 0). */
 export function centavosDoOfx(t) {
-  let s = String(t || '').trim().replace(/\s/g, '');
-  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
-  const n = Number(s);
-  if (!Number.isFinite(n)) throw new Error(`Valor inválido no arquivo OFX: "${t}".`);
-  return Math.round(n * 100);
+  if (String(t ?? '').trim() === '') return 0;
+  try { return K.centavosDoTexto(t); } catch { throw new Error(`Valor inválido no arquivo OFX: "${t}".`); }
 }
 /** Valor de uma marca SGML/XML (<TAG>valor até a próxima marca ou fim da linha). */
 const marca = (bloco, tag) => { const m = new RegExp(`<${tag}>([^<\\r\\n]*)`, 'i').exec(bloco); return m ? m[1].trim() : ''; };

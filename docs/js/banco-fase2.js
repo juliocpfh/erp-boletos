@@ -11,6 +11,7 @@
 // (conciliacao.js / importarExtrato) converte para centavos.
 
 import { chamarPonte } from './banco.js';
+import * as K from './c6-comum.js';
 import * as SIM from './simulado-banco.js';
 
 /** Fala com a ponte; em `?teste` responde a ponte simulada deste arquivo (dados fictícios de simulado-banco.js). */
@@ -122,22 +123,8 @@ function pdfDeTexto(linhas) {
   return pdf;
 }
 
-/** Extrato fictício no período: os lançamentos de novembro/2026 repetem-se em cada mês pedido (reference ganha o sufixo do mês). */
-function extratoTeste(contaId, de, ate) {
-  const entries = (SIM.EXTRATO[contaId] || { entries: [] }).entries;
-  const out = [];
-  for (let mes = de.slice(0, 7); mes <= ate.slice(0, 7); mes = somarMes(mes)) {
-    for (const e of entries) {
-      const dia = Math.min(Number(e.entry_date.slice(8, 10)), new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0)).getUTCDate());
-      const entry_date = `${mes}-${String(dia).padStart(2, '0')}`;
-      if (entry_date < de || entry_date > ate) continue;
-      const sufixo = mes === e.entry_date.slice(0, 7) ? '' : `-${mes.replace('-', '')}`;
-      out.push({ ...e, entry_date, created_at: `${entry_date}T${e.created_at.slice(11)}`, reference: `${e.reference}${sufixo}`, local_reference: `${e.local_reference}${sufixo}`, conta_id: contaId });
-    }
-  }
-  return out.sort((a, b) => a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at));
-}
-const somarMes = (mes) => { const [a, m] = mes.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`; };
+/** Extrato fictício no período: os lançamentos de novembro/2026 repetem-se em cada mês pedido (o mesmo de c6-simulado.mjs, em c6-comum). */
+const extratoTeste = (contaId, de, ate) => K.lancamentosNoPeriodo((SIM.EXTRATO[contaId] || { entries: [] }).entries, de, ate).map((e) => ({ ...e, conta_id: contaId }));
 
 /** Boletos pagos fictícios: os pagamentos de novembro/2026 trazidos para o mês pedido. */
 function boletosPagosTeste(contaId, de, ate, por) {
@@ -145,19 +132,6 @@ function boletosPagosTeste(contaId, de, ate, por) {
   return ((SIM.BOLETOS_PAGOS[contaId] || { content: [] }).content).map((b) => ({ ...b, due_date: noMes(b.due_date, mes),
     payments: (b.payments || []).map((p) => ({ ...p, payment_date: p.payment_date ? noMes(p.payment_date, mes) : p.payment_date, credit_date: p.credit_date ? noMes(p.credit_date, mes) : p.credit_date })) }))
     .filter((b) => (b.payments || []).some((p) => { const dt = p[por] || p.payment_date || p.credit_date; return dt && dt >= de && dt <= ate; }));
-}
-
-/** O que o banco "lê" de cada item: código de barras (44/47/48 dígitos) ou Pix (copia e cola ou chave) → READ_DATA; o resto → DECODE_ERROR. */
-function lerItemTeste(contaId, it, group_id) {
-  const content = String(it.content || '').trim();
-  const dig = content.replace(/\D/g, '');
-  const barras = dig === content.replace(/[\s.]/g, '') && [44, 47, 48].includes(dig.length);
-  const pix = !barras && (/^000201/.test(content) || content.includes('@') || /^\+?\d{11,14}$/.test(dig) || /^[0-9a-f-]{36}$/i.test(content));
-  const base = { id: idTeste(), group_id, content, amount: it.amount, description: it.description || '', transaction_date: it.transaction_date || new Date().toISOString().slice(0, 10) };
-  if (content.includes('erro@')) return { ...base, product_type: 'PIX', status: 'DECODE_ERROR', error_message: `It was not possible to find key: ${content}` };
-  if (!barras && !pix || !(Number(it.amount) > 0)) return { ...base, product_type: barras ? 'BOLETO' : 'PIX', status: 'DECODE_ERROR', error_message: `It was not possible to decode: ${content}` };
-  if (barras) return { ...base, bank_code: dig.slice(0, 3), bank_name: 'Banco Exemplo', beneficiary_name: 'Beneficiario Exemplo Ltda', payer_name: `${contaId.toUpperCase()} Administradora Ltda`, due_date: base.transaction_date, overdue: false, product_type: 'BOLETO', status: 'READ_DATA' };
-  return { ...base, bank_code: '336', bank_name: 'Banco C6', beneficiary_name: 'Recebedor Pix Exemplo', payer_name: `${contaId.toUpperCase()} Administradora Ltda`, product_type: 'PIX', status: 'READ_DATA' };
 }
 
 /** Responde como a ponte responderia (ponte-c6/rotas-fase2.mjs), só com os dados fictícios. */
@@ -174,7 +148,9 @@ async function ponteSimulada(contaId, metodo, caminho, corpo) {
   if (partes[0] === 'pagamentos') {
     if (m === 'POST' && partes[1] === 'decodificar') {
       const group_id = idTeste();
-      gruposTeste.set(group_id, (corpo.items || []).map((it) => lerItemTeste(contaId, it, group_id)));
+      // como a ponte: cada item é conferido antes (validarItem, c6-comum) e um item ruim recusa o pedido inteiro
+      const items = Array.isArray(corpo && corpo.items) && corpo.items.length ? corpo.items.map((it, i) => K.validarItem(it, i + 1)) : erroTeste('Informe pelo menos um pagamento.');
+      gruposTeste.set(group_id, items.map((it) => K.itemLidoSimulado(contaId, it, { id: idTeste(), group_id, hoje: new Date().toISOString().slice(0, 10) })));
       return { conta_id: contaId, group_id };
     }
     const grupoId = decodeURIComponent(partes[1] || '');

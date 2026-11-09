@@ -147,3 +147,12 @@ test('GET /contas/:conta/comprovante/:reference gera o PDF com data, valor, tipo
   assert.match(textoDoPdf(saida), /- R\$ 123,45/);
   assert.match(textoDoPdf(saida), /Empresa: JCK/);
 });
+
+test('POST /pagamentos/decodificar aceita R$ 19,99 e R$ 1,15 (revisão 09/11: "no máximo 2 casas decimais" recusava ~9% dos valores)', async () => {
+  const BARRAS = `83660000001${'9'.repeat(33)}`;
+  for (const amount of [19.99, 1.15, 123.45]) {
+    const r = await pedir('POST', '/contas/ank/pagamentos/decodificar', { items: [{ content: BARRAS, amount, description: 'Luz Loja 1' }] });
+    assert.equal(r.status, 201, `R$ ${amount}`);
+  }
+  assert.equal((await pedir('POST', '/contas/ank/pagamentos/decodificar', { items: [{ content: BARRAS, amount: 1.234 }] })).status, 400);
+});
