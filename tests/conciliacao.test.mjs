@@ -3,6 +3,7 @@ import test from 'node:test';
 import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 import * as Z from '../docs/js/conciliacao.js';
+import * as K from '../docs/js/c6-comum.js';
 
 // Dados fictícios (CPF e CNPJ de teste); duas empresas com conta no C6 (ank e jck).
 function base() {
@@ -46,7 +47,7 @@ test('importação do extrato: converte "1500.00" em centavos, nunca repete o re
   assert.equal(r.novas[0].classificacao, null);
   assert.equal(d.historico.filter((h) => h.acao === 'Inclusão' && h.tabela === 'movimentacoes_banco').length - 0, 3);
   assert.ok(d.historico.length >= antes + 4);
-  assert.equal(d.config_banco.ultima_importacao.ank, '2026-11-05');
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-05');
   const r2 = importar(d, 'ank', lancs);
   assert.deepEqual([r2.novas.length, r2.repetidas], [0, 3]);
   assert.equal(d.movimentacoes_banco.length, 3);
@@ -66,9 +67,9 @@ test('centavos do C6 e janelas de 30 dias para o extrato', () => {
   assert.equal(Z.centavosDoC6(123.45), 12345);
   assert.throws(() => Z.centavosDoC6('abc'), /inválido/);
   assert.equal(Z.reaisParaC6(131850), 1318.5);
-  assert.deepEqual(Z.janelasDe30Dias('2026-10-01', '2026-10-31'), [{ de: '2026-10-01', ate: '2026-10-30' }, { de: '2026-10-31', ate: '2026-10-31' }]);
-  assert.deepEqual(Z.janelasDe30Dias('2026-10-01', '2026-10-30'), [{ de: '2026-10-01', ate: '2026-10-30' }]);
-  assert.deepEqual(Z.janelasDe30Dias('2026-10-05', '2026-10-01'), []);
+  assert.deepEqual(K.janelas('2026-10-01', '2026-10-31', 30), [{ de: '2026-10-01', ate: '2026-10-30' }, { de: '2026-10-31', ate: '2026-10-31' }]);
+  assert.deepEqual(K.janelas('2026-10-01', '2026-10-30', 30), [{ de: '2026-10-01', ate: '2026-10-30' }]);
+  assert.deepEqual(K.janelas('2026-10-05', '2026-10-01', 30), []);
 });
 
 test('nome padrão do comprovante: sem acento, sem caracteres proibidos, pelo modelo configurável', () => {
@@ -112,7 +113,7 @@ test('sugestão de destino: palavras da descrição com o imóvel pela matrícul
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.confianca], ['conta_imovel', loja.id, 'Água', 'media']);
   s = Z.sugerirDestino(d, pix);
   assert.deepEqual([s.classificacao, s.cobranca_id, s.imovel_id, s.confianca], ['boleto', cb2.id, loja.id, 'alta']);
-  assert.equal(Z.sugerirClassificacao(d, tarifa).classificacao, 'tarifa');
+  assert.equal(Z.sugerirDestino(d, tarifa).classificacao, 'tarifa');
   // transferência: cita a outra empresa (sem a outra ponta no extrato da JCK)
   assert.deepEqual([Z.sugerirDestino(d, ted).classificacao, Z.sugerirDestino(d, ted).confianca], ['transferencia', 'alta']);
   // com a outra ponta importada na JCK, a sugestão traz o par
@@ -204,7 +205,7 @@ test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados
   assert.equal(R.buscar(d, 'cobrancas', cb2.id).movimentacao_id, null);
   assert.deepEqual([R.buscar(d, 'movimentacoes_banco', ent.id).classificacao, R.buscar(d, 'movimentacoes_banco', ent.id).cobranca_id], [null, null]);
   // ordem do plano (mov, boleto) e via vincularMovimentacao
-  assert.equal(Z.confirmarPagamentoPeloExtrato(d, ent.id, cb2.id, 'julio').divergente, false);
+  assert.equal(Z.confirmarPagamentoPeloBanco(d, cb2.id, ent.id, 'julio').divergente, false);
   R.estornarPagamento(d, cb2.id, 'julio');
   // divergente: devolve sem gravar; com valor da NF e justificativa grava nf_manual
   // creditado em 12/08 (depois do vencimento) com valor estranho: o previsto é com multa e juros até 12/08; se o inquilino pagou em dia, a tela marca
@@ -321,12 +322,12 @@ test('consulta: movimentações por conta, mês, imóvel e filtro; resumo da con
   assert.deepEqual(Z.movimentacoesDo(d, { conta_id: 'ank', mes: '2026-11' }).map((m) => m.id_externo), ['r2', 'r1']);
   assert.deepEqual(Z.movimentacoesDo(d, { filtro: 'saidas' }).map((m) => m.id_externo), ['j1', 'r1', 'r3'], 'data mais nova primeiro; na mesma data, a mais recente');
   assert.deepEqual(Z.movimentacoesDo(d, { filtro: 'entradas' }).map((m) => m.id_externo), ['r2']);
-  const r = Z.resumoBanco(d, 'ank', '2026-11');
-  assert.deepEqual(r, { entradas: 2000, saidas: 1000, total: 2, pendentes: 2, semComprovante: 0, importadoAte: '2026-11-06' });
+  assert.deepEqual(Z.movimentacoesDo(d, { conta_id: 'ank', mes: '2026-11', filtro: 'pendentes' }).map((m) => [m.tipo, m.valor]), [['entrada', 2000], ['saida', 1000]]);
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-06');
   assert.equal(Z.contaSugeridaDoImovel(d, sobre.id), 'jck');
   assert.equal(Z.contaSugeridaDoImovel(d, loja.id), 'ank', 'empate 50/50: conta padrão');
   assert.equal(Z.empresaDaConta(d, 'jck').nome, 'JCK ADMINISTRADORA');
-  assert.equal(Z.contaDo(d, 'xx'), null);
+  assert.equal(R.contaBancaria(d, 'xx'), null);
 });
 
 test('pagamentos pelo banco: preparar (validações), aprovar, lote enviado, situação do C6, pago cria a conta do imóvel, cancelar', () => {
@@ -376,7 +377,7 @@ test('pagamentos pelo banco: preparar (validações), aprovar, lote enviado, sit
   assert.deepEqual([de.imovel_id, de.tipo, de.competencia, de.valor, de.data_pagamento, de.pagamento_banco_id], [sobre.id, 'Luz', '2026-11', 20000, '2026-11-10', q.id]);
   assert.throws(() => Z.cancelarPagamento(d2, q.id, 'julio'), /já foi pago/);
   assert.throws(() => Z.atualizarPagamento(d2, q.id, { situacao: 'rascunho' }, 'julio'), /não pode passar/);
-  assert.equal(Z.pagamentosDo(d2, { imovel_id: sobre.id, situacao: 'pago' }).length, 1);
+  assert.equal(d2.pagamentos_banco.filter((x) => x.imovel_id === sobre.id && x.situacao === 'pago').length, 1);
   // erro do banco → pode cancelar; cancelado não volta
   const [e] = Z.prepararPagamentos(d2, [{ ...dados, valor: 5000, forma: 'pix', codigo_barras: null, chave_pix: 'financeiro@exemplo.com.br' }], 'ana');
   assert.equal(e.content, 'financeiro@exemplo.com.br');
@@ -391,7 +392,7 @@ test('pagamentos pelo banco: preparar (validações), aprovar, lote enviado, sit
   // IPTU: ao pagar, a parcela fica marcada
   const [pi] = Z.prepararPagamentos(d2, [{ conta_id: 'ank', imovel_id: loja.id, origem: { tipo: 'iptu', id: iptu.id, n: 1 }, forma: 'boleto', codigo_barras: '8'.repeat(48), valor: 10000, data_pagamento: '2026-02-10' }], 'ana');
   assert.deepEqual([pi.tipo_conta, pi.content.length], ['IPTU', 44]);
-  Z.marcarPagamentoEnviado(d2, pi.id, { id_externo: 'it-3' }, 'julio');
+  Z.atualizarPagamento(d2, pi.id, { situacao: 'agendado', id_externo: 'it-3', grupo_id: null }, 'julio');
   Z.atualizarPagamento(d2, pi.id, { situacao: 'pago', pago_em: '2026-02-10' }, 'julio');
   assert.equal(R.buscar(d2, 'iptus', iptu.id).pagas[1], '2026-02-10');
   assert.deepEqual(R.pastaDoComprovante(d2, pi), { escopo: 'iptuano', id: R.idPastaAno(loja.id, 2026) });
@@ -405,12 +406,12 @@ test('pagamento confirmado pela saída do extrato: vira pago na data da moviment
   const [p] = Z.prepararPagamentos(d, [{ conta_id: 'jck', origem: { tipo: 'despesa', id: lanc.id }, forma: 'boleto', codigo_barras: '1'.repeat(44), valor: 12345, data_pagamento: '2026-11-06' }], 'ana');
   assert.deepEqual([p.imovel_id, p.tipo_conta, p.competencia, p.despesa_id], [sobre.id, 'Água', '2026-11', lanc.id]);
   Z.aprovarPagamento(d, p.id, 'julio');
-  Z.marcarPagamentoEnviado(d, p.id, { id_externo: 'it-9' }, 'julio');
+  Z.atualizarPagamento(d, p.id, { situacao: 'agendado', id_externo: 'it-9', grupo_id: null }, 'julio');
   const { novas: [mov, outra] } = importar(d, 'jck', [saida('s1', '2026-11-06', '123.45', 'PAGAMENTO BOLETO SANEPAR'), saida('s2', '2026-11-06', '123.46', 'OUTRO')]);
   const s = Z.sugerirDestino(d, mov);
   assert.deepEqual([s.classificacao, s.pagamento_banco_id, s.imovel_id, s.confianca], ['conta_imovel', p.id, sobre.id, 'alta']);
   assert.throws(() => Z.marcarPagoPeloExtrato(d, p.id, outra.id, 'julio'), /diferente do pagamento/);
-  Z.conciliarPagamentoComExtrato(d, p.id, mov.id, 'julio');
+  Z.marcarPagoPeloExtrato(d, p.id, mov.id, 'julio');
   assert.deepEqual([p.situacao, p.pago_em, p.movimentacao_id], ['pago', '2026-11-06', mov.id]);
   const m = R.buscar(d, 'movimentacoes_banco', mov.id);
   assert.deepEqual([m.classificacao, m.imovel_id, m.pagamento_banco_id, m.despesa_id], ['conta_imovel', sobre.id, p.id, lanc.id]);
@@ -431,7 +432,7 @@ test('comprovante único: a pasta do contador é a do mês do dinheiro (não da 
   const [p] = Z.prepararPagamentos(d, [{ conta_id: 'jck', imovel_id: sobre.id, origem: { tipo: 'avulso', id: null, n: null }, tipo_conta: 'Condomínio', competencia: '2026-12', forma: 'boleto', codigo_barras: '2'.repeat(47), valor: 45000, data_pagamento: '2026-11-28' }], 'ana');
   assert.deepEqual(Z.escopoContador(d, p), { escopo: 'contador', id: R.idContador(jck.id, '2026-11') }, 'sem movimentação: a data do pagamento');
   Z.aprovarPagamento(d, p.id, 'julio');
-  Z.marcarPagamentoEnviado(d, p.id, { id_externo: 'it-1' }, 'julio');
+  Z.atualizarPagamento(d, p.id, { situacao: 'agendado', id_externo: 'it-1', grupo_id: null }, 'julio');
   const { novas: [mov] } = importar(d, 'jck', [saida('s1', '2026-11-28', '450.00', 'PIX CONDOMINIO EDIFICIO EXEMPLO')]);
   Z.marcarPagoPeloExtrato(d, p.id, mov.id, 'julio');
   const pago = R.buscar(d, 'pagamentos_banco', p.id);
@@ -504,8 +505,8 @@ test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Pa
   assert.ok(e, 'etapa existe');
   assert.deepEqual([e.pendentes, e.contas.map((c) => c.semImportar)], [2, [true, true]]);
   assert.match(e.detalhe, /ANK: extrato ainda não buscado · JCK: extrato ainda não buscado/);
-  importar(d, 'ank', [saida('r1', '2026-11-05', '10.00', 'A'), saida('r2', '2026-11-06', '5.00', 'B')], { ate: '2026-11-30' });
-  importar(d, 'jck', [saida('j1', '2026-11-05', '7.00', 'C')], { ate: '2026-11-30' });
+  importar(d, 'ank', [saida('r1', '2026-11-05', '10.00', 'A'), saida('r2', '2026-11-06', '5.00', 'B')], { ate: '2026-11-30', hoje });
+  importar(d, 'jck', [saida('j1', '2026-11-05', '7.00', 'C')], { ate: '2026-11-30', hoje });
   e = R.etapasFechamento(d, '2026-11', hoje).find((x) => x.chave === 'banco');
   assert.deepEqual([e.pendentes, e.feito], [3, false]);
   assert.match(e.detalhe, /ANK: 2 sem destino · JCK: 1 sem destino/);
@@ -528,10 +529,10 @@ test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Pa
   d3.config_banco.permitir_pagamentos = true;
   const [p] = Z.prepararPagamentos(d3, [{ conta_id: 'ank', forma: 'boleto', codigo_barras: '1'.repeat(44), valor: 100, data_pagamento: '2026-11-10', tipo_conta: 'Outra' }], 'ana');
   Z.aprovarPagamento(d3, p.id, 'julio');
-  Z.marcarPagamentoEnviado(d3, p.id, { id_externo: 'x' }, 'julio');
+  Z.atualizarPagamento(d3, p.id, { situacao: 'agendado', id_externo: 'x', grupo_id: null }, 'julio');
   a = R.todosAlertas(d3, '2026-11-12').find((x) => x.tipo === 'Banco');
   assert.deepEqual([a.nivel, /enviado\(s\) ao banco sem confirmação/.test(a.texto)], ['aviso', true]);
-  assert.deepEqual(Z.pendenciasBanco(d3, '2026-11', '2026-11-12').pagamentosPendentes, 1);
+  assert.deepEqual(R.pendenciasBancoDoMes(d3, '2026-11', '2026-11-12').pagamentosPendentes, 1);
 });
 
 test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 sem mexer na da base; movimentações não se desfazem pelo histórico', () => {
@@ -641,7 +642,7 @@ test('pagamento ligado ao banco não se desfaz pelo Histórico nem pelo "desfaze
   d.config_banco.permitir_pagamentos = true;
   const [p] = Z.prepararPagamentos(d, [{ conta_id: 'ank', origem: { tipo: 'despesa', id: solta.id }, forma: 'boleto', codigo_barras: '1'.repeat(44), valor: 5000, data_pagamento: '2026-11-06' }], 'ana');
   Z.aprovarPagamento(d, p.id, 'julio');
-  Z.marcarPagamentoEnviado(d, p.id, { id_externo: 'it-c10' }, 'julio');
+  Z.atualizarPagamento(d, p.id, { situacao: 'agendado', id_externo: 'it-c10', grupo_id: null }, 'julio');
   Z.atualizarPagamento(d, p.id, { situacao: 'pago', pago_em: '2026-11-06' }, 'julio');
   const iPago = d.historico.findLastIndex((h) => h.tabela === 'despesas' && h.registro_id === solta.id && h.detalhes && h.detalhes.data_pagamento);
   assert.throws(() => R.desfazerAlteracoes(d, [`${iPago}:data_pagamento`], 'julio'), /paga pelo banco \(pagamento nº/);
@@ -707,7 +708,7 @@ test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançame
   assert.equal(r.de, '2026-09-01');
   assert.equal(r.ate, '2026-09-30');
   assert.equal(r.lancamentos.length, 2); // o FITID repetido entra uma vez
-  assert.deepEqual(r.lancamentos[0], { id_externo: '111', data: '2026-09-30', valor_centavos: -21500, tipo: 'saida', descricao: 'TRANSF ENVIADA PIX', categoria: 'DEBIT', end_to_end_id: 'E3187249520260930235672592QNCkdA', local_reference: null });
+  assert.deepEqual(r.lancamentos[0], { id_externo: '111', data: '2026-09-30', valor_centavos: -21500, tipo: 'saida', descricao: 'TRANSF ENVIADA PIX', categoria: 'DEBIT', end_to_end_id: 'E3187249520260930235672592QNCkdA', local_reference: null, fonte: 'ofx' });
   assert.equal(r.lancamentos[1].local_reference, '01M25HJ18FY3CKSB2P2B5QJT46');
   assert.equal(Z.centavosDoOfx('1.234,56'), 123456);
   assert.throws(() => Z.lerOfx('<html>não é ofx</html>'), /não é um OFX/);
@@ -716,7 +717,7 @@ test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançame
   assert.equal(imp.novas.length, 2);
   assert.equal(imp.novas[1].valor, 131850);
   assert.equal(imp.novas[1].tipo, 'entrada');
-  assert.equal(d.config_banco.ultima_importacao.ank, '2026-09-30');
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-09-30');
   // o mesmo arquivo de novo: nada entra em dobro
   assert.equal(Z.importarExtrato(d, 'ank', Z.lerOfx(OFX_TESTE).lancamentos, 'julio').repetidas, 2);
   // o texto com acento quebrado em UTF-8 é relido como Windows-1252

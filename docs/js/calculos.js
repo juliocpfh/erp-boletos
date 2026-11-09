@@ -48,14 +48,19 @@ export function numero(texto) {
   return n;
 }
 
+// formatadores criados uma vez (criar um a cada chamada custa ~60 vezes mais); a saída é a mesma do toLocaleString
+const FMT_REAIS = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const FMT_PCT = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
+
 export function reais(c, comSimbolo = true) {
-  const v = (c || 0) / 100;
-  const t = v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const t = FMT_REAIS.format((c || 0) / 100);
   return comSimbolo ? `R$ ${t}` : t;
 }
 
 export function pct(n) {
-  return `${(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
+  const x = n || 0;
+  // número: o formatador; outro tipo (texto em dado antigo) fica como o toLocaleString dele devolvia
+  return `${typeof x === 'number' ? FMT_PCT.format(x) : x.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
 }
 
 // --------------------------------------------------------------------------
@@ -90,6 +95,18 @@ export function dataBr(isoData) {
   const [a, m, d] = isoData.slice(0, 10).split('-');
   return `${d}/${m}/${a}`;
 }
+
+// o toLocaleString('pt-BR') sem opções usa ano, mês, dia, hora, minuto e segundo: o formatador com essas opções dá o mesmo texto
+const FMT_DATA_HORA = new Intl.DateTimeFormat('pt-BR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+
+/** Data e hora de um instante (texto ISO, número ou Date), igual ao toLocaleString('pt-BR'): "09/11/2026, 19:37:05". Inválido: "Invalid Date", como ele. */
+export function dataHoraBr(quando) {
+  const dt = new Date(quando);
+  return Number.isNaN(dt.getTime()) ? String(dt) : FMT_DATA_HORA.format(dt);
+}
+
+/** Data e hora de agora: "09/11/2026, 19:37:05". */
+export const agoraBr = () => dataHoraBr(Date.now());
 
 export function compBr(comp) {
   return comp ? `${comp.slice(5, 7)}/${comp.slice(0, 4)}` : '-';
@@ -143,6 +160,61 @@ export function somarAnos(isoData, anos) {
   const [a, m, d] = isoData.split('-').map(Number);
   const alvo = `${String(a + anos).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
   return `${alvo}-${String(Math.min(d, diasNoMes(alvo))).padStart(2, '0')}`;
+}
+
+// --------------------------------------------------------------------------
+// Dias úteis (bancos): sábado, domingo e feriado nacional não contam
+// --------------------------------------------------------------------------
+const FERIADOS = new Map();
+
+/** Feriados nacionais em que os bancos não abrem (fixos e móveis pela Páscoa: Carnaval, Sexta-feira Santa, Corpus Christi). */
+export function feriados(ano) {
+  if (FERIADOS.has(ano)) return FERIADOS.get(ano);
+  // domingo de Páscoa (algoritmo de Meeus/Jones/Butcher)
+  const a = ano % 19; const b = Math.floor(ano / 100); const c = ano % 100;
+  const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
+  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  const pascoa = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map((x) => `${ano}-${x}`);
+  const lista = new Set([...fixos, ...[-48, -47, -2, 60].map((n) => somarDias(pascoa, n))]);
+  FERIADOS.set(ano, lista);
+  return lista;
+}
+
+/** Dia útil para o banco: nem sábado, nem domingo, nem feriado nacional. */
+export function diaUtil(isoData) {
+  const dia = paraData(isoData).getUTCDay();
+  return dia !== 0 && dia !== 6 && !feriados(Number(isoData.slice(0, 4))).has(isoData.slice(0, 10));
+}
+
+/** Dia útil igual ou anterior à data (vencimento de tributo federal que cai em dia sem expediente bancário antecipa). */
+export function diaUtilAteh(isoData) {
+  let x = isoData;
+  while (!diaUtil(x)) x = somarDias(x, -1);
+  return x;
+}
+
+/** Dia útil igual ou seguinte à data. */
+export function proximoDiaUtil(isoData) {
+  let x = isoData;
+  while (!diaUtil(x)) x = somarDias(x, 1);
+  return x;
+}
+
+/**
+ * Último dia para pagar o boleto em dia (sem multa e juros, com a bonificação): o vencimento ou, se ele cai em sábado,
+ * domingo ou feriado nacional, o próximo dia útil (decisão do dono, 09/11/2026). Ex.: sáb 10/10/2026 → ter 13/10/2026.
+ */
+export function limitePagamento(vencimento) {
+  return proximoDiaUtil(vencimento);
+}
+
+/** Boleto vencido em ``hoje``: só depois do último dia para pagar em dia (``limitePagamento``). */
+export function vencido(vencimento, hoje) {
+  return !!vencimento && hoje > limitePagamento(vencimento);
 }
 
 /** Vencimento da cobrança de uma competência. Dia inexistente vira o último dia do mês. */
@@ -284,8 +356,13 @@ export function jurosAoDia(base, jurosMesPct) {
   return Math.floor((base * (jurosMesPct || 0)) / 100 / 30 + 1e-7);
 }
 
-/** Multa fixa sobre o valor em aberto e juros simples pro rata dia (mês de 30 dias). */
+/**
+ * Multa fixa sobre o valor em aberto e juros simples pro rata dia (mês de 30 dias). Vencimento em dia não útil: pago até o
+ * próximo dia útil não tem multa nem juros; depois dele, o atraso conta desde o vencimento, como fazem os bancos.
+ * Ex.: vence sáb 10/10/2026 → pago ter 13/10 em dia; pago qua 14/10 = 4 dias de juros.
+ */
 export function multaEJuros(base, vencimento, pagamento, multaPct, jurosMesPct) {
+  if (!vencido(vencimento, pagamento)) return { dias: 0, multa: 0, juros: 0 };
   const dias = diasEntre(vencimento, pagamento);
   if (dias <= 0) return { dias: 0, multa: 0, juros: 0 };
   return {
@@ -350,6 +427,24 @@ export function ufDoCep(cep) {
   const f = FAIXAS_CEP.find(([de, ate]) => p >= de && p <= ate);
   return f ? f[2] : '';
 }
+
+// --------------------------------------------------------------------------
+// Ordem das listas (para .sort): pelo campo "data" ('AAAA-MM-DD'); no mesmo dia, pela ordem em que foram lançados (id)
+// --------------------------------------------------------------------------
+/** A mais recente primeiro; no mesmo dia, a lançada por último. */
+export const maisRecentePrimeiro = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+
+/** A mais antiga primeiro; no mesmo dia, a lançada primeiro. */
+export const maisAntigoPrimeiro = (a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id;
+
+// --------------------------------------------------------------------------
+// Textos
+// --------------------------------------------------------------------------
+/** Texto sem acento ("Água São João" → "Agua Sao Joao"); maiúsculas, espaços e o resto ficam como estão. Vazio/nulo → ''. */
+export const semAcento = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Texto para nome de arquivo ou id: sem acento, minúsculas, o que não for letra ou número vira "-" (ex.: "Apólice Nº 1" → "apolice-n-1"). */
+export const paraNomeDeArquivo = (t) => semAcento(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 // --------------------------------------------------------------------------
 // Parâmetros do endereço (#/tela?comp=…&ordem=…): só valem no formato esperado

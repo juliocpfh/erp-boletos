@@ -1,4 +1,5 @@
 // Campos de cada cadastro, desenho dos formulários e leitura do que foi digitado.
+import { soDigitos } from './c6-comum.js';
 import { centavos, numero } from './calculos.js';
 
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,7 +12,7 @@ const QUEBRA = { quebra: true };
 // --------------------------------------------------------------------------
 // CPF, CNPJ, CEP e telefone: máscara ao digitar e conferência dos dígitos ao salvar
 // --------------------------------------------------------------------------
-export const soDigitos = (v) => String(v || '').replace(/\D/g, '');
+export { soDigitos }; // de c6-comum.js (a mesma da ponte)
 
 export function cpfValido(v) {
   const n = soDigitos(v);
@@ -557,14 +558,18 @@ export const COBRANCA = [
 ];
 
 // --------------------------------------------------------------------------
+// formatadores criados uma vez (criar um a cada chamada custa ~60 vezes mais); a saída é a mesma do toLocaleString
+const FMT_DINHEIRO = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const FMT_PCT = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4, useGrouping: false });
+
 export function dinheiroTexto(c) {
   if (c === null || c === undefined || c === '') return '';
-  return (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return FMT_DINHEIRO.format(c / 100);
 }
 
 export function pctTexto(n) {
   if (n === null || n === undefined || n === '') return '';
-  return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 4, useGrouping: false });
+  return FMT_PCT.format(Number(n));
 }
 
 /** Valores de um registro no formato que aparece nos campos da tela. */
@@ -631,12 +636,15 @@ export function ler(campos, form, antigo = null) {
   return { dados, erros };
 }
 
+/** Um item na caixa "Editar lista": o nome e o × que o tira da lista. */
+export const chipDaLista = (lista, v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${lista}" data-valor="${esc(v)}">×</button></span>`;
+
 /** Caixa para editar uma lista de opções (incluir e remover), aberta pelo botão "Editar lista". */
 function editorLista(c) {
   const itens = c.opcoes.map((o) => (Array.isArray(o) ? o[0] : o));
   return `<button type="button" class="link-botao" data-acao="abrirLista" data-lista="${c.lista}">Editar lista</button>
     <div class="editor-lista" data-editor="${c.lista}" hidden>
-      <div class="chips">${itens.map((v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${c.lista}" data-valor="${esc(v)}">×</button></span>`).join('')}</div>
+      <div class="chips">${itens.map((v) => chipDaLista(c.lista, v)).join('')}</div>
       <div class="acoes"><input data-lista-novo="${c.lista}" placeholder="Nome para incluir" style="max-width:240px"><button type="button" class="pequeno" data-acao="incluirNaLista" data-lista="${c.lista}">OK</button></div>
       <div class="ajuda">Só dá para remover o que não estiver em uso.</div></div>`;
 }

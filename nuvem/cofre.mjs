@@ -21,8 +21,10 @@ export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualiz
 export const CONTADORES = ['proxima_fatura'];
 /** Segredos que nunca ficam nos dados (regra 8 do CLAUDE.md; normalizar também apaga). */
 const SEGREDOS = ['senha_ponte', 'ponte_url'];
+/** Campos da senha (os de camposDeSenha em docs/js/auth.js): qualquer papel troca a própria senha. */
+const CAMPOS_SENHA = ['senha_sal', 'senha_hash', 'senha_iteracoes'];
 /** O que o operador pode mudar no próprio usuário (trocar a senha); o resto de "usuarios" é do administrador. */
-const USUARIO_PROPRIO = ['senha_sal', 'senha_hash', 'senha_iteracoes', 'sessoes', 'pendente'];
+const USUARIO_PROPRIO = [...CAMPOS_SENHA, 'sessoes', 'pendente'];
 /** Sessões lembradas por usuário (igual a MAX_SESSOES de docs/js/nuvem.js; tests/sincronia.test.mjs confere). */
 export const MAX_SESSOES = 10;
 const NIVEL = { consulta: 1, operador: 2, admin: 3 };
@@ -36,6 +38,8 @@ export const SO_ADMIN = {
   tabela: ['emitentes'],
 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
+/** Tabelas que existem sempre (mesmo antes do primeiro registro): uma mudança "raiz" com esse nome trocaria a tabela inteira. */
+const TABELAS_SEMPRE = ['usuarios', ...SO_ADMIN.tabela];
 
 export class ErroCofre extends Error {
   constructor(status, mensagem, extra = {}) { super(mensagem); this.status = status; this.extra = extra; }
@@ -107,6 +111,21 @@ export class Cofre {
     this.sql.exec('INSERT INTO controle (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor', chave, String(valor));
     return valor;
   }
+  /**
+   * Tabela e campo da raiz não se misturam: "raiz" com nome de tabela trocaria a tabela inteira nos outros aparelhos (passando
+   * por cima das regras de usuários e de SO_ADMIN), e tabela com nome de campo da raiz (config_banco, logo…) o apagaria no `tudo()`.
+   */
+  ehTabela(nome) {
+    return TABELAS_SEMPRE.includes(nome) || this.q('SELECT 1 AS x FROM tabelas WHERE nome = ?', nome).length > 0
+      || this.q('SELECT 1 AS x FROM registros WHERE tabela = ? LIMIT 1', nome).length > 0;
+  }
+  tabelaDeRegistros(t) {
+    const nome = nomeTabela(t);
+    if (CONTADORES.includes(nome) || SO_ADMIN.raiz.includes(nome) || this.q('SELECT 1 AS x FROM raiz WHERE campo = ?', nome).length) {
+      throw new ErroCofre(400, `"${nome}" é um campo da configuração geral, não uma tabela.`);
+    }
+    return nome;
+  }
   registrarLog(tipo, tabela, id, dados, por) {
     this.sql.exec('INSERT INTO log (tipo, tabela, id, dados, por, em) VALUES (?, ?, ?, ?, ?, ?)', tipo, tabela, id, dados === undefined ? null : texto(dados), por, this.agora());
   }
@@ -139,8 +158,10 @@ export class Cofre {
       this.exigir(email, 'admin');
     }
     return this.transacao(() => {
+      // `tabelas` (o próximo código de cada uma) fica: as faixas já entregues aos aparelhos continuam valendo depois de
+      // "Voltar para este dia" ou "Substituir…", senão dois aparelhos ganhariam os mesmos códigos (o próximo nunca volta)
       if (!this.vazio()) {
-        for (const t of ['registros', 'tabelas', 'raiz', 'historico', 'conflitos', 'excluidos']) this.sql.exec(`DELETE FROM ${t}`);
+        for (const t of ['registros', 'raiz', 'historico', 'conflitos', 'excluidos']) this.sql.exec(`DELETE FROM ${t}`);
       }
       let n = 0;
       for (const [chave, valor] of Object.entries(d)) {
@@ -153,7 +174,7 @@ export class Cofre {
             this.sql.exec('INSERT INTO registros (tabela, id, dados, ordem) VALUES (?, ?, ?, ?)', t, codigo(r.id), texto(semSegredos(r)), n += 1);
             maior = Math.max(maior, r.id);
           }
-          this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?)', t, maior + 1);
+          this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?) ON CONFLICT(nome) DO UPDATE SET proximo = MAX(proximo, excluded.proximo)', t, maior + 1);
         } else if (!RAIZ_DO_SERVIDOR.includes(chave)) {
           this.sql.exec('INSERT INTO raiz (campo, valor) VALUES (?, ?)', nomeCampo(chave), texto(semSegredos(valor)));
         }
@@ -232,10 +253,7 @@ export class Cofre {
     if (!Array.isArray(lote.ops) || lote.ops.length > MAX_OPS) throw new ErroCofre(400, `Lote inválido (até ${MAX_OPS} mudanças).`);
     if (this.vazio()) throw new ErroCofre(409, 'A nuvem ainda não tem dados: faça a carga inicial.');
     const quem = this.exigir(email, 'consulta');
-    // consulta só registra a própria entrada e saída (sessão do login); qualquer outra mudança é recusada
-    if (quem.papel === 'consulta' && !lote.ops.every((o) => o?.op === 'alterar' && o.tabela === 'usuarios' && o.id === quem.id && Object.keys(o.campos || {}).every((c) => c === 'sessoes'))) {
-      throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
-    }
+    if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
     return this.transacao(() => {
       const resultados = []; const novosConflitos = [];
       for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
@@ -250,6 +268,19 @@ export class Cofre {
     });
   }
 
+  /**
+   * O que o usuário de consulta grava: a própria entrada e saída (sessões do login), a própria senha (trocar, ou o login regravar
+   * a do padrão antigo) e a linha do histórico dessa troca. Qualquer outra mudança é recusada.
+   */
+  soProprioAcesso(ops, quem) {
+    const alteracoes = ops.filter((o) => o?.op !== 'historico');
+    const proprias = alteracoes.every((o) => o?.op === 'alterar' && o.tabela === 'usuarios' && o.id === quem.id && o.campos && typeof o.campos === 'object'
+      && Object.keys(o.campos).every((c) => c === 'sessoes' || CAMPOS_SENHA.includes(c)));
+    if (!proprias) return false;
+    const trocouSenha = alteracoes.some((o) => Object.keys(o.campos).some((c) => CAMPOS_SENHA.includes(c)));
+    return ops.filter((o) => o?.op === 'historico').every((o) => trocouSenha && o.entrada?.tabela === 'usuarios' && Number(o.entrada?.registro_id) === quem.id);
+  }
+
   aplicarOp(op, email, quem, novosConflitos) {
     if (!op || typeof op !== 'object') throw new ErroCofre(400, 'Mudança inválida.');
     if (op.op === 'historico') {
@@ -260,7 +291,7 @@ export class Cofre {
       return { ok: true };
     }
     if (op.op === 'raiz') return this.mudarRaiz(op, email, quem, novosConflitos);
-    const tabela = nomeTabela(op.tabela);
+    const tabela = this.tabelaDeRegistros(op.tabela);
     const id = codigo(op.id);
     if (tabela === 'usuarios' && quem.papel !== 'admin') {
       const soSenha = op.op === 'alterar' && id === quem.id && Object.keys(op.campos || {}).every((c) => USUARIO_PROPRIO.includes(c));
@@ -350,6 +381,7 @@ export class Cofre {
   mudarRaiz(op, email, quem, novosConflitos) {
     const campo = nomeCampo(op.campo);
     if (RAIZ_DO_SERVIDOR.includes(campo)) return { ok: true, ignorado: true };
+    if (this.ehTabela(campo)) throw new ErroCofre(400, `"${campo}" é uma tabela: as mudanças vão registro a registro (a tabela inteira não pode ser trocada de uma vez).`);
     if (CONTADORES.includes(campo)) {
       const linha = this.q('SELECT valor FROM raiz WHERE campo = ?', campo)[0];
       if (!igual(linha ? JSON.parse(linha.valor) : undefined, op.antes)) throw new ErroCofre(409, 'O número da NF mudou em outro aparelho: refaça com o número novo.', { contador: true });
@@ -447,7 +479,7 @@ export class Cofre {
   /** Faixa de códigos novos de uma tabela para um aparelho usar mesmo sem internet (nunca repete entre aparelhos). */
   faixa({ tabela, quantidade = 200 } = {}, email) {
     this.exigir(email, 'operador');
-    const t = nomeTabela(tabela);
+    const t = this.tabelaDeRegistros(tabela);
     const qtd = Math.min(MAX_FAIXA, Math.max(1, Math.floor(Number(quantidade) || 0)));
     return this.transacao(() => {
       const maior = Number(this.q('SELECT MAX(id) AS m FROM registros WHERE tabela = ?', t)[0]?.m || 0);
@@ -581,7 +613,12 @@ export class CofreDO {
       if (!email) throw new ErroCofre(401, 'Sem login.');
       const c = this.cofre; const rota = url.pathname;
       let r;
-      if (rota === '/papel' && request.method === 'GET') r = c.exigir(email, url.searchParams.get('nivel') === 'operador' ? 'operador' : 'consulta');
+      if (rota === '/papel' && request.method === 'GET') {
+        // o Worker pede 'admin' para os backups (banco inteiro, com as senhas de todos): nível desconhecido é recusado, nunca vira 'consulta'
+        const nivel = url.searchParams.get('nivel');
+        if (!Object.hasOwn(NIVEL, nivel || '')) throw new ErroCofre(400, 'Nível de acesso desconhecido.');
+        r = c.exigir(email, nivel);
+      }
       else if (rota === '/tudo' && request.method === 'GET') r = c.tudo(c.exigir(email, 'consulta'));
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
       else if (rota === '/conflitos' && request.method === 'GET') { c.exigir(email, 'consulta'); r = { conflitos: c.conflitosAbertos() }; }

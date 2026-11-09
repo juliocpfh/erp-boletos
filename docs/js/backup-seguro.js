@@ -173,14 +173,38 @@ async function nomesEm(dir) {
   return nomes;
 }
 
+/**
+ * Chave da pasta segura. null = a pasta não tem backup seguro (o arquivo não existe, ou não é uma chave deste sistema).
+ * Arquivo que existe mas não deu para ler agora (OneDrive ainda baixando, disco ocupado, sem permissão, leitura pela metade)
+ * lança um erro esperado: antes virava "não configurado" e o backup desligava calado na sessão inteira.
+ */
 export async function lerChave(dir) {
+  const falhou = (e) => Object.assign(new Error(`Não consegui ler a chave do backup seguro (${e?.message || e?.name || 'erro desconhecido'}). O sistema tenta de novo sozinho.`), { esperado: true, causa: e });
+  let conteudo;
   try {
-    const arq = await (await dir.getFileHandle(ARQUIVO_CHAVE)).getFile();
-    const chave = JSON.parse(await arq.text());
-    return chave.formato === MAGICO ? chave : null;
-  } catch {
-    return null;
+    conteudo = await (await (await dir.getFileHandle(ARQUIVO_CHAVE)).getFile()).text();
+  } catch (e) {
+    if (e?.name === 'NotFoundError') return null;
+    throw falhou(e);
   }
+  let chave;
+  try { chave = JSON.parse(conteudo); } catch (e) { throw falhou(e); } // vazio ou pela metade: o OneDrive ainda não terminou
+  return chave && chave.formato === MAGICO ? chave : null;
+}
+
+/**
+ * Cópia do banco na pasta segura sem acumular: pedidos que chegam enquanto uma cópia ainda espera a vez viram essa mesma
+ * (cada uma cifra e grava o banco inteiro). A tarefa lê o banco na hora em que roda, então vale o estado final.
+ * `enfileirar(fn)`: a fila de gravação da pasta segura (naFilaSegura em app.js). Devolve a função que pede a cópia.
+ */
+export function espelhoSemAcumular(enfileirar, tarefa) {
+  let esperando = false;
+  return () => {
+    if (esperando) return false;
+    esperando = true;
+    enfileirar(async () => { esperando = false; await tarefa(); });
+    return true;
+  };
 }
 
 export const gravarChave = (dir, chave) => gravar(dir, ARQUIVO_CHAVE, JSON.stringify(chave, null, 1));

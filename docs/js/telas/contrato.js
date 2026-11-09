@@ -415,10 +415,11 @@ export function caixaSeguros(c) {
 /** Contrato, vistoria e recibo das chaves: gerar cada um e marcar quando foi assinado. */
 /** Botões para gerar cada documento de entrada (contrato, vistoria de entrada, recibo das chaves). */
 function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
-  const entrada = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  // a vistoria de entrada do contrato (na troca de titular, a do anterior: só se vê aqui, edita-se lá)
+  const entrada = K.vistoriaDeEntrada(d(), c);
   return {
     doc_contrato_em: link(`#/contrato-gerar/${c.id}`, 'Gerar contrato', cls),
-    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria', cls)} ${opera() ? link(`#/vistoria/${entrada.id}`, 'Editar vistoria', cls) : ''}`
+    doc_vistoria_em: entrada ? `${link(`#/imprimir/vistoria?id=${entrada.id}`, 'Ver vistoria', cls)} ${opera() && entrada.contrato_id === c.id ? link(`#/vistoria/${entrada.id}`, 'Editar vistoria', cls) : ''}`
       : (opera() ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Entrada`, 'Fazer vistoria de entrada', cls) : ''),
     doc_chaves_em: link(`#/imprimir/chaves?contrato=${c.id}`, 'Gerar termo de entrega das chaves', cls),
   };
@@ -426,7 +427,7 @@ function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
 
 /** Marca única da situação do boleto: paga em dia, paga com atraso, vencida, em aberto ou carência. */
 export function situacaoBoleto(cb, hoje = C.hojeIso()) {
-  if (R.aCobrar(cb) && cb.vencimento < hoje) return etiqueta('Vencida', 'perigo');
+  if (R.aCobrar(cb) && C.vencido(cb.vencimento, hoje)) return etiqueta('Vencida', 'perigo');
   return cb.pagou_em_dia ? `<span title="Pagou até o vencimento; o banco compensou depois">${situacao(cb.situacao)}</span>` : situacao(cb.situacao);
 }
 
@@ -439,7 +440,7 @@ function caixaBoletosInquilino(c, cobs, hoje) {
     const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : '';
     return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('caução', 'info')}` : ''}${R.ehParcelaAcordo(x) ? ` ${etiqueta(`acordo ${x.acordo_parcela || ''}`.trim(), 'info')}` : ''}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td>
-      <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}${R.aCobrar(x) && opera() ? ` ${botao('lembrete', x.vencimento < hoje ? 'Cobrar' : 'Lembrete', { id: x.id }, 'secundario mini')}` : ''}</td>
+      <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}${R.aCobrar(x) && opera() ? ` ${botao('lembrete', C.vencido(x.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: x.id }, 'secundario mini')}` : ''}</td>
       <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
   };
   const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
@@ -504,7 +505,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
   const anterior = R.contratoHerdado(d(), c);
   const ir = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
   const mini = 'botao secundario mini';
-  const vistoria = R.vistoriasDo(d(), c.id).find((v) => v.tipo === 'Entrada');
+  const vistoria = K.vistoriaDeEntrada(d(), c);
   const doc = { contrato_assinado: 'assinado', vistoria_assinada: 'assinada', chaves_assinado: 'assinado' };
   const atalhos = {
     reserva: () => (c.reserva_valor > 0 ? link(ir('reserva'), 'Anexar o comprovante', mini) : link(`#/editar/contratos/${c.id}`, 'Informar a reserva', mini)),
@@ -619,9 +620,11 @@ function caixaAditivos(c) {
   const anteriores = R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => [x, R.aditivosValidos(d(), x.id)]).filter(([, l]) => l.length);
   const ant = R.contratoHerdado(d(), c);
   const aguardando = R.aditivosAguardando(d(), c.id);
+  // troca de titular: só o termo da troca assinado faz o contrato passar (outro termo assinado não conta)
+  const faltaTroca = ant && !R.aditivoDaTroca(d(), c);
   const ver = (a) => (a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver / PDF') : '');
   return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, 'Gerar termo aditivo') : ''}</div>
-    ${ant && !R.aditivosDo(d(), c.id).length ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.length ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
+    ${faltaTroca ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.some((a) => a.tipo === K.TIPO_ADITIVO_TROCA) ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
       <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
@@ -639,6 +642,7 @@ function caixaAditivos(c) {
       <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">
       <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
       <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      ${faltaTroca ? `<input type="hidden" name="pergunta_troca" value="1"><label class="check" style="margin:0"><input type="checkbox" name="troca" value="1" checked> É o termo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)})</label>` : ''}
       <button class="secundario pequeno">Registrar aditivo</button>
       ${botao('registrarAditivoPerdido', 'Registrar como perdido', { contrato: c.id }, 'perigo pequeno')}</form>
       <p class="suave">Termo assinado cujo papel se perdeu: "Perdido" (nos que aguardam assinatura) ou "Registrar como perdido" (termo antigo, sem o arquivo) vale como assinado. O termo da troca de titular não pode ser dado como perdido.</p>` : ''}`;
@@ -678,7 +682,7 @@ export function telaContrato(c) {
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? botao('editarContrato', 'Editar contrato', { id: c.id }, 'botao') : ''}
       ${opera() && c.imovel_id && !cobs.some((cb) => cb.data_pagamento) ? botao('corrigirImovel', 'Corrigir imóvel', { id: c.id }, 'secundario') : ''}
-      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
+      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e tudo o que é dele (boletos, garantia, vistorias, termos aditivos, cartas)? Os arquivos que o sistema guardou desses lançamentos (comprovantes, documentos assinados, apólices) também são apagados; documentos postos à mão na pasta ficam.') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${alertaArquivosFaltando(c.id)}
@@ -703,14 +707,14 @@ export function telaContrato(c) {
       ${c.solidario_nome ? `<h3>Inquilino solidário</h3><p><b>${esc(c.solidario_nome)}</b> · ${pessoa('solidario')}</p><p class="suave">O boleto sai no nome do inquilino principal.</p>` : ''}</div>
     <div class="cartao"><h2>Contrato e valores</h2><div class="grade">
       ${item(R.fimDeVinculo(d(), c) ? 'Entrada / fim do vínculo' : 'Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
-      ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${c.prazo_meses ? ` (${c.prazo_meses} meses)` : ''}`}`)}
+      ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${R.prazoDoContrato(d(), c) ? ` (${R.prazoDoContrato(d(), c)} meses)` : ''}`}`)}
       ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
       ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
       ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', reais(c.taxa_boleto))}
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<div class="cabecalho"><h3 id="reserva">Reserva dada na visita</h3>${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao secundario mini') : ''}</div><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}<br>${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${c.reserva_competencia ? '' : ' (primeiro aluguel)'}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+      ${c.reserva_valor > 0 ? `<div class="cabecalho"><h3 id="reserva">Reserva dada na visita</h3>${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao secundario mini') : ''}</div><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}<br>${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${!c.reserva_competencia ? ' (primeiro aluguel)' : c.reserva_competencia !== R.competenciaReserva(c) ? ` (o mês marcado, ${compBr(c.reserva_competencia)}, é de carência)` : ''}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
         ${caixaReservaAbatida(c)}` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaRessarcimentos(c)}

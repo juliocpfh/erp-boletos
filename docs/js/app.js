@@ -160,19 +160,30 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
     E.d = disco;
     if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
-  const copia = structuredClone(E.d || disco);
+  const copia = N.copiar(E.d || disco); // o histórico (só cresce) não é copiado entrada por entrada
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
   copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
-  if (E.seguro && E.seguro.chave) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, copia));
-  if (!E.backupFeito) {
-    E.backupFeito = true;
-    S.backupDiario(E.pasta, copia).catch(() => {});
-  }
+  espelharSeguro();
+  backupDoDia(copia);
   atualizarFaixa();
   return resultado;
+}
+
+/**
+ * Pasta: o backup do dia (pasta backups) na primeira gravação do dia. Só fica marcado como feito depois de gravado; se falhar
+ * (OneDrive ocupado…), o erro vai ao console e a próxima gravação tenta de novo (no máximo a cada 5 minutos).
+ */
+let backupDoDiaAndando = false; let backupDoDiaFalhouEm = 0;
+function backupDoDia(dados) {
+  if (E.backupFeito || backupDoDiaAndando || Date.now() - backupDoDiaFalhouEm < 300000) return;
+  backupDoDiaAndando = true;
+  S.backupDiario(E.pasta, dados)
+    .then(() => { E.backupFeito = true; })
+    .catch((e) => { backupDoDiaFalhouEm = Date.now(); logarErro(e); })
+    .finally(() => { backupDoDiaAndando = false; });
 }
 
 // --------------------------------------------------------------------------
@@ -193,7 +204,16 @@ export async function pastaSeguraDeTeste() {
   return raiz.getDirectoryHandle('teste-backup-seguro', { create: true });
 }
 
-/** Liga o backup seguro se este computador tem a pasta lembrada e a permissão (``pedir``: só com clique do usuário). */
+let falhasDaChave = 0; let chaveTentadaEm = 0;
+const ESPERA_CHAVE = 60000; // ms entre as tentativas de ler de novo a chave do backup seguro
+const AVISAR_DEPOIS_DE = 3; // tentativas seguidas sem conseguir: avisa o administrador na tela
+
+/**
+ * Liga o backup seguro se este computador tem a pasta lembrada e a permissão (``pedir``: só com clique do usuário).
+ * Chave que existe mas não deu para ler agora (OneDrive baixando, disco ocupado): fica "desconectado" (o botão Reconectar
+ * tenta de novo), o motivo aparece para o administrador (seguroErro) e o sistema tenta sozinho a cada minuto
+ * (tentarSeguroDeNovo); antes o backup desligava calado na sessão inteira.
+ */
 export async function conectarSeguro(pedir = false) {
   const h = await S.pastaSeguraLembrada();
   if (!h) {
@@ -204,9 +224,28 @@ export async function conectarSeguro(pedir = false) {
     E.seguro = { dir: h, desconectado: true };
     return false;
   }
-  const chave = await B.lerChave(h);
+  chaveTentadaEm = Date.now();
+  let chave;
+  try {
+    chave = await B.lerChave(h);
+  } catch (e) {
+    falhasDaChave += 1;
+    E.seguro = { dir: h, desconectado: true, falhou: true };
+    E.seguroErro = e.message;
+    logarErro(e.causa || e);
+    if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario('admin')) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Dados e backup.`, 'aviso');
+    return false;
+  }
+  if (falhasDaChave) E.seguroErro = '';
+  falhasDaChave = 0;
   E.seguro = chave ? { dir: h, chave } : null;
   return !!chave;
+}
+
+/** A chave do backup seguro falhou ao ler: tenta de novo (no máximo uma vez por minuto) e, se voltou, faz a cópia que faltou. */
+function tentarSeguroDeNovo() {
+  if (!E.seguro?.falhou || Date.now() - chaveTentadaEm < ESPERA_CHAVE) return;
+  conectarSeguro(false).then((ok) => { if (ok) espelharSeguro(); }).catch(logarErro);
 }
 
 /** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado. */
@@ -237,9 +276,14 @@ export function atualizarProgramaSeguro() {
   });
 }
 
-/** Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). */
+/**
+ * Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). Cada cópia cifra e grava o
+ * banco inteiro: gravações seguidas (e mudanças de outros aparelhos) enquanto uma espera a vez viram uma só, com o banco do momento.
+ */
+const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, () => (E.seguro && E.seguro.chave && E.d ? B.espelhar(E.seguro.dir, E.seguro.chave, E.d) : undefined));
 function espelharSeguro() {
-  if (E.seguro && E.seguro.chave && E.d) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+  if (E.seguro?.falhou) { tentarSeguroDeNovo(); return; }
+  if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
 }
 
 /** Ao abrir a pasta (ou a nuvem): cópia do banco do dia, a versão PC se houver mais nova e, se já passou uma semana, o backup completo. */
@@ -267,6 +311,7 @@ function aoMudarNuvem(externo) {
 }
 
 async function verificarMudancasExternas() {
+  tentarSeguroDeNovo(); // chave do backup seguro que não deu para ler: tenta de novo (no máximo uma vez por minuto)
   if (E.nuvem) {
     if (document.hidden) return;
     await E.nuvem.sincronizar().catch(() => {}); // aoMudar avisa
@@ -385,7 +430,12 @@ export function carregarScript(url, global) {
     const s = document.createElement('script');
     s.src = url;
     s.onload = () => ok(window[global]);
-    s.onerror = () => erro(new Error('Não consegui carregar um componente do programa. Recarregue a página.'));
+    s.onerror = () => {
+      // esquece a tentativa que falhou (ex.: sem internet): o próximo uso tenta de novo, sem precisar recarregar a página
+      delete scripts[url];
+      s.remove();
+      erro(new Error('Não consegui carregar um componente do programa: confira a internet e tente de novo.'));
+    };
     document.head.appendChild(s);
   });
   return scripts[url];
@@ -430,6 +480,8 @@ export async function escolherPasta() {
 }
 
 const MODO_NUVEM = 'imoveis-modo-nuvem';
+/** Tabelas do sistema (as listas de bancoVazio): na nuvem, cada uma ganha faixa de códigos mesmo antes do 1º registro. */
+const TABELAS_DO_SISTEMA = Object.entries(R.bancoVazio()).filter(([k, v]) => Array.isArray(v) && k !== 'historico').map(([k]) => k);
 /** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
 export async function abrirNuvem() {
   // cópia do aparelho cifrada (cofrinho.js): a chave só fica aberta durante o login lembrado
@@ -437,7 +489,7 @@ export async function abrirNuvem() {
   E.cofrinho = new Cofrinho(cru);
   await E.cofrinho.daSessao(!!lerSessao());
   const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
-  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar });
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar, tabelas: TABELAS_DO_SISTEMA });
   E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
@@ -466,7 +518,10 @@ export async function reabrirSessao() {
   else { E.usuario = null; gravarSessao(null); }
 }
 
-/** Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). */
+/**
+ * Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). O banco
+ * baixado com a cópia trancada (tela de login) é aproveitado e gravado agora (iniciar), em vez de baixar tudo de novo.
+ */
 async function destrancarNuvem(loginTexto, senha) {
   await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
   E.anexos.fila = null;
@@ -537,7 +592,7 @@ export async function sair() {
     await E.anexos?.enviarFila().catch(() => {});
     const nada = !E.nuvem.pendentesQtd() && !(E.anexos?.fila?.length);
     await E.cofrinho.sair();
-    if (nada) await E.cofrinho.cru.apagar('base');
+    if (nada) { await E.cofrinho.cru.apagar('base'); await E.cofrinho.cru.apagar('base-seq'); }
   }
 }
 
@@ -559,10 +614,10 @@ function atualizarFaixa() {
     const avisos = [cf && (podeUsuario('admin') ? `${cf} conflito(s) para escolher` : `${cf} conflito(s) esperando o administrador`), rc && `${rc} mudança(s) recusada(s)`, E.anexos?.naoEnviados?.length && `${E.anexos.naoEnviados.length} anexo(s) não enviado(s)`].filter(Boolean);
     el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
       + `${avisos.length ? ` · <a href="#/conflitos"><b>⚠ ${avisos.join(' e ')}</b></a>` : ''}`
-      + ` · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
+      + ` · Última atualização: <b>${E.d.atualizado_em ? C.dataHoraBr(E.d.atualizado_em) : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
     return;
   }
-  el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? new Date(E.d.atualizado_em).toLocaleString('pt-BR') : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split('-').reverse().join('/')}` : ''}`;
+  el.innerHTML = `Pasta dos dados: <b>${esc(E.pasta.name)}</b> · Última atualização: <b>${E.d.atualizado_em ? C.dataHoraBr(E.d.atualizado_em) : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''} · tudo é salvo automaticamente na pasta${window.VERSAO_OFFLINE ? ` · versão sem internet de ${window.VERSAO_OFFLINE.split('-').reverse().join('/')}` : ''}`;
 }
 
 const MENU = [
@@ -583,7 +638,7 @@ function layout(conteudo, rota) {
   return `<header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
-      <form data-form="buscaGlobal" class="busca-topo" role="search"><input name="q" type="search" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
+      <form data-form="ir" data-ir="buscar" class="busca-topo" role="search"><input name="q" type="search" maxlength="100" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -613,7 +668,9 @@ function guardarClipes() {
     localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
+let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
 export async function mostrar(estadoForm = null) {
+  desenhos += 1;
   const app = document.getElementById('app');
   const rota = rotaAtual();
   try {
@@ -748,6 +805,8 @@ document.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const botao = form.querySelector('button[type=submit],button:not([type])');
   if (botao) botao.disabled = true;
+  const endereco = location.hash;
+  const desenhosAntes = desenhos;
   try {
     const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
     if (resposta && resposta.erros) {
@@ -758,6 +817,10 @@ document.addEventListener('submit', async (ev) => {
     logarErro(e);
     aviso(e.message, 'erro');
     if (botao) botao.disabled = false;
+  } finally {
+    // saiu sem trocar de tela (ex.: "Cancelar" numa confirmação, arquivo só baixado): o botão volta a funcionar.
+    // Se a tela vai ser desenhada de novo (ir/mostrar), fica apagado até a nova aparecer: não dá para enviar duas vezes.
+    if (botao?.isConnected && location.hash === endereco && desenhos === desenhosAntes) botao.disabled = false;
   }
 });
 
@@ -850,27 +913,14 @@ document.addEventListener('change', async (ev) => {
     nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
     return;
   }
-  if (ev.target.matches('input[data-acao-arquivo]')) {
-    if (!ev.target.files.length) return;
-    try {
-      await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
-    } catch (e) {
-      logarErro(e);
-      aviso(e.message, 'erro');
-    }
-    return;
-  }
-  // extrato em arquivo OFX (app do C6): tela Banco
-  const ofx = ev.target.closest('input[data-importar-ofx]');
-  if (ofx && ofx.files.length) {
-    try { await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx); } catch (e) { aviso(e.message, 'erro'); }
-    return;
-  }
-  const el = ev.target.closest('input[data-upload]');
-  if (!el || !el.files.length) return;
+  // arquivo escolhido → ação: data-acao-arquivo="nome da ação" (anexar arquivos, comprovante, documento assinado, extrato OFX…);
+  // os outros data-* do campo vão como dados da ação, como nos botões com data-acao
+  const arquivo = ev.target.closest('input[data-acao-arquivo]');
+  if (!arquivo || !arquivo.files.length) return;
   try {
-    await ACOES.enviarArquivos(el.dataset, el);
+    await ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
   } catch (e) {
+    logarErro(e);
     aviso(e.message, 'erro');
   }
 });

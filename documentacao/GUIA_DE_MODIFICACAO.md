@@ -26,7 +26,7 @@
 ## Adicionar uma tela
 1. Função `telaX(rota)` que devolve HTML em texto, no arquivo do assunto em `docs/js/telas/` (assunto novo: arquivo novo com a 1ª linha dizendo o que tem); exporte e registre em `TELAS` (`docs/js/telas.js`) com a chave da rota (`#/x/...` → `TELAS.x`). `rota.partes` = pedaços do caminho; `rota.q` = parâmetros, já passados por `C.sanearParametros`: parâmetro novo ganha uma entrada em `FORMATOS_PARAMETRO` (`calculos.js`), e mês/data usam `C.competenciaValida(rota.q.mes, padrão)`/`C.dataValida` (ver `TELAS.cobrancas`). `?ir=<id>` rola até o elemento e depois sai do endereço (`mostrar` em `app.js`).
 2. Texto do usuário sempre com `esc()`; valores com `reais()`, `dataBr()`, `compBr()`. Registro que não existe: `naoEncontrado('Boleto não encontrado', '#/cobrancas', 'Ver os boletos')` (`telas/comum.js`). Tabela larga: dentro de `<div class="cartao rolagem">`, 1ª linha com `th`: no celular vira cartões sozinha se não couber (`cartoesNoCelular`); `responsiva` força sempre; desenho próprio que não pode virar cartão entra em `SEM_CARTOES` (`app.js`).
-3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`); o botão fica desabilitado enquanto a ação roda (`data-ocupado`), e `alterar` grava uma de cada vez. Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`). Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
+3. Botões: `botao('acao', 'Texto', { id })` + função em `ACOES` (`telas/acoes.js`); o botão fica desabilitado enquanto a ação roda (`data-ocupado`), e `alterar` grava uma de cada vez. Formulários: `<form data-form="nome">` + função em `FORMULARIOS` (`telas/envios.js`); formulário que só monta o endereço e navega (ir para o mês, filtro, busca): `<form data-form="ir" data-ir="tela">` (`enderecoDoFormulario`, sem função nova; parâmetro novo entra em `FORMATOS_PARAMETRO`); campo de arquivo que dispara ação: `<input type="file" data-acao-arquivo="acao">`. Tarefa em segundo plano que redesenha: `redesenharSeLivre` (não apaga formulário aberto). Parte grande e pouco usada: `import()` dentro de `carregarParte` e o arquivo em `ADIADOS` do `sw.js`. Componentes comuns (`botao`, `link`, `etiqueta`, `d`, `buscar`) vêm de `telas/comum.js`.
 4. Menu: `MENU` em `docs/js/app.js` (o 3º item é a expressão que marca o menu ativo pela rota). Abas dentro de uma página: modelo `abasFinanceiro` (`telas/financeiro.js`); caixa recolhida: `<details>` (ex.: `caixaHistorico`); com `id`, fica aberta ou fechada como estava depois de uma ação na mesma página (`mostrar` em `app.js`).
 5. Telas de impressão: um tipo novo em `telaImprimir` (`#/imprimir/<tipo>`), que desenha sem o menu.
 
@@ -39,7 +39,7 @@
    }
    ```
 2. Grave só por `inserir`/`atualizar`/`excluir` (eles registram o histórico). Na tela, chame dentro de `alterar((db) => ...)`.
-3. Se a regra muda valores de boleto, inclua o campo em `CAMPOS_RECALCULO` e em `montarCobranca`.
+3. Se a regra muda valores de boleto, inclua o campo em `CAMPOS_RECALCULO` e em `montarCobranca` (a reserva não: só `realocarReserva`). Regra que dependa de "vencido" usa `C.vencido`/`C.limitePagamento` (dia não útil); regra do contrato que precise do fim ou da vistoria de entrada usa `fimDoContrato`/`vistoriaDeEntrada`.
 4. Teste em `tests/regras.test.mjs` usando `base()` (banco de exemplo do próprio arquivo). Regra do banco (extrato, destino, comprovante, pagamento): em `docs/js/conciliacao.js`, com os dados no formato exato do C6 (`documentacao/c6-openapi/`), e teste em `tests/conciliacao.test.mjs`; o que o site pede à ponte vai em `banco-fase2.js` (e a resposta simulada em `?teste`, com dados de `simulado-banco.js`).
 
 ## Adicionar um relatório
@@ -90,5 +90,5 @@ Hoje o sistema já tem tudo pronto; os botões "Emitir no C6" aparecem desabilit
 | Nomes | Funções `camelCase` (`montarCobranca`), constantes `MAIUSCULAS` (`TABELAS`), campos do banco `snake_case` (`data_entrada`) |
 | Valores | Dinheiro em centavos inteiros; datas `'AAAA-MM-DD'`; competência `'AAAA-MM'` |
 | Estilo | ES modules, 2 espaços, aspas simples, ponto e vírgula, HTML em template strings. Não há linter no repositório: siga o estilo do arquivo que estiver alterando |
-| Atributos de evento | `data-acao`, `data-form`, `data-mostrar-se`, `data-mascara` |
+| Atributos de evento | `data-acao`, `data-form` (`data-form="ir"` + `data-ir`), `data-acao-arquivo`, `data-mostrar-se`, `data-mascara` |
 | Commits, branches e PRs | Título em português descrevendo o que mudou; corpo com tópicos `- `; trailers `Co-Authored-By:` e `Claude-Session:` nos commits feitos com Claude. Trabalho em branch e merge por PR no GitHub; branches feitas pelo Claude: `claude/<nome>`; um branch cujo PR já foi mergeado é recriado a partir de `main` |

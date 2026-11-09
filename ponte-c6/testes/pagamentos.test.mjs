@@ -47,6 +47,8 @@ test('validarItem: valor com 2 casas e maior que zero, descrição até 100, dat
   assert.throws(() => P.validarItem({ content: BARRAS, amount: 10, transaction_date: '12/11/2026' }), /AAAA-MM-DD/);
   assert.throws(() => P.validarItem({ content: 'nada', amount: 10 }, 3), /Não reconheci/);
   assert.throws(() => P.validarItem(null, 2), /Item 2/);
+  // 19,99 × 100 = 1998,9999… no computador: antes ~9% dos valores (R$ 19,99, R$ 1,15…) eram recusados
+  for (const amount of [19.99, 1.15, 0.29, 4.35, 1234.57]) assert.equal(P.validarItem({ content: BARRAS, amount }).amount, amount);
 });
 
 test('decodificar valida ANTES de chamar o banco; com itens bons manda { items } e devolve group_id', async () => {

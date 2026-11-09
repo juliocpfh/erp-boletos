@@ -129,6 +129,30 @@ test('sair tranca a cópia: sem internet o aparelho não abre; entrando de novo 
   assert.equal(a.sinc.pendentesQtd(), 0);
 });
 
+test('entrar depois de Sair baixa o banco uma vez só: o que veio com a cópia trancada (tela de login) é gravado ao destrancar', async () => {
+  const { a } = await cenario();
+  await a.sinc.sincronizar();
+  // Sair sem nada esperando envio (app.js sair): tranca e apaga a cópia
+  await a.sair(); await a.cru.apagar('base'); await a.cru.apagar('base-seq');
+  let tudo = 0;
+  a.falhar = (m, rota) => { if (rota === 'tudo') tudo += 1; return null; };
+  const s = a.novaSincronia();
+  await a.cofrinho.daSessao(false);
+  await s.iniciar(); // abrirNuvem com a cópia trancada: baixa para a tela de login
+  assert.equal(await a.guardar.ler('base'), undefined, 'trancado: nada gravado');
+  await a.entrar('dono', 'senha do dono 123');
+  await s.iniciar(); // destrancarNuvem
+  await s.sincronizar();
+  assert.equal(tudo, 1, 'um download só (antes eram dois)');
+  assert.equal((await a.guardar.ler('base'))?.imoveis?.[0]?.nome, 'Apto 604', 'a cópia baixada ficou gravada, cifrada');
+  assert.doesNotMatch(legivel(a.cru), /Maria|529\.982/);
+  // recarregou a página com o login lembrado: abre da cópia do aparelho, sem baixar de novo
+  const s2 = a.novaSincronia();
+  await s2.iniciar(); await s2.sincronizar();
+  assert.equal(tudo, 1);
+  assert.equal(imovel(s2).nome, 'Apto 604');
+});
+
 test('login lembrado: a chave da sessão abre a cópia ao recarregar; vencida, tranca e apaga a chave', async () => {
   const { a } = await cenario();
   const outraAba = new C.Cofrinho(a.cru);

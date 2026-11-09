@@ -122,7 +122,6 @@ textarea { min-height: 80px; }
 .login { max-width: 380px; margin: 60px auto; }
 .detalhes { font-size: 12px; color: var(--suave); }
 .detalhes code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; }
-.mes-nav { display: flex; gap: 8px; align-items: center; }
 .pagamento { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .pagamento input[type=date] { width: 140px; padding: 3px 6px; }
 .pagamento input[name=valor] { width: 100px; padding: 3px 6px; }
@@ -190,7 +189,6 @@ a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 .caixa-movel.arrastando { opacity: .4; outline: 2px dashed var(--primaria); }
 body.arrastando-caixa { user-select: none; cursor: grabbing; }
 
-.so-impressao { display: none; }
 @page { size: A4; margin: 10mm; }
 /* Banco (extrato do C6): entrada em verde, saída normal, etiquetas de destino, linha ignorada apagada, código de barras */
 .mov-entrada { color: var(--ok); font-weight: 600; }
@@ -207,7 +205,6 @@ table.banco td:nth-child(2) { max-width: 320px; }
   header.topo, .faixa, .nao-imprimir, #mensagens { display: none !important; }
   body { background: #fff; }
   main { max-width: none; padding: 0; }
-  .so-impressao { display: block; }
   .demonstrativo, .fatura-xls { border: 0; margin: 0 auto; break-after: page; }
   .fatura-xls { padding: 0; zoom: .88; }
   .cartao { border: 0; padding: 0; }

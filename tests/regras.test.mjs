@@ -266,22 +266,16 @@ test('troca de garantia e de fiador ficam no histórico', () => {
   assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 700000);
 });
 
-test('vincular inquilino ao imóvel grava a leitura dos relógios; a saída também', () => {
+test('leitura dos relógios na entrada (vistoria de entrada) e na saída (cálculo final)', () => {
   const d = R.bancoVazio();
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa', endereco: 'Rua A' }, 'julio');
-  const c = R.inserir(d, 'contratos', { inquilino_nome: 'X', data_entrada: '2026-01-15', aluguel_inicial: 100000, ativo: false }, 'julio');
-  R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-02-01', leitura_agua: '0123', leitura_energia: '45678', leitura_gas: '' }, 'julio');
-  const ct = R.buscar(d, 'contratos', c.id);
-  assert.deepEqual([ct.imovel_id, ct.data_entrada, ct.ativo, ct.leitura_agua], [casa.id, '2026-02-01', true, undefined]);
-  assert.throws(() => R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-02-01' }, 'julio'));
+  const c = R.inserir(d, 'contratos', { inquilino_nome: 'X', imovel_id: casa.id, data_entrada: '2026-02-01', aluguel_inicial: 100000 }, 'julio');
+  R.gravarLeitura(d, c, 'Entrada do inquilino', '2026-02-01', { agua: '0123', energia: '45678', gas: '' }, 'julio');
   R.encerrarContrato(d, c.id, { data_saida: '2026-09-30', leitura_agua: '0456', leitura_energia: '0789', leitura_gas: '' }, 'julio');
   assert.equal(d.encerramentos[0].leitura_agua, undefined);
   assert.deepEqual(R.leiturasDoImovel(d, casa.id).map((l) => [l.momento, l.data, l.agua, l.energia]),
     [['Saída do inquilino', '2026-09-30', '0456', '0789'], ['Entrada do inquilino', '2026-02-01', '0123', '45678']]);
   assert.equal(R.textoLeitura(d.leituras[0]), 'água 0123 · energia 45678');
-  // sem leitura informada, nada é gravado
-  const y = R.inserir(d, 'contratos', { inquilino_nome: 'Y', data_entrada: '2026-03-01' }, 'julio');
-  R.vincularInquilino(d, casa.id, { contrato_id: y.id, data_entrada: '2026-03-01', leitura_agua: '' }, 'julio');
   assert.equal(d.leituras.length, 2);
 });
 
@@ -434,7 +428,6 @@ test('mesmo inquilino em dois imóveis: contrato novo só com os dados da pessoa
   const { d, c } = base();
   const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 2', endereco: 'Rua B' }, 'julio');
   Object.assign(c, { prazo_tipo: 'Determinado', prazo_meses: 30 });
-  assert.throws(() => R.vincularInquilino(d, casa.id, { contrato_id: c.id, data_entrada: '2026-09-01' }, 'julio'), /contrato novo/);
   const pessoa = R.dadosDaPessoa(c);
   assert.equal(pessoa.inquilino_cpf, c.inquilino_cpf);
   for (const k of ['aluguel_inicial', 'prazo_meses', 'dia_vencimento', 'indice_correcao', 'garantia_tipo']) assert.equal(pessoa[k], undefined, `${k} não vem`);
@@ -1009,12 +1002,12 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   assert.equal(x.necessaria, 567000);
   assert.equal(x.complemento, 27000);
   assert.match(R.alertasContrato(d, c, '2026-03-05').find((a) => a.tipo === 'Correção da caução').texto, /boleto do complemento de R\$ 270,00/);
-  const cb = R.gerarBoletoCaucao(d, c.id, 'julio');
+  const [cb] = R.gerarBoletosCaucao(d, c.id, 'julio');
   assert.equal(cb.vencimento, '2026-04-10');
   assert.equal(cb.taxa_boleto, 0);
   assert.equal(R.totais(cb).a_pagar_pontual, 27000);
   assert.match(R.dadosBoleto(d, cb).descricao, /COMPLEMENTO DA CAUÇÃO RS270,00/);
-  assert.throws(() => R.gerarBoletoCaucao(d, c.id, 'julio'), /já foi gerado/);
+  assert.throws(() => R.gerarBoletosCaucao(d, c.id, 'julio'), /já foi gerado/);
   // o boleto do aluguel do mês continua sendo gerado normalmente
   assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 1, existentes: 0 });
   assert.equal(R.boletoDoMes(d, c.id, '2026-03').aluguel, 210000);
@@ -1923,7 +1916,7 @@ test('complemento da caução: vencimento escolhido, parcelas que somam na cauç
   // 2 × R$ 135,00, a 1ª com mais prazo (10/01/2027) e a 2ª um mês depois
   const cbs = R.gerarBoletosCaucao(d, c.id, 'julio', null, { vencimento: '2027-01-10', parcelas: 2 });
   assert.deepEqual(cbs.map((x) => [x.competencia, x.vencimento, x.caucao_complemento, x.caucao_parcela, x.valor_nf]), [['2026-12', '2027-01-10', 13500, '1/2', null], ['2027-01', '2027-02-10', 13500, '2/2', null]]);
-  assert.throws(() => R.gerarBoletoCaucao(d, c.id, 'julio'), /já foi gerado/);
+  assert.throws(() => R.gerarBoletosCaucao(d, c.id, 'julio'), /já foi gerado/);
   // paga a 2ª antes da 1ª: cada uma soma
   R.registrarPagamento(d, cbs[1].id, '2027-01-05', null, 'julio');
   assert.equal(R.valorGarantia(d, c), 553500);

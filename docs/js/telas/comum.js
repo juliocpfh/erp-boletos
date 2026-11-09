@@ -29,6 +29,23 @@ export const item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}<
 
 export const opera = () => podeUsuario('operador');
 
+/**
+ * Parte do programa que só carrega quando é usada (planilha/PDF de tudo, regras em texto, passagem para a nuvem):
+ * ``importar`` = () => import('../arquivo.js'). Se não carregar (sem internet e ainda não guardada no aparelho, ou o site
+ * fora do ar), aparece uma mensagem simples; o motivo de verdade fica no console.
+ */
+export async function carregarParte(importar) {
+  try {
+    return await importar();
+  } catch (e) {
+    console.error(e);
+    throw new C.ErroUsuario('Não deu para abrir esta parte do programa agora (sem internet ou o site fora do ar). Tente de novo daqui a pouco.');
+  }
+}
+
+/** Desfazer a numeração apaga as NFs do ciclo: só o administrador (a nuvem recusa o apagar NF do operador). */
+export const SO_ADMIN_NUMERACAO = 'Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).';
+
 export const d = () => E.d;
 
 export const buscar = (t, id) => R.buscar(E.d, t, id);
@@ -65,7 +82,7 @@ export function tabelaHistorico(lista, desfazer = null) {
     } else if (h.detalhes) {
       det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('')}</details>`;
     }
-    return `<tr><td class="nw">${new Date(h.quando).toLocaleString('pt-BR')}</td><td>${esc(h.usuario)}</td>
+    return `<tr><td class="nw">${C.dataHoraBr(h.quando)}</td><td>${esc(h.usuario)}</td>
       <td>${esc(h.acao)}${h.tabela ? ` · ${esc(R.TABELAS[h.tabela] || h.tabela)}` : ''}${h.descricao ? `<br><span class="suave">${esc(h.descricao)}</span>` : ''}</td>
       <td class="detalhes">${det}</td></tr>`;
   }).join('');
@@ -92,9 +109,6 @@ export const SUB_ANUNCIO = 'Anúncio';
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
 const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas', contas: 'Contas pagas' };
-
-/** Comprovantes do banco: pasta do imóvel por ano ("Imóvel/Contas pagas/2026", escopo `contasano`, id = imóvel×10000 + ano, como o IPTU). */
-export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
 
 /** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
 export const PASTA_CONTADOR = '_Contador';
@@ -244,6 +258,19 @@ async function completarHeranca(id) {
   return r;
 }
 
+/** Há formulário aberto na página (o usuário pode estar digitando)? A mesma conferência da mudança vinda de outro aparelho (app.js). */
+export const formularioAberto = () => !!document.querySelector('main form[data-form]');
+
+/**
+ * Tarefa em segundo plano (Painel: heranças, nomes dos comprovantes, limpeza, conferência dos arquivos) terminou e mudou algo:
+ * desenha a tela de novo só se o usuário continua na página em que ela começou (``endereco``) e sem formulário aberto.
+ * Senão o que ele digitou sumiria; o que mudou aparece na próxima vez que a tela for desenhada.
+ */
+export function redesenharSeLivre(endereco) {
+  if (location.hash !== endereco || formularioAberto()) return null;
+  return mostrar();
+}
+
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
 
@@ -256,12 +283,13 @@ export async function trazerHerancaAssinada(id) {
 export async function trazerHerancasPendentes() {
   if (herancasFeitas || !opera() || !E.pasta) return;
   herancasFeitas = true;
+  const endereco = location.hash;
   // troca agendada (data futura): passa só no dia
   const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c) && !R.herancaAgendada(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
   // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações), a reserva ou o seguro do anterior
   const completadas = await conferirHerancas();
-  if (pendentes.length || completadas) await mostrar();
+  if (pendentes.length || completadas) await redesenharSeLivre(endereco);
 }
 
 /**
@@ -302,26 +330,31 @@ let nomesAcertados = false;
 export async function acertarNomesUmaVez() {
   if (nomesAcertados || !opera() || !E.pasta) return;
   nomesAcertados = true;
-  if (await acertarNomesDosComprovantes()) await mostrar();
+  const endereco = location.hash;
+  if (await acertarNomesDosComprovantes()) await redesenharSeLivre(endereco);
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
 export const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
 
-/** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
+/**
+ * Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome, contrato? }] (``contrato``: o registro do
+ * contrato que acabou de ser excluído, para achar a pasta dele). Devolve quantos apagou.
+ */
 export async function apagarAnexos(lista, motivo) {
   const apagados = [];
   const falharam = [];
   for (const a of lista) {
     try {
-      await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome);
+      await (await pastaDoEscopo(a.escopo, Number(a.id), false, a.contrato || null)).removeEntry(a.nome);
       apagados.push(a);
     } catch (e) {
       // "não existe" é normal (já tinha sido apagado fora do sistema); outro erro (arquivo aberto, OneDrive travado) é avisado
       if (e && e.name !== 'NotFoundError') falharam.push(a.nome);
     }
   }
-  if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
+  if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null,
+    a.contrato ? { contrato_id: a.contrato.id, imovel_id: a.contrato.imovel_id || null } : vinculoDoEscopo(a.escopo, a.id))));
   if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, 'aviso');
   return apagados.length;
 }
@@ -332,16 +365,22 @@ export async function apagarAnexos(lista, motivo) {
  */
 export async function alterarApagandoAnexos(fn) {
   const antes = R.arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
+  // contrato excluído junto (ex.: excluir o contrato): a pasta dele é achada pelo registro de antes
+  const contratos = new Map(d().contratos.map((c) => [c.id, c]));
   const r = await alterar(fn);
   const emUso = anexosEmUso();
   const soltos = antes.filter((a) => a.pasta && !emUso.has(`${a.pasta}|${a.nome}`))
-    .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n);
+    .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n)
+    .map((a) => (escopoDoContrato(a.escopo) && !buscar('contratos', a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a));
   await apagarAnexos(soltos, 'Arquivo apagado junto com o lançamento');
   return r;
 }
 
-/** Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página). */
-export async function pastaDoEscopo(escopo, id, criar = true) {
+/**
+ * Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página).
+ * ``contrato``: o registro do contrato, quando ele já foi excluído do banco (apagar os arquivos que eram dele).
+ */
+export async function pastaDoEscopo(escopo, id, criar = true, contrato = null) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'ficha') {
     const f = buscar('fichas', id);
@@ -349,7 +388,8 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
     return S.subpasta(raiz, [PASTA_FICHAS, f.pasta || nomePastaFicha(f)], criar);
   }
   if (escopoDoContrato(escopo)) {
-    const c = buscar('contratos', id);
+    const c = contrato || buscar('contratos', id);
+    if (!c) throw new Error('Inquilino não encontrado.');
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
   if (escopo === 'contador') {
@@ -366,7 +406,8 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
 
 /**
  * Limpeza da pasta "Sem imóvel" (uma vez por sessão, ao abrir o Painel):
- * - contrato que ficou 7 dias sem imóvel (e sem boleto) é apagado, com a pasta dele se estiver vazia;
+ * - contrato que ficou 7 dias sem imóvel (e sem boleto) é apagado, com a pasta dele se estiver vazia (só quando o
+ *   administrador abre: excluir contrato é só dele, e a nuvem recusa o do operador);
  * - pasta vazia que não é de nenhum contrato sem imóvel (ex.: contrato excluído) é apagada.
  * Pasta com arquivos nunca é apagada sozinha: aparece no aviso do Painel.
  */
@@ -375,7 +416,8 @@ let limpezaFeita = false;
 export async function limparSemImovel() {
   if (limpezaFeita || !opera() || !E.pasta) return;
   limpezaFeita = true;
-  const vencidos = R.contratosSemImovelVencidos(d());
+  const endereco = location.hash;
+  const vencidos = podeUsuario('admin') ? R.contratosSemImovelVencidos(d()) : [];
   if (vencidos.length) {
     await alterar((db) => vencidos.forEach((c) => R.excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel`)));
     aviso(`Apagado(s) por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(', ')}.`, 'info');
@@ -389,7 +431,7 @@ export async function limparSemImovel() {
     if (!(await S.apagarPastaVazia(sem, nome))) pastasComArquivos.push(nome);
   }
   if (!(await S.subpastas(sem)).length) await S.apagarPastaVazia(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), PASTA_SEM_IMOVEL);
-  if (vencidos.length || pastasComArquivos.length) await mostrar();
+  if (vencidos.length || pastasComArquivos.length) await redesenharSeLivre(endereco);
 }
 
 export let pastasComArquivos = [];
@@ -489,6 +531,7 @@ function ancoraDoArquivo(escopo, rotulo) {
  */
 export async function conferirArquivos() {
   if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };
+  const endereco = location.hash;
   // nuvem: as listas de todas as pastas vêm numa ida só (senão seria um pedido por pasta de inquilino)
   if (E.nuvem && E.anexos?.carregarTudo) await E.anexos.carregarTudo([S.PASTA_ARQUIVOS]);
   const rotulos = R.rotulosDosArquivos(d());
@@ -533,7 +576,7 @@ export async function conferirArquivos() {
   }
   const mudou = JSON.stringify(faltando) !== JSON.stringify(arquivosFaltando);
   arquivosFaltando = faltando;
-  if (mudou || devolvidos.length) await mostrar();
+  if (mudou || devolvidos.length) await redesenharSeLivre(endereco);
   return { conferidos, devolvidos, faltando };
 }
 
@@ -703,7 +746,7 @@ export const extensao = (nome) => { const p = nome.lastIndexOf('.'); return p > 
 
 export const semAcentoArquivo = (nome) => {
   const ext = extensao(nome);
-  const base = (ext ? nome.slice(0, nome.lastIndexOf('.')) : nome).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const base = C.paraNomeDeArquivo(ext ? nome.slice(0, nome.lastIndexOf('.')) : nome);
   return `${base || 'arquivo'}${ext}`;
 };
 
@@ -711,12 +754,12 @@ export const semAcentoArquivo = (nome) => {
 export async function salvarAssinado(escopo, contratoId, arquivo, texto) {
   const ponto = arquivo.name.lastIndexOf('.');
   const ext = ponto > 0 ? arquivo.name.slice(ponto).toLowerCase() : '';
-  const base = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const base = C.paraNomeDeArquivo(texto);
   return S.salvarArquivo(await pastaDoEscopo(escopo, contratoId), new File([arquivo], `${base}${ext}`));
 }
 
 /** Cor e ênfase de cada tipo de alerta (escolhidas em "Editar" nos alertas do Painel). */
-const SEM_ACENTO = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const SEM_ACENTO = (t) => C.semAcento(t).toLowerCase();
 
 export const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão' ? '' : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
 
@@ -725,6 +768,12 @@ export const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.t
 /** Para onde leva o clique no alerta: o que traz ``link`` (ex.: Banco → #/banco) vai para lá; o reajuste abre a tela Reajustes; os demais, o contrato ou o imóvel. */
 export const linkAlerta = (a) => (a.link ? a.link : a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
   : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}`);
+
+/** Alerta com o link: "Loja 1 · João: texto" (o nome leva ao contrato ou ao imóvel) ou, sem imóvel nem inquilino, só o texto com o link (Painel e Pendências). */
+export const nomeAlerta = (a) => (a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? ' · ' : ''}${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`);
+
+/** Alerta adiado ou "já estou cuidando": em cinza, com quem marcou, até quando e o botão para voltar a mostrar (Painel e Pendências). */
+export const alertaAdiado = (a, hoje) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === 'cuidando' ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje ? 'hoje (volta amanhã)' : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao('voltarAlerta', 'Voltar a mostrar', { chave: a.chave }, 'secundario mini') : ''}</div>`;
 
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */
 export const gruposDeAlertas = (alertas) => {
@@ -743,7 +792,7 @@ export const ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
 export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-acao-arquivo="enviarArquivos" data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
     ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'Ao anexar aqui, o sistema pergunta se é a apólice ou outro documento e de qual vigência.'}</p>` : ''}</div>`;
 }
 

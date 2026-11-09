@@ -3,7 +3,7 @@
 // As ações ficam em telas/acoes.js. A conta que emite: padrão (ANK) ou escolhida boleto a boleto (opção em Empresas).
 import { podeUsuario } from '../app.js';
 import * as B from '../banco.js';
-import { dataBr, reais } from '../calculos.js';
+import { dataBr, dataHoraBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as M from '../mapa-c6.js';
 import * as R from '../regras.js';
@@ -58,7 +58,7 @@ const NEG_TXT = { SCHEDULED: ['negativação agendada', 'aviso'], IN_PROGRESS: [
 function tabelaNotificacoes(b) {
   if (!b.notificacoes || !b.notificacoes.length) return '';
   return `<h3>Avisos ao inquilino pelo banco</h3><table class="boleto-banco"><tr><th>Canal</th><th>Para</th><th>Quando</th><th>Situação</th></tr>
-    ${b.notificacoes.map((n) => { const [t, tipo] = NOTIF_TXT[n.situacao] || [n.situacao || '-', 'neutra']; return `<tr><td>${esc(n.canal === 'SMS' ? 'SMS' : 'E-mail')}</td><td>${esc(n.destino || '-')}</td><td>${esc(MOMENTO_TXT[n.momento] || n.momento || '-')}</td><td>${etiqueta(t, tipo)}${n.enviada_em ? `<br><span class="suave">${new Date(n.enviada_em).toLocaleString('pt-BR')}</span>` : ''}</td></tr>`; }).join('')}</table>`;
+    ${b.notificacoes.map((n) => { const [t, tipo] = NOTIF_TXT[n.situacao] || [n.situacao || '-', 'neutra']; return `<tr><td>${esc(n.canal === 'SMS' ? 'SMS' : 'E-mail')}</td><td>${esc(n.destino || '-')}</td><td>${esc(MOMENTO_TXT[n.momento] || n.momento || '-')}</td><td>${etiqueta(t, tipo)}${n.enviada_em ? `<br><span class="suave">${dataHoraBr(n.enviada_em)}</span>` : ''}</td></tr>`; }).join('')}</table>`;
 }
 
 /** Negativação do pagador no birô de crédito: situação (``denial_info``) e botões (só administrador, conta com a opção ligada). */
@@ -86,8 +86,8 @@ export function caixaBancoC6(cb) {
     const sugerida = R.contaSugerida(d(), cb);
     const contas = R.configBanco(d()).contas;
     return `<div class="cartao" id="banco-c6">${titulo}
-      ${b && b.situacao === 'erro' ? `<div class="alerta perigo"><b>A última emissão falhou</b> (${esc(new Date(b.erro_em || Date.now()).toLocaleString('pt-BR'))}): ${esc(b.erro || '')}</div>` : ''}
-      ${b && b.situacao === 'cancelado' ? `<div class="alerta info">Boleto anterior cancelado no banco${b.cancelado_em ? ` em ${esc(new Date(b.cancelado_em).toLocaleString('pt-BR'))}` : ''}${b.linha_digitavel ? ` (linha digitável ${esc(b.linha_digitavel)})` : ''}. Pode emitir de novo.</div>` : ''}
+      ${b && b.situacao === 'erro' ? `<div class="alerta perigo"><b>A última emissão falhou</b> (${esc(dataHoraBr(b.erro_em || Date.now()))}): ${esc(b.erro || '')}</div>` : ''}
+      ${b && b.situacao === 'cancelado' ? `<div class="alerta info">Boleto anterior cancelado no banco${b.cancelado_em ? ` em ${esc(dataHoraBr(b.cancelado_em))}` : ''}${b.linha_digitavel ? ` (linha digitável ${esc(b.linha_digitavel)})` : ''}. Pode emitir de novo.</div>` : ''}
       ${cb.situacao === 'Carência' ? '<p class="suave">Boleto em carência: nada a cobrar.</p>'
     : motivo ? `<p class="suave">${esc(motivo)}. Enquanto isso, use os dados abaixo para emitir no site do banco.</p>`
       : `<p class="suave">Emite o boleto (valor cheio, desconto até o vencimento, multa e juros como no demonstrativo) com QR Code Pix no C6, pela ponte${sugerida ? `, na conta <b>${esc(sugerida.apelido)}</b>` : contas.length > 1 ? '; o sistema pergunta por qual conta' : ''}. O banco avisa o inquilino por e-mail/SMS conforme a configuração da conta e do contrato.</p>`}
@@ -104,9 +104,9 @@ export function caixaBancoC6(cb) {
     ${b.situacao === 'pago' && !cb.data_pagamento ? `<div class="alerta aviso"><b>O banco informou o pagamento</b>${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ''}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ''}, mas ele ainda não está registrado aqui. ${opera() ? botao('consultarBoletoC6', 'Registrar o pagamento', { id: cb.id }, 'pequeno') : 'Peça a um operador para registrar.'}</div>` : ''}
     ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ''}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ''}.${opera() ? ` ${botao('alterarBoletoC6', 'Atualizar o boleto no banco com os valores do sistema', { id: cb.id }, 'pequeno', 'Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?')}` : ''} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ''}
     <div class="grade">${item('Conta', conta ? `${esc(conta.apelido)} (${esc((buscar('emitentes', conta.emitente_id) || {}).nome || '')})` : esc(b.conta_id || '-'))}${item('Ambiente', b.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste): não vale como cobrança', 'aviso'))}
-      ${item('Emitido em', b.emitido_em ? new Date(b.emitido_em).toLocaleString('pt-BR') : '-')}${b.pago_em ? item('Pago em (banco)', `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ''}`) : ''}
+      ${item('Emitido em', b.emitido_em ? dataHoraBr(b.emitido_em) : '-')}${b.pago_em ? item('Pago em (banco)', `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ''}`) : ''}
       ${item('Valor no banco', reais(b.valor))}${item('Vencimento no banco', b.vencimento ? dataBr(b.vencimento) : '-')}
-      ${item('Situação no banco', `${esc(b.situacao_banco || b.situacao)}${b.consultado_em ? `<br><span class="suave">consultado em ${new Date(b.consultado_em).toLocaleString('pt-BR')}</span>` : ''}`)}</div>
+      ${item('Situação no banco', `${esc(b.situacao_banco || b.situacao)}${b.consultado_em ? `<br><span class="suave">consultado em ${dataHoraBr(b.consultado_em)}</span>` : ''}`)}</div>
     <table class="boleto-banco codigos">${linha('Linha digitável', b.linha_digitavel)}${linha('Código de barras', b.codigo_barras)}${linha('Nosso número', b.nosso_numero)}${linha('Pix copia e cola', b.pix_copia_cola)}${linha('Referência', b.id_externo)}</table>
     ${qr ? `<div class="qr-pix"><img src="${qr}" alt="QR Code do Pix" width="180" height="180"><div class="suave">QR Code do Pix: o inquilino lê com o app do banco.</div></div>` : ''}
     ${tabelaNotificacoes(b)}

@@ -8,12 +8,10 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
-import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
-import { dinheiroTexto, esc } from '../formularios.js';
+import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
-import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
@@ -21,11 +19,10 @@ import { ACOES_FICHAS } from './fichas.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
-import { usarVisualizador, visualizar } from '../visualizador.js';
 
 // --------------------------------------------------------------------------
 // Botões
@@ -41,6 +38,20 @@ async function modeloFatura() {
     if (!r.ok) throw new Error('Modelo da NF não encontrado.');
     return r.arrayBuffer();
   }
+}
+
+/**
+ * Celular: o anexo abre na própria tela (visualizador.js, que só carrega aqui). Devolve false para abrir como no computador
+ * (aba nova), inclusive se o visualizador não carregar (sem internet e ainda não guardado no aparelho).
+ * ``esperar``: termina só quando o arquivo estiver desenhado.
+ */
+async function noVisualizador(blob, nome, tipo, esperar = true) {
+  let V;
+  try { V = await import('../visualizador.js'); } catch { return false; }
+  if (!V.usarVisualizador()) return false;
+  const desenho = V.visualizar(blob, nome, tipo, baixar);
+  if (esperar) await desenho;
+  return true;
 }
 
 async function excelDoNumero(ExcelJS, modelo, numero) {
@@ -82,13 +93,31 @@ const TABELAS_EXCLUSAO = {
   },
 };
 
-/** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
-async function redesenharFormulario(el, ajustes, lista) {
-  const form = el.closest('form');
-  const valores = { ...Object.fromEntries(new FormData(form)), ...ajustes };
-  await mostrar({ valores, erros: {} });
-  const editor = document.querySelector(`[data-editor="${lista}"]`);
-  if (editor) editor.hidden = false;
+/**
+ * Lista de opções editada dentro do formulário (concessionárias, índices): acerta na hora só o que mostra a lista (as
+ * opções do campo e os itens da caixa "Editar lista"), sem desenhar a página de novo: o que já foi digitado ou escolhido
+ * (inclusive o arquivo do comprovante) continua. ``incluido`` passa a ficar escolhido no campo da caixa usada (``el``).
+ */
+function acertarListaNaTela(el, lista, { incluido = null, removido = null }) {
+  const usada = el.closest('[data-editor]');
+  for (const editor of document.querySelectorAll('[data-editor]')) {
+    if (editor.dataset.editor !== lista) continue;
+    const sel = editor.parentElement.querySelector('select');
+    const chips = editor.querySelector('.chips');
+    if (incluido !== null) {
+      chips.insertAdjacentHTML('beforeend', chipDaLista(lista, incluido));
+      if (sel && ![...sel.options].some((o) => o.value === incluido)) sel.add(new Option(incluido, incluido));
+      if (sel && editor === usada) {
+        sel.value = incluido;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // campos que aparecem conforme a escolha
+      }
+    }
+    if (removido !== null) {
+      for (const b of chips.querySelectorAll('[data-acao=removerDaLista]')) if (b.dataset.valor === removido) b.closest('.chip').remove();
+      // a opção escolhida neste formulário fica até ele ser salvo (como acontecia ao desenhar de novo)
+      if (sel) for (const o of [...sel.options]) if (o.value === removido && !o.selected) o.remove();
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -131,37 +160,54 @@ async function emitirNoC6(cb, conta) {
   return alterar((db) => R.registrarBoletoBancario(db, cb.id, r.resposta, login(), { conta_id: conta.id, ambiente: r.resposta.ambiente || conta.ambiente }));
 }
 
-/** Banco disse que pagou: janela com a data em que pagou e a data contábil (crédito); só grava se o usuário confirmar. */
-async function proporPagamentoDoBanco(cb) {
-  const b = cb.banco;
+/**
+ * Banco disse que pagou: janela com a data em que pagou e a data contábil (crédito); só grava se o usuário confirmar. ``pagamento``: o
+ * que a listagem do banco informou (sugestão de Z.conciliarBoletos: data_pagamento, data_credito, valor, conta_id); sem ele, o que a
+ * consulta gravou no boleto. A entrada do extrato desse dinheiro, se já foi importada, fica ligada ao boleto (como na tela Banco).
+ */
+async function proporPagamentoDoBanco(cb, pagamento = null) {
+  const b = cb.banco || {};
   const hoje = C.hojeIso();
-  const pagou = b.pago_em || hoje;
-  const credito = b.credito_em || pagou;
+  const pagoEm = pagamento ? pagamento.data_pagamento : b.pago_em;
+  const creditoEm = pagamento ? pagamento.data_credito : b.credito_em;
+  const pagou = pagoEm || hoje;
+  const credito = creditoEm || pagou;
+  const contaId = (pagamento && pagamento.conta_id) || b.conta_id || null;
   const previsto = R.previstoNoPagamento(cb, credito, { dataPagou: pagou !== credito ? pagou : null });
-  const valorBanco = b.valor_pago ?? null;
+  const valorBanco = pagamento ? pagamento.valor : (b.valor_pago ?? null);
   const difere = valorBanco !== null && valorBanco !== previsto.valor_devido;
   const resp = await janela({ titulo: 'O banco confirmou o pagamento. Registrar aqui?',
-    html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${b.pago_em ? ` em <b>${esc(dataBr(b.pago_em))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${b.credito_em ? `, creditado em <b>${esc(dataBr(b.credito_em))}</b>` : ''}.</p>
+    html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${pagoEm ? ` em <b>${esc(dataBr(pagoEm))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${creditoEm ? `, creditado em <b>${esc(dataBr(creditoEm))}</b>` : ''}.</p>
+      ${pagamento && pagamento.certeza !== 'exata' ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ''}
       <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
       <p><label>Data contábil (entrada na conta: é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
       <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
     sim: 'Registrar pagamento', nao: 'Agora não' });
-  if (!resp) { aviso('Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".', 'info'); return; }
+  if (!resp) { aviso(cb.banco ? 'Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".' : 'Pagamento não registrado. Registre quando quiser pela tela Banco ("Conferir boletos pagos no banco") ou na página do boleto.', 'info'); return; }
   const data = String((resp.data || [])[0] || '');
   const dataPagou = String((resp.pagou || [])[0] || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
   if (dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
-  const pagouEmDia = dataPagou <= cb.vencimento && data > cb.vencimento;
+  // em dia até o vencimento ou, se ele não é dia útil, até o próximo dia útil
+  const pagouEmDia = dataPagou <= C.limitePagamento(cb.vencimento) && data > cb.vencimento;
   if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
     // mesmo caminho do pagamento com valor diferente digitado à mão: justificativa + valor da NF na página do boleto
-    memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}` };
+    // a entrada do extrato desse dinheiro, se já importada, fica ligada ao boleto quando o pagamento for confirmado (FORMULARIOS.pagamentoNf)
+    const entrada = Z.entradaDoRecebimento(d(), { conta_id: contaId, valor: valorBanco, data });
+    memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}`, movimentacao_id: entrada ? entrada.id : null };
     ir(`#/cobranca/${cb.id}?ir=pagamento`);
     return;
   }
-  const r = await alterar((db) => R.registrarPagamento(db, cb.id, data, difere ? valorBanco : null, login(), { pagouEmDia, dataPagou: pagouEmDia || dataPagou === data ? null : dataPagou }));
-  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+  let ligada = null;
+  const r = await alterar((db) => {
+    const res = R.registrarPagamento(db, cb.id, data, difere ? valorBanco : null, login(), { pagouEmDia, dataPagou: pagouEmDia || dataPagou === data ? null : dataPagou });
+    ligada = Z.ligarEntradaDoBoleto(db, cb.id, contaId, login());
+    return res;
+  });
+  const extrato = ligada ? ` A entrada de ${dataBr(ligada.data)} no extrato ficou ligada ao boleto.` : '';
+  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.${extrato}` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.${extrato}`, r.pontual ? 'ok' : 'aviso');
 }
 
 const numerosSelecionados = () => {
@@ -793,9 +839,10 @@ export const ACOES = {
     if (cfg.admin && !podeUsuario('admin')) throw new Error('Só administradores podem excluir.');
     const r = buscar(tabela, id);
     const destino = cfg.voltar ? cfg.voltar(r) : null;
-    // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato e imóvel guardam a pasta.
+    // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato: saem os arquivos
+    // dos registros dele (os documentos postos à mão na pasta ficam, e a pasta com eles). Imóvel guarda a pasta.
     const pastaFicha = tabela === 'fichas' && r ? r.pasta || nomePastaFicha(r) : null;
-    await (['contratos', 'imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
+    await (['imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
@@ -994,14 +1041,14 @@ export const ACOES = {
   async fazerAcordo({ contrato }) {
     const c = buscar('contratos', contrato);
     const hoje = C.hojeIso();
-    const vencidos = d().cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && cb.vencimento < hoje && !R.ehComplementoCaucao(cb))
+    const vencidos = d().cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && C.vencido(cb.vencimento, hoje) && !R.ehComplementoCaucao(cb))
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
     if (!vencidos.length) throw new C.ErroUsuario('Este inquilino não tem boleto vencido em aberto.');
     const hojeDe = (cb) => C.liquidar(cb, hoje).valor_devido;
     const proximo = C.vencimentoDaCompetencia(C.competenciaDe(hoje), c.dia_vencimento || 10, false);
     const primeiro = proximo > hoje ? proximo : C.somarMesesData(proximo, 1);
     const nome = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}` : compBr(cb.competencia));
-    const r = await janela({ titulo: `Acordo · ${esc(c.inquilino_nome)}`, sim: 'Fazer o acordo', nao: 'Cancelar',
+    const r = await janela({ titulo: `Acordo · ${c.inquilino_nome}`, sim: 'Fazer o acordo', nao: 'Cancelar',
       html: `<p class="suave">Os boletos marcados ficam "em acordo" (saem da inadimplência) e o sistema cria os boletos novos. Se um boleto do acordo atrasar, o inquilino volta para a lista.</p>
         <p><label>Boletos do acordo</label>${vencidos.map((cb) => `<label class="check-mini"><input type="checkbox" name="boleto" value="${cb.id}" checked data-hoje="${hojeDe(cb)}">
           ${esc(nome(cb))} · venceu ${dataBr(cb.vencimento)} · ${reais(R.totais(cb).a_pagar_sem_desconto)} <span class="suave">(hoje ${reais(hojeDe(cb))})</span></label>`).join('<br>')}</p>
@@ -1021,7 +1068,9 @@ export const ACOES = {
             const p = R.previaAcordo(d(), { contrato_id: c.id, ids: marcados().map((el) => el.value), total: C.centavos(total.value || '0'),
               parcelas: dlg.querySelector('[name=parcelas]').value, primeiro_vencimento: dlg.querySelector('[name=vencimento]').value }, hoje);
             previa.innerHTML = `<b>Boletos novos:</b><br>${p.boletos.map((b) => `${b.parcela || 'único'} · vence ${dataBr(b.vencimento)} · <b>${reais(b.valor)}</b> (NF ${reais(b.nf)})`).join('<br>')}
-              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`;
+              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; ${p.foraDaNf < 0
+    ? `a reserva (ou o ressarcimento) já abatida no boleto também entra (${reais(-p.foraDaNf)} a mais na NF), como no pagamento normal.`
+    : `IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`}`;
           } catch (e) { previa.innerHTML = `<span class="texto-perigo">${esc(e.message)}</span>`; }
         };
         total.addEventListener('input', () => { mexeu = true; });
@@ -1053,7 +1102,7 @@ export const ACOES = {
     const c = buscar('contratos', cb.contrato_id);
     const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
     const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
-    await janela({ titulo: `${titulo} · ${esc(c.inquilino_nome)}`, sim: 'Fechar', nao: '',
+    await janela({ titulo: `${titulo} · ${c.inquilino_nome}`, sim: 'Fechar', nao: '',
       html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
         <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
         <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
@@ -1090,7 +1139,7 @@ export const ACOES = {
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     const hoje = C.hojeIso();
     const sim = C.liquidar(cb, hoje);
-    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ''}`,
+    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
       html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
         <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
         <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
@@ -1201,8 +1250,8 @@ export const ACOES = {
   async incluirNaLista({ lista }, el) {
     const campoNovo = el.parentElement.querySelector('[data-lista-novo]');
     const valor = await alterar((db) => R.incluirNaLista(db, lista, campoNovo.value, login()));
-    const sel = el.closest('[data-editor]').parentElement.querySelector('select');
-    await redesenharFormulario(el, sel ? { [sel.name]: valor } : {}, lista);
+    acertarListaNaTela(el, lista, { incluido: valor });
+    campoNovo.value = '';
     aviso(`"${valor}" incluído na lista.`);
   },
 
@@ -1214,10 +1263,11 @@ export const ACOES = {
       window.alert(e.message);
       return;
     }
-    await redesenharFormulario(el, {}, lista);
+    acertarListaNaTela(el, lista, { removido: valor });
   },
 
   async desfazerUltimaNumeracao() {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const ciclo = await alterar((db) => R.desfazerUltimaNumeracao(db, login()));
     aviso(`Numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)} desfeita. Corrija o que precisar, inclua o que faltou e clique em "Numerar estas NFs".`);
     await mostrar();
@@ -1301,7 +1351,7 @@ export const ACOES = {
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
-    const r = await janela({ titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`, sim: 'Abrir o e-mail e marcar como enviada',
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: 'Abrir o e-mail e marcar como enviada',
       html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
         <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
@@ -1494,7 +1544,7 @@ export const ACOES = {
     const ws = wb.addWorksheet('Movimentações');
     const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
     ws.addRow([`${e.nome} · entradas e saídas de ${compBr(mes)}`]).font = { bold: true, size: 14 };
-    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([`Gerado em ${C.agoraBr()} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
     ws.addRow([]);
     const cab = ws.addRow(['Data', 'Conta', 'Tipo', 'Valor', 'Descrição do banco', 'Destino', 'Imóvel', 'Comprovante']);
     cab.font = { bold: true };
@@ -1516,7 +1566,7 @@ export const ACOES = {
       const dir = await pastaDoEscopo('contador', R.idContador(e.id, mes), false);
       for (const a of await S.listar(dir)) { zip.file(`Comprovantes/${a.nome}`, await S.lerConteudo(await dir.getFileHandle(a.nome))); comprovantes += 1; }
     } catch { /* pasta ainda não existe: sem comprovantes */ }
-    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${new Date().toLocaleString('pt-BR')}`, '',
+    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${C.agoraBr()}`, '',
       `NFs: ${numeros.length} número(s) em Excel (pasta NFs).`, `Movimentações bancárias: ${movs.length} (planilha Movimentacoes), ${movs.filter((m) => !m.classificacao).length} ainda sem destino.`,
       `Comprovantes: ${comprovantes} arquivo(s) (pasta Comprovantes).`, ...(avisos.length ? ['', 'Avisos:', ...avisos] : [])].join('\n'));
     baixar(await zip.generateAsync({ type: 'blob' }), S.limparNome(`Contador ${e.nome} ${mes}.zip`));
@@ -1531,7 +1581,7 @@ export const ACOES = {
     const ws = wb.addWorksheet('Resultados');
     const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
     ws.addRow([`Resultados financeiros de ${dataBr(de)} a ${dataBr(ate)}`]).font = { bold: true, size: 14 };
-    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')}`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([`Gerado em ${C.agoraBr()}`]).font = { italic: true, color: { argb: 'FF666666' } };
     ws.addRow([]);
     const colunas = [['Posição', 9], ['Imóvel', 30], ['Valor do imóvel + reformas', 22], ['Aluguel recebido', 18], ['NFs avulsas', 15], ['Airbnb', 15], ['IPTU pago pelo proprietário', 22],
       ['Contas pagas por nós', 20], ['Resultado bruto', 18], ['Retorno ao ano', 15], ['Impostos (rateio)', 18], ['Impostos estimados', 18], ['Líquido', 18], ['Retorno líquido ao ano', 15],
@@ -1606,14 +1656,15 @@ export const ACOES = {
   },
 
   async exportarPlanilhaPdf() {
-    const [ExcelJS, { jsPDF }] = await Promise.all([excelJs(), bibliotecasPdf()]);
+    const [ExcelJS, { jsPDF }, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), bibliotecasPdf(), carregarParte(() => import('../exportar.js'))]);
     const quando = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Todos os dados exportados em planilha e PDF', null, {}, false));
   },
 
-  baixarRegras() {
+  async baixarRegras() {
+    const { REGRAS_TEXTO } = await carregarParte(() => import('../regras-texto.js'));
     baixar(new Blob(['﻿', REGRAS_TEXTO], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
   },
 
@@ -1664,7 +1715,7 @@ export const ACOES = {
     const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
-    if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar); // celular: mostra na tela em vez de baixar
+    if (await noVisualizador(arq, nome, tipo)) return; // celular: mostra na tela em vez de baixar
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
@@ -1849,6 +1900,8 @@ export const ACOES = {
   /**
    * Conferência dos pagamentos do mês no banco: lista na conta emissora os boletos pagos (ou aguardando crédito) por data de pagamento,
    * atualiza a situação de cada um aqui e, para os pagos ainda não registrados, propõe registrar um a um (sempre com confirmação).
+   * Quais propor: a mesma regra da tela Banco (Z.conciliarBoletos + Z.prontoParaRegistrar): pela referência do boleto e, sem ela, pelo
+   * valor e pela data; um pagamento que casa com mais de um boleto não é proposto (escolha na tela Banco).
    */
   async conferirPagamentosC6({ comp }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
@@ -1857,18 +1910,30 @@ export const ACOES = {
     if (!contas.length) throw new Error('Nenhum boleto deste mês foi emitido no C6.');
     aviso(`Conferindo no banco os pagamentos de ${dataBr(de)} a ${dataBr(ate)}…`, 'info');
     let atualizados = 0;
-    const pagosSemRegistro = [];
+    let ambiguos = 0;
+    const propostas = [];
+    const incompletos = [];
     for (const contaId of contas) {
       const itens = await BANCO.listarTodosBoletos(d(), contaId, { payment_date_from: de, payment_date_to: ate });
+      if (itens.incompleto) incompletos.push(`${contaId.toUpperCase()}: ${itens.length}${itens.total ? ` de ${itens.total}` : ''}`);
       const { casados } = R.casarListagemC6(d(), itens, contaId);
       for (const { cb, item } of casados) {
-        const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
+        await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
         atualizados += 1;
-        if (banco.situacao === 'pago' && !buscar('cobrancas', cb.id).data_pagamento) pagosSemRegistro.push(cb.id);
+      }
+      for (const s of Z.conciliarBoletos(d(), contaId, itens)) {
+        if (Z.prontoParaRegistrar(d(), s)) propostas.push(s);
+        else if (s.alternativas > 1 && !s.jaPago && !s.aguardandoCredito) ambiguos += 1;
       }
     }
-    for (const cbId of pagosSemRegistro) await proporPagamentoDoBanco(buscar('cobrancas', cbId));
-    aviso(`${atualizados} boleto(s) conferido(s) no banco${pagosSemRegistro.length ? `; ${pagosSemRegistro.length} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}.`);
+    const propostos = new Set();
+    for (const s of propostas) {
+      const cb = buscar('cobrancas', s.cobranca_id);
+      if (!cb || cb.data_pagamento || propostos.has(cb.id)) continue;
+      propostos.add(cb.id);
+      await proporPagamentoDoBanco(cb, s);
+    }
+    aviso(`${atualizados} boleto(s) conferido(s) no banco${propostos.size ? `; ${propostos.size} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}${ambiguos ? `; ${ambiguos} pagamento(s) com o valor de mais de um boleto: escolha qual na tela Banco ("Conferir boletos pagos no banco")` : ''}${incompletos.length ? `. Atenção: o banco tem mais boletos do que o sistema leu (${incompletos.join('; ')}); confira um período menor` : ''}.`, ambiguos || incompletos.length ? 'aviso' : 'ok');
     await mostrar();
   },
 
@@ -1912,8 +1977,7 @@ export const ACOES = {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
-      if (usarVisualizador()) visualizar(blob, 'boleto.pdf', 'application/pdf', baixar);
-      else window.open(URL.createObjectURL(blob), '_blank');
+      if (!(await noVisualizador(blob, 'boleto.pdf', 'application/pdf', false))) window.open(URL.createObjectURL(blob), '_blank');
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     } });
   },

@@ -1,5 +1,6 @@
 // Índice e caixas recolhíveis nas páginas longas (inquilino e imóvel): embaixo do nome, um link para cada caixa; cada caixa
 // ganha o botão ▾/▸ para recolher. As recolhidas ficam lembradas neste navegador (localStorage, por página), não no banco de dados.
+import { paraNomeDeArquivo } from './calculos.js';
 import { esc } from './formularios.js';
 
 /** Páginas com índice (rota → chave da memória local). */
@@ -19,7 +20,7 @@ const tituloDa = (cx) => {
   // sem o ☰ (alça do administrador para arrastar), a contagem "(3)" e o que vem depois de " · "
   return t ? t.textContent.replace(/☰/g, '').replace(/\s*\([^)]*\)\s*$/, '').split(' · ')[0].replace(/\s+/g, ' ').trim() : '';
 };
-const idDe = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+const idDe = (texto) => paraNomeDeArquivo(texto).slice(0, 40);
 
 /** Caixas de primeiro nível da página (fora de formulários), com título. */
 function caixasDe(raiz) {

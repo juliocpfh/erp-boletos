@@ -44,7 +44,7 @@ Os exemplos usam o mês de **novembro/2026**: a inquilina **Maria Exemplo**, da 
    - **um por vez**: abra o boleto e clique em **Emitir no C6**;
    - **todos de uma vez**: use a opção de emitir **todos do mês**. O sistema emite um a um e avisa quantos foram emitidos e quais deram erro.
 4. O banco devolve, para cada boleto: a **linha digitável**, o **código de barras**, o **nosso número** e o **Pix copia e cola** com o QR Code. Tudo fica guardado no boleto, e o PDF entra na pasta do inquilino.
-5. Se algum boleto for recusado, o sistema mostra o motivo em português. O caso mais comum é um campo do cadastro maior do que o C6 aceita (nome com mais de 40 letras, rua com número maior que 40, bairro ou cidade com mais de 40, CEP sem 8 números, barra "/" no endereço). O sistema **avisa e não corta nada sozinho**: encurte o cadastro (ex.: "Av." em vez de "Avenida") e emita de novo.
+5. Se algum boleto for recusado, o sistema mostra o motivo em português. O caso mais comum é um campo do cadastro maior do que o C6 aceita (nome com mais de 40 letras, rua com número maior que 40, bairro ou cidade com mais de 40, CEP sem 8 números, barra "/" no endereço). O sistema **avisa e não corta nada sozinho**: a emissão fica barrada com a mensagem de qual campo passou e quantas letras tem (ex.: "Nome tem 44 letras e o banco aceita até 40"); encurte o cadastro (ex.: "Av." em vez de "Avenida") e emita de novo.
 
 Exemplo: no boleto da Maria Exemplo, o banco vai cobrar **R$ 1.219,50** até 10/12/2026. Se ela atrasar, o próprio boleto passa a cobrar o aluguel cheio (R$ 1.355,00) mais a multa e os juros do contrato, do mesmo jeito que o sistema calcula. O inquilino nunca precisa pedir um boleto novo por causa de atraso.
 
@@ -68,7 +68,7 @@ Há dois caminhos, que se completam:
 - **Aviso automático**: quando um boleto é pago, o C6 avisa a ponte. A ponte **não dá baixa com esse aviso**: ela consulta o boleto no banco para confirmar e o sistema mostra o boleto como "pago no banco, aguardando confirmação" na tela **Boletos**.
 - **Conferir boletos pagos no banco**: botão na tela **Boletos**. O sistema pergunta ao C6 quais boletos foram pagos num período e mostra a lista com a data em que o inquilino pagou e a data em que o dinheiro foi creditado. Use quando quiser conferir tudo de uma vez, por exemplo no dia 11 e no fim do mês.
 
-Nos dois casos o sistema **mostra**; quem **confirma** é você (passo 2.4).
+Nos dois casos o sistema **mostra**; quem **confirma** é você (passo 2.4). Na conferência, só vem marcado o boleto que casa com um pagamento só; quando um pagamento serve para mais de um boleto (mesmo valor), nenhum vem marcado e você escolhe; o que ainda não teve o dinheiro creditado fica travado. Um pagamento nunca registra dois boletos.
 
 ### 2.4 Confirmar o pagamento e numerar a NF
 
@@ -86,13 +86,13 @@ Exemplo: a Maria Exemplo pagou pelo Pix em **10/12/2026** às 22h, e o C6 credit
 1. Abra o menu **Banco**. Há uma aba por conta: **ANK · conta no C6** e **JCK · conta no C6**. Escolha o mês com as setas (← novembro/2026 →).
 2. Clique em **Buscar o extrato de novembro/2026 no banco**. O sistema pega no C6 só o que ainda não tinha e avisa, por exemplo: "ANK: 12 movimentações novas, 30 já estavam." Nada é importado duas vezes.
 3. Repita na aba **JCK**.
-4. **Ver saldo** mostra o saldo do momento. Os números de cima da tela mostram entradas, saídas, quantas linhas estão **sem destino**, quantas estão **sem comprovante** e até que dia o extrato já foi buscado.
+4. **Ver saldo** mostra o saldo do momento. Os números de cima da tela mostram entradas, saídas, quantas linhas estão **sem destino**, quantas estão **sem comprovante** e até que dia o extrato já foi buscado. Buscado até hoje, ele fica "importado até ontem", porque o dia de hoje ainda não acabou; a busca do mês seguinte pega o que faltou (ex.: dezembro buscado desde 30/11).
 
 Pode buscar quantas vezes quiser no mês (uma vez por semana, por exemplo). O importante é que, no fechamento, as duas contas estejam buscadas até o último dia do mês.
 
 ### 2.6 Dar destino a cada movimentação
 
-Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quando reconhece a linha (etiqueta "parece: Loja 1 · Água"); basta clicar em **Usar sugestão**. Quando não reconhece, você escolhe:
+Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quando reconhece a linha (etiqueta "parece: Loja 1 · Água"); basta clicar em **Usar sugestão**. Se a conta (ex.: água de R$ 123,45) já foi lançada à mão em Contas pagas por nós, a sugestão liga a linha a ela, sem lançar outra; se a entrada é de um boleto já registrado à mão (mesma data e valor), a sugestão é "já pago: só ligar". Quando não reconhece, você escolhe:
 
 | O que é a linha | O que fazer | Exemplo |
 |---|---|---|
@@ -154,7 +154,7 @@ Vale para água, luz, gás, condomínio, internet, IPTU e guias de imposto. Prec
 
 Observações:
 - **Cancelar** (ou **Descartar** o lote) só funciona enquanto o pagamento está em rascunho, aprovado sem envio ou com erro; se o banco já tinha lido o código, o item é tirado do lote lido também (nada foi pago). Depois de enviado, cancele no app do C6 e, se o sistema continuar mostrando "Enviado ao banco" porque o C6 não avisou, o administrador clica em **Foi cancelado no C6**: o pagamento passa a "Cancelado" e some do alerta do Painel (se o dinheiro saiu, use "Confirmar pelo extrato" em vez disso).
-- Se a internet cair logo depois do **Aprovar e enviar**, o sistema mostra: "Não tive resposta do banco. Clique em 'Atualizar situação' antes de tentar de novo." Faça isso: o pedido tem um número único e o banco nunca o recebe duas vezes.
+- Se a internet cair logo depois do **Aprovar e enviar**, o sistema mostra: "Não tive resposta do banco. Clique em 'Atualizar situação' antes de tentar de novo." Faça isso: o pedido tem um número único e o banco nunca o recebe duas vezes. "Atualizar situação" aparece também quando o pagamento fica em "Aprovado no sistema, envio ao banco pendente", e o Painel avisa (alerta "Banco"); "Aprovar e enviar" de novo registra o que o banco já recebeu, e "Cancelar" confere no banco antes (não cancela o que já chegou lá).
 - Se o DDA da conta estiver ativo, o C6 já conhece os boletos em nome da empresa; mesmo assim, no sistema cada pagamento é preparado e aprovado um a um.
 
 ### 2.10 Fechamento do mês

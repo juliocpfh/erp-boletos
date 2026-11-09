@@ -1,6 +1,6 @@
 // Leitura e gravação na pasta escolhida pelo usuário (ex.: uma pasta do OneDrive),
 // usando a File System Access API do Chrome/Edge. Nada é enviado para a internet.
-import { hojeIso } from './calculos.js';
+import { ErroUsuario, hojeIso } from './calculos.js';
 import { normalizar } from './regras.js';
 
 export const ARQUIVO_BANCO = 'imoveis-dados.json';
@@ -164,7 +164,7 @@ export function tipoParaAbrir(nome) {
 }
 
 export async function salvarArquivo(dir, arquivo) {
-  if (!nomeAnexavel(arquivo.name)) throw new Error(ERRO_TIPO_ARQUIVO);
+  if (!nomeAnexavel(arquivo.name)) throw new ErroUsuario(ERRO_TIPO_ARQUIVO); // o usuário escolheu o arquivo errado: só na tela
   const nome = limparNome(arquivo.name);
   const ponto = nome.lastIndexOf('.');
   const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ''];

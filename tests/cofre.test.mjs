@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { Cofre, CofreDO, backupDoDia, canon, MANTER_SUBSTITUICOES, MAX_FAIXA, proximaManutencao, SO_ADMIN } from '../nuvem/cofre.mjs';
+import * as W from '../nuvem/worker.mjs';
+import { diferencas } from '../docs/js/nuvem.js';
+import * as R from '../docs/js/regras.js';
 import { r2Falso } from './r2-falso.mjs';
 
 /** Mesmo formato do ctx.storage.sql do Cloudflare: exec(consulta, ...valores).toArray(). */
@@ -143,6 +146,23 @@ test('faixas de códigos: dois aparelhos sem internet nunca repetem; código rep
   assert.equal(contrato(c, a.inicio).valor, 1, 'lote com erro não aplica nada (tudo ou nada)');
 });
 
+test('voltar para um backup (ou substituir pelos dados de uma pasta) não reemite faixas de códigos já entregues', () => {
+  const c = carregado();
+  const backup = c.tudo(); // o backup de 01/11
+  const celular = c.faixa({ tabela: 'contratos', quantidade: 100 }, SOCIO); // 05/11: celular novo pega a faixa dele
+  const nova = c.faixa({ tabela: 'tabela_nova', quantidade: 10 }, SOCIO); // tabela que não existe no backup
+  assert.deepEqual([celular.inicio, celular.fim, nova.inicio, nova.fim], [26, 125, 1, 10]);
+  c.importar(backup, DONO, { substituir: true }); // 09/11: "Voltar para este dia"
+  const pc = c.faixa({ tabela: 'contratos', quantidade: 100 }, DONO);
+  assert.ok(pc.inicio > celular.fim, `faixa do PC (${pc.inicio}–${pc.fim}) não pode cruzar a do celular (${celular.inicio}–${celular.fim})`);
+  assert.ok(c.faixa({ tabela: 'tabela_nova' }, DONO).inicio > nova.fim, 'nem na tabela que o backup não tinha');
+  assert.ok(c.tudo().seq.contratos >= pc.fim, 'quem ainda não usa faixa também começa depois');
+  // pasta com códigos maiores que os já entregues: vale o maior dos dois
+  const pasta = bancoExemplo(); pasta.contratos.push({ id: 900, valor: 1 });
+  c.importar(pasta, DONO, { substituir: true });
+  assert.equal(c.faixa({ tabela: 'contratos', quantidade: 1 }, DONO).inicio, 901);
+});
+
 test('número da NF: só pelo contador, um de cada vez, nunca repete', () => {
   const c = carregado();
   assert.deepEqual([c.contador({ nome: 'proxima_fatura' }, DONO).numero, c.contador({ nome: 'proxima_fatura' }, SOCIO).numero], [157, 158]);
@@ -186,6 +206,58 @@ test('papéis: consulta só lê; operador não mexe em usuários (só a própria
   // usuário desativado deixa de entrar
   c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { ativo: { antes: true, depois: false } } }]), DONO);
   assert.throws(() => c.exigir(OPERADOR, 'consulta'), (e) => e.status === 403);
+});
+
+test('consulta troca a própria senha (e o login reforça a senha antiga), com a linha do histórico dessa troca; nada mais', () => {
+  const c = carregado();
+  // "Minha senha" como a tela faz (R.atualizar + diferencas): campos da senha + uma linha no histórico
+  const antes = c.tudo(c.exigir(CONSULTA, 'consulta')); const depois = structuredClone(antes);
+  R.atualizar(depois, 'usuarios', 4, { senha_sal: 's2', senha_hash: 'h2', senha_iteracoes: 600000 }, CONSULTA, 'Trocou a própria senha');
+  const troca = diferencas(antes, depois);
+  assert.deepEqual(troca.map((o) => o.op).sort(), ['alterar', 'historico']);
+  assert.equal(c.aplicar(lote(troca), CONSULTA).ok, true, 'a nuvem aceita a troca');
+  const u = () => c.tudo().usuarios.find((x) => x.id === 4);
+  assert.deepEqual([u().senha_sal, u().senha_hash, u().senha_iteracoes], ['s2', 'h2', 600000]);
+  assert.equal(c.tudo().historico.at(-1).email_nuvem, CONSULTA);
+  // senha no padrão antigo regravada ao entrar (sem histórico), junto com a sessão
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { senha_hash: { antes: 'h2', depois: 'h3' }, sessoes: { antes: undefined, depois: ['t1'] } } }]), CONSULTA).ok, true);
+  assert.equal(u().senha_hash, 'h3');
+  // nada mais
+  const senha = (id = 4) => ({ op: 'alterar', tabela: 'usuarios', id, campos: { senha_hash: { antes: id === 4 ? 'h3' : 'h1', depois: 'h4' } } });
+  const linha = (extra = {}) => ({ op: 'historico', entrada: { acao: 'Alteração', tabela: 'usuarios', registro_id: 4, descricao: 'Trocou a própria senha', ...extra } });
+  for (const [ops, motivo] of [
+    [[senha(1)], 'a senha de outro'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { papel: { antes: 'consulta', depois: 'admin' } } }], 'o próprio papel'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { pendente: { antes: undefined, depois: true } } }], 'outro campo do próprio usuário'],
+    [[linha()], 'linha do histórico sem troca de senha'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { sessoes: { antes: ['t1'], depois: ['t1', 't2'] } } }, linha()], 'linha do histórico só com a sessão'],
+    [[senha(), linha({ tabela: 'contratos', registro_id: 20 })], 'linha do histórico de outra coisa'],
+    [[senha(), linha({ registro_id: 1 })], 'linha do histórico de outro usuário'],
+    [[senha(), { op: 'alterar', tabela: 'contratos', id: 20, campos: { valor: { antes: 364445, depois: 1 } } }], 'outra mudança junto com a troca'],
+  ]) assert.throws(() => c.aplicar(lote(ops), CONSULTA), (e) => e.status === 403, motivo);
+  assert.equal(u().senha_hash, 'h3', 'nada do que foi recusado ficou');
+  assert.equal(contrato(c, 20).valor, 364445);
+});
+
+test('tabela e campo da raiz não se trocam: "raiz" com nome de tabela (usuários, empresas…) e tabela com nome de campo da raiz são recusados', () => {
+  const c = carregado();
+  const antes = c.tudo();
+  const usuariosFalsos = antes.usuarios.map((u) => ({ ...u, ativo: u.login === OPERADOR }));
+  for (const email of [OPERADOR, DONO]) {
+    for (const [campo, depois] of [['usuarios', usuariosFalsos], ['contratos', []], ['recebimentos', undefined], ['emitentes', [{ id: 1, nome: 'Empresa trocada' }]]]) {
+      assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo, antes: antes[campo], depois }]), email), (e) => e.status === 400, `raiz "${campo}" por ${email}`);
+    }
+    for (const tabela of ['config_banco', 'logo', 'proxima_fatura', 'listas']) {
+      assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela, id: 1, dados: { id: 1 } }]), email), (e) => e.status === 400, `inserir em "${tabela}" por ${email}`);
+      assert.throws(() => c.faixa({ tabela }, email), (e) => e.status === 400, `faixa de "${tabela}" por ${email}`);
+    }
+  }
+  const depois = c.tudo();
+  assert.deepEqual(depois.usuarios, antes.usuarios, 'ninguém foi desativado');
+  assert.deepEqual([depois.contratos.length, depois.config_banco, depois.listas, depois.proxima_fatura], [2, { ativo: false }, { tipos: ['Condomínio'] }, 157]);
+  assert.equal(depois.emitentes, undefined);
+  // o normal continua: campo da raiz que não é tabela e registro novo em tabela nova
+  assert.equal(c.aplicar(lote([{ op: 'raiz', campo: 'listas', antes: antes.listas, depois: { tipos: ['Água'] } }, { op: 'inserir', tabela: 'tabela_nova', id: 1, dados: { id: 1 } }]), OPERADOR).ok, true);
 });
 
 test('entradas perigosas: segredos removidos, nomes que mexem no JavaScript barrados, tamanho limitado', () => {
@@ -298,4 +370,32 @@ test('B6: backup do dia e faxina rodam no alarme diário (3h de Brasília); sem 
   await chamar2('/lote', lote([{ op: 'historico', entrada: { a: 3 } }]));
   assert.equal(limpezas2, 2, 'passada uma hora, roda de novo');
   assert.ok(sql2.db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'log_em'").all().length, 'índice em log(em)');
+});
+
+test('backups (banco inteiro, com as senhas e sessões de todos): pelo Worker com o cofre de verdade, só o administrador baixa', async () => {
+  const sql = sqlFalso();
+  const r2 = r2Falso();
+  const dobj = new CofreDO({ storage: { sql, transactionSync: transacaoDe(sql) } }, { DADOS: r2 });
+  dobj.cofre.importar(bancoExemplo(), DONO);
+  await r2.put('backups/imoveis-dados-2026-11-08.json', JSON.stringify(dobj.cofre.tudo()));
+  await r2.put('arquivos/Sala 101/contrato.pdf', 'x');
+  const BASE = 'http://localhost:8787';
+  for (const [email, esperado] of [[CONSULTA, 403], [OPERADOR, 403], [DONO, 200]]) {
+    W.esquecerPapeis();
+    const env = { MODO_TESTE: '1', EMAIL_TESTE: email, ORIGEM: BASE, DADOS: r2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => dobj.fetch(req) }) } };
+    const pedir = (caminho) => W.atender(new Request(`${BASE}/api/${caminho}`), env);
+    const backup = await pedir('backups/imoveis-dados-2026-11-08.json');
+    assert.equal(backup.status, esperado, `${email}: baixar um backup`);
+    if (esperado !== 200) assert.doesNotMatch(await backup.text(), /senha_hash/);
+    assert.equal((await pedir('lista-tudo/backups/')).status, esperado, `${email}: lista-tudo dos backups`);
+    assert.equal((await pedir('arquivos/Sala%20101/contrato.pdf')).status, 200, `${email}: anexos todos leem`);
+    assert.equal((await pedir('lista-tudo/arquivos/')).status, 200, `${email}: lista-tudo dos anexos`);
+  }
+  // nível que o cofre não conhece (ou nenhum) é recusado, em vez de virar "consulta"
+  const papel = (q, email = DONO) => dobj.fetch(new Request(`https://cofre/papel${q}`, { headers: { 'X-Email-Conferido': email } }));
+  assert.equal((await papel('?nivel=admin', CONSULTA)).status, 403);
+  assert.equal((await papel('?nivel=admin', OPERADOR)).status, 403);
+  assert.equal((await papel('?nivel=admin')).status, 200);
+  assert.equal((await papel('?nivel=dono')).status, 400);
+  assert.equal((await papel('')).status, 400);
 });

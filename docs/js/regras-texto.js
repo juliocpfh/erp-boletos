@@ -10,8 +10,9 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 2. CONTRATO
 - O contrato liga o inquilino ao imóvel (a mesma pessoa pode ter vários contratos). O imóvel é escolhido só no "Novo contrato" e é obrigatório.
 - O prazo conta da "Data de vigência inicial": término = mesma data, X meses depois (ex.: 05/01/2026 + 30 meses = 05/07/2028).
+- Renovação com nova data de término: o fim e o prazo do contrato passam a ser os da renovação (ex.: 05/03/2024 + 30 meses = 05/09/2026, renovado até 05/09/2028 → 54 meses). Editar o cadastro não volta o fim; o prazo de um contrato renovado muda só por outra renovação. Na troca de titular o prazo não recomeça: o novo titular fica com o fim do contrato assumido.
 - A "Data do contrato" é a das assinaturas. Contrato novo não herda condições do inquilino anterior do imóvel: tudo é escolhido de novo.
-- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório. Os boletos continuam com o anterior até a véspera da troca; com data futura, garantia, seguro e reserva passam só no dia.
+- Troca de titular ("Continua o contrato de"): o anterior tem fim do vínculo na véspera da troca (não é saída). O novo herda contrato, vistoria, termo das chaves, aluguel, reserva e garantia. O termo aditivo da troca é obrigatório; com a garantia que continua, o fiador do contrato entra no termo e assina concordando. Os boletos continuam com o anterior até a véspera da troca; com data futura, garantia, seguro e reserva passam só no dia.
 - Rotina de entrada na página do inquilino: reserva, contrato (gerar e assinar), garantia, vistoria e termo das chaves (gerar e assinar), troca de titularidade da água, energia, gás e condomínio (quando por conta do inquilino) e seguro. O que já está registrado marca sozinho (documento registrado como perdido conta como feito, também quando a perda foi registrada no titular anterior; com assinatura faltante, continua faltando); o resto se marca com a data ou "não se aplica".
 - Contrato sem imóvel há 7 dias (e sem boleto) é apagado sozinho.
 - Contrato gerado por modelo editável. Documentos de entrada (contrato, vistoria, termo das chaves; o que falta aparece no alerta "Rotina de entrada") só são marcados como assinados com o arquivo assinado anexado. Podem ser anexados com assinatura faltante ou registrados como perdidos (os de operador aguardam o administrador).
@@ -19,8 +20,10 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 3. SAÍDA DO INQUILINO
 - Duas etapas: 1) informar a data de saída quando ele avisa (o último boleto sai proporcional); 2) fazer o cálculo final.
-- O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe.
+- O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe. Mudar a data de saída para mais tarde volta o inquilino a ativo (ex.: saída 15/10 mudada para 15/11: sai o boleto de 01 a 15/11).
+- Boleto em aberto de um mês sem nenhum dia ocupado (ex.: dezembro já gerado e saída em 15/11) é excluído ao salvar a saída; se já foi emitido no C6, fica e aparece nos alertas para cancelar no banco.
 - Leitura dos relógios (água e energia) é obrigatória na vistoria de entrada e na de saída.
+- A vistoria de saída é comparada com a vistoria de entrada do contrato (pendência = item pior que na entrada). Quem continua o contrato de outro (troca de titular) é comparado com a vistoria de entrada do titular anterior; se fez a própria vistoria de entrada na troca, vale a dele.
 
 4. REAJUSTE DO ALUGUEL
 - O mês de entrada conta como 1º mês, qualquer que seja o dia. O aluguel do 13º mês já vem corrigido.
@@ -44,12 +47,13 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Gerados por mês: aluguel proporcional, bonificação, IPTU, seguro, FCI, tarifa, reserva e ressarcimentos.
 - Gerados a partir do dia 20 do mês, já com o aluguel do próprio mês, vencendo no mês seguinte (ex.: a partir de 20/10, os de 10/2026, que vencem em 11/2026). A carta de reajuste vai junto com o boleto do aluguel corrigido.
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
-- Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo assinado; até lá, boletos e correções continuam no anterior.
+- Vencimento em sábado, domingo ou feriado nacional: pode pagar no próximo dia útil sem multa e juros, com a bonificação. Pago depois dele, o atraso conta desde o vencimento, como no banco (ex.: vence sábado 10/10/2026, 12/10 é feriado: em dia até terça 13/10; pago na quarta 14/10 = 4 dias de atraso). Só então o boleto aparece como vencido e na inadimplência.
+- Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo da troca assinado (outro termo assinado, como o de troca do vencimento, não conta); até lá, boletos e correções continuam no anterior.
 - Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros.
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
 - Boleto de controle (inquilino sem NF) fica fora das somas e dos resultados.
-- Acordo de dívida (Financeiro → Inadimplência → "Fazer acordo"): não existe "baixar como perda" (o boleto é título executável). Os boletos vencidos escolhidos ficam "Em acordo" (saem da inadimplência e não se cobram mais) e saem boletos novos com o total combinado, divididos em parcelas mensais a partir do 1º vencimento. Ex.: boleto de R$ 1.350,00 vencido há 40 dias, acordo de R$ 1.500,00 em 3: boletos de R$ 500,00 vencendo 10/12, 10/01 e 10/02. Parcela do acordo atrasada: o inquilino volta para a inadimplência. Na NF de cada parcela vai a parte do aluguel com a multa e os juros do acordo (IPTU, seguro, tarifa e FCI dos boletos originais ficam fora, como sempre), com o período dos aluguéis que ela paga. O acordo só se desfaz enquanto nenhuma parcela foi paga nem emitida no C6; boleto original emitido no C6 precisa ser cancelado no banco antes do acordo.
+- Acordo de dívida (Financeiro → Inadimplência → "Fazer acordo"): não existe "baixar como perda" (o boleto é título executável). Os boletos vencidos escolhidos ficam "Em acordo" (saem da inadimplência e não se cobram mais) e saem boletos novos com o total combinado, divididos em parcelas mensais a partir do 1º vencimento. Ex.: boleto de R$ 1.350,00 vencido há 40 dias, acordo de R$ 1.500,00 em 3: boletos de R$ 500,00 vencendo 10/12, 10/01 e 10/02. Parcela do acordo atrasada: o inquilino volta para a inadimplência. Na NF de cada parcela vai a parte do aluguel com a multa e os juros do acordo (IPTU, seguro, tarifa e FCI dos boletos originais ficam fora, como sempre; a reserva já abatida no boleto original e o ressarcimento de condomínio entram, como no pagamento normal, com o aluguel cheio: ex. aluguel R$ 1.350,00 com R$ 500,00 de reserva, acordo de R$ 937,80 → NF de R$ 1.437,80), com o período dos aluguéis que ela paga. O acordo só se desfaz enquanto nenhuma parcela foi paga nem emitida no C6 nem entrou num acordo mais novo (desfaça antes o mais novo); boleto original emitido no C6 precisa ser cancelado no banco antes do acordo.
 
 7. PAGAMENTO E NOTAS FISCAIS (NF)
 - Cada pagamento tem a data contábil (data em que o dinheiro entrou).
@@ -64,6 +68,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - O proprietário paga todas as guias na prefeitura. O inquilino devolve no boleto só os dias em que ocupou (mês de entrada e de saída proporcionais); o resto é do proprietário.
 - Cobrado a partir do mês de vencimento do 1º boleto, sempre pelo valor parcelado.
 - Imóvel vazio, contrato sem IPTU ou carência sem IPTU: a parcela toda é do proprietário, com alerta.
+- A parte do inquilino é a cobrada nos boletos (também de quem já saiu e ficou inativo; boleto alterado à mão vale o valor dele); para os meses ainda sem boleto, a prevista pelos dias ocupados. A tela IPTU, os totais e o Financeiro usam a mesma conta.
+- IPTU pago à vista pelo proprietário: no Financeiro entra a cota única menos o que os inquilinos devolvem nos boletos (ex.: pagou R$ 900,00 à vista e o inquilino devolve R$ 1.000,00 parcelado: sobra R$ 100,00 para o proprietário).
 
 9. SEGURO
 - O seguro obrigatório é do inquilino: cada contrato tem a sua apólice; quem sai leva, quem entra precisa de outra. Na troca de titular, a apólice em vigência passa ao novo titular. Deve ser de 1 ano e não pode se sobrepor ao anterior.
@@ -73,6 +79,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 10. RESERVA
 - Na troca de titular, a reserva vai para o novo com o comprovante e mostra o que já foi usado no anterior e em que mês; não abate de novo.
 - A reserva começa exatamente no aluguel marcado e segue nos seguintes só se sobrar. Pode ser marcada como já abatida em aluguel antigo.
+- Sem mês marcado, vai para o primeiro aluguel: o mês de entrada ou, com carência, o 1º mês depois dela (ex.: entrada 07/06/2026 com 1 mês de carência → boleto de 07/2026). Nunca abate o boleto da carência; se a carência cobra IPTU, esse boleto é cobrado normalmente.
 
 11. CONTAS (ÁGUA, ENERGIA, GÁS, CONDOMÍNIO, INTERNET)
 - Contas pagas por nós (custos do imóvel) podem ser lançadas em qualquer imóvel, com mês de referência, vencimento, data do pagamento e valor (Financeiro → Resultado bruto → "+ custo", ou pelo destino do extrato). A etiqueta do imóvel orienta: "vago"; "alugado em X: veja se ficou conta nossa pendente" até 2 meses depois da entrada; conta "incluso no contrato" (nossa); sem etiqueta, o inquilino paga pelo contrato.
@@ -89,6 +96,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 13. ARQUIVOS
 - Excluir ou desfazer um lançamento apaga também o arquivo anexado (se nenhum outro lançamento o usa). O "x" ao lado do clipe apaga só o arquivo e deixa o lançamento esperando novo anexo.
+- Excluir o contrato (só o administrador) apaga tudo o que é dele (boletos, garantia e depósitos, vistorias, termos aditivos, cartas de reajuste, titularidades, acordos) e os arquivos desses lançamentos; documentos postos à mão na pasta do inquilino ficam, e a pasta com eles.
 - Nomes de arquivos gravados pelo sistema não têm acento.
 - Ao abrir o Painel, o sistema confere os arquivos dos lançamentos: o que estiver em outra pasta volta ao lugar; o que sumiu vira alerta para anexar de novo. Arquivo de lançamento não se apaga pela lista de arquivos.
 - Termos aditivos, cartas de reajuste enviadas (PDF) e outras comunicações ficam na pasta "Aditivos, correções e comunicação" do inquilino.

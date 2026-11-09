@@ -43,7 +43,7 @@ export function valorCelula(nome, v) {
   const s = String(v);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return C.dataBr(s);
   if (/^\d{4}-\d{2}$/.test(s)) return C.compBr(s);
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return new Date(s).toLocaleString('pt-BR');
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return C.dataHoraBr(s);
   return s.slice(0, 32000);
 }
 
@@ -89,7 +89,7 @@ export async function planilhaDeTudo(ExcelJS, d) {
   const lista = dadosParaExportar(d);
   const resumo = wb.addWorksheet('Resumo');
   resumo.columns = [{ header: 'Cadastro', width: 40 }, { header: 'Registros', width: 12 }];
-  resumo.addRow([`Todos os dados em ${new Date().toLocaleString('pt-BR')}`, '']);
+  resumo.addRow([`Todos os dados em ${C.agoraBr()}`, '']);
   for (const t of lista) resumo.addRow([t.titulo, t.registros.length]);
   resumo.getRow(1).font = { bold: true };
   const usados = new Set(['resumo']);
@@ -131,7 +131,7 @@ export function pdfDeTudo(JsPDF, d) {
     y += depois;
   };
   escrever('Administração de Imóveis · todos os dados', { tam: 14, negrito: true, depois: 1 });
-  escrever(`Gerado em ${new Date().toLocaleString('pt-BR')}. Só os campos preenchidos; o histórico de alterações está na planilha.`, { depois: 4 });
+  escrever(`Gerado em ${C.agoraBr()}. Só os campos preenchidos; o histórico de alterações está na planilha.`, { depois: 4 });
   for (const t of dadosParaExportar(d, { historico: false }).filter((x) => x.registros.length)) { // cadastros vazios ficam de fora
     pular(14);
     escrever(`${t.titulo} (${t.registros.length})`, { tam: 12, negrito: true, depois: 2 });

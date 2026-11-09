@@ -16,7 +16,7 @@ import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -205,15 +205,16 @@ export const TELAS = {
     const todosOsAlertas = R.alertasComAdiamento(d(), hoje);
     const alertas = todosOsAlertas.filter((a) => !a.adiamento);
     const adiados = todosOsAlertas.filter((a) => a.adiamento);
-    const nomeAlerta = (a) => (a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? ' · ' : ''}${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`);
     const adiar = (a) => (opera() ? `<span class="adiar-alerta nw">${botao('adiarAlerta', `Adiar ${R.DIAS_ADIAR_ALERTA} dias`, { chave: a.chave, modo: 'adiado', tipo: a.tipo }, 'secundario mini')} ${botao('adiarAlerta', 'Já estou cuidando', { chave: a.chave, modo: 'cuidando', tipo: a.tipo }, 'secundario mini')}</span>` : '');
     const pend = R.pendentesDeFatura(d());
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
     const mesAtual = C.competenciaDe(hoje);
     // tudo o que ficou para trás nos meses anteriores (ex.: NFs de 10/2026 numeradas depois da virada, contas de 09/2026), mais as etapas do mês já liberadas e não feitas
-    const faltamEtapas = [...R.etapasAtrasadas(d(), mesAtual, hoje),
-      ...R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
-    const previstas = R.etapasFechamento(d(), mesAtual, hoje).filter((e) => e.prevista && e.chave !== 'cartas');
+    // os pagamentos sem NF (pend) servem a todos os meses; as etapas do mês atual são calculadas uma vez
+    const etapasDoMes = R.etapasFechamento(d(), mesAtual, hoje, { pendentes: pend });
+    const faltamEtapas = [...R.etapasAtrasadas(d(), mesAtual, hoje, { pendentes: pend }),
+      ...etapasDoMes.filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
+    const previstas = etapasDoMes.filter((e) => e.prevista && e.chave !== 'cartas');
     const incompletos = cadastrosIncompletos();
     // o tipo de alerta com mais avisos ativos (ex.: 4 de "Reajuste do aluguel")
     const porTipo = {};
@@ -246,11 +247,11 @@ export const TELAS = {
         ${gruposDeAlertas(alertas).map(([tipo, lista]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
           ${lista.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
         ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
-          ${adiados.map((a) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === 'cuidando' ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje ? 'hoje (volta amanhã)' : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao('voltarAlerta', 'Voltar a mostrar', { chave: a.chave }, 'secundario mini') : ''}</div>`).join('')}</details>` : ''}
+          ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}</details>` : ''}
         <p class="suave" style="margin:10px 0 0">${link('#/pendencias', 'Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só', '')}</p>
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
-        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString('pt-BR')}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
+        <p class="suave">Banco criado em ${C.dataHoraBr(d().criado_em)}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
   },
 
   // ------------------------------------------------------------------------
@@ -262,7 +263,7 @@ export const TELAS = {
     // matrícula ao lado do nome (número ou vazio); embaixo do nome, os clipes dela (📎1, 📎2…, apagar em "✎ Editar") e o botão "Anexar"
     const numeroMatricula = (i) => `<span class="contas">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}</span>`;
     const anexosMatricula = (i) => `<span class="contas matricula"><span data-arquivos="matricula:${i.id}"></span>
-      ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-upload="matricula:${i.id}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
+      ${opera() ? `<label class="botao secundario mini enviar" title="Anexar o arquivo da matrícula (pode ser mais de um)">📎 Anexar<input type="file" multiple data-acao-arquivo="enviarArquivos" data-upload="matricula:${i.id}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
     const hoje = C.hojeIso();
     const linhas = R.imoveisPorEndereco(d().imoveis).map((i) => {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && !R.herancaAgendada(d(), c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
@@ -358,7 +359,7 @@ export const TELAS = {
     const papeis = Object.entries(PAPEIS).map(([k, v]) => `<option value="${k}" ${k === 'operador' ? 'selected' : ''}>${v}</option>`).join('');
     return `<div class="cabecalho"><h1>Usuários</h1>${link('#/novo/usuarios', 'Novo usuário', 'botao')}</div>
       ${pendentes.length ? `<div class="cartao destaque"><h2>Pedidos de acesso (${pendentes.length})</h2><table><tr><th>Nome</th><th>Login</th><th>Pedido em</th><th>Liberar como</th><th></th></tr>
-        ${pendentes.map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${u.criado_em ? new Date(u.criado_em).toLocaleString('pt-BR') : '-'}</td>
+        ${pendentes.map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${u.criado_em ? C.dataHoraBr(u.criado_em) : '-'}</td>
           <td><select data-papel-de="${u.id}" style="width:auto">${papeis}</select></td>
           <td class="n nw">${botao('aprovarUsuario', 'Aprovar', { id: u.id }, 'pequeno')} ${botao('recusarUsuario', 'Recusar', { id: u.id }, 'perigo pequeno', `Recusar o pedido de ${u.nome}?`)}</td></tr>`).join('')}</table></div>` : ''}
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>

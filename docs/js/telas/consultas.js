@@ -19,7 +19,7 @@ export function telaBusca(q) {
   const total = grupos.reduce((s, g) => s + g.itens.length, 0);
   const url = (tipo) => `#/buscar?q=${encodeURIComponent(texto)}${tipo ? `&tipo=${tipo}` : ''}`;
   return `<h1>Busca</h1>
-    <form data-form="buscaGlobal" class="acoes" style="margin-bottom:12px"><input name="q" value="${esc(texto)}" placeholder="Imóvel, inquilino, CPF, telefone, nº da NF ou valor" style="width:420px;max-width:100%" autofocus><button>Buscar</button></form>
+    <form data-form="ir" data-ir="buscar" class="acoes" style="margin-bottom:12px"><input name="q" maxlength="100" value="${esc(texto)}" placeholder="Imóvel, inquilino, CPF, telefone, nº da NF ou valor" style="width:420px;max-width:100%" autofocus><button>Buscar</button></form>
     ${texto ? `<div class="abas"><a href="${url('')}" class="${filtro ? '' : 'ativo'}">Tudo (${total})</a>${TIPOS_BUSCA.map(([k, t]) => { const g = grupos.find((x) => x.tipo === t); return `<a href="${url(k)}" class="${filtro && filtro[0] === k ? 'ativo' : ''}">${t.replace(' com esse valor', '')} (${g ? g.itens.length : 0})</a>`; }).join('')}</div>` : ''}
     ${vistos.map((g) => `<div class="cartao"><h2>${esc(g.tipo)} <span class="suave">(${g.itens.length})</span></h2>
       ${g.itens.map((x) => `<p style="margin:6px 0"><a href="${x.link}"><b>${esc(x.titulo)}</b></a>${x.extra ? ` ${etiqueta(x.extra, 'neutra')}` : ''}<br><span class="suave">${esc(x.detalhe)}</span></p>`).join('')}</div>`).join('')
@@ -40,7 +40,7 @@ export function telaSolicitacoes(q) {
   const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
   const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    .sort(C.maisRecentePrimeiro);
   return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
     <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
@@ -85,7 +85,7 @@ export function telaInquilinos(q) {
   const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');
   const resumo = R.resumoSolicitacoes(d());
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao') : ''}</div>
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
     ${caixaFichas()}
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro">${opera() ? 'Solicitação · ' : ''}Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
@@ -175,7 +175,7 @@ export function telaIptu(ano) {
     const p = doAno(i);
     const idGuias = idGuiasDoAno(i.id, ano);
     // guias do ano: 📎1 ×, 📎2 ×… e o clipe cinza para anexar mais uma
-    const guias = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-upload="iptuano:${idGuias}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
+    const guias = `<span class="clipes-iptu"><span data-arquivos="iptuano:${idGuias}:clipe"></span>${opera() ? `<label class="clipe-anexar enviar" title="Anexar a guia do IPTU ${ano}">📎<input type="file" multiple data-acao-arquivo="enviarArquivos" data-upload="iptuano:${idGuias}" accept="${ACEITA_DOCUMENTOS}"></label>` : ''}</span>`;
     const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias}`;
     if (!p) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, 'aviso')} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno') : ''}</td></tr>`;
     const mapa = mapas.get(i.id);
