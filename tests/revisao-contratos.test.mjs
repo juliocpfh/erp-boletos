@@ -196,3 +196,44 @@ test('vistoria de entrada própria feita na troca de titular: vale ela (é o est
   const s = R.inserir(d2, 'contratos', { imovel_id: i2.id, inquilino_nome: 'Ana', data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01' }, 'j');
   assert.equal(K.vistoriaDeEntrada(d2, s), null);
 });
+
+// --------------------------------------------------------------------------
+// 4. Extenso: o percentual sai do número escrito no documento; "um milhão e mil"
+// --------------------------------------------------------------------------
+test('percentual por extenso: lido do número como sai no documento', () => {
+  assert.equal(K.percentualComExtenso(100 / 11), '9,0909% (nove vírgula zero novecentos e nove por cento)');
+  assert.equal(K.percentualComExtenso(1.05), '1,05% (um vírgula zero cinco por cento)');
+  assert.equal(K.percentualComExtenso(4.5), '4,5% (quatro vírgula cinco por cento)');
+  assert.equal(K.percentualComExtenso(0.5), '0,5% (zero vírgula cinco por cento)');
+  assert.equal(K.percentualComExtenso(0.033), '0,033% (zero vírgula zero trinta e três por cento)');
+  // os que já saíam certos continuam iguais
+  assert.equal(K.percentualComExtenso(2), '2% (dois por cento)');
+  assert.equal(K.percentualComExtenso(1), '1% (um por cento)');
+  assert.equal(K.percentualComExtenso(10), '10% (dez por cento)');
+  assert.equal(K.percentualComExtenso(0.33), '0,33% (zero vírgula trinta e três por cento)');
+  assert.equal(K.percentualComExtenso(3.39), '3,39% (três vírgula trinta e nove por cento)');
+  assert.equal(K.percentualComExtenso(12.75), '12,75% (doze vírgula setenta e cinco por cento)');
+  assert.equal(K.percentualComExtenso(0), '0% (zero por cento)');
+});
+
+test('valores por extenso: "um milhão e mil"; os que já saíam certos continuam iguais', () => {
+  assert.equal(K.numeroPorExtenso(1001000), 'um milhão e mil');
+  assert.equal(K.valorComExtenso(100100000), 'R$ 1.001.000,00 (um milhão e mil reais)');
+  assert.equal(K.numeroPorExtenso(1100000), 'um milhão e cem mil');
+  assert.equal(K.numeroPorExtenso(2500000), 'dois milhões e quinhentos mil');
+  // iguais a antes
+  assert.equal(K.valorComExtenso(1), 'R$ 0,01 (um centavo)');
+  assert.equal(K.valorComExtenso(99), 'R$ 0,99 (noventa e nove centavos)');
+  assert.equal(K.valorComExtenso(101), 'R$ 1,01 (um real e um centavo)');
+  assert.equal(K.valorComExtenso(200110), 'R$ 2.001,10 (dois mil e um reais e dez centavos)');
+  assert.equal(K.valorComExtenso(100000000), 'R$ 1.000.000,00 (um milhão de reais)');
+  assert.equal(K.valorComExtenso(200000000), 'R$ 2.000.000,00 (dois milhões de reais)');
+  assert.equal(K.valorComExtenso(200000100), 'R$ 2.000.001,00 (dois milhões e um reais)');
+  assert.equal(K.valorComExtenso(1234567890), 'R$ 12.345.678,90 (doze milhões trezentos e quarenta e cinco mil seiscentos e setenta e oito reais e noventa centavos)');
+  assert.equal(K.valorComExtenso(10100000), 'R$ 101.000,00 (cento e um mil reais)');
+  assert.equal(K.valorComExtenso(110100), 'R$ 1.101,00 (mil cento e um reais)');
+  for (const [n, t] of [[100, 'cem'], [101, 'cento e um'], [1000, 'mil'], [1001, 'mil e um'], [1100, 'mil e cem'], [1250, 'mil duzentos e cinquenta'],
+    [100001, 'cem mil e um'], [1000000, 'um milhão'], [1000001, 'um milhão e um'], [2000100, 'dois milhões e cem'], [1234000, 'um milhão duzentos e trinta e quatro mil'],
+    [1200300, 'um milhão duzentos mil e trezentos'], [21000, 'vinte e um mil']]) assert.equal(K.numeroPorExtenso(n), t, String(n));
+  for (const [n, t] of [[1, 'primeira'], [11, 'décima primeira'], [21, 'vigésima primeira'], [99, 'nonagésima nona']]) assert.equal(K.ordinalPorExtenso(n), t);
+});

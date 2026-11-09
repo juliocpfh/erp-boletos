@@ -35,8 +35,9 @@ export function numeroPorExtenso(n) {
     if (i > 0) t = `${t} ${nomes[i][g === 1 ? 0 : 1]}`.trim();
     partes.unshift({ t, g, i });
   });
-  // "e" antes do último grupo quando ele é menor que 100 ou é centena redonda (mil e quinhentos; mil trezentos e cinquenta)
-  return partes.map((p, k) => (k === 0 ? p.t : `${partes[k].i === 0 && (p.g < 100 || p.g % 100 === 0) ? 'e ' : ''}${p.t}`)).join(' ');
+  // "e" antes do último grupo quando ele é menor que 100 ou é centena redonda (mil e quinhentos; mil trezentos e cinquenta;
+  // um milhão e mil; um milhão e cem mil; um milhão duzentos e trinta e quatro mil)
+  return partes.map((p, k) => (k === 0 ? p.t : `${k === partes.length - 1 && (p.g < 100 || p.g % 100 === 0) ? 'e ' : ''}${p.t}`)).join(' ');
 }
 
 /** Valor em centavos por extenso: 388889 → "três mil, oitocentos e oitenta e oito reais e oitenta e nove centavos". */
@@ -53,13 +54,21 @@ export function reaisPorExtenso(centavos) {
 export const valorComExtenso = (centavos) => `R$ ${C.reais(centavos, false)} (${reaisPorExtenso(centavos)})`;
 /** "30 (trinta)" */
 export const numeroComExtenso = (n) => `${n} (${numeroPorExtenso(n)})`;
-/** "2% (dois por cento)" */
+/**
+ * Número escrito como no documento ("9,0909") por extenso: as casas depois da vírgula são lidas como estão escritas, com os
+ * zeros da frente ("9,0909" → "nove vírgula zero novecentos e nove"; "1,05" → "um vírgula zero cinco"; "4,5" → "quatro vírgula cinco").
+ */
+function decimalPorExtenso(escrito) {
+  const [inteiro, dec = ''] = String(escrito).split(',');
+  const texto = numeroPorExtenso(Number(inteiro.replace(/\D/g, '')) || 0);
+  if (!/[1-9]/.test(dec)) return texto;
+  return [texto, 'vírgula', ...Array(dec.match(/^0*/)[0].length).fill('zero'), numeroPorExtenso(Number(dec))].join(' ');
+}
+
+/** "2% (dois por cento)"; o extenso sai do número como aparece no documento: "9,0909% (nove vírgula zero novecentos e nove por cento)" */
 export function percentualComExtenso(p) {
-  const n = Number(p) || 0;
-  const inteiro = Math.trunc(n);
-  const dec = Math.round((n - inteiro) * 100);
-  const extenso = dec ? `${numeroPorExtenso(inteiro)} vírgula ${numeroPorExtenso(dec)}` : numeroPorExtenso(inteiro);
-  return `${C.pct(n)} (${extenso} por cento)`;
+  const escrito = C.pct(Number(p) || 0);
+  return `${escrito} (${decimalPorExtenso(escrito.replace('%', ''))} por cento)`;
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
