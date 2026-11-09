@@ -181,11 +181,8 @@ export function normalizar(d) {
   for (const [k, v] of Object.entries(CONFIG_BANCO_FASE2)) if (d.config_banco[k] === undefined) d.config_banco[k] = typeof v === 'object' && v ? { ...v } : v;
   if (!d.config_banco.ultima_importacao || typeof d.config_banco.ultima_importacao !== 'object') d.config_banco.ultima_importacao = {};
   // "extrato importado até" saiu de config_banco (que só o administrador muda na nuvem) para a raiz, por conta (2026-11-09):
-  // copia o que estava lá, sem voltar uma data mais nova; o campo antigo fica como estava (versões antigas ainda o leem)
-  for (const [conta, ate] of Object.entries(d.config_banco.ultima_importacao)) {
-    if (!ate || (d.extrato_importado_ate && d.extrato_importado_ate[conta] >= ate)) continue;
-    d.extrato_importado_ate = { ...(d.extrato_importado_ate || {}), [conta]: ate };
-  }
+  // sem cópia aqui (o operador abriria conflito na nuvem com a cópia que só ele tem): `extratoImportadoAte` lê os dois e vale a
+  // data mais nova; o campo novo nasce na primeira importação
   for (const m of d.movimentacoes_banco) {
     if (m.classificacao === undefined) m.classificacao = null;
     if (m.valor < 0) { m.valor = -m.valor; m.tipo = 'saida'; }

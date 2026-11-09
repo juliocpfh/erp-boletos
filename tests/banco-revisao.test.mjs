@@ -96,7 +96,7 @@ test('item 8: o operador importa o extrato na nuvem (antes o lote inteiro era re
   const DONO = 'dono@exemplo.com.br'; const OP = 'operador@exemplo.com.br';
   const d0 = R.bancoVazio();
   d0.usuarios = [{ id: 1, login: DONO, papel: 'admin', ativo: true }, { id: 2, login: OP, papel: 'operador', ativo: true }];
-  d0.config_banco = { ...d0.config_banco, contas: [{ id: 'ank', apelido: 'ANK', emitente_id: 1 }] };
+  d0.config_banco = { ...d0.config_banco, contas: [{ id: 'ank', apelido: 'ANK', emitente_id: 1 }], ultima_importacao: { ank: '2026-10-31' } };
   R.normalizar(d0);
   c.importar(d0, DONO);
   const antes = R.normalizar(c.tudo(OP));
@@ -108,9 +108,11 @@ test('item 8: o operador importa o extrato na nuvem (antes o lote inteiro era re
   const nuvem = c.tudo();
   assert.equal(nuvem.movimentacoes_banco.length, 1, 'a movimentação chegou à nuvem');
   assert.equal(R.extratoImportadoAte(nuvem, 'ank'), '2026-11-08');
+  // a data antiga (de config_banco) não vira conflito, mesmo o operador importando antes de o administrador entrar
+  assert.equal(c.conflitosAbertos().length, 0);
 });
 
-test('item 8: "importado até" fica na raiz (extrato_importado_ate, por conta); normalizar copia o que estava em config_banco.ultima_importacao', () => {
+test('item 8: "importado até" fica na raiz (extrato_importado_ate, por conta); o que estava em config_banco.ultima_importacao continua valendo', () => {
   const { d } = base();
   const cfgAntes = structuredClone(d.config_banco);
   Z.importarExtrato(d, 'ank', [saida('a1', '2026-11-05', '123.45', 'SANEPAR')], 'julio', { de: '2026-11-01', ate: '2026-11-15', hoje: '2026-11-20' });
@@ -118,15 +120,18 @@ test('item 8: "importado até" fica na raiz (extrato_importado_ate, por conta); 
   assert.deepEqual(d.extrato_importado_ate, { ank: '2026-11-15' });
   assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-15');
   assert.equal(R.extratoImportadoAte(d, 'jck'), null);
-  // banco antigo: a data estava em config_banco.ultima_importacao
-  const velho = R.bancoVazio();
+  // banco antigo: a data estava em config_banco.ultima_importacao; normalizar não copia (o operador abriria conflito na nuvem
+  // com uma cópia que só o aparelho dele tem), a leitura vale para os dois
+  const velho = base().d;
   velho.config_banco.ultima_importacao = { ank: '2026-10-31', jck: '2026-10-15' };
   R.normalizar(velho);
-  assert.deepEqual(velho.extrato_importado_ate, { ank: '2026-10-31', jck: '2026-10-15' });
+  assert.equal(velho.extrato_importado_ate, undefined);
   assert.deepEqual(velho.config_banco.ultima_importacao, { ank: '2026-10-31', jck: '2026-10-15' }, 'o campo antigo fica como estava');
-  velho.extrato_importado_ate.ank = '2026-11-08';
-  R.normalizar(velho);
-  assert.equal(velho.extrato_importado_ate.ank, '2026-11-08', 'a data mais nova não volta para a antiga');
+  assert.equal(R.extratoImportadoAte(velho, 'jck'), '2026-10-15');
+  Z.importarExtrato(velho, 'ank', [saida('a2', '2026-11-05', '10.00', 'TARIFA')], 'julio', { de: '2026-11-01', ate: '2026-11-08', hoje: '2026-11-20' });
+  assert.deepEqual(velho.extrato_importado_ate, { ank: '2026-11-08' });
+  assert.equal(R.extratoImportadoAte(velho, 'ank'), '2026-11-08', 'a data mais nova vale');
+  assert.equal(R.extratoImportadoAte(velho, 'jck'), '2026-10-15', 'a outra conta continua com a antiga');
   // sem importação nenhuma, normalizar não cria o campo (nada a mandar à nuvem)
   const novo = R.normalizar(R.bancoVazio());
   assert.equal(novo.extrato_importado_ate, undefined);
