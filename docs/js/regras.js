@@ -179,6 +179,12 @@ export function normalizar(d) {
   d.config_banco = d.config_banco || {};
   for (const [k, v] of Object.entries(CONFIG_BANCO_FASE2)) if (d.config_banco[k] === undefined) d.config_banco[k] = typeof v === 'object' && v ? { ...v } : v;
   if (!d.config_banco.ultima_importacao || typeof d.config_banco.ultima_importacao !== 'object') d.config_banco.ultima_importacao = {};
+  // "extrato importado até" saiu de config_banco (que só o administrador muda na nuvem) para a raiz, por conta (2026-11-09):
+  // copia o que estava lá, sem voltar uma data mais nova; o campo antigo fica como estava (versões antigas ainda o leem)
+  for (const [conta, ate] of Object.entries(d.config_banco.ultima_importacao)) {
+    if (!ate || (d.extrato_importado_ate && d.extrato_importado_ate[conta] >= ate)) continue;
+    d.extrato_importado_ate = { ...(d.extrato_importado_ate || {}), [conta]: ate };
+  }
   for (const m of d.movimentacoes_banco) {
     if (m.classificacao === undefined) m.classificacao = null;
     if (m.valor < 0) { m.valor = -m.valor; m.tipo = 'saida'; }
@@ -5076,11 +5082,25 @@ export function salvarGuiaImposto(d, emitenteId, imposto, periodo, valor, usuari
 // Banco (C6), fase 2: extrato, comprovantes e pagamentos. Aqui fica só o que normalizar, arquivosReferenciados,
 // etapasFechamento e todosAlertas precisam; as regras de conciliação estão em conciliacao.js (que importa este arquivo).
 // --------------------------------------------------------------------------
-/** Campos novos de config_banco (os da base — ativo, provedor, ponte_url, senha_ponte, conta_padrao_id, contas — ficam como estão). */
+/**
+ * Campos novos de config_banco (os da base — ativo, provedor, ponte_url, senha_ponte, conta_padrao_id, contas — ficam como estão).
+ * ``ultima_importacao`` é antigo: desde 2026-11-09 o "extrato importado até" fica na raiz, em ``d.extrato_importado_ate``
+ * ({ conta: 'AAAA-MM-DD' }), porque config_banco só o administrador muda na nuvem e o operador também importa o extrato.
+ */
 export const CONFIG_BANCO_FASE2 = {
   pasta_contador: '_Contador', modelo_nome_comprovante: '{data} {empresa} {imovel} {tipo} {valor}', tolerancia_dias: 3,
   permitir_pagamentos: false, limite_pagamento: 0, ultima_importacao: {}, copiar_para_contador: true,
 };
+
+/**
+ * Até que dia o extrato da conta já foi importado ('AAAA-MM-DD' ou null): ``d.extrato_importado_ate`` (campo da raiz, criado na
+ * primeira importação) ou, em banco antigo ainda não normalizado, ``config_banco.ultima_importacao`` (vale a data mais nova).
+ */
+export function extratoImportadoAte(d, contaId) {
+  const novo = ((d && d.extrato_importado_ate) || {})[contaId] || null;
+  const antigo = (((d && d.config_banco) || {}).ultima_importacao || {})[contaId] || null;
+  return novo && antigo ? (novo > antigo ? novo : antigo) : novo || antigo;
+}
 /** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
 export const DIAS_ALERTA_BANCO = 7;
 /** No mês corrente, a etapa "Banco" do fechamento aceita o extrato buscado há até este número de dias (não precisa chegar até hoje). */
@@ -5181,7 +5201,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
   const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
   const porConta = contas.map((c) => {
-    const importadoAte = (cfg.ultima_importacao || {})[c.id] || null;
+    const importadoAte = extratoImportadoAte(d, c.id);
     return { id: c.id, apelido: apelidoDaConta(d, c.id), semDestino: semDestinoDe(c.id), importadoAte, semImportar: !importadoAte || importadoAte < ate };
   });
   const semComprovante = movs.filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador).length;

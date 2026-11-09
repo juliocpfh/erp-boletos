@@ -78,7 +78,7 @@ export function telaBanco(rota) {
   const semComprovante = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m)).length;
   const saldo = estado.saldos[conta];
   const e = emitenteDaConta(conta);
-  const importadoAte = (config().ultima_importacao || {})[conta] || null;
+  const importadoAte = R.extratoImportadoAte(d(), conta);
   const filtroLink = (k, t) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${t}</a>`;
   return `<div class="cabecalho"><h1>Banco</h1><div class="acoes">${link('#/banco/pagamentos', 'Pagamentos pelo banco', 'botao secundario')}</div></div>
     ${bancoAtivo() ? '' : avisoNaoConfigurado()}
@@ -674,12 +674,16 @@ export const ACOES_BANCO = {
   async buscarExtrato({ conta, mes }) {
     if (!opera()) throw new Error('Seu usuário não pode importar o extrato.');
     if (!bancoAtivo()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
-    const [de, fim] = C.limitesCompetencia(mes);
+    const [inicio, fim] = C.limitesCompetencia(mes);
     const ate = fim < C.hojeIso() ? fim : C.hojeIso();
-    if (de > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+    if (inicio > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+    // o que faltou do mês anterior vem junto (ex.: buscado em 30/11 às 10h, importado até 29/11: dezembro começa em 30/11);
+    // o que já estava não entra em dobro
+    const anterior = R.extratoImportadoAte(d(), conta);
+    const de = anterior && anterior < C.somarDias(inicio, -1) && anterior >= C.somarDias(inicio, -62) ? C.somarDias(anterior, 1) : inicio;
     const r = await P.extratoDaConta(conta, de, ate);
     const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos || [], login(), { de, ate }));
-    aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m).`);
+    aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m)${de < inicio ? ` (busquei desde ${dataBr(de)}, o que faltava do mês anterior)` : ''}.`);
     await mostrar();
   },
 

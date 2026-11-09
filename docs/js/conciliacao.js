@@ -6,7 +6,7 @@ import * as C from './calculos.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  pendenciasBancoDoMes, CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem,
+  pendenciasBancoDoMes, CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte,
 } from './regras.js';
 
 export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, contaBancaria as contaDo, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
@@ -117,9 +117,11 @@ const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null,
 
 /**
  * Importa o extrato de uma conta. ``lancamentos`` = ``entries[]`` do C6. Nunca repete o mesmo ``reference`` na mesma conta.
- * Devolve { novas: [mov], repetidas: n, conta }. Grava config_banco.ultima_importacao[conta] = ``ate`` (ou a maior data importada).
+ * Devolve { novas: [mov], repetidas: n, conta }. Grava ``d.extrato_importado_ate[conta]`` = ``ate`` (ou a maior data importada), na
+ * raiz e não em config_banco (o operador também importa, e config_banco só o administrador muda na nuvem). Período que chega até
+ * hoje grava ontem: o dia ainda não acabou e o que entrar à tarde precisa ser buscado de novo (ex.: busca em 30/11 às 10h → 29/11).
  */
-export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, ate = null } = {}) {
+export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, ate = null, hoje: dia = hoje() } = {}) {
   const conta = exigirConta(d, contaId);
   const existentes = new Set((d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId).map((m) => m.id_externo));
   const novas = [];
@@ -134,11 +136,12 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
     novas.push(inserir(d, 'movimentacoes_banco', { ...m, importada_em: new Date().toISOString(), ...CAMPOS_DESTINO }, usuario,
       `Extrato ${apelidoDaConta(d, contaId)}: ${C.dataBr(m.data)} · ${m.tipo} ${C.reais(m.valor)} · ${m.descricao}`.slice(0, 200)));
   }
-  const fim = ate || maior;
+  const ultimo = ate || maior;
+  let fim = ultimo && ultimo >= dia ? C.somarDias(dia, -1) : ultimo;
+  if (fim && de && de > fim) fim = null; // só o dia de hoje: nenhum dia completo ainda
   if (fim) {
-    cfg(d).ultima_importacao = cfg(d).ultima_importacao || {};
-    const anterior = cfg(d).ultima_importacao[contaId] || null;
-    if (!anterior || fim > anterior) cfg(d).ultima_importacao[contaId] = fim;
+    const anterior = extratoImportadoAte(d, contaId);
+    if (!anterior || fim > anterior) d.extrato_importado_ate = { ...(d.extrato_importado_ate || {}), [contaId]: fim };
   }
   registrar(d, usuario, 'Alteração', 'banco', null, `Extrato ${apelidoDaConta(d, contaId)} importado${de ? ` de ${C.dataBr(de)}` : ''}${fim ? ` até ${C.dataBr(fim)}` : ''}: ${novas.length} nova(s), ${repetidas} já estava(m)`,
     { conta_id: contaId, novas: novas.length, repetidas, de, ate: fim });
@@ -210,7 +213,7 @@ export function resumoBanco(d, contaId, mes) {
   const movs = movimentacoesDo(d, { conta_id: contaId, mes });
   const soma = (tipo) => movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.valor, 0);
   return { entradas: soma('entrada'), saidas: soma('saida'), total: movs.length, pendentes: movs.filter((m) => !m.classificacao).length,
-    semComprovante: movs.filter(semComprovante).length, importadoAte: (cfg(d).ultima_importacao || {})[contaId] || null };
+    semComprovante: movs.filter(semComprovante).length, importadoAte: extratoImportadoAte(d, contaId) };
 }
 
 export const pendenciasBanco = (d, mes, dia) => pendenciasBancoDoMes(d, mes, dia);

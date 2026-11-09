@@ -76,3 +76,77 @@ test('item 4: em ?teste o simulador do site confere os itens como a ponte (valid
     delete globalThis.location;
   }
 });
+
+// --------------------------------------------------------------------------
+// Itens 8 e 5: "importado até" fora de config_banco (o operador importa na nuvem) e nunca o dia de hoje (o fim do dia se perdia)
+// --------------------------------------------------------------------------
+/** Cofre da nuvem com o SQLite do Node (igual a tests/cofre.test.mjs). */
+async function cofreDeTeste() {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { Cofre } = await import('../nuvem/cofre.mjs');
+  const db = new DatabaseSync(':memory:');
+  const sql = { db, exec(q, ...p) { if (!p.length && q.trim().split(';').filter((x) => x.trim()).length > 1) { db.exec(q); return { toArray: () => [] }; } const l = db.prepare(q).all(...p).map((x) => ({ ...x })); return { toArray: () => l }; } };
+  const tx = (fn) => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
+  return new Cofre(sql, tx, () => new Date('2026-11-09T10:00:00-03:00'));
+}
+
+test('item 8: o operador importa o extrato na nuvem (antes o lote inteiro era recusado: "Só o administrador muda config_banco")', async () => {
+  const { diferencas } = await import('../docs/js/nuvem.js');
+  const c = await cofreDeTeste();
+  const DONO = 'dono@exemplo.com.br'; const OP = 'operador@exemplo.com.br';
+  const d0 = R.bancoVazio();
+  d0.usuarios = [{ id: 1, login: DONO, papel: 'admin', ativo: true }, { id: 2, login: OP, papel: 'operador', ativo: true }];
+  d0.config_banco = { ...d0.config_banco, contas: [{ id: 'ank', apelido: 'ANK', emitente_id: 1 }] };
+  R.normalizar(d0);
+  c.importar(d0, DONO);
+  const antes = R.normalizar(c.tudo(OP));
+  const depois = structuredClone(antes);
+  Z.importarExtrato(depois, 'ank', [{ id_externo: 'x1', data: '2026-11-03', valor_centavos: 150000, tipo: 'entrada', descricao: 'PIX RECEBIDO' }], OP, { de: '2026-11-01', ate: '2026-11-08', hoje: '2026-11-09' });
+  const ops = diferencas(antes, depois);
+  assert.ok(!ops.some((o) => o.op === 'raiz' && o.campo === 'config_banco'), 'importar não mexe em config_banco');
+  c.aplicar({ id: 'aparelho-op-lote-0001', ops }, OP);
+  const nuvem = c.tudo();
+  assert.equal(nuvem.movimentacoes_banco.length, 1, 'a movimentação chegou à nuvem');
+  assert.equal(R.extratoImportadoAte(nuvem, 'ank'), '2026-11-08');
+});
+
+test('item 8: "importado até" fica na raiz (extrato_importado_ate, por conta); normalizar copia o que estava em config_banco.ultima_importacao', () => {
+  const { d } = base();
+  const cfgAntes = structuredClone(d.config_banco);
+  Z.importarExtrato(d, 'ank', [saida('a1', '2026-11-05', '123.45', 'SANEPAR')], 'julio', { de: '2026-11-01', ate: '2026-11-15', hoje: '2026-11-20' });
+  assert.deepEqual(d.config_banco, cfgAntes, 'config_banco não muda ao importar');
+  assert.deepEqual(d.extrato_importado_ate, { ank: '2026-11-15' });
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-15');
+  assert.equal(R.extratoImportadoAte(d, 'jck'), null);
+  // banco antigo: a data estava em config_banco.ultima_importacao
+  const velho = R.bancoVazio();
+  velho.config_banco.ultima_importacao = { ank: '2026-10-31', jck: '2026-10-15' };
+  R.normalizar(velho);
+  assert.deepEqual(velho.extrato_importado_ate, { ank: '2026-10-31', jck: '2026-10-15' });
+  assert.deepEqual(velho.config_banco.ultima_importacao, { ank: '2026-10-31', jck: '2026-10-15' }, 'o campo antigo fica como estava');
+  velho.extrato_importado_ate.ank = '2026-11-08';
+  R.normalizar(velho);
+  assert.equal(velho.extrato_importado_ate.ank, '2026-11-08', 'a data mais nova não volta para a antiga');
+  // sem importação nenhuma, normalizar não cria o campo (nada a mandar à nuvem)
+  const novo = R.normalizar(R.bancoVazio());
+  assert.equal(novo.extrato_importado_ate, undefined);
+});
+
+test('item 5: buscar o extrato até hoje grava "importado até" = ontem (o que entra à tarde não se perde no fechamento)', () => {
+  const { d } = base();
+  // segunda 30/11/2026, 10h: "Buscar extrato de 11/2026" (de 01/11 até hoje)
+  Z.importarExtrato(d, 'ank', [saida('a1', '2026-11-05', '123.45', 'SANEPAR')], 'julio', { de: '2026-11-01', ate: '2026-11-30', hoje: '2026-11-30' });
+  Z.importarExtrato(d, 'jck', [], 'julio', { de: '2026-11-01', ate: '2026-11-30', hoje: '2026-11-30' });
+  assert.deepEqual(d.extrato_importado_ate, { ank: '2026-11-29', jck: '2026-11-29' });
+  // em 02/12 o Fechamento de novembro ainda pede o extrato das duas contas
+  let p = R.pendenciasBancoDoMes(d, '2026-11', '2026-12-02');
+  assert.deepEqual(p.contasSemImportar, ['ank', 'jck']);
+  // buscando de novo em 01/12, novembro fica completo
+  Z.importarExtrato(d, 'ank', [saida('a1', '2026-11-05', '123.45', 'SANEPAR'), saida('a2', '2026-11-30', '39.90', 'TARIFA PACOTE')], 'julio', { de: '2026-11-01', ate: '2026-11-30', hoje: '2026-12-01' });
+  p = R.pendenciasBancoDoMes(d, '2026-11', '2026-12-02');
+  assert.deepEqual(p.contasSemImportar, ['jck']);
+  assert.equal(d.movimentacoes_banco.length, 2, 'a tarifa da tarde de 30/11 entrou; a de 05/11 não repetiu');
+  // arquivo OFX que vai até hoje: o mesmo cuidado
+  Z.importarExtrato(d, 'jck', [], 'julio', { de: '2026-12-01', ate: '2026-12-03', hoje: '2026-12-03' });
+  assert.equal(R.extratoImportadoAte(d, 'jck'), '2026-12-02');
+});

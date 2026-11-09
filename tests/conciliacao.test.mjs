@@ -46,7 +46,7 @@ test('importação do extrato: converte "1500.00" em centavos, nunca repete o re
   assert.equal(r.novas[0].classificacao, null);
   assert.equal(d.historico.filter((h) => h.acao === 'Inclusão' && h.tabela === 'movimentacoes_banco').length - 0, 3);
   assert.ok(d.historico.length >= antes + 4);
-  assert.equal(d.config_banco.ultima_importacao.ank, '2026-11-05');
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-05');
   const r2 = importar(d, 'ank', lancs);
   assert.deepEqual([r2.novas.length, r2.repetidas], [0, 3]);
   assert.equal(d.movimentacoes_banco.length, 3);
@@ -504,8 +504,8 @@ test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Pa
   assert.ok(e, 'etapa existe');
   assert.deepEqual([e.pendentes, e.contas.map((c) => c.semImportar)], [2, [true, true]]);
   assert.match(e.detalhe, /ANK: extrato ainda não buscado · JCK: extrato ainda não buscado/);
-  importar(d, 'ank', [saida('r1', '2026-11-05', '10.00', 'A'), saida('r2', '2026-11-06', '5.00', 'B')], { ate: '2026-11-30' });
-  importar(d, 'jck', [saida('j1', '2026-11-05', '7.00', 'C')], { ate: '2026-11-30' });
+  importar(d, 'ank', [saida('r1', '2026-11-05', '10.00', 'A'), saida('r2', '2026-11-06', '5.00', 'B')], { ate: '2026-11-30', hoje });
+  importar(d, 'jck', [saida('j1', '2026-11-05', '7.00', 'C')], { ate: '2026-11-30', hoje });
   e = R.etapasFechamento(d, '2026-11', hoje).find((x) => x.chave === 'banco');
   assert.deepEqual([e.pendentes, e.feito], [3, false]);
   assert.match(e.detalhe, /ANK: 2 sem destino · JCK: 1 sem destino/);
@@ -716,7 +716,7 @@ test('D5: lerOfx lê o arquivo do app do C6 e importarExtrato aceita os lançame
   assert.equal(imp.novas.length, 2);
   assert.equal(imp.novas[1].valor, 131850);
   assert.equal(imp.novas[1].tipo, 'entrada');
-  assert.equal(d.config_banco.ultima_importacao.ank, '2026-09-30');
+  assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-09-30');
   // o mesmo arquivo de novo: nada entra em dobro
   assert.equal(Z.importarExtrato(d, 'ank', Z.lerOfx(OFX_TESTE).lancamentos, 'julio').repetidas, 2);
   // o texto com acento quebrado em UTF-8 é relido como Windows-1252
