@@ -106,6 +106,7 @@ test('mesmo campo mudado em dois aparelhos: volta ao valor anterior e nada vale 
   assert.equal(contrato(c, 20).valor, 364445);
   assert.equal(c.conflitosAbertos().length, 2);
   assert.throws(() => c.resolver({ conflito: cf.id, escolha: 'atual' }, CONSULTA), (e) => e.status === 403);
+  assert.throws(() => c.resolver({ conflito: cf.id, escolha: 'atual' }, OPERADOR), (e) => e.status === 403, 'só o administrador escolhe');
   c.resolver({ conflito: cf.id, escolha: 'atual' }, DONO);
   assert.equal(contrato(c, 20).valor, 370000, 'a escolha vale em todos os aparelhos');
   assert.equal(c.conflitosAbertos().length, 0, 'fecha todas as propostas do mesmo campo');

@@ -26,7 +26,7 @@ export function telaConflitos() {
   const conflitos = E.nuvem.conflitos;
   const recusas = E.nuvem.recusas;
   const naoEnviados = E.anexos?.naoEnviados || [];
-  const pode = podeUsuario('operador');
+  const pode = podeUsuario('admin'); // só o administrador escolhe (a nuvem também confere)
   const linhas = conflitos.map((c) => {
     if (c.tipo === 'campo') {
       return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(c.campo)}</b></td>
@@ -42,7 +42,7 @@ export function telaConflitos() {
   }).join('');
   return `<h1>Conflitos da nuvem</h1>
     <div class="caixa"><h2>Para escolher</h2>
-      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. Até alguém escolher, vale o valor de antes.</p>
+      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, vale o valor de antes.${pode ? '' : ' Avise o administrador.'}</p>
       ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>

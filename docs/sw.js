@@ -49,12 +49,17 @@ self.addEventListener('fetch', (ev) => {
   ev.respondWith(req.mode === 'navigate' ? abrirPagina(req) : arquivo(req));
 });
 
-/** A página em si: sempre tenta o site (o login do Cloudflare precisa passar por ela); sem internet, a guardada. */
+/**
+ * A página em si: sempre tenta o site (o login do Cloudflare precisa passar por ela); sem internet, a guardada.
+ * Site fora do ar respondendo com página de erro (5xx: Cloudflare ou GitHub Pages com problema) também abre a guardada:
+ * para o sistema, "o site caiu" é o mesmo que "sem internet" (edita aqui e envia sozinho quando voltar).
+ */
 async function abrirPagina(req) {
   conferencia = conferirVersao().catch(() => 'copia');
   try {
     const r = await fetch(req);
     if (r.ok && r.type === 'basic' && !r.redirected) { const copia = r.clone(); conferencia.then(() => guardar('./', copia)); } // depois da limpeza, se houver
+    if (r.status >= 500) return (await caches.match('./', { ignoreSearch: true })) || r;
     return r;
   } catch (e) {
     const guardada = await caches.match('./', { ignoreSearch: true });
@@ -73,6 +78,7 @@ async function arquivo(req) {
   try {
     const r = await fetch(req, { cache: 'no-cache' });
     if (r.ok && r.type === 'basic' && !r.redirected) guardar(req, r.clone());
+    if (r.status >= 500) return (await caches.match(req)) || r; // site fora do ar: a cópia guardada
     return r;
   } catch (e) {
     const guardada = await caches.match(req);

@@ -16,11 +16,12 @@ import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
+import { alertaFichas, telaFicha } from './telas/fichas.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
@@ -193,7 +194,9 @@ export const TELAS = {
       // cartas de reajuste marcadas como enviadas antes de o sistema guardar o PDF: vão para a pasta do inquilino
       .then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, 'aviso'))
       // arquivos dos lançamentos: os que estão em outra pasta voltam; os que sumiram viram alerta
-      .then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, 'aviso'));
+      .then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, 'aviso'))
+      // fichas reprovadas há 3 meses: os documentos pessoais saem da pasta
+      .then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, 'aviso'));
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
@@ -234,6 +237,9 @@ export const TELAS = {
         ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
+      ${alertaFichas()}
+      ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
+        ${link('#/conflitos', podeUsuario('admin') ? 'Escolher agora' : 'Ver (o administrador escolhe)', 'botao pequeno')}</div>` : ''}
       ${avisoBackupSeguro()}
       ${calendarioDoPainel(C.competenciaValida(rota.q.mes, C.competenciaDe(hoje)), hoje)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario('admin') ? link('#/alertas-config', 'Editar', 'botao secundario pequeno') : ''}</div>
@@ -339,6 +345,7 @@ export const TELAS = {
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
   inquilinos: (rota) => telaInquilinos(rota.q),
+  ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),
   solicitacoes: (rota) => telaSolicitacoes(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),

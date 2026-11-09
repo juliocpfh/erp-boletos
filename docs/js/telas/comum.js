@@ -106,6 +106,11 @@ const SUB_SEGURO = 'Seguro (apólices)';
 
 export const PASTA_SEM_IMOVEL = 'Sem imóvel';
 
+/** Fichas em análise: uma pasta por ficha (sem acento, como os nomes gravados pelo sistema). */
+export const PASTA_FICHAS = 'Fichas em analise';
+/** Nome da pasta da ficha, escolhido ao criar e que não muda depois. Ex.: "Maria Souza (ficha 12-11-2026)". */
+export const nomePastaFicha = (f) => S.limparNome(`${f.inquilino_nome} (ficha ${dataBr(f.data_recebida || C.hojeIso()).replace(/\//g, '-')})`);
+
 /** Pasta-mãe dos arquivos do inquilino (partes do caminho): "Imóvel/Inquilinos", ou "Sem imóvel". */
 export function pastaPaiContrato(c) {
   const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null;
@@ -133,11 +138,12 @@ const escopoDoContrato = (escopo) => ['contrato', 'assinados', 'aditivos', 'segu
 
 const SUB_DO_ESCOPO = { assinados: SUB_ASSINADOS, aditivos: SUB_ADITIVOS, seguro: SUB_SEGURO };
 
-export const vinculoDoEscopo = (escopo, id) => (escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id }
+export const vinculoDoEscopo = (escopo, id) => (escopo === 'ficha' ? {} : escopoDoContrato(escopo) ? { contrato_id: Number(id), imovel_id: buscar('contratos', id).imovel_id }
   : escopo === 'contador' ? {} : { imovel_id: imovelDoEscopo(escopo, Number(id)) });
 
 /** Identifica a pasta de verdade (dois contratos podem usar a mesma pasta): "Imóvel/Inquilino (datas)/Aditivos, correções e comunicação". */
 export function chavePasta(escopo, id) {
+  if (escopo === 'ficha') { const f = buscar('fichas', id); return f ? [PASTA_FICHAS, f.pasta].join('/') : null; }
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
     return c ? [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), SUB_DO_ESCOPO[escopo] || ''].join('/') : null;
@@ -337,6 +343,11 @@ export async function alterarApagandoAnexos(fn) {
 /** Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página). */
 export async function pastaDoEscopo(escopo, id, criar = true) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
+  if (escopo === 'ficha') {
+    const f = buscar('fichas', id);
+    if (!f) throw new Error('Ficha não encontrada.');
+    return S.subpasta(raiz, [PASTA_FICHAS, f.pasta || nomePastaFicha(f)], criar);
+  }
   if (escopoDoContrato(escopo)) {
     const c = buscar('contratos', id);
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
@@ -383,6 +394,77 @@ export async function limparSemImovel() {
 
 export let pastasComArquivos = [];
 
+// --------------------------------------------------------------------------
+// Arquivos das fichas em análise (pasta "Fichas em analise/<nome> (ficha <data>)")
+// --------------------------------------------------------------------------
+/** Pasta da ficha, ou null se ainda não existe (nada anexado). */
+async function pastaDaFicha(pastaNome) {
+  try { return await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, pastaNome], false); } catch { return null; }
+}
+
+/** Apaga a pasta da ficha se ficou vazia (e a "Fichas em analise", se não sobrou nenhuma). */
+async function apagarPastaDaFichaSeVazia(pastaNome) {
+  try {
+    const mae = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), [PASTA_FICHAS], false);
+    await S.apagarPastaVazia(mae, pastaNome);
+    if (!(await S.subpastas(mae)).length) await S.apagarPastaVazia(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), PASTA_FICHAS);
+  } catch { /* pasta nem existia */ }
+}
+
+/**
+ * Contrato feito a partir da ficha: os documentos (ficha cadastral, documentos pessoais, comprovante da reserva…) vão
+ * para a pasta do inquilino e saem da pasta da ficha. Só no primeiro contrato da ficha ("todos juntos": os outros
+ * contratos apontam para a pasta do primeiro na página da ficha). Devolve quantos arquivos foram.
+ */
+export async function levarDocumentosDaFicha(fichaId, contratoId) {
+  const f = buscar('fichas', fichaId);
+  if (!f || f.documentos_no_contrato) return 0;
+  const de = await pastaDaFicha(f.pasta || nomePastaFicha(f));
+  const nomes = [];
+  if (de) {
+    const para = await pastaDoEscopo('contrato', Number(contratoId));
+    for (const a of await S.listar(de)) {
+      try {
+        await S.escreverTexto(para, a.nome, await S.abrirArquivo(de, a.nome));
+        await de.removeEntry(a.nome);
+        nomes.push(a.nome);
+      } catch { /* fica na pasta da ficha: dá para levar à mão */ }
+    }
+  }
+  await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_no_contrato: Number(contratoId), comprovante_reserva: null }, login(),
+    `Documentos da ficha levados para a pasta do inquilino${nomes.length ? `: ${nomes.join(', ')}` : ''}`));
+  await apagarPastaDaFichaSeVazia(f.pasta || nomePastaFicha(f));
+  return nomes.length;
+}
+
+/** Exclusão da ficha: apaga todos os arquivos da pasta dela (documentos pessoais não ficam soltos). */
+export async function apagarPastaDaFicha(pastaNome) {
+  const dir = await pastaDaFicha(pastaNome);
+  if (dir) for (const a of await S.listar(dir)) await dir.removeEntry(a.nome).catch(() => {});
+  await apagarPastaDaFichaSeVazia(pastaNome);
+}
+
+let documentosDeFichasConferidos = false;
+
+/**
+ * Ficha reprovada: 3 meses depois da decisão, os documentos pessoais são apagados (pedido do dono). Ficam o registro da
+ * ficha e os comprovantes da reserva e da devolução (são de dinheiro). Uma vez por sessão, ao abrir o Painel.
+ */
+export async function apagarDocumentosVencidosDasFichas() {
+  if (documentosDeFichasConferidos || !opera() || !E.pasta) return;
+  documentosDeFichasConferidos = true;
+  const vencidas = R.fichasComDocumentosVencidos(d());
+  for (const f of vencidas) {
+    const dir = await pastaDaFicha(f.pasta || nomePastaFicha(f));
+    const ficam = new Set(R.CAMPOS_ARQUIVO_FICHA.map((k) => f[k]).filter(Boolean));
+    const apagados = [];
+    if (dir) for (const a of await S.listar(dir)) if (!ficam.has(a.nome)) { try { await dir.removeEntry(a.nome); apagados.push(a.nome); } catch { /* tenta de novo amanhã */ } }
+    await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso() }, login(),
+      `Documentos da ficha reprovada apagados (${R.MESES_DOCUMENTOS_REPROVADA} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`));
+  }
+  if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${R.MESES_DOCUMENTOS_REPROVADA} meses: ${vencidas.map((f) => f.inquilino_nome).join(', ')}.`, 'info');
+}
+
 /** Arquivos ligados a lançamentos que não estão na pasta (conferirArquivos): { contrato_id, nome, rotulo, ancora }. */
 export let arquivosFaltando = [];
 
@@ -415,7 +497,7 @@ export async function conferirArquivos() {
   let conferidos = 0;
   for (const a of R.arquivosReferenciados(d())) {
     const chave = `${chavePasta(a.escopo, a.id)}|${a.nome}`;
-    if (vistos.has(chave) || !buscar('contratos', a.id)) continue;
+    if (vistos.has(chave) || a.escopo === 'ficha' || !buscar('contratos', a.id)) continue; // ficha: comprovantes só da análise
     vistos.add(chave);
     conferidos += 1;
     try { await (await pastaDoEscopo(a.escopo, Number(a.id), false)).getFileHandle(a.nome); } catch { sumidos.push(a); }

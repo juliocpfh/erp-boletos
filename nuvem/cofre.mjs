@@ -401,7 +401,7 @@ export class Cofre {
    * · excluido: 'manter_excluido' | 'recriar' (volta o registro apagado com a mudança proposta).
    */
   resolver({ conflito, escolha } = {}, email) {
-    this.exigir(email, 'operador');
+    this.exigir(email, 'admin'); // decisão do dono (2026-11-09): o conflito para e só o administrador escolhe
     return this.transacao(() => {
       const c = this.q('SELECT * FROM conflitos WHERE id = ? AND resolvido_em IS NULL', Number(conflito))[0];
       if (!c) throw new ErroCofre(404, 'Conflito não encontrado ou já resolvido.');

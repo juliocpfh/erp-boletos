@@ -17,10 +17,11 @@ import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
+import { ACOES_FICHAS } from './fichas.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
@@ -62,6 +63,8 @@ const TABELAS_EXCLUSAO = {
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   devolucoes_garantia: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
+  // ficha: só o administrador exclui; os documentos da pasta dela saem juntos (ACOES.excluir)
+  fichas: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.ficha_id === r.id) ? 'Esta ficha já virou contrato e não pode ser excluída.' : null), voltar: () => '#/inquilinos?ir=fichas' },
   depositos_garantia: { depois: (db, r) => (r.complementar ? null : R.acertarGarantiaDepositada(db, r.contrato_id, r.qual, login())), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   despesas: { checar: (db, r) => (r.movimentacao_id || r.pagamento_banco_id ? 'Esta conta veio do banco: desfaça o destino da movimentação na tela Banco.' : null) },
   ganhos_airbnb: {
@@ -372,7 +375,17 @@ async function marcarGeradoNaRotina(tipo, m) {
 export const ACOES = {
   escolherPasta: () => escolherPasta(),
   reabrir: () => reabrirPastaLembrada(),
-  sair: () => sair(),
+  async sair() {
+    // nuvem: tenta mandar o que falta antes; se ainda sobrar (sem internet), avisa antes de sair
+    if (E.nuvem) {
+      await E.nuvem.sincronizar().catch(() => {});
+      await E.anexos?.enviarFila().catch(() => {});
+      const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0);
+      if (n && !confirm(`Há ${n} alteração(ões) feitas neste aparelho que ainda não foram enviadas (sem internet).\n\n`
+        + 'Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com internet, mas o mais seguro é esperar a internet voltar e sair depois.\n\nSair mesmo assim?')) return;
+    }
+    await sair();
+  },
   async imprimir() {
     window.print();
     if (!/^#\/imprimir\/(contrato|chaves)\b/.test(location.hash)) return;
@@ -628,7 +641,7 @@ export const ACOES = {
     const [, , tabela, id] = location.hash.split('?')[0].split('/');
     const r = buscar(tabela, id);
     if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
-    const [escopo, dono] = tabela === 'seguros' ? ['seguro', r.contrato_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
+    const [escopo, dono] = tabela === 'fichas' ? ['ficha', r.id] : tabela === 'seguros' ? ['seguro', r.contrato_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
     await ACOES.abrirArquivo({ escopo, id: dono, nome: r[campo] });
   },
 
@@ -780,7 +793,8 @@ export const ACOES = {
     const r = buscar(tabela, id);
     const destino = cfg.voltar ? cfg.voltar(r) : null;
     // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato e imóvel guardam a pasta.
-    await (['contratos', 'imoveis'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
+    const pastaFicha = tabela === 'fichas' && r ? r.pasta || nomePastaFicha(r) : null;
+    await (['contratos', 'imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
@@ -788,10 +802,11 @@ export const ACOES = {
         for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') R.excluirContrato(db, reg.id, login());
-      else R.excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || null);
+      else R.excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === 'fichas' ? `Ficha de ${reg.inquilino_nome}` : null));
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
       if (cfg.depois) cfg.depois(db, reg);
     });
+    if (pastaFicha) await apagarPastaDaFicha(pastaFicha);
     // contrato excluído: a pasta dele sai junto se estiver vazia (pasta com documentos fica guardada)
     if (tabela === 'contratos') {
       try { await S.apagarPastaVazia(await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), pastaPaiContrato(r), false), r.pasta || nomePastaContrato(r)); } catch { /* pasta nem existia */ }
@@ -1914,4 +1929,4 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM);
+Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS);

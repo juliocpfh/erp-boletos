@@ -5,6 +5,7 @@ import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
+import { caixaFichas } from './fichas.js';
 
 /** Filtros da busca global (parâmetro ``tipo`` do endereço → grupo devolvido por ``R.buscarGlobal``). */
 const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'Notas fiscais']];
@@ -86,6 +87,7 @@ export function telaInquilinos(q) {
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="buscaInquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
+    ${caixaFichas()}
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro">${opera() ? 'Solicitação · ' : ''}Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${matricula(x)}</td><td>${nome(x)}</td>${registrar(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
