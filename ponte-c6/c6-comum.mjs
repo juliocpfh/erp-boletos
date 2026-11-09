@@ -51,8 +51,8 @@ export function centavosDoTexto(valor) {
   return Math.round(n * 100 + (n < 0 ? -1e-7 : 1e-7));
 }
 
-/** Só os dígitos de uma linha digitável colada com pontos e espaços. */
-export const soDigitos = (texto) => String(texto ?? '').replace(/\D/g, '');
+/** Só os dígitos ("123.456.789-00" → "12345678900"; linha digitável colada com pontos e espaços). Vazio/nulo → ''. Usado também nos cadastros do site. */
+export const soDigitos = (texto) => String(texto || '').replace(/\D/g, '');
 
 /**
  * Linha digitável (47 dígitos, boleto bancário; 48, arrecadação/concessionária) → código de barras de 44 dígitos (44 volta como está).

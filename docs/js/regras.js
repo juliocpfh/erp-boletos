@@ -1,6 +1,7 @@
 // Regras de negócio sobre o banco de dados (um objeto JSON em memória).
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
+import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
 import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
 import * as M from './mapa-c6.js';
@@ -5530,7 +5531,6 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 /** Texto para comparar: minúsculas e sem acento ("João" → "joao"). */
 export const textoDeBusca = (t) => C.semAcento(t).toLocaleLowerCase('pt-BR').trim();
-const soDigitosBusca = (t) => String(t || '').replace(/\D/g, '');
 
 /**
  * Busca em tudo o que o dono procura no dia a dia. Devolve grupos `{ tipo, itens: [{ titulo, detalhe, link, extra }] }`:
@@ -5540,11 +5540,11 @@ const soDigitosBusca = (t) => String(t || '').replace(/\D/g, '');
  */
 export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
   const q = textoDeBusca(texto);
-  const digitos = soDigitosBusca(texto);
+  const digitos = soDigitos(texto);
   if (!q) return [];
   const bate = (...campos) => campos.some((v) => v && textoDeBusca(v).includes(q));
   // número: compara também só os dígitos (CPF com ou sem pontos, telefone com ou sem traço)
-  const bateDigitos = (...campos) => digitos.length >= 3 && campos.some((v) => v && soDigitosBusca(v).includes(digitos));
+  const bateDigitos = (...campos) => digitos.length >= 3 && campos.some((v) => v && soDigitos(v).includes(digitos));
   const grupos = [];
   const imoveis = d.imoveis.filter((i) => bate(i.nome, i.endereco, i.complemento, i.cidade, i.matricula, i.sublote) || bateDigitos(i.matricula, i.copel_uc, i.sanepar_matricula, i.gas_relogio, i.cep))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))

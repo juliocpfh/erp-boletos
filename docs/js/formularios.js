@@ -1,4 +1,5 @@
 // Campos de cada cadastro, desenho dos formulários e leitura do que foi digitado.
+import { soDigitos } from './c6-comum.js';
 import { centavos, numero } from './calculos.js';
 
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,7 +12,7 @@ const QUEBRA = { quebra: true };
 // --------------------------------------------------------------------------
 // CPF, CNPJ, CEP e telefone: máscara ao digitar e conferência dos dígitos ao salvar
 // --------------------------------------------------------------------------
-export const soDigitos = (v) => String(v || '').replace(/\D/g, '');
+export { soDigitos }; // de c6-comum.js (a mesma da ponte)
 
 export function cpfValido(v) {
   const n = soDigitos(v);
