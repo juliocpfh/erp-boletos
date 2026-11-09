@@ -1406,6 +1406,34 @@ export function pendentesDeFatura(d) {
   return lista.sort((a, b) => a.data.localeCompare(b.data) || a.tipo.localeCompare(b.tipo) || a.registro.id - b.registro.id);
 }
 
+/** Chave de um pagamento da fila de NF (para marcar na tela): "cobranca:12", "avulsa:3". */
+export const chavePendente = (p) => `${p.tipo}:${p.registro.id}`;
+
+/** Mês fechado: já virou (ex.: em 09/11/2026, outubro e antes). As NFs se numeram por mês fechado, do dia 1º ao último. */
+export const mesFechado = (comp, hoje = C.hojeIso()) => comp < C.competenciaDe(hoje);
+
+/** Entradas do Airbnb no extrato de um mês que ainda não receberam destino (o ganho não foi lançado nos imóveis). */
+export const entradasAirbnbSemDestino = (d, comp) => (d.movimentacoes_banco || []).filter((m) => m.tipo === 'entrada' && !m.classificacao
+  && String(m.data || '').slice(0, 7) === comp && /AIRBNB/i.test(`${m.titulo || ''} ${m.descricao || ''}`));
+
+/**
+ * Lembretes do Airbnb antes de numerar as NFs dos meses ``meses`` (só os fechados): entrada do Airbnb no extrato sem destino,
+ * ganhos lançados sem a NF gerada, NF com soma desatualizada, ou nenhum ganho lançado. Lista de textos (vazia = tudo certo).
+ */
+export function lembretesAirbnb(d, meses, hoje = C.hojeIso()) {
+  const out = [];
+  for (const comp of [...new Set(meses)].filter((m) => mesFechado(m, hoje)).sort()) {
+    const sem = entradasAirbnbSemDestino(d, comp);
+    if (sem.length) out.push(`${sem.length} entrada(s) do Airbnb no extrato de ${C.compBr(comp)} ainda sem destino (${C.reais(sem.reduce((t, m) => t + m.valor, 0))}): dê o destino no Financeiro, dividindo entre os imóveis.`);
+    const m = airbnbDoMes(d, comp);
+    if (m.numerada) continue;
+    if (m.total && !m.nf) out.push(`Os ganhos do Airbnb de ${C.compBr(comp)} (${C.reais(m.total)}) ainda não viraram NF: gere a NF do Airbnb.`);
+    else if (m.divergente) out.push(`A NF do Airbnb de ${C.compBr(comp)} está com ${C.reais(m.nf.valor)}, mas os ganhos somam ${C.reais(m.total)}: acerte a NF do Airbnb.`);
+    else if (!m.total && !sem.length) out.push(`Nenhuma entrada do Airbnb lançada em ${C.compBr(comp)}. Se houve, lance antes de numerar.`);
+  }
+  return out;
+}
+
 export function ultimaFatura(d) {
   return d.faturas.reduce((m, f) => (!m || f.numero > m.numero ? f : m), null);
 }
@@ -1491,9 +1519,11 @@ function problemaDaFatura(d, base) {
  * A data de emissão é a data do pagamento. Se algum pagamento é anterior à última fatura já emitida,
  * nada é feito sem ``forcar`` (para não bagunçar a sequência).
  */
-export function numerarFaturas(d, usuario, { forcar = false, ate = null } = {}) {
+export function numerarFaturas(d, usuario, { forcar = false, ate = null, apenas = null } = {}) {
   let pendentes = pendentesDeFatura(d);
   if (ate) pendentes = pendentes.filter((p) => p.data <= ate);
+  // só os pagamentos marcados na tela (chaves "cobranca:12", "avulsa:3")
+  if (apenas) { const marcados = new Set(apenas); pendentes = pendentes.filter((p) => marcados.has(chavePendente(p))); }
   const ultima = ultimaFatura(d);
   const foraDeOrdem = ultima ? pendentes.filter((p) => p.data < ultima.emissao) : [];
   if (foraDeOrdem.length && !forcar) return { numeradas: [], foraDeOrdem, problema: null, ultima };

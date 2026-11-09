@@ -1436,12 +1436,23 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Numera só os pagamentos marcados na fila (por padrão, os dos meses fechados), lembrando antes do Airbnb. */
   async numerar() {
-    let r = await alterar((db) => R.numerarFaturas(db, login()));
+    const apenas = [...document.querySelectorAll('input[data-nfp]:checked')].map((x) => x.dataset.nfp);
+    if (!apenas.length) throw new C.ErroUsuario('Marque na lista os pagamentos que quer numerar.');
+    const marcados = R.pendentesDeFatura(E.d).filter((p) => apenas.includes(R.chavePendente(p)));
+    const meses = [...new Set(marcados.map((p) => p.data.slice(0, 7)))];
+    const abertos = meses.filter((m) => !R.mesFechado(m));
+    const avisos = [
+      ...(abertos.length ? [`Há pagamento(s) de ${abertos.map(compBr).join(', ')}, mês ainda em andamento: o normal é numerar depois da virada do mês.`] : []),
+      ...R.lembretesAirbnb(E.d, meses),
+    ];
+    if (avisos.length && !confirm(`${avisos.map((t) => `• ${t}`).join('\n')}\n\nNumerar mesmo assim?`)) return;
+    let r = await alterar((db) => R.numerarFaturas(db, login(), { apenas }));
     if (r.foraDeOrdem.length) {
       const lista = r.foraDeOrdem.map((p) => `${dataBr(p.data)}`).join(', ');
       if (!confirm(`A última NF (nº ${R.numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista}.\n\nNumerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
-      r = await alterar((db) => R.numerarFaturas(db, login(), { forcar: true }));
+      r = await alterar((db) => R.numerarFaturas(db, login(), { forcar: true, apenas }));
     }
     if (r.numeradas.length) aviso(`NFs numeradas: ${r.numeradas.map((n) => R.numeroFatura(n.numero)).join(', ')}.`);
     if (r.problema) aviso(r.problema, 'erro');

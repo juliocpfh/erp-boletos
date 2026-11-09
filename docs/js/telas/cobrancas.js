@@ -109,7 +109,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
         <div class="acoes">${link(url({ filtro: 'todos' }), `← Boletos de ${compBr(comp)}`, 'botao secundario')}</div></div>
       ${filtros}
-      ${filtro === 'semnf' && lista.length && opera() ? `<div class="alerta info">${lista.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
+      ${filtro === 'semnf' && lista.length && opera() ? `<div class="alerta info">${lista.length} pagamento(s) aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
       ${opera() && ['abertos', 'vencidos'].includes(filtro) ? caixaBaixaLote(lista, hoje) : ''}
       ${tabelaBoletos(lista, hoje, ordem, url, { comp: true, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
   }
@@ -134,7 +134,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
       ${caucoes.map((x) => `<div class="acoes" style="margin-top:6px">${esc(x.contrato.inquilino_nome)}: caução de ${reais(x.atual)} para ${reais(x.necessaria)}
         ${link(`#/reajustes?contrato=${x.contrato.id}`, `Completar ${reais(x.complemento)} em Reajustes`, 'botao pequeno')}</div>`).join('')}</div>` : ''}
     ${opera() && lista.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao('recalcularMes', `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, 'secundario pequeno', 'Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.')}</p>` : ''}
-    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao('numerar', 'Numerar NFs agora', {}, 'pequeno')}</div>` : ''}
+    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ''}
     ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, reajustes, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
