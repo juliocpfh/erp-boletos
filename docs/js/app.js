@@ -6,6 +6,7 @@ import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import { montarIndice } from './indice.js';
 import * as C from './calculos.js';
+import { encaixarFaturas } from './fatura.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
 import { AnexosNuvem } from './pasta-nuvem.js';
@@ -696,6 +697,7 @@ async function montarExtras(raiz) {
 
 /** Celular: tabelas que não cabem viram cartões (com o nome da coluna em cada valor); caixas com rolagem ganham o aviso. */
 function arrumarTabelas(raiz) {
+  encaixarFaturas(raiz);
   if (window.matchMedia?.('(max-width: 760px)').matches) cartoesNoCelular(raiz);
   // no celular, as tabelas largas viram cartões: cada célula mostra o nome da coluna (ver estilo.css, @media)
   for (const tabela of raiz.querySelectorAll('table.responsiva')) {
