@@ -9,7 +9,7 @@ import { compBr, dataBr, reais } from '../calculos.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
-import { faturaExcel, faturaHtml } from '../fatura.js';
+import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
 import { dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
@@ -178,6 +178,7 @@ async function pdfDaFatura(f) {
   caixa.style.cssText = 'position:fixed;left:-20000px;top:0;background:#fff';
   caixa.innerHTML = faturaHtml(f, e);
   document.body.appendChild(caixa);
+  encaixarFaturas(caixa);
   try {
     const canvas = await html2canvas(caixa.firstElementChild, { scale: 2, backgroundColor: '#ffffff' });
     const pdf = new jsPDF({ unit: 'mm', format: 'a4' });

@@ -60,14 +60,47 @@ function linhas(f, emitente) {
   };
 }
 
+/** Largura de cada coluna em pixels e da folha inteira: fixas, para toda NF sair do mesmo tamanho. */
+const PX = LARGURAS.map((w) => Math.round(w * 7 + 5));
+const LARGURA_TOTAL = PX.reduce((t, w) => t + w, 0);
+
 export function faturaHtml(f, emitente) {
   const ls = linhas(f, emitente);
-  const cols = LARGURAS.map((w) => `<col style="width:${(w * 7 + 5).toFixed(0)}px">`).join('');
+  const cols = PX.map((w) => `<col style="width:${w}px">`).join('');
   const corpo = Object.keys(ls).map(Number).sort((a, b) => a - b).map((r) => {
     const altura = ALTURAS[r] || 15;
     return `<tr style="height:${(altura * 4 / 3).toFixed(1)}px">${ls[r].map(([n, t, cls]) => `<td colspan="${n}" class="${cls}">${t}</td>`).join('')}</tr>`;
   }).join('');
-  return `<div class="fatura-xls"><table><colgroup>${cols}</colgroup>${corpo}</table></div>`;
+  return `<div class="fatura-xls"><table style="width:${LARGURA_TOTAL}px"><colgroup>${cols}</colgroup>${corpo}</table></div>`;
+}
+
+/**
+ * Texto que não cabe na célula (nome, endereço ou observação compridos) diminui a letra só daquela célula, em vez de
+ * alargar a tabela ou esticar a linha: assim toda NF tem o mesmo tamanho na tela, na impressão e no PDF.
+ * Chame depois que a fatura estiver na página (precisa medir).
+ */
+export function encaixarFaturas(raiz) {
+  for (const tabela of raiz.querySelectorAll('.fatura-xls table')) {
+    for (const tr of tabela.rows) {
+      const altura = parseFloat(tr.style.height) || 0;
+      for (const td of tr.cells) {
+        if (!td.textContent.trim()) continue;
+        const quebra = getComputedStyle(td).whiteSpace !== 'nowrap'; // o canhoto quebra linha: cuida da altura
+        const faixa = document.createRange();
+        faixa.selectNodeContents(td);
+        for (let i = 0; i < 10; i += 1) {
+          const cx = faixa.getBoundingClientRect();
+          const livre = td.clientWidth - 6; // 3px de margem de cada lado
+          const fator = quebra ? (altura && cx.height > altura ? 0.93 : 1) : (cx.width > livre ? Math.max(0.6, livre / cx.width) : 1);
+          if (fator >= 1) break;
+          // mede tudo antes de mudar: o texto de dentro herda a letra da célula e encolheria duas vezes
+          const els = [td, ...td.querySelectorAll('*')];
+          const tamanhos = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
+          els.forEach((el, k) => { el.style.fontSize = `${(tamanhos[k] * fator * 0.99).toFixed(2)}px`; });
+        }
+      }
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
