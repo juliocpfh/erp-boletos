@@ -1,7 +1,7 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
 import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
-import { dataBr } from '../calculos.js';
+import { dataBr, hojeIso } from '../calculos.js';
 import { levarParaNuvem } from '../migracao.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -60,6 +60,8 @@ const mb = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigi
 /** Dia de um backup da nuvem pelo nome (`imoveis-dados-AAAA-MM-DD[-antes-da-substituicao].json`). */
 const diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+))?\.json$/) || []).slice(1);
 const pastaBackups = () => E.pasta.getDirectoryHandle(S.PASTA_BACKUPS);
+/** O momento que o backup guarda: o do dia é feito às 3h (horário de Brasília) e leva a data desse dia (o de 09/11 = como estava às 3h de 09/11). */
+const momentoDoBackup = (dia, motivo) => (motivo ? `logo antes da substituição feita em ${dataBr(dia)}` : `às 3h de ${dataBr(dia)}`);
 
 /** Backups diários dos dados da nuvem (30 dias, feitos pelo servidor): baixar ou voltar para um dia. Só administrador. */
 export async function telaBackupsNuvem() {
@@ -72,13 +74,15 @@ export async function telaBackupsNuvem() {
   lista.sort((a, b) => b.nome.localeCompare(a.nome));
   const linhas = lista.map((a) => {
     const [dia, , motivo] = diaDoBackup(a.nome);
-    return `<tr><td>${dataBr(dia)}</td><td>${motivo ? 'cópia feita antes de substituir os dados' : 'backup do dia'}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
+    return `<tr><td>${dataBr(dia)}</td><td>${motivo ? 'cópia feita logo antes de substituir os dados' : 'como os dados estavam às 3h desse dia'}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
       <td>${botao('baixarBackupNuvem', 'Baixar', { nome: a.nome }, 'secundario pequeno')} ${botao('restaurarBackupNuvem', 'Voltar para este dia', { nome: a.nome }, 'perigo pequeno')}</td></tr>`;
   }).join('');
+  // exemplo com o backup do dia mais recente (ou hoje): "o de 09/11 é como os dados estavam às 3h de 09/11"
+  const exemplo = dataBr(lista.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
-    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita na primeira gravação de cada dia. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
-      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele dia (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
-      <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito na primeira gravação do dia).</td></tr>'}</table></div></div>`;
+    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
+      <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
 }
 
 /** Relatório da passagem da pasta para a nuvem (etapa 4). */
@@ -139,17 +143,18 @@ export const ACOES_NUVEM = {
   /** Volta os dados da nuvem para os de um dia (o servidor guarda antes uma cópia "antes-da-substituicao"). */
   async restaurarBackupNuvem({ nome }) {
     if (!podeUsuario('admin')) throw new Error('Só o administrador restaura backups.');
-    const [dia] = diaDoBackup(nome);
+    const [dia, , motivo] = diaDoBackup(nome);
     if (!dia) throw new Error('Backup desconhecido.');
     if (E.nuvem.pendentesQtd()) throw Object.assign(new Error('Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de voltar para um backup.'), { esperado: true });
+    const momento = momentoDoBackup(dia, motivo);
     const ok = await janela({ titulo: `Voltar os dados para ${dataBr(dia)}?`, forte: true, sim: 'Voltar para este dia',
-      html: `<p>Os dados da nuvem passam a ser os do backup de <b>${dataBr(dia)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois desse dia se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita antes de substituir").</p>` });
+      html: `<p>Os dados da nuvem voltam a ser como estavam <b>${esc(momento)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois ${motivo ? 'dessa substituição' : `das 3h de ${dataBr(dia)}`} se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita logo antes de substituir").</p>` });
     if (!ok) return;
     const dados = JSON.parse(await (await S.abrirArquivo(await pastaBackups(), nome)).text());
     if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
     E.d = await E.nuvem.importar(dados, { substituir: true });
     await reabrirSessao();
-    aviso(`Dados voltaram para ${dataBr(dia)}. Os outros aparelhos recebem a versão nova sozinhos.`);
+    aviso(`Dados voltaram a ser como estavam ${momento}. Os outros aparelhos recebem a versão nova sozinhos.`);
     ir('#/');
   },
   async esquecerNaoEnviado(ds) {
