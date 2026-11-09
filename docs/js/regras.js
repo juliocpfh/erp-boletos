@@ -5003,10 +5003,28 @@ export function fazerAcordo(d, dados, usuario, hoje = C.hojeIso()) {
   return { acordo: a, parcelas };
 }
 
-/** Desfaz o acordo (só se nenhuma parcela foi paga nem emitida no C6): apaga as parcelas e os boletos originais voltam a ser cobrados. */
+/**
+ * Acordo mais novo (não desfeito) que incluiu uma parcela deste: { acordo, parcela } ou null. Enquanto existir, este não se
+ * desfaz (a parcela seria apagada e o acordo novo continuaria cobrando por ela: a dívida ficaria em dobro).
+ */
+export function acordoPosterior(d, a) {
+  for (const p of parcelasDoAcordo(d, a)) {
+    if (!emAcordo(p) || !p.acordo_id) continue;
+    const b = buscar(d, 'acordos', p.acordo_id);
+    if (b && !b.desfeito_em) return { acordo: b, parcela: p };
+  }
+  return null;
+}
+
+/**
+ * Desfaz o acordo (só se nenhuma parcela foi paga nem emitida no C6, nem entrou num acordo mais novo): apaga as parcelas e os
+ * boletos originais voltam a ser cobrados.
+ */
 export function desfazerAcordo(d, acordoId, usuario, hoje = C.hojeIso()) {
   const a = buscar(d, 'acordos', Number(acordoId));
   if (!a || a.desfeito_em) throw new Error('Acordo não encontrado.');
+  const depois = acordoPosterior(d, a);
+  if (depois) throw new C.ErroUsuario(`Desfaça antes o acordo de ${C.dataBr(depois.acordo.data)}, que inclui a parcela ${depois.parcela.acordo_parcela || 'única'}.`);
   const parcelas = parcelasDoAcordo(d, a);
   if (parcelas.some((cb) => cb.data_pagamento)) throw new Error('Uma parcela do acordo já foi paga: desfaça o pagamento antes.');
   if (parcelas.some((cb) => emitidoNoBanco(cb))) throw new Error('Uma parcela do acordo foi emitida no C6: cancele no banco antes.');

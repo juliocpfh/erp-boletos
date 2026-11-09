@@ -188,3 +188,26 @@ test('vencimento no sábado: pago até o 1º dia útil é em dia; depois, o atra
   R.registrarPagamento(d, cb.id, '2026-10-13', null, 'julio');
   assert.deepEqual([cb.situacao, cb.dias_atraso, cb.valor_pago, cb.valor_nf], ['Paga em dia', 0, 121850, 121500]);
 });
+
+test('desfazer acordo com parcela dentro de um acordo mais novo: recusa (senão cobraria em dobro)', () => {
+  const { d, c } = base({ reserva_valor: 0, cobrar_iptu: false, taxa_boleto: 0, desconto_pontualidade_percentual: 0 });
+  R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08
+  R.gerarCobrancas(d, '2026-08', 'julio'); // vence 10/09
+  const ids = d.cobrancas.map((x) => x.id);
+  const A = R.fazerAcordo(d, { contrato_id: c.id, ids, total: 280000, parcelas: 2, primeiro_vencimento: '2026-10-01' }, 'julio', '2026-09-20');
+  // a 1ª parcela de A (01/10) não foi paga; em 20/10, acordo B só com ela
+  const B = R.fazerAcordo(d, { contrato_id: c.id, ids: [A.parcelas[0].id], total: 145000, parcelas: 1, primeiro_vencimento: '2026-11-05' }, 'julio', '2026-10-20');
+  assert.deepEqual(R.acordoPosterior(d, A.acordo), { acordo: B.acordo, parcela: A.parcelas[0] });
+  assert.equal(R.acordoPosterior(d, B.acordo), null);
+  const antes = JSON.stringify(d.cobrancas);
+  assert.throws(() => R.desfazerAcordo(d, A.acordo.id, 'julio', '2026-10-21'),
+    (e) => e instanceof C.ErroUsuario && e.message === 'Desfaça antes o acordo de 20/10/2026, que inclui a parcela 1/2.');
+  assert.equal(JSON.stringify(d.cobrancas), antes, 'nada mudou');
+  // desfazendo na ordem (B e depois A), volta a dívida original: R$ 2.700,00
+  R.desfazerAcordo(d, B.acordo.id, 'julio', '2026-10-21');
+  assert.equal(R.acordoPosterior(d, A.acordo), null);
+  R.desfazerAcordo(d, A.acordo.id, 'julio', '2026-10-21');
+  const aCobrar = d.cobrancas.filter(R.aCobrar);
+  assert.deepEqual(aCobrar.map((x) => x.competencia), ['2026-07', '2026-08']);
+  assert.equal(aCobrar.reduce((s, x) => s + R.totais(x).a_pagar_sem_desconto, 0), 270000);
+});

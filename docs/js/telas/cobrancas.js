@@ -274,12 +274,15 @@ function caixaAcordo(cb) {
   if (!a || (!R.emAcordo(cb) && !R.ehParcelaAcordo(cb))) return '';
   const parcelas = R.parcelasDoAcordo(d(), a);
   const lista = (l) => l.map((x) => `${link(`#/cobranca/${x.id}`, R.ehParcelaAcordo(x) && x.acordo_parcela_de === a.id ? (x.acordo_parcela || 'boleto') : compBr(x.competencia))} ${reais(R.totais(x).a_pagar_sem_desconto)} · vence ${dataBr(x.vencimento)}${x.data_pagamento ? ` · pago em ${dataBr(x.data_pagamento)}` : ''}`).join('<br>');
-  const podeDesfazer = opera() && !a.desfeito_em && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x));
+  // parcela dentro de um acordo mais novo: só desfaz depois dele (o texto diz qual)
+  const depois = !a.desfeito_em && R.acordoPosterior(d(), a);
+  const podeDesfazer = opera() && !a.desfeito_em && !depois && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x));
   return `<div class="alerta info nao-imprimir"><b>Acordo de ${dataBr(a.data)}</b> com ${esc(R.buscar(d(), 'contratos', a.contrato_id).inquilino_nome)}: ${esc(a.referente)}
     (${reais(a.divida_na_data)} na data) em ${a.parcelas} boleto(s), total ${reais(a.valor_total)}.${a.observacoes ? ` <i>${esc(a.observacoes)}</i>` : ''}
     <br><b>Boletos do acordo:</b><br>${lista(parcelas)}
     <br><b>Boletos que ele substituiu:</b><br>${lista(R.origensDoAcordo(d(), a))}
-    ${podeDesfazer ? `<br>${botao('desfazerAcordo', 'Desfazer o acordo', { id: a.id }, 'secundario pequeno', 'Desfazer o acordo? Os boletos do acordo serão excluídos e os originais voltam a ser cobrados.')}` : ''}</div>`;
+    ${podeDesfazer ? `<br>${botao('desfazerAcordo', 'Desfazer o acordo', { id: a.id }, 'secundario pequeno', 'Desfazer o acordo? Os boletos do acordo serão excluídos e os originais voltam a ser cobrados.')}` : ''}
+    ${depois ? `<br><span class="suave">Para desfazer este acordo, desfaça antes o ${link(`#/cobranca/${depois.parcela.id}`, `acordo de ${dataBr(depois.acordo.data)}`)}, que inclui a parcela ${esc(depois.parcela.acordo_parcela || 'única')}.</span>` : ''}</div>`;
 }
 
 export function telaCobranca(cb) {
