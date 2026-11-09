@@ -344,3 +344,51 @@ test('item 2: a sugestão liga a conta já lançada à mão (mesmo imóvel, tipo
   assert.deepEqual([s3.imovel_id, s3.despesa_id], [sobre.id, cond.id]);
   void l3;
 });
+
+// --------------------------------------------------------------------------
+// Item 3: a resposta do banco se perde depois de "Aprovar e enviar": o pagamento ficava travado
+// --------------------------------------------------------------------------
+test('item 3: aprovado e enviado, resposta perdida — "Atualizar situação" e o reenvio reconhecem o que já está no banco; o Painel avisa', async () => {
+  const { rotasFase2 } = await import('../ponte-c6/rotas-fase2.mjs');
+  const { criarC6Simulado } = await import('../ponte-c6/c6-simulado.mjs');
+  const c6 = criarC6Simulado({ conta: 'ank' });
+  const rotas = rotasFase2({ c6DaConta: () => c6 });
+  const ponte = (m, url, corpo) => rotas.find((x) => x.metodo === m && x.caminho.test(url)).handler({ url }, { conta: 'ank', corpo }).then((r) => r.corpo);
+  const { d, sobre } = base();
+  d.config_banco.permitir_pagamentos = true;
+  const BARRAS = `83660000001${'9'.repeat(33)}`;
+  const [p] = Z.prepararPagamentos(d, [{ conta_id: 'ank', imovel_id: sobre.id, origem: { tipo: 'avulso' }, tipo_conta: 'Luz', competencia: '2026-11', valor: 1999, forma: 'boleto', codigo_barras: BARRAS, data_pagamento: '2026-11-20' }], 'julio');
+  // "Mandar o banco ler o código"
+  const { group_id: g } = await ponte('POST', '/contas/ank/pagamentos/decodificar', { items: [{ content: p.content, amount: p.amount, description: p.description, transaction_date: p.transaction_date }] });
+  let { items } = await ponte('GET', `/contas/ank/pagamentos/${g}/itens`);
+  Z.atualizarPagamento(d, p.id, { situacao: 'rascunho', id_externo: Z.casarItensDoGrupo([p], items)[0].id, grupo_id: g }, 'julio');
+  // "Aprovar e enviar": aprova aqui, o banco recebe… e a resposta seguinte se perde
+  Z.aprovarPagamento(d, p.id, 'julio');
+  await ponte('POST', `/contas/ank/pagamentos/${g}/enviar`, { uploader_name: 'Julio' });
+  assert.equal(p.situacao, 'aguardando_aprovacao');
+  assert.match(R.alertaBanco(d, '2026-11-10').texto, /1 pagamento\(s\) aprovado\(s\) aqui sem a confirmação de que chegou ao banco/, 'o Painel avisa');
+  // de novo "Aprovar e enviar": o item já está no banco (SCHEDULED) → é registrado, não vira erro
+  ({ items } = await ponte('GET', `/contas/ank/pagamentos/${g}/itens`));
+  const sep = Z.separarParaEnvio([p], items);
+  assert.deepEqual([sep.prontos.length, sep.jaNoBanco.map((x) => x.id)], [0, [p.id]]);
+  Z.registrarGrupoEnviado(d, sep.jaNoBanco.map((x) => x.id), g, items, 'julio');
+  assert.equal(p.situacao, 'agendado');
+  assert.equal(R.alertaBanco(d, '2026-11-10'), null, 'enviado, ainda no prazo: sem alerta');
+  // "Atualizar situação" também resolve: SCHEDULED → agendado; READ_DATA (o envio não chegou) não mexe
+  const { d: d2, sobre: s2 } = base();
+  d2.config_banco.permitir_pagamentos = true;
+  const [q] = Z.prepararPagamentos(d2, [{ conta_id: 'ank', imovel_id: s2.id, origem: { tipo: 'avulso' }, tipo_conta: 'Luz', competencia: '2026-11', valor: 1999, forma: 'boleto', codigo_barras: BARRAS, data_pagamento: '2026-11-20' }], 'julio');
+  Z.atualizarPagamento(d2, q.id, { situacao: 'rascunho', id_externo: 'it-1', grupo_id: 'g1' }, 'julio');
+  Z.aprovarPagamento(d2, q.id, 'julio');
+  assert.deepEqual(Z.atualizarSituacaoPagamentos(d2, [{ id: 'it-1', status: 'READ_DATA' }], 'julio'), []);
+  assert.equal(q.situacao, 'aguardando_aprovacao', 'só lido: continua esperando o envio');
+  Z.atualizarSituacaoPagamentos(d2, [{ id: 'it-1', status: 'SCHEDULED' }], 'julio');
+  assert.equal(q.situacao, 'agendado');
+});
+
+test('item 3: separarParaEnvio — prontos (lidos), já no banco e com erro', () => {
+  const pags = [{ id: 1, id_externo: 'a', content: 'X', valor: 100 }, { id: 2, id_externo: 'b', content: 'Y', valor: 200 }, { id: 3, id_externo: 'c', content: 'Z', valor: 300 }];
+  const items = [{ id: 'a', status: 'READ_DATA' }, { id: 'b', status: 'PROCESSING' }, { id: 'c', status: 'DECODE_ERROR' }, { id: 'd', status: 'ERROR' }];
+  const r = Z.separarParaEnvio(pags, items);
+  assert.deepEqual([r.prontos.map((p) => p.id), r.jaNoBanco.map((p) => p.id), r.comErro.map((it) => it.id)], [[1], [2], ['c', 'd']]);
+});

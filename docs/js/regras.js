@@ -5209,7 +5209,10 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
 }
 
-/** Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias e pagamentos enviados sem confirmação. Só com o banco ligado. */
+/**
+ * Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias, pagamentos enviados sem confirmação e
+ * pagamentos aprovados aqui cujo envio ao banco não se confirmou (a resposta se perdeu: "Atualizar situação"). Só com o banco ligado.
+ */
 export function alertaBanco(d, hoje = C.hojeIso()) {
   const cfg = d.config_banco || {};
   if (!cfg.ativo) return null;
@@ -5217,14 +5220,17 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const semDestino = (d.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
   const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador && m.data <= limite);
   const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
+  const semEnvio = (d.pagamentos_banco || []).filter((p) => p.situacao === 'aguardando_aprovacao');
   const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
-  if (!semDestino.length && !semComprovante.length && !enviados.length && !erros.length) return null;
+  if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length) return null;
   const partes = [];
   if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
+  if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
-  return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
+  const soPagamentos = !semDestino.length && !semComprovante.length;
+  return { nivel: enviados.length || semEnvio.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: soPagamentos ? '#/banco/pagamentos' : '#/banco', texto: `${partes.join('; ')}.` };
 }
 
 // --------------------------------------------------------------------------

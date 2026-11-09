@@ -308,9 +308,17 @@ function caixaConferirBoletos(conta, mes) {
 const AVISO_APROVACAO = '<div class="alerta info"><b>O pagamento só acontece depois que você aprovar no aplicativo do C6.</b> Aqui o sistema prepara o pagamento, o banco confere o código, e o administrador aprova e envia numa confirmação só (digitando o valor total); o dinheiro só sai quando alguém autorizado aprova no app. A confirmação final aparece no extrato.</div>';
 const CODIGO_PAG = (p) => p.content || p.codigo_barras || p.pix_copia_cola || p.chave_pix || '';
 const PENDENTES = ['rascunho', 'aguardando_aprovacao', 'erro'];
-/** Texto da confirmação de "Cancelar"/"Descartar": com lote no banco, os códigos já foram lidos lá (nada foi pago). */
-const CONFIRMA_CANCELAR = (comLote, plural = false) => (comLote ? `Cancelar ${plural ? 'estes pagamentos' : 'este pagamento'}? O banco só leu o${plural ? 's códigos' : ' código'}; nada foi pago. ${plural ? 'Os itens saem' : 'O item sai'} do lote lido pelo banco.`
-  : `Cancelar ${plural ? 'estes pagamentos' : 'este pagamento'}? Nada foi enviado ao banco.`);
+/**
+ * Texto da confirmação de "Cancelar"/"Descartar" dos pagamentos ``pags``: com lote no banco, os códigos já foram lidos lá (nada foi
+ * pago); aprovado aqui com o envio pendente, o envio pode ter chegado ao banco: o sistema confere antes e, se chegou, não cancela.
+ */
+function CONFIRMA_CANCELAR(pags) {
+  const plural = pags.length > 1;
+  const oQue = plural ? 'estes pagamentos' : 'este pagamento';
+  if (pags.some((p) => p.situacao === 'aguardando_aprovacao' && p.grupo_id)) return `Cancelar ${oQue}? ${plural ? 'Foram aprovados' : 'Foi aprovado'} aqui e o envio pode ter chegado ao banco: antes de cancelar, o sistema confere no banco. Se já chegou, não cancela aqui (cancele no app do C6 e depois use "Foi cancelado no C6").`;
+  if (pags.some((p) => p.grupo_id)) return `Cancelar ${oQue}? O banco só leu o${plural ? 's códigos' : ' código'}; nada foi pago. ${plural ? 'Os itens saem' : 'O item sai'} do lote lido pelo banco.`;
+  return `Cancelar ${oQue}? Nada foi enviado ao banco.`;
+}
 
 function linhaPagamento(p) {
   const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null;
@@ -320,10 +328,11 @@ function linhaPagamento(p) {
     // a aprovação do administrador acontece junto com o envio ("Aprovar e enviar"); antes disso o banco precisa ter lido o código
     if (PENDENTES.includes(p.situacao) && !p.grupo_id) acoes.push(botaoPonte('lerNoBanco', 'Mandar o banco ler o código', { ids: p.id }, 'botao pequeno'));
     if (['rascunho', 'aguardando_aprovacao'].includes(p.situacao) && p.grupo_id && podeUsuario('admin')) acoes.push(botaoPonte('enviarGrupoAprovacao', 'Aprovar e enviar', { conta: p.conta_id, grupo: p.grupo_id }, 'botao pequeno'));
-    if (p.situacao === 'agendado' && p.grupo_id) acoes.push(botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: p.conta_id, grupo: p.grupo_id }));
+    // também no aprovado com envio pendente: a resposta do banco pode ter se perdido depois do "Aprovar e enviar"
+    if (['agendado', 'aguardando_aprovacao'].includes(p.situacao) && p.grupo_id) acoes.push(botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: p.conta_id, grupo: p.grupo_id }));
     if (p.situacao === 'agendado') acoes.push(botao('confirmarPagamentoPeloExtrato', 'Confirmar pelo extrato', { id: p.id }, 'botao pequeno'));
     if (p.situacao === 'agendado' && podeUsuario('admin')) acoes.push(botao('canceladoNoBanco', 'Foi cancelado no C6', { id: p.id }, 'secundario pequeno'));
-    if (PENDENTES.includes(p.situacao)) acoes.push(botao('cancelarPagamentoBanco', 'Cancelar', { id: p.id }, 'secundario pequeno', CONFIRMA_CANCELAR(!!p.grupo_id)));
+    if (PENDENTES.includes(p.situacao)) acoes.push(botao('cancelarPagamentoBanco', 'Cancelar', { id: p.id }, 'secundario pequeno', CONFIRMA_CANCELAR([p])));
   }
   const codigo = CODIGO_PAG(p);
   return `<tr><td>${i ? `<a href="#/contas/${i.id}?comp=${esc(p.competencia || '')}"><b>${esc(i.nome)}</b></a><br>` : ''}${esc(p.tipo_conta || '')}${p.competencia ? ` de ${compBr(p.competencia)}` : ''}${p.descricao ? `<br><span class="suave">${esc(p.descricao)}</span>` : ''}</td>
@@ -404,7 +413,8 @@ export function caixaPagarPeloBanco(i, comp) {
     <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Beneficiário</th><th>Vencimento</th><th class="n">Valor</th><th>Banco disse</th></tr>${l.map(itemLote).join('')}</table></div>
     <p class="acoes">${g ? (podeUsuario('admin') ? botaoPonte('enviarGrupoAprovacao', 'Aprovar e enviar para aprovação no app do C6', { conta: l[0].conta_id, grupo: g }, 'botao') : '<span class="suave">Só o administrador aprova e envia para o banco.</span>')
     : botaoPonte('lerNoBanco', 'Mandar o banco ler os códigos', { ids: l.map((p) => p.id).join(',') }, 'botao')}
-      ${botao('descartarPagamentos', 'Descartar', { ids: l.map((p) => p.id).join(',') }, 'secundario pequeno', CONFIRMA_CANCELAR(!!g, l.length > 1))}</p>`;
+      ${g && l.some((p) => p.situacao === 'aguardando_aprovacao') ? botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: l[0].conta_id, grupo: g }) : ''}
+      ${botao('descartarPagamentos', 'Descartar', { ids: l.map((p) => p.id).join(',') }, 'secundario pequeno', CONFIRMA_CANCELAR(l))}</p>`;
   return `<div class="cartao" id="pagar-banco" data-caixa="pagar-banco"><h2>Pagar pelo banco (C6)</h2>${AVISO_APROVACAO}
     ${bancoAtivo() ? '' : avisoNaoConfigurado()}${config().permitir_pagamentos ? '' : avisoPagamentosDesligados()}
     ${!opera() || !config().permitir_pagamentos ? '' : `<form data-form="pagarPeloBanco"><input type="hidden" name="imovel" value="${i.id}"><input type="hidden" name="competencia" value="${comp}">
@@ -662,6 +672,26 @@ async function tirarDoLote(pags) {
   if (falhas.length) aviso(`Cancelado aqui, mas o item não saiu do lote lido pelo banco (${falhas[0]}). Isso não paga nada: o lote só anda com a aprovação.`, 'aviso');
 }
 
+/**
+ * Antes de cancelar aqui um pagamento aprovado com o envio pendente: pergunta ao banco. Se o envio chegou (o item está na fila de
+ * aprovação do app), registra como enviado e não cancela (o cancelamento é no app do C6, depois "Foi cancelado no C6").
+ */
+async function conferirAntesDeCancelar(pags) {
+  const aprovados = pags.filter((p) => p.situacao === 'aguardando_aprovacao' && p.grupo_id);
+  if (!aprovados.length || !bancoAtivo()) return;
+  const porLote = new Map();
+  for (const p of aprovados) porLote.set(`${p.conta_id}|${p.grupo_id}`, [...(porLote.get(`${p.conta_id}|${p.grupo_id}`) || []), p]);
+  for (const l of porLote.values()) {
+    const { items } = await P.itensDoGrupo(l[0].conta_id, l[0].grupo_id);
+    const { jaNoBanco } = Z.separarParaEnvio(l, items || []);
+    if (jaNoBanco.length) {
+      await alterar((db) => Z.registrarGrupoEnviado(db, jaNoBanco.map((p) => p.id), l[0].grupo_id, items || [], login()));
+      await mostrar();
+      throw new C.ErroUsuario(`${jaNoBanco.length > 1 ? 'Estes pagamentos já chegaram' : 'Este pagamento já chegou'} ao banco (situação atualizada para "Enviado ao banco"): não dá para cancelar aqui. Cancele no aplicativo do C6 e depois clique em "Foi cancelado no C6".`);
+    }
+  }
+}
+
 // --------------------------------------------------------------------------
 // Botões (data-acao) e formulários (data-form)
 // --------------------------------------------------------------------------
@@ -844,11 +874,15 @@ export const ACOES_BANCO = {
     const pags = pagamentosDoLote(grupo);
     if (!pags.length) throw new Error('Nenhum pagamento deste lote está pronto para enviar (prepare de novo).');
     const { items } = await P.itensDoGrupo(conta, grupo);
-    const lidos = (items || []).filter((it) => it.status === 'READ_DATA');
-    const prontos = pags.filter((p) => lidos.some((it) => String(it.id) === String(p.id_externo)));
+    const { prontos, jaNoBanco, comErro } = Z.separarParaEnvio(pags, items || []);
+    // a resposta do envio anterior se perdeu: o banco já tem estes (na fila de aprovação do app); aqui só se registra
+    if (jaNoBanco.length) {
+      await alterar((db) => Z.registrarGrupoEnviado(db, jaNoBanco.map((p) => p.id), grupo, items || [], login()));
+      aviso(`${jaNoBanco.length} pagamento(s) já tinha(m) chegado ao banco: a situação foi atualizada para "Enviado ao banco". Aprove no aplicativo do C6.`, 'aviso');
+      if (!prontos.length) return mostrar();
+    }
     if (!prontos.length) throw new Error('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
     const total = prontos.reduce((t, p) => t + p.valor, 0);
-    const comErro = (items || []).filter((it) => it.status !== 'READ_DATA' && it.status !== 'SCHEDULED' && it.status !== 'PROCESSING' && it.status !== 'PROCESSED');
     // uma janela só: o resumo completo e o valor total digitado (qualquer diferença cancela)
     const r2 = await janela({ titulo: 'Aprovar e enviar ao banco', sim: 'Aprovar e enviar', forte: true,
       html: `<p>Conta que paga: <b>${esc(nomeConta(conta))}</b></p><ul>${prontos.map((p) => { const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null; const codigo = CODIGO_PAG(p); return `<li>${i ? `${esc(i.nome)} · ` : ''}${esc(p.tipo_conta)} ${compBr(p.competencia)} · ${esc((p.beneficiario && p.beneficiario.nome) || '')} · <b>${reais(p.valor)}</b>${p.vencimento ? ` · vence ${dataBr(p.vencimento)}` : ''} · pagar em ${dataBr(p.data_pagamento)}${codigo ? `<br><span class="codigo-barras suave">${esc(codigo)}</span>` : ''}</li>`; }).join('')}</ul>
@@ -865,8 +899,16 @@ export const ACOES_BANCO = {
     }
     await alterar((db) => prontos.forEach((p) => { if (R.buscar(db, 'pagamentos_banco', p.id).situacao === 'rascunho') Z.aprovarPagamento(db, p.id, login()); }));
     if (comErro.length) await P.removerItensDoGrupo(conta, grupo, comErro.map((it) => it.id));
-    await P.enviarGrupoParaAprovacao(conta, grupo, E.usuario ? E.usuario.nome || login() : login());
-    const depois = await P.itensDoGrupo(conta, grupo);
+    let depois;
+    try {
+      await P.enviarGrupoParaAprovacao(conta, grupo, E.usuario ? E.usuario.nome || login() : login());
+      depois = await P.itensDoGrupo(conta, grupo);
+    } catch (e) {
+      // aprovado aqui; o envio pode ter chegado ao banco ou não: "Atualizar situação" pergunta (o lote é enviado uma vez só)
+      await mostrar();
+      if (e && e.status) throw new Error(`${e.message} Clique em "Atualizar situação" para ver o que o banco tem antes de tentar de novo.`);
+      throw new Error('Não tive resposta do banco. Clique em "Atualizar situação" antes de tentar de novo.');
+    }
     await alterar((db) => Z.registrarGrupoEnviado(db, prontos.map((p) => p.id), grupo, depois.items || [], login()));
     aviso('Enviado ao banco. Agora aprove no aplicativo do C6; depois busque o extrato e confirme o pagamento.', 'aviso');
     await mostrar();
@@ -874,6 +916,7 @@ export const ACOES_BANCO = {
 
   async descartarPagamentos({ ids }) {
     const pags = String(ids).split(',').map((x) => pag(x)).filter((p) => PENDENTES.includes(p.situacao));
+    await conferirAntesDeCancelar(pags);
     await alterar((db) => pags.forEach((p) => Z.cancelarPagamento(db, p.id, login(), { motivo: 'descartado antes de enviar' })));
     await tirarDoLote(pags);
     await mostrar();
@@ -906,6 +949,7 @@ export const ACOES_BANCO = {
 
   async cancelarPagamentoBanco({ id }) {
     const p = pag(id);
+    await conferirAntesDeCancelar([p]);
     await alterar((db) => Z.cancelarPagamento(db, p.id, login()));
     await tirarDoLote([p]);
     await mostrar();

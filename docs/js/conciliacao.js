@@ -1041,12 +1041,32 @@ export function registrarGrupoEnviado(d, ids, grupoId, itensC6, usuario) {
 /** Enviado à ponte/C6 fora de um lote: marca agendado (ou a situação informada). */
 export const marcarPagamentoEnviado = (d, pagId, { id_externo = null, situacao = 'agendado', erro = null, grupo_id = null } = {}, usuario) => atualizarPagamento(d, pagId, { situacao, erro, id_externo, grupo_id }, usuario);
 
-/** Atualiza as situações pelos ``items[]`` do grupo (casa por id_externo = item.id). Devolve os pagamentos que mudaram. */
+/** Situações do item no C6 depois do envio para aprovação (o banco já tem o pagamento na fila do app). */
+const ENVIADO_C6 = ['SCHEDULED', 'PROCESSING', 'PROCESSED', 'SCHEDULING_CANCELLED'];
+
+/**
+ * Antes de "Aprovar e enviar" (de novo): o que o banco tem de cada pagamento do lote. ``prontos``: lidos (READ_DATA), vão no envio;
+ * ``jaNoBanco``: já enviados (a resposta do envio anterior se perdeu), só se registram (registrarGrupoEnviado); ``comErro``: itens do
+ * grupo com erro de leitura, que saem do lote.
+ */
+export function separarParaEnvio(pags, itensC6) {
+  const casados = casarItensDoGrupo(pags, itensC6);
+  return {
+    prontos: pags.filter((p, k) => casados[k] && casados[k].status === 'READ_DATA'),
+    jaNoBanco: pags.filter((p, k) => casados[k] && ENVIADO_C6.includes(casados[k].status)),
+    comErro: (itensC6 || []).filter((it) => it.status !== 'READ_DATA' && !ENVIADO_C6.includes(it.status)),
+  };
+}
+
+/**
+ * Atualiza as situações pelos ``items[]`` do grupo (casa por id_externo = item.id). Devolve os pagamentos que mudaram. Item só lido
+ * (READ_DATA) não muda nada: aprovado aqui com o envio pendente continua esperando o "Aprovar e enviar".
+ */
 export function atualizarSituacaoPagamentos(d, itensC6, usuario) {
   const mudados = [];
   for (const it of itensC6 || []) {
     const p = (d.pagamentos_banco || []).find((x) => x.id_externo && String(x.id_externo) === String(it.id));
-    if (!p) continue;
+    if (!p || it.status === 'READ_DATA') continue;
     const situacao = SITUACAO_C6[it.status];
     if (!situacao || situacao === p.situacao || !TRANSICOES[p.situacao].includes(situacao)) continue;
     atualizarPagamento(d, p.id, { situacao, erro: it.error_message || null, pago_em: situacao === 'pago' ? (it.transaction_date || hoje()) : null, beneficiario: it.beneficiary_name ? { nome: it.beneficiary_name } : undefined }, usuario);
