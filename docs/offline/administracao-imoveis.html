@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-tMETpDer1w0opeGYuNR//N77ii1H/o8xTA27wXOtFs4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-imtXN558yy1e1CfC/u5XvZKzOjhbLrhYtJPCZWlmWcE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="610cceb0b04897bf">
+<meta name="fontes" content="09e6a3ba426bddad">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -427,7 +427,6 @@ input.doc-invalido { border-color: var(--perigo); }
 .resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
 .resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
 th.centro, td.centro { text-align: center; }
-.botao-icone { display: inline-flex; align-items: center; padding: 4px 10px; }
 .indices-compacta { margin-top: 8px; width: auto; }
 .indices-compacta th, .indices-compacta td { padding: 3px 14px 3px 0; }
 /* Excluir/remover: sempre o mesmo quadradinho vermelho com o × dentro (fácil de acertar com o mouse) */
@@ -3152,6 +3151,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     indiceFaturas: () => indiceFaturas,
     informarSaida: () => informarSaida,
     inquilinoPagaCondominio: () => inquilinoPagaCondominio,
+    inquilinosParaSolicitacao: () => inquilinosParaSolicitacao,
     inserir: () => inserir,
     iptuNaCompetencia: () => iptuNaCompetencia,
     iptuPagoPeloBanco: () => iptuPagoPeloBanco,
@@ -6585,6 +6585,20 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const atual = totais(cb).a_pagar_sem_desconto;
     if (atual === cb.banco.valor && (!cb.banco.vencimento || cb.banco.vencimento === cb.vencimento)) return null;
     return { no_banco: cb.banco.valor, no_sistema: atual, vencimento_banco: cb.banco.vencimento, vencimento_sistema: cb.vencimento };
+  }
+  function inquilinosParaSolicitacao(d2, hoje3, incluirId = null) {
+    const porChave = /* @__PURE__ */ new Map();
+    const ativos = d2.contratos.filter((c) => c.id === incluirId || c.ativo !== false && contratoAtivo(c, hoje3));
+    for (const c of ativos) {
+      const doc = soDigitos(c.inquilino_cpf);
+      const chave = doc ? `d${doc}` : `n${String(c.inquilino_nome || "").trim().toLocaleLowerCase("pt-BR")}`;
+      const imovel = c.imovel_id ? (buscar(d2, "imoveis", c.imovel_id) || {}).nome || "" : "";
+      if (!porChave.has(chave)) porChave.set(chave, { chave, nome: c.inquilino_nome, contratos: [] });
+      porChave.get(chave).contratos.push({ id: c.id, imovel });
+    }
+    const lista3 = [...porChave.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR"));
+    for (const p2 of lista3) p2.contratos.sort((a, b) => a.imovel.localeCompare(b.imovel, "pt-BR"));
+    return lista3;
   }
   function resumoSolicitacoes(d2) {
     const r = { Aberta: 0, "Em andamento": 0, Concluída: 0, "Não atendida": 0 };
@@ -17174,6 +17188,13 @@ Salvar assim mesmo?`)) {
   var linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || "")}"></label>` : etiqueta("sem comprovante", "aviso");
   var fiadoresMudancas = { novos: [], alterados: [] };
+  var inquilinosDaSolicitacao = (r) => inquilinosParaSolicitacao(d(), hojeIso(), r ? r.contrato_id : null);
+  function escolhaDoContrato(contratoId, r = null) {
+    const pessoas = inquilinosDaSolicitacao(r);
+    const k = pessoas.findIndex((p2) => p2.contratos.some((c) => c.id === contratoId));
+    if (k < 0) return {};
+    return { inquilino: pessoas[k].chave, ...pessoas[k].contratos.length > 1 ? { [`imovel_${k}`]: String(contratoId) } : {} };
+  }
   var fiadoresDaTroca2 = { novos: [], saem: [], alterados: [] };
   var avisoAditivo = "";
   var guardarModeloAirbnb = false;
@@ -17225,18 +17246,50 @@ Salvar assim mesmo?`)) {
     },
     solicitacoes: {
       titulo: (r) => r ? "Solicitação do inquilino" : "Nova solicitação do inquilino",
-      // inquilino escolhido na lista (ativos, em ordem de nome); vindo da tela Inquilinos, já vem marcado
+      // escolhe o inquilino (ativos, em ordem de nome); quem aluga mais de um imóvel escolhe também o imóvel do pedido
+      // (um campo de imóvel por inquilino, que aparece só quando ele é escolhido); com um imóvel só, já vai o dele
+      // vindo da página do inquilino (?contrato=), já vem marcado
       campos: (r) => {
-        const ops = d().contratos.filter((c) => r && c.id === r.contrato_id || c.ativo !== false && contratoAtivo(c, hojeIso())).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, "pt-BR")).map((c) => {
-          const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
-          return [String(c.id), `${c.inquilino_nome}${i ? ` · ${i.nome}` : ""}`];
-        });
-        return [{ nome: "contrato_id", rotulo: "Inquilino", tipo: "opcao", obrig: true, opcoes: ops }, ...SOLICITACAO];
+        const pessoas = inquilinosDaSolicitacao(r);
+        const inquilino = {
+          nome: "inquilino",
+          rotulo: "Inquilino",
+          tipo: "opcao",
+          obrig: true,
+          virtual: true,
+          opcoes: pessoas.map((p2) => [p2.chave, `${p2.nome} · ${p2.contratos.length > 1 ? `${p2.contratos.length} imóveis` : p2.contratos[0].imovel || "sem imóvel"}`])
+        };
+        const imoveis = pessoas.flatMap((p2, k) => p2.contratos.length > 1 ? [{
+          nome: `imovel_${k}`,
+          rotulo: "Imóvel do pedido",
+          tipo: "opcao",
+          obrig: true,
+          virtual: true,
+          opcoes: p2.contratos.map((c) => [String(c.id), c.imovel || "sem imóvel"]),
+          mostrarSe: { campo: "inquilino", valores: [p2.chave] },
+          ajuda: `${p2.nome} aluga mais de um imóvel: escolha de qual é o pedido`
+        }] : []);
+        return [inquilino, ...imoveis, ...SOLICITACAO];
       },
-      padrao: (q) => ({ data: hojeIso(), contrato_id: q.contrato || "" }),
+      valores: (r) => ({ ...r, ...escolhaDoContrato(r.contrato_id, r) }),
+      padrao: (q) => ({ data: hojeIso(), ...q.contrato ? escolhaDoContrato(Number(q.contrato)) : {} }),
       voltar: (r, q) => ({ inquilinos: "#/inquilinos", solicitacoes: "#/solicitacoes" })[q && q.de] || (r || q && q.contrato ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : "#/solicitacoes"),
       descricao: (dados) => `Solicitação: ${String(dados.descricao || "").slice(0, 80)}`,
-      ajustar(dados) {
+      ajustar(dados, erros, r, form) {
+        const fd = new FormData(form);
+        const pessoas = inquilinosDaSolicitacao(r);
+        const k = pessoas.findIndex((p3) => p3.chave === fd.get("inquilino"));
+        if (k < 0) {
+          erros.inquilino = "Escolha o inquilino";
+          return;
+        }
+        const p2 = pessoas[k];
+        const contrato = p2.contratos.length > 1 ? p2.contratos.find((c) => String(c.id) === fd.get(`imovel_${k}`)) : p2.contratos[0];
+        if (!contrato) {
+          erros[`imovel_${k}`] = "Escolha o imóvel do pedido";
+          return;
+        }
+        dados.contrato_id = contrato.id;
         if (dados.situacao === "Concluída" && !dados.data_conclusao) dados.data_conclusao = hojeIso();
       }
     },
@@ -19555,14 +19608,14 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const doc = documentoEntrada(d(), c, "doc_contrato_em");
       return doc && doc.arquivo ? `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">📄 Contrato</a>` : `<span class="botao secundario pequeno desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">📄 Contrato</span>`;
     };
-    const registrar2 = (c) => `<td class="centro nw">${opera() ? `<a class="botao secundario pequeno botao-icone" href="#/novo/solicitacoes?contrato=${c.id}&de=inquilinos" title="Registrar solicitação de ${esc(c.inquilino_nome)}" aria-label="Registrar solicitação"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="2"/><path d="M1.5 2l8.5 7 8.5-7"/></svg></a> ` : ""}${botaoContrato(c)}</td>`;
+    const registrar2 = (c) => `<td class="centro nw">${botaoContrato(c)}</td>`;
     const matricula = (x) => x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : "";
     const resumo = resumoSolicitacoes(d());
     return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link("#/novo/contratos", "Novo contrato", "botao") : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
     ${caixaFichas()}
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro">${opera() ? "Solicitação · " : ""}Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro">Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}</td><td>${nome(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.data_entrada || x.c.vigencia_inicio ? `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
