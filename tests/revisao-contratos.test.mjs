@@ -326,3 +326,22 @@ test('troca de titular: termo registrado à mão como o da troca (ou antigo, sem
   delete m.tipo;
   assert.equal(R.trocaAguardaAditivo(d, n), false);
 });
+
+// --------------------------------------------------------------------------
+// 8. Meses e datas por extenso num lugar só, cada documento como era
+// --------------------------------------------------------------------------
+test('datas por extenso: uma lista de meses e uma função (contrato "05 de setembro"; cartas e declaração "5 de setembro")', () => {
+  assert.equal(K.MESES_EXTENSO.length, 12);
+  assert.equal(K.MESES_EXTENSO[2], 'março');
+  assert.equal(K.dataPorExtenso('2026-09-05'), '05 de setembro de 2026', 'contrato, vistoria, termos: dia com dois dígitos');
+  assert.equal(K.dataPorExtenso('2026-09-05', { zero: false }), '5 de setembro de 2026', 'carta de reajuste e declaração de aluguéis');
+  assert.equal(K.dataPorExtenso('2026-12-25', { zero: false }), '25 de dezembro de 2026');
+  assert.equal(K.dataPorExtenso(''), '');
+  assert.equal(K.dataPorExtenso(null, { zero: false }), '');
+  assert.equal(K.mesPorExtenso('2026-03'), 'março de 2026');
+  // o mês de referência do termo de vencimento continua igual
+  const { d, i } = casa();
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', vigencia_inicio: '2026-01-10', data_entrada: '2026-01-10', aluguel_inicial: 300000, dia_vencimento: 10, garantia_tipo: 'Sem garantia' }, 'j');
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: 20, mes: '2026-12', texto: K.modelosDe(d, 'aditivo')[0].texto }, 'j');
+  assert.match(texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, c, a))), /a partir do vencimento de 20 de dezembro de 2026, referente ao mês de novembro de 2026/);
+});

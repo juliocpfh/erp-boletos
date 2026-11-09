@@ -71,9 +71,15 @@ export function percentualComExtenso(p) {
   return `${escrito} (${decimalPorExtenso(escrito.replace('%', ''))} por cento)`;
 }
 
-const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-/** "05 de setembro de 2026" */
-export const dataPorExtenso = (iso) => (iso ? `${iso.slice(8, 10)} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}` : '');
+/** Os meses por extenso (lista única do sistema: contratos, termos, cartas e declarações). */
+export const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+/** Mês por extenso: '2026-09' → "setembro de 2026". */
+export const mesPorExtenso = (comp) => (comp ? `${MESES_EXTENSO[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}` : '');
+/**
+ * Data por extenso: "05 de setembro de 2026" (contrato, vistoria, termos e recibo). ``zero: false``: "5 de setembro de 2026"
+ * (carta de reajuste e declaração de aluguéis), como cada documento sempre saiu.
+ */
+export const dataPorExtenso = (iso, { zero = true } = {}) => (iso ? `${zero ? iso.slice(8, 10) : Number(iso.slice(8, 10))} de ${mesPorExtenso(iso.slice(0, 7))}` : '');
 
 const ORD_UNID = ['', 'primeira', 'segunda', 'terceira', 'quarta', 'quinta', 'sexta', 'sétima', 'oitava', 'nona'];
 const ORD_DEZ = ['', 'décima', 'vigésima', 'trigésima', 'quadragésima', 'quinquagésima', 'sexagésima', 'septuagésima', 'octogésima', 'nonagésima'];
@@ -597,7 +603,7 @@ export function dadosDoAditivo(d, c, a) {
     dia_vencimento_anterior: numeroComExtenso(a.dia_anterior),
     dia_vencimento_novo: numeroComExtenso(a.dia_novo),
     primeiro_vencimento: dataPorExtenso(a.primeiro_vencimento),
-    mes_referencia: `${MESES[Number(ref.slice(5, 7)) - 1]} de ${ref.slice(0, 4)}`,
+    mes_referencia: mesPorExtenso(ref),
   });
   dados.condicoes.mes_seguinte = mesSeguinte;
   return dados;

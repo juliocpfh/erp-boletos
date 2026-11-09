@@ -215,8 +215,6 @@ export async function guardarCartasAntigas() {
 }
 
 /** Nome dos arquivos baixados: "Documento Imóvel - Inquilino - ano de entrada" (ex.: "Contrato locação Loja 1 - Maria - 2026"). */
-const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-const dataPorExtenso = (iso) => `${Number(iso.slice(8, 10))} de ${MESES_EXTENSO[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
 
 /**
  * Declaração anual de aluguéis (D9): uma folha por empresa que emitiu as NFs, para o IRPF do inquilino. Só o aluguel pago
@@ -237,7 +235,7 @@ function declaracaoHtml(r, g) {
       <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${C.reais(g.total)}</b></td></tr></table>
     ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ''}
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
-    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${dataPorExtenso(C.hojeIso())}.</p>
+    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
 }
 
