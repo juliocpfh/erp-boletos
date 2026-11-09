@@ -554,10 +554,11 @@ function telaAditivoTroca(c, a) {
   if (!ant) return escolherAditivo(c);
   const modelos = K.modelosDe(d(), 'aditivo_troca');
   const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
-  // de quem sai, só a qualificação das pessoas importa
-  const falta = [...K.pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
-    ...K.pendenciasDoContrato(d(), c)];
   const troca = c.data_entrada || c.vigencia_inicio;
+  // de quem sai, só a qualificação das pessoas importa; o fiador que continua ainda está no contrato de quem sai (vai ao termo)
+  const comFiador = K.fiadoresDaTroca(d(), c, a ? a.data : troca || C.hojeIso()).length > 0;
+  const falta = [...K.pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
+    ...K.pendenciasDoContrato(d(), c).filter((x) => x !== 'fiador' || !comFiador)];
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : 'Gerar termo aditivo: troca de inquilino'}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}

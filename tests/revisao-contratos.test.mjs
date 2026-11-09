@@ -112,3 +112,40 @@ test('renovação: contrato que perdeu o fim da renovação ao ser editado volta
   assert.ok(d.historico.some((h) => /renovação/.test(h.descricao) && /05\/09\/2028/.test(h.descricao)), 'passa pelo histórico');
   assert.equal(R.rotinaDeAbertura(d, 'julio', { soConferir: true }), 0, 'uma vez só');
 });
+
+// --------------------------------------------------------------------------
+// 2. Termo aditivo da troca de titular com o fiador do contrato (que ainda está no contrato de quem sai)
+// --------------------------------------------------------------------------
+function trocaComFiador(garantia = 'continua') {
+  const { d, i } = casa();
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', inquilino_cpf: '529.982.247-25', inquilino_genero: 'Masculino', data_entrada: '2026-01-10',
+    vigencia_inicio: '2026-01-10', vigencia_fim: '2028-07-10', prazo_meses: 30, aluguel_inicial: 275000, desconto_pontualidade_percentual: 9.090909090909092, dia_vencimento: 10,
+    indice_correcao: 'IPCA', garantia_tipo: 'Fiador', finalidade: 'Residencial', descricao_objeto: 'a casa nº 3' }, 'j');
+  R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'José Fiador', cpf: '529.982.247-25', genero: 'Masculino' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: c.id, inquilino_nome: 'Lúcia Prado', inquilino_cpf: '529.982.247-25', inquilino_genero: 'Feminino',
+    data_entrada: '2026-12-01', vigencia_inicio: '2026-12-01', vigencia_fim: '2028-07-10', prazo_meses: 30, aluguel_inicial: 275000, desconto_pontualidade_percentual: 9.090909090909092,
+    dia_vencimento: 10, indice_correcao: 'IPCA', garantia_tipo: 'Fiador', garantia_na_troca: garantia, finalidade: 'Residencial', descricao_objeto: 'a casa nº 3' }, 'j');
+  const modelo = K.modelosDe(d, 'aditivo_troca')[0];
+  const a = R.salvarAditivoTroca(d, n.id, { data: '2026-11-20', texto: modelo.texto }, 'j');
+  return { d, c, n, a };
+}
+
+test('termo da troca de titular com a garantia que continua: o fiador do contrato concorda e assina', () => {
+  const { d, n, a } = trocaComFiador();
+  const t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.match(t, /FIADOR: JOSÉ FIADOR/, 'o fiador é parte do termo');
+  assert.match(t, /O FIADOR declara conhecer e aceitar a substituição do locatário e garante as obrigações do LOCATÁRIO ENTRANTE/, 'cláusula em que ele concorda');
+  assert.match(t, /\[LOCADORA, LOCATÁRIO SAINTE, LOCATÁRIO ENTRANTE, FIADOR\]/);
+  assert.doesNotMatch(t, /DA GARANTIA\nDISPOSIÇÕES FINAIS/, '"DA GARANTIA" não fica vazia');
+  assert.equal(K.fiadoresDaTroca(d, n, a.data).map((f) => f.nome).join(), 'José Fiador');
+});
+
+test('termo da troca com garantia nova: o fiador de quem sai não entra (só o de quem entra)', () => {
+  const { d, n, a } = trocaComFiador('nova');
+  let t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.doesNotMatch(t, /JOSÉ FIADOR/);
+  R.inserir(d, 'fiadores', { contrato_id: n.id, nome: 'Ana Lima', cpf: '529.982.247-25', genero: 'Feminino' }, 'j');
+  t = texto(K.montarContrato(a.texto, K.dadosDoAditivo(d, n, a)));
+  assert.match(t, /ANA LIMA/);
+  assert.doesNotMatch(t, /JOSÉ FIADOR/);
+});

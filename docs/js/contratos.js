@@ -162,9 +162,13 @@ export function locadorasDoContrato(d, c) {
   return partes.length ? partes : d.emitentes.filter((e) => e.ativo);
 }
 
+/** Fiadores do contrato que ainda valem na data (sem fim do vínculo antes dela e sem substituto). */
+const fiadoresNaData = (d, contratoId, data) => d.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data || C.hojeIso())));
+
 /**
  * Monta tudo que o modelo usa: campos de texto ({campo}), condições ([se x]) e quantidades (singular/plural).
- * ``extra``: data da assinatura e testemunhas informadas na hora de gerar.
+ * ``extra``: data da assinatura e testemunhas informadas na hora de gerar; ``fiadores``: os fiadores que entram no
+ * documento, quando não são os do próprio contrato (termo da troca de titular, `fiadoresDaTroca`).
  */
 export function dadosDoContrato(d, c, extra = {}) {
   const R = { buscar: (t, id) => d[t].find((x) => x.id === Number(id)) };
@@ -174,7 +178,7 @@ export function dadosDoContrato(d, c, extra = {}) {
   const locatarios = [];
   if (pj) locatarios.push(qualificarEmpresa(c.inquilino_nome, c.inquilino_cpf, c.inquilino_endereco, pessoaDe(c, 'representante_'), c.representante_cargo));
   else locatarios.push(qualificarPessoa(pessoaDe(c, 'inquilino_')));
-  const fiadores = d.fiadores.filter((f) => f.contrato_id === c.id && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (extra.data || C.hojeIso())));
+  const fiadores = extra.fiadores || fiadoresNaData(d, c.id, extra.data);
   const temFiador = ['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && fiadores.length > 0;
   const aluguel = c.aluguel_inicial || 0;
   const pctBonif = c.bonificacao === false ? 0 : (c.desconto_pontualidade_percentual || 0);
@@ -593,6 +597,17 @@ export function dadosDoAditivo(d, c, a) {
 export const TIPO_ADITIVO_TROCA = 'Troca de titular';
 
 /**
+ * Fiadores do termo da troca de titular: os do contrato de quem entra; com a garantia que continua e quem entra ainda sem
+ * fiador, os de agora do contrato de quem sai (eles só passam ao novo com o termo assinado, em `transferirHeranca`, e
+ * precisam assinar concordando). Ex.: Pedro tem o fiador José; Lúcia assume com a garantia que continua → José no termo.
+ */
+export function fiadoresDaTroca(d, c, data) {
+  const proprios = fiadoresNaData(d, c.id, data);
+  const ant = c.contrato_anterior_id && d.contratos.find((x) => x.id === c.contrato_anterior_id);
+  return proprios.length || !ant || c.garantia_na_troca === 'nova' ? proprios : fiadoresNaData(d, ant.id, data);
+}
+
+/**
  * Termo aditivo de troca de inquilino (herança do contrato). ``c``: o contrato do novo titular (continua o anterior);
  * ``a``: registro da tabela aditivos (data, aluguel na data da troca, testemunhas). Saem o titular anterior e o solidário dele;
  * entram o novo titular e o solidário dele (no texto, todos como locatários: {a:...|...} e {s:...|...}).
@@ -605,7 +620,8 @@ function dadosDoAditivoTroca(d, c, a) {
     vistos.add(original.id);
     original = d.contratos.find((x) => x.id === original.contrato_anterior_id) || original;
   }
-  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
+  // fiadores: com a garantia que continua, os do contrato (ainda no de quem sai até o termo ser assinado)
+  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [], fiadores: fiadoresDaTroca(d, c, a.data) });
   const saiu = ant.id ? dadosDoContrato(d, ant, { data: a.data }) : { campos: { locatarios: '', solidario: '' }, assinaturas: [] };
   const saintes = [saiu.campos.locatarios, saiu.campos.solidario].filter(Boolean);
   const entrantes = [dados.campos.locatarios, dados.campos.solidario].filter(Boolean);
