@@ -312,3 +312,35 @@ test('item 9: a listagem de boletos lida pelo site avisa quando o banco tem mais
   assert.deepEqual([curta.length, curta.incompleto], [1, undefined]);
   await B.esquecerPonteLocal();
 });
+
+// --------------------------------------------------------------------------
+// Item 2: "Usar sugestão" lançava de novo a conta já lançada à mão (segunda água de R$ 123,45)
+// --------------------------------------------------------------------------
+test('item 2: a sugestão liga a conta já lançada à mão (mesmo imóvel, tipo e valor), em vez de lançar outra', () => {
+  const { d, loja } = base();
+  // o dono lançou à mão em "Contas pagas por nós" a água de 10/2026 da Loja 1, paga em 05/11 (R$ 123,45)
+  const [agua] = R.lancarDespesas(d, loja.id, '2026-10', [{ tipo: 'Água', valor: 12345, data_pagamento: '2026-11-05' }], 'julio');
+  const [mov] = Z.importarExtrato(d, 'ank', [saida('r1', '2026-11-05', '123.45', 'PAGAMENTO BOLETO SANEPAR MATR 123456')], 'julio', { hoje: '2026-11-20' }).novas;
+  const s = Z.sugerirDestino(d, mov);
+  assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.despesa_id], ['conta_imovel', loja.id, 'Água', agua.id]);
+  assert.match(s.motivo, /já lançada/);
+  // "Usar sugestão" grava com o despesa_id: liga a conta, nada novo é lançado
+  Z.vincularMovimentacao(d, mov.id, { classificacao: s.classificacao, imovel_id: s.imovel_id, tipo_despesa: s.tipo_despesa, despesa_id: s.despesa_id }, 'julio');
+  const aguas = d.despesas.filter((x) => x.imovel_id === loja.id && x.tipo === 'Água');
+  assert.deepEqual(aguas.map((x) => [x.id, x.movimentacao_id]), [[agua.id, mov.id]], 'uma água só, ligada à linha do extrato');
+  assert.equal(R.buscar(d, 'movimentacoes_banco', mov.id).despesa_criada, false);
+  // conta de outro valor, de outro tipo, já ligada ou paga longe da data não serve
+  const { d: d2, loja: l2 } = base();
+  R.lancarDespesas(d2, l2.id, '2026-10', [{ tipo: 'Água', valor: 12000, data_pagamento: '2026-11-05' }, { tipo: 'Luz', valor: 12345, data_pagamento: '2026-11-05' }, { tipo: 'Água', valor: 12345, data_pagamento: '2026-09-05' }], 'julio');
+  const [m2] = Z.importarExtrato(d2, 'ank', [saida('r1', '2026-11-05', '123.45', 'PAGAMENTO BOLETO SANEPAR MATR 123456')], 'julio', { hoje: '2026-11-20' }).novas;
+  assert.equal(Z.sugerirDestino(d2, m2).despesa_id, undefined, 'nenhuma é esta conta: a sugestão lança uma nova');
+  // pela memória (mesma descrição de antes) também liga a já lançada
+  const { d: d3, loja: l3, sobre } = base();
+  const [m0] = Z.importarExtrato(d3, 'ank', [saida('r0', '2026-10-05', '80.00', 'DEBITO CONDOMINIO EDIFICIO X')], 'julio', { hoje: '2026-11-20' }).novas;
+  Z.vincularMovimentacao(d3, m0.id, { classificacao: 'conta_imovel', imovel_id: sobre.id, tipo_despesa: 'Condomínio', competencia: '2026-09' }, 'julio');
+  const [cond] = R.lancarDespesas(d3, sobre.id, '2026-10', [{ tipo: 'Condomínio', valor: 8000, data_pagamento: '2026-11-04' }], 'julio');
+  const [m3] = Z.importarExtrato(d3, 'ank', [saida('r3', '2026-11-05', '80.00', 'DEBITO CONDOMINIO EDIFICIO X')], 'julio', { hoje: '2026-11-20' }).novas;
+  const s3 = Z.sugerirDestino(d3, m3);
+  assert.deepEqual([s3.imovel_id, s3.despesa_id], [sobre.id, cond.id]);
+  void l3;
+});

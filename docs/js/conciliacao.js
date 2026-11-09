@@ -598,8 +598,8 @@ export function sugerirDestino(d, mov) {
     else porPalavra = { classificacao: 'conta_imovel', imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === 'nome' ? 'descrição' : 'matrícula/UC cadastrada'}` : `descrição de ${tipo}`, confianca: imv ? 'media' : 'baixa' };
     break;
   }
-  if (porPalavra && (porPalavra.imovel_id || porPalavra.classificacao !== 'conta_imovel')) return porPalavra;
-  if (imv) return { classificacao: imv.tipo === 'IPTU' ? 'iptu' : 'conta_imovel', imovel_id: imv.imovel.id, tipo_despesa: imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : 'Outra', motivo: 'imóvel citado na descrição', confianca: 'media' };
+  if (porPalavra && (porPalavra.imovel_id || porPalavra.classificacao !== 'conta_imovel')) return comContaLancada(d, mov, porPalavra);
+  if (imv) return comContaLancada(d, mov, { classificacao: imv.tipo === 'IPTU' ? 'iptu' : 'conta_imovel', imovel_id: imv.imovel.id, tipo_despesa: imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : 'Outra', motivo: 'imóvel citado na descrição', confianca: 'media' });
   // 5) memória: última movimentação já classificada com a mesma descrição (sem números) ou a mesma contrapartida (vale mais que a palavra sem imóvel)
   const chave = semDigitos(mov.descricao);
   const doc = mov.contrapartida && mov.contrapartida.documento ? String(mov.contrapartida.documento).replace(/\D/g, '') : '';
@@ -608,10 +608,31 @@ export function sugerirDestino(d, mov) {
     .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id)[0];
   if (antiga) {
     const de = antiga.despesa_id ? buscar(d, 'despesas', antiga.despesa_id) : null;
-    return { classificacao: antiga.classificacao, imovel_id: antiga.imovel_id, tipo_despesa: de ? de.tipo : null, iptu: antiga.iptu_id ? { id: antiga.iptu_id, n: null } : null,
-      motivo: `igual à movimentação de ${C.dataBr(antiga.data)}`, confianca: 'media' };
+    return comContaLancada(d, mov, { classificacao: antiga.classificacao, imovel_id: antiga.imovel_id, tipo_despesa: de ? de.tipo : null, iptu: antiga.iptu_id ? { id: antiga.iptu_id, n: null } : null,
+      motivo: `igual à movimentação de ${C.dataBr(antiga.data)}`, confianca: 'media' });
   }
   return porPalavra;
+}
+
+/**
+ * A conta do imóvel já lançada à mão (Contas pagas por nós) que é esta saída do extrato: mesmo imóvel, tipo e valor, sem linha do
+ * extrato nem pagamento pelo banco ligados, paga até 7 dias antes ou depois (sem data de pagamento: do mês da saída ou dos 2 antes).
+ * A de data mais perto primeiro; null se não há. Ex.: água de R$ 123,45 da Loja 1 lançada com pagamento em 05/11 e a saída de 05/11.
+ */
+export function contaJaLancada(d, imovelId, tipo, mov) {
+  const ligadas = new Set((d.movimentacoes_banco || []).filter((m) => m.despesa_id).map((m) => m.despesa_id));
+  const mes = String(mov.data).slice(0, 7);
+  const perto = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) <= 7 : x.competencia <= mes && x.competencia >= C.somarMeses(mes, -2));
+  const distancia = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) : 99);
+  return (d.despesas || []).filter((x) => x.imovel_id === Number(imovelId) && x.tipo === tipo && x.valor === mov.valor && !x.movimentacao_id && !x.pagamento_banco_id
+    && !ligadas.has(x.id) && perto(x)).sort((a, b) => distancia(a) - distancia(b) || b.id - a.id)[0] || null;
+}
+
+/** Sugestão de "conta do imóvel" com a conta já lançada à mão, para LIGAR (``despesa_id``) em vez de lançar de novo. */
+function comContaLancada(d, mov, s) {
+  if (!s || s.classificacao !== 'conta_imovel' || !s.imovel_id || !s.tipo_despesa || mov.tipo !== 'saida') return s;
+  const de = contaJaLancada(d, s.imovel_id, s.tipo_despesa, mov);
+  return de ? { ...s, despesa_id: de.id, motivo: `${s.motivo} · conta já lançada em Contas pagas por nós (${de.tipo} de ${C.compBr(de.competencia)}): só ligar` } : s;
 }
 export const sugerirClassificacao = sugerirDestino;
 
