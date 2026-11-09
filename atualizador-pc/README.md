@@ -17,9 +17,9 @@ Tudo que ele grava é cifrado com a mesma chave do backup seguro: sem a senha do
 1. Copie a pasta `atualizador-pc` para o computador (ex.: `C:\Imoveis\atualizador-pc`).
 2. Crie a chave de serviço no painel do Cloudflare (conta do sistema): **Zero Trust → Access → Service Auth → Service Tokens → Create Service Token**. Nome `atualizador-pc`, duração 1 ano. Copie o **Client ID** e o **Client Secret** (o Secret só aparece uma vez).
 3. Deixe a chave entrar no sistema: **Zero Trust → Access → Applications → "Sistema de Imoveis" → Policies → Add a policy**: nome `Atualizador`, ação **Service Auth**, regra *Include → Service Token → atualizador-pc*. Salve.
-4. Diga ao Worker de quem é essa chave: **Workers & Pages → erp-boletos → Settings → Variables and secrets → Add**, tipo **Secret**, nome `SERVICOS`, valor `<Client ID>=<seu e-mail do sistema>` (o e-mail de um administrador cadastrado em Usuários; mais de uma chave: separe por vírgula). Sem isso a nuvem recusa a chave.
+4. Diga ao Worker de quem é essa chave: **Workers & Pages → erp-boletos → Settings → Variables and secrets → Add**, tipo **Secret**, nome `SERVICOS`, valor `<Client ID>=<seu e-mail do sistema>`, tudo junto e sem espaços (ex.: `1a2b3c.access=fulano@gmail.com`; o e-mail de um administrador cadastrado em Usuários; mais de uma chave: separe por vírgula). Sem isso a nuvem recusa a chave com "Este e-mail não tem acesso ao sistema": é o mesmo aviso quando o Client ID foi copiado com o começo `CF-Access-Client-Id:` ou com espaço sobrando.
 5. Na pasta copiada, copie `.env.exemplo` para `.env` e preencha `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET` e `PASTA_BACKUP` (a pasta do backup seguro).
-6. Dê dois cliques em `instalar-tarefa.cmd`: cria as duas tarefas no Windows e já roda a primeira atualização. Deve aparecer `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
+6. Clique com o botão direito em `instalar-tarefa.cmd` → **Executar como administrador**: cria as duas tarefas no Windows e já roda a primeira atualização (com dois cliques normais só a das 20h é criada; a "ao entrar" dá "Acesso negado" sem administrador). Deve aparecer `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
 
 Para rodar na mão a qualquer hora: `node atualizador.mjs`. Para desfazer as tarefas: `desinstalar-tarefa.cmd`.
 
