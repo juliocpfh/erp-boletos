@@ -8,12 +8,10 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
-import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
-import { dinheiroTexto, esc } from '../formularios.js';
+import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
-import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
@@ -21,11 +19,10 @@ import { ACOES_FICHAS } from './fichas.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
-import { usarVisualizador, visualizar } from '../visualizador.js';
 
 // --------------------------------------------------------------------------
 // Botões
@@ -41,6 +38,20 @@ async function modeloFatura() {
     if (!r.ok) throw new Error('Modelo da NF não encontrado.');
     return r.arrayBuffer();
   }
+}
+
+/**
+ * Celular: o anexo abre na própria tela (visualizador.js, que só carrega aqui). Devolve false para abrir como no computador
+ * (aba nova), inclusive se o visualizador não carregar (sem internet e ainda não guardado no aparelho).
+ * ``esperar``: termina só quando o arquivo estiver desenhado.
+ */
+async function noVisualizador(blob, nome, tipo, esperar = true) {
+  let V;
+  try { V = await import('../visualizador.js'); } catch { return false; }
+  if (!V.usarVisualizador()) return false;
+  const desenho = V.visualizar(blob, nome, tipo, baixar);
+  if (esperar) await desenho;
+  return true;
 }
 
 async function excelDoNumero(ExcelJS, modelo, numero) {
@@ -82,13 +93,31 @@ const TABELAS_EXCLUSAO = {
   },
 };
 
-/** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
-async function redesenharFormulario(el, ajustes, lista) {
-  const form = el.closest('form');
-  const valores = { ...Object.fromEntries(new FormData(form)), ...ajustes };
-  await mostrar({ valores, erros: {} });
-  const editor = document.querySelector(`[data-editor="${lista}"]`);
-  if (editor) editor.hidden = false;
+/**
+ * Lista de opções editada dentro do formulário (concessionárias, índices): acerta na hora só o que mostra a lista (as
+ * opções do campo e os itens da caixa "Editar lista"), sem desenhar a página de novo: o que já foi digitado ou escolhido
+ * (inclusive o arquivo do comprovante) continua. ``incluido`` passa a ficar escolhido no campo da caixa usada (``el``).
+ */
+function acertarListaNaTela(el, lista, { incluido = null, removido = null }) {
+  const usada = el.closest('[data-editor]');
+  for (const editor of document.querySelectorAll('[data-editor]')) {
+    if (editor.dataset.editor !== lista) continue;
+    const sel = editor.parentElement.querySelector('select');
+    const chips = editor.querySelector('.chips');
+    if (incluido !== null) {
+      chips.insertAdjacentHTML('beforeend', chipDaLista(lista, incluido));
+      if (sel && ![...sel.options].some((o) => o.value === incluido)) sel.add(new Option(incluido, incluido));
+      if (sel && editor === usada) {
+        sel.value = incluido;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // campos que aparecem conforme a escolha
+      }
+    }
+    if (removido !== null) {
+      for (const b of chips.querySelectorAll('[data-acao=removerDaLista]')) if (b.dataset.valor === removido) b.closest('.chip').remove();
+      // a opção escolhida neste formulário fica até ele ser salvo (como acontecia ao desenhar de novo)
+      if (sel) for (const o of [...sel.options]) if (o.value === removido && !o.selected) o.remove();
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -1001,7 +1030,7 @@ export const ACOES = {
     const proximo = C.vencimentoDaCompetencia(C.competenciaDe(hoje), c.dia_vencimento || 10, false);
     const primeiro = proximo > hoje ? proximo : C.somarMesesData(proximo, 1);
     const nome = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}` : compBr(cb.competencia));
-    const r = await janela({ titulo: `Acordo · ${esc(c.inquilino_nome)}`, sim: 'Fazer o acordo', nao: 'Cancelar',
+    const r = await janela({ titulo: `Acordo · ${c.inquilino_nome}`, sim: 'Fazer o acordo', nao: 'Cancelar',
       html: `<p class="suave">Os boletos marcados ficam "em acordo" (saem da inadimplência) e o sistema cria os boletos novos. Se um boleto do acordo atrasar, o inquilino volta para a lista.</p>
         <p><label>Boletos do acordo</label>${vencidos.map((cb) => `<label class="check-mini"><input type="checkbox" name="boleto" value="${cb.id}" checked data-hoje="${hojeDe(cb)}">
           ${esc(nome(cb))} · venceu ${dataBr(cb.vencimento)} · ${reais(R.totais(cb).a_pagar_sem_desconto)} <span class="suave">(hoje ${reais(hojeDe(cb))})</span></label>`).join('<br>')}</p>
@@ -1053,7 +1082,7 @@ export const ACOES = {
     const c = buscar('contratos', cb.contrato_id);
     const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
     const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
-    await janela({ titulo: `${titulo} · ${esc(c.inquilino_nome)}`, sim: 'Fechar', nao: '',
+    await janela({ titulo: `${titulo} · ${c.inquilino_nome}`, sim: 'Fechar', nao: '',
       html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
         <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
         <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
@@ -1090,7 +1119,7 @@ export const ACOES = {
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     const hoje = C.hojeIso();
     const sim = C.liquidar(cb, hoje);
-    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ''}`,
+    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
       html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
         <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
         <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
@@ -1201,8 +1230,8 @@ export const ACOES = {
   async incluirNaLista({ lista }, el) {
     const campoNovo = el.parentElement.querySelector('[data-lista-novo]');
     const valor = await alterar((db) => R.incluirNaLista(db, lista, campoNovo.value, login()));
-    const sel = el.closest('[data-editor]').parentElement.querySelector('select');
-    await redesenharFormulario(el, sel ? { [sel.name]: valor } : {}, lista);
+    acertarListaNaTela(el, lista, { incluido: valor });
+    campoNovo.value = '';
     aviso(`"${valor}" incluído na lista.`);
   },
 
@@ -1214,10 +1243,11 @@ export const ACOES = {
       window.alert(e.message);
       return;
     }
-    await redesenharFormulario(el, {}, lista);
+    acertarListaNaTela(el, lista, { removido: valor });
   },
 
   async desfazerUltimaNumeracao() {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const ciclo = await alterar((db) => R.desfazerUltimaNumeracao(db, login()));
     aviso(`Numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)} desfeita. Corrija o que precisar, inclua o que faltou e clique em "Numerar estas NFs".`);
     await mostrar();
@@ -1301,7 +1331,7 @@ export const ACOES = {
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
-    const r = await janela({ titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`, sim: 'Abrir o e-mail e marcar como enviada',
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: 'Abrir o e-mail e marcar como enviada',
       html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
         <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
@@ -1606,14 +1636,15 @@ export const ACOES = {
   },
 
   async exportarPlanilhaPdf() {
-    const [ExcelJS, { jsPDF }] = await Promise.all([excelJs(), bibliotecasPdf()]);
+    const [ExcelJS, { jsPDF }, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), bibliotecasPdf(), carregarParte(() => import('../exportar.js'))]);
     const quando = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Todos os dados exportados em planilha e PDF', null, {}, false));
   },
 
-  baixarRegras() {
+  async baixarRegras() {
+    const { REGRAS_TEXTO } = await carregarParte(() => import('../regras-texto.js'));
     baixar(new Blob(['﻿', REGRAS_TEXTO], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
   },
 
@@ -1664,7 +1695,7 @@ export const ACOES = {
     const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
-    if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar); // celular: mostra na tela em vez de baixar
+    if (await noVisualizador(arq, nome, tipo)) return; // celular: mostra na tela em vez de baixar
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
@@ -1912,8 +1943,7 @@ export const ACOES = {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
-      if (usarVisualizador()) visualizar(blob, 'boleto.pdf', 'application/pdf', baixar);
-      else window.open(URL.createObjectURL(blob), '_blank');
+      if (!(await noVisualizador(blob, 'boleto.pdf', 'application/pdf', false))) window.open(URL.createObjectURL(blob), '_blank');
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     } });
   },

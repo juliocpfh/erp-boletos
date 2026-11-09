@@ -11,10 +11,18 @@
 // (conciliacao.js / importarExtrato) converte para centavos.
 
 import { chamarPonte } from './banco.js';
-import * as SIM from './simulado-banco.js';
+
+let SIM = null; // dados fictícios do `?teste` (simulado-banco.js): só carregam no modo de teste
 
 /** Fala com a ponte; em `?teste` responde a ponte simulada deste arquivo (dados fictícios de simulado-banco.js). */
-const ponte = (contaId, metodo, caminho, corpo) => (emTeste() ? ponteSimulada(contaId, metodo, caminho, corpo) : chamarPonte(contaId, metodo, caminho, corpo));
+const ponte = async (contaId, metodo, caminho, corpo) => {
+  if (!emTeste()) return chamarPonte(contaId, metodo, caminho, corpo);
+  if (!SIM) {
+    SIM = await import('./simulado-banco.js');
+    gruposTeste.set(SIM.GRUPO_ITENS.group_id, SIM.GRUPO_ITENS.items.map((i) => ({ ...i })));
+  }
+  return ponteSimulada(contaId, metodo, caminho, corpo);
+};
 
 const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
 const data = (d, nome) => {
@@ -104,7 +112,7 @@ export async function baixarComprovantePonte(contaId, reference, data_ = null) {
 const emTeste = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('teste');
 
 const noMes = (data, mes) => `${mes}-${String(data).slice(8, 10)}`;
-const gruposTeste = new Map([[SIM.GRUPO_ITENS.group_id, SIM.GRUPO_ITENS.items.map((i) => ({ ...i }))]]);
+const gruposTeste = new Map(); // começa com o grupo fictício de simulado-banco.js, posto ao carregá-lo (ponte)
 let seqTeste = 0;
 const idTeste = () => `TESTE${String(++seqTeste).padStart(4, '0')}${Date.now().toString(36).toUpperCase()}`.slice(0, 26);
 const erroTeste = (m) => { throw new Error(m); };

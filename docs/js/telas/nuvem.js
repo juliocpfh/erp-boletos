@@ -2,10 +2,9 @@
 import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { dataBr, hojeIso } from '../calculos.js';
-import { levarParaNuvem } from '../migracao.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { botao } from './comum.js';
+import { botao, carregarParte } from './comum.js';
 
 const valorTexto = (v) => {
   if (v === null || v === undefined || v === '') return '(vazio)';
@@ -134,7 +133,8 @@ export const ACOES_NUVEM = {
     // só leitura: a pasta de sempre não é alterada (e não fica lembrada como pasta dos dados)
     try { pasta = await window.showDirectoryPicker({ id: 'imoveis', mode: 'read' }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
     const el = document.getElementById('progresso-nuvem');
-    const r = await levarParaNuvem(pasta, {
+    const migracao = await carregarParte(() => import('../migracao.js')); // só aqui (passagem para a nuvem ou "Substituir…")
+    const r = await migracao.levarParaNuvem(pasta, {
       anexos: E.anexos, sinc: E.nuvem, substituir,
       aoAndar: (p) => {
         if (!el) return;

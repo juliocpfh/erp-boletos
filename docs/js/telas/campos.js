@@ -436,8 +436,17 @@ function ligarReajusteManual(raiz) {
 /** Número da série mensal de cada índice no Banco Central. Os que não estão aqui (ex.: IVAR, Poupança) são digitados. */
 const SERIES_BC = { 'IGP-M': 189, IPCA: 433, INPC: 188, 'IGP-DI': 190 };
 
+/**
+ * Acumulados já trazidos do Banco Central nesta sessão (série|mês → { percentual, de }): a tela Reajustes é desenhada de
+ * novo a cada ação, e não precisa perguntar de novo. Só fica o que veio completo: erro, sem internet ou mês que ainda
+ * não saiu perguntam de novo na próxima vez.
+ */
+const acumuladosTrazidos = new Map();
+
 /** Acumulado de 12 meses até ``mesRef`` ('AAAA-MM'): { percentual, de } ou { falta } quando o mês ainda não saiu. */
-async function acumuladoNoBancoCentral(serie, mesRef) {
+export async function acumuladoNoBancoCentral(serie, mesRef) {
+  const chave = `${serie}|${mesRef}`;
+  if (acumuladosTrazidos.has(chave)) return acumuladosTrazidos.get(chave);
   const de = C.somarMeses(mesRef, -11);
   const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
   const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(mesRef)}`);
@@ -446,7 +455,10 @@ async function acumuladoNoBancoCentral(serie, mesRef) {
   const meses = new Map((Array.isArray(lista) ? lista : []).map((x) => [`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`, Number(x.valor)]));
   const todos = Array.from({ length: 12 }, (_, k) => C.somarMeses(de, k));
   const falta = todos.filter((m) => !Number.isFinite(meses.get(m)));
-  return falta.length ? { falta } : { percentual: C.acumuladoDosMeses(todos.map((m) => meses.get(m))), de };
+  if (falta.length) return { falta };
+  const r = { percentual: C.acumuladoDosMeses(todos.map((m) => meses.get(m))), de };
+  acumuladosTrazidos.set(chave, r);
+  return r;
 }
 
 /** Séries mensais para corrigir o FCI: as do reajuste mais a poupança (rendimento do mês) e a SELIC do mês. */

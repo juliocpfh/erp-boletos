@@ -29,6 +29,23 @@ export const item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}<
 
 export const opera = () => podeUsuario('operador');
 
+/**
+ * Parte do programa que só carrega quando é usada (planilha/PDF de tudo, regras em texto, passagem para a nuvem):
+ * ``importar`` = () => import('../arquivo.js'). Se não carregar (sem internet e ainda não guardada no aparelho, ou o site
+ * fora do ar), aparece uma mensagem simples; o motivo de verdade fica no console.
+ */
+export async function carregarParte(importar) {
+  try {
+    return await importar();
+  } catch (e) {
+    console.error(e);
+    throw new C.ErroUsuario('Não deu para abrir esta parte do programa agora (sem internet ou o site fora do ar). Tente de novo daqui a pouco.');
+  }
+}
+
+/** Desfazer a numeração apaga as NFs do ciclo: só o administrador (a nuvem recusa o apagar NF do operador). */
+export const SO_ADMIN_NUMERACAO = 'Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).';
+
 export const d = () => E.d;
 
 export const buscar = (t, id) => R.buscar(E.d, t, id);
@@ -92,9 +109,6 @@ export const SUB_ANUNCIO = 'Anúncio';
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
 const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas', contas: 'Contas pagas' };
-
-/** Comprovantes do banco: pasta do imóvel por ano ("Imóvel/Contas pagas/2026", escopo `contasano`, id = imóvel×10000 + ano, como o IPTU). */
-export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
 
 /** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
 export const PASTA_CONTADOR = '_Contador';
@@ -244,6 +258,19 @@ async function completarHeranca(id) {
   return r;
 }
 
+/** Há formulário aberto na página (o usuário pode estar digitando)? A mesma conferência da mudança vinda de outro aparelho (app.js). */
+export const formularioAberto = () => !!document.querySelector('main form[data-form]');
+
+/**
+ * Tarefa em segundo plano (Painel: heranças, nomes dos comprovantes, limpeza, conferência dos arquivos) terminou e mudou algo:
+ * desenha a tela de novo só se o usuário continua na página em que ela começou (``endereco``) e sem formulário aberto.
+ * Senão o que ele digitou sumiria; o que mudou aparece na próxima vez que a tela for desenhada.
+ */
+export function redesenharSeLivre(endereco) {
+  if (location.hash !== endereco || formularioAberto()) return null;
+  return mostrar();
+}
+
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
 
@@ -256,12 +283,13 @@ export async function trazerHerancaAssinada(id) {
 export async function trazerHerancasPendentes() {
   if (herancasFeitas || !opera() || !E.pasta) return;
   herancasFeitas = true;
+  const endereco = location.hash;
   // troca agendada (data futura): passa só no dia
   const pendentes = d().contratos.filter((c) => c.contrato_anterior_id && !c.heranca_transferida && R.contratoHerdado(d(), c) && !R.herancaAgendada(d(), c));
   for (const c of pendentes) await trazerHeranca(c.id);
   // heranças já feitas em que ficou faltando a garantia (comprovantes, depósitos, aplicações), a reserva ou o seguro do anterior
   const completadas = await conferirHerancas();
-  if (pendentes.length || completadas) await mostrar();
+  if (pendentes.length || completadas) await redesenharSeLivre(endereco);
 }
 
 /**
@@ -302,7 +330,8 @@ let nomesAcertados = false;
 export async function acertarNomesUmaVez() {
   if (nomesAcertados || !opera() || !E.pasta) return;
   nomesAcertados = true;
-  if (await acertarNomesDosComprovantes()) await mostrar();
+  const endereco = location.hash;
+  if (await acertarNomesDosComprovantes()) await redesenharSeLivre(endereco);
 }
 
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
@@ -366,7 +395,8 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
 
 /**
  * Limpeza da pasta "Sem imóvel" (uma vez por sessão, ao abrir o Painel):
- * - contrato que ficou 7 dias sem imóvel (e sem boleto) é apagado, com a pasta dele se estiver vazia;
+ * - contrato que ficou 7 dias sem imóvel (e sem boleto) é apagado, com a pasta dele se estiver vazia (só quando o
+ *   administrador abre: excluir contrato é só dele, e a nuvem recusa o do operador);
  * - pasta vazia que não é de nenhum contrato sem imóvel (ex.: contrato excluído) é apagada.
  * Pasta com arquivos nunca é apagada sozinha: aparece no aviso do Painel.
  */
@@ -375,7 +405,8 @@ let limpezaFeita = false;
 export async function limparSemImovel() {
   if (limpezaFeita || !opera() || !E.pasta) return;
   limpezaFeita = true;
-  const vencidos = R.contratosSemImovelVencidos(d());
+  const endereco = location.hash;
+  const vencidos = podeUsuario('admin') ? R.contratosSemImovelVencidos(d()) : [];
   if (vencidos.length) {
     await alterar((db) => vencidos.forEach((c) => R.excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel`)));
     aviso(`Apagado(s) por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(', ')}.`, 'info');
@@ -389,7 +420,7 @@ export async function limparSemImovel() {
     if (!(await S.apagarPastaVazia(sem, nome))) pastasComArquivos.push(nome);
   }
   if (!(await S.subpastas(sem)).length) await S.apagarPastaVazia(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), PASTA_SEM_IMOVEL);
-  if (vencidos.length || pastasComArquivos.length) await mostrar();
+  if (vencidos.length || pastasComArquivos.length) await redesenharSeLivre(endereco);
 }
 
 export let pastasComArquivos = [];
@@ -489,6 +520,7 @@ function ancoraDoArquivo(escopo, rotulo) {
  */
 export async function conferirArquivos() {
   if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };
+  const endereco = location.hash;
   // nuvem: as listas de todas as pastas vêm numa ida só (senão seria um pedido por pasta de inquilino)
   if (E.nuvem && E.anexos?.carregarTudo) await E.anexos.carregarTudo([S.PASTA_ARQUIVOS]);
   const rotulos = R.rotulosDosArquivos(d());
@@ -533,7 +565,7 @@ export async function conferirArquivos() {
   }
   const mudou = JSON.stringify(faltando) !== JSON.stringify(arquivosFaltando);
   arquivosFaltando = faltando;
-  if (mudou || devolvidos.length) await mostrar();
+  if (mudou || devolvidos.length) await redesenharSeLivre(endereco);
   return { conferidos, devolvidos, faltando };
 }
 
@@ -743,7 +775,7 @@ export const ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
 export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {
   return `<div class="${dentro ? 'arquivos-dentro' : 'cartao'}" id="${ancora}">${dentro ? `<h3>${esc(titulo)}</h3>` : `<h2>${esc(titulo)}</h2>`}${ajuda ? `<p class="suave">${esc(ajuda)}</p>` : ''}
     <div data-arquivos="${escopo}:${id}"><p class="suave">Carregando…</p></div>
-    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
+    ${opera() && enviar ? `<label class="botao secundario pequeno enviar">Anexar arquivos<input type="file" multiple data-acao-arquivo="enviarArquivos" data-upload="${escopo}:${id}" accept="${escopo === 'anuncio' ? 'image/*' : ACEITA_ANEXOS}"></label>` : ''}
     ${opera() && enviar && ['contrato', 'seguro'].includes(escopo) ? `<p class="suave" style="margin-top:4px">${escopo === 'contrato' ? 'Comprovantes de depósito, reserva e caução: anexe no próprio lançamento ("⚠ anexar"), para ficarem ligados a ele. Aqui, só os documentos soltos.' : 'Ao anexar aqui, o sistema pergunta se é a apólice ou outro documento e de qual vigência.'}</p>` : ''}</div>`;
 }
 

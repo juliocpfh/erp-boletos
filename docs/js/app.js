@@ -638,7 +638,7 @@ function layout(conteudo, rota) {
   return `<header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
-      <form data-form="buscaGlobal" class="busca-topo" role="search"><input name="q" type="search" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
+      <form data-form="ir" data-ir="buscar" class="busca-topo" role="search"><input name="q" type="search" maxlength="100" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
@@ -668,7 +668,9 @@ function guardarClipes() {
     localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
+let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
 export async function mostrar(estadoForm = null) {
+  desenhos += 1;
   const app = document.getElementById('app');
   const rota = rotaAtual();
   try {
@@ -803,6 +805,8 @@ document.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const botao = form.querySelector('button[type=submit],button:not([type])');
   if (botao) botao.disabled = true;
+  const endereco = location.hash;
+  const desenhosAntes = desenhos;
   try {
     const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
     if (resposta && resposta.erros) {
@@ -813,6 +817,10 @@ document.addEventListener('submit', async (ev) => {
     logarErro(e);
     aviso(e.message, 'erro');
     if (botao) botao.disabled = false;
+  } finally {
+    // saiu sem trocar de tela (ex.: "Cancelar" numa confirmação, arquivo só baixado): o botão volta a funcionar.
+    // Se a tela vai ser desenhada de novo (ir/mostrar), fica apagado até a nova aparecer: não dá para enviar duas vezes.
+    if (botao?.isConnected && location.hash === endereco && desenhos === desenhosAntes) botao.disabled = false;
   }
 });
 
@@ -905,27 +913,14 @@ document.addEventListener('change', async (ev) => {
     nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
     return;
   }
-  if (ev.target.matches('input[data-acao-arquivo]')) {
-    if (!ev.target.files.length) return;
-    try {
-      await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
-    } catch (e) {
-      logarErro(e);
-      aviso(e.message, 'erro');
-    }
-    return;
-  }
-  // extrato em arquivo OFX (app do C6): tela Banco
-  const ofx = ev.target.closest('input[data-importar-ofx]');
-  if (ofx && ofx.files.length) {
-    try { await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx); } catch (e) { aviso(e.message, 'erro'); }
-    return;
-  }
-  const el = ev.target.closest('input[data-upload]');
-  if (!el || !el.files.length) return;
+  // arquivo escolhido → ação: data-acao-arquivo="nome da ação" (anexar arquivos, comprovante, documento assinado, extrato OFX…);
+  // os outros data-* do campo vão como dados da ação, como nos botões com data-acao
+  const arquivo = ev.target.closest('input[data-acao-arquivo]');
+  if (!arquivo || !arquivo.files.length) return;
   try {
-    await ACOES.enviarArquivos(el.dataset, el);
+    await ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
   } catch (e) {
+    logarErro(e);
     aviso(e.message, 'erro');
   }
 });
