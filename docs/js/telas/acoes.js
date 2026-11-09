@@ -1001,7 +1001,7 @@ export const ACOES = {
     const proximo = C.vencimentoDaCompetencia(C.competenciaDe(hoje), c.dia_vencimento || 10, false);
     const primeiro = proximo > hoje ? proximo : C.somarMesesData(proximo, 1);
     const nome = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}` : compBr(cb.competencia));
-    const r = await janela({ titulo: `Acordo · ${esc(c.inquilino_nome)}`, sim: 'Fazer o acordo', nao: 'Cancelar',
+    const r = await janela({ titulo: `Acordo · ${c.inquilino_nome}`, sim: 'Fazer o acordo', nao: 'Cancelar',
       html: `<p class="suave">Os boletos marcados ficam "em acordo" (saem da inadimplência) e o sistema cria os boletos novos. Se um boleto do acordo atrasar, o inquilino volta para a lista.</p>
         <p><label>Boletos do acordo</label>${vencidos.map((cb) => `<label class="check-mini"><input type="checkbox" name="boleto" value="${cb.id}" checked data-hoje="${hojeDe(cb)}">
           ${esc(nome(cb))} · venceu ${dataBr(cb.vencimento)} · ${reais(R.totais(cb).a_pagar_sem_desconto)} <span class="suave">(hoje ${reais(hojeDe(cb))})</span></label>`).join('<br>')}</p>
@@ -1053,7 +1053,7 @@ export const ACOES = {
     const c = buscar('contratos', cb.contrato_id);
     const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
     const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
-    await janela({ titulo: `${titulo} · ${esc(c.inquilino_nome)}`, sim: 'Fechar', nao: '',
+    await janela({ titulo: `${titulo} · ${c.inquilino_nome}`, sim: 'Fechar', nao: '',
       html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
         <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
         <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
@@ -1090,7 +1090,7 @@ export const ACOES = {
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     const hoje = C.hojeIso();
     const sim = C.liquidar(cb, hoje);
-    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? esc(c.inquilino_nome) : ''}`,
+    const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
       html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
         <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
         <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
@@ -1301,7 +1301,7 @@ export const ACOES = {
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
-    const r = await janela({ titulo: `Enviar carta de reajuste · ${esc(c.inquilino_nome)}`, sim: 'Abrir o e-mail e marcar como enviada',
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: 'Abrir o e-mail e marcar como enviada',
       html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
         <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
