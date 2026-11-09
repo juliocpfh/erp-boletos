@@ -153,7 +153,8 @@ async function proporPagamentoDoBanco(cb) {
   const dataPagou = String((resp.pagou || [])[0] || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
   if (dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
-  const pagouEmDia = dataPagou <= cb.vencimento && data > cb.vencimento;
+  // em dia até o vencimento ou, se ele não é dia útil, até o próximo dia útil
+  const pagouEmDia = dataPagou <= C.limitePagamento(cb.vencimento) && data > cb.vencimento;
   if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
     // mesmo caminho do pagamento com valor diferente digitado à mão: justificativa + valor da NF na página do boleto
     memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}` };
@@ -994,7 +995,7 @@ export const ACOES = {
   async fazerAcordo({ contrato }) {
     const c = buscar('contratos', contrato);
     const hoje = C.hojeIso();
-    const vencidos = d().cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && cb.vencimento < hoje && !R.ehComplementoCaucao(cb))
+    const vencidos = d().cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && C.vencido(cb.vencimento, hoje) && !R.ehComplementoCaucao(cb))
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
     if (!vencidos.length) throw new C.ErroUsuario('Este inquilino não tem boleto vencido em aberto.');
     const hojeDe = (cb) => C.liquidar(cb, hoje).valor_devido;

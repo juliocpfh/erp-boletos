@@ -4457,7 +4457,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
   const gerados = d.cobrancas.filter((x) => x.competencia === mes && !ehBoletoAvulso(x)).length;
   const doMes = d.cobrancas.filter((x) => x.competencia === comp && !ehBoletoAvulso(x));
   const emAberto = doMes.filter(aCobrar);
-  const vencidos = emAberto.filter((x) => x.vencimento < hoje);
+  const vencidos = emAberto.filter((x) => C.vencido(x.vencimento, hoje));
   // a carta vai junto com o boleto do próprio aluguel corrigido (o índice só sai no começo do mês do reajuste)
   const cartas = ativos.map((c) => reajusteNaCompetencia(d, c, mes)).filter((r) => r && r.faltaCarta);
   const air = airbnbDoMes(d, mes);
@@ -4571,7 +4571,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       const pago = cb && cb.data_pagamento;
       ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null,
         texto: `${c.inquilino_nome} · aluguel de ${C.compBr(comp)}${cb ? ` · ${C.reais(totais(cb).a_pagar_pontual)}` : ' · boleto ainda não gerado'}${geraNf(c) ? '' : ' · boleto de controle'}`,
-        situacao: pago ? 'ok' : !cb ? 'neutra' : venc < hoje ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(cb.data_pagamento)}` : !cb ? 'previsto' : venc < hoje ? 'vencido' : 'em aberto' });
+        situacao: pago ? 'ok' : !cb ? 'neutra' : C.vencido(venc, hoje) ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(cb.data_pagamento)}` : !cb ? 'previsto' : C.vencido(venc, hoje) ? 'vencido' : 'em aberto' });
     }
   }
   // boletos do complemento da caução
@@ -4581,7 +4581,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
     const pago = cb.data_pagamento;
     ev.push({ data: cb.vencimento, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb.id,
       texto: `${c.inquilino_nome} · complemento da caução · ${C.reais(cb.caucao_complemento)}`,
-      situacao: pago ? 'ok' : cb.vencimento < hoje ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(pago)}` : cb.vencimento < hoje ? 'vencido' : 'em aberto' });
+      situacao: pago ? 'ok' : C.vencido(cb.vencimento, hoje) ? 'perigo' : 'aviso', estado: pago ? `pago em ${C.dataBr(pago)}` : C.vencido(cb.vencimento, hoje) ? 'vencido' : 'em aberto' });
   }
   // IPTU na prefeitura
   for (const p of d.iptus) {
@@ -4890,13 +4890,14 @@ export const contratoEncerrado = (d, c) => c.ativo === false || !!encerramentoDo
 
 /**
  * Devedores: inquilinos com boleto vencido e não pago (carência sem valor não conta), com o valor de hoje
- * (multa e juros até hoje); contrato encerrado não entra (``contratoEncerrado``). Histórico: pagamentos com atraso
+ * (multa e juros até hoje); contrato encerrado não entra (``contratoEncerrado``). Vencimento em dia não útil só vence
+ * depois do próximo dia útil (``C.vencido``); os dias de atraso contam desde o vencimento. Histórico: pagamentos com atraso
  * nos últimos 12 meses, para ver quem costuma atrasar.
  */
 export function inadimplencia(d, hoje = C.hojeIso()) {
   const porContrato = new Map();
   for (const cb of d.cobrancas) {
-    if (!aCobrar(cb) || !(cb.vencimento < hoje)) continue;
+    if (!aCobrar(cb) || !C.vencido(cb.vencimento, hoje)) continue;
     const c = buscar(d, 'contratos', cb.contrato_id);
     if (!c || contratoEncerrado(d, c)) continue;
     if (!porContrato.has(c.id)) porContrato.set(c.id, { contrato: c, boletos: [] });
@@ -4957,7 +4958,7 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   for (const cb of lista) {
     const nome = nomeNoAcordo(cb);
     if (cb.contrato_id !== c.id) throw new Error(`O boleto ${nome} é de outro inquilino.`);
-    if (!aCobrar(cb) || !(cb.vencimento < hoje)) throw new Error(`O boleto ${nome} não está vencido e em aberto.`);
+    if (!aCobrar(cb) || !C.vencido(cb.vencimento, hoje)) throw new Error(`O boleto ${nome} não está vencido e em aberto.`);
     if (ehComplementoCaucao(cb)) throw new Error('O complemento da caução é garantia: não entra em acordo.');
     if (cb.banco && cb.banco.situacao === 'emitido') throw new Error(`O boleto ${nome} está emitido no C6: cancele no banco antes de fazer o acordo (senão o inquilino ainda pode pagá-lo).`);
   }
@@ -5072,22 +5073,8 @@ export function faturamentoNf(d, emitenteId, comp, indice = null) {
 
 const guiaDo = (d, emitenteId, imposto, periodo) => d.guias_impostos.find((g) => g.emitente_id === emitenteId && g.imposto === imposto && g.periodo === periodo) || null;
 
-/** Feriados nacionais em que os bancos não abrem (fixos e móveis pela Páscoa: Carnaval, Sexta-feira Santa, Corpus Christi). */
-function feriados(ano) {
-  // domingo de Páscoa (algoritmo de Meeus/Jones/Butcher)
-  const a = ano % 19; const b = Math.floor(ano / 100); const c = ano % 100;
-  const h = (19 * a + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
-  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - (c % 4)) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const mes = Math.floor((h + l - 7 * m + 114) / 31);
-  const dia = ((h + l - 7 * m + 114) % 31) + 1;
-  const pascoa = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-  const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map((x) => `${ano}-${x}`);
-  return new Set([...fixos, ...[-48, -47, -2, 60].map((n) => C.somarDias(pascoa, n))]);
-}
-const diaUtil = (iso) => { const dia = new Date(`${iso}T12:00:00`).getDay(); return dia !== 0 && dia !== 6 && !feriados(Number(iso.slice(0, 4))).has(iso); };
-/** Dia útil igual ou anterior à data (vencimento de tributo federal que cai em dia sem expediente bancário). */
-export function diaUtilAteh(iso) { let x = iso; while (!diaUtil(x)) x = C.somarDias(x, -1); return x; }
+/** Dia útil igual ou anterior à data (vencimento de tributo federal que cai em dia sem expediente bancário); feriados em calculos.js. */
+export const diaUtilAteh = C.diaUtilAteh;
 /** Vencimento da guia: PIS/COFINS até o dia 25 do mês seguinte; IRPJ/CSLL até o último dia útil do mês seguinte ao trimestre. */
 export function vencimentoGuia(mensal, periodo) {
   if (mensal) return diaUtilAteh(`${C.somarMeses(periodo, 1)}-25`);
@@ -5408,24 +5395,32 @@ export const ASSINATURA_LEMBRETE = 'ANK Administradora';
 
 /**
  * Texto do lembrete de um boleto em aberto. Fase: ``antes`` (vence depois de hoje), ``dia`` (vence hoje) ou ``atrasado``
- * (valor de hoje com multa e juros). Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
+ * (valor de hoje com multa e juros). Vencimento em dia não útil: o prazo é o próximo dia útil (``C.limitePagamento``), e o
+ * texto diz até quando pode pagar sem multa. Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
  * Ex.: boleto de 10/2026 (R$ 1.218,50 em dia) vencendo em 10/11; em 07/11 → "vence em 10/11/2026 … R$ 1.218,50".
  */
 export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', cb.contrato_id);
   const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
   const t = totais(cb);
-  const fase = cb.vencimento > hoje ? 'antes' : cb.vencimento === hoje ? 'dia' : 'atrasado';
+  const limite = C.limitePagamento(cb.vencimento);
+  const adiado = limite !== cb.vencimento;
+  const fase = limite > hoje ? 'antes' : limite === hoje ? 'dia' : 'atrasado';
   const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
   const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
     : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
   const onde = i ? ` (${i.nome})` : '';
   const linhas = [`Olá, ${nome}!`, ''];
+  const bonificacao = cb.desconto ? ' (já com a bonificação de pontualidade)' : '';
+  // vencimento em sábado, domingo ou feriado: pode pagar sem multa até o próximo dia útil
+  const naoUtil = adiado ? `, que não é dia útil: pode ser pago sem multa até ${C.dataBr(limite)}` : '';
   if (fase === 'antes') {
-    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
-    if (!ehComplementoCaucao(cb)) linhas.push(`Após o vencimento: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+    const quando = cb.vencimento > hoje ? `vence em ${C.dataBr(cb.vencimento)}` : cb.vencimento === hoje ? `vence hoje, ${C.dataBr(cb.vencimento)}` : `venceu em ${C.dataBr(cb.vencimento)}`;
+    linhas.push(`Lembrete: o boleto ${oQue}${onde} ${quando}${naoUtil}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`);
+    if (!ehComplementoCaucao(cb)) linhas.push(`${adiado ? `Depois de ${C.dataBr(limite)}` : 'Após o vencimento'}: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
   } else if (fase === 'dia') {
-    linhas.push(`Lembrete: o boleto ${oQue}${onde} vence hoje, ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${cb.desconto ? ' (já com a bonificação de pontualidade)' : ''}.`);
+    linhas.push(adiado ? `Lembrete: o boleto ${oQue}${onde} venceu em ${C.dataBr(cb.vencimento)}, que não é dia útil, e pode ser pago sem multa até hoje, ${C.dataBr(limite)}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`
+      : `Lembrete: o boleto ${oQue}${onde} vence hoje, ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`);
     if (!ehComplementoCaucao(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
   } else {
     const r = C.liquidar(cb, hoje);

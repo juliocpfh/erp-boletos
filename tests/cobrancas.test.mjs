@@ -151,3 +151,40 @@ test('saída: mudar a data para mais tarde reativa o inquilino e o boleto do mê
   R.gerarCobrancas(b.d, '2026-10', 'julio');
   assert.equal(doMes(b.d, b.c, '2026-10').dias_cobrados, 20);
 });
+
+test('dias úteis: sábado, domingo e feriado nacional; o prazo do boleto passa ao próximo dia útil', () => {
+  assert.deepEqual(['2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13'].map(C.diaUtil), [true, false, false, false, true], '12/10 é feriado');
+  assert.equal(C.limitePagamento('2026-10-10'), '2026-10-13', 'sábado → terça (segunda é feriado)');
+  assert.equal(C.limitePagamento('2026-08-10'), '2026-08-10', 'segunda-feira: o próprio dia');
+  assert.equal(C.limitePagamento('2027-02-08'), '2027-02-10', 'segunda e terça de Carnaval');
+  assert.equal(C.diaUtilAteh('2026-10-31'), '2026-10-30', 'os impostos antecipam, como antes');
+  assert.deepEqual([C.vencido('2026-10-10', '2026-10-13'), C.vencido('2026-10-10', '2026-10-14'), C.vencido('2026-08-10', '2026-08-11')], [false, true, true]);
+  assert.equal(R.vencimentoGuia(false, '2026-T3'), '2026-10-30');
+});
+
+test('vencimento no sábado: pago até o 1º dia útil é em dia; depois, o atraso conta desde o vencimento', () => {
+  // aluguel de 09/2026 vence no sábado 10/10/2026; segunda 12/10 é feriado: pode pagar sem multa até terça 13/10
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', reserva_valor: 0, cobrar_iptu: false });
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  const cb = doMes(d, c, '2026-09');
+  assert.equal(cb.vencimento, '2026-10-10');
+  const terca = R.previstoNoPagamento(cb, '2026-10-13');
+  assert.deepEqual([terca.dias_atraso, terca.multa, terca.juros, terca.valor_devido, terca.valor_nf, terca.pontual], [0, 0, 0, 121850, 121500, true], 'em dia, com a bonificação');
+  const quarta = R.previstoNoPagamento(cb, '2026-10-14');
+  assert.deepEqual([quarta.dias_atraso, quarta.multa, quarta.juros, quarta.valor_devido], [4, 13535, 180, 135350 + 13535 + 180], '4 dias desde 10/10');
+  // inadimplência, lembrete, acordo e fechamento seguem o mesmo prazo
+  for (const dia of ['2026-10-11', '2026-10-12', '2026-10-13']) assert.equal(R.inadimplencia(d, dia).devedores.length, 0, dia);
+  assert.equal(R.inadimplencia(d, '2026-10-14').devedores[0].diasMax, 4);
+  assert.equal(R.textoLembrete(d, cb, '2026-10-11').fase, 'antes');
+  assert.match(R.textoLembrete(d, cb, '2026-10-11').texto, /venceu em 10\/10\/2026, que não é dia útil: pode ser pago sem multa até 13\/10\/2026, no valor de R\$ 1\.218,50/);
+  assert.match(R.textoLembrete(d, cb, '2026-10-01').texto, /vence em 10\/10\/2026, que não é dia útil: pode ser pago sem multa até 13\/10\/2026.*\nDepois de 13\/10\/2026: R\$ 1\.353,50/);
+  assert.equal(R.textoLembrete(d, cb, '2026-10-13').fase, 'dia');
+  assert.match(R.textoLembrete(d, cb, '2026-10-13').texto, /pode ser pago sem multa até hoje, 13\/10\/2026/);
+  assert.match(R.textoLembrete(d, cb, '2026-10-14').texto, /\(4 dia\(s\) de atraso\)/);
+  assert.throws(() => R.previaAcordo(d, { contrato_id: c.id, ids: [cb.id], total: 130000, parcelas: 1, primeiro_vencimento: '2026-10-20' }, '2026-10-13'), /não está vencido/);
+  assert.equal(R.etapasFechamento(d, '2026-10', '2026-10-13').find((e) => e.chave === 'pagamentos').detalhe, '1 em aberto');
+  assert.equal(R.etapasFechamento(d, '2026-10', '2026-10-14').find((e) => e.chave === 'pagamentos').detalhe, '1 em aberto, 1 vencido(s)');
+  // confirmado na terça: pago em dia, NF com a bonificação
+  R.registrarPagamento(d, cb.id, '2026-10-13', null, 'julio');
+  assert.deepEqual([cb.situacao, cb.dias_atraso, cb.valor_pago, cb.valor_nf], ['Paga em dia', 0, 121850, 121500]);
+});
