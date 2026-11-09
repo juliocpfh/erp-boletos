@@ -11,7 +11,8 @@ const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por p
 
 const naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, 'NotFoundError');
 const semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
-const codificar = (partes) => partes.map(encodeURIComponent).join('/');
+/** Partes do caminho → caminho na API, cada parte codificada (ex.: ['arquivos', 'Loja 1', 'a b.pdf'] → 'arquivos/Loja%201/a%20b.pdf'). */
+export const codificar = (partes) => partes.map(encodeURIComponent).join('/');
 
 /**
  * Cliente dos anexos: chama a API, guarda as listas por pouco tempo e a fila de envios feitos sem internet.

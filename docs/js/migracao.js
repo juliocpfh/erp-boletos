@@ -4,11 +4,10 @@
 // A pasta do computador não é alterada. Os backups da pasta não vão (a nuvem faz os seus).
 import { ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_MODELOS, lerBanco, lerConteudo } from './armazenamento.js';
 import { canon, RAIZ_DO_SERVIDOR } from './nuvem.js';
+import { codificar } from './pasta-nuvem.js';
 
 /** Quantos arquivos vão ao mesmo tempo (um por um demorava muito na internet de casa). */
 export const SIMULTANEOS = 4;
-
-const codificar = (partes) => partes.map(encodeURIComponent).join('/');
 
 /** Todos os arquivos de uma pasta (com as subpastas): [{ partes, handle, tamanho }]. */
 async function percorrer(dir, partes, lista) {
