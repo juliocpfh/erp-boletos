@@ -4217,6 +4217,26 @@ export const boletosParaEmitir = (d, comp) => d.cobrancas.filter((cb) => cb.comp
 export const solicitacoesDo = (d, contratoId) => d.solicitacoes.filter((x) => x.contrato_id === contratoId)
   .sort(C.maisRecentePrimeiro);
 
+/**
+ * Inquilinos para abrir uma solicitação: cada pessoa (mesmo CPF/CNPJ, ou mesmo nome sem documento) com os contratos ativos
+ * dela (um por imóvel), em ordem de nome. ``incluirId``: contrato que entra mesmo inativo (solicitação antiga em edição).
+ * Devolve [{ chave, nome, contratos: [{ id, imovel }] }] (imovel: nome do imóvel ou '').
+ */
+export function inquilinosParaSolicitacao(d, hoje, incluirId = null) {
+  const porChave = new Map();
+  const ativos = d.contratos.filter((c) => c.id === incluirId || (c.ativo !== false && contratoAtivo(c, hoje)));
+  for (const c of ativos) {
+    const doc = soDigitos(c.inquilino_cpf);
+    const chave = doc ? `d${doc}` : `n${String(c.inquilino_nome || '').trim().toLocaleLowerCase('pt-BR')}`;
+    const imovel = c.imovel_id ? (buscar(d, 'imoveis', c.imovel_id) || {}).nome || '' : '';
+    if (!porChave.has(chave)) porChave.set(chave, { chave, nome: c.inquilino_nome, contratos: [] });
+    porChave.get(chave).contratos.push({ id: c.id, imovel });
+  }
+  const lista = [...porChave.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  for (const p of lista) p.contratos.sort((a, b) => a.imovel.localeCompare(b.imovel, 'pt-BR'));
+  return lista;
+}
+
 /** Quantas solicitações há em cada situação (sem situação conta como "Aberta"). */
 export function resumoSolicitacoes(d) {
   const r = { Aberta: 0, 'Em andamento': 0, Concluída: 0, 'Não atendida': 0 };

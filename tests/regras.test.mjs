@@ -912,6 +912,20 @@ test('resumo das solicitações por situação (sem situação conta como aberta
   assert.deepEqual(R.resumoSolicitacoes(d), { Aberta: 2, 'Em andamento': 1, Concluída: 2, 'Não atendida': 1 });
 });
 
+test('inquilinos da solicitação: mesma pessoa (CPF) junta os imóveis; inativo só se for o da edição', () => {
+  const d = R.bancoVazio();
+  d.imoveis.push({ id: 1, nome: 'Casa Azul' }, { id: 2, nome: 'Apto 101' }, { id: 3, nome: 'Loja' });
+  d.contratos.push(
+    { id: 10, imovel_id: 1, inquilino_nome: 'Maria Teste', inquilino_cpf: '529.982.247-25', data_entrada: '2026-01-01' },
+    { id: 11, imovel_id: 2, inquilino_nome: 'Maria Teste', inquilino_cpf: '52998224725', data_entrada: '2026-03-01' },
+    { id: 12, imovel_id: 3, inquilino_nome: 'Ana Exemplo', data_entrada: '2025-01-01', data_saida: '2026-06-30' },
+  );
+  const lista = R.inquilinosParaSolicitacao(d, '2026-11-09');
+  assert.deepEqual(lista.map((p) => [p.nome, p.contratos.map((c) => c.imovel)]), [['Maria Teste', ['Apto 101', 'Casa Azul']]]);
+  const comAntigo = R.inquilinosParaSolicitacao(d, '2026-11-09', 12);
+  assert.deepEqual(comAntigo.map((p) => p.nome), ['Ana Exemplo', 'Maria Teste']);
+});
+
 test('termo aditivo: exige data, assunto e arquivo; marca o contrato com "possui termo aditivo"', () => {
   const { d, c } = base();
   assert.throws(() => R.registrarAditivo(d, c.id, { data: '2026-10-15', assunto: 'Troca do vencimento' }, 'julio'), /Anexe o arquivo/);

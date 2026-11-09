@@ -103,6 +103,17 @@ export const linkComprovante = (contratoId, nome, anexo = null) => (nome && !(an
 
 export let fiadoresMudancas = { novos: [], alterados: [] };
 
+/** Inquilinos da lista da solicitação (o da solicitação em edição entra mesmo inativo). */
+const inquilinosDaSolicitacao = (r) => R.inquilinosParaSolicitacao(d(), C.hojeIso(), r ? r.contrato_id : null);
+
+/** Inquilino e imóvel já marcados no formulário da solicitação para um contrato ({ inquilino, imovel_k }). */
+function escolhaDoContrato(contratoId, r = null) {
+  const pessoas = inquilinosDaSolicitacao(r);
+  const k = pessoas.findIndex((p) => p.contratos.some((c) => c.id === contratoId));
+  if (k < 0) return {};
+  return { inquilino: pessoas[k].chave, ...(pessoas[k].contratos.length > 1 ? { [`imovel_${k}`]: String(contratoId) } : {}) };
+}
+
 /** Fiadores que entram, saem ou são corrigidos na troca de garantia (preenchido em ajustar, usado em salvar). */
 let fiadoresDaTroca = { novos: [], saem: [], alterados: [] };
 
@@ -158,18 +169,32 @@ export const CADASTROS = {
   },
   solicitacoes: {
     titulo: (r) => (r ? 'Solicitação do inquilino' : 'Nova solicitação do inquilino'),
-    // inquilino escolhido na lista (ativos, em ordem de nome); vindo da tela Inquilinos, já vem marcado
+    // escolhe o inquilino (ativos, em ordem de nome); quem aluga mais de um imóvel escolhe também o imóvel do pedido
+    // (um campo de imóvel por inquilino, que aparece só quando ele é escolhido); com um imóvel só, já vai o dele
+    // vindo da página do inquilino (?contrato=), já vem marcado
     campos: (r) => {
-      const ops = d().contratos.filter((c) => (r && c.id === r.contrato_id) || (c.ativo !== false && R.contratoAtivo(c, C.hojeIso())))
-        .sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR'))
-        .map((c) => { const i = c.imovel_id ? buscar('imoveis', c.imovel_id) : null; return [String(c.id), `${c.inquilino_nome}${i ? ` · ${i.nome}` : ''}`]; });
-      return [{ nome: 'contrato_id', rotulo: 'Inquilino', tipo: 'opcao', obrig: true, opcoes: ops }, ...F.SOLICITACAO];
+      const pessoas = inquilinosDaSolicitacao(r);
+      const inquilino = { nome: 'inquilino', rotulo: 'Inquilino', tipo: 'opcao', obrig: true, virtual: true,
+        opcoes: pessoas.map((p) => [p.chave, `${p.nome} · ${p.contratos.length > 1 ? `${p.contratos.length} imóveis` : p.contratos[0].imovel || 'sem imóvel'}`]) };
+      const imoveis = pessoas.flatMap((p, k) => (p.contratos.length > 1 ? [{ nome: `imovel_${k}`, rotulo: 'Imóvel do pedido', tipo: 'opcao', obrig: true, virtual: true,
+        opcoes: p.contratos.map((c) => [String(c.id), c.imovel || 'sem imóvel']), mostrarSe: { campo: 'inquilino', valores: [p.chave] },
+        ajuda: `${p.nome} aluga mais de um imóvel: escolha de qual é o pedido` }] : []));
+      return [inquilino, ...imoveis, ...F.SOLICITACAO];
     },
-    padrao: (q) => ({ data: C.hojeIso(), contrato_id: q.contrato || '' }),
+    valores: (r) => ({ ...r, ...escolhaDoContrato(r.contrato_id, r) }),
+    padrao: (q) => ({ data: C.hojeIso(), ...(q.contrato ? escolhaDoContrato(Number(q.contrato)) : {}) }),
     voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de]
       || (r || (q && q.contrato) ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : '#/solicitacoes')),
     descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
-    ajustar(dados) {
+    ajustar(dados, erros, r, form) {
+      const fd = new FormData(form);
+      const pessoas = inquilinosDaSolicitacao(r);
+      const k = pessoas.findIndex((p) => p.chave === fd.get('inquilino'));
+      if (k < 0) { erros.inquilino = 'Escolha o inquilino'; return; }
+      const p = pessoas[k];
+      const contrato = p.contratos.length > 1 ? p.contratos.find((c) => String(c.id) === fd.get(`imovel_${k}`)) : p.contratos[0];
+      if (!contrato) { erros[`imovel_${k}`] = 'Escolha o imóvel do pedido'; return; }
+      dados.contrato_id = contrato.id;
       if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
     },
   },
