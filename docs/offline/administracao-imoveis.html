@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-Z/L9tIhhc3CnrvkOqO0N8TGaP7k+lz/vTo4fDi9apf8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-5PX3qDS7HBcwIa/g9OlJe9mhqeuI8crUbLmgvO9QsOc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="8b4becc4e440c21b">
+<meta name="fontes" content="61aed3e4e1e01419">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1631,6 +1631,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     caucoesACompletar: () => caucoesACompletar,
     centavosParaReais: () => centavosParaReais,
     chaveAlerta: () => chaveAlerta,
+    chavePendente: () => chavePendente,
     cobrancasEmAberto: () => cobrancasEmAberto,
     competenciaDaParcela: () => competenciaDaParcela,
     competenciaDoAbatimento: () => competenciaDoAbatimento,
@@ -1711,6 +1712,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     encerrarVinculoPorContinuacao: () => encerrarVinculoPorContinuacao,
     enderecoCompleto: () => enderecoCompleto,
     enderecoDoPagador: () => enderecoDoPagador,
+    entradasAirbnbSemDestino: () => entradasAirbnbSemDestino,
     estiloAlerta: () => estiloAlerta,
     estornarPagamento: () => estornarPagamento,
     etapasAtrasadas: () => etapasAtrasadas,
@@ -1770,6 +1772,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     leituraDo: () => leituraDo,
     leiturasDo: () => leiturasDo,
     leiturasDoImovel: () => leiturasDoImovel,
+    lembretesAirbnb: () => lembretesAirbnb,
     ligarArquivoSeguro: () => ligarArquivoSeguro,
     lista: () => lista2,
     mapaIptuAvista: () => mapaIptuAvista,
@@ -1788,6 +1791,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
     mesDeAniversario: () => mesDeAniversario,
     mesDoDinheiro: () => mesDoDinheiro,
+    mesFechado: () => mesFechado,
     mesesDoTrimestre: () => mesesDoTrimestre,
     mesesIptuAvista: () => mesesIptuAvista,
     mesesUsoReserva: () => mesesUsoReserva,
@@ -4086,7 +4090,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function mesesIptuAvista(d2, p2) {
     if (!p2.pago_avista) return [];
-    const porMes = /* @__PURE__ */ new Map();
+    const porMes2 = /* @__PURE__ */ new Map();
     const umDoze = p2.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1];
     for (const c of d2.contratos.filter((x) => x.imovel_id === p2.imovel_id && x.ativo !== false && x.cobrar_iptu)) {
       for (let k = 0, comp = `${p2.ano - 1}-01`; k < 36; k += 1, comp = somarMeses(comp, 1)) {
@@ -4094,27 +4098,27 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const dias = n ? diasOcupados(comp, c.data_entrada, c.data_saida) : 0;
         if (!dias || emCarencia(c, comp) && !c.carencia_cobrar_iptu) continue;
         const mesBoleto = c.cobranca_mes_seguinte === false ? comp : somarMeses(comp, 1);
-        const item3 = porMes.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? "1/12 (você pagou à vista)" : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
+        const item3 = porMes2.get(mesBoleto) || { mesBoleto, comp, n, rotulo: umDoze ? "1/12 (você pagou à vista)" : `${n}ª parcela (você pagou à vista)`, valor: 0, inquilinos: [] };
         const valor = aluguelProporcional(v, dias, diasNoMes(comp));
         item3.valor += valor;
         item3.inquilinos.push({ contrato: c, comp, dias, diasMes: diasNoMes(comp), valor });
-        porMes.set(mesBoleto, item3);
+        porMes2.set(mesBoleto, item3);
       }
     }
-    return [...porMes.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+    return [...porMes2.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
   }
   function mapaIptuAvista(d2, p2) {
     if (!p2.pago_avista) return [];
     const n = Number(p2.num_parcelas) || 0;
     const primeiro = p2.primeiro_vencimento_boleto || p2.primeira_competencia && somarMeses(p2.primeira_competencia, 1);
     const esquema = p2.cobranca_inquilino !== COBRANCA_IPTU_QUITADO[1] && n && primeiro ? valoresIptu(p2).map((valor, k) => ({ mesBoleto: somarMeses(primeiro, k), rotulo: `${k + 1}ª parcela`, valor })) : parcelas(p2.valor_total, 12).map((valor, k) => ({ mesBoleto: somarMeses(`${p2.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, "0")}/${p2.ano})`, valor }));
-    const porMes = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
+    const porMes2 = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
     for (const m of mesesIptuAvista(d2, p2)) {
-      const it2 = porMes.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(" (você pagou à vista)", ""), valor: m.valor, valorInquilino: 0 };
+      const it2 = porMes2.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(" (você pagou à vista)", ""), valor: m.valor, valorInquilino: 0 };
       it2.valorInquilino += m.valor;
-      porMes.set(m.mesBoleto, it2);
+      porMes2.set(m.mesBoleto, it2);
     }
-    return [...porMes.values()].map((x) => ({ ...x, valorProprietario: Math.max(0, x.valor - x.valorInquilino) })).sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
+    return [...porMes2.values()].map((x) => ({ ...x, valorProprietario: Math.max(0, x.valor - x.valorInquilino) })).sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
   }
   function totaisIptu(d2, p2) {
     const ps = parcelasIptu(d2, p2);
@@ -4415,6 +4419,22 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return lista3.sort((a, b) => a.data.localeCompare(b.data) || a.tipo.localeCompare(b.tipo) || a.registro.id - b.registro.id);
   }
+  var chavePendente = (p2) => `${p2.tipo}:${p2.registro.id}`;
+  var mesFechado = (comp, hoje3 = hojeIso()) => comp < competenciaDe(hoje3);
+  var entradasAirbnbSemDestino = (d2, comp) => (d2.movimentacoes_banco || []).filter((m) => m.tipo === "entrada" && !m.classificacao && String(m.data || "").slice(0, 7) === comp && /AIRBNB/i.test(`${m.titulo || ""} ${m.descricao || ""}`));
+  function lembretesAirbnb(d2, meses, hoje3 = hojeIso()) {
+    const out = [];
+    for (const comp of [...new Set(meses)].filter((m) => mesFechado(m, hoje3)).sort()) {
+      const sem = entradasAirbnbSemDestino(d2, comp);
+      if (sem.length) out.push(`${sem.length} entrada(s) do Airbnb no extrato de ${compBr(comp)} ainda sem destino (${reais(sem.reduce((t, m2) => t + m2.valor, 0))}): dê o destino no Financeiro, dividindo entre os imóveis.`);
+      const m = airbnbDoMes(d2, comp);
+      if (m.numerada) continue;
+      if (m.total && !m.nf) out.push(`Os ganhos do Airbnb de ${compBr(comp)} (${reais(m.total)}) ainda não viraram NF: gere a NF do Airbnb.`);
+      else if (m.divergente) out.push(`A NF do Airbnb de ${compBr(comp)} está com ${reais(m.nf.valor)}, mas os ganhos somam ${reais(m.total)}: acerte a NF do Airbnb.`);
+      else if (!m.total && !sem.length) out.push(`Nenhuma entrada do Airbnb lançada em ${compBr(comp)}. Se houve, lance antes de numerar.`);
+    }
+    return out;
+  }
   function ultimaFatura(d2) {
     return d2.faturas.reduce((m, f) => !m || f.numero > m.numero ? f : m, null);
   }
@@ -4495,9 +4515,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!(base.valor > 0)) return `Valor da NF zerado em ${base.descricao}.`;
     return null;
   }
-  function numerarFaturas(d2, usuario, { forcar = false, ate = null } = {}) {
+  function numerarFaturas(d2, usuario, { forcar = false, ate = null, apenas = null } = {}) {
     let pendentes = pendentesDeFatura(d2);
     if (ate) pendentes = pendentes.filter((p2) => p2.data <= ate);
+    if (apenas) {
+      const marcados = new Set(apenas);
+      pendentes = pendentes.filter((p2) => marcados.has(chavePendente(p2)));
+    }
     const ultima = ultimaFatura(d2);
     const foraDeOrdem = ultima ? pendentes.filter((p2) => p2.data < ultima.emissao) : [];
     if (foraDeOrdem.length && !forcar) return { numeradas: [], foraDeOrdem, problema: null, ultima };
@@ -7584,8 +7608,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const meses = mesesDoTrimestre(comp).filter((m) => m <= comp);
     const tri = trimestreDe(comp);
     const mes = faturamentoNf(d2, e.id, comp);
-    const porMes = meses.map((m) => ({ mes: m, ...faturamentoNf(d2, e.id, m) }));
-    const trimestre = porMes.reduce((t, x) => t + x.valor, 0);
+    const porMes2 = meses.map((m) => ({ mes: m, ...faturamentoNf(d2, e.id, m) }));
+    const trimestre = porMes2.reduce((t, x) => t + x.valor, 0);
     const presumido = (imposto) => {
       const extra = mesesDoTrimestre(comp)[0] >= INICIO_LC224[imposto] ? excedenteLc224(d2, e.id, comp, INICIO_LC224[imposto]) : 0;
       return { base: Math.round(trimestre * PRESUNCAO / 100) + Math.round(extra * PRESUNCAO / 1e3), lc224: extra };
@@ -7594,7 +7618,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       empresa: e,
       faturamento: mes,
       trimestre,
-      porMes,
+      porMes: porMes2,
       fechado: meses.length === 3,
       guias: IMPOSTOS.map((x) => {
         const periodo2 = x.mensal ? comp : tri;
@@ -7701,8 +7725,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const cfg2 = d2.config_banco || {};
     const contas2 = cfg2.contas || [];
     const fim = limitesCompetencia(mes)[1];
-    const mesFechado = fim < hoje3;
-    const ate = mesFechado ? fim : somarDias(hoje3, -DIAS_EXTRATO_RECENTE);
+    const mesFechado2 = fim < hoje3;
+    const ate = mesFechado2 ? fim : somarDias(hoje3, -DIAS_EXTRATO_RECENTE);
     const movs2 = (d2.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
     const semDestinoDe = (id) => movs2.filter((m) => m.conta_id === id && !m.classificacao).length;
     const porConta = contas2.map((c) => {
@@ -7711,7 +7735,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     });
     const semComprovante = movs2.filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador).length;
     const pagamentosPendentes = (d2.pagamentos_banco || []).filter((p2) => ["aguardando_aprovacao", "agendado", "erro"].includes(p2.situacao)).length;
-    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
+    return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado: mesFechado2 };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
     const cfg2 = d2.config_banco || {};
@@ -17425,16 +17449,15 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <a class="botao secundario" href="#/faturas?mes=${somarMeses(mes, 1)}">${compBr(somarMeses(mes, 1))} →</a></div></div>
     <div class="cartao"><h2>Pagamentos aguardando número</h2>
       <p class="suave">Última NF: ${ultima ? `<b>Nº ${numeroFatura(ultima.numero)}</b> de ${dataBr(ultima.emissao)}` : "nenhuma ainda"} · próximo número: <b>${numeroFatura(d().proxima_fatura)}</b>. A numeração segue a data contábil (em que o dinheiro entrou), e a data de emissão é essa data. Inquilinos marcados "sem NF" não entram.</p>
-      ${pend.length ? `<table><tr><th>Ordem</th><th>Pagamento em</th><th>Origem</th><th>Observações na NF</th><th class="n">Valor da NF</th><th></th></tr>
-        ${pend.map((p2, n) => {
-      const b = baseDaFatura(d(), p2.tipo, p2.registro);
-      return `<tr class="${ultima && p2.data < ultima.emissao ? "fora" : ""}"><td>${numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p2.data)}${ultima && p2.data < ultima.emissao ? ` ${etiqueta("anterior à última NF", "perigo")}` : ""}</td><td>${esc(b.descricao)}</td>
-          <td class="suave">${esc(b.observacoes || "")}</td><td class="n">${reais(b.valor)}</td>
-          <td class="n">${opera() ? `${link(p2.tipo === "cobranca" ? `#/editar/cobrancas/${p2.registro.id}?nf=1` : `#/editar/avulsas/${p2.registro.id}`, "Corrigir")}
-            ${formNfExterna(p2.tipo, p2.registro.id, p2.data)}` : ""}</td></tr>`;
-    }).join("")}</table>
-        <p class="suave">Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
-        ${opera() ? `<p>${botao("numerar", "Numerar estas NFs", {}, "")}</p>` : ""}` : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
+      ${caixaAirbnb(pend)}
+      ${pend.length ? `<div class="acoes barra-nf"><label class="check-mini"><input type="checkbox" data-marcar-todas="nfp"> marcar todos</label>
+        <span class="suave">Vêm marcados os pagamentos dos meses fechados (do dia 1º ao último dia). O mês em andamento fica desmarcado: numere depois da virada.</span></div>
+        <table><tr><th></th><th>Pagamento em</th><th>Origem</th><th>Observações na NF</th><th class="n">Valor da NF</th><th></th></tr>
+        ${porMes(pend).map(([mes2, ps]) => `<tr class="grupo-mes"><th><input type="checkbox" data-marcar-todas="nfp-${mes2}" ${mesFechado(mes2) ? "checked" : ""} title="Marcar o mês todo"></th>
+          <th colspan="5">${compBr(mes2)} · ${ps.length} pagamento(s) · ${reais(ps.reduce((t, p2) => t + baseDaFatura(d(), p2.tipo, p2.registro).valor, 0))} ${mesFechado(mes2) ? etiqueta("mês fechado", "ok") : etiqueta("mês em andamento", "aviso")}</th></tr>
+          ${ps.map((p2) => linhaPendente(p2, mes2, ultima)).join("")}`).join("")}</table>
+        <p class="suave">A numeração segue a data contábil dos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
+        ${opera() ? `<p>${botao("numerar", "Numerar as NFs marcadas", {}, "")}</p>` : ""}` : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
     <div class="cartao rolagem">
       ${emitidas.length ? `<div class="acoes barra-nf"><label class="check-mini"><input type="checkbox" data-marcar-todas> selecionar todas</label>
@@ -17451,6 +17474,37 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${[...new Set(doMes.filter((f) => f.situacao === "Emitida").map((f) => f.emitente_id))].map((id) => buscar2("emitentes", id)).filter(Boolean).map((e) => botao("pdfMes", `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(" ")}
       ${botao("excelMes", "Baixar todas em Excel (ZIP)", { mes })}</div>` : ""}
     ${opera() && ultima ? caixaRenumerar() : ""}`;
+  }
+  function porMes(pend) {
+    const m = /* @__PURE__ */ new Map();
+    for (const p2 of pend) {
+      const comp = p2.data.slice(0, 7);
+      if (!m.has(comp)) m.set(comp, []);
+      m.get(comp).push(p2);
+    }
+    return [...m];
+  }
+  function linhaPendente(p2, mes, ultima) {
+    const b = baseDaFatura(d(), p2.tipo, p2.registro);
+    const antes = ultima && p2.data < ultima.emissao;
+    return `<tr class="${antes ? "fora" : ""}"><td>${opera() ? `<input type="checkbox" data-nfp="${chavePendente(p2)}" data-nfp-${mes} ${mesFechado(mes) ? "checked" : ""}>` : ""}</td>
+    <td>${dataBr(p2.data)}${antes ? ` ${etiqueta("anterior à última NF", "perigo")}` : ""}</td><td>${esc(b.descricao)}</td>
+    <td class="suave">${esc(b.observacoes || "")}</td><td class="n">${reais(b.valor)}</td>
+    <td class="n">${opera() ? `${link(p2.tipo === "cobranca" ? `#/editar/cobrancas/${p2.registro.id}?nf=1` : `#/editar/avulsas/${p2.registro.id}`, "Corrigir")}
+      ${formNfExterna(p2.tipo, p2.registro.id, p2.data)}` : ""}</td></tr>`;
+  }
+  function caixaAirbnb(pend) {
+    const hoje3 = hojeIso();
+    const meses = [somarMeses(competenciaDe(hoje3), -1), ...pend.map((p2) => p2.data.slice(0, 7))];
+    const lembretes = lembretesAirbnb(d(), meses, hoje3);
+    const gerar = [...new Set(meses)].filter((m) => mesFechado(m, hoje3)).sort().filter((m) => {
+      const a = airbnbDoMes(d(), m);
+      return !a.numerada && a.total && (!a.nf || a.divergente);
+    });
+    if (!lembretes.length) return '<p class="suave">Airbnb: entradas lançadas e NF gerada nos meses fechados. ✓</p>';
+    return `<div class="alerta aviso"><b>Antes de numerar, lance as entradas do Airbnb.</b><ul>${lembretes.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+    ${opera() ? gerar.map((m) => botao("gerarNfAirbnb", `Gerar a NF do Airbnb de ${compBr(m)}`, { mes: m }, "pequeno")).join(" ") : ""}
+    ${link(`#/financeiro?mes=${somarMeses(competenciaDe(hoje3), -1)}`, "Ir ao Financeiro")}</div>`;
   }
   function caixaRenumerar() {
     const ciclo = ultimoCicloDeNumeracao(d());
@@ -17553,7 +17607,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
         <div class="acoes">${link(url({ filtro: "todos" }), `← Boletos de ${compBr(comp)}`, "botao secundario")}</div></div>
       ${filtros}
-      ${filtro === "semnf" && lista3.length && opera() ? `<div class="alerta info">${lista3.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
+      ${filtro === "semnf" && lista3.length && opera() ? `<div class="alerta info">${lista3.length} pagamento(s) aguardando número de NF. ${link("#/faturas", "Numerar na tela NF", "botao pequeno")}</div>` : ""}
       ${opera() && ["abertos", "vencidos"].includes(filtro) ? caixaBaixaLote(lista3, hoje3) : ""}
       ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: true, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma2((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma2((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
     }
@@ -17576,7 +17630,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${caucoes.map((x) => `<div class="acoes" style="margin-top:6px">${esc(x.contrato.inquilino_nome)}: caução de ${reais(x.atual)} para ${reais(x.necessaria)}
         ${link(`#/reajustes?contrato=${x.contrato.id}`, `Completar ${reais(x.complemento)} em Reajustes`, "botao pequeno")}</div>`).join("")}</div>` : ""}
     ${opera() && lista3.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao("recalcularMes", `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, "secundario pequeno", "Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.")}</p>` : ""}
-    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${botao("numerar", "Numerar NFs agora", {}, "pequeno")}</div>` : ""}
+    ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) aguardando número de NF. ${link("#/faturas", "Numerar na tela NF", "botao pequeno")}</div>` : ""}
     ${opera() ? caixaBaixaLote(lista3, hoje3) : ""}
     ${lista3.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ""}
     ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: false, reajustes, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
@@ -19022,7 +19076,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 7. PAGAMENTO E NOTAS FISCAIS (NF)
 - Cada pagamento tem a data contábil (data em que o dinheiro entrou).
 - A numeração das NFs é contínua, pela data em que o dinheiro entrou, e dividida entre as empresas.
-- As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro).
+- As NFs de um mês são numeradas só depois da virada do mês, com as NFs avulsas e as do Airbnb do mês já lançadas (ex.: a partir de 01/11, as de outubro). Na tela NF, a fila vem separada por mês, com caixas de seleção: os meses fechados (do dia 1º ao último dia) vêm marcados e o mês em andamento desmarcado; só os marcados são numerados. Antes de numerar, o sistema lembra do Airbnb (entrada no extrato sem destino, ganho sem NF gerada, ou nenhum ganho lançado no mês).
 - Valor da NF = aluguel com bonificação (pago em dia) ou com multa e juros (atrasado). Não inclui IPTU, seguro nem tarifa. O padrão é NF com o aluguel cheio e o ressarcimento de condomínio como gasto.
 - Valor recebido diferente do previsto para a data: pede justificativa e a NF é digitada à mão (a justificativa fica só no sistema).
 - Para corrigir uma NF errada há dois caminhos, na tela NFs: (1) "Cancelar" a NF: o número fica cancelado (não é reaproveitado) e o pagamento volta para a fila e recebe um número novo; o administrador pode depois apagar a NF cancelada da lista (fica só no Histórico). (2) "Voltar a última numeração" (ou "desfazer a partir de um número", para NFs numeradas antes de existir o ciclo ou para voltar mais de um ciclo): as NFs saem da lista (ficam no Histórico), os pagamentos voltam para a fila e os mesmos números são usados de novo, na ordem das datas. Assim a sequência nunca fica com buraco: ou o número consta como cancelado, ou é reaproveitado.
@@ -20573,14 +20627,27 @@ ${MODELO_COMODOS[comodo].join("\n")}
       });
       await mostrar();
     },
+    /** Numera só os pagamentos marcados na fila (por padrão, os dos meses fechados), lembrando antes do Airbnb. */
     async numerar() {
-      let r = await alterar((db) => numerarFaturas(db, login()));
+      const apenas = [...document.querySelectorAll("input[data-nfp]:checked")].map((x) => x.dataset.nfp);
+      if (!apenas.length) throw new ErroUsuario("Marque na lista os pagamentos que quer numerar.");
+      const marcados = pendentesDeFatura(E.d).filter((p2) => apenas.includes(chavePendente(p2)));
+      const meses = [...new Set(marcados.map((p2) => p2.data.slice(0, 7)))];
+      const abertos = meses.filter((m) => !mesFechado(m));
+      const avisos = [
+        ...abertos.length ? [`Há pagamento(s) de ${abertos.map(compBr).join(", ")}, mês ainda em andamento: o normal é numerar depois da virada do mês.`] : [],
+        ...lembretesAirbnb(E.d, meses)
+      ];
+      if (avisos.length && !confirm(`${avisos.map((t) => `• ${t}`).join("\n")}
+
+Numerar mesmo assim?`)) return;
+      let r = await alterar((db) => numerarFaturas(db, login(), { apenas }));
       if (r.foraDeOrdem.length) {
         const lista3 = r.foraDeOrdem.map((p2) => `${dataBr(p2.data)}`).join(", ");
         if (!confirm(`A última NF (nº ${numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista3}.
 
 Numerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
-        r = await alterar((db) => numerarFaturas(db, login(), { forcar: true }));
+        r = await alterar((db) => numerarFaturas(db, login(), { forcar: true, apenas }));
       }
       if (r.numeradas.length) aviso(`NFs numeradas: ${r.numeradas.map((n) => numeroFatura(n.numero)).join(", ")}.`);
       if (r.problema) aviso(r.problema, "erro");
