@@ -207,7 +207,7 @@ export const CADASTROS = {
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
-      inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: r.prazo_meses || C.mesesDoPrazo(r.data_entrada || r.vigencia_inicio, r.vigencia_fim) || C.mesesDoPrazo(r.vigencia_inicio, r.vigencia_fim),
+      inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: R.prazoDoContrato(d(), r),
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
@@ -249,13 +249,18 @@ export const CADASTROS = {
       if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = 'Informe um dia entre 1 e 31';
       if (dados.data_saida && dados.data_entrada && dados.data_saida < dados.data_entrada) erros.data_saida = 'A saída não pode ser antes da entrada';
       if (dados.prazo_tipo === 'Determinado') {
+        // o fim sai de um lugar só (R.fimDoContrato): o da renovação; na troca de titular, o do contrato assumido (o prazo não
+        // recomeça); senão, a data de vigência inicial (sem ela, a do contrato) + o prazo
+        const renovado = r ? R.fimRenovado(d(), r) : null;
         if (!(dados.prazo_meses > 0)) erros.prazo_meses = 'Informe o prazo em meses, ou marque prazo indeterminado';
-        // troca de titular: o prazo continua o do contrato assumido (ao editar, fica o fim já gravado: muda pela renovação)
-        else if (herdado && (r ? r.vigencia_fim : R.fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id }))) {
-          dados.vigencia_fim = r ? r.vigencia_fim : R.fimDoPrazoHerdado(d(), { contrato_anterior_id: anteriorHerdado.id });
+        else if (renovado && dados.prazo_meses !== R.prazoDoContrato(d(), r)) {
+          erros.prazo_meses = `Contrato renovado até ${dataBr(renovado)}: o prazo e o fim mudam pela renovação ("Renovação / novo valor", na página do inquilino)`;
+        } else {
+          const fim = R.fimDoContrato(d(), { ...r, ...dados, id: r ? r.id : null, contrato_anterior_id: herdado ? anteriorHerdado.id : null });
+          if (fim) dados.vigencia_fim = fim;
+          // renovado: o prazo acompanha o fim da renovação (também se a data de vigência inicial foi corrigida)
+          if (renovado) dados.prazo_meses = R.prazoDoContrato(d(), { ...r, ...dados, id: r.id });
         }
-        // o prazo conta da data de vigência inicial (sem ela, da data do contrato)
-        else if (dados.data_entrada || dados.vigencia_inicio) dados.vigencia_fim = C.fimDoPrazo(dados.data_entrada || dados.vigencia_inicio, dados.prazo_meses);
       }
       if (dados.carencia_meses < 0) erros.carencia_meses = 'Valor inválido';
       if (dados.inquilino_tipo === 'Pessoa jurídica (empresa)' && !dados.representante_nome) erros.representante_nome = 'Empresa precisa do representante (pessoa física)';

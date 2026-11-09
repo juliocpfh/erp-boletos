@@ -703,7 +703,7 @@ export function telaContrato(c) {
       ${c.solidario_nome ? `<h3>Inquilino solidário</h3><p><b>${esc(c.solidario_nome)}</b> · ${pessoa('solidario')}</p><p class="suave">O boleto sai no nome do inquilino principal.</p>` : ''}</div>
     <div class="cartao"><h2>Contrato e valores</h2><div class="grade">
       ${item(R.fimDeVinculo(d(), c) ? 'Entrada / fim do vínculo' : 'Entrada / saída', `${dataBr(c.data_entrada)} a ${dataBr(c.data_saida)}`)}
-      ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${c.prazo_meses ? ` (${c.prazo_meses} meses)` : ''}`}`)}
+      ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${R.prazoDoContrato(d(), c) ? ` (${R.prazoDoContrato(d(), c)} meses)` : ''}`}`)}
       ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
       ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
       ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', reais(c.taxa_boleto))}

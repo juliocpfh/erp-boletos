@@ -168,10 +168,11 @@ export function normalizar(d) {
   // "Possui termo aditivo" só com termo registrado, inativar quem saiu e completar a caução pelos depósitos eram feitos aqui,
   // calados: desde 2026-11-07 (rotina C9) ficam em `rotinaDeAbertura`, que roda com o usuário logado e passa pelo histórico.
   // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
+  // (o fim sai de `fimDoContrato`, o mesmo do cadastro: sem renovação, o do contrato assumido)
   const renovados = new Set(d.renovacoes.map((x) => x.contrato_id));
   for (const c of d.contratos) {
     if (!c.contrato_anterior_id) continue;
-    const fim = fimDoPrazoHerdado(d, c);
+    const fim = fimDoContrato(d, c);
     if (fim && fim !== c.vigencia_fim && c.prazo_tipo !== 'Indeterminado' && c.vigencia_fim === C.fimDoPrazo(c.data_entrada || c.vigencia_inicio, c.prazo_meses)
       && !renovados.has(c.id)) c.vigencia_fim = fim;
   }
@@ -1654,14 +1655,21 @@ export function desfazerNumeracao(d, aPartirDe, usuario, descricao = null) {
 // Renovação, novo valor negociado e saída do inquilino
 // --------------------------------------------------------------------------
 
-/** Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). */
+/**
+ * Registra renovação / repactuação e aplica no contrato (nova data, prazo indeterminado, novo aluguel). A nova data de término
+ * leva junto o prazo em meses (ex.: 05/03/2024, renovado até 05/09/2028 → 54 meses), para o cadastro não ter duas datas de fim.
+ */
 export function registrarRenovacao(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   exigirAditivoDaTroca(d, c);
   const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados }, usuario, dados.tipo);
   const mud = {};
   if (dados.tipo === 'Passou a prazo indeterminado') mud.prazo_tipo = 'Indeterminado';
-  if (dados.nova_vigencia_fim) Object.assign(mud, { vigencia_fim: dados.nova_vigencia_fim, prazo_tipo: 'Determinado' });
+  if (dados.nova_vigencia_fim) {
+    Object.assign(mud, { vigencia_fim: dados.nova_vigencia_fim, prazo_tipo: 'Determinado' });
+    const meses = prazoDoContrato(d, c);
+    if (meses > 0 && meses !== c.prazo_meses) mud.prazo_meses = meses;
+  }
   if (Object.keys(mud).length) atualizar(d, 'contratos', c.id, mud, usuario, dados.tipo);
   if (dados.novo_valor > 0) {
     const anterior = aluguelAtual(d, c, C.somarDias(dados.data, -1));
@@ -2354,6 +2362,34 @@ export const contratoHerdado = (d, c) => (d && c.contrato_anterior_id ? buscar(d
 export function fimDoPrazoHerdado(d, c) {
   const a = contratoHerdado(d, c);
   return a && a.prazo_tipo !== 'Indeterminado' && a.vigencia_fim ? a.vigencia_fim : null;
+}
+/** Última renovação que mexeu no prazo do contrato (nova data de término ou prazo indeterminado), ou null. */
+const renovacaoDoPrazo = (d, c) => (c && c.id ? (d.renovacoes || [])
+  .filter((r) => r.contrato_id === c.id && (r.nova_vigencia_fim || r.tipo === 'Passou a prazo indeterminado'))
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id)[0] || null : null);
+/** Data da renovação que fixou o fim do contrato (a última, com nova data de término), ou null. */
+export const fimRenovado = (d, c) => { const r = renovacaoDoPrazo(d, c); return (r && r.nova_vigencia_fim) || null; };
+/**
+ * Fim do contrato de prazo determinado, num lugar só (cadastro, normalizar e troca de titular):
+ * 1º renovado com nova data de término: a da última renovação (ex.: 05/03/2024 + 30 meses = 05/09/2026, renovado até
+ *    05/09/2028 → 05/09/2028, também ao editar o telefone no cadastro);
+ * 2º troca de titular: o do contrato assumido (o prazo não recomeça, `fimDoPrazoHerdado`);
+ * 3º senão: data de vigência inicial (sem ela, a do contrato) + prazo em meses. Null se não dá para calcular.
+ */
+export function fimDoContrato(d, c) {
+  const renovado = fimRenovado(d, c);
+  if (renovado) return renovado;
+  const herdado = fimDoPrazoHerdado(d, c);
+  if (herdado) return herdado;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  return inicio && c.prazo_meses > 0 ? C.fimDoPrazo(inicio, c.prazo_meses) : null;
+}
+/** Prazo em meses do contrato: renovado, do início até o fim da renovação (05/03/2024 a 05/09/2028 = 54); senão, o gravado. */
+export function prazoDoContrato(d, c) {
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const renovado = fimRenovado(d, c);
+  if (renovado && inicio && renovado > inicio) return C.mesesDoPrazo(inicio, renovado);
+  return c.prazo_meses || C.mesesDoPrazo(inicio, c.vigencia_fim) || C.mesesDoPrazo(c.vigencia_inicio, c.vigencia_fim);
 }
 export const continuadoPor = (d, c) => d.contratos.find((x) => x.contrato_anterior_id === c.id) || null;
 /**
@@ -4617,6 +4653,23 @@ export function desativarSeSaiu(d, c, usuario = null, hoje = C.hojeIso()) {
 }
 
 /**
+ * Contrato renovado com nova data de término: o fim e o prazo são os da renovação. Até 09/11/2026 a edição do cadastro
+ * gravava de volta o início + prazo (ex.: 05/03/2024, 30 meses, renovado até 05/09/2028 e editado o telefone → 05/09/2026)
+ * e a renovação não mudava o prazo em meses. Devolve o que acertar ({ vigencia_fim, prazo_meses }) ou null. O fim só volta
+ * quando é o início + prazo (o que a edição gravava).
+ */
+function acertoDaRenovacao(d, c) {
+  const fim = fimRenovado(d, c);
+  if (!fim || c.prazo_tipo === 'Indeterminado') return null;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const mud = {};
+  if (c.vigencia_fim !== fim && inicio && c.prazo_meses > 0 && c.vigencia_fim === C.fimDoPrazo(inicio, c.prazo_meses)) mud.vigencia_fim = fim;
+  const meses = prazoDoContrato(d, c);
+  if ((mud.vigencia_fim || c.vigencia_fim) === fim && meses > 0 && meses !== c.prazo_meses) mud.prazo_meses = meses;
+  return Object.keys(mud).length ? mud : null;
+}
+
+/**
  * Rotina de abertura (C9, 2026-11-07): regras de negócio que antes rodavam caladas em ``normalizar`` passam pelo histórico com o
  * usuário que abriu o sistema. Ex.: Maria saiu em 15/07 e o boleto de julho já existe → em 01/08 o contrato fica inativo
  * "por julio"; os depósitos da caução chegaram a R$ 4.050,00 → a caução fica registrada como depositada. Com
@@ -4628,6 +4681,13 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
     // "possui termo aditivo" só com termo registrado (assinado ou perdido): a marca antiga (vencimento/garantia) sai
     if (!!c.possui_aditivos !== (aditivosValidos(d, c.id).length > 0)) { n += 1; if (!soConferir) marcarAditivos(d, c.id, usuario); }
     if (deveDesativar(d, c, hoje)) { n += 1; if (!soConferir) desativarSeSaiu(d, c, usuario, hoje); }
+    const renovacao = acertoDaRenovacao(d, c);
+    if (renovacao) {
+      n += 1;
+      const fim = C.dataBr(fimRenovado(d, c));
+      if (!soConferir) atualizar(d, 'contratos', c.id, renovacao, usuario, `${c.inquilino_nome}: ${[renovacao.vigencia_fim && `fim do contrato volta ao da renovação (${fim})`,
+        renovacao.prazo_meses && `prazo de ${renovacao.prazo_meses} meses, como na renovação até ${fim}`].filter(Boolean).join('; ')}`);
+    }
     if (!(d.depositos_garantia || []).length) continue;
     for (const qual of ['caucao', 'deposito']) {
       if (!(qual === 'caucao' ? temCaucao(c) : temDeposito(c)) || !depositosCompletam(d, c, qual)) continue;
