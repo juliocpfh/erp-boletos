@@ -858,27 +858,14 @@ document.addEventListener('change', async (ev) => {
     nome.textContent = ev.target.files.length ? `📎 ${ev.target.files[0].name}` : 'Anexar';
     return;
   }
-  if (ev.target.matches('input[data-acao-arquivo]')) {
-    if (!ev.target.files.length) return;
-    try {
-      await ACOES[ev.target.dataset.acaoArquivo](ev.target.dataset, ev.target);
-    } catch (e) {
-      logarErro(e);
-      aviso(e.message, 'erro');
-    }
-    return;
-  }
-  // extrato em arquivo OFX (app do C6): tela Banco
-  const ofx = ev.target.closest('input[data-importar-ofx]');
-  if (ofx && ofx.files.length) {
-    try { await ACOES.importarOfx({ conta: ofx.dataset.importarOfx }, ofx); } catch (e) { aviso(e.message, 'erro'); }
-    return;
-  }
-  const el = ev.target.closest('input[data-upload]');
-  if (!el || !el.files.length) return;
+  // arquivo escolhido → ação: data-acao-arquivo="nome da ação" (anexar arquivos, comprovante, documento assinado, extrato OFX…);
+  // os outros data-* do campo vão como dados da ação, como nos botões com data-acao
+  const arquivo = ev.target.closest('input[data-acao-arquivo]');
+  if (!arquivo || !arquivo.files.length) return;
   try {
-    await ACOES.enviarArquivos(el.dataset, el);
+    await ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
   } catch (e) {
+    logarErro(e);
     aviso(e.message, 'erro');
   }
 });
