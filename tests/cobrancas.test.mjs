@@ -58,6 +58,15 @@ test('reserva com mês marcado: continua começando exatamente nele, com ou sem 
   assert.equal(R.competenciaReserva(b.c), '2026-06');
 });
 
+test('reserva marcada para um mês de carência: vai para o 1º aluguel depois dela (não fica parada sem aviso)', () => {
+  // entrada 07/06/2026, 2 meses de carência (junho e julho), reserva marcada para 06/2026
+  const { d, c } = base({ carencia_meses: 2, reserva_competencia: '2026-06' });
+  assert.equal(R.competenciaReserva(c), '2026-08');
+  for (const comp of ['2026-06', '2026-07', '2026-08', '2026-09']) R.gerarCobrancas(d, comp, 'julio');
+  assert.deepEqual(['2026-06', '2026-07', '2026-08', '2026-09'].map((m) => doMes(d, c, m).reserva_utilizada), [0, 0, 50000, 0]);
+  assert.equal(R.saldoReserva(d, c), 0);
+});
+
 test('reserva calculada num lugar só: conta o FCI e o ressarcimento do boleto, e some quando o contrato deixa de ter reserva', () => {
   // reserva de R$ 3.000,00, maior que o boleto: o boleto de junho fica zerado contando o FCI (fora da conta antiga do boleto)
   const { d, c } = base({ reserva_valor: 300000, fci_percentual: 5, cobrar_iptu: false, taxa_boleto: 0 });

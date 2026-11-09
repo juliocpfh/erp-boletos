@@ -782,12 +782,12 @@ export function situacaoAplicacao(d, c) {
 
 /**
  * Aluguel em que a reserva começa: o mês marcado ("Usar a reserva no aluguel de"); em branco, o primeiro aluguel, que é o
- * mês de entrada ou, com carência desde a entrada, o 1º mês depois dela. Ex.: entrada 07/06/2026 com 1 mês de carência → 07/2026.
+ * mês de entrada. Mês (marcado ou de entrada) dentro da carência não tem aluguel: vale o 1º mês depois dela, senão a reserva
+ * ficaria parada sem aviso. Ex.: entrada 07/06/2026 com 1 mês de carência → 07/2026 (em branco ou marcado 06/2026).
  */
 export function competenciaReserva(contrato) {
   if (!(contrato.reserva_valor > 0)) return null;
-  if (contrato.reserva_competencia) return contrato.reserva_competencia;
-  let comp = C.competenciaDe(contrato.data_entrada);
+  let comp = contrato.reserva_competencia || C.competenciaDe(contrato.data_entrada);
   const carencia = periodoCarencia(contrato);
   if (carencia && comp >= carencia[0] && comp <= carencia[1]) comp = C.somarMeses(carencia[1], 1);
   return comp;
