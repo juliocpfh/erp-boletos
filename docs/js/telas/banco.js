@@ -739,7 +739,7 @@ export const ACOES_BANCO = {
   async saldoBanco({ conta }) {
     if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
     const s = await P.saldoDaConta(conta);
-    estado.saldos[conta] = { valor: centavosDoBanco(s.total_available ?? s.available ?? 0), quando: `consultado ${new Date().toLocaleString('pt-BR')}${s.available !== undefined && s.total_available !== undefined && s.available !== s.total_available ? ` · disponível sem limite ${reais(centavosDoBanco(s.available))}` : ''}` };
+    estado.saldos[conta] = { valor: centavosDoBanco(s.total_available ?? s.available ?? 0), quando: `consultado ${C.agoraBr()}${s.available !== undefined && s.total_available !== undefined && s.available !== s.total_available ? ` · disponível sem limite ${reais(centavosDoBanco(s.available))}` : ''}` };
     await mostrar();
   },
 

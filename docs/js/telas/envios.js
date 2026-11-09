@@ -87,7 +87,7 @@ export const FORMULARIOS = {
     }
     if (f.get('destino') !== 'pasta') {
       baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
-      aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+      aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
       return;
     }
     // abrir numa pasta do computador (versão PC com o site fora do ar): grava o banco e os anexos na pasta escolhida e abre
@@ -97,7 +97,7 @@ export const FORMULARIOS = {
     await S.importarZip(JSZip, dir, blob, null);
     await S.lembrarPasta(dir);
     await abrirPasta(dir);
-    aviso(`Backup de ${new Date(info.criado_em).toLocaleString('pt-BR')} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.`);
+    aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.`);
   },
 
   async modeloVistoria(form) {

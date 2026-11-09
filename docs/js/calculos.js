@@ -96,6 +96,18 @@ export function dataBr(isoData) {
   return `${d}/${m}/${a}`;
 }
 
+// o toLocaleString('pt-BR') sem opções usa ano, mês, dia, hora, minuto e segundo: o formatador com essas opções dá o mesmo texto
+const FMT_DATA_HORA = new Intl.DateTimeFormat('pt-BR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+
+/** Data e hora de um instante (texto ISO, número ou Date), igual ao toLocaleString('pt-BR'): "09/11/2026, 19:37:05". Inválido: "Invalid Date", como ele. */
+export function dataHoraBr(quando) {
+  const dt = new Date(quando);
+  return Number.isNaN(dt.getTime()) ? String(dt) : FMT_DATA_HORA.format(dt);
+}
+
+/** Data e hora de agora: "09/11/2026, 19:37:05". */
+export const agoraBr = () => dataHoraBr(Date.now());
+
 export function compBr(comp) {
   return comp ? `${comp.slice(5, 7)}/${comp.slice(0, 4)}` : '-';
 }

@@ -1544,7 +1544,7 @@ export const ACOES = {
     const ws = wb.addWorksheet('Movimentações');
     const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
     ws.addRow([`${e.nome} · entradas e saídas de ${compBr(mes)}`]).font = { bold: true, size: 14 };
-    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([`Gerado em ${C.agoraBr()} · ${movs.length} movimentação(ões) · ${movs.filter((m) => !m.classificacao).length} sem destino`]).font = { italic: true, color: { argb: 'FF666666' } };
     ws.addRow([]);
     const cab = ws.addRow(['Data', 'Conta', 'Tipo', 'Valor', 'Descrição do banco', 'Destino', 'Imóvel', 'Comprovante']);
     cab.font = { bold: true };
@@ -1566,7 +1566,7 @@ export const ACOES = {
       const dir = await pastaDoEscopo('contador', R.idContador(e.id, mes), false);
       for (const a of await S.listar(dir)) { zip.file(`Comprovantes/${a.nome}`, await S.lerConteudo(await dir.getFileHandle(a.nome))); comprovantes += 1; }
     } catch { /* pasta ainda não existe: sem comprovantes */ }
-    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${new Date().toLocaleString('pt-BR')}`, '',
+    zip.file('LEIA-ME.txt', [`${e.razao_social || e.nome}${e.cnpj ? ` · CNPJ ${e.cnpj}` : ''}`, `Mês: ${compBr(mes)} · gerado em ${C.agoraBr()}`, '',
       `NFs: ${numeros.length} número(s) em Excel (pasta NFs).`, `Movimentações bancárias: ${movs.length} (planilha Movimentacoes), ${movs.filter((m) => !m.classificacao).length} ainda sem destino.`,
       `Comprovantes: ${comprovantes} arquivo(s) (pasta Comprovantes).`, ...(avisos.length ? ['', 'Avisos:', ...avisos] : [])].join('\n'));
     baixar(await zip.generateAsync({ type: 'blob' }), S.limparNome(`Contador ${e.nome} ${mes}.zip`));
@@ -1581,7 +1581,7 @@ export const ACOES = {
     const ws = wb.addWorksheet('Resultados');
     const moeda = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
     ws.addRow([`Resultados financeiros de ${dataBr(de)} a ${dataBr(ate)}`]).font = { bold: true, size: 14 };
-    ws.addRow([`Gerado em ${new Date().toLocaleString('pt-BR')}`]).font = { italic: true, color: { argb: 'FF666666' } };
+    ws.addRow([`Gerado em ${C.agoraBr()}`]).font = { italic: true, color: { argb: 'FF666666' } };
     ws.addRow([]);
     const colunas = [['Posição', 9], ['Imóvel', 30], ['Valor do imóvel + reformas', 22], ['Aluguel recebido', 18], ['NFs avulsas', 15], ['Airbnb', 15], ['IPTU pago pelo proprietário', 22],
       ['Contas pagas por nós', 20], ['Resultado bruto', 18], ['Retorno ao ano', 15], ['Impostos (rateio)', 18], ['Impostos estimados', 18], ['Líquido', 18], ['Retorno líquido ao ano', 15],

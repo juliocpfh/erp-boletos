@@ -82,7 +82,7 @@ export function tabelaHistorico(lista, desfazer = null) {
     } else if (h.detalhes) {
       det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('')}</details>`;
     }
-    return `<tr><td class="nw">${new Date(h.quando).toLocaleString('pt-BR')}</td><td>${esc(h.usuario)}</td>
+    return `<tr><td class="nw">${C.dataHoraBr(h.quando)}</td><td>${esc(h.usuario)}</td>
       <td>${esc(h.acao)}${h.tabela ? ` · ${esc(R.TABELAS[h.tabela] || h.tabela)}` : ''}${h.descricao ? `<br><span class="suave">${esc(h.descricao)}</span>` : ''}</td>
       <td class="detalhes">${det}</td></tr>`;
   }).join('');

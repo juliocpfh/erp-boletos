@@ -1,7 +1,7 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
 import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
-import { dataBr, hojeIso } from '../calculos.js';
+import { dataBr, dataHoraBr, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao, carregarParte } from './comum.js';
@@ -18,7 +18,7 @@ const nomeDoRegistro = (c) => {
   const nome = r && (r.nome || r.descricao || r.inquilino_nome || r.competencia || r.numero);
   return `${rotulo} nº ${c.reg_id}${nome ? ` (${valorTexto(nome)})` : ''}`;
 };
-const quando = (t) => (t ? new Date(t).toLocaleString('pt-BR') : '');
+const quando = (t) => (t ? dataHoraBr(t) : '');
 
 /** Campos que não aparecem com o valor (senha e login lembrado): só o nome. */
 const SEM_VALOR = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes']);

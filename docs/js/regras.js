@@ -444,7 +444,7 @@ export function desfazerAlteracoes(d, itens, usuario) {
     if (!campos.length) throw new Error('Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).');
     const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
     for (const k of campos) r[k] = h.detalhes[k].de ?? null;
-    registrar(d, usuario, 'Alteração', h.tabela, r.id, `Desfeito pelo administrador (alteração de ${h.usuario} em ${new Date(h.quando).toLocaleString('pt-BR')})${h.descricao ? `: ${h.descricao}` : ''}`,
+    registrar(d, usuario, 'Alteração', h.tabela, r.id, `Desfeito pelo administrador (alteração de ${h.usuario} em ${C.dataHoraBr(h.quando)})${h.descricao ? `: ${h.descricao}` : ''}`,
       det, vinculos(d, h.tabela, r));
     d.historico[d.historico.length - 1].desfaz = i;
     mudados.push({ tabela: h.tabela, id: r.id });

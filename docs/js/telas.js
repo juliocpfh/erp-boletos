@@ -251,7 +251,7 @@ export const TELAS = {
         <p class="suave" style="margin:10px 0 0">${link('#/pendencias', 'Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só', '')}</p>
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
-        <p class="suave">Banco criado em ${new Date(d().criado_em).toLocaleString('pt-BR')}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
+        <p class="suave">Banco criado em ${C.dataHoraBr(d().criado_em)}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
   },
 
   // ------------------------------------------------------------------------
@@ -359,7 +359,7 @@ export const TELAS = {
     const papeis = Object.entries(PAPEIS).map(([k, v]) => `<option value="${k}" ${k === 'operador' ? 'selected' : ''}>${v}</option>`).join('');
     return `<div class="cabecalho"><h1>Usuários</h1>${link('#/novo/usuarios', 'Novo usuário', 'botao')}</div>
       ${pendentes.length ? `<div class="cartao destaque"><h2>Pedidos de acesso (${pendentes.length})</h2><table><tr><th>Nome</th><th>Login</th><th>Pedido em</th><th>Liberar como</th><th></th></tr>
-        ${pendentes.map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${u.criado_em ? new Date(u.criado_em).toLocaleString('pt-BR') : '-'}</td>
+        ${pendentes.map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${u.criado_em ? C.dataHoraBr(u.criado_em) : '-'}</td>
           <td><select data-papel-de="${u.id}" style="width:auto">${papeis}</select></td>
           <td class="n nw">${botao('aprovarUsuario', 'Aprovar', { id: u.id }, 'pequeno')} ${botao('recusarUsuario', 'Recusar', { id: u.id }, 'perigo pequeno', `Recusar o pedido de ${u.nome}?`)}</td></tr>`).join('')}</table></div>` : ''}
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>

@@ -2,7 +2,7 @@
 import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr } from '../calculos.js';
+import { dataBr, dataHoraBr } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
@@ -52,7 +52,7 @@ export async function telaBackupSeguro() {
   }
   const lista = await B.listarBackups(E.seguro.dir);
   const ultimo = (pasta) => lista.find((x) => x.pasta === pasta);
-  const quando = (x) => (x ? new Date(x.alterado).toLocaleString('pt-BR') : 'nenhum ainda');
+  const quando = (x) => (x ? dataHoraBr(x.alterado) : 'nenhum ainda');
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
     ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ''}
     <div class="cartao"><div class="grade">
@@ -66,7 +66,7 @@ export async function telaBackupSeguro() {
         ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div></div>
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
-      ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${new Date(x.alterado).toLocaleString('pt-BR')}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
+      ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
       || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
 }
 
@@ -193,8 +193,8 @@ export async function telaDados() {
   return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     <div class="cartao"><div class="grade">
-      ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', new Date(d().criado_em).toLocaleString('pt-BR'))}
-      ${item('Última atualização', d().atualizado_em ? `${new Date(d().atualizado_em).toLocaleString('pt-BR')} por ${esc(d().atualizado_por)}` : '-')}
+      ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', dataHoraBr(d().criado_em))}
+      ${item('Última atualização', d().atualizado_em ? `${dataHoraBr(d().atualizado_em)} por ${esc(d().atualizado_por)}` : '-')}
       ${item('Versão do arquivo', `revisão ${d().revisao}`)}
       ${item('Versão do sistema', await versaoDoSistema())}</div>
       ${E.nuvem ? '' : `<p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
