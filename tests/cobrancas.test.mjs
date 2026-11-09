@@ -211,3 +211,75 @@ test('desfazer acordo com parcela dentro de um acordo mais novo: recusa (senão 
   assert.deepEqual(aCobrar.map((x) => x.competencia), ['2026-07', '2026-08']);
   assert.equal(aCobrar.reduce((s, x) => s + R.totais(x).a_pagar_sem_desconto, 0), 270000);
 });
+
+// IPTU de R$ 1.000,00 em 10 parcelas, nos boletos de 03 a 12/2026 (aluguel de 02 a 11/2026)
+function baseIptu(extra = {}, iptu = {}) {
+  const b = base({ data_entrada: '2025-06-01', vigencia_inicio: '2025-06-01', reserva_valor: 0, desconto_pontualidade_percentual: 0, taxa_boleto: 0, ...extra });
+  const p = b.d.iptus[0];
+  Object.assign(p, { primeira_competencia: null, primeiro_vencimento_boleto: '2026-03', vencimento_primeira: '2026-03-10', ...iptu });
+  if (!p.pago_avista) for (let n = 1; n <= 10; n += 1) p.pagas = { ...(p.pagas || {}), [n]: `2026-${String(n + 2).padStart(2, '0')}-10` };
+  return { ...b, p };
+}
+const iptuNoFinanceiro = (d, loja) => R.resultadosFinanceiros(d, '2026-01-01', '2026-12-31').find((x) => x.imovel.id === loja.id).iptu;
+
+test('IPTU de quem saiu e ficou inativo: o que ele pagou nos boletos continua sendo dele', () => {
+  const { d, c, loja, p } = baseIptu();
+  for (const m of ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']) R.gerarCobrancas(d, m, 'julio');
+  for (const cb of d.cobrancas) R.registrarPagamento(d, cb.id, cb.vencimento, null, 'julio');
+  R.informarSaida(d, c.id, '2026-06-30', 'julio', '2026-06-20');
+  const confere = (quando) => {
+    assert.deepEqual(R.parcelasIptu(d, p).map((x) => x.valorInquilino), [10000, 10000, 10000, 10000, 10000, 0, 0, 0, 0, 0], quando);
+    assert.deepEqual(R.totaisIptu(d, p), { custo: 100000, inquilino: 50000, proprietario: 50000, emAberto: 0 }, quando);
+    assert.equal(iptuNoFinanceiro(d, loja), 50000, quando);
+  };
+  confere('ativo');
+  R.desativarSeSaiu(d, c, 'julio', '2026-07-15');
+  assert.equal(c.ativo, false);
+  confere('inativo');
+});
+
+test('IPTU: a parte do inquilino é a gravada no boleto (mês de saída proporcional; boleto alterado à mão vale o valor dele)', () => {
+  const { d, c, loja, p } = baseIptu();
+  for (const m of ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06']) R.gerarCobrancas(d, m, 'julio');
+  R.informarSaida(d, c.id, '2026-06-15', 'julio', '2026-06-01');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio');
+  assert.equal(doMes(d, c, '2026-06').iptu, 5000, 'junho: 15 de 30 dias da 5ª parcela');
+  R.atualizar(d, 'cobrancas', doMes(d, c, '2026-03').id, { iptu: 4000, editado_manual: true }, 'julio');
+  for (const cb of d.cobrancas) R.registrarPagamento(d, cb.id, cb.vencimento, null, 'julio');
+  R.desativarSeSaiu(d, c, 'julio', '2026-07-15');
+  const ps = R.parcelasIptu(d, p);
+  assert.deepEqual(ps.map((x) => x.valorInquilino), [10000, 4000, 10000, 10000, 5000, 0, 0, 0, 0, 0]);
+  assert.deepEqual(ps.map((x) => x.valorProprietario).slice(0, 5), [0, 6000, 0, 0, 5000]);
+  const t = R.totaisIptu(d, p);
+  assert.deepEqual([t.inquilino, t.proprietario], [39000, 61000]);
+  assert.equal(iptuNoFinanceiro(d, loja), 61000, 'Financeiro = a parte do proprietário');
+});
+
+test('IPTU pago à vista e repassado nos boletos: o Financeiro mostra a parte do proprietário (o desconto à vista sobra para ele)', () => {
+  // parcelado: o inquilino paga as 10 parcelas, nada fica com o proprietário
+  const par = baseIptu({ data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01' });
+  for (let m = 1; m <= 12; m += 1) R.gerarCobrancas(par.d, `2026-${String(m).padStart(2, '0')}`, 'julio');
+  assert.equal(iptuNoFinanceiro(par.d, par.loja), 0);
+  // à vista: pagou R$ 900,00 em 15/02; o inquilino devolve R$ 1.000,00 nos boletos → sobra R$ 100,00
+  const { d, c, loja, p } = baseIptu({ data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01' },
+    { pago_avista: true, valor_avista: 90000, data_quitacao: '2026-02-15', cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[0] });
+  for (let m = 1; m <= 12; m += 1) R.gerarCobrancas(d, `2026-${String(m).padStart(2, '0')}`, 'julio');
+  for (const cb of d.cobrancas) R.registrarPagamento(d, cb.id, cb.vencimento, null, 'julio');
+  assert.equal(d.cobrancas.reduce((s, cb) => s + cb.iptu, 0), 100000);
+  const t = R.totaisIptu(d, p);
+  assert.deepEqual([t.custo, t.inquilino, t.proprietario], [90000, 100000, -10000]);
+  assert.equal(iptuNoFinanceiro(d, loja), -10000, 'antes: R$ 900,00 de custo');
+  // o inquilino sai em 30/06 e fica inativo: os meses que ele pagou continuam com ele; jul–nov ficam com o proprietário
+  R.informarSaida(d, c.id, '2026-06-30', 'julio', '2026-06-20');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio'); // os boletos pagos ficam
+  R.desativarSeSaiu(d, c, 'julio', '2026-07-15');
+  assert.equal(R.mesesIptuAvista(d, p).reduce((s, x) => s + x.valor, 0), 100000, 'boletos pagos de 03 a 12 (jul–nov já estavam pagos)');
+  assert.equal(R.totaisIptu(d, p).inquilino, 100000);
+  // a parcela do boleto de 12/2026 desfeita e excluída: fica com o proprietário
+  const nov = doMes(d, c, '2026-11');
+  R.estornarPagamento(d, nov.id, 'julio');
+  R.excluir(d, 'cobrancas', nov.id, 'julio', 'teste');
+  assert.equal(R.totaisIptu(d, p).inquilino, 90000);
+  assert.equal(R.mapaIptuAvista(d, p).find((x) => x.mesBoleto === '2026-12').valorProprietario, 10000);
+  assert.equal(iptuNoFinanceiro(d, loja), 0);
+});

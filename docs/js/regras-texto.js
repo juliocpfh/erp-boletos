@@ -66,6 +66,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - O proprietário paga todas as guias na prefeitura. O inquilino devolve no boleto só os dias em que ocupou (mês de entrada e de saída proporcionais); o resto é do proprietário.
 - Cobrado a partir do mês de vencimento do 1º boleto, sempre pelo valor parcelado.
 - Imóvel vazio, contrato sem IPTU ou carência sem IPTU: a parcela toda é do proprietário, com alerta.
+- A parte do inquilino é a cobrada nos boletos (também de quem já saiu e ficou inativo; boleto alterado à mão vale o valor dele); para os meses ainda sem boleto, a prevista pelos dias ocupados. A tela IPTU, os totais e o Financeiro usam a mesma conta.
+- IPTU pago à vista pelo proprietário: no Financeiro entra a cota única menos o que os inquilinos devolvem nos boletos (ex.: pagou R$ 900,00 à vista e o inquilino devolve R$ 1.000,00 parcelado: sobra R$ 100,00 para o proprietário).
 
 9. SEGURO
 - O seguro obrigatório é do inquilino: cada contrato tem a sua apólice; quem sai leva, quem entra precisa de outra. Na troca de titular, a apólice em vigência passa ao novo titular. Deve ser de 1 ano e não pode se sobrepor ao anterior.
