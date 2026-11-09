@@ -10,7 +10,7 @@ import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
-import { dinheiroTexto, esc } from '../formularios.js';
+import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { REGRAS_TEXTO } from '../regras-texto.js';
@@ -82,13 +82,31 @@ const TABELAS_EXCLUSAO = {
   },
 };
 
-/** Redesenha o formulário aberto mantendo o que já foi digitado (depois de editar uma lista de opções). */
-async function redesenharFormulario(el, ajustes, lista) {
-  const form = el.closest('form');
-  const valores = { ...Object.fromEntries(new FormData(form)), ...ajustes };
-  await mostrar({ valores, erros: {} });
-  const editor = document.querySelector(`[data-editor="${lista}"]`);
-  if (editor) editor.hidden = false;
+/**
+ * Lista de opções editada dentro do formulário (concessionárias, índices): acerta na hora só o que mostra a lista (as
+ * opções do campo e os itens da caixa "Editar lista"), sem desenhar a página de novo: o que já foi digitado ou escolhido
+ * (inclusive o arquivo do comprovante) continua. ``incluido`` passa a ficar escolhido no campo da caixa usada (``el``).
+ */
+function acertarListaNaTela(el, lista, { incluido = null, removido = null }) {
+  const usada = el.closest('[data-editor]');
+  for (const editor of document.querySelectorAll('[data-editor]')) {
+    if (editor.dataset.editor !== lista) continue;
+    const sel = editor.parentElement.querySelector('select');
+    const chips = editor.querySelector('.chips');
+    if (incluido !== null) {
+      chips.insertAdjacentHTML('beforeend', chipDaLista(lista, incluido));
+      if (sel && ![...sel.options].some((o) => o.value === incluido)) sel.add(new Option(incluido, incluido));
+      if (sel && editor === usada) {
+        sel.value = incluido;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // campos que aparecem conforme a escolha
+      }
+    }
+    if (removido !== null) {
+      for (const b of chips.querySelectorAll('[data-acao=removerDaLista]')) if (b.dataset.valor === removido) b.closest('.chip').remove();
+      // a opção escolhida neste formulário fica até ele ser salvo (como acontecia ao desenhar de novo)
+      if (sel) for (const o of [...sel.options]) if (o.value === removido && !o.selected) o.remove();
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -1201,8 +1219,8 @@ export const ACOES = {
   async incluirNaLista({ lista }, el) {
     const campoNovo = el.parentElement.querySelector('[data-lista-novo]');
     const valor = await alterar((db) => R.incluirNaLista(db, lista, campoNovo.value, login()));
-    const sel = el.closest('[data-editor]').parentElement.querySelector('select');
-    await redesenharFormulario(el, sel ? { [sel.name]: valor } : {}, lista);
+    acertarListaNaTela(el, lista, { incluido: valor });
+    campoNovo.value = '';
     aviso(`"${valor}" incluído na lista.`);
   },
 
@@ -1214,7 +1232,7 @@ export const ACOES = {
       window.alert(e.message);
       return;
     }
-    await redesenharFormulario(el, {}, lista);
+    acertarListaNaTela(el, lista, { removido: valor });
   },
 
   async desfazerUltimaNumeracao() {

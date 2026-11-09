@@ -631,12 +631,15 @@ export function ler(campos, form, antigo = null) {
   return { dados, erros };
 }
 
+/** Um item na caixa "Editar lista": o nome e o × que o tira da lista. */
+export const chipDaLista = (lista, v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${lista}" data-valor="${esc(v)}">×</button></span>`;
+
 /** Caixa para editar uma lista de opções (incluir e remover), aberta pelo botão "Editar lista". */
 function editorLista(c) {
   const itens = c.opcoes.map((o) => (Array.isArray(o) ? o[0] : o));
   return `<button type="button" class="link-botao" data-acao="abrirLista" data-lista="${c.lista}">Editar lista</button>
     <div class="editor-lista" data-editor="${c.lista}" hidden>
-      <div class="chips">${itens.map((v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${c.lista}" data-valor="${esc(v)}">×</button></span>`).join('')}</div>
+      <div class="chips">${itens.map((v) => chipDaLista(c.lista, v)).join('')}</div>
       <div class="acoes"><input data-lista-novo="${c.lista}" placeholder="Nome para incluir" style="max-width:240px"><button type="button" class="pequeno" data-acao="incluirNaLista" data-lista="${c.lista}">OK</button></div>
       <div class="ajuda">Só dá para remover o que não estiver em uso.</div></div>`;
 }
