@@ -133,3 +133,16 @@ test('NF: "Corrigir e numerar de novo" só para o administrador (desfazer a nume
   assert.equal(d.faturas.length, E.d.faturas.length);
   assert.ok(E.d.faturas.every((f) => f.situacao === 'Emitida'), 'nenhuma NF desfeita');
 });
+
+test('salvar a edição de um registro que outra pessoa excluiu: avisa e não cria um registro novo solto', async () => {
+  const { c } = comInquilino('Maria Exemplo');
+  entrarComo(E, 'admin');
+  const r = R.inserir(E.d, 'ressarcimentos', { contrato_id: c.id, descricao: 'Fundo de obras', valor: 15000, competencia_condominio: '2026-10' }, 'teste');
+  const form = { campos: [['descricao', 'Fundo de obras'], ['valor', '150,00'], ['competencia_condominio', '2026-10']] };
+  R.excluir(E.d, 'ressarcimentos', r.id, 'outra@exemplo.com.br', 'excluído no outro computador');
+  const excluido = { name: 'ErroUsuario', message: 'Este registro foi excluído por outra pessoa; nada foi salvo.' };
+  await assert.rejects(T.FORMULARIOS.cadastro(form, { partes: ['editar', 'ressarcimentos', String(r.id)], q: { contrato: String(c.id) } }), excluido);
+  assert.equal(E.d.ressarcimentos.length, 0, 'nada foi criado');
+  // cadastro que monta os fixos com o contrato do endereço (correção do aluguel): antes dava erro de programa
+  await assert.rejects(T.FORMULARIOS.cadastro({ campos: [] }, { partes: ['editar', 'correcoes', '999'], q: { contrato: '999' } }), excluido);
+});

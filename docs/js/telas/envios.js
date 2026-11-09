@@ -19,6 +19,8 @@ import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
+const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
+
 /** Pagamento confirmado num imóvel sem empresa emitente: avisa agora, para não descobrir só na hora de numerar a NF. */
 function avisarImovelSemEmpresa(cb) {
   const c = cb && buscar('contratos', cb.contrato_id);
@@ -385,6 +387,8 @@ export const FORMULARIOS = {
     const tabela = rota.partes[1];
     const cfg = CADASTROS[tabela];
     const registro = rota.partes[0] === 'editar' ? buscar(tabela, rota.partes[2]) : null;
+    // editando um registro que outra pessoa excluiu enquanto o formulário estava aberto: nada de criar um novo solto
+    if (rota.partes[0] === 'editar' && !registro) throw new C.ErroUsuario(REGISTRO_EXCLUIDO);
     const antigo = registro ? { ...registro } : null;
     const campos = cfg.campos(registro, rota.q);
     // documentos já salvos (CPF/CNPJ) e que não mudaram não são barrados; "valores" traz também os que aparecem no formulário (ex.: fiadores no contrato)
@@ -398,6 +402,7 @@ export const FORMULARIOS = {
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     let recalculados = 0;
     const salvo = await alterar((db) => {
+      if (registro && !R.buscar(db, tabela, registro.id)) throw new C.ErroUsuario(REGISTRO_EXCLUIDO); // excluído enquanto salvava
       let r;
       if (cfg.salvar) r = cfg.salvar(db, dados, rota.q, registro);
       else if (registro) {
