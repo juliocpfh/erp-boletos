@@ -60,3 +60,36 @@ test('backup seguro: quais cópias guardar e quando fazer o completo', () => {
   assert.equal(B.precisaCompleto(['completo-2026-10-10.bkp'], '2026-10-13'), false);
   assert.equal(B.precisaCompleto(['completo-2026-10-06.bkp'], '2026-10-13'), true);
 });
+
+/** Pasta de mentira com um arquivo da chave que pode faltar, falhar ao ler ou vir pela metade. */
+const pastaComChave = (arquivo) => ({
+  async getFileHandle(nome) {
+    if (nome !== B.ARQUIVO_CHAVE || arquivo === undefined) throw new DOMException(nome, 'NotFoundError');
+    return { getFile: async () => { if (arquivo instanceof Error) throw arquivo; return new File([arquivo], nome); } };
+  },
+});
+
+test('backup seguro: chave que falta = não configurado; chave que existe mas não deu para ler = erro (não desliga calado)', async () => {
+  const chave = await B.criarChave('senha-forte-1');
+  assert.equal(await B.lerChave(pastaComChave(undefined)), null, 'pasta sem backup seguro');
+  assert.deepEqual(await B.lerChave(pastaComChave(JSON.stringify(chave))), chave);
+  assert.equal(await B.lerChave(pastaComChave(JSON.stringify({ formato: 'outro' }))), null, 'arquivo que não é chave deste sistema');
+  await assert.rejects(B.lerChave(pastaComChave(new DOMException('O arquivo está sendo usado', 'NotReadableError'))), (e) => e.esperado && /tenta de novo/.test(e.message));
+  await assert.rejects(B.lerChave(pastaComChave('')), (e) => e.esperado, 'vazio (OneDrive ainda baixando)');
+  await assert.rejects(B.lerChave(pastaComChave(JSON.stringify(chave).slice(0, 40))), (e) => e.esperado, 'lido pela metade');
+});
+
+test('backup seguro: gravações seguidas não acumulam cópias do banco inteiro; a que roda grava o estado final', async () => {
+  let fila = Promise.resolve();
+  let soltar; const ocupada = new Promise((ok) => { soltar = ok; });
+  const enfileirar = (fn) => { fila = fila.then(fn); return fila; };
+  enfileirar(() => ocupada); // uma cópia grande ainda gravando
+  let banco = 0; const gravados = [];
+  const pedir = B.espelhoSemAcumular(enfileirar, async () => { gravados.push(banco); });
+  for (banco = 1; banco <= 10; banco += 1) pedir(); // 10 gravações enquanto a pasta está ocupada
+  banco = 10;
+  soltar(); await fila;
+  assert.deepEqual(gravados, [10], 'uma cópia só, com o banco como ficou');
+  pedir(); await fila;
+  assert.deepEqual(gravados, [10, 10], 'depois de gravar, a próxima gravação pede outra');
+});

@@ -119,32 +119,39 @@ export class AnexosNuvem {
    * Sem internet: não faz nada (as listas guardadas continuam valendo). Devolve quantos arquivos vieram.
    */
   async carregarTudo(partes) {
-    const raiz = partes.join('/');
-    const arvore = new Map([[raiz, { pastas: new Set(), arquivos: new Map() }]]);
-    const pasta = (chave) => { let l = arvore.get(chave); if (!l) { l = { pastas: new Set(), arquivos: new Map() }; arvore.set(chave, l); } return l; };
-    let total = 0;
-    try {
-      let cursor;
-      for (let n = 0; n < 1000; n += 1) {
-        const r = await (await this.pedir('GET', `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)).json();
-        for (const a of r.arquivos) {
-          const p = a.caminho.split('/');
-          let chave = raiz;
-          for (let i = 0; i < p.length - 1; i += 1) { pasta(chave).pastas.add(p[i]); chave = `${chave}/${p[i]}`; }
-          pasta(chave).arquivos.set(p.at(-1), a.tamanho);
-          total += 1;
-        }
-        if (!r.mais) break;
-        cursor = r.cursor;
-      }
-    } catch (e) {
+    let arvore;
+    try { arvore = await this.arvore(partes); } catch (e) {
       if (passageiro(e)) return 0;
       throw e;
     }
-    const em = Date.now();
-    for (const [chave, l] of arvore) this.listas.set(chave, { em, pastas: l.pastas, arquivos: l.arquivos });
-    this.tudo = { raiz, em };
+    const em = Date.now(); let total = 0;
+    for (const [chave, l] of arvore) { this.listas.set(chave, { em, pastas: l.pastas, arquivos: l.arquivos }); total += l.arquivos.size; }
+    this.tudo = { raiz: partes.join('/'), em };
     return total;
+  }
+
+  /**
+   * Tudo o que há dentro de `partes`, com as subpastas: Map caminho → { pastas: Set, arquivos: Map(nome → tamanho) }, numa ida à
+   * nuvem (pasta grande vem em partes, com cursor). Não guarda nada e qualquer falha (até a falta de internet) lança: a passagem
+   * da pasta para a nuvem (migracao.js) precisa saber se a lista veio inteira.
+   */
+  async arvore(partes) {
+    const raiz = partes.join('/');
+    const arvore = new Map([[raiz, { pastas: new Set(), arquivos: new Map() }]]);
+    const pasta = (chave) => { let l = arvore.get(chave); if (!l) { l = { pastas: new Set(), arquivos: new Map() }; arvore.set(chave, l); } return l; };
+    let cursor;
+    for (let n = 0; n < 1000; n += 1) {
+      const r = await (await this.pedir('GET', `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)).json();
+      for (const a of r.arquivos) {
+        const p = a.caminho.split('/');
+        let chave = raiz;
+        for (let i = 0; i < p.length - 1; i += 1) { pasta(chave).pastas.add(p[i]); chave = `${chave}/${p[i]}`; }
+        pasta(chave).arquivos.set(p.at(-1), a.tamanho);
+      }
+      if (!r.mais) break;
+      cursor = r.cursor;
+    }
+    return arvore;
   }
 
   /** A árvore de ``raiz`` (ou acima dela) veio por inteiro há menos de VALIDADE_LISTA? */

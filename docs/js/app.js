@@ -160,19 +160,30 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
     E.d = disco;
     if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
-  const copia = structuredClone(E.d || disco);
+  const copia = N.copiar(E.d || disco); // o histórico (só cresce) não é copiado entrada por entrada
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
   copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
-  if (E.seguro && E.seguro.chave) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, copia));
-  if (!E.backupFeito) {
-    E.backupFeito = true;
-    S.backupDiario(E.pasta, copia).catch(() => {});
-  }
+  espelharSeguro();
+  backupDoDia(copia);
   atualizarFaixa();
   return resultado;
+}
+
+/**
+ * Pasta: o backup do dia (pasta backups) na primeira gravação do dia. Só fica marcado como feito depois de gravado; se falhar
+ * (OneDrive ocupado…), o erro vai ao console e a próxima gravação tenta de novo (no máximo a cada 5 minutos).
+ */
+let backupDoDiaAndando = false; let backupDoDiaFalhouEm = 0;
+function backupDoDia(dados) {
+  if (E.backupFeito || backupDoDiaAndando || Date.now() - backupDoDiaFalhouEm < 300000) return;
+  backupDoDiaAndando = true;
+  S.backupDiario(E.pasta, dados)
+    .then(() => { E.backupFeito = true; })
+    .catch((e) => { backupDoDiaFalhouEm = Date.now(); logarErro(e); })
+    .finally(() => { backupDoDiaAndando = false; });
 }
 
 // --------------------------------------------------------------------------
@@ -193,7 +204,16 @@ export async function pastaSeguraDeTeste() {
   return raiz.getDirectoryHandle('teste-backup-seguro', { create: true });
 }
 
-/** Liga o backup seguro se este computador tem a pasta lembrada e a permissão (``pedir``: só com clique do usuário). */
+let falhasDaChave = 0; let chaveTentadaEm = 0;
+const ESPERA_CHAVE = 60000; // ms entre as tentativas de ler de novo a chave do backup seguro
+const AVISAR_DEPOIS_DE = 3; // tentativas seguidas sem conseguir: avisa o administrador na tela
+
+/**
+ * Liga o backup seguro se este computador tem a pasta lembrada e a permissão (``pedir``: só com clique do usuário).
+ * Chave que existe mas não deu para ler agora (OneDrive baixando, disco ocupado): fica "desconectado" (o botão Reconectar
+ * tenta de novo), o motivo aparece para o administrador (seguroErro) e o sistema tenta sozinho a cada minuto
+ * (tentarSeguroDeNovo); antes o backup desligava calado na sessão inteira.
+ */
 export async function conectarSeguro(pedir = false) {
   const h = await S.pastaSeguraLembrada();
   if (!h) {
@@ -204,9 +224,28 @@ export async function conectarSeguro(pedir = false) {
     E.seguro = { dir: h, desconectado: true };
     return false;
   }
-  const chave = await B.lerChave(h);
+  chaveTentadaEm = Date.now();
+  let chave;
+  try {
+    chave = await B.lerChave(h);
+  } catch (e) {
+    falhasDaChave += 1;
+    E.seguro = { dir: h, desconectado: true, falhou: true };
+    E.seguroErro = e.message;
+    logarErro(e.causa || e);
+    if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario('admin')) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Dados e backup.`, 'aviso');
+    return false;
+  }
+  if (falhasDaChave) E.seguroErro = '';
+  falhasDaChave = 0;
   E.seguro = chave ? { dir: h, chave } : null;
   return !!chave;
+}
+
+/** A chave do backup seguro falhou ao ler: tenta de novo (no máximo uma vez por minuto) e, se voltou, faz a cópia que faltou. */
+function tentarSeguroDeNovo() {
+  if (!E.seguro?.falhou || Date.now() - chaveTentadaEm < ESPERA_CHAVE) return;
+  conectarSeguro(false).then((ok) => { if (ok) espelharSeguro(); }).catch(logarErro);
 }
 
 /** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado. */
@@ -237,9 +276,14 @@ export function atualizarProgramaSeguro() {
   });
 }
 
-/** Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). */
+/**
+ * Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). Cada cópia cifra e grava o
+ * banco inteiro: gravações seguidas (e mudanças de outros aparelhos) enquanto uma espera a vez viram uma só, com o banco do momento.
+ */
+const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, () => (E.seguro && E.seguro.chave && E.d ? B.espelhar(E.seguro.dir, E.seguro.chave, E.d) : undefined));
 function espelharSeguro() {
-  if (E.seguro && E.seguro.chave && E.d) naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d));
+  if (E.seguro?.falhou) { tentarSeguroDeNovo(); return; }
+  if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
 }
 
 /** Ao abrir a pasta (ou a nuvem): cópia do banco do dia, a versão PC se houver mais nova e, se já passou uma semana, o backup completo. */
@@ -267,6 +311,7 @@ function aoMudarNuvem(externo) {
 }
 
 async function verificarMudancasExternas() {
+  tentarSeguroDeNovo(); // chave do backup seguro que não deu para ler: tenta de novo (no máximo uma vez por minuto)
   if (E.nuvem) {
     if (document.hidden) return;
     await E.nuvem.sincronizar().catch(() => {}); // aoMudar avisa
@@ -435,6 +480,8 @@ export async function escolherPasta() {
 }
 
 const MODO_NUVEM = 'imoveis-modo-nuvem';
+/** Tabelas do sistema (as listas de bancoVazio): na nuvem, cada uma ganha faixa de códigos mesmo antes do 1º registro. */
+const TABELAS_DO_SISTEMA = Object.entries(R.bancoVazio()).filter(([k, v]) => Array.isArray(v) && k !== 'historico').map(([k]) => k);
 /** Abre os dados da nuvem (cópia local + fila). Sem internet, abre a cópia deste aparelho. */
 export async function abrirNuvem() {
   // cópia do aparelho cifrada (cofrinho.js): a chave só fica aberta durante o login lembrado
@@ -442,7 +489,7 @@ export async function abrirNuvem() {
   E.cofrinho = new Cofrinho(cru);
   await E.cofrinho.daSessao(!!lerSessao());
   const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
-  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar });
+  E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar, tabelas: TABELAS_DO_SISTEMA });
   E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
@@ -471,7 +518,10 @@ export async function reabrirSessao() {
   else { E.usuario = null; gravarSessao(null); }
 }
 
-/** Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). */
+/**
+ * Entrou com a senha: abre a chave da cópia deste aparelho e relê o que estava guardado (fila, anexos sem internet). O banco
+ * baixado com a cópia trancada (tela de login) é aproveitado e gravado agora (iniciar), em vez de baixar tudo de novo.
+ */
 async function destrancarNuvem(loginTexto, senha) {
   await E.cofrinho.entrar(loginTexto, senha, Date.now() + LIMITE_SESSAO);
   E.anexos.fila = null;
@@ -542,7 +592,7 @@ export async function sair() {
     await E.anexos?.enviarFila().catch(() => {});
     const nada = !E.nuvem.pendentesQtd() && !(E.anexos?.fila?.length);
     await E.cofrinho.sair();
-    if (nada) await E.cofrinho.cru.apagar('base');
+    if (nada) { await E.cofrinho.cru.apagar('base'); await E.cofrinho.cru.apagar('base-seq'); }
   }
 }
 
