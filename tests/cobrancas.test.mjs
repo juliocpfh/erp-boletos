@@ -75,3 +75,79 @@ test('reserva calculada num lugar só: conta o FCI e o ressarcimento do boleto, 
   assert.equal(R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio'), 2, 'cada boleto conta uma vez');
   assert.deepEqual(d.cobrancas.map((x) => x.reserva_utilizada), [0, 0]);
 });
+
+test('saída: boleto em aberto de mês sem nenhum dia ocupado é excluído no recálculo (com histórico)', () => {
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', reserva_valor: 0, cobrar_iptu: false });
+  R.gerarCobrancas(d, '2026-11', 'julio');
+  R.gerarCobrancas(d, '2026-12', 'julio'); // dezembro gerado adiantado
+  R.informarSaida(d, c.id, '2026-11-15', 'julio', '2026-11-09');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio'); // o que a tela faz depois de mudar o contrato
+  const nov = doMes(d, c, '2026-11');
+  assert.deepEqual([nov.dias_cobrados, nov.aluguel], [15, 67500], 'novembro proporcional, 01 a 15/11');
+  assert.equal(doMes(d, c, '2026-12'), null, 'dezembro excluído');
+  assert.ok(d.historico.some((h) => h.acao === 'Exclusão' && h.tabela === 'cobrancas' && /12\/2026.*nenhum dia ocupado/.test(h.descricao)));
+  assert.deepEqual(R.boletosParaEmitir(d, '2026-12'), []);
+  assert.equal(R.etapasFechamento(d, '2027-01', '2027-01-20').find((e) => e.chave === 'pagamentos').pendentes, 0);
+});
+
+test('saída: boleto de mês sem dia ocupado já emitido no C6 fica, com alerta para cancelar no banco', () => {
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', reserva_valor: 0, cobrar_iptu: false });
+  R.gerarCobrancas(d, '2026-11', 'julio');
+  R.gerarCobrancas(d, '2026-12', 'julio');
+  const dez = doMes(d, c, '2026-12');
+  R.atualizar(d, 'cobrancas', dez.id, { banco: { situacao: 'emitido', valor: R.totais(dez).a_pagar_sem_desconto, vencimento: dez.vencimento } }, 'julio');
+  R.informarSaida(d, c.id, '2026-11-15', 'julio', '2026-11-09');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio');
+  assert.equal(doMes(d, c, '2026-12'), dez, 'emitido no banco: não exclui');
+  assert.equal(dez.aluguel, 135000, 'continua como o banco cobra');
+  const a = R.todosAlertas(d, '2026-11-09').find((x) => x.link === `#/cobranca/${dez.id}`);
+  assert.ok(a, 'alerta do boleto');
+  assert.equal(a.tipo, 'Banco');
+  assert.match(a.texto, /12\/2026.*emitido no C6.*nenhum dia ocupado.*saída em 15\/11\/2026.*cancele no banco/);
+  // cancelado no banco: o próximo recálculo exclui
+  R.atualizar(d, 'cobrancas', dez.id, { banco: { ...dez.banco, situacao: 'cancelado' } }, 'julio');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio');
+  assert.equal(doMes(d, c, '2026-12'), null);
+  assert.ok(!R.todosAlertas(d, '2026-11-09').some((x) => x.link === `#/cobranca/${dez.id}`));
+});
+
+test('saída: boleto alterado à mão em mês sem dia ocupado não é excluído sozinho, mas aparece nos alertas', () => {
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01', reserva_valor: 0, cobrar_iptu: false });
+  R.gerarCobrancas(d, '2026-12', 'julio');
+  const dez = doMes(d, c, '2026-12');
+  R.atualizar(d, 'cobrancas', dez.id, { outros: 5000, editado_manual: true }, 'julio');
+  R.informarSaida(d, c.id, '2026-11-15', 'julio', '2026-11-09');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio');
+  assert.equal(doMes(d, c, '2026-12'), dez);
+  const a = R.todosAlertas(d, '2026-11-09').find((x) => x.link === `#/cobranca/${dez.id}`);
+  assert.match(a.texto, /12\/2026.*alterado à mão.*nenhum dia ocupado/);
+});
+
+test('saída: mudar a data para mais tarde reativa o inquilino e o boleto do mês novo sai', () => {
+  const { d, c } = base({ data_entrada: '2026-01-10', vigencia_inicio: '2026-01-10', reserva_valor: 0, cobrar_iptu: false });
+  for (const m of ['2026-09', '2026-10']) R.gerarCobrancas(d, m, 'julio');
+  R.informarSaida(d, c.id, '2026-10-15', 'julio', '2026-11-09');
+  assert.equal(c.ativo, false, 'saiu em 15/10, boleto de outubro existe: inativo');
+  // o inquilino avisa que fica até 15/11
+  R.informarSaida(d, c.id, '2026-11-15', 'julio', '2026-11-09');
+  R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio');
+  assert.equal(c.ativo, true);
+  assert.equal(R.contratoAtivo(c, '2026-11-09'), true);
+  assert.equal(doMes(d, c, '2026-10').dias_cobrados, 31);
+  assert.deepEqual(R.gerarCobrancas(d, '2026-11', 'julio'), { geradas: 1, existentes: 0 });
+  assert.equal(doMes(d, c, '2026-11').dias_cobrados, 15);
+  // data mais tarde, mas ainda no passado e com o boleto do mês: continua inativo (sem gravar duas vezes)
+  const b = base({ data_entrada: '2026-01-10', vigencia_inicio: '2026-01-10', reserva_valor: 0, cobrar_iptu: false });
+  for (const m of ['2026-08', '2026-09']) R.gerarCobrancas(b.d, m, 'julio');
+  R.informarSaida(b.d, b.c.id, '2026-09-10', 'julio', '2026-11-09');
+  assert.equal(b.c.ativo, false);
+  const n = b.d.historico.length;
+  R.informarSaida(b.d, b.c.id, '2026-09-20', 'julio', '2026-11-09');
+  assert.equal(b.c.ativo, false);
+  assert.equal(b.d.historico.length, n + 1, 'só a nova data');
+  // data mais tarde no passado, sem o boleto do mês novo: volta a ativo para o boleto proporcional sair
+  R.informarSaida(b.d, b.c.id, '2026-10-20', 'julio', '2026-11-09');
+  assert.equal(b.c.ativo, true);
+  R.gerarCobrancas(b.d, '2026-10', 'julio');
+  assert.equal(doMes(b.d, b.c, '2026-10').dias_cobrados, 20);
+});

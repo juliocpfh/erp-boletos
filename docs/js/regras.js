@@ -1285,9 +1285,42 @@ const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'alugue
   'seguro_parcela', 'taxa_boleto', 'fci', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
+ * Boleto do aluguel de um mês em que o inquilino não ocupou nenhum dia (depois da saída ou antes da entrada), em aberto.
+ * Fim do vínculo na troca de titular não conta: esses boletos passam ao novo titular no dia da troca.
+ */
+function boletoSemOcupacao(d, cb, c = buscar(d, 'contratos', cb.contrato_id)) {
+  return !!c && !cb.data_pagamento && !emAcordo(cb) && !ehBoletoAvulso(cb)
+    && C.diasOcupados(cb.competencia, c.data_entrada, c.data_saida) === 0 && !continuadoPor(d, c);
+}
+
+/**
+ * Alertas dos boletos em aberto de mês sem nenhum dia ocupado (``boletoSemOcupacao``) que ficaram: emitido no C6 (o banco
+ * ainda cobra: cancele lá e depois exclua), alterado à mão (o recálculo não mexe) ou de antes desta conferência.
+ */
+export function alertasBoletosSemOcupacao(d) {
+  const lista = [];
+  for (const cb of d.cobrancas) {
+    if (cb.data_pagamento || emAcordo(cb) || ehBoletoAvulso(cb)) continue;
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    if (!boletoSemOcupacao(d, cb, c)) continue;
+    const i = buscar(d, 'imoveis', c.imovel_id);
+    const motivo = c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`;
+    const banco = emitidoNoBanco(cb);
+    lista.push({ nivel: banco ? 'perigo' : 'aviso', tipo: banco ? 'Banco' : 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
+      link: `#/cobranca/${cb.id}`, ancora: `boleto-${cb.id}`,
+      texto: banco ? `Boleto de ${C.compBr(cb.competencia)} está emitido no C6, mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.`
+        : cb.editado_manual ? `Boleto de ${C.compBr(cb.competencia)} (alterado à mão) não tem nenhum dia ocupado (${motivo}): confira e exclua o boleto se não deve ser cobrado.`
+          : `Boleto de ${C.compBr(cb.competencia)} não tem nenhum dia ocupado (${motivo}): exclua o boleto (ou recalcule os boletos em aberto do mês).` });
+  }
+  return lista;
+}
+
+/**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
  * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está (só a reserva dele pode mudar de mês).
- * Devolve quantos boletos mudaram.
+ * Boleto de mês sem nenhum dia ocupado (ex.: dezembro gerado e saída em 15/11) é excluído, com histórico, se não tem NF e
+ * não foi emitido no C6; emitido no C6, fica (o banco ainda cobra) e aparece nos alertas para cancelar no banco
+ * (``alertasBoletosSemOcupacao``). Devolve quantos boletos mudaram.
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
@@ -1297,6 +1330,13 @@ export function recalcularCobrancas(d, filtro, usuario) {
   for (const cb of lista) {
     const c = buscar(d, 'contratos', cb.contrato_id);
     if (c) contratos.set(c.id, c);
+    if (boletoSemOcupacao(d, cb, c)) {
+      if (!faturasDe(d, 'cobranca', cb.id, false).length && !emitidoNoBanco(cb)) {
+        excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${c.inquilino_nome} excluído: nenhum dia ocupado no mês (${c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`})`);
+        mudaram.add(cb.id);
+      }
+      continue;
+    }
     const novo = c && montarCobranca(d, c, cb.competencia);
     if (!novo) continue;
     const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
@@ -1996,15 +2036,19 @@ export const leituraDo = (d, contratoId, momento) => d.leituras.find((l) => l.co
 
 /**
  * Saída do inquilino, 1ª etapa: a data em que ele sai (avisou que sai em 30/11 → o boleto de novembro sai proporcional).
- * O cálculo final (garantia, débitos, leitura) vem depois. Também muda a data, enquanto não há cálculo final.
+ * O cálculo final (garantia, débitos, leitura) vem depois. Também muda a data, enquanto não há cálculo final: quem já tinha
+ * ficado inativo pela data antiga volta a ativo se, pela nova, ainda não deve sair (ex.: saída 15/10 mudada para 15/11, hoje
+ * 09/11: ativo de novo, para o boleto de 01 a 15/11 sair).
  */
-export function informarSaida(d, contratoId, data, usuario) {
+export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw new Error('Informe a data de saída.');
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
   if (c.data_entrada && data < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
-  atualizar(d, 'contratos', c.id, { data_saida: data }, usuario, `Saída do inquilino em ${C.dataBr(data)}`);
-  desativarSeSaiu(d, c, usuario);
+  const reativar = c.ativo === false && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
+  atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}) }, usuario,
+    `Saída do inquilino em ${C.dataBr(data)}${reativar ? ' (ativo de novo até a saída)' : ''}`);
+  desativarSeSaiu(d, c, usuario, hoje);
   return c;
 }
 
@@ -3488,6 +3532,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   lista.push(...alertasIptu(d, hoje));
   const banco = alertaBanco(d, hoje);
   if (banco) lista.push(banco);
+  lista.push(...alertasBoletosSemOcupacao(d));
   for (const x of inadimplencia(d, hoje).devedores) {
     const i = buscar(d, 'imoveis', x.contrato.imovel_id);
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,

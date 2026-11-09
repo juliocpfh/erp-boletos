@@ -19,7 +19,8 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 3. SAÍDA DO INQUILINO
 - Duas etapas: 1) informar a data de saída quando ele avisa (o último boleto sai proporcional); 2) fazer o cálculo final.
-- O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe.
+- O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe. Mudar a data de saída para mais tarde volta o inquilino a ativo (ex.: saída 15/10 mudada para 15/11: sai o boleto de 01 a 15/11).
+- Boleto em aberto de um mês sem nenhum dia ocupado (ex.: dezembro já gerado e saída em 15/11) é excluído ao salvar a saída; se já foi emitido no C6, fica e aparece nos alertas para cancelar no banco.
 - Leitura dos relógios (água e energia) é obrigatória na vistoria de entrada e na de saída.
 
 4. REAJUSTE DO ALUGUEL
