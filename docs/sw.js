@@ -15,6 +15,9 @@ const MANTER_ATE_O_NOVO = /\/(vendor|modelos)\//; // só são pedidos quando usa
 const FOLGA_DATA = 60 * 1000; // o GitHub grava os arquivos de uma publicação um a um: a data de cada um varia alguns segundos
 const ESPERA_SEGUNDO_PLANO = 3000; // ms: o que fica em segundo plano começa depois da abertura, sem disputar a internet com ela
 const MAX_TENTATIVAS = 3; // arquivo que nem passando por cima dos caches vem com a data da versão: aceito como veio depois disso
+// Partes do programa que a página só carrega quando usadas (import() em telas/acoes.js e telas/nuvem.js): ficam guardadas
+// desde a primeira abertura com internet, para funcionarem sem internet mesmo sem terem sido usadas antes
+const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', 'js/migracao.js'];
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -141,7 +144,13 @@ async function baixarPendentes() {
 async function emSegundoPlano() {
   try {
     await conferencia;
-    if (!comInternet || !pendentes.size) return;
+    if (!comInternet) return;
+    const c = await caches.open(CACHE);
+    for (const p of ADIADOS) {
+      const url = new URL(p, self.location.href).href;
+      if (!pendentes.has(url) && !(await c.match(url))) pendentes.set(url, 0);
+    }
+    if (!pendentes.size) return;
     await esperar(ESPERA_SEGUNDO_PLANO);
     await baixarPendentes();
   } catch { /* fica para a próxima abertura */ }

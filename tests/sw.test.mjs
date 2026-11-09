@@ -98,6 +98,21 @@ test('primeira abertura baixa tudo; a seguinte, na mesma versão, faz uma confer
   assert.match(textos[0], /js\/app\.js/);
 });
 
+test('partes carregadas só quando usadas (planilha, regras em texto, visualizador, passagem) ficam guardadas desde a 1ª abertura', async () => {
+  const m = mundo();
+  await m.abrir(); // abre com internet e não usa nenhuma delas
+  for (const a of ['/js/exportar.js', '/js/regras-texto.js', '/js/visualizador.js', '/js/migracao.js']) {
+    assert.ok(m.guardados().includes(a), `guardou ${a}`);
+  }
+  m.site.internet = false;
+  await m.abrir();
+  assert.match(await m.pedir('js/exportar.js'), /exportar\.js/, 'sem internet, a planilha de tudo ainda carrega');
+  // em localhost não baixa nada em segundo plano (lá cada arquivo é conferido quando a página pede)
+  const local = mundo({ hostname: 'localhost' });
+  await local.abrir();
+  assert.ok(!local.guardados().includes('/js/exportar.js'));
+});
+
 test('versão nova publicada: a cópia é refeita com os arquivos novos', async () => {
   const m = mundo();
   await m.abrir();
