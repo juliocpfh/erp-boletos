@@ -280,7 +280,9 @@ export function pendenciasDoContrato(d, c) {
   if (c.garantia_tipo === 'Caução' && !(c.caucao_valor > 0) && !(c.caucao_meses > 0)) falta.push('caução: valor ou quantos aluguéis');
   if (!c.vigencia_inicio || (c.prazo_tipo !== 'Indeterminado' && !c.vigencia_fim)) falta.push('datas do contrato');
   if (!c.indice_correcao) falta.push('índice de correção');
-  if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)) falta.push('fiador');
+  // troca de titular com a garantia que continua: o fiador ainda está no contrato de quem sai (vai ao termo, `fiadoresDaTroca`)
+  if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)
+    && !(c.contrato_anterior_id && fiadoresDaTroca(d, c).length)) falta.push('fiador');
   for (const e of locadorasDoContrato(d, c)) {
     if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
     if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);

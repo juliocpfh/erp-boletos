@@ -138,6 +138,7 @@ test('termo da troca de titular com a garantia que continua: o fiador do contrat
   assert.match(t, /\[LOCADORA, LOCATÁRIO SAINTE, LOCATÁRIO ENTRANTE, FIADOR\]/);
   assert.doesNotMatch(t, /DA GARANTIA\nDISPOSIÇÕES FINAIS/, '"DA GARANTIA" não fica vazia');
   assert.equal(K.fiadoresDaTroca(d, n, a.data).map((f) => f.nome).join(), 'José Fiador');
+  assert.ok(!K.pendenciasDoContrato(d, n).includes('fiador'), 'a tela do termo não acusa "falta fiador"');
 });
 
 test('termo da troca com garantia nova: o fiador de quem sai não entra (só o de quem entra)', () => {
