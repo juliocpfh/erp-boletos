@@ -21,10 +21,37 @@ const nomeDoRegistro = (c) => {
 };
 const quando = (t) => (t ? new Date(t).toLocaleString('pt-BR') : '');
 
-export function telaConflitos() {
+/** Campos que não aparecem com o valor (senha e login lembrado): só o nome. */
+const SEM_VALOR = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes']);
+const MOSTRAR_MUDANCAS = 8;
+const curto = (v) => { const t = valorTexto(v); return t.length > 60 ? `${t.slice(0, 60)}…` : t; };
+
+/** Uma mudança recusada em palavras (ex.: "Imóvel nº 1 (Apto 604): nome «Apto 604» → «Sala»"). Histórico: null (acompanha as outras). */
+function descreverMudanca(o) {
+  if (o.op === 'historico') return null;
+  if (o.op === 'raiz') return `Configuração geral: ${o.campo}`;
+  const reg = o.op === 'inserir' ? o.dados : (E.d[o.tabela] || []).find((x) => x.id === o.id) || o.base;
+  const nome = reg && (reg.nome || reg.descricao || reg.inquilino_nome || reg.competencia || reg.numero);
+  const quem = `${R.TABELAS[o.tabela] || o.tabela} nº ${o.id}${nome ? ` (${curto(nome)})` : ''}`;
+  if (o.op === 'inserir') return `${quem}: incluído`;
+  if (o.op === 'excluir') return `${quem}: excluído`;
+  const campos = Object.entries(o.campos || {}).map(([c, v]) => (SEM_VALOR.has(c) || o.tabela === 'usuarios' ? c : `${c} «${curto(v.antes)}» → «${'depois' in v ? curto(v.depois) : '(apagado)'}»`));
+  return `${quem}: ${campos.join('; ')}`;
+}
+
+/** O que a gravação recusada mudava, em até MOSTRAR_MUDANCAS linhas (sem as entradas do histórico, salvo se só houver elas). */
+function resumoDaRecusa(ops) {
+  if (!ops) return '<span class="suave">(recusada antes de o sistema guardar os detalhes)</span>';
+  let linhas = ops.map(descreverMudanca).filter(Boolean);
+  if (!linhas.length) linhas = ops.filter((o) => o.op === 'historico').map((o) => `Histórico: ${o.entrada?.descricao || o.entrada?.acao || ''}`);
+  const mais = linhas.length - MOSTRAR_MUDANCAS;
+  return `<ul>${linhas.slice(0, MOSTRAR_MUDANCAS).map((l) => `<li>${esc(l)}</li>`).join('')}${mais > 0 ? `<li class="suave">e mais ${mais} mudança(s) (baixe para ver todas)</li>` : ''}</ul>`;
+}
+
+export async function telaConflitos() {
   if (!E.nuvem) return '<h1>Conflitos</h1><p class="suave">Só existem com os dados na nuvem.</p>';
   const conflitos = E.nuvem.conflitos;
-  const recusas = E.nuvem.recusas;
+  const recusas = await Promise.all(E.nuvem.recusas.map(async (r) => ({ ...r, id: r.id || r.lote, ops: await E.nuvem.lerRecusa(r.id || r.lote).catch(() => null) })));
   const naoEnviados = E.anexos?.naoEnviados || [];
   const pode = podeUsuario('admin'); // só o administrador escolhe (a nuvem também confere)
   const linhas = conflitos.map((c) => {
@@ -46,9 +73,11 @@ export function telaConflitos() {
       ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
-      <p class="suave">Estas mudanças feitas neste aparelho não foram aceitas e não valem. Refaça se ainda precisar.</p>
-      <ul>${recusas.map((r) => `<li>${esc(quando(r.em))}: ${esc(r.erro)} (${r.mudancas} mudança(s))</li>`).join('')}</ul>
-      ${botao('esquecerRecusas', 'Já vi, limpar a lista', {}, 'secundario')}</div>` : ''}
+      <p class="suave">Estas gravações feitas neste aparelho não foram aceitas e não valem (a tela já voltou ao que vale). Veja o que eram e o motivo; refaça o que ainda precisar. "Baixar" guarda o detalhe num arquivo.</p>
+      ${recusas.map((r) => `<div class="cartao"><p><b>${esc(quando(r.em))}</b> · ${Number(r.mudancas) || 0} mudança(s)<br>Motivo: <b>${esc(r.erro)}</b></p>
+        ${resumoDaRecusa(r.ops)}
+        <div class="acoes">${r.ops ? botao('baixarRecusa', 'Baixar', { id: r.id }, 'secundario pequeno') : ''} ${botao('esquecerRecusa', 'Esquecer', { id: r.id }, 'secundario pequeno')}</div></div>`).join('')}
+      ${recusas.length > 1 ? botao('esquecerRecusas', 'Esquecer todas', {}, 'secundario', 'Esquecer todas as mudanças recusadas? Elas não estão na nuvem e somem deste aparelho.') : ''}</div>` : ''}
     ${naoEnviados.length ? `<div class="caixa"><h2>Anexos que a nuvem não aceitou</h2>
       <p class="suave">Foram anexados sem internet e, ao enviar, a nuvem recusou. O arquivo continua neste aparelho: baixe e anexe de novo (ou esqueça).</p>
       <ul>${naoEnviados.map((f) => `<li>${esc(quando(f.em))}: <b>${esc(f.partes.join(' / '))}</b> · ${esc(f.erro)}
@@ -123,6 +152,19 @@ export const ACOES_NUVEM = {
   },
   async esquecerRecusas() {
     await E.nuvem.esquecerRecusas();
+    await mostrar();
+  },
+  /** Mudança recusada: o detalhe num arquivo (o que era, quando e o motivo), para conferir ou refazer. */
+  async baixarRecusa(ds) {
+    const r = E.nuvem.recusas.find((x) => (x.id || x.lote) === ds.id);
+    const ops = r && (await E.nuvem.lerRecusa(ds.id));
+    if (!ops) return aviso('Esta mudança não está mais neste aparelho.', 'erro');
+    const texto = JSON.stringify({ recusada_em: r.em, motivo: r.erro, gravacao: r.lote, parte: ds.id, mudancas: ops }, null, 1);
+    baixar(new Blob([texto], { type: 'application/json' }), `mudanca-recusada-${String(r.em || '').slice(0, 10)}-${ds.id.slice(-10).replace(/[^A-Za-z0-9-]/g, '')}.json`);
+  },
+  async esquecerRecusa(ds) {
+    if (!(await janela({ titulo: 'Esquecer esta mudança?', html: '<p>Ela não está na nuvem e some deste aparelho. Se ainda precisar, baixe antes ou refaça na tela.</p>', sim: 'Esquecer', forte: true }))) return;
+    await E.nuvem.esquecerRecusa(ds.id);
     await mostrar();
   },
   async baixarNaoEnviado(ds) {
