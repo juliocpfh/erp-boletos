@@ -679,7 +679,7 @@ export function telaContrato(c) {
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? botao('editarContrato', 'Editar contrato', { id: c.id }, 'botao') : ''}
       ${opera() && c.imovel_id && !cobs.some((cb) => cb.data_pagamento) ? botao('corrigirImovel', 'Corrigir imóvel', { id: c.id }, 'secundario') : ''}
-      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e todos os seus boletos?') : ''}</div></div>
+      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo', 'Excluir este contrato e tudo o que é dele (boletos, garantia, vistorias, termos aditivos, cartas)? Os arquivos que o sistema guardou desses lançamentos (comprovantes, documentos assinados, apólices) também são apagados; documentos postos à mão na pasta ficam.') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}
     ${c.ativo === false ? `<div class="alerta info">Inquilino inativo: não gera boleto.</div>` : ''}
     ${alertaArquivosFaltando(c.id)}

@@ -256,7 +256,32 @@ test('numeração do termo aditivo conta os termos de todos os contratos da cade
   R.assinarAditivo(d, t.id, { data: '2026-11-21', arquivo: 'troca.pdf' }, 'j');
   const v2 = R.salvarAditivoVencimento(d, n.id, { data: '2027-01-05', dia_novo: 20, mes: '2027-02', texto: K.modelosDe(d, 'aditivo')[0].texto }, 'j');
   assert.equal(v2.numero, 3);
-  // termo excluído antes de assinar não faz repetir o número do seguinte
+  // termo excluído não faz repetir o número do seguinte
   R.excluir(d, 'aditivos', v.id, 'j');
   assert.equal(R.salvarAditivoVencimento(d, n.id, { data: '2027-02-05', dia_novo: 25, mes: '2027-03', texto: 'x' }, 'j').numero, 4);
+});
+
+// --------------------------------------------------------------------------
+// 6. Excluir o contrato apaga tudo o que tem o contrato_id dele (e os arquivos deixam de ser usados)
+// --------------------------------------------------------------------------
+test('excluir o contrato apaga os registros de todas as tabelas com o contrato (depósitos, cartas, titularidades, acordos...)', () => {
+  const { d, i } = casa();
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', data_entrada: '2026-01-10', vigencia_inicio: '2026-01-10', aluguel_inicial: 300000,
+    garantia_tipo: 'Caução', comprovante_caucao: 'comprovante-caucao.pdf' }, 'j');
+  const outro = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Ana', data_entrada: '2025-01-10', vigencia_inicio: '2025-01-10', aluguel_inicial: 200000 }, 'j');
+  // um registro com o contrato em cada tabela que tem contrato_id (as do banco e as NFs não pertencem ao contrato)
+  const fora = new Set(['contratos', 'arquivos', 'banco', 'listas', 'faturas', 'movimentacoes_banco', 'pagamentos_banco']);
+  const tabelas = Object.keys(R.TABELAS).filter((t) => !fora.has(t) && Array.isArray(d[t]));
+  for (const t of tabelas) {
+    R.inserir(d, t, { contrato_id: c.id, imovel_id: i.id, comprovante: `${t}.pdf`, arquivo: `${t}-arquivo.pdf` }, 'j');
+    R.inserir(d, t, { contrato_id: outro.id, imovel_id: i.id }, 'j');
+  }
+  assert.ok(['depositos_garantia', 'cartas_reajuste', 'titularidades', 'acordos'].every((t) => tabelas.includes(t)));
+  R.excluirContrato(d, c.id, 'julio');
+  for (const t of tabelas) {
+    assert.equal(d[t].filter((x) => x.contrato_id === c.id).length, 0, `${t} do contrato excluído`);
+    assert.equal(d[t].filter((x) => x.contrato_id === outro.id).length, 1, `${t} do outro contrato fica`);
+  }
+  assert.equal(R.buscar(d, 'contratos', c.id), undefined);
+  assert.equal(R.arquivosReferenciados(d).filter((a) => a.id === c.id).length, 0, 'nenhum arquivo do contrato excluído continua em uso (sai da pasta junto)');
 });

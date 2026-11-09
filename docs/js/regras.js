@@ -1927,12 +1927,20 @@ export function dadosDaFicha(d, f) {
   return { ...dadosDaPessoa(f), ...(primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data } : {}) };
 }
 
-/** Exclui o contrato e tudo o que pertence a ele (boletos, fiadores, garantia, vistorias...). */
+/** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */
+const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_banco', 'pagamentos_banco']);
+
+/**
+ * Exclui o contrato e tudo o que pertence a ele: os registros de todas as tabelas (TABELAS) com o contrato_id dele (boletos,
+ * fiadores, garantia e depósitos, vistorias, aditivos, cartas de reajuste, titularidades, acordos...). Os arquivos desses
+ * registros deixam de ser usados (`arquivosReferenciados`) e a tela os apaga da pasta (`alterarApagandoAnexos`).
+ */
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
-  for (const t of ['cobrancas', 'seguros', 'correcoes', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'trocas_garantia', 'leituras', 'solicitacoes', 'vistorias', 'aditivos', 'ressarcimentos']) {
-    d[t].filter((x) => x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
+  for (const t of Object.keys(TABELAS)) {
+    if (FICAM_SEM_O_CONTRATO.has(t) || !Array.isArray(d[t])) continue;
+    d[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
   }
   // a garantia que tinha passado a este contrato volta a ser do anterior (senão não passa a um novo titular)
   for (const a of d.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d, 'contratos', a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);

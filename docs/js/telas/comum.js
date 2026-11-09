@@ -308,20 +308,24 @@ export async function acertarNomesUmaVez() {
 /** Arquivos que algum lançamento usa, por pasta: Set de "pasta|nome". */
 export const anexosEmUso = () => new Set(R.arquivosReferenciados(d()).map((a) => `${chavePasta(a.escopo, a.id)}|${a.nome}`));
 
-/** Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome }]. Devolve quantos apagou. */
+/**
+ * Apaga os arquivos da pasta e registra no histórico. ``lista``: [{ escopo, id, nome, contrato? }] (``contrato``: o registro do
+ * contrato que acabou de ser excluído, para achar a pasta dele). Devolve quantos apagou.
+ */
 export async function apagarAnexos(lista, motivo) {
   const apagados = [];
   const falharam = [];
   for (const a of lista) {
     try {
-      await (await pastaDoEscopo(a.escopo, Number(a.id), false)).removeEntry(a.nome);
+      await (await pastaDoEscopo(a.escopo, Number(a.id), false, a.contrato || null)).removeEntry(a.nome);
       apagados.push(a);
     } catch (e) {
       // "não existe" é normal (já tinha sido apagado fora do sistema); outro erro (arquivo aberto, OneDrive travado) é avisado
       if (e && e.name !== 'NotFoundError') falharam.push(a.nome);
     }
   }
-  if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null, vinculoDoEscopo(a.escopo, a.id))));
+  if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null,
+    a.contrato ? { contrato_id: a.contrato.id, imovel_id: a.contrato.imovel_id || null } : vinculoDoEscopo(a.escopo, a.id))));
   if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, 'aviso');
   return apagados.length;
 }
@@ -332,16 +336,22 @@ export async function apagarAnexos(lista, motivo) {
  */
 export async function alterarApagandoAnexos(fn) {
   const antes = R.arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
+  // contrato excluído junto (ex.: excluir o contrato): a pasta dele é achada pelo registro de antes
+  const contratos = new Map(d().contratos.map((c) => [c.id, c]));
   const r = await alterar(fn);
   const emUso = anexosEmUso();
   const soltos = antes.filter((a) => a.pasta && !emUso.has(`${a.pasta}|${a.nome}`))
-    .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n);
+    .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n)
+    .map((a) => (escopoDoContrato(a.escopo) && !buscar('contratos', a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a));
   await apagarAnexos(soltos, 'Arquivo apagado junto com o lançamento');
   return r;
 }
 
-/** Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página). */
-export async function pastaDoEscopo(escopo, id, criar = true) {
+/**
+ * Pasta de uma caixa de arquivos. ``criar`` = false: só olha (não cria pasta vazia só por abrir a página).
+ * ``contrato``: o registro do contrato, quando ele já foi excluído do banco (apagar os arquivos que eram dele).
+ */
+export async function pastaDoEscopo(escopo, id, criar = true, contrato = null) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'ficha') {
     const f = buscar('fichas', id);
@@ -349,7 +359,8 @@ export async function pastaDoEscopo(escopo, id, criar = true) {
     return S.subpasta(raiz, [PASTA_FICHAS, f.pasta || nomePastaFicha(f)], criar);
   }
   if (escopoDoContrato(escopo)) {
-    const c = buscar('contratos', id);
+    const c = contrato || buscar('contratos', id);
+    if (!c) throw new Error('Inquilino não encontrado.');
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
   if (escopo === 'contador') {

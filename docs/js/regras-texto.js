@@ -91,6 +91,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 13. ARQUIVOS
 - Excluir ou desfazer um lançamento apaga também o arquivo anexado (se nenhum outro lançamento o usa). O "x" ao lado do clipe apaga só o arquivo e deixa o lançamento esperando novo anexo.
+- Excluir o contrato (só o administrador) apaga tudo o que é dele (boletos, garantia e depósitos, vistorias, termos aditivos, cartas de reajuste, titularidades, acordos) e os arquivos desses lançamentos; documentos postos à mão na pasta do inquilino ficam, e a pasta com eles.
 - Nomes de arquivos gravados pelo sistema não têm acento.
 - Ao abrir o Painel, o sistema confere os arquivos dos lançamentos: o que estiver em outra pasta volta ao lugar; o que sumiu vira alerta para anexar de novo. Arquivo de lançamento não se apaga pela lista de arquivos.
 - Termos aditivos, cartas de reajuste enviadas (PDF) e outras comunicações ficam na pasta "Aditivos, correções e comunicação" do inquilino.
