@@ -40,7 +40,7 @@ export function telaSolicitacoes(q) {
   const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
   const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    .sort(C.maisRecentePrimeiro);
   return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
     <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}

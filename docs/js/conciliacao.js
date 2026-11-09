@@ -249,7 +249,7 @@ export function movimentacoesDo(d, { conta_id = null, mes = null, imovel_id = nu
     && (!imovel_id || m.imovel_id === Number(imovel_id))
     && (filtro === 'todas' || (filtro === 'pendentes' && !m.classificacao) || (filtro === 'entradas' && m.tipo === 'entrada')
       || (filtro === 'saidas' && m.tipo === 'saida') || (filtro === 'sem_comprovante' && semComprovante(m))))
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    .sort(C.maisRecentePrimeiro);
 }
 
 // --------------------------------------------------------------------------
@@ -589,7 +589,7 @@ export function sugerirDestino(d, mov) {
   const doc = mov.contrapartida && mov.contrapartida.documento ? String(mov.contrapartida.documento).replace(/\D/g, '') : '';
   const antiga = (d.movimentacoes_banco || []).filter((m) => m.id !== mov.id && m.classificacao && !['boleto', 'ignorar', 'transferencia'].includes(m.classificacao) && m.tipo === mov.tipo
     && ((chave && semDigitos(m.descricao) === chave) || (doc && m.contrapartida && String(m.contrapartida.documento || '').replace(/\D/g, '') === doc)))
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id)[0];
+    .sort(C.maisRecentePrimeiro)[0];
   if (antiga) {
     const de = antiga.despesa_id ? buscar(d, 'despesas', antiga.despesa_id) : null;
     return comContaLancada(d, mov, { classificacao: antiga.classificacao, imovel_id: antiga.imovel_id, tipo_despesa: de ? de.tipo : null, iptu: antiga.iptu_id ? { id: antiga.iptu_id, n: null } : null,

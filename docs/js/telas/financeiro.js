@@ -295,7 +295,7 @@ export function telaFinanceiro(q) {
   const conta = (m) => !['transferencia', 'ignorar'].includes(m.classificacao);
   const entradas = movs.filter((m) => m.tipo === 'entrada' && conta(m)).reduce((t, m) => t + m.valor, 0);
   const saidas = movs.filter((m) => m.tipo === 'saida' && conta(m)).reduce((t, m) => t + m.valor, 0);
-  const semDestino = movs.filter((m) => !m.classificacao).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
+  const semDestino = movs.filter((m) => !m.classificacao).sort(C.maisAntigoPrimeiro);
   const res = R.resultadosFinanceiros(d(), ini, fim).filter((x) => !x.controle);
   const tot = (k) => res.reduce((s, x) => s + x[k], 0);
   // NF do Airbnb: do próprio mês, se já passou; no mês corrente, a do mês anterior

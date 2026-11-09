@@ -429,6 +429,15 @@ export function ufDoCep(cep) {
 }
 
 // --------------------------------------------------------------------------
+// Ordem das listas (para .sort): pelo campo "data" ('AAAA-MM-DD'); no mesmo dia, pela ordem em que foram lançados (id)
+// --------------------------------------------------------------------------
+/** A mais recente primeiro; no mesmo dia, a lançada por último. */
+export const maisRecentePrimeiro = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+
+/** A mais antiga primeiro; no mesmo dia, a lançada primeiro. */
+export const maisAntigoPrimeiro = (a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id;
+
+// --------------------------------------------------------------------------
 // Textos
 // --------------------------------------------------------------------------
 /** Texto sem acento ("Água São João" → "Agua Sao Joao"); maiúsculas, espaços e o resto ficam como estão. Vazio/nulo → ''. */

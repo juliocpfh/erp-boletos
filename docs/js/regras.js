@@ -531,7 +531,7 @@ const correcoesCaucaoAtual = (d, c) => correcoesGarantiaDo(d, c.id).filter((x) =
 export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
 export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.contrato_id === contratoId)
-  .sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id);
+  .sort(C.maisAntigoPrimeiro);
 /** Lançamentos ligados ao contrato que têm o campo ``comprovante`` (arquivo na pasta do inquilino). */
 const TABELAS_COMPROVANTE = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia'];
 
@@ -2509,7 +2509,7 @@ export function fimDoPrazoHerdado(d, c) {
 /** Última renovação que mexeu no prazo do contrato (nova data de término ou prazo indeterminado), ou null. */
 const renovacaoDoPrazo = (d, c) => (c && c.id ? (d.renovacoes || [])
   .filter((r) => r.contrato_id === c.id && (r.nova_vigencia_fim || r.tipo === 'Passou a prazo indeterminado'))
-  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id)[0] || null : null);
+  .sort(C.maisRecentePrimeiro)[0] || null : null);
 /** Data da renovação que fixou o fim do contrato (a última, com nova data de término), ou null. */
 export const fimRenovado = (d, c) => { const r = renovacaoDoPrazo(d, c); return (r && r.nova_vigencia_fim) || null; };
 /**
@@ -4243,7 +4243,7 @@ export const boletosParaEmitir = (d, comp) => d.cobrancas.filter((cb) => cb.comp
 // --------------------------------------------------------------------------
 /** Solicitações do inquilino (pequenos reparos e pedidos), das mais recentes para as mais antigas. */
 export const solicitacoesDo = (d, contratoId) => d.solicitacoes.filter((x) => x.contrato_id === contratoId)
-  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  .sort(C.maisRecentePrimeiro);
 
 /** Quantas solicitações há em cada situação (sem situação conta como "Aberta"). */
 export function resumoSolicitacoes(d) {
@@ -4253,7 +4253,7 @@ export function resumoSolicitacoes(d) {
 }
 
 export const reformasDo =(d, imovelId) => d.reformas.filter((r) => r.imovel_id === imovelId)
-  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  .sort(C.maisRecentePrimeiro);
 
 // --------------------------------------------------------------------------
 // Airbnb: ganhos lançados por imóvel (só imóvel vago); o Airbnb informa só o total, então a NF é UMA por mês, sem imóvel

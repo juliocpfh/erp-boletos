@@ -70,7 +70,7 @@ export function telaBanco(rota) {
   const imovelFiltro = rota.q.imovel ? buscar('imoveis', Number(rota.q.imovel)) : null;
   const url = (q) => `#/banco?${new URLSearchParams({ conta, mes, ...(filtro !== 'todas' ? { filtro } : {}), ...(imovelFiltro ? { imovel: imovelFiltro.id } : {}), ...q })}`;
   const doMes = movs().filter((m) => m.conta_id === conta && (imovelFiltro ? m.imovel_id === imovelFiltro.id : String(m.data).slice(0, 7) === mes))
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    .sort(C.maisRecentePrimeiro);
   const filtradas = doMes.filter((m) => (filtro === 'sem_destino' ? !m.classificacao : filtro === 'sem_comprovante' ? precisaComprovante(m) && !comComprovante(m) : true));
   const soma = (tipo) => doMes.filter((m) => m.tipo === tipo).reduce((t, m) => t + m.valor, 0);
   const semDestino = doMes.filter((m) => !m.classificacao).length;
@@ -430,7 +430,7 @@ export function caixaPagarPeloBanco(i, comp) {
 
 export function caixaBancoImovel(i) {
   const ano = Number(C.hojeIso().slice(0, 4));
-  const todas = movs().filter((m) => m.imovel_id === i.id).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+  const todas = movs().filter((m) => m.imovel_id === i.id).sort(C.maisRecentePrimeiro);
   const doAno = todas.filter((m) => String(m.data).slice(0, 4) === String(ano));
   const soma = (tipo) => doAno.filter((m) => m.tipo === tipo).reduce((t, m) => t + m.valor, 0);
   const meus = pagamentos().filter((p) => p.imovel_id === i.id && !['pago', 'cancelado'].includes(p.situacao));
