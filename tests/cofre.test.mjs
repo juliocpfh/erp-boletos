@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { Cofre, CofreDO, backupDoDia, canon, MANTER_SUBSTITUICOES, MAX_FAIXA, proximaManutencao, SO_ADMIN } from '../nuvem/cofre.mjs';
 import * as W from '../nuvem/worker.mjs';
+import { diferencas } from '../docs/js/nuvem.js';
+import * as R from '../docs/js/regras.js';
 import { r2Falso } from './r2-falso.mjs';
 
 /** Mesmo formato do ctx.storage.sql do Cloudflare: exec(consulta, ...valores).toArray(). */
@@ -187,6 +189,37 @@ test('papéis: consulta só lê; operador não mexe em usuários (só a própria
   // usuário desativado deixa de entrar
   c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { ativo: { antes: true, depois: false } } }]), DONO);
   assert.throws(() => c.exigir(OPERADOR, 'consulta'), (e) => e.status === 403);
+});
+
+test('consulta troca a própria senha (e o login reforça a senha antiga), com a linha do histórico dessa troca; nada mais', () => {
+  const c = carregado();
+  // "Minha senha" como a tela faz (R.atualizar + diferencas): campos da senha + uma linha no histórico
+  const antes = c.tudo(c.exigir(CONSULTA, 'consulta')); const depois = structuredClone(antes);
+  R.atualizar(depois, 'usuarios', 4, { senha_sal: 's2', senha_hash: 'h2', senha_iteracoes: 600000 }, CONSULTA, 'Trocou a própria senha');
+  const troca = diferencas(antes, depois);
+  assert.deepEqual(troca.map((o) => o.op).sort(), ['alterar', 'historico']);
+  assert.equal(c.aplicar(lote(troca), CONSULTA).ok, true, 'a nuvem aceita a troca');
+  const u = () => c.tudo().usuarios.find((x) => x.id === 4);
+  assert.deepEqual([u().senha_sal, u().senha_hash, u().senha_iteracoes], ['s2', 'h2', 600000]);
+  assert.equal(c.tudo().historico.at(-1).email_nuvem, CONSULTA);
+  // senha no padrão antigo regravada ao entrar (sem histórico), junto com a sessão
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { senha_hash: { antes: 'h2', depois: 'h3' }, sessoes: { antes: undefined, depois: ['t1'] } } }]), CONSULTA).ok, true);
+  assert.equal(u().senha_hash, 'h3');
+  // nada mais
+  const senha = (id = 4) => ({ op: 'alterar', tabela: 'usuarios', id, campos: { senha_hash: { antes: id === 4 ? 'h3' : 'h1', depois: 'h4' } } });
+  const linha = (extra = {}) => ({ op: 'historico', entrada: { acao: 'Alteração', tabela: 'usuarios', registro_id: 4, descricao: 'Trocou a própria senha', ...extra } });
+  for (const [ops, motivo] of [
+    [[senha(1)], 'a senha de outro'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { papel: { antes: 'consulta', depois: 'admin' } } }], 'o próprio papel'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { pendente: { antes: undefined, depois: true } } }], 'outro campo do próprio usuário'],
+    [[linha()], 'linha do histórico sem troca de senha'],
+    [[{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { sessoes: { antes: ['t1'], depois: ['t1', 't2'] } } }, linha()], 'linha do histórico só com a sessão'],
+    [[senha(), linha({ tabela: 'contratos', registro_id: 20 })], 'linha do histórico de outra coisa'],
+    [[senha(), linha({ registro_id: 1 })], 'linha do histórico de outro usuário'],
+    [[senha(), { op: 'alterar', tabela: 'contratos', id: 20, campos: { valor: { antes: 364445, depois: 1 } } }], 'outra mudança junto com a troca'],
+  ]) assert.throws(() => c.aplicar(lote(ops), CONSULTA), (e) => e.status === 403, motivo);
+  assert.equal(u().senha_hash, 'h3', 'nada do que foi recusado ficou');
+  assert.equal(contrato(c, 20).valor, 364445);
 });
 
 test('tabela e campo da raiz não se trocam: "raiz" com nome de tabela (usuários, empresas…) e tabela com nome de campo da raiz são recusados', () => {

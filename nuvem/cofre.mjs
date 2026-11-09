@@ -21,8 +21,10 @@ export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualiz
 export const CONTADORES = ['proxima_fatura'];
 /** Segredos que nunca ficam nos dados (regra 8 do CLAUDE.md; normalizar também apaga). */
 const SEGREDOS = ['senha_ponte', 'ponte_url'];
+/** Campos da senha (os de camposDeSenha em docs/js/auth.js): qualquer papel troca a própria senha. */
+const CAMPOS_SENHA = ['senha_sal', 'senha_hash', 'senha_iteracoes'];
 /** O que o operador pode mudar no próprio usuário (trocar a senha); o resto de "usuarios" é do administrador. */
-const USUARIO_PROPRIO = ['senha_sal', 'senha_hash', 'senha_iteracoes', 'sessoes', 'pendente'];
+const USUARIO_PROPRIO = [...CAMPOS_SENHA, 'sessoes', 'pendente'];
 /** Sessões lembradas por usuário (igual a MAX_SESSOES de docs/js/nuvem.js; tests/sincronia.test.mjs confere). */
 export const MAX_SESSOES = 10;
 const NIVEL = { consulta: 1, operador: 2, admin: 3 };
@@ -249,10 +251,7 @@ export class Cofre {
     if (!Array.isArray(lote.ops) || lote.ops.length > MAX_OPS) throw new ErroCofre(400, `Lote inválido (até ${MAX_OPS} mudanças).`);
     if (this.vazio()) throw new ErroCofre(409, 'A nuvem ainda não tem dados: faça a carga inicial.');
     const quem = this.exigir(email, 'consulta');
-    // consulta só registra a própria entrada e saída (sessão do login); qualquer outra mudança é recusada
-    if (quem.papel === 'consulta' && !lote.ops.every((o) => o?.op === 'alterar' && o.tabela === 'usuarios' && o.id === quem.id && Object.keys(o.campos || {}).every((c) => c === 'sessoes'))) {
-      throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
-    }
+    if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
     return this.transacao(() => {
       const resultados = []; const novosConflitos = [];
       for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
@@ -265,6 +264,19 @@ export class Cofre {
       this.sql.exec('INSERT INTO lotes (lote, resposta, em) VALUES (?, ?, ?)', lote.id, JSON.stringify(resposta), this.agora());
       return resposta;
     });
+  }
+
+  /**
+   * O que o usuário de consulta grava: a própria entrada e saída (sessões do login), a própria senha (trocar, ou o login regravar
+   * a do padrão antigo) e a linha do histórico dessa troca. Qualquer outra mudança é recusada.
+   */
+  soProprioAcesso(ops, quem) {
+    const alteracoes = ops.filter((o) => o?.op !== 'historico');
+    const proprias = alteracoes.every((o) => o?.op === 'alterar' && o.tabela === 'usuarios' && o.id === quem.id && o.campos && typeof o.campos === 'object'
+      && Object.keys(o.campos).every((c) => c === 'sessoes' || CAMPOS_SENHA.includes(c)));
+    if (!proprias) return false;
+    const trocouSenha = alteracoes.some((o) => Object.keys(o.campos).some((c) => CAMPOS_SENHA.includes(c)));
+    return ops.filter((o) => o?.op === 'historico').every((o) => trocouSenha && o.entrada?.tabela === 'usuarios' && Number(o.entrada?.registro_id) === quem.id);
   }
 
   aplicarOp(op, email, quem, novosConflitos) {
