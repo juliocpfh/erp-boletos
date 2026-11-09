@@ -2096,7 +2096,7 @@ export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw new Error('Informe a data de saída.');
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
   if (c.data_entrada && data < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
-  const reativar = c.ativo === false && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
+  const reativar = c.ativo === false && !fimDeVinculo(d, c) && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
   atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}) }, usuario,
     `Saída do inquilino em ${C.dataBr(data)}${reativar ? ' (ativo de novo até a saída)' : ''}`);
   desativarSeSaiu(d, c, usuario, hoje);
