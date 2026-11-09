@@ -8,12 +8,10 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
-import { pdfDeTudo, planilhaDeTudo } from '../exportar.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
 import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
-import { REGRAS_TEXTO } from '../regras-texto.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
@@ -21,11 +19,10 @@ import { ACOES_FICHAS } from './fichas.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
-import { usarVisualizador, visualizar } from '../visualizador.js';
 
 // --------------------------------------------------------------------------
 // Botões
@@ -41,6 +38,20 @@ async function modeloFatura() {
     if (!r.ok) throw new Error('Modelo da NF não encontrado.');
     return r.arrayBuffer();
   }
+}
+
+/**
+ * Celular: o anexo abre na própria tela (visualizador.js, que só carrega aqui). Devolve false para abrir como no computador
+ * (aba nova), inclusive se o visualizador não carregar (sem internet e ainda não guardado no aparelho).
+ * ``esperar``: termina só quando o arquivo estiver desenhado.
+ */
+async function noVisualizador(blob, nome, tipo, esperar = true) {
+  let V;
+  try { V = await import('../visualizador.js'); } catch { return false; }
+  if (!V.usarVisualizador()) return false;
+  const desenho = V.visualizar(blob, nome, tipo, baixar);
+  if (esperar) await desenho;
+  return true;
 }
 
 async function excelDoNumero(ExcelJS, modelo, numero) {
@@ -1625,14 +1636,15 @@ export const ACOES = {
   },
 
   async exportarPlanilhaPdf() {
-    const [ExcelJS, { jsPDF }] = await Promise.all([excelJs(), bibliotecasPdf()]);
+    const [ExcelJS, { jsPDF }, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), bibliotecasPdf(), carregarParte(() => import('../exportar.js'))]);
     const quando = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Todos os dados exportados em planilha e PDF', null, {}, false));
   },
 
-  baixarRegras() {
+  async baixarRegras() {
+    const { REGRAS_TEXTO } = await carregarParte(() => import('../regras-texto.js'));
     baixar(new Blob(['﻿', REGRAS_TEXTO], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
   },
 
@@ -1683,7 +1695,7 @@ export const ACOES = {
     const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
-    if (usarVisualizador()) return visualizar(arq, nome, tipo, baixar); // celular: mostra na tela em vez de baixar
+    if (await noVisualizador(arq, nome, tipo)) return; // celular: mostra na tela em vez de baixar
     window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
   },
 
@@ -1931,8 +1943,7 @@ export const ACOES = {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
-      if (usarVisualizador()) visualizar(blob, 'boleto.pdf', 'application/pdf', baixar);
-      else window.open(URL.createObjectURL(blob), '_blank');
+      if (!(await noVisualizador(blob, 'boleto.pdf', 'application/pdf', false))) window.open(URL.createObjectURL(blob), '_blank');
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     } });
   },

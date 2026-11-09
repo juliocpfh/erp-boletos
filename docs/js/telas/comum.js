@@ -29,6 +29,20 @@ export const item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}<
 
 export const opera = () => podeUsuario('operador');
 
+/**
+ * Parte do programa que só carrega quando é usada (planilha/PDF de tudo, regras em texto, passagem para a nuvem):
+ * ``importar`` = () => import('../arquivo.js'). Se não carregar (sem internet e ainda não guardada no aparelho, ou o site
+ * fora do ar), aparece uma mensagem simples; o motivo de verdade fica no console.
+ */
+export async function carregarParte(importar) {
+  try {
+    return await importar();
+  } catch (e) {
+    console.error(e);
+    throw new C.ErroUsuario('Não deu para abrir esta parte do programa agora (sem internet ou o site fora do ar). Tente de novo daqui a pouco.');
+  }
+}
+
 /** Desfazer a numeração apaga as NFs do ciclo: só o administrador (a nuvem recusa o apagar NF do operador). */
 export const SO_ADMIN_NUMERACAO = 'Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).';
 
@@ -95,9 +109,6 @@ export const SUB_ANUNCIO = 'Anúncio';
 export const ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
 
 const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: 'IPTU (guias)', reformas: 'Reformas', contas: 'Contas pagas' };
-
-/** Comprovantes do banco: pasta do imóvel por ano ("Imóvel/Contas pagas/2026", escopo `contasano`, id = imóvel×10000 + ano, como o IPTU). */
-export const idPastaAno = (imovelId, ano) => imovelId * 10000 + Number(ano);
 
 /** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
 export const PASTA_CONTADOR = '_Contador';
