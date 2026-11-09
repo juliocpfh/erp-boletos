@@ -5,7 +5,7 @@ import * as S from '../armazenamento.js';
 import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
-import { resultadoVistoriaSaida } from '../contratos.js';
+import { resultadoVistoriaSaida, TIPO_ADITIVO_TROCA } from '../contratos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -357,7 +357,7 @@ export const CADASTROS = {
         const anterior = buscar('contratos', cont.anteriorId);
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
         const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
-        await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome }, login()));
+        await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome, tipo: TIPO_ADITIVO_TROCA }, login()));
         await trazerHerancaAssinada(salvo.id);
         aviso('Termo aditivo da troca de titular registrado.');
       }

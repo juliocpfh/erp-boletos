@@ -2,7 +2,7 @@
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato, vistoriaDeEntrada } from './contratos.js';
+import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA } from './modelos-contrato.js';
 
@@ -2413,14 +2413,21 @@ export const fimDeVinculo = (d, c) => !!(c.data_saida && continuadoPor(d, c));
  */
 export function herancaAgendada(d, c, hoje = C.hojeIso()) {
   const data = c.data_entrada || c.vigencia_inicio;
-  return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje || !aditivosDo(d, c.id).length) && contratoHerdado(d, c) ? data : null;
+  return c.contrato_anterior_id && !c.heranca_transferida && data && (data > hoje || !aditivoDaTroca(d, c)) && contratoHerdado(d, c) ? data : null;
 }
+
+/**
+ * Termo aditivo da troca de titular assinado (com o arquivo) no contrato do novo titular, ou null. Vale o gerado pelo sistema
+ * (tipo "Troca de titular") ou o registrado à mão como o da troca; o registrado antes de 09/11/2026 (sem tipo) também vale,
+ * como valia. Outro termo assinado (ex.: troca do vencimento, tipo "Vencimento"; à mão, "Outro") não faz o contrato passar.
+ */
+export const aditivoDaTroca = (d, c) => aditivosDo(d, c.id).find((a) => !a.tipo || a.tipo === TIPO_ADITIVO_TROCA) || null;
 
 /**
  * Troca de titular sem o termo aditivo assinado: o contrato ainda é do anterior, mesmo passada a data da troca. O novo não tem
  * boleto nem correção do aluguel e o anterior continua ativo. Ex.: troca em 01/11/2026, assinado em 10/11/2026 → só então passa.
  */
-export const trocaAguardaAditivo = (d, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d, c) && !aditivosDo(d, c.id).length);
+export const trocaAguardaAditivo = (d, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d, c) && !aditivoDaTroca(d, c));
 /** Barra correção do aluguel no novo titular enquanto o termo não está assinado. */
 function exigirAditivoDaTroca(d, c) {
   if (trocaAguardaAditivo(d, c)) throw new Error(`O contrato ainda é de ${contratoHerdado(d, c).inquilino_nome}: lance a correção lá. Passa para ${c.inquilino_nome} com o termo aditivo assinado.`);
@@ -2456,7 +2463,7 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   const passa = (tabela, x, texto) => atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
   // troca numa data futura ou sem o termo assinado: o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
   // agora só a data-base do reajuste e, com o termo assinado, o fim do vínculo dele (o último boleto sai proporcional). O resto passa depois.
-  const assinado = aditivosDo(d, n.id).length > 0;
+  const assinado = !!aditivoDaTroca(d, n);
   if (data > hoje || !assinado) {
     if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
     if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
@@ -2800,8 +2807,8 @@ export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !docume
 /** Troca de titular: o termo aditivo que coloca o novo titular no contrato é obrigatório (alerta até registrar um aditivo neste contrato). */
 export function alertaAditivoHerdeiro(d, c) {
   const ant = contratoHerdado(d, c);
-  if (!ant || c.ativo === false || c.data_saida || aditivosDo(d, c.id).length) return null;
-  const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === 'Troca de titular');
+  if (!ant || c.ativo === false || c.data_saida || aditivoDaTroca(d, c)) return null;
+  const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === TIPO_ADITIVO_TROCA);
   return { nivel: 'perigo', tipo: 'Aditivo da troca de titular', ancora: 'aditivos',
     texto: gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${C.dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").`
       : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
@@ -3026,9 +3033,10 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     contrato_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_contrato_em', 'contrato já assinado')),
     contrato_assinado: () => docAssinado('doc_contrato_em', 'contrato_assinado'),
     aditivo: () => {
-      const l = aditivosDo(d, c.id);
-      if (l.length) return feita(l[0].data, l[0].assunto);
-      return aditivosAguardando(d, c.id).length ? andamento('gerado, aguardando assinatura') : undefined;
+      // só o termo da troca de titular (outro termo assinado não conta)
+      const t = aditivoDaTroca(d, c);
+      if (t) return feita(t.data, t.assunto);
+      return aditivosAguardando(d, c.id).some((a) => a.tipo === TIPO_ADITIVO_TROCA) ? andamento('gerado, aguardando assinatura') : undefined;
     },
     garantia: () => {
       if (anterior && !garantiaNova(c) && (garantiaHerdada(d, c) || herancaAgendada(d, c, hoje))) {
@@ -3393,14 +3401,16 @@ export function assinarAditivo(d, id, { data, arquivo }, usuario) {
  * Registra um termo aditivo já assinado: exige data, assunto e o arquivo anexado. Marca o contrato com "Possui termo aditivo".
  * ``perdido``: termo antigo assinado cujo papel se perdeu (sem arquivo; ``hoje`` = data do registro da perda). Quem não é
  * administrador fica aguardando a análise. Não vale como o termo da troca de titular.
+ * ``tipo``: "Troca de titular" quando é o termo da troca (o novo titular assume o contrato com ele assinado); "Outro" para
+ * outro assunto no contrato de quem ainda espera o termo da troca (não faz o contrato passar). Sem tipo: como antes.
  */
-export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdido = false }, usuario, administrador = true, hoje = C.hojeIso()) {
+export function registrarAditivo(d, contratoId, { data, assunto, arquivo, perdido = false, tipo = null }, usuario, administrador = true, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   if (!data) throw new Error('Informe a data do termo aditivo.');
   if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
   if (!arquivo && !perdido) throw new Error('Anexe o arquivo do termo aditivo assinado.');
   const perda = perdido && !arquivo ? { perdido_em: hoje, perdido_pendente: administrador ? null : usuario } : {};
-  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, data, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda }, usuario,
+  const a = inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, ...(tipo ? { tipo } : {}), data, assunto: String(assunto).trim(), arquivo: arquivo || null, ...perda }, usuario,
     `${c.inquilino_nome}: termo aditivo de ${C.dataBr(data)}${perda.perdido_em ? ` (perdido, registrado em ${C.dataBr(hoje)}${administrador ? '' : ', aguardando o administrador'})` : ''}`);
   marcarAditivos(d, c.id, usuario);
   return a;

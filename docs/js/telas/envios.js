@@ -189,7 +189,9 @@ export const FORMULARIOS = {
     if (!String(f.assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
     const nome = await salvarAssinado('aditivos', Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
-    await alterar((db) => R.registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome }, login()));
+    // novo titular esperando o termo da troca: a caixa diz se este é o termo da troca (só ele faz o contrato passar)
+    const tipo = f.pergunta_troca ? (f.troca === '1' ? K.TIPO_ADITIVO_TROCA : 'Outro') : null;
+    await alterar((db) => R.registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome, tipo }, login()));
     await trazerHerancaAssinada(Number(f.contrato));
     aviso('Termo aditivo registrado.');
     await mostrar();

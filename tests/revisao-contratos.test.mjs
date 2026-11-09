@@ -285,3 +285,44 @@ test('excluir o contrato apaga os registros de todas as tabelas com o contrato (
   assert.equal(R.buscar(d, 'contratos', c.id), undefined);
   assert.equal(R.arquivosReferenciados(d).filter((a) => a.id === c.id).length, 0, 'nenhum arquivo do contrato excluído continua em uso (sai da pasta junto)');
 });
+
+// --------------------------------------------------------------------------
+// 7. Troca de titular: só o termo da troca assinado faz o contrato passar (não qualquer termo aditivo)
+// --------------------------------------------------------------------------
+test('troca de titular espera o termo da troca: outro termo assinado (ex.: vencimento) não conta', () => {
+  const { d, i } = casa();
+  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', data_entrada: '2025-01-10', vigencia_inicio: '2025-01-10', vigencia_fim: '2027-07-10',
+    aluguel_inicial: 300000, dia_vencimento: 10, garantia_tipo: 'Sem garantia' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: a.id, inquilino_nome: 'Lúcia Prado', data_entrada: '2026-11-01', vigencia_inicio: '2026-11-01',
+    vigencia_fim: '2027-07-10', aluguel_inicial: 300000, dia_vencimento: 10, garantia_tipo: 'Sem garantia' }, 'j');
+  const hoje = '2026-11-09';
+  // termo de vencimento gerado e assinado no contrato de Lúcia: não é o da troca
+  const v = R.salvarAditivoVencimento(d, n.id, { data: '2026-11-02', dia_novo: 15, mes: '2026-12', texto: K.modelosDe(d, 'aditivo')[0].texto }, 'j');
+  R.assinarAditivo(d, v.id, { data: '2026-11-03', arquivo: 'venc.pdf' }, 'j');
+  assert.equal(R.trocaAguardaAditivo(d, n), true);
+  assert.equal(R.herancaAgendada(d, n, hoje), '2026-11-01');
+  assert.equal(R.aditivoDaTroca(d, n), null);
+  assert.ok(R.alertaAditivoHerdeiro(d, n), 'continua o alerta "Aditivo da troca de titular"');
+  // termo registrado à mão marcado como outro assunto: também não conta
+  R.registrarAditivo(d, n.id, { data: '2026-11-04', assunto: 'Autorização de reforma', arquivo: 'reforma.pdf', tipo: 'Outro' }, 'j');
+  assert.equal(R.trocaAguardaAditivo(d, n), true);
+  // o da troca assinado: passa
+  const t = R.salvarAditivoTroca(d, n.id, { data: '2026-11-05', texto: K.modelosDe(d, 'aditivo_troca')[0].texto }, 'j');
+  R.assinarAditivo(d, t.id, { data: '2026-11-06', arquivo: 'troca.pdf' }, 'j');
+  assert.equal(R.aditivoDaTroca(d, n).id, t.id);
+  assert.equal(R.trocaAguardaAditivo(d, n), false);
+  assert.equal(R.herancaAgendada(d, n, hoje), null);
+  assert.equal(R.alertaAditivoHerdeiro(d, n), null);
+});
+
+test('troca de titular: termo registrado à mão como o da troca (ou antigo, sem tipo) vale', () => {
+  const { d, i } = casa();
+  const a = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Pedro Souza', data_entrada: '2025-01-10', vigencia_inicio: '2025-01-10', aluguel_inicial: 300000, garantia_tipo: 'Sem garantia' }, 'j');
+  const n = R.inserir(d, 'contratos', { imovel_id: i.id, contrato_anterior_id: a.id, inquilino_nome: 'Lúcia Prado', data_entrada: '2026-11-01', vigencia_inicio: '2026-11-01', aluguel_inicial: 300000, garantia_tipo: 'Sem garantia' }, 'j');
+  const m = R.registrarAditivo(d, n.id, { data: '2026-11-01', assunto: 'Troca de titular: Pedro Souza → Lúcia Prado', arquivo: 'troca.pdf', tipo: K.TIPO_ADITIVO_TROCA }, 'j');
+  assert.equal(m.tipo, 'Troca de titular');
+  assert.equal(R.trocaAguardaAditivo(d, n), false);
+  // registro antigo (sem tipo): continua valendo como antes
+  delete m.tipo;
+  assert.equal(R.trocaAguardaAditivo(d, n), false);
+});
