@@ -73,6 +73,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 10. RESERVA
 - Na troca de titular, a reserva vai para o novo com o comprovante e mostra o que já foi usado no anterior e em que mês; não abate de novo.
 - A reserva começa exatamente no aluguel marcado e segue nos seguintes só se sobrar. Pode ser marcada como já abatida em aluguel antigo.
+- Sem mês marcado, vai para o primeiro aluguel: o mês de entrada ou, com carência, o 1º mês depois dela (ex.: entrada 07/06/2026 com 1 mês de carência → boleto de 07/2026). Nunca abate o boleto da carência; se a carência cobra IPTU, esse boleto é cobrado normalmente.
 
 11. CONTAS (ÁGUA, ENERGIA, GÁS, CONDOMÍNIO, INTERNET)
 - Contas pagas por nós (custos do imóvel) podem ser lançadas em qualquer imóvel, com mês de referência, vencimento, data do pagamento e valor (Financeiro → Resultado bruto → "+ custo", ou pelo destino do extrato). A etiqueta do imóvel orienta: "vago"; "alugado em X: veja se ficou conta nossa pendente" até 2 meses depois da entrada; conta "incluso no contrato" (nossa); sem etiqueta, o inquilino paga pelo contrato.

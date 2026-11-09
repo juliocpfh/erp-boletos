@@ -779,9 +779,17 @@ export function situacaoAplicacao(d, c) {
   return { total, linhas, soma, falta: total - soma, ok: total > 0 && soma >= total };
 }
 
+/**
+ * Aluguel em que a reserva começa: o mês marcado ("Usar a reserva no aluguel de"); em branco, o primeiro aluguel, que é o
+ * mês de entrada ou, com carência desde a entrada, o 1º mês depois dela. Ex.: entrada 07/06/2026 com 1 mês de carência → 07/2026.
+ */
 export function competenciaReserva(contrato) {
   if (!(contrato.reserva_valor > 0)) return null;
-  return contrato.reserva_competencia || C.competenciaDe(contrato.data_entrada);
+  if (contrato.reserva_competencia) return contrato.reserva_competencia;
+  let comp = C.competenciaDe(contrato.data_entrada);
+  const carencia = periodoCarencia(contrato);
+  if (carencia && comp >= carencia[0] && comp <= carencia[1]) comp = C.somarMeses(carencia[1], 1);
+  return comp;
 }
 
 /** ``ignorar``: id de um boleto, ou função (boleto) => true para os boletos que não contam (os que estão sendo recalculados). */
@@ -841,24 +849,30 @@ export function reservaParaCompetencia(d, contrato, comp, ignorar = null) {
 
 /**
  * Redistribui a reserva pelos boletos em aberto do contrato (também os alterados à mão: só o campo da reserva muda),
- * do mês marcado em diante. Boleto já pago fica como está. Devolve quantos boletos mudaram.
+ * do mês marcado em diante. Boleto já pago fica como está. É o único lugar que decide a reserva de cada boleto
+ * (o boleto gerado ou recalculado vem sem ela): no boleto da carência nada; nos outros, até o total do boleto em dia
+ * (com FCI e ressarcimento). Contrato sem reserva: tira a que tiver ficado nos boletos em aberto. Devolve quantos mudaram.
  */
 export function realocarReserva(d, contrato, usuario) {
-  if (!(contrato.reserva_valor > 0)) return 0;
+  return realocar(d, contrato, usuario).length;
+}
+
+/** O mesmo que ``realocarReserva``, devolvendo os ids dos boletos que mudaram. */
+function realocar(d, contrato, usuario) {
   const abertos = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !cb.data_pagamento && !emAcordo(cb) && !ehBoletoAvulso(cb))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
   const livres = new Set(abertos.map((cb) => cb.id));
-  let n = 0;
+  const mudaram = [];
   for (const cb of abertos) {
     const disponivel = reservaParaCompetencia(d, contrato, cb.competencia, (x) => livres.has(x.id));
     const usar = cb.carencia ? 0 : C.totaisCobranca(cb, disponivel).reserva_utilizada;
     livres.delete(cb.id);
     if ((cb.reserva_utilizada || 0) !== usar) {
       atualizar(d, 'cobrancas', cb.id, { reserva_utilizada: usar }, usuario, `Boleto ${C.compBr(cb.competencia)}: reserva ${usar ? `de ${C.reais(usar)} aplicada` : 'retirada'}`);
-      n += 1;
+      mudaram.push(cb.id);
     }
   }
-  return n;
+  return mudaram;
 }
 
 /** Reserva que não foi usada no mês marcado (boleto já pago sem ela, ou mês fora do sistema): pede para escolher outro mês. */
@@ -1194,8 +1208,11 @@ export function marcarIptuPago(d, iptuId, n, data, usuario, { peloBanco = false 
   atualizar(d, 'iptus', p.id, { pagas }, usuario, data ? `IPTU ${p.ano} ${n}ª parcela paga pelo proprietário em ${C.dataBr(data)}` : `IPTU ${p.ano} ${n}ª parcela: pagamento desfeito`);
 }
 
-/** Calcula (sem gravar) a cobrança de um contrato numa competência. */
-export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
+/**
+ * Calcula (sem gravar) a cobrança de um contrato numa competência, sem a reserva: quem decide a reserva de cada boleto
+ * é ``realocarReserva``, chamada depois de gerar ou recalcular.
+ */
+export function montarCobranca(d, contrato, comp) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
   const diasMes = C.diasNoMes(comp);
@@ -1217,13 +1234,12 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     ? parcelasDoMes(segurosDoContrato(d, contrato.id), comp,
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
-  const reserva = reservaParaCompetencia(d, contrato, comp, ignorarCobranca);
   const ressarc = ressarcimentosNoBoleto(d, contrato.id, comp);
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
     descontoPercentual: percentualBonificacao(contrato), iptu, seguro,
-    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, reservaDisponivel: reserva,
+    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0,
   });
   return {
     contrato_id: contrato.id, competencia: comp,
@@ -1231,10 +1247,11 @@ export function montarCobranca(d, contrato, comp, ignorarCobranca = null) {
     dias_cobrados: r.dias_cobrados, dias_mes: r.dias_mes, aluguel_mensal: r.aluguel_mensal,
     aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
     seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, fci: fciDoMes(contrato, r.aluguel, r.desconto), outros: 0, outros_descricao: '',
-    reserva_utilizada: r.reserva_utilizada, carencia,
+    reserva_utilizada: 0, carencia,
     ressarcimento: ressarc.valor, ressarcimento_descricao: ressarc.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && ressarc.valor > 0,
     multa_percentual: contrato.multa_percentual || 0, juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
-    situacao: carencia && r.a_pagar_pontual <= 0 ? 'Carência' : 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null,
+    // carência sem nada a cobrar (a reserva não conta: ela nunca entra no boleto da carência)
+    situacao: carencia && r.total_pontual <= 0 ? 'Carência' : 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null,
     valor_nf: null, banco: null,
   };
 }
@@ -1252,7 +1269,7 @@ export function gerarCobrancas(d, comp, usuario) {
     if (dados) {
       inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
       geradas += 1;
-      // gerou um mês anterior a boletos que já existiam: a reserva vai para o mês certo
+      // a reserva do boleto novo (e a dos que já existiam, se gerou um mês anterior a eles) vai para o mês certo
       realocarReserva(d, contrato, usuario);
     }
   }
@@ -1260,34 +1277,34 @@ export function gerarCobrancas(d, comp, usuario) {
   return { geradas, existentes };
 }
 
-/** Campos que o recálculo atualiza (o ajuste do mês, as observações e o vencimento alterado à mão ficam). */
+/**
+ * Campos que o recálculo atualiza (o ajuste do mês, as observações e o vencimento alterado à mão ficam). A reserva
+ * (``reserva_utilizada``) não está aqui: ela liga os meses do contrato e é redistribuída por ``realocarReserva`` no fim.
+ */
 const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'aluguel', 'desconto', 'iptu', 'iptu_parcela', 'seguro',
-  'seguro_parcela', 'taxa_boleto', 'fci', 'reserva_utilizada', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
+  'seguro_parcela', 'taxa_boleto', 'fci', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
- * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está. Devolve quantos mudaram.
+ * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está (só a reserva dele pode mudar de mês).
+ * Devolve quantos boletos mudaram.
  */
 export function recalcularCobrancas(d, filtro, usuario) {
-  let n = 0;
+  const mudaram = new Set();
   const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb);
-  const escolhidos = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb));
-  // a reserva liga os meses do contrato: com reserva, todos os boletos em aberto dele são refeitos juntos
-  const comReserva = new Set(escolhidos.map((cb) => cb.contrato_id).filter((id) => (buscar(d, 'contratos', id) || {}).reserva_valor > 0));
-  const lista = d.cobrancas.filter((cb) => abertos(cb) && (filtro(cb) || comReserva.has(cb.contrato_id)))
-    .sort((a, b) => a.competencia.localeCompare(b.competencia));
-  // a reserva que estava num boleto ainda não refeito fica livre para um mês anterior
-  const pendentes = new Set(lista.map((cb) => cb.id));
+  const lista = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb)).sort((a, b) => a.competencia.localeCompare(b.competencia));
+  const contratos = new Map();
   for (const cb of lista) {
     const c = buscar(d, 'contratos', cb.contrato_id);
-    const novo = c && montarCobranca(d, c, cb.competencia, (x) => pendentes.has(x.id));
-    pendentes.delete(cb.id);
+    if (c) contratos.set(c.id, c);
+    const novo = c && montarCobranca(d, c, cb.competencia);
     if (!novo) continue;
     const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
-    if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) n += 1;
+    if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) mudaram.add(cb.id);
   }
-  for (const id of comReserva) n += realocarReserva(d, buscar(d, 'contratos', id), usuario);
-  return n;
+  // com os valores novos, a reserva de cada contrato é redistribuída pelos boletos em aberto dele
+  for (const c of contratos.values()) for (const id of realocar(d, c, usuario)) mudaram.add(id);
+  return mudaram.size;
 }
 
 export const totais = (cb) => C.totaisCobranca(cb, cb.reserva_utilizada || 0);
