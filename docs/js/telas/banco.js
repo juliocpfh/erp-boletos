@@ -993,7 +993,7 @@ export const FORMULARIOS_BANCO = {
         const cb = R.buscar(db, 'cobrancas', s.cobranca_id);
         if (!cb || cb.data_pagamento) continue;
         // o mesmo pagamento do banco nunca paga dois boletos (ex.: dois boletos de mesmo valor marcados)
-        if (s.pagamento !== undefined && usados.has(s.pagamento)) { repetidos.push(compBr(cb.competencia)); continue; }
+        if (s.pagamento !== undefined && usados.has(s.pagamento)) { const c = R.buscar(db, 'contratos', cb.contrato_id); repetidos.push(`${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}`); continue; }
         // a entrada desse dinheiro no extrato, se já importada, fica ligada ao boleto (Z.registrarPagamentoDoBanco, o mesmo da tela Boletos)
         const r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login());
         if (r.divergente) divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`);
