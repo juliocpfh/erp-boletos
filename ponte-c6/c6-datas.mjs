@@ -1,19 +1,11 @@
 // Datas 'AAAA-MM-DD' sem fuso: soma de dias, validação e divisão de um período em janelas
 // (o C6 limita o extrato a 30 dias e a lista de boletos a 60 dias por consulta).
-// somarDias, janelas e centavosDoTexto vêm de c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js, usado pelo site; C19).
-import { somarDias, janelas as janelasComum, centavosDoTexto } from './c6-comum.mjs';
+// somarDias, validarData, janelas e centavosDoTexto vêm de c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js, usado pelo site; C19).
+import { somarDias, validarData, janelas as janelasComum, centavosDoTexto } from './c6-comum.mjs';
 
-export { somarDias, centavosDoTexto };
+export { somarDias, validarData, centavosDoTexto };
 
 const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Confere 'AAAA-MM-DD' (e que a data existe). Lança Error em português. */
-export function validarData(texto, nome = 'data') {
-  if (typeof texto !== 'string' || !RE_DATA.test(texto)) throw new Error(`A ${nome} precisa estar no formato AAAA-MM-DD (recebi "${texto}").`);
-  const d = new Date(`${texto}T00:00:00Z`);
-  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== texto) throw new Error(`A ${nome} "${texto}" não existe no calendário.`);
-  return texto;
-}
 
 /** Dias corridos entre duas datas (ate - de); 0 quando iguais. */
 export const diasEntre = (de, ate) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86400000);

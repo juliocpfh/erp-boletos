@@ -22,38 +22,21 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { diasEntre, hoje, somarDias } from './c6-datas.mjs';
 import { gerarPdf } from './pdf-minimo.mjs';
-import { tipoDoContent, normalizarContent } from './c6-pagamentos.mjs';
+// extrato redatado e leitura de um item: c6-comum.mjs, iguais aos do simulador do site (docs/js/banco-fase2.js, modo ?teste)
+import { lancamentosNoPeriodo, itemLidoSimulado } from './c6-comum.mjs';
+
+export { lancamentosNoPeriodo };
 
 const PASTA = path.join(path.dirname(fileURLToPath(import.meta.url)), 'simulado');
 const ler = (nome) => JSON.parse(fs.readFileSync(path.join(PASTA, nome), 'utf8'));
 /** PNG 1x1 (base64) para o `image_content` do QR Code fictício. */
 export const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-const BANCOS = { 336: 'Banco C6', 341: 'Itaú Unibanco', '001': 'Banco do Brasil', 237: 'Bradesco', 104: 'Caixa Econômica Federal', '033': 'Santander' };
 
 /** Identificador de 26 caracteres [0-9A-Z], parecido com os ULIDs do C6. */
 export const idSimulado = () => crypto.randomBytes(16).toString('base64').replace(/[^0-9A-Z]/gi, '').toUpperCase().padEnd(26, '0').slice(0, 26);
 
 const resposta = (status, corpo = null) => ({ status, corpo });
 const erro = (status, message) => resposta(status, { code: String(status), message });
-const diasDoMes = (ano, mes) => new Date(Date.UTC(ano, mes, 0)).getUTCDate();
-
-/** Extrato do JSON redatado para o período: cada mês entre `de` e `ate` recebe os lançamentos, no mesmo dia. */
-export function lancamentosNoPeriodo(entries, de, ate) {
-  const saida = [];
-  for (let mes = de.slice(0, 7); mes <= ate.slice(0, 7); mes = somarDias(`${mes}-01`, 32).slice(0, 7)) {
-    const [ano, m] = mes.split('-').map(Number);
-    for (const e of entries) {
-      const mesOriginal = e.entry_date.slice(0, 7);
-      const dia = Math.min(Number(e.entry_date.slice(8, 10)), diasDoMes(ano, m));
-      const entry_date = `${mes}-${String(dia).padStart(2, '0')}`;
-      if (entry_date < de || entry_date > ate) continue;
-      const sufixo = mes === mesOriginal ? '' : `-${mes.replace('-', '')}`;
-      saida.push({ ...e, entry_date, created_at: `${entry_date}T${e.created_at.slice(11)}`, reference: `${e.reference}${sufixo}`, local_reference: `${e.local_reference}${sufixo}` });
-    }
-  }
-  return saida.sort((a, b) => a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at));
-}
-
 /** Linha digitável (47 dígitos, formato "AAABC.CCCCX DDDDD.DDDDDY EEEEE.EEEEEZ K UUUUVVVVVVVVVV") a partir do código de barras; dígitos verificadores fictícios. */
 const linhaDigitavel = (b) => `${b.slice(0, 4)}${b.slice(19, 20)}.${b.slice(20, 24)}1   ${b.slice(24, 29)}.${b.slice(29, 34)}2   ${b.slice(34, 39)}.${b.slice(39, 44)}3   ${b[4]}   ${b.slice(5, 19)}`;
 
@@ -136,17 +119,7 @@ export function criarC6Simulado({ conta = 'ank', agora = () => new Date() } = {}
     const items = Array.isArray(corpo?.items) ? corpo.items : null;
     if (!items?.length) return erro(400, 'items é obrigatório');
     const group_id = idSimulado();
-    const lidos = items.map((it) => {
-      const tipo = tipoDoContent(it.content);
-      const base = { id: idSimulado(), group_id, content: it.content, amount: it.amount, description: it.description, transaction_date: it.transaction_date ?? hoje() };
-      if (!tipo || !(it.amount > 0)) return { ...base, product_type: tipo === 'codigo_barras' ? 'BOLETO' : 'PIX', status: 'DECODE_ERROR', error_message: `It was not possible to decode: ${it.content}` };
-      if (String(it.content).includes('erro@')) return { ...base, product_type: 'PIX', status: 'DECODE_ERROR', error_message: `It was not possible to find key: ${it.content}` };
-      if (tipo === 'codigo_barras') {
-        const barras = normalizarContent(it.content);
-        return { ...base, content: barras, bank_code: barras.slice(0, 3), bank_name: BANCOS[barras.slice(0, 3)] ?? 'Banco Exemplo', beneficiary_name: 'Beneficiário Exemplo Ltda', payer_name: `${conta.toUpperCase()} Administradora Ltda`, due_date: base.transaction_date, overdue: false, product_type: 'BOLETO', status: 'READ_DATA' };
-      }
-      return { ...base, bank_code: '336', bank_name: 'Banco C6', beneficiary_name: 'Recebedor Pix Exemplo', payer_name: `${conta.toUpperCase()} Administradora Ltda`, product_type: 'PIX', status: 'READ_DATA' };
-    });
+    const lidos = items.map((it) => itemLidoSimulado(conta, it, { id: idSimulado(), group_id, hoje: hoje() }));
     grupos.set(group_id, lidos);
     return resposta(201, { group_id });
   };

@@ -78,7 +78,7 @@ export function telaBanco(rota) {
   const semComprovante = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m)).length;
   const saldo = estado.saldos[conta];
   const e = emitenteDaConta(conta);
-  const importadoAte = (config().ultima_importacao || {})[conta] || null;
+  const importadoAte = R.extratoImportadoAte(d(), conta);
   const filtroLink = (k, t) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${t}</a>`;
   return `<div class="cabecalho"><h1>Banco</h1><div class="acoes">${link('#/banco/pagamentos', 'Pagamentos pelo banco', 'botao secundario')}</div></div>
     ${bancoAtivo() ? '' : avisoNaoConfigurado()}
@@ -120,7 +120,7 @@ function descreverSugestao(s) {
   const i = s.imovel_id ? buscar('imoveis', s.imovel_id) : null;
   const cb = s.cobranca_id ? buscar('cobrancas', s.cobranca_id) : null;
   const c = cb ? buscar('contratos', cb.contrato_id) : null;
-  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}` : '',
+  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}${s.ligar ? ' (já pago: só ligar)' : ''}` : '',
     s.classificacao === 'boleto' && !cb && s.candidatos ? `${s.candidatos.length} boletos com este valor` : ''].filter(Boolean).join(' · ');
 }
 
@@ -180,10 +180,10 @@ function descreverPasta(p) {
   return `${i ? i.nome : '?'} › ${p.escopo === 'iptuano' ? 'IPTU (guias)' : 'Contas pagas'} › ${Number(p.id) % 10000}`;
 }
 
-/** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência; o pagamento, só se já foi confirmado pelo extrato. */
+/** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência (Z.referenciaNoBanco); o pagamento, só se já foi confirmado pelo extrato. */
 function lancamentoDaPonte(x, tabela) {
-  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: m.id_externo, data: m.data } : null; }
-  return x.id_externo ? { conta: x.conta_id, referencia: x.id_externo, data: x.data } : null;
+  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: Z.referenciaNoBanco(m), data: m.data } : null; }
+  return x.id_externo ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
 }
 
 function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
@@ -287,13 +287,14 @@ function caixaConferirBoletos(conta, mes) {
     const c = cb ? buscar('contratos', cb.contrato_id) : null;
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     if (!cb) return '';
-    return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${cb.data_pagamento ? 'disabled' : 'checked'}></td>
+    const travada = !!cb.data_pagamento || s.jaPago || s.aguardandoCredito;
+    return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${travada ? 'disabled' : Z.prontoParaRegistrar(d(), s) ? 'checked' : ''}></td>
       <td><a href="#/cobranca/${cb.id}"><b>${esc(i ? i.nome : '')}</b> · ${esc(c ? c.inquilino_nome : '')}</a><br><span class="suave">boleto ${compBr(cb.competencia)} · vence ${dataBr(cb.vencimento)}${s.certeza === 'provavel' ? ' · casado só pelo valor e pela data: confira' : ''}</span></td>
       <td class="nw">${dataBr(s.data_credito)}${s.data_pagamento && s.data_pagamento !== s.data_credito ? `<br><span class="suave">pagou ${dataBr(s.data_pagamento)}</span>` : ''}</td><td class="n">${reais(s.valor)}${s.previsto !== s.valor ? `<br><span class="texto-aviso">previsto ${reais(s.previsto)}</span>` : ''}</td>
-      <td>${cb.data_pagamento ? etiqueta('já estava pago', 'neutra') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}</td></tr>`;
+      <td>${cb.data_pagamento || s.jaPago ? etiqueta('já estava pago', 'neutra') : s.aguardandoCredito ? etiqueta('pago, aguardando crédito no banco', 'aviso') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}${s.alternativas > 1 && !s.jaPago ? `<br>${etiqueta(`este pagamento casa com ${s.alternativas} boletos: marque só o certo`, 'aviso')}` : ''}</td></tr>`;
   };
   return `<div class="cartao" id="conferir-boletos" data-caixa="conferir-boletos"><h2>Conferir boletos pagos no banco</h2>
-    <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
+    <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou (a linha do extrato desse dinheiro, se já foi buscada, fica ligada ao boleto). Um pagamento que casa com mais de um boleto (mesmo valor) não vem marcado: marque só o certo. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
     ${opera() ? `<p class="acoes">${botaoPonte('conferirBoletosBanco', `Buscar boletos pagos em ${compBr(mes)}`, { conta, mes })}</p>` : ''}
     ${conf ? (conf.sugestoes.length ? `<form data-form="registrarPagamentosBanco"><input type="hidden" name="conta" value="${esc(conta)}"><input type="hidden" name="mes" value="${mes}">
       <div class="rolagem"><table class="responsiva"><tr><th></th><th>Boleto</th><th>Crédito em</th><th class="n">Valor recebido</th><th>Conferência</th></tr>${conf.sugestoes.map(linha).join('')}</table></div>
@@ -307,9 +308,17 @@ function caixaConferirBoletos(conta, mes) {
 const AVISO_APROVACAO = '<div class="alerta info"><b>O pagamento só acontece depois que você aprovar no aplicativo do C6.</b> Aqui o sistema prepara o pagamento, o banco confere o código, e o administrador aprova e envia numa confirmação só (digitando o valor total); o dinheiro só sai quando alguém autorizado aprova no app. A confirmação final aparece no extrato.</div>';
 const CODIGO_PAG = (p) => p.content || p.codigo_barras || p.pix_copia_cola || p.chave_pix || '';
 const PENDENTES = ['rascunho', 'aguardando_aprovacao', 'erro'];
-/** Texto da confirmação de "Cancelar"/"Descartar": com lote no banco, os códigos já foram lidos lá (nada foi pago). */
-const CONFIRMA_CANCELAR = (comLote, plural = false) => (comLote ? `Cancelar ${plural ? 'estes pagamentos' : 'este pagamento'}? O banco só leu o${plural ? 's códigos' : ' código'}; nada foi pago. ${plural ? 'Os itens saem' : 'O item sai'} do lote lido pelo banco.`
-  : `Cancelar ${plural ? 'estes pagamentos' : 'este pagamento'}? Nada foi enviado ao banco.`);
+/**
+ * Texto da confirmação de "Cancelar"/"Descartar" dos pagamentos ``pags``: com lote no banco, os códigos já foram lidos lá (nada foi
+ * pago); aprovado aqui com o envio pendente, o envio pode ter chegado ao banco: o sistema confere antes e, se chegou, não cancela.
+ */
+function CONFIRMA_CANCELAR(pags) {
+  const plural = pags.length > 1;
+  const oQue = plural ? 'estes pagamentos' : 'este pagamento';
+  if (pags.some((p) => p.situacao === 'aguardando_aprovacao' && p.grupo_id)) return `Cancelar ${oQue}? ${plural ? 'Foram aprovados' : 'Foi aprovado'} aqui e o envio pode ter chegado ao banco: antes de cancelar, o sistema confere no banco. Se já chegou, não cancela aqui (cancele no app do C6 e depois use "Foi cancelado no C6").`;
+  if (pags.some((p) => p.grupo_id)) return `Cancelar ${oQue}? O banco só leu o${plural ? 's códigos' : ' código'}; nada foi pago. ${plural ? 'Os itens saem' : 'O item sai'} do lote lido pelo banco.`;
+  return `Cancelar ${oQue}? Nada foi enviado ao banco.`;
+}
 
 function linhaPagamento(p) {
   const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null;
@@ -319,10 +328,11 @@ function linhaPagamento(p) {
     // a aprovação do administrador acontece junto com o envio ("Aprovar e enviar"); antes disso o banco precisa ter lido o código
     if (PENDENTES.includes(p.situacao) && !p.grupo_id) acoes.push(botaoPonte('lerNoBanco', 'Mandar o banco ler o código', { ids: p.id }, 'botao pequeno'));
     if (['rascunho', 'aguardando_aprovacao'].includes(p.situacao) && p.grupo_id && podeUsuario('admin')) acoes.push(botaoPonte('enviarGrupoAprovacao', 'Aprovar e enviar', { conta: p.conta_id, grupo: p.grupo_id }, 'botao pequeno'));
-    if (p.situacao === 'agendado' && p.grupo_id) acoes.push(botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: p.conta_id, grupo: p.grupo_id }));
+    // também no aprovado com envio pendente: a resposta do banco pode ter se perdido depois do "Aprovar e enviar"
+    if (['agendado', 'aguardando_aprovacao'].includes(p.situacao) && p.grupo_id) acoes.push(botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: p.conta_id, grupo: p.grupo_id }));
     if (p.situacao === 'agendado') acoes.push(botao('confirmarPagamentoPeloExtrato', 'Confirmar pelo extrato', { id: p.id }, 'botao pequeno'));
     if (p.situacao === 'agendado' && podeUsuario('admin')) acoes.push(botao('canceladoNoBanco', 'Foi cancelado no C6', { id: p.id }, 'secundario pequeno'));
-    if (PENDENTES.includes(p.situacao)) acoes.push(botao('cancelarPagamentoBanco', 'Cancelar', { id: p.id }, 'secundario pequeno', CONFIRMA_CANCELAR(!!p.grupo_id)));
+    if (PENDENTES.includes(p.situacao)) acoes.push(botao('cancelarPagamentoBanco', 'Cancelar', { id: p.id }, 'secundario pequeno', CONFIRMA_CANCELAR([p])));
   }
   const codigo = CODIGO_PAG(p);
   return `<tr><td>${i ? `<a href="#/contas/${i.id}?comp=${esc(p.competencia || '')}"><b>${esc(i.nome)}</b></a><br>` : ''}${esc(p.tipo_conta || '')}${p.competencia ? ` de ${compBr(p.competencia)}` : ''}${p.descricao ? `<br><span class="suave">${esc(p.descricao)}</span>` : ''}</td>
@@ -403,7 +413,8 @@ export function caixaPagarPeloBanco(i, comp) {
     <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Beneficiário</th><th>Vencimento</th><th class="n">Valor</th><th>Banco disse</th></tr>${l.map(itemLote).join('')}</table></div>
     <p class="acoes">${g ? (podeUsuario('admin') ? botaoPonte('enviarGrupoAprovacao', 'Aprovar e enviar para aprovação no app do C6', { conta: l[0].conta_id, grupo: g }, 'botao') : '<span class="suave">Só o administrador aprova e envia para o banco.</span>')
     : botaoPonte('lerNoBanco', 'Mandar o banco ler os códigos', { ids: l.map((p) => p.id).join(',') }, 'botao')}
-      ${botao('descartarPagamentos', 'Descartar', { ids: l.map((p) => p.id).join(',') }, 'secundario pequeno', CONFIRMA_CANCELAR(!!g, l.length > 1))}</p>`;
+      ${g && l.some((p) => p.situacao === 'aguardando_aprovacao') ? botaoPonte('atualizarSituacaoPagamento', 'Atualizar situação', { conta: l[0].conta_id, grupo: g }) : ''}
+      ${botao('descartarPagamentos', 'Descartar', { ids: l.map((p) => p.id).join(',') }, 'secundario pequeno', CONFIRMA_CANCELAR(l))}</p>`;
   return `<div class="cartao" id="pagar-banco" data-caixa="pagar-banco"><h2>Pagar pelo banco (C6)</h2>${AVISO_APROVACAO}
     ${bancoAtivo() ? '' : avisoNaoConfigurado()}${config().permitir_pagamentos ? '' : avisoPagamentosDesligados()}
     ${!opera() || !config().permitir_pagamentos ? '' : `<form data-form="pagarPeloBanco"><input type="hidden" name="imovel" value="${i.id}"><input type="hidden" name="competencia" value="${comp}">
@@ -460,12 +471,17 @@ const opcoes = (lista, atual, vazio = '') => `${vazio ? `<option value="">${esc(
 const despesasSemExtrato = (imovelId, m) => R.despesasDo(d(), imovelId).filter((x) => x.valor > 0 && !x.movimentacao_id && !movs().some((y) => y.despesa_id === x.id))
   .sort((a, b) => (a.valor === m.valor ? -1 : b.valor === m.valor ? 1 : 0)).slice(0, 24);
 
-/** Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. */
+/**
+ * Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. Entram também os já pagos à
+ * mão com o mesmo valor até 5 dias antes, ainda sem linha do extrato (escolher um deles só liga a entrada: nada é pago de novo).
+ */
 function boletosAbertos(imovelId, m) {
   const cs = d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id);
-  return d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
+  const ligaveis = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && !cb.movimentacao_id && cb.valor_pago === m.valor
+    && cb.data_pagamento <= m.data && cb.data_pagamento >= C.somarDias(m.data, -5)).map((cb) => ({ cb, previsto: cb.valor_pago, jaPago: true }));
+  return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
     .map((cb) => ({ cb, previsto: R.previstoNoPagamento(cb, m.data).valor_devido }))
-    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))).slice(0, 30);
+    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento)))].slice(0, 30);
 }
 
 /** Guias de imposto da empresa da conta ainda não pagas (as de mesmo valor primeiro). */
@@ -536,8 +552,8 @@ async function janelaDestino(m, inicialDe = null) {
       const ds = imovelId ? despesasSemExtrato(imovelId, m) : [];
       sel('despesa').innerHTML = opcoes(ds.map((x) => [x.id, `${x.tipo} de ${compBr(x.competencia)} · ${reais(x.valor)} · paga em ${dataBr(x.data_pagamento)}${x.valor === m.valor ? ' ★ mesmo valor' : ''}`]), s.despesa_id || (ds.find((x) => x.valor === m.valor) || {}).id, '— lançar agora');
       const bs = boletosAbertos(imovelId, m);
-      sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · vence ${dataBr(cb.vencimento)} · ${reais(previsto)}${previsto === m.valor ? ' ★ mesmo valor' : ''}`]; }),
-        s.cobranca_id || (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id, '— nenhum');
+      sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto, jaPago }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · ${jaPago ? `já pago em ${dataBr(cb.data_pagamento)}: só ligar esta entrada` : `vence ${dataBr(cb.vencimento)}`} · ${reais(previsto)}${previsto === m.valor && !jaPago ? ' ★ mesmo valor' : ''}`]; }),
+        s.cobranca_id || (bs.length && !bs.some((x) => x.jaPago) ? (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id : null), '— nenhum');
       const ips = d().iptus.filter((p) => !imovelId || p.imovel_id === imovelId).sort((a, b) => b.ano - a.ano || b.id - a.id);
       sel('iptu').innerHTML = opcoes(ips.map((p) => { const i = buscar('imoveis', p.imovel_id); return [p.id, `${p.ano}${!imovelId && i ? ` · ${i.nome}` : ''}`]; }), s.iptu ? s.iptu.id : (ips[0] || {}).id, ips.length ? '' : '— nenhum IPTU cadastrado');
       encherTipos();
@@ -594,7 +610,7 @@ function abrirDivergencia(r, m) {
 async function salvarDestino(m, destino) {
   const r = await alterar((db) => Z.vincularMovimentacao(db, m.id, destino, login()));
   if (r && r.divergente) return abrirDivergencia(r, m);
-  if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(`Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
+  if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(r && r.ligada ? `Entrada ligada ao boleto de ${compBr(cb.competencia)}, que já estava pago (${dataBr(cb.data_pagamento)}). Nada foi pago de novo.` : `Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
   return mostrar();
 }
 
@@ -613,17 +629,6 @@ function destinoDaSugestao(s) {
 // --------------------------------------------------------------------------
 // Pagamentos: o banco lê os códigos (decode) e o lote é enviado para aprovação
 // --------------------------------------------------------------------------
-/** Casa os itens que o banco devolveu com os pagamentos (content + valor; senão pela ordem). */
-function casarItens(pags, items) {
-  const usados = new Set();
-  return pags.map((p, k) => {
-    let idx = items.findIndex((it, j) => !usados.has(j) && (String(it.id) === String(p.id_externo) || (it.content === p.content && centavosDoBanco(it.amount) === p.valor)));
-    if (idx < 0 && items[k] && !usados.has(k)) idx = k;
-    if (idx >= 0) usados.add(idx);
-    return idx >= 0 ? items[idx] : null;
-  });
-}
-
 /** Manda os códigos ao banco (decode), guarda o grupo e o que o banco leu em cada pagamento (erro de leitura → situação "erro"). */
 async function lerNoBanco(conta, pags) {
   const itensC6 = pags.map((p) => ({ content: p.content, amount: p.amount, description: p.description, transaction_date: p.transaction_date }));
@@ -635,7 +640,7 @@ async function lerNoBanco(conta, pags) {
   } catch (e) {
     throw new Error(`Os pagamentos ficaram como rascunho, mas o banco não respondeu: ${e.message} Use "Mandar o banco ler os códigos" quando a ponte voltar.`);
   }
-  const casados = casarItens(pags, items || []);
+  const casados = Z.casarItensDoGrupo(pags, items || []);
   await alterar((db) => pags.forEach((p, k) => {
     const it = casados[k];
     if (!it) return;
@@ -667,6 +672,26 @@ async function tirarDoLote(pags) {
   if (falhas.length) aviso(`Cancelado aqui, mas o item não saiu do lote lido pelo banco (${falhas[0]}). Isso não paga nada: o lote só anda com a aprovação.`, 'aviso');
 }
 
+/**
+ * Antes de cancelar aqui um pagamento aprovado com o envio pendente: pergunta ao banco. Se o envio chegou (o item está na fila de
+ * aprovação do app), registra como enviado e não cancela (o cancelamento é no app do C6, depois "Foi cancelado no C6").
+ */
+async function conferirAntesDeCancelar(pags) {
+  const aprovados = pags.filter((p) => p.situacao === 'aguardando_aprovacao' && p.grupo_id);
+  if (!aprovados.length || !bancoAtivo()) return;
+  const porLote = new Map();
+  for (const p of aprovados) porLote.set(`${p.conta_id}|${p.grupo_id}`, [...(porLote.get(`${p.conta_id}|${p.grupo_id}`) || []), p]);
+  for (const l of porLote.values()) {
+    const { items } = await P.itensDoGrupo(l[0].conta_id, l[0].grupo_id);
+    const { jaNoBanco } = Z.separarParaEnvio(l, items || []);
+    if (jaNoBanco.length) {
+      await alterar((db) => Z.registrarGrupoEnviado(db, jaNoBanco.map((p) => p.id), l[0].grupo_id, items || [], login()));
+      await mostrar();
+      throw new C.ErroUsuario(`${jaNoBanco.length > 1 ? 'Estes pagamentos já chegaram' : 'Este pagamento já chegou'} ao banco (situação atualizada para "Enviado ao banco"): não dá para cancelar aqui. Cancele no aplicativo do C6 e depois clique em "Foi cancelado no C6".`);
+    }
+  }
+}
+
 // --------------------------------------------------------------------------
 // Botões (data-acao) e formulários (data-form)
 // --------------------------------------------------------------------------
@@ -674,12 +699,16 @@ export const ACOES_BANCO = {
   async buscarExtrato({ conta, mes }) {
     if (!opera()) throw new Error('Seu usuário não pode importar o extrato.');
     if (!bancoAtivo()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
-    const [de, fim] = C.limitesCompetencia(mes);
+    const [inicio, fim] = C.limitesCompetencia(mes);
     const ate = fim < C.hojeIso() ? fim : C.hojeIso();
-    if (de > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+    if (inicio > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+    // o que faltou do mês anterior vem junto (ex.: buscado em 30/11 às 10h, importado até 29/11: dezembro começa em 30/11);
+    // o que já estava não entra em dobro
+    const anterior = R.extratoImportadoAte(d(), conta);
+    const de = anterior && anterior < C.somarDias(inicio, -1) && anterior >= C.somarDias(inicio, -62) ? C.somarDias(anterior, 1) : inicio;
     const r = await P.extratoDaConta(conta, de, ate);
     const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos || [], login(), { de, ate }));
-    aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m).`);
+    aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s), ${res.repetidas} já estava(m)${de < inicio ? ` (busquei desde ${dataBr(de)}, o que faltava do mês anterior)` : ''}.`);
     await mostrar();
   },
 
@@ -783,7 +812,7 @@ export const ACOES_BANCO = {
     const falhas = [];
     for (const m of faltam) {
       try {
-        const blob = await P.baixarComprovantePonte(m.conta_id, m.id_externo, m.data);
+        const blob = await P.baixarComprovantePonte(m.conta_id, Z.referenciaNoBanco(m), m.data);
         await guardarComprovante(mov(m.id), 'movimentacoes_banco', Z.nomePadraoComprovante(d(), m), blob, 'ponte', { avisar: false });
         gerados += 1;
       } catch (e) {
@@ -819,7 +848,8 @@ export const ACOES_BANCO = {
     const r = await P.boletosPagos(conta, de, fim < C.hojeIso() ? fim : C.hojeIso());
     const pagos = Array.isArray(r) ? r : (r && (r.boletos || r.content)) || [];
     estado.conferencia = { conta, mes, recebidos: pagos.length, sugestoes: Z.conciliarBoletos(d(), conta, pagos) };
-    aviso(`${pagos.length} boleto(s) pago(s) segundo o banco; ${estado.conferencia.sugestoes.length} correspondem a boletos em aberto aqui.`, 'info');
+    const marcaveis = estado.conferencia.sugestoes.filter((s) => Z.prontoParaRegistrar(d(), s)).length;
+    aviso(`${pagos.length} boleto(s) pago(s) segundo o banco; ${estado.conferencia.sugestoes.length} correspondem a boletos daqui (${marcaveis} já marcado(s) para registrar).`, 'info');
     await mostrar();
   },
 
@@ -844,11 +874,15 @@ export const ACOES_BANCO = {
     const pags = pagamentosDoLote(grupo);
     if (!pags.length) throw new Error('Nenhum pagamento deste lote está pronto para enviar (prepare de novo).');
     const { items } = await P.itensDoGrupo(conta, grupo);
-    const lidos = (items || []).filter((it) => it.status === 'READ_DATA');
-    const prontos = pags.filter((p) => lidos.some((it) => String(it.id) === String(p.id_externo)));
+    const { prontos, jaNoBanco, comErro } = Z.separarParaEnvio(pags, items || []);
+    // a resposta do envio anterior se perdeu: o banco já tem estes (na fila de aprovação do app); aqui só se registra
+    if (jaNoBanco.length) {
+      await alterar((db) => Z.registrarGrupoEnviado(db, jaNoBanco.map((p) => p.id), grupo, items || [], login()));
+      aviso(`${jaNoBanco.length} pagamento(s) já tinha(m) chegado ao banco: a situação foi atualizada para "Enviado ao banco". Aprove no aplicativo do C6.`, 'aviso');
+      if (!prontos.length) return mostrar();
+    }
     if (!prontos.length) throw new Error('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
     const total = prontos.reduce((t, p) => t + p.valor, 0);
-    const comErro = (items || []).filter((it) => it.status !== 'READ_DATA' && it.status !== 'SCHEDULED' && it.status !== 'PROCESSING' && it.status !== 'PROCESSED');
     // uma janela só: o resumo completo e o valor total digitado (qualquer diferença cancela)
     const r2 = await janela({ titulo: 'Aprovar e enviar ao banco', sim: 'Aprovar e enviar', forte: true,
       html: `<p>Conta que paga: <b>${esc(nomeConta(conta))}</b></p><ul>${prontos.map((p) => { const i = p.imovel_id ? buscar('imoveis', p.imovel_id) : null; const codigo = CODIGO_PAG(p); return `<li>${i ? `${esc(i.nome)} · ` : ''}${esc(p.tipo_conta)} ${compBr(p.competencia)} · ${esc((p.beneficiario && p.beneficiario.nome) || '')} · <b>${reais(p.valor)}</b>${p.vencimento ? ` · vence ${dataBr(p.vencimento)}` : ''} · pagar em ${dataBr(p.data_pagamento)}${codigo ? `<br><span class="codigo-barras suave">${esc(codigo)}</span>` : ''}</li>`; }).join('')}</ul>
@@ -865,8 +899,16 @@ export const ACOES_BANCO = {
     }
     await alterar((db) => prontos.forEach((p) => { if (R.buscar(db, 'pagamentos_banco', p.id).situacao === 'rascunho') Z.aprovarPagamento(db, p.id, login()); }));
     if (comErro.length) await P.removerItensDoGrupo(conta, grupo, comErro.map((it) => it.id));
-    await P.enviarGrupoParaAprovacao(conta, grupo, E.usuario ? E.usuario.nome || login() : login());
-    const depois = await P.itensDoGrupo(conta, grupo);
+    let depois;
+    try {
+      await P.enviarGrupoParaAprovacao(conta, grupo, E.usuario ? E.usuario.nome || login() : login());
+      depois = await P.itensDoGrupo(conta, grupo);
+    } catch (e) {
+      // aprovado aqui; o envio pode ter chegado ao banco ou não: "Atualizar situação" pergunta (o lote é enviado uma vez só)
+      await mostrar();
+      if (e && e.status) throw new Error(`${e.message} Clique em "Atualizar situação" para ver o que o banco tem antes de tentar de novo.`);
+      throw new Error('Não tive resposta do banco. Clique em "Atualizar situação" antes de tentar de novo.');
+    }
     await alterar((db) => Z.registrarGrupoEnviado(db, prontos.map((p) => p.id), grupo, depois.items || [], login()));
     aviso('Enviado ao banco. Agora aprove no aplicativo do C6; depois busque o extrato e confirme o pagamento.', 'aviso');
     await mostrar();
@@ -874,6 +916,7 @@ export const ACOES_BANCO = {
 
   async descartarPagamentos({ ids }) {
     const pags = String(ids).split(',').map((x) => pag(x)).filter((p) => PENDENTES.includes(p.situacao));
+    await conferirAntesDeCancelar(pags);
     await alterar((db) => pags.forEach((p) => Z.cancelarPagamento(db, p.id, login(), { motivo: 'descartado antes de enviar' })));
     await tirarDoLote(pags);
     await mostrar();
@@ -906,6 +949,7 @@ export const ACOES_BANCO = {
 
   async cancelarPagamentoBanco({ id }) {
     const p = pag(id);
+    await conferirAntesDeCancelar([p]);
     await alterar((db) => Z.cancelarPagamento(db, p.id, login()));
     await tirarDoLote([p]);
     await mostrar();
@@ -937,20 +981,22 @@ export const FORMULARIOS_BANCO = {
     if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
     let n = 0;
     const divergentes = [];
+    const repetidos = [];
     await alterar((db) => {
+      const usados = new Set();
       for (const s of marcados) {
         const cb = R.buscar(db, 'cobrancas', s.cobranca_id);
         if (!cb || cb.data_pagamento) continue;
-        // a entrada correspondente no extrato (mesmo valor e data de crédito, ainda sem destino) fica ligada ao boleto
-        const m = (db.movimentacoes_banco || []).find((x) => x.conta_id === conf.conta && x.tipo === 'entrada' && x.valor === s.valor && x.data === s.data_credito && !x.classificacao);
-        const origem = m ? m.id : { amount: s.valor / 100, payment_date: s.data_pagamento, credit_date: s.data_credito, external_payment_id: s.external_payment_id, payment_type: s.payment_type };
-        const r = Z.confirmarPagamentoPeloBanco(db, cb.id, origem, login(), { pagouEmDia: s.pagouEmDia || null });
+        // o mesmo pagamento do banco nunca paga dois boletos (ex.: dois boletos de mesmo valor marcados)
+        if (s.pagamento !== undefined && usados.has(s.pagamento)) { const c = R.buscar(db, 'contratos', cb.contrato_id); repetidos.push(`${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}`); continue; }
+        // a entrada desse dinheiro no extrato, se já importada, fica ligada ao boleto (Z.registrarPagamentoDoBanco, o mesmo da tela Boletos)
+        const r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login());
         if (r.divergente) divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`);
-        else n += 1;
+        else { n += 1; usados.add(s.pagamento); }
       }
     });
     estado.conferencia = null;
-    aviso(`${n} pagamento(s) registrado(s).${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length ? 'aviso' : 'ok');
+    aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length || repetidos.length ? 'aviso' : 'ok');
     await mostrar();
   },
 

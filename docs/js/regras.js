@@ -180,6 +180,12 @@ export function normalizar(d) {
   d.config_banco = d.config_banco || {};
   for (const [k, v] of Object.entries(CONFIG_BANCO_FASE2)) if (d.config_banco[k] === undefined) d.config_banco[k] = typeof v === 'object' && v ? { ...v } : v;
   if (!d.config_banco.ultima_importacao || typeof d.config_banco.ultima_importacao !== 'object') d.config_banco.ultima_importacao = {};
+  // "extrato importado até" saiu de config_banco (que só o administrador muda na nuvem) para a raiz, por conta (2026-11-09):
+  // copia o que estava lá, sem voltar uma data mais nova; o campo antigo fica como estava (versões antigas ainda o leem)
+  for (const [conta, ate] of Object.entries(d.config_banco.ultima_importacao)) {
+    if (!ate || (d.extrato_importado_ate && d.extrato_importado_ate[conta] >= ate)) continue;
+    d.extrato_importado_ate = { ...(d.extrato_importado_ate || {}), [conta]: ate };
+  }
   for (const m of d.movimentacoes_banco) {
     if (m.classificacao === undefined) m.classificacao = null;
     if (m.valor < 0) { m.valor = -m.valor; m.tipo = 'saida'; }
@@ -4015,6 +4021,20 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   if (b.desconto > 0) Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
   void t;
   // instruções: as fixas da conta e depois a descrição do boleto, até 4 linhas de 80
+  // dados do pagador nos limites da API (decisão de 2026-10-16): nome, rua e número, bairro e cidade até 40, e-mail até 70, sem "/"
+  // no endereço. Nada é cortado: o campo que passa barra a emissão com o nome do campo e quantas letras tem, para abreviar no cadastro.
+  const doInquilino = partesDoEndereco(c.inquilino_endereco) || {};
+  const ondeEndereco = (k) => (doInquilino[k] ? 'no endereço do cadastro do inquilino' : `no cadastro do imóvel${imovel ? ` ${imovel.nome}` : ''}`);
+  const pagador = { nome: String(c.inquilino_nome || '').trim(), rua: String(endereco.address || '').trim(), cidade: String(endereco.city || '').trim(), email: String(c.inquilino_email || '').trim(),
+    bairro: String(endereco.neighborhood || '').trim() || String((imovel && imovel.bairro) || '').trim() || 'Centro' };
+  const problemas = [];
+  for (const [k, rotulo, verbo, max, onde, semBarra] of [['nome', 'O nome do pagador', 'tem', L.nome, 'no cadastro do inquilino', false], ['rua', 'A rua e o número', 'têm', L.endereco, ondeEndereco('address'), true],
+    ['bairro', 'O bairro', 'tem', L.bairro, ondeEndereco('neighborhood'), true], ['cidade', 'A cidade', 'tem', L.cidade, ondeEndereco('city'), true], ['email', 'O e-mail', 'tem', L.email, 'no cadastro do inquilino', false]]) {
+    const v = pagador[k];
+    if (v.length > max) problemas.push(`${rotulo} ${verbo} ${v.length} letras e o banco aceita até ${max} ("${v}"): abrevie ${onde}`);
+    if (semBarra && v.includes('/')) problemas.push(`${rotulo} ${verbo} uma barra "/", que o banco não aceita ("${v}"): troque por espaço ou "-" ${onde}`);
+  }
+  if (problemas.length) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: ${problemas.join('; ')}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
   const instrucoes = [...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')].map((x) => x.trim().slice(0, L.instrucao)).filter(Boolean).slice(0, L.instrucoes);
   const boleto = { [K.carteira]: carteiraDaConta(conta), [K.seu_numero]: String(cb.id).slice(-L.seu_numero) };
   if (instrucoes.length) boleto[K.instrucoes] = instrucoes;
@@ -4023,11 +4043,11 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
     [K.valor]: centavosParaReais(b.valor),
     [K.vencimento]: b.vencimento,
     [K.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, L.descricao),
-    // limites da API: nome, endereço, bairro e cidade com 40 caracteres, e-mail 70, CEP com 8 dígitos
-    [K.pagador]: { [K.pagador_nome]: corta(c.inquilino_nome, L.nome), [K.pagador_documento]: taxId,
-      [K.pagador_endereco]: { [K.endereco_rua]: corta(endereco.address, L.endereco), [K.endereco_bairro]: corta(endereco.neighborhood, L.bairro) || corta(imovel && imovel.bairro, L.bairro) || 'Centro',
-        [K.endereco_cidade]: corta(endereco.city, L.cidade), [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
-      ...(c.inquilino_email ? { [K.pagador_email]: corta(c.inquilino_email, L.email) } : {}),
+    // limites da API (nome, endereço, bairro e cidade 40, e-mail 70) conferidos acima, sem cortar; CEP com 8 dígitos, UF com 2 letras
+    [K.pagador]: { [K.pagador_nome]: pagador.nome, [K.pagador_documento]: taxId,
+      [K.pagador_endereco]: { [K.endereco_rua]: pagador.rua, [K.endereco_bairro]: pagador.bairro,
+        [K.endereco_cidade]: pagador.cidade, [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
+      ...(pagador.email ? { [K.pagador_email]: pagador.email } : {}),
       // "phone" não é campo da API: a ponte usa só para conferir o destino dos SMS e o descarta antes de mandar ao banco
       ...(String(c.inquilino_telefone || '').replace(/\D/g, '') ? { phone: String(c.inquilino_telefone || '').replace(/\D/g, '') } : {}) },
     [K.forma]: { [K.boleto]: boleto },
@@ -5357,11 +5377,25 @@ export function salvarGuiaImposto(d, emitenteId, imposto, periodo, valor, usuari
 // Banco (C6), fase 2: extrato, comprovantes e pagamentos. Aqui fica só o que normalizar, arquivosReferenciados,
 // etapasFechamento e todosAlertas precisam; as regras de conciliação estão em conciliacao.js (que importa este arquivo).
 // --------------------------------------------------------------------------
-/** Campos novos de config_banco (os da base — ativo, provedor, ponte_url, senha_ponte, conta_padrao_id, contas — ficam como estão). */
+/**
+ * Campos novos de config_banco (os da base — ativo, provedor, ponte_url, senha_ponte, conta_padrao_id, contas — ficam como estão).
+ * ``ultima_importacao`` é antigo: desde 2026-11-09 o "extrato importado até" fica na raiz, em ``d.extrato_importado_ate``
+ * ({ conta: 'AAAA-MM-DD' }), porque config_banco só o administrador muda na nuvem e o operador também importa o extrato.
+ */
 export const CONFIG_BANCO_FASE2 = {
   pasta_contador: '_Contador', modelo_nome_comprovante: '{data} {empresa} {imovel} {tipo} {valor}', tolerancia_dias: 3,
   permitir_pagamentos: false, limite_pagamento: 0, ultima_importacao: {}, copiar_para_contador: true,
 };
+
+/**
+ * Até que dia o extrato da conta já foi importado ('AAAA-MM-DD' ou null): ``d.extrato_importado_ate`` (campo da raiz, criado na
+ * primeira importação) ou, em banco antigo ainda não normalizado, ``config_banco.ultima_importacao`` (vale a data mais nova).
+ */
+export function extratoImportadoAte(d, contaId) {
+  const novo = ((d && d.extrato_importado_ate) || {})[contaId] || null;
+  const antigo = (((d && d.config_banco) || {}).ultima_importacao || {})[contaId] || null;
+  return novo && antigo ? (novo > antigo ? novo : antigo) : novo || antigo;
+}
 /** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
 export const DIAS_ALERTA_BANCO = 7;
 /** No mês corrente, a etapa "Banco" do fechamento aceita o extrato buscado há até este número de dias (não precisa chegar até hoje). */
@@ -5462,7 +5496,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
   const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
   const porConta = contas.map((c) => {
-    const importadoAte = (cfg.ultima_importacao || {})[c.id] || null;
+    const importadoAte = extratoImportadoAte(d, c.id);
     return { id: c.id, apelido: apelidoDaConta(d, c.id), semDestino: semDestinoDe(c.id), importadoAte, semImportar: !importadoAte || importadoAte < ate };
   });
   const semComprovante = movs.filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador).length;
@@ -5470,7 +5504,10 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   return { semDestino: movs.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado };
 }
 
-/** Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias e pagamentos enviados sem confirmação. Só com o banco ligado. */
+/**
+ * Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias, pagamentos enviados sem confirmação e
+ * pagamentos aprovados aqui cujo envio ao banco não se confirmou (a resposta se perdeu: "Atualizar situação"). Só com o banco ligado.
+ */
 export function alertaBanco(d, hoje = C.hojeIso()) {
   const cfg = d.config_banco || {};
   if (!cfg.ativo) return null;
@@ -5478,14 +5515,17 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const semDestino = (d.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
   const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador && m.data <= limite);
   const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
+  const semEnvio = (d.pagamentos_banco || []).filter((p) => p.situacao === 'aguardando_aprovacao');
   const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
-  if (!semDestino.length && !semComprovante.length && !enviados.length && !erros.length) return null;
+  if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length) return null;
   const partes = [];
   if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
+  if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
-  return { nivel: enviados.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: '#/banco', texto: `${partes.join('; ')}.` };
+  const soPagamentos = !semDestino.length && !semComprovante.length;
+  return { nivel: enviados.length || semEnvio.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: soPagamentos ? '#/banco/pagamentos' : '#/banco', texto: `${partes.join('; ')}.` };
 }
 
 // --------------------------------------------------------------------------

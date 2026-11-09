@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { listarPagos, DIAS_JANELA_BOLETOS, TAMANHO_PAGINA } from '../c6-boletos-listar.mjs';
+import { listarPagos, listarPaginas, DIAS_JANELA_BOLETOS, TAMANHO_PAGINA } from '../c6-boletos-listar.mjs';
 import { diasEntre } from '../c6-datas.mjs';
 import { criarC6Simulado } from '../c6-simulado.mjs';
 
@@ -58,4 +58,23 @@ test('listarPagos no simulado: boletos da ANK com payments[] no formato do C6; J
   assert.equal(r.corpo.content.length, 1);
   const jck = await listarPagos(criarC6Simulado({ conta: 'jck' }), { de: '2026-11-01', ate: '2026-11-30' });
   assert.equal(jck.length, 0);
+});
+
+test('listarPaginas (a listagem única da ponte, usada também por GET /contas/:conta/boletos): todas as páginas, sem repetir, no caminho pedido', async () => {
+  const chamadas = [];
+  const c6 = { async chamar(m, caminho, { query }) {
+    chamadas.push({ caminho, query });
+    // 230 boletos; a página 1 repete o último da página 0
+    const inicio = query.page * query.size;
+    const content = Array.from({ length: Math.max(0, Math.min(query.size, 230 - inicio)) }, (_, i) => ({ id: `b${inicio + i}` }));
+    if (query.page === 1) content.unshift({ id: 'b99' });
+    return { status: 200, corpo: { content, total_pages: 3 } };
+  } };
+  const lista = await listarPaginas(c6, { due_date_from: '2026-03-01', due_date_to: '2026-03-31', status: 'PAID' }, { caminho: '/v1/bank_slips' });
+  assert.equal(lista.length, 230);
+  assert.deepEqual(chamadas.map((c) => [c.caminho, c.query.page, c.query.size, c.query.status]), [['/v1/bank_slips', 0, 100, 'PAID'], ['/v1/bank_slips', 1, 100, 'PAID'], ['/v1/bank_slips', 2, 100, 'PAID']]);
+  // resposta em lista solta (sem content) também serve
+  const solta = await listarPaginas({ async chamar() { return { status: 200, corpo: [{ id: 'x' }] }; } }, { due_date_from: '2026-03-01' });
+  assert.deepEqual(solta.map((b) => b.id), ['x']);
+  await assert.rejects(listarPaginas({ async chamar() { return { status: 400, corpo: { message: 'intervalo' } }; } }, {}), /respondeu 400/);
 });

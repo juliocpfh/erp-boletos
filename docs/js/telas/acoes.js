@@ -160,24 +160,32 @@ async function emitirNoC6(cb, conta) {
   return alterar((db) => R.registrarBoletoBancario(db, cb.id, r.resposta, login(), { conta_id: conta.id, ambiente: r.resposta.ambiente || conta.ambiente }));
 }
 
-/** Banco disse que pagou: janela com a data em que pagou e a data contábil (crédito); só grava se o usuário confirmar. */
-async function proporPagamentoDoBanco(cb) {
-  const b = cb.banco;
+/**
+ * Banco disse que pagou: janela com a data em que pagou e a data contábil (crédito); só grava se o usuário confirmar. ``pagamento``: o
+ * que a listagem do banco informou (sugestão de Z.conciliarBoletos: data_pagamento, data_credito, valor, conta_id); sem ele, o que a
+ * consulta gravou no boleto. A entrada do extrato desse dinheiro, se já foi importada, fica ligada ao boleto (como na tela Banco).
+ */
+async function proporPagamentoDoBanco(cb, pagamento = null) {
+  const b = cb.banco || {};
   const hoje = C.hojeIso();
-  const pagou = b.pago_em || hoje;
-  const credito = b.credito_em || pagou;
+  const pagoEm = pagamento ? pagamento.data_pagamento : b.pago_em;
+  const creditoEm = pagamento ? pagamento.data_credito : b.credito_em;
+  const pagou = pagoEm || hoje;
+  const credito = creditoEm || pagou;
+  const contaId = (pagamento && pagamento.conta_id) || b.conta_id || null;
   const previsto = R.previstoNoPagamento(cb, credito, { dataPagou: pagou !== credito ? pagou : null });
-  const valorBanco = b.valor_pago ?? null;
+  const valorBanco = pagamento ? pagamento.valor : (b.valor_pago ?? null);
   const difere = valorBanco !== null && valorBanco !== previsto.valor_devido;
   const resp = await janela({ titulo: 'O banco confirmou o pagamento. Registrar aqui?',
-    html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${b.pago_em ? ` em <b>${esc(dataBr(b.pago_em))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${b.credito_em ? `, creditado em <b>${esc(dataBr(b.credito_em))}</b>` : ''}.</p>
+    html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${pagoEm ? ` em <b>${esc(dataBr(pagoEm))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${creditoEm ? `, creditado em <b>${esc(dataBr(creditoEm))}</b>` : ''}.</p>
+      ${pagamento && pagamento.certeza !== 'exata' ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ''}
       <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
       <p><label>Data contábil (entrada na conta: é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
       <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
     sim: 'Registrar pagamento', nao: 'Agora não' });
-  if (!resp) { aviso('Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".', 'info'); return; }
+  if (!resp) { aviso(cb.banco ? 'Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".' : 'Pagamento não registrado. Registre quando quiser pela tela Banco ("Conferir boletos pagos no banco") ou na página do boleto.', 'info'); return; }
   const data = String((resp.data || [])[0] || '');
   const dataPagou = String((resp.pagou || [])[0] || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
@@ -186,12 +194,20 @@ async function proporPagamentoDoBanco(cb) {
   const pagouEmDia = dataPagou <= C.limitePagamento(cb.vencimento) && data > cb.vencimento;
   if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
     // mesmo caminho do pagamento com valor diferente digitado à mão: justificativa + valor da NF na página do boleto
-    memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}` };
+    // a entrada do extrato desse dinheiro, se já importada, fica ligada ao boleto quando o pagamento for confirmado (FORMULARIOS.pagamentoNf)
+    const entrada = Z.entradaDoRecebimento(d(), { conta_id: contaId, valor: valorBanco, data });
+    memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}`, movimentacao_id: entrada ? entrada.id : null };
     ir(`#/cobranca/${cb.id}?ir=pagamento`);
     return;
   }
-  const r = await alterar((db) => R.registrarPagamento(db, cb.id, data, difere ? valorBanco : null, login(), { pagouEmDia, dataPagou: pagouEmDia || dataPagou === data ? null : dataPagou }));
-  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+  let ligada = null;
+  const r = await alterar((db) => {
+    const res = R.registrarPagamento(db, cb.id, data, difere ? valorBanco : null, login(), { pagouEmDia, dataPagou: pagouEmDia || dataPagou === data ? null : dataPagou });
+    ligada = Z.ligarEntradaDoBoleto(db, cb.id, contaId, login());
+    return res;
+  });
+  const extrato = ligada ? ` A entrada de ${dataBr(ligada.data)} no extrato ficou ligada ao boleto.` : '';
+  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.${extrato}` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.${extrato}`, r.pontual ? 'ok' : 'aviso');
 }
 
 const numerosSelecionados = () => {
@@ -1884,6 +1900,8 @@ export const ACOES = {
   /**
    * Conferência dos pagamentos do mês no banco: lista na conta emissora os boletos pagos (ou aguardando crédito) por data de pagamento,
    * atualiza a situação de cada um aqui e, para os pagos ainda não registrados, propõe registrar um a um (sempre com confirmação).
+   * Quais propor: a mesma regra da tela Banco (Z.conciliarBoletos + Z.prontoParaRegistrar): pela referência do boleto e, sem ela, pelo
+   * valor e pela data; um pagamento que casa com mais de um boleto não é proposto (escolha na tela Banco).
    */
   async conferirPagamentosC6({ comp }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
@@ -1892,18 +1910,30 @@ export const ACOES = {
     if (!contas.length) throw new Error('Nenhum boleto deste mês foi emitido no C6.');
     aviso(`Conferindo no banco os pagamentos de ${dataBr(de)} a ${dataBr(ate)}…`, 'info');
     let atualizados = 0;
-    const pagosSemRegistro = [];
+    let ambiguos = 0;
+    const propostas = [];
+    const incompletos = [];
     for (const contaId of contas) {
       const itens = await BANCO.listarTodosBoletos(d(), contaId, { payment_date_from: de, payment_date_to: ate });
+      if (itens.incompleto) incompletos.push(`${contaId.toUpperCase()}: ${itens.length}${itens.total ? ` de ${itens.total}` : ''}`);
       const { casados } = R.casarListagemC6(d(), itens, contaId);
       for (const { cb, item } of casados) {
-        const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
+        await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
         atualizados += 1;
-        if (banco.situacao === 'pago' && !buscar('cobrancas', cb.id).data_pagamento) pagosSemRegistro.push(cb.id);
+      }
+      for (const s of Z.conciliarBoletos(d(), contaId, itens)) {
+        if (Z.prontoParaRegistrar(d(), s)) propostas.push(s);
+        else if (s.alternativas > 1 && !s.jaPago && !s.aguardandoCredito) ambiguos += 1;
       }
     }
-    for (const cbId of pagosSemRegistro) await proporPagamentoDoBanco(buscar('cobrancas', cbId));
-    aviso(`${atualizados} boleto(s) conferido(s) no banco${pagosSemRegistro.length ? `; ${pagosSemRegistro.length} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}.`);
+    const propostos = new Set();
+    for (const s of propostas) {
+      const cb = buscar('cobrancas', s.cobranca_id);
+      if (!cb || cb.data_pagamento || propostos.has(cb.id)) continue;
+      propostos.add(cb.id);
+      await proporPagamentoDoBanco(cb, s);
+    }
+    aviso(`${atualizados} boleto(s) conferido(s) no banco${propostos.size ? `; ${propostos.size} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}${ambiguos ? `; ${ambiguos} pagamento(s) com o valor de mais de um boleto: escolha qual na tela Banco ("Conferir boletos pagos no banco")` : ''}${incompletos.length ? `. Atenção: o banco tem mais boletos do que o sistema leu (${incompletos.join('; ')}); confira um período menor` : ''}.`, ambiguos || incompletos.length ? 'aviso' : 'ok');
     await mostrar();
   },
 

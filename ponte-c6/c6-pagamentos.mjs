@@ -18,55 +18,12 @@
 //   description = até 100 caracteres (aparece na tela de aprovação)
 //   transaction_date = 'AAAA-MM-DD' (opcional; sem ela o banco paga hoje)
 
-import { validarData } from './c6-datas.mjs';
 import { erroDoC6 } from './c6-extrato.mjs';
+// O que vale num item (tipoDoContent, normalizarContent, validarItem), só os dígitos e linha digitável → código de barras:
+// c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js; o simulador do site em ?teste confere os itens com as mesmas funções).
+import { soDigitos, codigoDeBarrasDaLinha, tipoDoContent, normalizarContent, validarItem } from './c6-comum.mjs';
 
-const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}$/;
-const RE_TELEFONE = /^\+[1-9][0-9]\d{5,14}$/;
-const RE_EVP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-// Só os dígitos e linha digitável → código de barras: c6-comum.mjs (cópia idêntica de docs/js/c6-comum.js, usado pelo site; C19).
-import { soDigitos, codigoDeBarrasDaLinha } from './c6-comum.mjs';
-
-export { soDigitos, codigoDeBarrasDaLinha };
-
-/** Que tipo de "content" é: 'codigo_barras' | 'br_code' | 'chave_pix' | null. Linhas digitáveis contam como código de barras. */
-export function tipoDoContent(content) {
-  const t = String(content ?? '').trim();
-  if (!t) return null;
-  if (t.startsWith('000201')) return t.length >= 32 && t.length <= 396 ? 'br_code' : null;
-  const d = soDigitos(t);
-  if (/^[\d.\s]+$/.test(t) && [44, 47, 48].includes(d.length)) return 'codigo_barras';
-  if (/^\d{11}$/.test(t) || /^\d{14}$/.test(t) || RE_TELEFONE.test(t) || RE_EMAIL.test(t) || RE_EVP.test(t.toLowerCase())) return 'chave_pix';
-  return null;
-}
-
-/** Normaliza o `content`: código de barras sempre com 44 dígitos; BR Code e chave Pix como vieram (sem espaços nas pontas). */
-export function normalizarContent(content) {
-  const tipo = tipoDoContent(content);
-  const t = String(content ?? '').trim();
-  if (tipo === 'codigo_barras') return codigoDeBarrasDaLinha(t);
-  if (tipo === 'br_code' || tipo === 'chave_pix') return tipo === 'chave_pix' && RE_EVP.test(t.toLowerCase()) ? t.toLowerCase() : t;
-  throw new Error(`Não reconheci o que pagar: "${t.slice(0, 40)}". Use o código de barras (44 dígitos) ou a linha digitável do boleto, o Pix copia e cola ou uma chave Pix (CPF/CNPJ, telefone +55…, e-mail ou chave aleatória).`);
-}
-
-/** Valida e devolve o item no formato do C6: { content, amount, description?, transaction_date? }. Lança Error em português. */
-export function validarItem(item, posicao = 1) {
-  if (!item || typeof item !== 'object') throw new Error(`Item ${posicao}: pagamento vazio.`);
-  const content = normalizarContent(item.content);
-  const amount = typeof item.amount === 'string' ? Number(item.amount.replace(',', '.')) : item.amount;
-  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) throw new Error(`Item ${posicao}: o valor precisa ser um número maior que zero (recebi "${item.amount}").`);
-  if (Math.round(amount * 100) !== amount * 100) throw new Error(`Item ${posicao}: o valor precisa ter no máximo 2 casas decimais (recebi ${amount}).`);
-  if (amount > 5000000) throw new Error(`Item ${posicao}: valor acima do limite de R$ 5.000.000,00.`);
-  const pronto = { content, amount };
-  if (item.description != null && item.description !== '') {
-    const description = String(item.description).trim();
-    if (description.length > 100) throw new Error(`Item ${posicao}: a descrição tem ${description.length} caracteres; o máximo é 100.`);
-    pronto.description = description;
-  }
-  if (item.transaction_date != null && item.transaction_date !== '') pronto.transaction_date = validarData(String(item.transaction_date), `data de pagamento do item ${posicao}`);
-  return pronto;
-}
+export { soDigitos, codigoDeBarrasDaLinha, tipoDoContent, normalizarContent, validarItem };
 
 const validarGrupo = (groupId) => {
   const g = String(groupId ?? '').trim();
