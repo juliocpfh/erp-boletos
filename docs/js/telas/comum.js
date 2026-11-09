@@ -769,6 +769,12 @@ export const classeAlerta = (a) => classeEstilo(a.nivel, R.estiloAlerta(d(), a.t
 export const linkAlerta = (a) => (a.link ? a.link : a.tipo === 'Reajuste do aluguel' ? `#/reajustes?contrato=${a.contrato_id}`
   : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ''}`);
 
+/** Alerta com o link: "Loja 1 · João: texto" (o nome leva ao contrato ou ao imóvel) ou, sem imóvel nem inquilino, só o texto com o link (Painel e Pendências). */
+export const nomeAlerta = (a) => (a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? ' · ' : ''}${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`);
+
+/** Alerta adiado ou "já estou cuidando": em cinza, com quem marcou, até quando e o botão para voltar a mostrar (Painel e Pendências). */
+export const alertaAdiado = (a, hoje) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === 'cuidando' ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje ? 'hoje (volta amanhã)' : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao('voltarAlerta', 'Voltar a mostrar', { chave: a.chave }, 'secundario mini') : ''}</div>`;
+
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */
 export const gruposDeAlertas = (alertas) => {
   const grupos = new Map();

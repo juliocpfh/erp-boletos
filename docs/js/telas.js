@@ -16,7 +16,7 @@ import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, linkAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -205,7 +205,6 @@ export const TELAS = {
     const todosOsAlertas = R.alertasComAdiamento(d(), hoje);
     const alertas = todosOsAlertas.filter((a) => !a.adiamento);
     const adiados = todosOsAlertas.filter((a) => a.adiamento);
-    const nomeAlerta = (a) => (a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? ' · ' : ''}${esc(a.inquilino)}` : ''}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`);
     const adiar = (a) => (opera() ? `<span class="adiar-alerta nw">${botao('adiarAlerta', `Adiar ${R.DIAS_ADIAR_ALERTA} dias`, { chave: a.chave, modo: 'adiado', tipo: a.tipo }, 'secundario mini')} ${botao('adiarAlerta', 'Já estou cuidando', { chave: a.chave, modo: 'cuidando', tipo: a.tipo }, 'secundario mini')}</span>` : '');
     const pend = R.pendentesDeFatura(d());
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
@@ -248,7 +247,7 @@ export const TELAS = {
         ${gruposDeAlertas(alertas).map(([tipo, lista]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
           ${lista.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
         ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
-          ${adiados.map((a) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === 'cuidando' ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje ? 'hoje (volta amanhã)' : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao('voltarAlerta', 'Voltar a mostrar', { chave: a.chave }, 'secundario mini') : ''}</div>`).join('')}</details>` : ''}
+          ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}</details>` : ''}
         <p class="suave" style="margin:10px 0 0">${link('#/pendencias', 'Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só', '')}</p>
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
