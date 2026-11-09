@@ -146,7 +146,7 @@ export function telaImpostos(comp) {
   return `<h1>Financeiro</h1>${abasFinanceiro('impostos')}
     <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
-      <form data-form="irImpostos" class="acoes"><input type="month" name="mes" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="impostos" class="acoes"><input type="month" name="mes" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, 1)}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Guia esperada, calculada pelo faturamento das NFs emitidas (data de emissão; NFs canceladas não entram). Atualiza sozinha a cada NF emitida.
       PIS/COFINS (${pct(3.65)}): guia mensal, vence no dia 25 do mês seguinte. IRPJ (${pct(4.8)}) e CSLL (${pct(2.88)}): 15% e 9% sobre o lucro presumido (32% do faturamento), guia trimestral (1º trimestre: NFs de janeiro a março; 2º: abril a junho; 3º: julho a setembro; 4º: outubro a dezembro), acumulando mês a mês até a guia completa no último mês do trimestre; vence no último dia útil do mês seguinte ao trimestre.
@@ -175,7 +175,7 @@ function periodo(q, base) {
     ['Ano passado', `${ano - 1}-01-01`, `${ano - 1}-12-31`],
     ['Últimos 5 anos', C.somarDias(C.somarAnos(hoje, -5), 1), hoje],
   ].map(([t, a, b]) => link(`#/${base}?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
-  const form = `<form class="cartao acoes" data-form="filtroResultados" data-base="${base}"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
+  const form = `<form class="cartao acoes" data-form="ir" data-ir="${base === 'liquido' ? 'liquido' : 'resultados'}"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
       ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>`;
   return { de, ate, form };
 }
@@ -306,7 +306,7 @@ export function telaFinanceiro(q) {
   return `<h1>Financeiro</h1>${abasFinanceiro('financeiro')}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
-      <form data-form="irFinanceiro" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="financeiro" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
       ${mes < atual ? `<a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a>` : ''}</div></div>
     <div class="numeros">
       <div class="cartao"><div class="grande">${reais(entradas)}</div>entradas nos extratos</div>

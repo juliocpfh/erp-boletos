@@ -21,6 +21,24 @@ import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
 
+/**
+ * Endereço de um formulário que só leva a outra tela: ``rota`` (o data-ir dele) com os campos preenchidos como parâmetros,
+ * passando por sanearParametros (parâmetro fora do formato fica de fora e a tela usa o padrão). Campo vazio fica de fora.
+ * Ex.: ('cobrancas', [['comp', '2026-11'], ['busca', ' Maria ']]) → '#/cobrancas?comp=2026-11&busca=Maria'.
+ */
+export function enderecoDoFormulario(rota, campos) {
+  if (!/^[a-z-]+$/.test(String(rota || ''))) throw new Error('Formulário sem a tela de destino (data-ir).');
+  const preenchidos = [...campos].map(([k, v]) => [k, String(v).trim().slice(0, 100)]).filter(([, v]) => v);
+  const q = String(new URLSearchParams(Object.entries(C.sanearParametros(Object.fromEntries(preenchidos)))));
+  return q ? `#/${rota}?${q}` : `#/${rota}`;
+}
+
+/** Testemunhas do contrato ou do termo aditivo: ficam lembradas neste navegador (o próximo já vem com elas) e vão no formato guardado. */
+function testemunhasDo(f) {
+  try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+  return [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() }));
+}
+
 /** Pagamento confirmado num imóvel sem empresa emitente: avisa agora, para não descobrir só na hora de numerar a NF. */
 function avisarImovelSemEmpresa(cb) {
   const c = cb && buscar('contratos', cb.contrato_id);
@@ -257,7 +275,7 @@ export const FORMULARIOS = {
 
   gerarContrato(form) {
     const f = Object.fromEntries(new FormData(form));
-    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    testemunhasDo(f);
     const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== ''));
     ir(`#/imprimir/contrato?${q}`);
   },
@@ -271,11 +289,10 @@ export const FORMULARIOS = {
 
   async aditivoVencimento(form) {
     const f = Object.fromEntries(new FormData(form));
-    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo').find((m) => String(m.id) === f.modelo);
     if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
-    const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes,
-      testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() })),
+    const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes, testemunhas,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
     await alterar((db) => { a = R.salvarAditivoVencimento(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null); });
@@ -285,11 +302,10 @@ export const FORMULARIOS = {
 
   async aditivoTroca(form) {
     const f = Object.fromEntries(new FormData(form));
-    try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
+    const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo_troca').find((m) => String(m.id) === f.modelo);
     if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
-    const dados = { data: f.data,
-      testemunhas: [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() })),
+    const dados = { data: f.data, testemunhas,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
     await alterar((db) => { a = R.salvarAditivoTroca(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null); });
@@ -520,8 +536,6 @@ export const FORMULARIOS = {
     if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${texto}?${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ''}.` : ''} Os boletos em aberto são recalculados.`)) return;
     await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
   },
-  irImpostos: (form) => ir(`#/impostos?mes=${new FormData(form).get('mes')}`),
-  irFinanceiro: (form) => ir(`#/financeiro?mes=${new FormData(form).get('mes')}`),
 
   /** Valor da guia calculado pelo contador (vazio apaga). */
   async guiaImposto(form) {
@@ -534,30 +548,11 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  filtroResultados(form) {
-    const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
-    ir(`#/${form.dataset.base === 'liquido' ? 'liquido' : 'resultados'}?${q}`);
-  },
-  irMes: (form) => ir(`#/cobrancas?comp=${new FormData(form).get('comp')}`),
-  irMesFatura: (form) => ir(`#/faturas?mes=${new FormData(form).get('mes')}`),
-  /** Tela de Boletos: busca por inquilino ou imóvel dentro do filtro escolhido (mês, em aberto, vencidos…). */
-  buscaBoletos(form) {
-    const f = new FormData(form);
-    const q = new URLSearchParams([...f].filter(([k, v]) => String(v).trim() && !(k === 'filtro' && v === 'todos')));
-    ir(`#/cobrancas?${q}`);
-  },
-  buscaGlobal(form) {
-    const q = String(new FormData(form).get('q') || '').trim().slice(0, 100);
-    ir(q ? `#/buscar?q=${encodeURIComponent(q)}` : '#/buscar');
-  },
-  buscaInquilinos(form) {
-    const busca = String(new FormData(form).get('busca') || '').trim();
-    ir(busca ? `#/inquilinos?busca=${encodeURIComponent(busca)}` : '#/inquilinos');
-  },
-  filtroHistorico(form) {
-    const q = new URLSearchParams([...new FormData(form)].filter(([, v]) => v));
-    ir(`#/historico?${q}`);
-  },
+  /**
+   * Formulário que só leva a outra tela (mês, período, filtro, busca): <form data-form="ir" data-ir="cobrancas">.
+   * Os campos preenchidos viram os parâmetros do endereço (enderecoDoFormulario).
+   */
+  ir: (form) => ir(enderecoDoFormulario(form.dataset.ir, new FormData(form))),
 
   async logo(form) {
     const arquivo = new FormData(form).get('arquivo');

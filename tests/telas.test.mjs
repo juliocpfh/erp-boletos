@@ -146,3 +146,26 @@ test('salvar a edição de um registro que outra pessoa excluiu: avisa e não cr
   // cadastro que monta os fixos com o contrato do endereço (correção do aluguel): antes dava erro de programa
   await assert.rejects(T.FORMULARIOS.cadastro({ campos: [] }, { partes: ['editar', 'correcoes', '999'], q: { contrato: '999' } }), excluido);
 });
+
+test('formulário que só leva a outra tela (data-form="ir"): endereço com os campos preenchidos, saneados', async () => {
+  const { enderecoDoFormulario } = await import('../docs/js/telas/envios.js');
+  assert.equal(enderecoDoFormulario('cobrancas', [['comp', '2026-11']]), '#/cobrancas?comp=2026-11');
+  assert.equal(enderecoDoFormulario('cobrancas', [['comp', '2026-11'], ['ordem', 'vencimento'], ['busca', '  Maria Exemplo ']]), '#/cobrancas?comp=2026-11&ordem=vencimento&busca=Maria+Exemplo');
+  assert.equal(enderecoDoFormulario('resultados', [['de', '2026-01-01'], ['ate', '']]), '#/resultados?de=2026-01-01', 'campo vazio fica de fora');
+  assert.equal(enderecoDoFormulario('faturas', [['mes', '2026-13"><img src=x>']]), '#/faturas', 'mês fora do formato: a tela usa o padrão');
+  assert.equal(enderecoDoFormulario('buscar', [['q', 'Pão & Cia']]), '#/buscar?q=P%C3%A3o+%26+Cia');
+  assert.equal(enderecoDoFormulario('buscar', [['q', 'x'.repeat(150)]]), `#/buscar?q=${'x'.repeat(100)}`, 'busca de até 100 letras');
+  assert.equal(enderecoDoFormulario('buscar', [['q', '   ']]), '#/buscar');
+  assert.equal(enderecoDoFormulario('banco', [['conta', 'ank'], ['mes', '2026-10']]), '#/banco?conta=ank&mes=2026-10');
+  assert.throws(() => enderecoDoFormulario('#/fora', []), /destino/);
+  // o envio de verdade: Boletos → "Ir" para outubro (os parâmetros chegam à tela pelo mesmo caminho de sempre)
+  location.hash = '#/cobrancas?comp=2026-11';
+  await enviar('ir', [['comp', '2026-10']], { ir: 'cobrancas' });
+  assert.equal(location.hash, '#/cobrancas?comp=2026-10');
+  location.hash = '#/';
+  // nenhuma tela usa um data-form que não existe (ex.: os antigos irMes, buscaGlobal, filtroHistorico)
+  const pasta = fileURLToPath(new URL('../docs/js/', import.meta.url));
+  for (const arq of fs.readdirSync(pasta, { recursive: true }).filter((x) => x.endsWith('.js') && !x.startsWith('offline'))) {
+    for (const m of fs.readFileSync(path.join(pasta, arq), 'utf8').matchAll(/<form[^>]*data-form="(\w+)"/g)) assert.ok(T.FORMULARIOS[m[1]], `${arq}: data-form="${m[1]}" sem FORMULARIOS.${m[1]}`);
+  }
+});

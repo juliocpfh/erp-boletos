@@ -102,7 +102,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   const todasMontadas = d().cobrancas.map(montar);
   const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje)).length;
   const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${k === 'todos' ? `Todos de ${compBr(comp)}` : `${x.titulo.replace('Boletos ', '').replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(' ')}
-    <form data-form="buscaBoletos" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}"><input type="hidden" name="filtro" value="${esc(filtro)}"><input name="busca" value="${esc(String(buscaPedida || ''))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: '' }).replace(/&busca=[^&]*/, '')}">Limpar</a>` : ''}</form></div>`;
+    <form data-form="ir" data-ir="cobrancas" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}">${filtro !== 'todos' ? `<input type="hidden" name="filtro" value="${esc(filtro)}">` : ''}<input name="busca" value="${esc(String(buscaPedida || ''))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: '' }).replace(/&busca=[^&]*/, '')}">Limpar</a>` : ''}</form></div>`;
   if (filtro !== 'todos') {
     // lista de trabalho (em aberto, vencidos, sem NF, pagos): sem as caixas do mês (gerar boletos, caução, recálculo)
     const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
@@ -124,7 +124,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="${url({ comp: C.somarMeses(comp, -1) })}">← ${compBr(C.somarMeses(comp, -1))}</a>
-      <form data-form="irMes" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="cobrancas" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="${url({ comp: C.somarMeses(comp, 1) })}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${filtros}

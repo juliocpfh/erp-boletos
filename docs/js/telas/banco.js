@@ -86,7 +86,7 @@ export function telaBanco(rota) {
     <div class="cabecalho"><h2>${imovelFiltro ? `Movimentações de ${esc(imovelFiltro.nome)}` : `Extrato de ${compBr(mes)}`}</h2>
       <div class="acoes">${imovelFiltro ? link(`#/banco?conta=${conta}&mes=${mes}`, 'Ver por mês', 'botao secundario')
     : `${link(url({ mes: C.somarMeses(mes, -1) }), `← ${compBr(C.somarMeses(mes, -1))}`, 'botao secundario')}
-      <form data-form="irMesBanco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="banco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       ${link(url({ mes: C.somarMeses(mes, 1) }), `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}`}</div></div>
     <div class="acoes" style="margin-bottom:12px">${opera() ? botaoPonte('buscarExtrato', `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, 'botao') : ''} ${botaoPonte('saldoBanco', 'Ver saldo', { conta })}
       ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX e escolha o arquivo aqui">📄 Importar arquivo OFX do app do C6<input type="file" accept=".ofx,application/x-ofx,text/plain" data-acao-arquivo="importarOfx" data-conta="${esc(conta)}" hidden></label>` : ''}
@@ -928,11 +928,6 @@ export const ACOES_BANCO = {
 };
 
 export const FORMULARIOS_BANCO = {
-  async irMesBanco(form) {
-    const f = Object.fromEntries(new FormData(form));
-    ir(`#/banco?conta=${encodeURIComponent(f.conta)}&mes=${f.mes || C.competenciaDe(C.hojeIso())}`);
-  },
-
   async registrarPagamentosBanco(form) {
     if (!opera()) throw new Error('Seu usuário não pode confirmar pagamentos.');
     const conf = estado.conferencia;
