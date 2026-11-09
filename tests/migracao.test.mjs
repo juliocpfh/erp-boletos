@@ -99,7 +99,7 @@ test('internet cai no meio: avisa; clicar de novo pula o que já subiu e termina
   fs.rmSync(raiz, { recursive: true, force: true });
 });
 
-test('envia 4 ao mesmo tempo; cada pasta é listada uma vez só; o andamento sobe certo até o fim', async () => {
+test('envia 4 ao mesmo tempo; o que a nuvem tem vem numa ida por pasta principal; o andamento sobe certo até o fim', async () => {
   const raiz = pastaFicticia({ extras: 12 });
   const { estado, sinc, anexos } = nuvemDeTeste();
   await sinc.iniciar();
@@ -109,10 +109,9 @@ test('envia 4 ao mesmo tempo; cada pasta é listada uma vez só; o andamento sob
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.total, 16);
   assert.equal(estado.pico, 4, 'no máximo (e de fato) 4 ao mesmo tempo');
-  const listas = estado.pedidos.filter((p) => p.startsWith('GET /api/lista/'));
-  const enviados = listas.slice(0, listas.length / 2); // metade no envio, metade na conferência
-  assert.equal(new Set(enviados).size, enviados.length, `nenhuma lista pedida em dobro: ${enviados}`);
-  assert.equal(enviados.length, 5, 'Inquilinos/Maria, IPTU/2026, Anúncio, Comprovantes, modelos');
+  // antes: uma lista por pasta (5 aqui; centenas na pasta de verdade); agora a árvore de cada pasta principal numa ida (lista-tudo)
+  const listas = estado.pedidos.filter((p) => p.startsWith('GET /api/lista'));
+  assert.deepEqual(listas, ['GET /api/lista-tudo/arquivos/', 'GET /api/lista-tudo/modelos/', 'GET /api/lista-tudo/arquivos/', 'GET /api/lista-tudo/modelos/'], 'no envio e na conferência');
   for (let i = 1; i < andamento.length; i += 1) {
     assert.ok(andamento[i].feitos >= andamento[i - 1].feitos && andamento[i].bytes >= andamento[i - 1].bytes, 'andamento nunca volta');
   }
