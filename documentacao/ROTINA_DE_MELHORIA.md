@@ -4,11 +4,8 @@ Análise feita um dia depois de a nuvem entrar no ar. Cada item traz a evidênci
 `node tools/mapa.mjs <trecho>` antes de mexer) e o que fazer. Marque `[x]` ao concluir e anote a PR.
 
 ## Próximos passos do dono (fora do sistema)
-1. **Cloudflare:** acrescentar `Content-Security-Policy: frame-ancestors 'none'` na Transform Rule "Cabecalhos de seguranca do sistema" (passo a passo em `SEGURANCA.md` 5b; item B10).
-2. **Cloudflare:** ligar os testes antes de publicar o Worker (Build command em `nuvem/README.md`, "Testes antes de publicar").
-3. **PC:** instalar o atualizador da versão PC: chave de serviço do Access + política "Atualizador" + secret `SERVICOS`, depois `.env` e `instalar-tarefa.cmd` (passo a passo em `atualizador-pc/README.md`).
-4. **E2 (OneDrive):** decidir por volta de 21/11/2026 se a pasta do OneDrive deixa de ser a reserva.
-- Feito: teste do celular sem internet (07/11/2026).
+1. **E2 (OneDrive):** decidir por volta de 21/11/2026 se a pasta do OneDrive deixa de ser a reserva.
+- Feito: teste do celular sem internet (07/11/2026); no Cloudflare, `frame-ancestors 'none'` na regra de cabeçalhos e os testes antes de publicar o Worker (08/11/2026); atualizador da versão PC instalado (08/11/2026; a chave de serviço vence em 08/11/2027).
 
 ## Como usar esta rotina
 - Uma PR por item (ou por grupo pequeno do mesmo assunto). Antes de cada item: `node tools/checar.mjs`; teste no navegador em `?teste` e, para a nuvem, `node nuvem/local.mjs`.
@@ -40,7 +37,7 @@ Análise feita um dia depois de a nuvem entrar no ar. Cada item traz a evidênci
 - [x] **B7.** Feito em 2026-11-07 (PR versão PC/bloco B): `tools/checar.mjs` roda também `ponte-c6/testes/*.test.mjs`; o build do Workers Builds passa a rodar `tests/nuvem|cofre|sincronia.test.mjs` antes do deploy: **configuração a fazer uma vez no painel** (Build command com `cd ..`, `NODE_VERSION=22`), passo a passo em `nuvem/README.md` ("Testes antes de publicar").
 - [x] **B8.** Feito em 2026-11-07 (PR versão PC/bloco B): `tests/nuvem-aparelho.test.mjs` (camada abaixo de `app.js` na nuvem: alterar/aoMudar/enviarAjustes, sair tranca, login lembrado, dois usuários, 401/408 com reenvio), `tests/banco-cliente.test.mjs` (`banco.js` e `banco-fase2.js` com fetch falso), `tests/fatura.test.mjs` (HTML e Excel com ExcelJS falso), `tests/caixas-visualizador.test.mjs` (partes sem DOM), `tests/atualizador-pc.test.mjs`, `tests/sw.test.mjs`. `app.js` em si não roda no Node (window/document ao carregar).
 - [x] **B9.** Conferido em 2026-11-07 (PR versão PC/bloco B): a nuvem guarda o histórico na ordem de chegada, então a posição de uma entrada já enviada é a mesma em todos os aparelhos e `desfaz` aponta certo; a única posição instável é a de entrada ainda não enviada, que `desfazerItens` já barra. Sem mudança de código; teste "desfazer pelo histórico com dois aparelhos" em `tests/sincronia.test.mjs`.
-- [x] **B10.** Feito em 2026-11-07 (PR versão PC/bloco B): `frame-ancestors` não funciona em `<meta>`; coberto pelo `X-Frame-Options: DENY` da Transform Rule do Cloudflare; **falta o dono** acrescentar `Content-Security-Policy: frame-ancestors 'none'` na mesma regra (passo a passo em `SEGURANCA.md` 5b). `connect-src` continua com `localhost:*`/`127.0.0.1:*` porque a porta da ponte é digitada pelo usuário (`ponte_url`) e o desenvolvimento usa 8000/8787; motivo em `SEGURANCA.md`.
+- [x] **B10.** Feito em 2026-11-07 (PR versão PC/bloco B): `frame-ancestors` não funciona em `<meta>`; coberto pelo `X-Frame-Options: DENY` da Transform Rule do Cloudflare; `Content-Security-Policy: frame-ancestors 'none'` acrescentado na mesma regra em 2026-11-08 (Add static, `SEGURANCA.md` 5b). `connect-src` continua com `localhost:*`/`127.0.0.1:*` porque a porta da ponte é digitada pelo usuário (`ponte_url`) e o desenvolvimento usa 8000/8787; motivo em `SEGURANCA.md`.
 - [x] **B11.** Feito em 2026-11-07 (PR versão PC/bloco B): `/importar` exige `substituir` e administrador antes da cópia "antes-da-substituicao"; ficam só as 5 mais recentes (`MANTER_SUBSTITUICOES`, `faxinaDeBackups`). Teste "B11" em `tests/cofre.test.mjs`.
 - [x] **B12.** Feito em 2026-11-07 (PR versão PC/bloco B): `cartoesNoCelular` (`app.js`) mede todas as tabelas e só depois aplica as classes (um recálculo da página por `mostrar`); login mostra "Entrando…" no botão enquanto confere a senha e volta a "Entrar" em erro (`FORMULARIOS.login`, `telas/envios.js`). Testado no navegador embutido em 375 px.
 
