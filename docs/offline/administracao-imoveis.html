@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-5PX3qDS7HBcwIa/g9OlJe9mhqeuI8crUbLmgvO9QsOc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-gZJbiXeJXjxo56eEvEmkYNuo1IQ5LgEouS5H/h1WSjo=' 'sha256-OYkmEFI6bt6fEQJi/XBzmtmD8FTQicfgJIDZGs+phgw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="61aed3e4e1e01419">
+<meta name="fontes" content="6799e42c8c7573be">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -9680,6 +9680,139 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     else raiz.prepend(nav);
   }
 
+  // docs/js/fatura.js
+  var LARGURAS = [2, 8, 6.8, 6.2, 8, 11.2, 4.7, 6.7, 5.8, 6, 13, 6, 15.5];
+  var ALTURAS = { 3: 50.25, 7: 9.95, 9: 9.95, 10: 20.1, 11: 20.1, 12: 20.1, 13: 9.95, 14: 9.95, 15: 9.95, 16: 30, 17: 30, 18: 30, 27: 30, 28: 30, 29: 30, 30: 30, 31: 30, 32: 3.75, 33: 20.1, 34: 20.1 };
+  var maiusc = (t) => String(t || "").toLocaleUpperCase("pt-BR");
+  var corta2 = (t, n) => String(t || "").slice(0, n);
+  function linhasObservacoes(texto3, porLinha = 90, maxLinhas = 5) {
+    const linhas2 = [];
+    for (const par of String(texto3 || "").split(/\r?\n/)) {
+      let atual = "";
+      for (const palavra of par.split(/\s+/).filter(Boolean)) {
+        const p2 = palavra.slice(0, porLinha);
+        if (atual && `${atual} ${p2}`.length > porLinha) {
+          linhas2.push(atual);
+          atual = p2;
+        } else atual = atual ? `${atual} ${p2}` : p2;
+      }
+      linhas2.push(atual);
+    }
+    while (linhas2.length && !linhas2.at(-1)) linhas2.pop();
+    return linhas2.slice(0, maxLinhas);
+  }
+  function linhas(f, emitente) {
+    const num = `Nº ${numeroFatura(f.numero)}`;
+    const periodo2 = `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`;
+    const vazio = (n, cls = "") => [n, "", cls];
+    return {
+      3: [[1, "", "be bt"], [9, `<span class="f-empresa">${esc(maiusc(emitente.nome))}</span>`, "bt bd"], [3, '<b class="f-titulo">FATURA DE LOCAÇÃO</b>', "be bt bd centro"]],
+      4: [[1, "", "be"], [9, esc(emitente.razao_social), "bd f-12"], [3, `<span class="f-num">${num}</span>`, "be bd centro topo"]],
+      5: [[1, "", "be"], [9, esc(emitente.cnpj ? `CNPJ ${emitente.cnpj}` : ""), "bd f-12"], [3, `<span class="f-12 f-light">Emissão: ${dataBr(f.emissao)}</span>`, "be bd centro topo"]],
+      6: [[1, "", "be bb"], [9, esc(emitente.endereco || ""), "bd bb f-12 f-light"], [3, "", "be bd bb"]],
+      7: [vazio(13, "be bd bt bb")],
+      8: [[1, "", "be bt"], [9, "TOMADOR DE SERVIÇO", "bt bd f-11"], [1, "", "be bd bt"], [2, "", "bt bd"]],
+      9: [[1, "", "be"], [9, "", "bd"], [1, "", "be bd"], [2, "", "bd"]],
+      10: [[1, "", "be"], [3, "<b>NOME DO CLIENTE</b>", "f-12 f-light"], [6, `<b>${esc(maiusc(corta2(f.tomador_nome, 60)))}</b>`, "bd f-12 f-light"], [1, "<b>TELEFONE</b>", "be bd f-10 f-light"], [2, `<b>${esc(f.tomador_telefone || "")}</b>`, "bd f-11"]],
+      11: [[1, "", "be"], [3, "<b>CPF</b>", "f-12 f-light"], [6, `<b>${esc(f.tomador_documento || "")}</b>`, "bd f-12 f-light"], [1, "", "be bd"], [2, "", "bd"]],
+      12: [[1, "", "be bb"], [3, "<b>ENDEREÇO</b>", "bb f-12 f-light"], [6, `<b>${esc(maiusc(corta2(f.tomador_endereco, 70)))}</b>`, "bd bb f-12 f-light"], [1, "", "be bd bb"], [2, "", "bd bb"]],
+      13: [vazio(13, "be bd bt bb")],
+      14: [vazio(13, "be bd bt bb")],
+      15: [vazio(13, "be bd bt preto")],
+      16: [[4, "", "be bt bb"], [2, "<b>PERÍODO DO SERVIÇO</b>", "bt bb f-12 f-light"], [7, `<b>${periodo2}</b>`, "bt bb bd f-12 f-light"]],
+      17: [[1, "", "be bt bb"], [12, "<b>DADOS DA LOCAÇÃO</b>", "bt bb bd f-12 f-light"]],
+      18: [[1, "", "be bd bt"], [1, "<b>ITEM</b>", "be bd bt centro f-11 f-light"], [3, "<b>DESCRIÇÃO</b>", "be bd bt centro f-11 f-light"], [1, "<b>MUNICÍPIO</b>", "be bd bt centro f-11 f-light"], [1, "<b>UN</b>", "be bd bt centro f-11 f-light"], [3, "<b>QUANTIDADE/MESES</b>", "be bd bt centro f-11 f-light"], [2, "<b>VALOR UNITÁRIO</b>", "be bd bt centro f-11 f-light"], [1, "<b>CUSTO TOTAL</b>", "be bd bt bb centro f-11 f-light"]],
+      ...Object.fromEntries([19, 20, 21, 23, 24, 25].map((r) => [r, [[1, "", "be bd"], [1, "", "be bd"], [3, "", "be bd"], [1, "", "be bd"], [1, "", "be bd"], [3, "", "be bd"], [2, "", "be bd"], [1, "", `be bd${r === 25 ? " bb" : ""}`]]])),
+      22: [[1, "", "be bd"], [1, "1", "be bd centro f-12 f-light"], [3, "LOCAÇÃO DE IMÓVEL", "be bd centro f-12 f-light"], [1, esc(maiusc(f.municipio)), "be bd centro f-12 f-light"], [1, "UN", "be bd centro f-12 f-light"], [3, "1", "be bd centro f-12 f-light"], [2, `<span class="moeda">${reais(f.valor)}</span>`, "be bd f-12 f-light"], [1, `<span class="moeda">${reais(f.valor)}</span>`, "be bd f-12 f-light"]],
+      26: [[1, "", "be bt bb"], [5, "", "bt bb"], [6, "<b>VALOR TOTAL DA FATURA</b>", "be bd bt bb centro f-12 f-light"], [1, `<b class="moeda">${reais(f.valor)}</b>`, "be bd bt bb f-12 f-light"]],
+      ...Object.fromEntries([27, 28, 29, 30, 31].map((r, n) => [r, [[1, "", "be"], [12, esc(linhasObservacoes(f.observacoes)[n] || ""), "bd f-11 f-light"]]])),
+      32: [vazio(13, "be bd preto")],
+      33: [[10, `RECEBEMOS DE ${esc(maiusc(f.tomador_nome))} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`, "be bd f-canhoto"], [3, "<b>FATURA DE LOCAÇÃO</b>", "be bd centro f-12"]],
+      34: [[4, "DATA DO RECEBIMENTO", "be bd bt f-canhoto"], [6, "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", "be bd bt f-canhoto"], [3, `<b>${num}</b>`, "be bd bt centro f-12"]],
+      35: [[4, "", "be bd bb"], [6, "", "be bd bb"], [3, "", "be bd bb"]]
+    };
+  }
+  var PX = LARGURAS.map((w) => Math.round(w * 7 + 5));
+  var LARGURA_TOTAL = PX.reduce((t, w) => t + w, 0);
+  function faturaHtml(f, emitente) {
+    const ls = linhas(f, emitente);
+    const cols = PX.map((w) => `<col style="width:${w}px">`).join("");
+    const corpo = Object.keys(ls).map(Number).sort((a, b) => a - b).map((r) => {
+      const altura = ALTURAS[r] || 15;
+      return `<tr style="height:${(altura * 4 / 3).toFixed(1)}px">${ls[r].map(([n, t, cls]) => `<td colspan="${n}" class="${cls}">${t}</td>`).join("")}</tr>`;
+    }).join("");
+    return `<div class="fatura-xls"><table style="width:${LARGURA_TOTAL}px"><colgroup>${cols}</colgroup>${corpo}</table></div>`;
+  }
+  function encaixarFaturas(raiz) {
+    for (const tabela of raiz.querySelectorAll(".fatura-xls table")) {
+      for (const tr of tabela.rows) {
+        const altura = parseFloat(tr.style.height) || 0;
+        for (const td of tr.cells) {
+          if (!td.textContent.trim()) continue;
+          const quebra = getComputedStyle(td).whiteSpace !== "nowrap";
+          const faixa = document.createRange();
+          faixa.selectNodeContents(td);
+          for (let i = 0; i < 10; i += 1) {
+            const cx = faixa.getBoundingClientRect();
+            const livre = td.clientWidth - 6;
+            const fator = quebra ? altura && cx.height > altura ? 0.93 : 1 : cx.width > livre ? Math.max(0.6, livre / cx.width) : 1;
+            if (fator >= 1) break;
+            const els = [td, ...td.querySelectorAll("*")];
+            const tamanhos = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
+            els.forEach((el, k) => {
+              el.style.fontSize = `${(tamanhos[k] * fator * 0.99).toFixed(2)}px`;
+            });
+          }
+        }
+      }
+    }
+  }
+  function abaDaEmpresa(wb, emitente, usadas) {
+    const livres = wb.worksheets.filter((w) => !usadas.has(w.id));
+    const porNome = (nome) => livres.find((w) => w.name.trim().toLocaleUpperCase("pt-BR") === nome.trim().toLocaleUpperCase("pt-BR"));
+    return emitente.aba_modelo && porNome(emitente.aba_modelo) || porNome(emitente.nome.split(/\s+/)[0]) || livres[0];
+  }
+  async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(modeloBuffer);
+    const usadas = /* @__PURE__ */ new Set();
+    for (const f of faturas) {
+      const e = emitentes.find((x) => x.id === f.emitente_id);
+      const ws = abaDaEmpresa(wb, e, usadas);
+      if (!ws) throw new Error("O modelo Excel tem menos abas do que empresas nesta fatura.");
+      usadas.add(ws.id);
+      const num = `Nº ${numeroFatura(f.numero)}`;
+      const valor = f.valor / 100;
+      const set = (ref, v) => {
+        ws.getCell(ref).value = v;
+      };
+      set("B3", maiusc(e.nome));
+      set("B4", e.razao_social || "");
+      set("B5", e.cnpj ? `CNPJ ${e.cnpj}` : "");
+      set("B6", e.endereco || "");
+      set("L4", num);
+      set("L5", `Emissão: ${dataBr(f.emissao)}`);
+      set("E10", maiusc(corta2(f.tomador_nome, 60)));
+      set("L10", f.tomador_telefone || "");
+      set("E11", f.tomador_documento || "");
+      set("E12", maiusc(corta2(f.tomador_endereco, 70)));
+      linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
+      set("G16", `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`);
+      set("F22", maiusc(corta2(f.municipio, 25)));
+      set("K22", valor);
+      set("M22", { formula: "K22", result: valor });
+      set("M26", { formula: "M22", result: valor });
+      set("A33", `RECEBEMOS DE ${maiusc(f.tomador_nome)} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`);
+      set("L34", num);
+      ws.pageSetup.fitToPage = true;
+      ws.pageSetup.fitToWidth = 1;
+      ws.pageSetup.fitToHeight = 1;
+    }
+    for (const ws of [...wb.worksheets]) if (!usadas.has(ws.id)) wb.removeWorksheet(ws.id);
+    wb.calcProperties.fullCalcOnLoad = true;
+    return new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+
   // docs/js/nuvem.js
   var RAIZ_DO_SERVIDOR = ["formato", "revisao", "atualizado_em", "atualizado_por", "seq", "revisao_so_sessao", "historico", "_nuvem"];
   var CONTADORES = ["proxima_fatura"];
@@ -16533,113 +16666,6 @@ Salvar assim mesmo?`)) {
     }
   }
 
-  // docs/js/fatura.js
-  var LARGURAS = [2, 8, 6.8, 6.2, 8, 11.2, 4.7, 6.7, 5.8, 6, 13, 6, 15.5];
-  var ALTURAS = { 3: 50.25, 7: 9.95, 9: 9.95, 10: 20.1, 11: 20.1, 12: 20.1, 13: 9.95, 14: 9.95, 15: 9.95, 16: 30, 17: 30, 18: 30, 27: 30, 28: 30, 29: 30, 30: 30, 31: 30, 32: 3.75, 33: 20.1, 34: 20.1 };
-  var maiusc = (t) => String(t || "").toLocaleUpperCase("pt-BR");
-  var corta2 = (t, n) => String(t || "").slice(0, n);
-  function linhasObservacoes(texto3, porLinha = 90, maxLinhas = 5) {
-    const linhas2 = [];
-    for (const par of String(texto3 || "").split(/\r?\n/)) {
-      let atual = "";
-      for (const palavra of par.split(/\s+/).filter(Boolean)) {
-        const p2 = palavra.slice(0, porLinha);
-        if (atual && `${atual} ${p2}`.length > porLinha) {
-          linhas2.push(atual);
-          atual = p2;
-        } else atual = atual ? `${atual} ${p2}` : p2;
-      }
-      linhas2.push(atual);
-    }
-    while (linhas2.length && !linhas2.at(-1)) linhas2.pop();
-    return linhas2.slice(0, maxLinhas);
-  }
-  function linhas(f, emitente) {
-    const num = `Nº ${numeroFatura(f.numero)}`;
-    const periodo2 = `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`;
-    const vazio = (n, cls = "") => [n, "", cls];
-    return {
-      3: [[1, "", "be bt"], [9, `<span class="f-empresa">${esc(maiusc(emitente.nome))}</span>`, "bt bd"], [3, '<b class="f-titulo">FATURA DE LOCAÇÃO</b>', "be bt bd centro"]],
-      4: [[1, "", "be"], [9, esc(emitente.razao_social), "bd f-12"], [3, `<span class="f-num">${num}</span>`, "be bd centro topo"]],
-      5: [[1, "", "be"], [9, esc(emitente.cnpj ? `CNPJ ${emitente.cnpj}` : ""), "bd f-12"], [3, `<span class="f-12 f-light">Emissão: ${dataBr(f.emissao)}</span>`, "be bd centro topo"]],
-      6: [[1, "", "be bb"], [9, esc(emitente.endereco || ""), "bd bb f-12 f-light"], [3, "", "be bd bb"]],
-      7: [vazio(13, "be bd bt bb")],
-      8: [[1, "", "be bt"], [9, "TOMADOR DE SERVIÇO", "bt bd f-11"], [1, "", "be bd bt"], [2, "", "bt bd"]],
-      9: [[1, "", "be"], [9, "", "bd"], [1, "", "be bd"], [2, "", "bd"]],
-      10: [[1, "", "be"], [3, "<b>NOME DO CLIENTE</b>", "f-12 f-light"], [6, `<b>${esc(maiusc(corta2(f.tomador_nome, 60)))}</b>`, "bd f-12 f-light"], [1, "<b>TELEFONE</b>", "be bd f-10 f-light"], [2, `<b>${esc(f.tomador_telefone || "")}</b>`, "bd f-11"]],
-      11: [[1, "", "be"], [3, "<b>CPF</b>", "f-12 f-light"], [6, `<b>${esc(f.tomador_documento || "")}</b>`, "bd f-12 f-light"], [1, "", "be bd"], [2, "", "bd"]],
-      12: [[1, "", "be bb"], [3, "<b>ENDEREÇO</b>", "bb f-12 f-light"], [6, `<b>${esc(maiusc(corta2(f.tomador_endereco, 70)))}</b>`, "bd bb f-12 f-light"], [1, "", "be bd bb"], [2, "", "bd bb"]],
-      13: [vazio(13, "be bd bt bb")],
-      14: [vazio(13, "be bd bt bb")],
-      15: [vazio(13, "be bd bt preto")],
-      16: [[4, "", "be bt bb"], [2, "<b>PERÍODO DO SERVIÇO</b>", "bt bb f-12 f-light"], [7, `<b>${periodo2}</b>`, "bt bb bd f-12 f-light"]],
-      17: [[1, "", "be bt bb"], [12, "<b>DADOS DA LOCAÇÃO</b>", "bt bb bd f-12 f-light"]],
-      18: [[1, "", "be bd bt"], [1, "<b>ITEM</b>", "be bd bt centro f-11 f-light"], [3, "<b>DESCRIÇÃO</b>", "be bd bt centro f-11 f-light"], [1, "<b>MUNICÍPIO</b>", "be bd bt centro f-11 f-light"], [1, "<b>UN</b>", "be bd bt centro f-11 f-light"], [3, "<b>QUANTIDADE/MESES</b>", "be bd bt centro f-11 f-light"], [2, "<b>VALOR UNITÁRIO</b>", "be bd bt centro f-11 f-light"], [1, "<b>CUSTO TOTAL</b>", "be bd bt bb centro f-11 f-light"]],
-      ...Object.fromEntries([19, 20, 21, 23, 24, 25].map((r) => [r, [[1, "", "be bd"], [1, "", "be bd"], [3, "", "be bd"], [1, "", "be bd"], [1, "", "be bd"], [3, "", "be bd"], [2, "", "be bd"], [1, "", `be bd${r === 25 ? " bb" : ""}`]]])),
-      22: [[1, "", "be bd"], [1, "1", "be bd centro f-12 f-light"], [3, "LOCAÇÃO DE IMÓVEL", "be bd centro f-12 f-light"], [1, esc(maiusc(f.municipio)), "be bd centro f-12 f-light"], [1, "UN", "be bd centro f-12 f-light"], [3, "1", "be bd centro f-12 f-light"], [2, `<span class="moeda">${reais(f.valor)}</span>`, "be bd f-12 f-light"], [1, `<span class="moeda">${reais(f.valor)}</span>`, "be bd f-12 f-light"]],
-      26: [[1, "", "be bt bb"], [5, "", "bt bb"], [6, "<b>VALOR TOTAL DA FATURA</b>", "be bd bt bb centro f-12 f-light"], [1, `<b class="moeda">${reais(f.valor)}</b>`, "be bd bt bb f-12 f-light"]],
-      ...Object.fromEntries([27, 28, 29, 30, 31].map((r, n) => [r, [[1, "", "be"], [12, esc(linhasObservacoes(f.observacoes)[n] || ""), "bd f-11 f-light"]]])),
-      32: [vazio(13, "be bd preto")],
-      33: [[10, `RECEBEMOS DE ${esc(maiusc(f.tomador_nome))} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`, "be bd f-canhoto"], [3, "<b>FATURA DE LOCAÇÃO</b>", "be bd centro f-12"]],
-      34: [[4, "DATA DO RECEBIMENTO", "be bd bt f-canhoto"], [6, "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", "be bd bt f-canhoto"], [3, `<b>${num}</b>`, "be bd bt centro f-12"]],
-      35: [[4, "", "be bd bb"], [6, "", "be bd bb"], [3, "", "be bd bb"]]
-    };
-  }
-  function faturaHtml(f, emitente) {
-    const ls = linhas(f, emitente);
-    const cols = LARGURAS.map((w) => `<col style="width:${(w * 7 + 5).toFixed(0)}px">`).join("");
-    const corpo = Object.keys(ls).map(Number).sort((a, b) => a - b).map((r) => {
-      const altura = ALTURAS[r] || 15;
-      return `<tr style="height:${(altura * 4 / 3).toFixed(1)}px">${ls[r].map(([n, t, cls]) => `<td colspan="${n}" class="${cls}">${t}</td>`).join("")}</tr>`;
-    }).join("");
-    return `<div class="fatura-xls"><table><colgroup>${cols}</colgroup>${corpo}</table></div>`;
-  }
-  function abaDaEmpresa(wb, emitente, usadas) {
-    const livres = wb.worksheets.filter((w) => !usadas.has(w.id));
-    const porNome = (nome) => livres.find((w) => w.name.trim().toLocaleUpperCase("pt-BR") === nome.trim().toLocaleUpperCase("pt-BR"));
-    return emitente.aba_modelo && porNome(emitente.aba_modelo) || porNome(emitente.nome.split(/\s+/)[0]) || livres[0];
-  }
-  async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(modeloBuffer);
-    const usadas = /* @__PURE__ */ new Set();
-    for (const f of faturas) {
-      const e = emitentes.find((x) => x.id === f.emitente_id);
-      const ws = abaDaEmpresa(wb, e, usadas);
-      if (!ws) throw new Error("O modelo Excel tem menos abas do que empresas nesta fatura.");
-      usadas.add(ws.id);
-      const num = `Nº ${numeroFatura(f.numero)}`;
-      const valor = f.valor / 100;
-      const set = (ref, v) => {
-        ws.getCell(ref).value = v;
-      };
-      set("B3", maiusc(e.nome));
-      set("B4", e.razao_social || "");
-      set("B5", e.cnpj ? `CNPJ ${e.cnpj}` : "");
-      set("B6", e.endereco || "");
-      set("L4", num);
-      set("L5", `Emissão: ${dataBr(f.emissao)}`);
-      set("E10", maiusc(corta2(f.tomador_nome, 60)));
-      set("L10", f.tomador_telefone || "");
-      set("E11", f.tomador_documento || "");
-      set("E12", maiusc(corta2(f.tomador_endereco, 70)));
-      linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
-      set("G16", `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`);
-      set("F22", maiusc(corta2(f.municipio, 25)));
-      set("K22", valor);
-      set("M22", { formula: "K22", result: valor });
-      set("M26", { formula: "M22", result: valor });
-      set("A33", `RECEBEMOS DE ${maiusc(f.tomador_nome)} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`);
-      set("L34", num);
-      ws.pageSetup.fitToPage = true;
-      ws.pageSetup.fitToWidth = 1;
-      ws.pageSetup.fitToHeight = 1;
-    }
-    for (const ws of [...wb.worksheets]) if (!usadas.has(ws.id)) wb.removeWorksheet(ws.id);
-    wb.calcProperties.fullCalcOnLoad = true;
-    return new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  }
-
   // docs/js/telas/reajustes.js
   var MESES3 = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   var dataExtenso = (iso2) => `${Number(iso2.slice(8, 10))} de ${MESES3[Number(iso2.slice(5, 7)) - 1]} de ${iso2.slice(0, 4)}`;
@@ -19360,6 +19386,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     caixa.style.cssText = "position:fixed;left:-20000px;top:0;background:#fff";
     caixa.innerHTML = faturaHtml(f, e);
     document.body.appendChild(caixa);
+    encaixarFaturas(caixa);
     try {
       const canvas = await html2canvas(caixa.firstElementChild, { scale: 2, backgroundColor: "#ffffff" });
       const pdf = new jsPDF({ unit: "mm", format: "a4" });
@@ -22837,6 +22864,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (mudou) arrumarTabelas(raiz);
   }
   function arrumarTabelas(raiz) {
+    encaixarFaturas(raiz);
     if (window.matchMedia?.("(max-width: 760px)").matches) cartoesNoCelular(raiz);
     for (const tabela of raiz.querySelectorAll("table.responsiva")) {
       const cabecalho = [...tabela.querySelectorAll("tr:first-child th")].map((th) => th.textContent.trim());
