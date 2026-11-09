@@ -50,13 +50,15 @@ export function telaFaturas(mes) {
       <a class="botao secundario" href="#/faturas?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a></div></div>
     <div class="cartao"><h2>Pagamentos aguardando número</h2>
       <p class="suave">Última NF: ${ultima ? `<b>Nº ${R.numeroFatura(ultima.numero)}</b> de ${dataBr(ultima.emissao)}` : 'nenhuma ainda'} · próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. A numeração segue a data contábil (em que o dinheiro entrou), e a data de emissão é essa data. Inquilinos marcados "sem NF" não entram.</p>
-      ${pend.length ? `<table><tr><th>Ordem</th><th>Pagamento em</th><th>Origem</th><th>Observações na NF</th><th class="n">Valor da NF</th><th></th></tr>
-        ${pend.map((p, n) => { const b = R.baseDaFatura(d(), p.tipo, p.registro); return `<tr class="${ultima && p.data < ultima.emissao ? 'fora' : ''}"><td>${R.numeroFatura(d().proxima_fatura + n)}</td><td>${dataBr(p.data)}${ultima && p.data < ultima.emissao ? ` ${etiqueta('anterior à última NF', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td>
-          <td class="suave">${esc(b.observacoes || '')}</td><td class="n">${reais(b.valor)}</td>
-          <td class="n">${opera() ? `${link(p.tipo === 'cobranca' ? `#/editar/cobrancas/${p.registro.id}?nf=1` : `#/editar/avulsas/${p.registro.id}`, 'Corrigir')}
-            ${formNfExterna(p.tipo, p.registro.id, p.data)}` : ''}</td></tr>`; }).join('')}</table>
-        <p class="suave">Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
-        ${opera() ? `<p>${botao('numerar', 'Numerar estas NFs', {}, '')}</p>` : ''}`
+      ${caixaAirbnb(pend)}
+      ${pend.length ? `<div class="acoes barra-nf"><label class="check-mini"><input type="checkbox" data-marcar-todas="nfp"> marcar todos</label>
+        <span class="suave">Vêm marcados os pagamentos dos meses fechados (do dia 1º ao último dia). O mês em andamento fica desmarcado: numere depois da virada.</span></div>
+        <table><tr><th></th><th>Pagamento em</th><th>Origem</th><th>Observações na NF</th><th class="n">Valor da NF</th><th></th></tr>
+        ${porMes(pend).map(([mes, ps]) => `<tr class="grupo-mes"><th><input type="checkbox" data-marcar-todas="nfp-${mes}" ${R.mesFechado(mes) ? 'checked' : ''} title="Marcar o mês todo"></th>
+          <th colspan="5">${compBr(mes)} · ${ps.length} pagamento(s) · ${reais(ps.reduce((t, p) => t + R.baseDaFatura(d(), p.tipo, p.registro).valor, 0))} ${R.mesFechado(mes) ? etiqueta('mês fechado', 'ok') : etiqueta('mês em andamento', 'aviso')}</th></tr>
+          ${ps.map((p) => linhaPendente(p, mes, ultima)).join('')}`).join('')}</table>
+        <p class="suave">A numeração segue a data contábil dos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
+        ${opera() ? `<p>${botao('numerar', 'Numerar as NFs marcadas', {}, '')}</p>` : ''}`
       : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
     <div class="cartao rolagem">
@@ -74,6 +76,39 @@ export function telaFaturas(mes) {
     .map((e) => botao('pdfMes', `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(' ')}
       ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
     ${opera() && ultima ? caixaRenumerar() : ''}`;
+}
+
+/** Fila de NF separada por mês do pagamento: [['AAAA-MM', [pendentes]]], do mais antigo ao mais novo. */
+function porMes(pend) {
+  const m = new Map();
+  for (const p of pend) {
+    const comp = p.data.slice(0, 7);
+    if (!m.has(comp)) m.set(comp, []);
+    m.get(comp).push(p);
+  }
+  return [...m];
+}
+
+function linhaPendente(p, mes, ultima) {
+  const b = R.baseDaFatura(d(), p.tipo, p.registro);
+  const antes = ultima && p.data < ultima.emissao;
+  return `<tr class="${antes ? 'fora' : ''}"><td>${opera() ? `<input type="checkbox" data-nfp="${R.chavePendente(p)}" data-nfp-${mes} ${R.mesFechado(mes) ? 'checked' : ''}>` : ''}</td>
+    <td>${dataBr(p.data)}${antes ? ` ${etiqueta('anterior à última NF', 'perigo')}` : ''}</td><td>${esc(b.descricao)}</td>
+    <td class="suave">${esc(b.observacoes || '')}</td><td class="n">${reais(b.valor)}</td>
+    <td class="n">${opera() ? `${link(p.tipo === 'cobranca' ? `#/editar/cobrancas/${p.registro.id}?nf=1` : `#/editar/avulsas/${p.registro.id}`, 'Corrigir')}
+      ${formNfExterna(p.tipo, p.registro.id, p.data)}` : ''}</td></tr>`;
+}
+
+/** Lembrete do Airbnb antes de numerar: o mês que acabou de fechar e os meses fechados que estão na fila. */
+function caixaAirbnb(pend) {
+  const hoje = C.hojeIso();
+  const meses = [C.somarMeses(C.competenciaDe(hoje), -1), ...pend.map((p) => p.data.slice(0, 7))];
+  const lembretes = R.lembretesAirbnb(d(), meses, hoje);
+  const gerar = [...new Set(meses)].filter((m) => R.mesFechado(m, hoje)).sort().filter((m) => { const a = R.airbnbDoMes(d(), m); return !a.numerada && a.total && (!a.nf || a.divergente); });
+  if (!lembretes.length) return '<p class="suave">Airbnb: entradas lançadas e NF gerada nos meses fechados. ✓</p>';
+  return `<div class="alerta aviso"><b>Antes de numerar, lance as entradas do Airbnb.</b><ul>${lembretes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    ${opera() ? gerar.map((m) => botao('gerarNfAirbnb', `Gerar a NF do Airbnb de ${compBr(m)}`, { mes: m }, 'pequeno')).join(' ') : ''}
+    ${link(`#/financeiro?mes=${C.somarMeses(C.competenciaDe(hoje), -1)}`, 'Ir ao Financeiro')}</div>`;
 }
 
 /** Voltar a última numeração (ciclo) para corrigir, incluir um pagamento esquecido e numerar de novo. */

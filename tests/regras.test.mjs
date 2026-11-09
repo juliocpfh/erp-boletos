@@ -2374,3 +2374,33 @@ test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago
   assert.equal(R.declaracaoAnual(d, c.id, 2027).total, cbs[2].valor_nf);
   assert.equal(R.declaracaoAnual(d, c.id, 2025).empresas.length, 0);
 });
+
+test('NFs: numera só os pagamentos marcados (mês fechado) e lembra do Airbnb antes', () => {
+  const { d } = base();
+  const sala = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Apto 204', endereco: 'Rua Teste, 1' }, 'julio');
+  d.proxima_fatura = 200;
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  R.gerarCobrancas(d, '2026-10', 'julio');
+  R.registrarPagamento(d, 1, '2026-10-10', null, 'julio'); // outubro: mês fechado em 09/11
+  R.registrarPagamento(d, 2, '2026-11-05', null, 'julio'); // novembro: mês em andamento
+  assert.deepEqual([R.mesFechado('2026-10', '2026-11-09'), R.mesFechado('2026-11', '2026-11-09')], [true, false]);
+  const pend = R.pendentesDeFatura(d);
+  assert.deepEqual(pend.map(R.chavePendente), ['cobranca:1', 'cobranca:2']);
+  // sem ganho do Airbnb em outubro: lembra de lançar; com a entrada no extrato sem destino: avisa a entrada
+  assert.match(R.lembretesAirbnb(d, ['2026-10', '2026-11'], '2026-11-09').join(' | '), /Nenhuma entrada do Airbnb lançada em 10\/2026/);
+  d.movimentacoes_banco = [{ id: 1, tipo: 'entrada', data: '2026-10-20', valor: 90000, titulo: 'PIX RECEBIDO AIRBNB PAYMENTS', classificacao: null }];
+  const l = R.lembretesAirbnb(d, ['2026-10'], '2026-11-09');
+  assert.equal(l.length, 1);
+  assert.match(l[0], /1 entrada\(s\) do Airbnb no extrato de 10\/2026 ainda sem destino \(R\$ 900,00\)/);
+  d.movimentacoes_banco[0].classificacao = 'airbnb';
+  R.lancarGanhoAirbnb(d, sala.id, { data_recebimento: '2026-10-20', competencia: '2026-10', valor: 90000 }, 'julio');
+  assert.match(R.lembretesAirbnb(d, ['2026-10'], '2026-11-09')[0], /ainda não viraram NF/);
+  R.gerarNfAirbnb(d, '2026-10', 'julio', '2026-11-09');
+  assert.deepEqual(R.lembretesAirbnb(d, ['2026-10', '2026-11'], '2026-11-09'), [], 'novembro (em andamento) não entra no lembrete');
+  // marcados: o aluguel de outubro e a NF do Airbnb de outubro (31/10); novembro fica na fila
+  const outubro = R.pendentesDeFatura(d).filter((p) => p.data.slice(0, 7) === '2026-10').map(R.chavePendente);
+  const r = R.numerarFaturas(d, 'julio', { apenas: outubro });
+  assert.deepEqual(r.numeradas.map((n) => [n.numero, n.data]), [[200, '2026-10-10'], [201, '2026-10-31']]);
+  assert.deepEqual(R.pendentesDeFatura(d).map(R.chavePendente), ['cobranca:2']);
+  assert.equal(R.airbnbDoMes(d, '2026-10').numerada, 201);
+});
