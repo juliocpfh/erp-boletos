@@ -746,7 +746,7 @@ export const extensao = (nome) => { const p = nome.lastIndexOf('.'); return p > 
 
 export const semAcentoArquivo = (nome) => {
   const ext = extensao(nome);
-  const base = (ext ? nome.slice(0, nome.lastIndexOf('.')) : nome).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const base = C.paraNomeDeArquivo(ext ? nome.slice(0, nome.lastIndexOf('.')) : nome);
   return `${base || 'arquivo'}${ext}`;
 };
 
@@ -754,12 +754,12 @@ export const semAcentoArquivo = (nome) => {
 export async function salvarAssinado(escopo, contratoId, arquivo, texto) {
   const ponto = arquivo.name.lastIndexOf('.');
   const ext = ponto > 0 ? arquivo.name.slice(ponto).toLowerCase() : '';
-  const base = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const base = C.paraNomeDeArquivo(texto);
   return S.salvarArquivo(await pastaDoEscopo(escopo, contratoId), new File([arquivo], `${base}${ext}`));
 }
 
 /** Cor e ênfase de cada tipo de alerta (escolhidas em "Editar" nos alertas do Painel). */
-const SEM_ACENTO = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const SEM_ACENTO = (t) => C.semAcento(t).toLowerCase();
 
 export const classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === 'Padrão' ? '' : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
 

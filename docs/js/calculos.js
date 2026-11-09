@@ -417,6 +417,15 @@ export function ufDoCep(cep) {
 }
 
 // --------------------------------------------------------------------------
+// Textos
+// --------------------------------------------------------------------------
+/** Texto sem acento ("Água São João" → "Agua Sao Joao"); maiúsculas, espaços e o resto ficam como estão. Vazio/nulo → ''. */
+export const semAcento = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Texto para nome de arquivo ou id: sem acento, minúsculas, o que não for letra ou número vira "-" (ex.: "Apólice Nº 1" → "apolice-n-1"). */
+export const paraNomeDeArquivo = (t) => semAcento(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// --------------------------------------------------------------------------
 // Parâmetros do endereço (#/tela?comp=…&ordem=…): só valem no formato esperado
 // Quem monta o endereço pode ser qualquer pessoa (um link mandado por WhatsApp): o que não estiver
 // no formato é descartado e a tela usa o padrão. Isso impede texto estranho de chegar ao HTML.

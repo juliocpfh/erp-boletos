@@ -1626,7 +1626,7 @@ export function enderecoCompleto(imovel) {
  */
 export function imoveisPorEndereco(imoveis) {
   const porNome = (a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
-  const chave = (i) => String(i.endereco || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || `#${i.id}`;
+  const chave = (i) => C.semAcento(i.endereco).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || `#${i.id}`;
   const grupos = new Map();
   for (const i of [...imoveis].sort(porNome)) {
     if (!grupos.has(chave(i))) grupos.set(chave(i), []);
@@ -5529,7 +5529,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
 // Busca global (campo do cabeçalho): imóvel, inquilino, CPF/CNPJ, telefone, nº da NF e valor de boleto
 // --------------------------------------------------------------------------
 /** Texto para comparar: minúsculas e sem acento ("João" → "joao"). */
-export const textoDeBusca = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+export const textoDeBusca = (t) => C.semAcento(t).toLocaleLowerCase('pt-BR').trim();
 const soDigitosBusca = (t) => String(t || '').replace(/\D/g, '');
 
 /**

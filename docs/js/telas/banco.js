@@ -32,7 +32,6 @@ const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Refor
 const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
 const SEM_IMOVEL = ['tarifa', 'transferencia', 'ignorar', 'imposto', 'airbnb'];
-const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 const mov = (id) => { const m = movs().find((x) => x.id === Number(id)); if (!m) throw new Error('Movimentação não encontrada.'); return m; };
 const pag = (id) => { const p = pagamentos().find((x) => x.id === Number(id)); if (!p) throw new Error('Pagamento não encontrado.'); return p; };
 const registroDe = (tabela, id) => (tabela === 'pagamentos_banco' ? pag(id) : mov(id));
@@ -204,7 +203,7 @@ function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
  * O nome vem sem acento e sem ".pdf" (a extensão é posta aqui); nome já existente na pasta ganha " (2)".
  */
 async function guardarComprovante(x, tabela, nomeBase, blob, origem, { avisar = true } = {}) {
-  const base = S.limparNome(semAcento(nomeBase).replace(/\.pdf$/i, '').trim());
+  const base = S.limparNome(C.semAcento(nomeBase).replace(/\.pdf$/i, '').trim());
   if (!base || base === 'sem nome') throw new Error('Dê um nome ao comprovante.');
   const arquivo = () => new File([blob], `${base}.pdf`, { type: 'application/pdf' });
   const p = Z.escopoDoComprovante(d(), x);

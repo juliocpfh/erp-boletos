@@ -111,8 +111,10 @@ export function movimentacaoDoC6(contaId, e) {
 
 /** De onde veio a movimentação: 'api', 'ofx' ou 'ofx+api' (as duas, juntadas). Antiga sem o campo: pelo jeito do id (o reference da API é um UUID). */
 const fonteDe = (m) => m.fonte || (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id_externo || '')) ? 'api' : 'ofx');
+/** Em maiúsculas e sem acento ("Água" → "AGUA"), para procurar palavras nas descrições do banco. */
+const maiusculaSemAcento = (t) => C.semAcento(String(t || '').toUpperCase());
 /** Descrição para comparar: sem acento, só letras e números. Iguais, ou uma contém a outra (o OFX pode cortar a do banco). */
-const descricaoComparavel = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+const descricaoComparavel = (t) => maiusculaSemAcento(t).replace(/[^A-Z0-9]/g, '');
 function mesmaDescricao(a, b) {
   const x = descricaoComparavel(a);
   const y = descricaoComparavel(b);
@@ -254,7 +256,7 @@ export function movimentacoesDo(d, { conta_id = null, mes = null, imovel_id = nu
 // Nome do comprovante
 // --------------------------------------------------------------------------
 /** Texto sem acento, sem caracteres proibidos em nome de arquivo, com espaços simples (a pasta de teste recusa acento). */
-export const nomeSemAcento = (texto) => String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+export const nomeSemAcento = (texto) => C.semAcento(texto)
   .replace(/[<>:"/\\|?*\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
 
 function tipoDoComprovante(d, mov) {
@@ -290,7 +292,7 @@ export const nomePadraoComprovante = (d, mov) => nomeComprovante(d, mov);
 // Conciliação de boletos
 // --------------------------------------------------------------------------
 const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo';
-const semDigitos = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
+const semDigitos = (t) => maiusculaSemAcento(t).replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
 
 /** Uma entrada casa só com boleto que vence até tantos dias depois dela (pagamento adiantado). Ex.: entrada de 10/08 → vencimentos até 24/09. */
 export const DIAS_ANTECIPACAO = 45;
@@ -498,13 +500,12 @@ const PALAVRAS = [
 ];
 /** Número da parcela citado na descrição ("PARCELA 3/10", "PARC. 03", "3ª PARCELA", "COTA UNICA" → 0); null se não cita. */
 export function parcelaCitada(texto) {
-  const t = String(texto || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const t = maiusculaSemAcento(texto);
   if (/COTA\s*UNICA|PARCELA\s*UNICA/.test(t)) return 0;
   const m = /PARC(?:ELA)?\.?\s*0?(\d{1,2})\b/.exec(t) || /\b0?(\d{1,2})\s*[ªA°º]?\s*PARC(?:ELA)?/.exec(t);
   return m ? Number(m[1]) : null;
 }
-const textoDaMov = (m) => `${m.descricao || ''} ${m.titulo || ''} ${(m.contrapartida && (`${m.contrapartida.nome || ''} ${m.contrapartida.documento || ''}`)) || ''}`
-  .toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const textoDaMov = (m) => maiusculaSemAcento(`${m.descricao || ''} ${m.titulo || ''} ${(m.contrapartida && (`${m.contrapartida.nome || ''} ${m.contrapartida.documento || ''}`)) || ''}`);
 
 function imovelNoTexto(d, texto) {
   for (const i of d.imoveis) {
@@ -515,7 +516,7 @@ function imovelNoTexto(d, texto) {
     }
   }
   for (const i of d.imoveis) {
-    const nome = String(i.nome || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const nome = maiusculaSemAcento(i.nome);
     if (nome.length >= 4 && texto.includes(nome)) return { imovel: i, tipo: null, campo: 'nome' };
   }
   return null;
