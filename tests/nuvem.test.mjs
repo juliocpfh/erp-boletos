@@ -216,3 +216,52 @@ test('login: só com token do Access válido, da equipe e do aplicativo certos, 
   assert.equal((await saude(await token({ ...valido, email: 'estranho@exemplo.com.br' }), semLista)).status, 200, 'sem EMAILS: a porta é o Access e o cadastro de usuários (o cofre confere)');
   assert.equal((await saude(await token({ ...valido, email: '' }), semLista)).status, 403, 'token sem e-mail');
 });
+
+test('ícone do aplicativo: padrão até o administrador gravar; só PNG do tamanho certo; operador não grava; fora das rotas genéricas', async () => {
+  W.esquecerPapeis();
+  const png = (larg, alt, extra = 0) => { // assinatura + IHDR (o resto não importa para o Worker)
+    const b = new Uint8Array(33 + extra); b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 73, 72, 68, 82]);
+    const v = new DataView(b.buffer); v.setUint32(16, larg); v.setUint32(20, alt); return b;
+  };
+  const env = { MODO_TESTE: '1', DADOS: r2Falso() }; // modo de teste sem cofre: administrador
+  for (const t of ['192', '512']) {
+    const r = await pedir(env, 'GET', `/api/icone-${t}.png`);
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('Location'), `/icones/erp-${t}.png`);
+    assert.equal(r.headers.get('Cache-Control'), 'no-cache');
+  }
+  assert.deepEqual(await (await pedir(env, 'PUT', '/api/icone/512', png(512, 512))).json(), { ok: true });
+  assert.equal((await pedir(env, 'PUT', '/api/icone/192', png(192, 192))).status, 200);
+  const lido = await pedir(env, 'GET', '/api/icone-512.png');
+  assert.equal(lido.status, 200);
+  assert.equal(lido.headers.get('Content-Type'), 'image/png');
+  assert.equal(lido.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.equal(lido.headers.get('Cache-Control'), 'no-cache');
+  assert.deepEqual([...new Uint8Array(await lido.arrayBuffer())], [...png(512, 512)]);
+  // recusas
+  assert.equal((await pedir(env, 'PUT', '/api/icone/512', new TextEncoder().encode('<svg onload=alert(1)>'))).status, 400, 'não é PNG');
+  assert.equal((await pedir(env, 'PUT', '/api/icone/512', png(100, 100))).status, 400, 'tamanho errado');
+  assert.equal((await pedir(env, 'PUT', '/api/icone/192', png(512, 512))).status, 400, 'tamanho de outra rota');
+  assert.equal((await pedir(env, 'PUT', '/api/icone/512', png(512, 512, 1024 * 1024))).status, 400, 'mais de 1 MB');
+  assert.equal((await pedir(env, 'PUT', '/api/icone/256', png(256, 256))).status, 404);
+  assert.equal((await W.atender(new Request(`${BASE}/api/icone/512`, { method: 'PUT', body: png(512, 512) }), { ORIGEM: BASE, ...env })).status, 403, 'sem o cabeçalho do sistema');
+  // a pasta sistema/ não é alcançada pelas rotas genéricas
+  for (const [m, c, corpo] of [['GET', '/api/arquivos/../sistema/icone-512.png'], ['GET', '/api/arquivos/%2E%2E/sistema/icone-512.png'], ['GET', '/api/sistema/icone-512.png'], ['PUT', '/api/sistema/icone-512.png', 'x'], ['DELETE', '/api/sistema/icone-512.png'],
+    ['GET', '/api/lista/sistema/'], ['GET', '/api/lista-tudo/sistema/'], ['POST', '/api/mover', '{"de":"sistema","para":"arquivos/x"}'], ['POST', '/api/mover', '{"de":"arquivos/a.pdf","para":"sistema/icone-192.png"}'], ['POST', '/api/apagar', '{"caminho":"sistema"}']]) {
+    const r = await pedir(env, m, c, corpo);
+    assert.ok(r.status >= 400, `${m} ${c} → ${r.status}`);
+  }
+  assert.equal(env.DADOS.m.size, 2, 'os dois ícones continuam lá');
+  // operador não grava nem apaga
+  W.esquecerPapeis();
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => (new URL(req.url).searchParams.get('nivel') === 'admin' ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response('{"papel":"operador"}')) }) };
+  const envOp = { ...env, COFRE };
+  assert.equal((await pedir(envOp, 'PUT', '/api/icone/512', png(512, 512))).status, 403);
+  assert.equal((await pedir(envOp, 'DELETE', '/api/icone')).status, 403);
+  assert.equal((await pedir(envOp, 'GET', '/api/icone-512.png')).status, 200, 'qualquer um que entrou vê o ícone');
+  // o administrador volta ao padrão
+  W.esquecerPapeis();
+  assert.deepEqual(await (await pedir(env, 'DELETE', '/api/icone')).json(), { ok: true });
+  for (const t of ['192', '512']) assert.equal((await pedir(env, 'GET', `/api/icone-${t}.png`)).status, 302);
+  assert.equal(env.DADOS.m.size, 0);
+});
