@@ -27,6 +27,7 @@ import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquid
 import { telaImovel } from './telas/imovel.js';
 import { telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
+import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 
 // --------------------------------------------------------------------------
 // Telas de abertura
@@ -43,6 +44,7 @@ export const TELAS = {
 
   _ligarDesconto(raiz) {
     ligarCamposAutomaticos(raiz);
+    ligarEditorIcone(raiz);
     ligarIndiceBancoCentral(raiz);
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];
@@ -220,7 +222,7 @@ export const TELAS = {
     const porTipo = {};
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
-    return `<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Registrar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
+    return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Registrar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/inquilinos')}

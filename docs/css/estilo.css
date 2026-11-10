@@ -617,3 +617,14 @@ body.com-visualizador { overflow: hidden; }
   .botoes-inq .botao { padding: 6px 12px; font-size: 14px; }
   .botoes-inq .zap { color: var(--ok); border-color: #86efac; }
 }
+
+/* Ícone do aplicativo (Empresas): editor quadrado com prévias redonda e quadrada */
+.icone-editor { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin: 8px 0; }
+.icone-tela { width: 280px; max-width: 100%; aspect-ratio: 1; border: 1px solid var(--borda); border-radius: 8px; cursor: grab; touch-action: none; background: #fff; }
+.icone-tela:active { cursor: grabbing; }
+.icone-previas { display: flex; gap: 14px; }
+.icone-previas > div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+.icone-previas canvas { width: 72px; height: 72px; }
+.icone-controles label { display: inline-flex; align-items: center; gap: 6px; }
+.icone-controles input[type=range] { width: 160px; }
+.primeira-logo .acoes { display: flex; }
