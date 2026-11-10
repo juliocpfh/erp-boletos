@@ -607,15 +607,15 @@ body.com-visualizador { overflow: hidden; }
   main pre { white-space: pre-wrap; }
 }
 
-/* Inquilinos: no celular, telefone ao lado do nome e botões de contato no cartão; a coluna Contrato some (o botão vai junto) */
+/* Inquilinos: no celular, telefone ao lado do nome (numa linha só; nome comprido diminui a letra) e o botão Contrato
+   ao lado da Matrícula; a coluna Contrato some */
 .so-celular { display: none; }
 @media (max-width: 760px) {
   .so-pc { display: none !important; }
   span.so-celular { display: inline; }
   .tel-inq { white-space: nowrap; }
-  .botoes-inq.so-celular { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .botoes-inq .botao { padding: 6px 12px; font-size: 14px; }
-  .botoes-inq .zap { color: var(--ok); border-color: #86efac; }
+  a.so-celular { display: inline-block; }
+  .linha-inq { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, calc((100vw - 76px) / (var(--letras) * 0.5)), 15px); }
 }
 
 /* Ícone do aplicativo (Empresas): editor quadrado com prévias redonda e quadrada */
