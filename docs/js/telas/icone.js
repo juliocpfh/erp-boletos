@@ -16,15 +16,15 @@ export function caixaIcone() {
     <p class="suave">Envie a logo acima. Depois você enquadra aqui o ícone que aparece na tela do celular (hoje é o quadrado "ERP").</p></div>`;
   return `<div class="cartao" id="icone-app"><h2>Ícone do aplicativo (celular)</h2>
     <p class="suave">Arraste a logo para posicionar e use o zoom (no celular, também com dois dedos). O círculo tracejado é a parte que sempre aparece: o celular pode cortar o que fica fora dele.</p>
-    <div class="icone-editor">
-      <canvas class="icone-tela" width="512" height="512" aria-label="Enquadramento do ícone: arraste para mover"></canvas>
-      <div class="icone-previas">
-        <div><canvas data-forma="redondo" width="96" height="96"></canvas><span class="suave">redondo</span></div>
-        <div><canvas data-forma="quadrado" width="96" height="96"></canvas><span class="suave">quadrado</span></div>
+    <div class="icone-editor" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;max-width:100%">
+      <canvas class="icone-tela" width="512" height="512" style="width:min(280px,100%);height:auto;aspect-ratio:1;max-width:100%;touch-action:none" aria-label="Enquadramento do ícone: arraste para mover"></canvas>
+      <div class="icone-previas" style="display:flex;gap:14px">
+        <div><canvas data-forma="redondo" width="96" height="96" style="width:72px;height:72px"></canvas><span class="suave">redondo</span></div>
+        <div><canvas data-forma="quadrado" width="96" height="96" style="width:72px;height:72px"></canvas><span class="suave">quadrado</span></div>
       </div>
     </div>
     <div class="acoes icone-controles">
-      <label>Zoom <input type="range" class="icone-zoom" min="30" max="400" step="1" value="${Math.round(enquadro.zoom * 100)}"></label>
+      <label>Zoom <input type="range" class="icone-zoom" style="width:140px;max-width:45vw" min="30" max="400" step="1" value="${Math.round(enquadro.zoom * 100)}"></label>
       <label>Fundo <input type="color" class="icone-fundo" value="${enquadro.fundo}"></label>
       <button type="button" class="secundario pequeno" data-acao="iconeCentralizar">Centralizar</button>
     </div>
