@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-yJiiP8twzcWl1quc/wCerO4XKt4g6H28vO3rmKF/eSo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-34U/56u5sTip3zxiFLwXPSpdkYWQ6tINHeeJUQc4gGY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ff2744c8b6a0b10d">
+<meta name="fontes" content="860c466c107e462d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -18054,6 +18054,17 @@ Salvar assim mesmo?`)) {
 
   // docs/js/telas/icone.js
   var enquadro = { zoom: 1, x: 0, y: 0, fundo: "#ffffff" };
+  var GUARDADO = "icone-enquadramento";
+  try {
+    Object.assign(enquadro, JSON.parse(localStorage.getItem(GUARDADO) || "{}"));
+  } catch {
+  }
+  var guardarEnquadro = () => {
+    try {
+      localStorage.setItem(GUARDADO, JSON.stringify(enquadro));
+    } catch {
+    }
+  };
   var AREA_SEGURA = 0.8;
   var imagemDaLogo = null;
   var logoCarregada = "";
@@ -18062,16 +18073,18 @@ Salvar assim mesmo?`)) {
     if (!d().logo) return `<div class="cartao" id="icone-app"><h2>Ícone do aplicativo (celular)</h2>
     <p class="suave">Envie a logo acima. Depois você enquadra aqui o ícone que aparece na tela do celular (hoje é o quadrado "ERP").</p></div>`;
     return `<div class="cartao" id="icone-app"><h2>Ícone do aplicativo (celular)</h2>
-    <p class="suave">Arraste a logo para posicionar e use o zoom (no celular, também com dois dedos). O círculo tracejado é a parte que sempre aparece: o celular pode cortar o que fica fora dele.</p>
+    <p class="suave">Arraste a logo para posicionar e use o zoom (no celular, também com dois dedos). O círculo tracejado é o que o Android mostra (ele corta o que fica fora); o iPhone mostra o quadrado inteiro, com os cantos arredondados. As prévias ao lado mostram como fica em cada um.</p>
     <div class="icone-editor" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;max-width:100%">
       <canvas class="icone-tela" width="512" height="512" style="width:min(280px,100%);height:auto;aspect-ratio:1;max-width:100%;touch-action:none" aria-label="Enquadramento do ícone: arraste para mover"></canvas>
       <div class="icone-previas" style="display:flex;gap:14px">
-        <div><canvas data-forma="redondo" width="96" height="96" style="width:72px;height:72px"></canvas><span class="suave">redondo</span></div>
-        <div><canvas data-forma="quadrado" width="96" height="96" style="width:72px;height:72px"></canvas><span class="suave">quadrado</span></div>
+        <div style="text-align:center"><canvas data-forma="android" width="120" height="120" style="width:72px;height:72px"></canvas><br><span class="suave">Android</span></div>
+        <div style="text-align:center"><canvas data-forma="iphone" width="120" height="120" style="width:72px;height:72px"></canvas><br><span class="suave">iPhone</span></div>
       </div>
     </div>
     <div class="acoes icone-controles">
-      <label>Zoom <input type="range" class="icone-zoom" style="width:140px;max-width:45vw" min="30" max="400" step="1" value="${Math.round(enquadro.zoom * 100)}"></label>
+      <span class="nw">Zoom <button type="button" class="secundario pequeno icone-menos" aria-label="Diminuir">−</button>
+        <input type="range" class="icone-zoom" style="width:120px;max-width:35vw;vertical-align:middle" min="30" max="400" step="1" value="${Math.round(enquadro.zoom * 100)}" aria-label="Zoom">
+        <button type="button" class="secundario pequeno icone-mais" aria-label="Aumentar">+</button> <b class="icone-pct">${Math.round(enquadro.zoom * 100)}%</b></span>
       <label>Fundo <input type="color" class="icone-fundo" value="${enquadro.fundo}"></label>
       <button type="button" class="secundario pequeno" data-acao="iconeCentralizar">Centralizar</button>
     </div>
@@ -18084,11 +18097,11 @@ Salvar assim mesmo?`)) {
     g.fillStyle = enquadro.fundo;
     g.fillRect(0, 0, lado, lado);
     const img = imagemDaLogo;
-    if (img && img.naturalWidth) {
-      const diagonal = Math.hypot(img.naturalWidth, img.naturalHeight);
+    if (img && img.width) {
+      const diagonal = Math.hypot(img.width, img.height);
       const escala = lado * AREA_SEGURA * enquadro.zoom / diagonal;
-      const w = img.naturalWidth * escala;
-      const h = img.naturalHeight * escala;
+      const w = img.width * escala;
+      const h = img.height * escala;
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = "high";
       g.drawImage(img, lado / 2 + enquadro.x * lado - w / 2, lado / 2 + enquadro.y * lado - h / 2, w, h);
@@ -18098,6 +18111,7 @@ Salvar assim mesmo?`)) {
   function redesenhar(caixa) {
     const tela = caixa.querySelector(".icone-tela");
     if (!tela) return;
+    guardarEnquadro();
     const g = tela.getContext("2d");
     const L = tela.width;
     desenharIcone(g, L);
@@ -18120,22 +18134,69 @@ Salvar assim mesmo?`)) {
       gp.clearRect(0, 0, l, l);
       gp.save();
       gp.beginPath();
-      if (p2.dataset.forma === "redondo") gp.arc(l / 2, l / 2, l / 2, 0, Math.PI * 2);
-      else gp.roundRect(0, 0, l, l, l * 0.22);
-      gp.clip();
-      desenharIcone(gp, l);
+      if (p2.dataset.forma === "android") {
+        gp.arc(l / 2, l / 2, l / 2, 0, Math.PI * 2);
+        gp.clip();
+        const grande = l / AREA_SEGURA;
+        gp.translate((l - grande) / 2, (l - grande) / 2);
+        desenharIcone(gp, grande);
+      } else {
+        gp.roundRect(0, 0, l, l, l * 0.22);
+        gp.clip();
+        desenharIcone(gp, l);
+      }
       gp.restore();
     }
+  }
+  function semMargens(img) {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const g = cv.getContext("2d", { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h);
+    let px;
+    try {
+      px = g.getImageData(0, 0, w, h).data;
+    } catch {
+      return cv;
+    }
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const k = (y * w + x) * 4;
+        const vazio = px[k + 3] < 16 || px[k] > 240 && px[k + 1] > 240 && px[k + 2] > 240;
+        if (!vazio) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0) return cv;
+    const folga = Math.round(Math.max(x1 - x0, y1 - y0) * 0.02);
+    x0 = Math.max(0, x0 - folga);
+    y0 = Math.max(0, y0 - folga);
+    x1 = Math.min(w - 1, x1 + folga);
+    y1 = Math.min(h - 1, y1 + folga);
+    const recorte = document.createElement("canvas");
+    recorte.width = x1 - x0 + 1;
+    recorte.height = y1 - y0 + 1;
+    recorte.getContext("2d").drawImage(cv, x0, y0, recorte.width, recorte.height, 0, 0, recorte.width, recorte.height);
+    return recorte;
   }
   async function carregarLogo() {
     const logo = d().logo || "";
     if (imagemDaLogo && logoCarregada === logo) return imagemDaLogo;
-    imagemDaLogo = await new Promise((ok, falha) => {
+    const original = await new Promise((ok, falha) => {
       const i = new Image();
       i.onload = () => ok(i);
       i.onerror = () => falha(new Error("Não consegui abrir a logo."));
       i.src = logo;
     });
+    imagemDaLogo = semMargens(original);
     logoCarregada = logo;
     return imagemDaLogo;
   }
@@ -18147,11 +18208,15 @@ Salvar assim mesmo?`)) {
     const zoom = caixa.querySelector(".icone-zoom");
     const pontos = /* @__PURE__ */ new Map();
     let pinca = null;
+    const pct2 = caixa.querySelector(".icone-pct");
     const mudarZoom = (z) => {
       enquadro.zoom = Math.min(4, Math.max(0.3, z));
       zoom.value = Math.round(enquadro.zoom * 100);
+      pct2.textContent = `${zoom.value}%`;
       redesenhar(caixa);
     };
+    caixa.querySelector(".icone-menos").addEventListener("click", () => mudarZoom(Math.round(enquadro.zoom * 10 - 1) / 10));
+    caixa.querySelector(".icone-mais").addEventListener("click", () => mudarZoom(Math.round(enquadro.zoom * 10 + 1) / 10));
     tela.addEventListener("pointerdown", (ev) => {
       tela.setPointerCapture(ev.pointerId);
       pontos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
@@ -18220,6 +18285,7 @@ Salvar assim mesmo?`)) {
       const caixa = document.querySelector("#icone-app");
       if (caixa) {
         caixa.querySelector(".icone-zoom").value = 100;
+        caixa.querySelector(".icone-pct").textContent = "100%";
         redesenhar(caixa);
       }
     },
