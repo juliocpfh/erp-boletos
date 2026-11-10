@@ -565,8 +565,9 @@ export const FORMULARIOS = {
       R.registrar(db, login(), 'Alteração', null, null, db.logo ? 'Logo da empresa trocada' : 'Logo da empresa enviada');
       db.logo = dataUrl;
     });
-    aviso('Logo salva.');
+    aviso(E.nuvem ? 'Logo salva. Agora enquadre o ícone do aplicativo logo abaixo.' : 'Logo salva.');
     await mostrar();
+    document.getElementById('icone-app')?.scrollIntoView({ block: 'start' });
   },
 
   async estilosAlertas(form) {

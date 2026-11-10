@@ -627,7 +627,17 @@ const MENU = [
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^backup|^empresas'],
 ];
 
+/** Na nuvem, a aba e o "adicionar à tela de início" do iPhone usam o ícone escolhido (/api/icone-192.png; sem ele, o "ERP"). */
+let versaoIcone = 0;
+export function trocarIconeDaAba(nova = true) {
+  if (nova) versaoIcone = Date.now();
+  if (!E.nuvem) return;
+  const href = `api/icone-192.png${versaoIcone ? `?v=${versaoIcone}` : ''}`;
+  for (const l of document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')) if (l.getAttribute('href') !== href) l.setAttribute('href', href);
+}
+
 function layout(conteudo, rota) {
+  trocarIconeDaAba(false);
   // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
   const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'solicitacoes'].includes(rota.partes[1]);
   const deIptu = ['novo', 'editar'].includes(rota.partes[0]) && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';

@@ -1,7 +1,8 @@
 // Worker do Cloudflare: guarda o banco (imoveis-dados.json) e os anexos no R2, no lugar da pasta do OneDrive.
 // Só entra quem passou pelo Cloudflare Access (lista de e-mails no painel) e tem usuário ativo com esse e-mail no sistema (o cofre confere). Não fala com o C6 (a ponte continua no computador).
 // Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
-// · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar.
+// · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
+// · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE).
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
@@ -277,6 +278,39 @@ async function apagarPasta(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// Ícone do aplicativo instalado (a logo enquadrada pelo administrador), em sistema/ (fora de RAIZES: as rotas genéricas não chegam)
+// ---------------------------------------------------------------------------
+const TAMANHOS_ICONE = ['192', '512'];
+const MAX_ICONE = 1024 * 1024;
+const ASSINATURA_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+async function lerIcone(env, tam) {
+  const obj = await env.DADOS.get(`sistema/icone-${tam}.png`);
+  if (!obj) return new Response(null, { status: 302, headers: { Location: `/icones/erp-${tam}.png`, 'Cache-Control': 'no-cache' } });
+  return new Response(obj.body, { headers: { 'Content-Type': 'image/png', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' } });
+}
+
+async function gravarIcone(request, env, tam, email) {
+  conferirGravacao(request, env);
+  let corpo;
+  try { corpo = await lerCorpo(request, MAX_ICONE); } catch (e) { throw e instanceof ErroHttp ? new ErroHttp(400, e.message) : e; }
+  const b = new Uint8Array(corpo);
+  if (b.length < 24 || ASSINATURA_PNG.some((x, i) => b[i] !== x)) throw new ErroHttp(400, 'O ícone precisa ser uma imagem PNG.');
+  // IHDR: comprimento (4) + "IHDR" (4) logo após a assinatura; largura e altura em 4 bytes cada (big-endian)
+  const v = new DataView(corpo);
+  const ihdr = String.fromCharCode(b[12], b[13], b[14], b[15]);
+  if (ihdr !== 'IHDR' || v.getUint32(16) !== Number(tam) || v.getUint32(20) !== Number(tam)) throw new ErroHttp(400, `O ícone precisa ter ${tam}×${tam} pixels.`);
+  await env.DADOS.put(`sistema/icone-${tam}.png`, corpo, { customMetadata: { por: email } });
+  return json(200, { ok: true });
+}
+
+async function apagarIcone(request, env) {
+  conferirGravacao(request, env);
+  await env.DADOS.delete(TAMANHOS_ICONE.map((t) => `sistema/icone-${t}.png`));
+  return json(200, { ok: true });
+}
+
+// ---------------------------------------------------------------------------
 export async function atender(request, env, buscar = fetch) {
   const url = new URL(request.url);
   const rota = url.pathname.replace(/^\/api\/?/, '');
@@ -287,6 +321,11 @@ export async function atender(request, env, buscar = fetch) {
     const email = await conferirLogin(request, env, buscar);
     const m = request.method;
     if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
+    const icone = rota.match(/^icone-(192|512)\.png$/);
+    if (icone && m === 'GET') return await lerIcone(env, icone[1]);
+    const novoIcone = rota.match(/^icone\/(192|512)$/);
+    if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
+    if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
     if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
