@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-VUWZX3yQ2RNNyo8Vz+MEOOqpzZwndpRftJ4E6jf98lM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-mhSFYFYFETBvkYlUAlsWY8Ibw79LM3RAxhIzfsFPIDI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7cab6385e433c0ad">
+<meta name="fontes" content="cc2ae1d4388cb9e8">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -19914,10 +19914,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
     ${caixaFichas()}
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Entrada</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar2(x.c)}<td class="nw">${dataBr(x.c.data_entrada)}</td>
+    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar2(x.c)}
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.data_entrada || x.c.vigencia_inicio ? `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(aluguelAtual(d(), x.c))}</td>
-        <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum.</td></tr>'}</table>
+        <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
       ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)} ${situacao2(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
