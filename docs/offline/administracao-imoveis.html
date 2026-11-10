@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-MmdbQLjmRkTyZDOSbpMxKWrnPXfGILyeCMBV1YKtk88='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-XLfQjnhlGcmcPDwYrOS4GjzwcppbXIaiBDNxpxZSDAA=' 'sha256-KdaC2ZRdZtTmgfCCh29EcXFRoSwyq96EDsC4AuewsmE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7857b078dd107834">
+<meta name="fontes" content="df3138faaa51fdbe">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -627,6 +627,17 @@ body.com-visualizador { overflow: hidden; }
   .botoes-inq .botao { padding: 6px 12px; font-size: 14px; }
   .botoes-inq .zap { color: var(--ok); border-color: #86efac; }
 }
+
+/* Ícone do aplicativo (Empresas): editor quadrado com prévias redonda e quadrada */
+.icone-editor { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin: 8px 0; }
+.icone-tela { width: 280px; max-width: 100%; aspect-ratio: 1; border: 1px solid var(--borda); border-radius: 8px; cursor: grab; touch-action: none; background: #fff; }
+.icone-tela:active { cursor: grabbing; }
+.icone-previas { display: flex; gap: 14px; }
+.icone-previas > div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+.icone-previas canvas { width: 72px; height: 72px; }
+.icone-controles label { display: inline-flex; align-items: center; gap: 6px; }
+.icone-controles input[type=range] { width: 160px; }
+.primeira-logo .acoes { display: flex; }
 </style>
 </head>
 <body>
@@ -18039,6 +18050,202 @@ Salvar assim mesmo?`)) {
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg2.voltar(registro, q))}">Voltar</a></p></form>`;
   }
 
+  // docs/js/telas/icone.js
+  var enquadro = { zoom: 1, x: 0, y: 0, fundo: "#ffffff" };
+  var AREA_SEGURA = 0.8;
+  var imagemDaLogo = null;
+  var logoCarregada = "";
+  function caixaIcone() {
+    if (!podeUsuario("admin")) return "";
+    if (!d().logo) return `<div class="cartao" id="icone-app"><h2>Ícone do aplicativo (celular)</h2>
+    <p class="suave">Envie a logo acima. Depois você enquadra aqui o ícone que aparece na tela do celular (hoje é o quadrado "ERP").</p></div>`;
+    return `<div class="cartao" id="icone-app"><h2>Ícone do aplicativo (celular)</h2>
+    <p class="suave">Arraste a logo para posicionar e use o zoom (no celular, também com dois dedos). O círculo tracejado é a parte que sempre aparece: o celular pode cortar o que fica fora dele.</p>
+    <div class="icone-editor">
+      <canvas class="icone-tela" width="512" height="512" aria-label="Enquadramento do ícone: arraste para mover"></canvas>
+      <div class="icone-previas">
+        <div><canvas data-forma="redondo" width="96" height="96"></canvas><span class="suave">redondo</span></div>
+        <div><canvas data-forma="quadrado" width="96" height="96"></canvas><span class="suave">quadrado</span></div>
+      </div>
+    </div>
+    <div class="acoes icone-controles">
+      <label>Zoom <input type="range" class="icone-zoom" min="30" max="400" step="1" value="${Math.round(enquadro.zoom * 100)}"></label>
+      <label>Fundo <input type="color" class="icone-fundo" value="${enquadro.fundo}"></label>
+      <button type="button" class="secundario pequeno" data-acao="iconeCentralizar">Centralizar</button>
+    </div>
+    <div class="acoes">${E.nuvem ? `<button type="button" data-acao="salvarIcone">Usar como ícone do aplicativo</button>
+      <button type="button" class="secundario" data-acao="iconePadrao" data-confirmar="Voltar ao ícone padrão (quadrado branco com ERP)?">Voltar ao ícone ERP</button>` : '<span class="suave">O ícone do aplicativo só muda com os dados na nuvem (o celular busca o ícone no site).</span>'}</div>
+    <p class="suave">Quem já tem o aplicativo instalado: o Android troca o ícone sozinho, em até um dia; no iPhone, tire o aplicativo da tela inicial e adicione de novo.</p></div>`;
+  }
+  function desenharIcone(g, lado) {
+    g.save();
+    g.fillStyle = enquadro.fundo;
+    g.fillRect(0, 0, lado, lado);
+    const img = imagemDaLogo;
+    if (img && img.naturalWidth) {
+      const diagonal = Math.hypot(img.naturalWidth, img.naturalHeight);
+      const escala = lado * AREA_SEGURA * enquadro.zoom / diagonal;
+      const w = img.naturalWidth * escala;
+      const h = img.naturalHeight * escala;
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, lado / 2 + enquadro.x * lado - w / 2, lado / 2 + enquadro.y * lado - h / 2, w, h);
+    }
+    g.restore();
+  }
+  function redesenhar(caixa) {
+    const tela = caixa.querySelector(".icone-tela");
+    if (!tela) return;
+    const g = tela.getContext("2d");
+    const L = tela.width;
+    desenharIcone(g, L);
+    g.save();
+    g.fillStyle = "rgba(0,0,0,0.35)";
+    g.beginPath();
+    g.rect(0, 0, L, L);
+    g.arc(L / 2, L / 2, L * AREA_SEGURA / 2, 0, Math.PI * 2, true);
+    g.fill("evenodd");
+    g.setLineDash([10, 8]);
+    g.lineWidth = 3;
+    g.strokeStyle = "#ffffff";
+    g.beginPath();
+    g.arc(L / 2, L / 2, L * AREA_SEGURA / 2, 0, Math.PI * 2);
+    g.stroke();
+    g.restore();
+    for (const p2 of caixa.querySelectorAll("canvas[data-forma]")) {
+      const gp = p2.getContext("2d");
+      const l = p2.width;
+      gp.clearRect(0, 0, l, l);
+      gp.save();
+      gp.beginPath();
+      if (p2.dataset.forma === "redondo") gp.arc(l / 2, l / 2, l / 2, 0, Math.PI * 2);
+      else gp.roundRect(0, 0, l, l, l * 0.22);
+      gp.clip();
+      desenharIcone(gp, l);
+      gp.restore();
+    }
+  }
+  async function carregarLogo() {
+    const logo = d().logo || "";
+    if (imagemDaLogo && logoCarregada === logo) return imagemDaLogo;
+    imagemDaLogo = await new Promise((ok, falha) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => falha(new Error("Não consegui abrir a logo."));
+      i.src = logo;
+    });
+    logoCarregada = logo;
+    return imagemDaLogo;
+  }
+  function ligarEditorIcone(raiz) {
+    const caixa = raiz.querySelector("#icone-app");
+    const tela = caixa?.querySelector(".icone-tela");
+    if (!tela || tela.dataset.ligado) return;
+    tela.dataset.ligado = "1";
+    const zoom = caixa.querySelector(".icone-zoom");
+    const pontos = /* @__PURE__ */ new Map();
+    let pinca = null;
+    const mudarZoom = (z) => {
+      enquadro.zoom = Math.min(4, Math.max(0.3, z));
+      zoom.value = Math.round(enquadro.zoom * 100);
+      redesenhar(caixa);
+    };
+    tela.addEventListener("pointerdown", (ev) => {
+      tela.setPointerCapture(ev.pointerId);
+      pontos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      ev.preventDefault();
+    });
+    tela.addEventListener("pointermove", (ev) => {
+      const antes = pontos.get(ev.pointerId);
+      if (!antes) return;
+      pontos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pontos.size >= 2) {
+        const [a, b] = [...pontos.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinca) mudarZoom(enquadro.zoom * (dist / pinca));
+        pinca = dist;
+        return;
+      }
+      const lado = tela.getBoundingClientRect().width || 1;
+      enquadro.x += (ev.clientX - antes.x) / lado;
+      enquadro.y += (ev.clientY - antes.y) / lado;
+      redesenhar(caixa);
+    });
+    const soltar2 = (ev) => {
+      pontos.delete(ev.pointerId);
+      if (pontos.size < 2) pinca = null;
+    };
+    tela.addEventListener("pointerup", soltar2);
+    tela.addEventListener("pointercancel", soltar2);
+    tela.addEventListener("wheel", (ev) => {
+      ev.preventDefault();
+      mudarZoom(enquadro.zoom * (ev.deltaY < 0 ? 1.08 : 1 / 1.08));
+    }, { passive: false });
+    zoom.addEventListener("input", () => mudarZoom(Number(zoom.value) / 100));
+    caixa.querySelector(".icone-fundo").addEventListener("input", (ev) => {
+      enquadro.fundo = ev.target.value;
+      redesenhar(caixa);
+    });
+    carregarLogo().then(() => redesenhar(caixa)).catch((e) => aviso(e.message, "aviso"));
+  }
+  function pngDoIcone(lado) {
+    const cv = document.createElement("canvas");
+    cv.width = lado;
+    cv.height = lado;
+    desenharIcone(cv.getContext("2d"), lado);
+    return new Promise((ok, falha) => cv.toBlob((b) => b ? ok(b) : falha(new Error("Não consegui gerar a imagem do ícone.")), "image/png"));
+  }
+  async function pedirNuvem(rota, metodo, corpo) {
+    const r = await fetch(`api/${rota}`, { method: metodo, body: corpo, headers: { "X-Sistema": "imoveis", ...corpo ? { "Content-Type": "image/png" } : {} } });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.erro || `A nuvem recusou (erro ${r.status}).`);
+    }
+  }
+  var chaveAdiada = () => `logo-adiada:${login() || ""}`;
+  function avisoPrimeiraLogo() {
+    if (!podeUsuario("admin") || d().logo) return "";
+    try {
+      if (localStorage.getItem(chaveAdiada())) return "";
+    } catch {
+    }
+    return `<div class="alerta info primeira-logo"><b>Primeiro passo: a logo da empresa.</b> Ela aparece no topo do sistema, nos contratos e cartas e vira o ícone do aplicativo no celular (hoje o quadrado "ERP").
+    <span class="acoes" style="margin-top:6px"><a class="botao pequeno" href="#/empresas?ir=logo-empresa">Escolher a logo</a> <button type="button" class="secundario pequeno" data-acao="adiarLogo">Fazer depois</button></span></div>`;
+  }
+  var ACOES_ICONE = {
+    iconeCentralizar() {
+      Object.assign(enquadro, { zoom: 1, x: 0, y: 0 });
+      const caixa = document.querySelector("#icone-app");
+      if (caixa) {
+        caixa.querySelector(".icone-zoom").value = 100;
+        redesenhar(caixa);
+      }
+    },
+    async salvarIcone() {
+      if (!podeUsuario("admin")) throw new Error("Só administradores podem trocar o ícone do aplicativo.");
+      if (!E.nuvem) throw new Error("O ícone do aplicativo só muda com os dados na nuvem.");
+      await carregarLogo();
+      const [grande, pequeno] = await Promise.all([pngDoIcone(512), pngDoIcone(192)]);
+      await pedirNuvem("icone/512", "PUT", grande);
+      await pedirNuvem("icone/192", "PUT", pequeno);
+      trocarIconeDaAba();
+      aviso("Ícone do aplicativo salvo. Quem instalar o aplicativo a partir de agora já recebe este ícone.");
+    },
+    async iconePadrao() {
+      if (!podeUsuario("admin")) throw new Error("Só administradores podem trocar o ícone do aplicativo.");
+      await pedirNuvem("icone", "DELETE");
+      trocarIconeDaAba();
+      aviso("O aplicativo voltou ao ícone padrão (ERP).");
+    },
+    async adiarLogo() {
+      try {
+        localStorage.setItem(chaveAdiada(), "1");
+      } catch {
+      }
+      await mostrar();
+    }
+  };
+
   // docs/js/telas/admin.js
   var tamanho = (b) => b > 1048576 ? `${(b / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
   var FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
@@ -18112,12 +18319,13 @@ Salvar assim mesmo?`)) {
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, "nome").map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || "-")}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta("Ativa", "ok") : etiqueta("Inativa", "neutra")}</td><td class="n">${podeUsuario("admin") ? link(`#/editar/emitentes/${e.id}`, "Editar") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
-    <div class="cartao"><h2>Logo da empresa</h2>
+    <div class="cartao" id="logo-empresa"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema e como marca-d'água nos contratos, vistorias e cartas. Envie em boa resolução (PNG ou SVG, de preferência com 1.000 pixels de largura ou mais).</p>
       ${d().logo && larguraLogo(d().logo) && larguraLogo(d().logo) < 800 ? `<div class="alerta aviso">A logo atual está em baixa resolução (${larguraLogo(d().logo)} pixels de largura): a marca-d'água sai serrilhada. Envie a logo de novo em "Trocar logo".</div>` : ""}
       ${d().logo ? `<p><img class="logo-previa" src="${esc(d().logo)}" alt="Logo atual"></p>` : '<p class="suave">Nenhuma logo enviada.</p>'}
       ${podeUsuario("admin") ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? "Trocar logo" : "Enviar logo"}</button>
         ${d().logo ? botao("removerLogo", "Remover logo", {}, "perigo pequeno", "Remover a logo?") : ""}</form>` : ""}</div>
+    ${caixaIcone()}
     <div class="cartao"><h2>Ressarcimento de taxas do condomínio</h2>
       <p>Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. ${d().ressarcimento_abate_nf ? "<b>Hoje: o ressarcimento sai do valor da NF</b> (a NF fica com o aluguel menos a taxa) e não conta de novo como gasto." : "<b>Hoje: a NF sai com o aluguel cheio</b> e o ressarcimento conta como gasto do imóvel nos Resultados."}</p>
       <p class="suave">Confirme com o contador qual forma usar. A mudança vale para os boletos gerados ou recalculados daqui em diante.</p>
@@ -22546,7 +22754,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await mostrar();
     }
   };
-  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS);
+  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE);
 
   // docs/js/telas/envios.js
   var REGISTRO_EXCLUIDO = "Este registro foi excluído por outra pessoa; nada foi salvo.";
@@ -23085,8 +23293,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         registrar(db, login(), "Alteração", null, null, db.logo ? "Logo da empresa trocada" : "Logo da empresa enviada");
         db.logo = dataUrl;
       });
-      aviso("Logo salva.");
+      aviso(E.nuvem ? "Logo salva. Agora enquadre o ícone do aplicativo logo abaixo." : "Logo salva.");
       await mostrar();
+      document.getElementById("icone-app")?.scrollIntoView({ block: "start" });
     },
     async estilosAlertas(form) {
       const f = Object.fromEntries(new FormData(form));
@@ -23218,6 +23427,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     "backups-nuvem": () => telaBackupsNuvem(),
     _ligarDesconto(raiz) {
       ligarCamposAutomaticos(raiz);
+      ligarEditorIcone(raiz);
       ligarIndiceBancoCentral(raiz);
       const regras = [...raiz.querySelectorAll("[data-mostrar-se]")];
       const valorDe = (form2, nome) => {
@@ -23404,7 +23614,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const porTipo = {};
       for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
       const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ["", 0];
-      return `<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link("#/cobrancas?filtro=abertos", "Registrar pagamento", "botao")} ${link("#/cobrancas", "Acompanhar boletos", "botao secundario")}</div>` : ""}</div>
+      return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link("#/cobrancas?filtro=abertos", "Registrar pagamento", "botao")} ${link("#/cobrancas", "Acompanhar boletos", "botao secundario")}</div>` : ""}</div>
       <div class="numeros">
         ${n(d().imoveis.length, "imóveis", "#/imoveis")}
         ${n(d().contratos.filter((c) => contratoAtivo(c, hoje3)).length, "contratos ativos", "#/inquilinos")}
@@ -24094,7 +24304,15 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     ["#/financeiro", "Financeiro", "^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia"],
     ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^backup|^empresas"]
   ];
+  var versaoIcone = 0;
+  function trocarIconeDaAba(nova = true) {
+    if (nova) versaoIcone = Date.now();
+    if (!E.nuvem) return;
+    const href = `api/icone-192.png${versaoIcone ? `?v=${versaoIcone}` : ""}`;
+    for (const l of document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')) if (l.getAttribute("href") !== href) l.setAttribute("href", href);
+  }
   function layout(conteudo, rota) {
+    trocarIconeDaAba(false);
     const deInquilino = ["novo", "editar"].includes(rota.partes[0]) && ["contratos", "fiadores", "aplicacoes", "correcoes_garantia", "depositos_garantia", "devolucoes_garantia", "renovacoes", "encerramentos", "correcoes", "solicitacoes"].includes(rota.partes[1]);
     const deIptu = ["novo", "editar"].includes(rota.partes[0]) && rota.partes[1] === "iptus" && rota.q.de === "iptu";
     const form = ["novo", "editar"].includes(rota.partes[0]) ? { emitentes: "empresas", usuarios: "usuarios" }[rota.partes[1]] : null;
