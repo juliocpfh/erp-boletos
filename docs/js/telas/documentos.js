@@ -113,6 +113,26 @@ export function cortesDoDocumento(el, topo = el.getBoundingClientRect().top) {
 }
 
 /**
+ * Marca-d'água do PDF: a logo do documento quase transparente (5%, como na tela) em PNG, com 14 cm de largura (no máximo
+ * 20 cm de altura), para pôr no centro de cada folha. Null sem logo.
+ */
+async function marcaDaguaPdf(img) {
+  if (!img || !img.getAttribute('src')) return null;
+  const logo = new Image();
+  logo.src = img.getAttribute('src');
+  await logo.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = logo.naturalWidth || 1000;
+  canvas.height = logo.naturalHeight || 1000;
+  const g = canvas.getContext('2d');
+  g.globalAlpha = 0.05;
+  g.drawImage(logo, 0, 0, canvas.width, canvas.height);
+  const prop = canvas.height / canvas.width;
+  const largura = Math.min(140, 200 / prop);
+  return { png: canvas.toDataURL('image/png'), largura, altura: largura * prop };
+}
+
+/**
  * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas entre um bloco e outro
  * (parágrafo, linha de tabela, foto, assinatura) ou entre as linhas de um parágrafo, com o rodapé das empresas e "Página X de Y" embaixo.
  */
@@ -123,8 +143,11 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   // o link das fotos continua clicável no PDF (área do link na folha certa)
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
   const cortes = cortesDoDocumento(el, topo);
+  const marca = await marcaDaguaPdf(el.querySelector('.ct-marca'));
   const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', onclone: (doc) => {
-    doc.querySelectorAll('.ct-rodape').forEach((x) => x.remove());
+    // a marca-d'água da tela repete a cada altura de A4, mas as folhas do PDF são cortadas entre os blocos: sai da imagem
+    // e entra por cima de cada folha, sempre no centro (como na impressão e no Word)
+    doc.querySelectorAll('.ct-rodape, .ct-marcas').forEach((x) => x.remove());
     doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
   } });
   const escala = canvas.width / el.offsetWidth;
@@ -152,8 +175,15 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     const pedaco = document.createElement('canvas');
     pedaco.width = canvas.width;
     pedaco.height = Math.round((fim - ini) * escala);
-    pedaco.getContext('2d').drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
+    const g = pedaco.getContext('2d');
+    // fundo branco: o último pedaço pode passar 1 pixel do fim da imagem, e o pixel vazio virava um risco preto no JPEG
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, pedaco.width, pedaco.height);
+    const y = Math.round(ini * escala);
+    const h = Math.min(pedaco.height, canvas.height - y);
+    if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
     pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', margemLado, topoDa(n), largura, (fim - ini) / pxMm);
+    if (marca) pdf.addImage(marca.png, 'PNG', 105 - marca.largura / 2, 148.5 - marca.altura / 2, marca.largura, marca.altura, 'marca-dagua');
     for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
     pdf.setFontSize(8).setTextColor(102);
     pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: 'right' });

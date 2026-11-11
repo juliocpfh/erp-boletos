@@ -340,7 +340,10 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
   @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
   /* 1ª página: margem de cima menor (dentro da área que a impressora imprime): a logo fica a 1 cm da borda, como no PDF e no Word */
   @page :first { margin-top: 1cm; }
-  .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
+  .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; overflow-wrap: anywhere; }
+  /* nada passa da margem: endereço comprido quebra a linha e foto/tabela cabe na largura da folha */
+  .contrato .ct-pagina { table-layout: fixed; }
+  .contrato .ct-pagina img:not(.ct-marca), .contrato .ct-tabela { max-width: 100%; }
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
   /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
