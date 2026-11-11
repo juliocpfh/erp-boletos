@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-fW4PGKJXHzzCQJC+LDTU7l0zmWE16YTc5ECW9Lus8iU=' 'sha256-tG2w5vYn4W50hFDzPtkHhnI2WE1JCRyJ9+4ElmKxMGA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-fW4PGKJXHzzCQJC+LDTU7l0zmWE16YTc5ECW9Lus8iU=' 'sha256-/S6zgo+/LmeLMFYy4TitHwdknY3mY6DMR/htqr+mM3U='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ccda735e888cc8f8">
+<meta name="fontes" content="03c79dc790636de3">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -350,7 +350,10 @@ textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', 
   @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
   /* 1ª página: margem de cima menor (dentro da área que a impressora imprime): a logo fica a 1 cm da borda, como no PDF e no Word */
   @page :first { margin-top: 1cm; }
-  .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; }
+  .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; overflow-wrap: anywhere; }
+  /* nada passa da margem: endereço comprido quebra a linha e foto/tabela cabe na largura da folha */
+  .contrato .ct-pagina { table-layout: fixed; }
+  .contrato .ct-pagina img:not(.ct-marca), .contrato .ct-tabela { max-width: 100%; }
   .ct-marcas { display: none; }
   .ct-marca { display: block; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14cm; }
   /* o rodapé fica fixo no pé de cada página; o tfoot da tabela repete um espaço vazio do mesmo tamanho para o texto não passar por baixo */
@@ -18885,6 +18888,21 @@ Salvar assim mesmo?`)) {
     const linhas2 = [...el.querySelectorAll(".ct-par")].flatMap((p2) => linhasDoParagrafo(p2).slice(1, -2));
     return [...blocos, ...linhas2].map((y) => y - topo).sort((a, b) => a - b);
   }
+  async function marcaDaguaPdf(img) {
+    if (!img || !img.getAttribute("src")) return null;
+    const logo = new Image();
+    logo.src = img.getAttribute("src");
+    await logo.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = logo.naturalWidth || 1e3;
+    canvas.height = logo.naturalHeight || 1e3;
+    const g = canvas.getContext("2d");
+    g.globalAlpha = 0.05;
+    g.drawImage(logo, 0, 0, canvas.width, canvas.height);
+    const prop = canvas.height / canvas.width;
+    const largura = Math.min(140, 200 / prop);
+    return { png: canvas.toDataURL("image/png"), largura, altura: largura * prop };
+  }
   async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     const { html2canvas, jsPDF } = await bibliotecasPdf();
     const caixa = el.getBoundingClientRect();
@@ -18894,8 +18912,9 @@ Salvar assim mesmo?`)) {
       return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height };
     });
     const cortes = cortesDoDocumento(el, topo);
+    const marca2 = await marcaDaguaPdf(el.querySelector(".ct-marca"));
     const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", onclone: (doc) => {
-      doc.querySelectorAll(".ct-rodape").forEach((x) => x.remove());
+      doc.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
       doc.querySelectorAll(".contrato").forEach((x) => {
         x.style.border = "0";
         x.style.boxShadow = "none";
@@ -18925,8 +18944,14 @@ Salvar assim mesmo?`)) {
       const pedaco = document.createElement("canvas");
       pedaco.width = canvas.width;
       pedaco.height = Math.round((fim - ini) * escala);
-      pedaco.getContext("2d").drawImage(canvas, 0, Math.round(ini * escala), canvas.width, pedaco.height, 0, 0, canvas.width, pedaco.height);
+      const g = pedaco.getContext("2d");
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, pedaco.width, pedaco.height);
+      const y = Math.round(ini * escala);
+      const h = Math.min(pedaco.height, canvas.height - y);
+      if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
       pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, topoDa(n), largura, (fim - ini) / pxMm);
+      if (marca2) pdf.addImage(marca2.png, "PNG", 105 - marca2.largura / 2, 148.5 - marca2.altura / 2, marca2.largura, marca2.altura, "marca-dagua");
       for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
       pdf.setFontSize(8).setTextColor(102);
       pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: "right" });
