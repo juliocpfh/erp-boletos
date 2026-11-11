@@ -92,3 +92,35 @@ test('comprovantes da ficha são arquivos ligados a ela (apagados se a ficha sai
   assert.deepEqual(usados.map((x) => [x.id, x.nome]), [[f.id, 'comprovante-reserva-2026-11-10.pdf'], [f.id, 'comprovante-devolucao-reserva-2026-11-20.pdf']]);
   assert.match(R.rotulosDosArquivos(d).get(`ficha:${f.id}|comprovante-reserva-2026-11-10.pdf`), /comprovante da reserva/);
 });
+
+test('proposta da ficha (aluguel, vencimento, bonificação e garantia) e comprovante da reserva vão para o Novo contrato', () => {
+  const { d, a, b, ficha } = base();
+  const f = ficha({ imoveis_ids: [a.id, b.id], modo_imoveis: 'Todos juntos', situacao: 'Aprovada', aluguel_inicial: 200000, dia_vencimento: 10, bonificacao: true,
+    desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', reserva_valor: 50000, reserva_data: '2026-11-10', comprovante_reserva: 'comprovante-reserva-2026-11-10.pdf', analise_serasa: 'analise-serasa-2026-11-10.pdf' });
+  const dados = R.dadosDaFicha(d, f);
+  assert.equal(dados.aluguel_inicial, 200000);
+  assert.equal(dados.aluguel_bonificado, 180000, 'R$ 2.000,00 com 10% → R$ 1.800,00');
+  assert.equal(dados.dia_vencimento, 10);
+  assert.equal(dados.garantia_tipo, 'Caução');
+  assert.equal(dados.comprovante_reserva, 'comprovante-reserva-2026-11-10.pdf');
+  assert.equal(dados.analise_serasa, undefined, 'o Serasa vai para a pasta do inquilino, não para um campo do contrato');
+  R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Interessado Teste', ficha_id: f.id }, 'teste');
+  const segundo = R.dadosDaFicha(d, f);
+  assert.equal(segundo.aluguel_inicial, 200000, 'a proposta vale para todos os contratos da ficha');
+  assert.equal(segundo.comprovante_reserva, undefined);
+  const sem = R.dadosDaFicha(d, ficha({ imoveis_ids: [b.id], aluguel_inicial: 150000, bonificacao: false, desconto_pontualidade_percentual: 0 }));
+  assert.equal(sem.aluguel_bonificado, undefined, 'sem bonificação não há aluguel bonificado');
+  assert.equal(sem.bonificacao, false);
+});
+
+test('Novo contrato aberto pelo imóvel acha a ficha aprovada que espera o contrato dele', () => {
+  const { d, a, b, ficha } = base();
+  const f = ficha({ imoveis_ids: [a.id], situacao: 'Aprovada', decisao_data: '2026-11-14' });
+  assert.equal(R.fichaAprovadaDoImovel(d, a.id).id, f.id);
+  assert.equal(R.fichaAprovadaDoImovel(d, String(a.id)).id, f.id, 'o id vem do endereço (texto)');
+  assert.equal(R.fichaAprovadaDoImovel(d, b.id), null);
+  ficha({ imoveis_ids: [b.id] });
+  assert.equal(R.fichaAprovadaDoImovel(d, b.id), null, 'em análise ainda não vira contrato');
+  R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Interessado Teste', ficha_id: f.id }, 'teste');
+  assert.equal(R.fichaAprovadaDoImovel(d, a.id), null, 'com o contrato feito, a ficha não é usada de novo');
+});

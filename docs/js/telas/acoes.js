@@ -684,6 +684,16 @@ export const ACOES = {
     arquivoApagadoNoFormulario(el, r[campo]);
   },
 
+  /** "×" do comprovante da ficha no Novo contrato feito dela (o arquivo ainda está na pasta da ficha): tira da ficha e apaga. */
+  async apagarArquivoDaFicha({ campo, ficha }, el) {
+    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    const f = buscar('fichas', ficha);
+    if (!f || !f[campo] || !R.CAMPOS_ARQUIVO_FICHA.includes(campo)) throw new Error('Arquivo não encontrado na ficha.');
+    const nome = f[campo];
+    await alterarApagandoAnexos((db) => R.atualizar(db, 'fichas', f.id, { [campo]: null }, login(), `Arquivo excluído: ${nome}`));
+    arquivoApagadoNoFormulario(el, nome);
+  },
+
   /** Nome do arquivo já guardado num formulário de edição (#/editar/tabela/id): abre o arquivo (na pasta do inquilino; o seguro, na subpasta das apólices). */
   async abrirAnexoDoCampo({ campo }) {
     const [, , tabela, id] = location.hash.split('?')[0].split('/');

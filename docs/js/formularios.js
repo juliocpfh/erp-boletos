@@ -207,6 +207,8 @@ export const fiadoresNoCadastro = (existentes = []) => Array.from({ length: vaga
 const SEM_COMPROVANTE = 'Ainda não tem? Salve assim mesmo: fica um alerta para buscar no banco e anexar depois';
 const comprovante = (nome, rotulo, extra = {}) => campo(nome, rotulo, 'arquivo', { ajuda: `PDF ou foto do comprovante. ${SEM_COMPROVANTE}`, ...extra });
 
+export const GARANTIAS = ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'];
+
 const PJ = quando('inquilino_tipo', 'Pessoa jurídica (empresa)');
 /** Rótulo do campo conforme o tipo de inquilino (ex.: CPF na pessoa física, CNPJ na empresa). */
 const rotuloPJ = (rotulo) => ({ rotuloSe: { campo: 'inquilino_tipo', valor: 'Pessoa jurídica (empresa)', rotulo } });
@@ -294,7 +296,7 @@ export const CONTRATO = [
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
   secao('Garantia'),
-  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: ['Caução', 'Depósito garantia', 'Fiador', 'Fiador + depósito', 'Seguro fiança', 'Sem garantia'] }),
+  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: GARANTIAS }),
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto")' }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor' }),
   campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino' }),
@@ -354,6 +356,15 @@ export const FICHA_FIM = [
   campo('doc_pessoais', 'Documentos pessoais (RG, CPF, CNH)', 'simnao'),
   campo('doc_renda', 'Comprovante de renda', 'simnao'),
   campo('doc_residencia', 'Comprovante de residência', 'simnao'),
+  campo('analise_serasa', 'Análise do Serasa', 'arquivo', { ajuda: 'PDF ou foto da consulta ao Serasa, para o histórico. Ao fazer o contrato, vai para a pasta do inquilino' }),
+  // proposta combinada com o interessado: vai preenchida para o Novo contrato (pedido do dono, 2026-11-10)
+  secao('Proposta (vai preenchida para o contrato)'),
+  campo('aluguel_inicial', 'Aluguel oferecido', 'dinheiro', { ajuda: 'Valor cheio do aluguel' }),
+  campo('dia_vencimento', 'Dia do vencimento', 'inteiro'),
+  campo('aluguel_bonificado', 'Aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'O valor que o inquilino paga em dia. Preencha dois dos três (aluguel, bonificado, %): o terceiro é calculado' }),
+  campo('desconto_pontualidade_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto' }),
+  campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true, colado: true }),
+  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { opcoes: GARANTIAS }),
   secao('Reserva'),
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
@@ -696,7 +707,9 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     const max = c.max ? `maxlength="${c.max}"` : '';
     if (c.tipo === 'arquivo') {
       // o nome do arquivo já guardado vem do registro; depois de um erro o navegador esquece o arquivo escolhido
-      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${typeof v === 'string' && v ? arquivoGuardado(c.nome, v) : ''}`;
+      // ``guardado``: o arquivo está em outro lugar (ex.: o comprovante da ficha no Novo contrato): { acao, dados, abrir }
+      const g = c.guardado;
+      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${typeof v === 'string' && v ? (g ? arquivoGuardado(c.nome, v, g.acao, g.dados, g.abrir) : arquivoGuardado(c.nome, v)) : ''}`;
     } else if (c.tipo === 'area') entrada = `<textarea id="${id}" name="${c.nome}" ${c.linha ? 'rows="1" class="cresce"' : ''} ${max}>${esc(v)}</textarea>`;
     else if (c.tipo === 'opcao') {
       const ops = c.opcoes.map((o) => (Array.isArray(o) ? o : [o, o]));

@@ -1994,7 +1994,11 @@ export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
 export const MODOS_FICHA = ['Apenas um dos imóveis', 'Todos juntos'];
 export const MESES_DOCUMENTOS_REPROVADA = 3;
 /** Campos de arquivo da ficha ligados a um lançamento (os demais documentos ficam soltos na pasta da ficha). */
-export const CAMPOS_ARQUIVO_FICHA = ['comprovante_reserva', 'comprovante_devolucao'];
+export const CAMPOS_ARQUIVO_FICHA = ['comprovante_reserva', 'comprovante_devolucao', 'analise_serasa'];
+/** Comprovantes de dinheiro da ficha: ficam mesmo depois de apagados os documentos pessoais da reprovada. */
+export const COMPROVANTES_DINHEIRO_FICHA = ['comprovante_reserva', 'comprovante_devolucao'];
+/** Proposta combinada na ficha (aluguel, vencimento, bonificação e garantia): vai preenchida para cada contrato feito dela. */
+export const CAMPOS_PROPOSTA_FICHA = ['aluguel_inicial', 'dia_vencimento', 'bonificacao', 'desconto_pontualidade_percentual', 'garantia_tipo'];
 
 /** Imóveis da ficha que já têm contrato feito a partir dela: { imovel_id: contrato_id }. */
 export function contratosDaFicha(d, f) {
@@ -2038,12 +2042,22 @@ export function pendenciasDasFichas(d) {
 }
 
 /**
- * Dados da ficha para o Novo contrato (#/novo/contratos?ficha=ID): os da pessoa e, no primeiro contrato feito a partir
- * dela, a reserva (valor, data e o comprovante, que vai para a pasta do inquilino ao salvar).
+ * Dados da ficha para o Novo contrato (#/novo/contratos?ficha=ID): os da pessoa, a proposta (aluguel, vencimento,
+ * bonificação e garantia) e, no primeiro contrato feito a partir dela, a reserva (valor, data e o comprovante, que vai
+ * para a pasta do inquilino ao salvar).
  */
 export function dadosDaFicha(d, f) {
   const primeiro = !Object.keys(contratosDaFicha(d, f)).length;
-  return { ...dadosDaPessoa(f), ...(primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data } : {}) };
+  const proposta = Object.fromEntries(CAMPOS_PROPOSTA_FICHA.filter((k) => f[k] !== undefined && f[k] !== null && f[k] !== '').map((k) => [k, f[k]]));
+  if (proposta.aluguel_inicial > 0 && f.bonificacao !== false) proposta.aluguel_bonificado = proposta.aluguel_inicial - C.descontoPorPercentual(proposta.aluguel_inicial, f.desconto_pontualidade_percentual || 0);
+  const reserva = primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data, ...(f.comprovante_reserva && !f.documentos_no_contrato ? { comprovante_reserva: f.comprovante_reserva } : {}) } : {};
+  return { ...dadosDaPessoa(f), ...proposta, ...reserva };
+}
+
+/** Ficha aprovada que ainda espera o contrato deste imóvel (o Novo contrato aberto pelo imóvel também a usa), ou null. */
+export function fichaAprovadaDoImovel(d, imovelId) {
+  const f = fichaAbertaDoImovel(d, imovelId);
+  return f && imoveisParaContrato(d, f).includes(Number(imovelId)) ? f : null;
 }
 
 /** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */
@@ -3350,6 +3364,7 @@ export function rotulosDosArquivos(d) {
   for (const f of d.fichas || []) {
     poe('ficha', f.id, f.comprovante_reserva, `comprovante da reserva (${C.dataBr(f.reserva_data)})`);
     poe('ficha', f.id, f.comprovante_devolucao, `comprovante da devolução da reserva (${C.dataBr(f.devolucao_data)})`);
+    poe('ficha', f.id, f.analise_serasa, 'análise do Serasa');
   }
   for (const s of d.seguros) {
     poe('seguro', s.contrato_id, s.arquivo_apolice, `apólice (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)})`);
