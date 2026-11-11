@@ -284,18 +284,22 @@ function ligarEnderecoDoImovel(raiz) {
     if (!caixa) continue;
     const form = caixa.form;
     const q = Object.fromEntries(new URLSearchParams(location.hash.split('?')[1] || ''));
-    const imovelId = () => (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular;
+    // ficha em análise: o imóvel de interesse marcado (precisa ser um só)
+    const marcados = () => [...form.querySelectorAll('input[type=checkbox][name^="imovel_"]')].filter((x) => x.checked).map((x) => x.name.slice(7));
+    const naFicha = !!form.querySelector('input[type=checkbox][name^="imovel_"]');
+    const imovelId = () => (naFicha ? (marcados().length === 1 ? marcados()[0] : null) : (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular);
     const aplicar = () => {
       const i = imovelId() && buscar('imoveis', imovelId());
       const campo = form.querySelector(`[name=${nomeCampo}]`);
       if (!caixa.checked) return mensagemAuto(caixa, '');
-      if (!i) return mensagemAuto(caixa, 'Escolha primeiro o imóvel deste contrato.');
+      if (!i) return mensagemAuto(caixa, naFicha ? 'Marque um só imóvel de interesse para usar o endereço dele.' : 'Escolha primeiro o imóvel deste contrato.');
       campo.value = enderecoInquilino(i);
       mensagemAuto(caixa, '');
     };
     caixa.addEventListener('change', aplicar);
     const sel = form.querySelector('[name=imovel_id]');
     if (sel) sel.addEventListener('change', aplicar);
+    for (const x of form.querySelectorAll('input[type=checkbox][name^="imovel_"]')) x.addEventListener('change', aplicar);
   }
 }
 

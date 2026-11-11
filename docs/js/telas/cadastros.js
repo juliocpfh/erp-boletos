@@ -122,6 +122,43 @@ let avisoAditivo = '';
 /** Pagamento com valor diferente do previsto, esperando o valor da NF na página do boleto (nada é salvo antes). */
 let guardarModeloAirbnb = false;
 
+/** Imóvel sem contrato ativo hoje nem contrato futuro. */
+const imovelVago = (id, hoje = C.hojeIso()) => !d().contratos.some((c) => c.imovel_id === Number(id) && R.contratoAtivo(c, hoje));
+
+/** Imóveis que aparecem na ficha: os vagos e os que ela já tem. */
+const imoveisDaFicha = (r) => ordenar(d().imoveis, 'nome').filter((i) => imovelVago(i.id) || (r && (r.imoveis_ids || []).includes(i.id)));
+
+/**
+ * O aluguel com bonificação digitado é o do aluguel inicial (histórico): o % sai sobre ele (sem arredondar, para o
+ * desconto bater no centavo) e vale também para o aluguel corrigido. Ex.: aluguel R$ 2.000,00 e bonificado R$ 1.800,00 → 10%.
+ */
+function percentualDoBonificado(dados, erros, form) {
+  const base = dados.aluguel_inicial;
+  const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
+  if (!dados.bonificacao || !bonificadoTexto) return;
+  let bonificado = NaN;
+  try { bonificado = C.centavos(bonificadoTexto); } catch { /* inválido */ }
+  if (!(base > 0)) erros.aluguel_inicial = erros.aluguel_inicial || 'Informe o aluguel cheio (ou apague o aluguel bonificado)';
+  else if (!Number.isFinite(bonificado) || bonificado < 0 || bonificado > base) erros.aluguel_bonificado = `Informe um valor entre R$ 0,00 e ${reais(base)} (aluguel cheio)`;
+  else dados.desconto_pontualidade_percentual = C.percentualPorBonificado(base, bonificado);
+}
+
+/**
+ * Ficha usada pelo Novo contrato: a do botão "Fazer o contrato" (q.ficha) ou, aberto pela página do imóvel, a ficha
+ * aprovada que espera o contrato dele (antes, por ali a reserva e o comprovante da ficha não vinham).
+ */
+function fichaDoNovoContrato(q = {}) {
+  if (q.ficha) return buscar('fichas', q.ficha) || null;
+  return q.imovel && !q.pessoa ? R.fichaAprovadaDoImovel(d(), q.imovel) : null;
+}
+
+/** Aviso do Novo contrato feito da ficha: o que já veio preenchido e o que falta. */
+function avisoDaFicha(f) {
+  const dados = R.dadosDaFicha(d(), f);
+  const veio = ['os dados da pessoa', dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? 'a proposta (aluguel, vencimento, bonificação e garantia)' : '', dados.reserva_valor ? 'a reserva' : ''].filter(Boolean);
+  return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (fiador, o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
+}
+
 export const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -221,14 +258,19 @@ export const CADASTROS = {
       // fiadores do contrato (não os da troca de garantia) vêm preenchidos para alterar, e mais um bloco em branco (incluir)
       const fiadores = r ? R.fiadoresDoContrato(d(), r.id) : [];
       // o vínculo com o imóvel acontece só aqui, no contrato novo (imóvel obrigatório); na edição o imóvel não muda
+      // contrato a partir da ficha: o comprovante da reserva ainda está na pasta da ficha (abre e apaga de lá)
+      const ficha = r ? null : fichaDoNovoContrato(q);
+      const guardado = ficha && { acao: 'apagarArquivoDaFicha', dados: { ficha: ficha.id }, abrir: { escopo: 'ficha', id: ficha.id } };
       return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
         .filter((c) => (r ? !c.soNovo : !c.soEditar))
-        .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis } : c)));
+        .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis }
+          : c.nome === 'comprovante_reserva' && guardado ? { ...c, guardado } : c)));
     },
     // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
     // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
-    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(q.ficha && buscar('fichas', q.ficha) ? R.dadosDaFicha(d(), buscar('fichas', q.ficha)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
+    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
@@ -236,7 +278,7 @@ export const CADASTROS = {
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
-    aviso: (r, q) => (!r && q && q.ficha && buscar('fichas', q.ficha) ? `Contrato a partir da ficha aprovada de ${buscar('fichas', q.ficha).inquilino_nome}: os dados da pessoa${R.dadosDaFicha(d(), buscar('fichas', q.ficha)).reserva_valor ? ' e a reserva' : ''} já vieram preenchidos. Complete garantia, fiador, o que está incluso, valores, datas e vencimento.${buscar('fichas', q.ficha).documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`
+    aviso: (r, q) => (!r && q && fichaDoNovoContrato(q) ? avisoDaFicha(fichaDoNovoContrato(q))
       : !r && q && q.pessoa ? `Contrato novo de ${buscar('contratos', q.pessoa).inquilino_nome} para este imóvel: os dados da pessoa já vieram preenchidos. Escolha as condições deste contrato (cada contrato é único).`
       : r ? `Imóvel: ${(buscar('imoveis', r.imovel_id) || {}).nome || 'sem imóvel'} (não muda aqui; lançado errado: "Corrigir imóvel" na página do inquilino). Mudou o dia do vencimento ou a garantia? Isso exige termo aditivo: depois de salvar, registre o termo assinado em "Termos aditivos" (botão "Contrato, Vistoria, Termos e Aditivos" na página do inquilino).` : ''),
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
@@ -255,16 +297,7 @@ export const CADASTROS = {
           dados[k] = ['bonificacao', 'cobranca_mes_seguinte'].includes(k) ? fonte[k] !== false : fonte[k] ?? null;
         }
       }
-      // o aluguel com bonificação digitado é o do aluguel inicial (histórico): o % sai sobre ele e vale também para o aluguel corrigido
-      const base = dados.aluguel_inicial;
-      const bonificadoTexto = String(new FormData(form).get('aluguel_bonificado') || '').trim();
-      if (dados.bonificacao && bonificadoTexto && !herdado) {
-        // o aluguel bonificado digitado manda: o % é calculado sem arredondar, para o desconto bater no centavo
-        let bonificado = NaN;
-        try { bonificado = C.centavos(bonificadoTexto); } catch { /* inválido */ }
-        if (!Number.isFinite(bonificado) || bonificado < 0 || bonificado > base) erros.aluguel_bonificado = `Informe um valor entre R$ 0,00 e ${reais(base)} (aluguel cheio)`;
-        else dados.desconto_pontualidade_percentual = C.percentualPorBonificado(base, bonificado);
-      }
+      if (!herdado) percentualDoBonificado(dados, erros, form);
       if (r && R.trocaAguardaAditivo(d(), r) && dados.aluguel_inicial !== r.aluguel_inicial) erros.aluguel_inicial = `O contrato ainda é de ${R.contratoHerdado(d(), r).inquilino_nome}: o aluguel só muda depois do termo aditivo assinado`;
       for (const k of ['desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'carencia_meses']) if (dados[k] === null) dados[k] = 0;
       if (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
@@ -317,7 +350,7 @@ export const CADASTROS = {
       }
       conferirComprovantes(COMPROVANTES_CONTRATO, dados, r, form);
       // contrato a partir da ficha: fica ligado a ela; o comprovante da reserva da ficha vale (vai para a pasta do inquilino em "depois")
-      const ficha = !r && q.ficha ? buscar('fichas', q.ficha) : null;
+      const ficha = r ? null : fichaDoNovoContrato(q);
       if (ficha) {
         dados.ficha_id = ficha.id;
         if (!dados.comprovante_reserva && ficha.comprovante_reserva && !ficha.documentos_no_contrato && dados.reserva_valor === ficha.reserva_valor) dados.comprovante_reserva = ficha.comprovante_reserva;
@@ -404,23 +437,27 @@ export const CADASTROS = {
   },
   fichas: {
     titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Nova ficha em análise'),
-    // imóveis de interesse: uma caixa de marcar por imóvel (o que já tem outra ficha aberta aparece avisado)
+    // imóveis de interesse: uma caixa de marcar por imóvel VAGO (pedido do dono, 2026-11-10: escolher ocupado dava brecha
+    // para erro); o que já está na ficha continua na lista. O que já tem outra ficha aberta aparece avisado
     campos: (r) => {
-      const hoje = C.hojeIso();
-      const vago = (i) => !d().contratos.some((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje));
-      const imoveis = ordenar(d().imoveis, 'nome').map((i) => {
+      const imoveis = imoveisDaFicha(r).map((i) => {
         const outra = R.fichaAbertaDoImovel(d(), i.id, r && r.id);
-        return { nome: `imovel_${i.id}`, rotulo: `${i.nome}${vago(i) ? ' · vago' : ''}${outra ? ` · já tem a ficha de ${outra.inquilino_nome}` : ''}`, tipo: 'simnao' };
+        return { nome: `imovel_${i.id}`, rotulo: `${i.nome}${imovelVago(i.id) ? '' : ' · ocupado'}${outra ? ` · já tem a ficha de ${outra.inquilino_nome}` : ''}`, tipo: 'simnao' };
       });
       return [...F.FICHA_INICIO,
         { secao: 'Imóveis de interesse' },
         { nome: 'modo_imoveis', rotulo: 'A ficha é para', tipo: 'opcao', obrig: true, padrao: R.MODOS_FICHA[0], opcoes: R.MODOS_FICHA, largo: true,
-          ajuda: 'Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada)' },
+          ajuda: `Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada). Só aparecem os imóveis vagos${imoveis.length ? '' : ' (nenhum vago no momento)'}` },
         { quebra: true }, ...imoveis,
-        ...F.camposDaPessoa(R.CAMPOS_PESSOA), ...F.FICHA_FIM];
+        // "Usar o endereço do imóvel": o de interesse (com um só marcado)
+        ...F.camposDaPessoa([...R.CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)])
+          .map((c) => (ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: 'Usar o endereço do imóvel de interesse', ajuda: 'Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)' } : c)),
+        ...F.FICHA_FIM];
     },
     padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
-    valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', ...Object.fromEntries((r.imoveis_ids || []).map((id) => [`imovel_${id}`, true])) }),
+    valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', bonificacao: r.bonificacao !== false,
+      aluguel_bonificado: r.bonificacao === false || !(r.aluguel_inicial > 0) ? null : inicialBonificado(r),
+      ...Object.fromEntries((r.imoveis_ids || []).map((id) => [`imovel_${id}`, true])) }),
     compacto: true,
     voltar: (r) => (r ? `#/ficha/${r.id}` : '#/inquilinos'),
     destino: (salvo) => `#/ficha/${salvo.id}`,
@@ -432,6 +469,9 @@ export const CADASTROS = {
       dados.imoveis_ids = ids;
       if (!ids.length) erros.modo_imoveis = 'Marque pelo menos um imóvel de interesse';
       const comContrato = r ? Object.keys(R.contratosDaFicha(d(), r)).map(Number) : [];
+      // só imóvel vago entra (o que já estava na ficha pode ficar)
+      const ocupado = ids.find((id) => !imovelVago(id) && !(r && (r.imoveis_ids || []).includes(id)));
+      if (ocupado) erros.modo_imoveis = `${buscar('imoveis', ocupado).nome} está ocupado: a ficha é só para imóvel vago`;
       if (comContrato.some((id) => !ids.includes(id))) erros.modo_imoveis = 'Um imóvel desmarcado já tem contrato feito a partir desta ficha';
       // cada imóvel tem no máximo uma ficha aberta (em análise ou aprovada sem contrato)
       if (dados.situacao !== 'Reprovada') {
@@ -453,6 +493,17 @@ export const CADASTROS = {
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
       }
       if (!dados.solidario_nome) for (const k of Object.keys(dados)) if (k.startsWith('solidario_')) dados[k] = null;
+      // "Usar o endereço do imóvel de interesse": precisa de um só imóvel marcado
+      for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
+        if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome) || (caixa.startsWith('representante') && dados.inquilino_tipo !== 'Pessoa jurídica (empresa)')) continue;
+        if (ids.length === 1) dados[campoEnd] = enderecoInquilino(buscar('imoveis', ids[0]));
+        else erros[campoEnd] = 'Para usar o endereço do imóvel, marque um só imóvel de interesse';
+      }
+      // proposta: o aluguel bonificado digitado dá o %; sem bonificação, o % fica zero
+      percentualDoBonificado(dados, erros, form);
+      if (!dados.bonificacao) dados.desconto_pontualidade_percentual = 0;
+      if (dados.desconto_pontualidade_percentual !== null && (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100)) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
+      if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = 'Informe um dia entre 1 e 31';
       // a pasta é escolhida ao criar e não muda (o nome pode ser corrigido depois)
       dados.pasta = r ? (r.pasta || nomePastaFicha(r)) : nomePastaFicha(dados);
       conferirComprovantes(COMPROVANTES_FICHA, dados, r, form);
@@ -461,6 +512,9 @@ export const CADASTROS = {
       const pasta = r ? () => pastaDoEscopo('ficha', r.id)
         : async () => S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, dados.pasta]);
       await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta);
+      // análise do Serasa (não é de dinheiro: grava sem valor)
+      const serasa = arquivoEscolhido(form, 'analise_serasa');
+      if (serasa) dados.analise_serasa = await S.salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${C.hojeIso()}${extensao(serasa.name)}`));
     },
   },
   correcoes: {

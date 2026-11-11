@@ -473,7 +473,7 @@ export async function levarDocumentosDaFicha(fichaId, contratoId) {
       } catch { /* fica na pasta da ficha: dá para levar à mão */ }
     }
   }
-  await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_no_contrato: Number(contratoId), comprovante_reserva: null }, login(),
+  await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_no_contrato: Number(contratoId), comprovante_reserva: null, analise_serasa: null }, login(),
     `Documentos da ficha levados para a pasta do inquilino${nomes.length ? `: ${nomes.join(', ')}` : ''}`));
   await apagarPastaDaFichaSeVazia(f.pasta || nomePastaFicha(f));
   return nomes.length;
@@ -498,10 +498,10 @@ export async function apagarDocumentosVencidosDasFichas() {
   const vencidas = R.fichasComDocumentosVencidos(d());
   for (const f of vencidas) {
     const dir = await pastaDaFicha(f.pasta || nomePastaFicha(f));
-    const ficam = new Set(R.CAMPOS_ARQUIVO_FICHA.map((k) => f[k]).filter(Boolean));
+    const ficam = new Set(R.COMPROVANTES_DINHEIRO_FICHA.map((k) => f[k]).filter(Boolean));
     const apagados = [];
     if (dir) for (const a of await S.listar(dir)) if (!ficam.has(a.nome)) { try { await dir.removeEntry(a.nome); apagados.push(a.nome); } catch { /* tenta de novo amanhã */ } }
-    await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso() }, login(),
+    await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso(), analise_serasa: null }, login(),
       `Documentos da ficha reprovada apagados (${R.MESES_DOCUMENTOS_REPROVADA} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`));
   }
   if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${R.MESES_DOCUMENTOS_REPROVADA} meses: ${vencidas.map((f) => f.inquilino_nome).join(', ')}.`, 'info');

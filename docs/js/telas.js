@@ -87,7 +87,9 @@ export const TELAS = {
       bonif.addEventListener('change', mostrarBonif);
       mostrarBonif();
     }
-    // bonificação: digitar o aluguel bonificado calcula o %, e digitar o % calcula o aluguel bonificado
+    // aluguel, aluguel bonificado e bonificação (%): preenchidos dois, o terceiro é calculado (pedido do dono, 2026-11-10).
+    // Calcula-se o que foi mexido há mais tempo; sem mexer em nada, o calculado é o bonificado. Ex.: aluguel R$ 2.000,00 e
+    // 10% → bonificado R$ 1.800,00; bonificado R$ 1.800,00 e 10% → aluguel R$ 2.000,00; aluguel e bonificado → 10%.
     const pctEl = raiz.querySelector('[data-vinculo="desconto"][data-tipo="pct"]');
     const valEl = raiz.querySelector('[data-vinculo="desconto"][data-tipo="dinheiro"]');
     if (!pctEl || !valEl) return;
@@ -95,40 +97,57 @@ export const TELAS = {
     const aluguel = raiz.querySelector('[name=aluguel_inicial]');
     const num = (t) => { try { return t.trim() === '' ? NaN : C.numero(t); } catch { return NaN; } };
     const cent = (t) => { try { return t.trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
-    // aluguel sobre o qual vale o %: o atual, quando já houve correção (fixo); senão, o aluguel cheio digitado
+    // aluguel sobre o qual vale o %: o atual, quando já houve correção (fixo: o aluguel nunca é o calculado); senão, o cheio digitado
+    const fixo = () => !!form.dataset.base || !aluguel || aluguel.readOnly;
     const base = () => (form.dataset.base ? Number(form.dataset.base) : aluguel ? cent(aluguel.value) : NaN);
     const avisar = (texto) => {
       valEl.classList.toggle('doc-invalido', !!texto);
       const caixa = valEl.closest('div').querySelector('.erro-bonif') || valEl.closest('div').appendChild(Object.assign(document.createElement('div'), { className: 'erro-campo erro-bonif' }));
       caixa.textContent = texto;
     };
-    // nada aqui pode "travar" o formulário: qualquer valor estranho só limpa o campo calculado e avisa
-    const doPct = () => {
-      try {
-        const b = base(); const p = num(pctEl.value);
-        const ok = Number.isFinite(b) && b > 0 && Number.isFinite(p) && p >= 0 && p <= 100;
-        valEl.value = ok ? F.dinheiroTexto(b - C.descontoPorPercentual(b, p)) : '';
-        avisar(Number.isFinite(p) && (p < 0 || p > 100) ? 'O % precisa ficar entre 0 e 100' : '');
-      } catch { valEl.value = ''; }
+    // nada aqui pode "travar" o formulário: qualquer valor estranho só deixa de calcular e avisa
+    const calcularBonificado = () => {
+      const b = base(); const p = num(pctEl.value);
+      avisar(Number.isFinite(p) && (p < 0 || p > 100) ? 'O % precisa ficar entre 0 e 100' : '');
+      if (Number.isFinite(b) && b > 0 && Number.isFinite(p) && p >= 0 && p <= 100) valEl.value = F.dinheiroTexto(b - C.descontoPorPercentual(b, p));
     };
-    const doValor = () => {
-      try {
-        const b = base(); const v = cent(valEl.value);
-        if (!Number.isFinite(b) || !(b > 0) || !Number.isFinite(v)) { pctEl.value = ''; avisar(''); return; }
-        if (v < 0 || v > b) { pctEl.value = ''; avisar(`O aluguel com bonificação precisa ficar entre R$ 0,00 e ${reais(b)} (aluguel cheio)`); return; }
-        pctEl.value = F.pctTexto(Math.round(C.percentualPorBonificado(b, v) * 10000) / 10000);
-        avisar('');
-      } catch { pctEl.value = ''; }
+    const calcularPct = () => {
+      const b = base(); const v = cent(valEl.value);
+      if (!Number.isFinite(b) || !(b > 0) || !Number.isFinite(v)) { avisar(''); return; }
+      if (v < 0 || v > b) { avisar(`O aluguel com bonificação precisa ficar entre R$ 0,00 e ${reais(b)} (aluguel cheio)`); return; }
+      pctEl.value = F.pctTexto(Math.round(C.percentualPorBonificado(b, v) * 10000) / 10000);
+      avisar('');
     };
-    pctEl.addEventListener('input', doPct);
-    valEl.addEventListener('input', doValor);
-    // mudou o aluguel cheio: o % fica e o aluguel com bonificação acompanha
-    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', () => { if (pctEl.value.trim() !== '') doPct(); else if (valEl.value.trim() !== '') doValor(); });
+    const calcularAluguel = () => {
+      const v = cent(valEl.value); const p = num(pctEl.value);
+      avisar(Number.isFinite(p) && (p < 0 || p >= 100) ? 'O % precisa ficar entre 0 e 100 (menos de 100 para calcular o aluguel)' : '');
+      if (Number.isFinite(v) && v > 0 && Number.isFinite(p) && p >= 0 && p < 100) aluguel.value = F.dinheiroTexto(C.cheioPorBonificado(v, p));
+    };
+    const CALCULO = { valor: calcularBonificado, pct: calcularPct, aluguel: calcularAluguel };
+    const EL = { valor: valEl, pct: pctEl, aluguel };
+    let ordem = ['aluguel', 'pct', 'valor']; // do mexido por último ao mais antigo
+    // digitados pela pessoa (os que vieram preenchidos contam, menos o bonificado, que é calculado)
+    const digitados = new Set(['aluguel', 'pct'].filter((k) => EL[k] && EL[k].value.trim() !== ''));
+    const mexeu = (campo) => {
+      ordem = [campo, ...ordem.filter((x) => x !== campo)];
+      if (EL[campo].value.trim() === '') digitados.delete(campo); else digitados.add(campo);
+      const outros = ordem.filter((x) => x !== campo);
+      const livres = outros.filter((x) => !digitados.has(x));
+      // calcula o que a pessoa não digitou; com os três digitados, o aluguel fica e muda o mais antigo entre o % e o bonificado
+      const alvo = fixo() ? { pct: 'valor', valor: 'pct', aluguel: 'valor' }[campo]
+        : livres.length === 1 ? livres[0] : livres.length === 2 ? { pct: 'valor', valor: 'pct', aluguel: 'valor' }[campo]
+          : outros.filter((x) => x !== 'aluguel').pop();
+      try { CALCULO[alvo](); } catch { /* digitando */ }
+      digitados.delete(alvo);
+    };
+    pctEl.addEventListener('input', () => mexeu('pct'));
+    valEl.addEventListener('input', () => mexeu('valor'));
+    if (aluguel && !form.dataset.base) aluguel.addEventListener('input', () => mexeu('aluguel'));
     if (form.dataset.base) {
       const nota = valEl.closest('div').querySelector('.ajuda');
       if (nota) nota.textContent = `O % vale sobre o aluguel atual de ${reais(Number(form.dataset.base))} (já corrigido). Digite o valor que o inquilino paga em dia: o % é calculado.`;
     }
-    if (pctEl.value !== '' && valEl.value === '') doPct();
+    if (pctEl.value !== '' && valEl.value === '') { try { calcularBonificado(); } catch { /* nada */ } }
   },
 
   arquivoSumiu: (copias) => `<main><div id="mensagens"></div><div class="cartao login" style="max-width:600px"><h1>Administração de Imóveis</h1>

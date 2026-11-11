@@ -2,7 +2,7 @@
 import { alterar, aviso, login, mostrar, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
-import { esc } from '../formularios.js';
+import { esc, pctTexto } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao, buscar, caixaArquivos, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera } from './comum.js';
 
@@ -59,6 +59,13 @@ export function telaFicha(id) {
     item('Profissão', esc(f.inquilino_profissao)), item('Endereço', esc(f.inquilino_endereco)),
     item('Representante', esc(f.representante_nome)), item('Inquilino solidário', esc(f.solidario_nome)),
   ].join('');
+  // proposta combinada (vai preenchida para o contrato)
+  const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - C.descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
+  const proposta = [
+    item('Aluguel', f.aluguel_inicial > 0 ? reais(f.aluguel_inicial) : ''),
+    item('Aluguel bonificado', bonificado !== null ? `${reais(bonificado)} <span class="suave">(${esc(pctTexto(Math.round(f.desconto_pontualidade_percentual * 100) / 100))}% de bonificação)</span>` : ''),
+    item('Dia do vencimento', f.dia_vencimento ? `dia ${esc(f.dia_vencimento)}` : ''), item('Garantia', esc(f.garantia_tipo)),
+  ].join('');
   // contratos feitos e por fazer, um por imóvel
   const contratos = (f.imoveis_ids || []).map((iid) => {
     const i = buscar('imoveis', iid);
@@ -91,9 +98,11 @@ export function telaFicha(id) {
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
       ${f.situacao === 'Aprovada' && paraFazer.length ? `<p class="suave">${primeiro ? 'O contrato abre com os dados da pessoa já preenchidos (a reserva e os documentos ficaram no primeiro contrato).' : 'O contrato abre com os dados da pessoa e a reserva já preenchidos. Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}</p>` : ''}</div>
     <div class="cartao"><h2>${esc(pj ? 'Empresa' : 'Interessado')}</h2><div class="grade">${pessoa || '<p class="suave">Só o nome foi preenchido.</p>'}</div></div>
+    <div class="cartao"><h2>Proposta</h2>${proposta ? `<div class="grade">${proposta}</div>` : '<p class="suave">Aluguel, vencimento, bonificação e garantia ainda não preenchidos (em "Editar"). Eles vão preenchidos para o contrato.</p>'}</div>
     <div class="cartao"><h2>Reserva</h2>${f.reserva_valor > 0 ? `<p>${reais(f.reserva_valor)}${f.reserva_data ? ` em ${dataBr(f.reserva_data)}` : ''} ${f.comprovante_reserva ? abrir(f.comprovante_reserva, 'comprovante') : primeiro ? '<span class="suave">(o comprovante foi para a pasta do inquilino)</span>' : etiqueta('sem comprovante', 'aviso')}</p>` : '<p class="suave">Sem reserva.</p>'}</div>
     <div class="cartao"><h2>Documentos</h2>
       <p>${[sim(f.doc_ficha, 'Ficha cadastral'), sim(f.doc_pessoais, 'Documentos pessoais'), sim(f.doc_renda, 'Comprovante de renda'), sim(f.doc_residencia, 'Comprovante de residência')].join(' · ')}</p>
+      ${f.analise_serasa ? `<p>Análise do Serasa: ${abrir(f.analise_serasa, f.analise_serasa)}</p>` : primeiro || f.documentos_apagados_em ? '' : '<p class="suave">Sem a análise do Serasa (anexe em "Editar").</p>'}
       ${documentos}
       ${primeiro || f.documentos_apagados_em ? '' : caixaArquivos('ficha', f.id, `Arquivos da ficha · 📁 ${f.pasta || nomePastaFicha(f)}`, 'arquivos', 'Ficha cadastral, documentos pessoais, comprovante de renda e outros (PDF ou foto). O comprovante da reserva vai no campo dele, em "Editar".', true)}</div>
     ${f.observacoes ? `<div class="cartao"><h2>Observações</h2><p>${esc(f.observacoes).replace(/\n/g, '<br>')}</p></div>` : ''}`;
