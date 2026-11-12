@@ -14,9 +14,9 @@ export function confirmarAvisos(avisos) {
   }
 }
 
-const DIAS_FUTURO = 60;
-
-const FORA_DO_PADRAO = 0.3;
+// números dos avisos: regras do sistema (Dados e backup → Regras), padrão 60 dias, 30% e 90 dias
+const diasFuturo = () => R.regra('dias_futuro');
+const foraDoPadrao = () => R.regra('fora_do_padrao') / 100;
 
 /** Avisos do cadastro do inquilino: aluguel muito diferente do anterior, imóvel ainda ocupado, entrada muito no futuro. */
 export function conferirContrato(dados, r, q) {
@@ -25,7 +25,7 @@ export function conferirContrato(dados, r, q) {
   const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id))
     .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] : null;
   const base = r ? r.aluguel_inicial : anterior ? R.aluguelAtual(d(), anterior) : null;
-  if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > FORA_DO_PADRAO && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
+  if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > foraDoPadrao() && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
     const p = Math.round(((dados.aluguel_inicial - base) / base) * 100);
     out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
   }
@@ -34,42 +34,19 @@ export function conferirContrato(dados, r, q) {
       && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
     if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
   }
-  if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), DIAS_FUTURO)) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${DIAS_FUTURO} dias no futuro.`);
+  if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), diasFuturo())) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${diasFuturo()} dias no futuro.`);
+  out.push(...R.avisosLegaisDoContrato(dados)); // prazo, bonificação, multa, juros, caução e garantia, com o artigo da lei
   // inquilino novo que emite NF num imóvel ainda sem empresa emitente: lembrar agora (sem isso a NF não é numerada)
   if (!r && imovelId && dados.gerar_nf !== false && !R.participacoesDo(d(), imovelId).length) {
     out.push(`O imóvel ${(buscar('imoveis', imovelId) || {}).nome || ''} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
   }
   if (dados.vigencia_inicio && dados.data_entrada && Math.abs(C.diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
-  out.push(...avisosDaGarantia(dados, r));
   const antigo = r ? CADASTROS.contratos.valores(r) : null;
   for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));
   const doc = F.soDigitos(dados.inquilino_cpf || '');
   for (const f of [...fiadoresMudancas.novos, ...fiadoresMudancas.alterados]) {
     out.push(...conferirPessoa(f, f.id ? buscar('fiadores', f.id) : null, '', `do fiador ${f.nome}`));
     if (doc && F.soDigitos(f.cpf || '') === doc) out.push(`O CPF do fiador ${f.nome} é o mesmo do inquilino.`);
-  }
-  return out;
-}
-
-/**
- * Garantia fora da lei (aviso, não bloqueia; decisão do dono em 2026-11-12): duas garantias no mesmo contrato (art. 37,
- * parágrafo único, e art. 43, II, da Lei 8.245/91) e caução ou depósito acima de 3 aluguéis (art. 38, § 2º). Só quando muda.
- * Ex.: aluguel de R$ 2.500,00 e caução de R$ 9.000,00 → "passa de 3 aluguéis (R$ 7.500,00)".
- */
-export function avisosDaGarantia(dados, r = null) {
-  const out = [];
-  const mudou = (k) => !r || dados[k] !== r[k];
-  if (dados.garantia_tipo === 'Fiador + depósito' && mudou('garantia_tipo')) {
-    out.push('Fiador + depósito são duas garantias no mesmo contrato: a Lei 8.245/91 (art. 37, parágrafo único) permite só uma; a segunda pode ser anulada, e exigir as duas é contravenção (art. 43, II). O melhor é ficar com uma só.');
-  }
-  const aluguel = dados.aluguel_inicial ?? (r && r.aluguel_inicial) ?? 0;
-  const limite = 3 * aluguel;
-  if (dados.garantia_tipo === 'Caução' && (mudou('caucao_meses') || mudou('caucao_valor') || mudou('garantia_tipo'))
-    && (dados.caucao_meses > 3 || (aluguel > 0 && dados.caucao_valor > limite))) {
-    out.push(`A caução${dados.caucao_valor ? ` de ${reais(dados.caucao_valor)}` : ''} passa de 3 aluguéis${aluguel ? ` (${reais(limite)})` : ''}, o máximo da Lei 8.245/91 (art. 38, § 2º). O que passar pode ter de ser devolvido.`);
-  }
-  if (['Depósito garantia', 'Fiador + depósito'].includes(dados.garantia_tipo) && (mudou('deposito_valor') || mudou('garantia_tipo')) && aluguel > 0 && dados.deposito_valor > limite) {
-    out.push(`O depósito de garantia de ${reais(dados.deposito_valor)} passa de 3 aluguéis (${reais(limite)}): é caução em dinheiro, e a Lei 8.245/91 (art. 38, § 2º) limita a 3 aluguéis.`);
   }
   return out;
 }
@@ -85,13 +62,13 @@ export function conferirBoleto(dados, r) {
 }
 
 /** Pagamento com data muito para trás costuma ser ano digitado errado (ex.: 2025 em vez de 2026). */
-const DIAS_PASSADO = 90;
+const diasPassado = () => R.regra('dias_passado');
 
-export const dataMuitoAntiga = (data, rotulo = 'A data') => (data && data < C.somarDias(C.hojeIso(), -DIAS_PASSADO) ? `${rotulo} (${dataBr(data)}) é de mais de ${DIAS_PASSADO} dias atrás. Confira o ano.` : '');
+export const dataMuitoAntiga = (data, rotulo = 'A data') => (data && data < C.somarDias(C.hojeIso(), -diasPassado()) ? `${rotulo} (${dataBr(data)}) é de mais de ${diasPassado()} dias atrás. Confira o ano.` : '');
 
 export const dataNoFuturo = (data, rotulo = 'A data') => (data && data > C.hojeIso() ? `${rotulo} (${dataBr(data)}) está no futuro.` : '');
 
-const diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > FORA_DO_PADRAO;
+const diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > foraDoPadrao();
 
 const pctDif = (novo, base) => { const p = Math.round(((novo - base) / base) * 100); return `${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'}`; };
 

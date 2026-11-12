@@ -318,10 +318,12 @@ function ligarCaucao(raiz) {
     if (valor.readOnly || (!novo && valor.value.trim() !== '')) return;
     const n = Number(meses.value);
     const bonif = form.querySelector('[name=bonificacao]');
-    const base = bonif && bonif.checked ? cent((form.querySelector('[name=aluguel_bonificado]') || {}).value) : cent(form.querySelector('[name=aluguel_inicial]').value);
+    // regra `caucao_base` (Dados e backup → Regras): com bonificação (padrão) ou sempre o aluguel cheio
+    const comBonif = bonif && bonif.checked && R.regra('caucao_base') !== 'cheio';
+    const base = comBonif ? cent((form.querySelector('[name=aluguel_bonificado]') || {}).value) : cent(form.querySelector('[name=aluguel_inicial]').value);
     if (!(n > 0) || !Number.isFinite(base)) return;
     valor.value = F.dinheiroTexto(n * base);
-    mensagemAuto(valor, `${n} × ${reais(base)} (aluguel ${bonif && bonif.checked ? 'com bonificação' : 'cheio'})`);
+    mensagemAuto(valor, `${n} × ${reais(base)} (aluguel ${comBonif ? 'com bonificação' : 'cheio'})`);
   };
   meses.addEventListener('input', calcular);
   for (const n of ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual']) {

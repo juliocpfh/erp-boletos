@@ -108,6 +108,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
 
 15. USUÁRIOS E SEGURANÇA
+- Regras do sistema (Dados e backup → Regras do sistema, só o administrador muda): reajuste, feriados da cidade, base da multa, proporcional, dia de gerar boletos, caução, valores que o Novo contrato traz, régua de cobrança e prazos. Cada regra mostra a explicação, a consequência e a lei; o sistema avisa quando a escolha tem risco legal, mas não proíbe. As regras deste texto são o padrão do sistema: valem enquanto nada for mudado, e dá para voltar a elas, a uma versão salva ou a um arquivo das regras.
 - Papéis: administrador (tudo, desfaz alterações de cadastro, backup seguro), operador (lança e edita) e consulta (só vê).
 - Senhas guardadas com PBKDF2-SHA256. Todas as alterações ficam no histórico.
 - Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).

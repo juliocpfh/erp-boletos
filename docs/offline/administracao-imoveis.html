@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-fW4PGKJXHzzCQJC+LDTU7l0zmWE16YTc5ECW9Lus8iU=' 'sha256-/S6zgo+/LmeLMFYy4TitHwdknY3mY6DMR/htqr+mM3U='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-kmktVtJsX1TDnNLHV+N88cgqwEvgQO0whTlNtdQtP80=' 'sha256-O8PFh63oLFkliyiFB3SLi71Cr6Dxr+P6jqbouDcqe2A='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="03c79dc790636de3">
+<meta name="fontes" content="544ec43add771327">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -643,12 +643,20 @@ body.com-visualizador { overflow: hidden; }
 .icone-controles { flex-wrap: wrap; }
 .icone-controles input[type=range] { width: 140px; max-width: 45vw; }
 .primeira-logo .acoes { display: flex; }
+/* Regras do sistema (#/regras) */
+.regra-sistema { border-top: 1px solid var(--borda); padding: 12px 0 4px; }
+.regra-sistema:first-of-type { border-top: 0; }
+.regra-sistema h3 { margin: 0 0 4px; font-size: 15px; }
+.regra-sistema p { margin: 4px 0; }
+.campo-regra { margin: 8px 0; }
+.opcao-regra { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; font-weight: normal; }
+.opcao-regra input { margin-top: 4px; }
 </style>
 </head>
 <body>
 <div id="app"><main><p class="suave">Carregando…</p></main></div>
 <noscript>Ative o JavaScript para usar o sistema.</noscript>
-<!-- Versão PC, gerada em 2026-11-11 por tools/gerar-offline.mjs (pelo GitHub a cada mudança na main). Não edite: gere de novo. -->
+<!-- Versão PC, gerada em 2026-11-12 por tools/gerar-offline.mjs (pelo GitHub a cada mudança na main). Não edite: gere de novo. -->
 <script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -1101,7 +1109,7 @@ function(t){var e=function(){return void 0===this.internal.vFS&&(this.internal.v
 function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,s,o,h,l=e,u=[[0,3,0,1,0,0,0],[0,3,0,1,2,2,0],[0,3,0,17,2,0,1],[0,3,5,5,4,1,0],[0,3,21,21,4,0,1],[0,3,5,5,4,2,0]],c=[[2,0,1,1,0,1,0],[2,0,1,1,0,2,0],[2,0,2,1,3,2,0],[2,0,2,33,3,1,1]],f={L:0,R:1,EN:2,AN:3,N:4,B:5,S:6},d={0:0,5:1,6:2,7:3,32:4,251:5,254:6,255:7},p=["(",")","(","<",">","<","[","]","[","{","}","{","«","»","«","‹","›","‹","⁅","⁆","⁅","⁽","⁾","⁽","₍","₎","₍","≤","≥","≤","〈","〉","〈","﹙","﹚","﹙","﹛","﹜","﹛","﹝","﹞","﹝","﹤","﹥","﹤"],g=new RegExp(/^([1-4|9]|1[0-9]|2[0-9]|3[0168]|4[04589]|5[012]|7[78]|159|16[0-9]|17[0-2]|21[569]|22[03489]|250)$/),m=!1,b=0;this.__bidiEngine__={};var v=function(t){var e=t.charCodeAt(),n=e>>8,r=d[n];return void 0!==r?l[256*r+(255&e)]:252===n||253===n?"AL":g.test(n)?"L":8===n?"R":"N"},w=function(t){for(var e,n=0;n<t.length;n++){if("L"===(e=v(t.charAt(n))))return!1;if("R"===e)return!0}return!1},y=function(t,e,s,o){var h,l,u,c,f=e[o];switch(f){case"L":case"R":case"LRE":case"RLE":case"LRO":case"RLO":case"PDF":m=!1;break;case"N":case"AN":break;case"EN":m&&(f="AN");break;case"AL":m=!0,f="R";break;case"WS":case"BN":f="N";break;case"CS":o<1||o+1>=e.length||"EN"!==(h=s[o-1])&&"AN"!==h||"EN"!==(l=e[o+1])&&"AN"!==l?f="N":m&&(l="AN"),f=l===h?l:"N";break;case"ES":f="EN"===(h=o>0?s[o-1]:"B")&&o+1<e.length&&"EN"===e[o+1]?"EN":"N";break;case"ET":if(o>0&&"EN"===s[o-1]){f="EN";break}if(m){f="N";break}for(u=o+1,c=e.length;u<c&&"ET"===e[u];)u++;f=u<c&&"EN"===e[u]?"EN":"N";break;case"NSM":if(i&&!a){for(c=e.length,u=o+1;u<c&&"NSM"===e[u];)u++;if(u<c){var d=t[o],p=d>=1425&&d<=2303||64286===d;if(h=e[u],p&&("R"===h||"AL"===h)){f="R";break}}}f=o<1||"B"===(h=e[o-1])?"N":s[o-1];break;case"B":m=!1,n=!0,f=b;break;case"S":r=!0,f="N"}return f},_=function(t,e,n){var r=t.split("");return n&&x(r,n,{hiLevel:b}),r.reverse(),e&&e.reverse(),r.join("")},x=function(t,e,i){var a,s,o,h,l,d=-1,p=t.length,g=0,w=[],_=b?c:u,x=[];for(m=!1,n=!1,r=!1,s=0;s<p;s++)x[s]=v(t[s]);for(o=0;o<p;o++){if(l=g,w[o]=y(t,x,w,o),a=240&(g=_[l][f[w[o]]]),g&=15,e[o]=h=_[g][5],a>0)if(16===a){for(s=d;s<o;s++)e[s]=1;d=-1}else d=-1;if(_[g][6])-1===d&&(d=o);else if(d>-1){for(s=d;s<o;s++)e[s]=h;d=-1}"B"===x[o]&&(e[o]=0),i.hiLevel|=h}r&&function(t,e,n){for(var r=0;r<n;r++)if("S"===t[r]){e[r]=b;for(var i=r-1;i>=0&&"WS"===t[i];i--)e[i]=b}}(x,e,p)},A=function(t,e,r,i,a){if(!(a.hiLevel<t)){if(1===t&&1===b&&!n)return e.reverse(),void(r&&r.reverse());for(var s,o,h,l,u=e.length,c=0;c<u;){if(i[c]>=t){for(h=c+1;h<u&&i[h]>=t;)h++;for(l=c,o=h-1;l<o;l++,o--)s=e[l],e[l]=e[o],e[o]=s,r&&(s=r[l],r[l]=r[o],r[o]=s);c=h}c++}}},L=function(t,e,n){var r=t.split(""),i={hiLevel:b};return n||(n=[]),x(r,n,i),function(t,e,n){if(0!==n.hiLevel&&h)for(var r,i=0;i<t.length;i++)1===e[i]&&(r=p.indexOf(t[i]))>=0&&(t[i]=p[r+1])}(r,n,i),A(2,r,e,n,i),A(1,r,e,n,i),r.join("")};return this.__bidiEngine__.doBidiReorder=function(t,e,n){if(function(t,e){if(e)for(var n=0;n<t.length;n++)e[n]=n;void 0===a&&(a=w(t)),void 0===o&&(o=w(t))}(t,e),i||!s||o)if(i&&s&&a^o)b=a?1:0,t=_(t,e,n);else if(!i&&s&&o)b=a?1:0,t=L(t,e,n),t=_(t,e);else if(!i||a||s||o){if(i&&!s&&a^o)t=_(t,e),a?(b=0,t=L(t,e,n)):(b=1,t=L(t,e,n),t=_(t,e));else if(i&&a&&!s&&o)b=1,t=L(t,e,n),t=_(t,e);else if(!i&&!s&&a^o){var r=h;a?(b=1,t=L(t,e,n),b=0,h=!1,t=L(t,e,n),h=r):(b=0,t=L(t,e,n),t=_(t,e),b=1,h=!1,t=L(t,e,n),h=r,t=_(t,e))}}else b=0,t=L(t,e,n);else b=a?1:0,t=L(t,e,n);return t},this.__bidiEngine__.setOptions=function(t){t&&(i=t.isInputVisual,s=t.isOutputVisual,a=t.isInputRtl,o=t.isOutputRtl,h=t.isSymmetricSwapping)},this.__bidiEngine__.setOptions(t),this.__bidiEngine__};var e=["BN","BN","BN","BN","BN","BN","BN","BN","BN","S","B","S","WS","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","B","B","B","S","WS","N","N","ET","ET","ET","N","N","N","N","N","ES","CS","ES","CS","CS","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","CS","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","BN","BN","BN","BN","BN","BN","B","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","BN","CS","N","ET","ET","ET","ET","N","N","N","N","L","N","N","BN","N","N","ET","ET","EN","EN","N","L","N","N","N","EN","L","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","L","L","L","L","L","L","L","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","L","N","N","N","N","N","ET","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","R","NSM","R","NSM","NSM","R","NSM","NSM","R","NSM","N","N","N","N","N","N","N","N","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","N","N","N","N","N","R","R","R","R","R","N","N","N","N","N","N","N","N","N","N","N","AN","AN","AN","AN","AN","AN","N","N","AL","ET","ET","AL","CS","AL","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AN","AN","AN","AN","AN","AN","AN","AN","AN","AN","ET","AN","AN","AL","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AN","N","NSM","NSM","NSM","NSM","NSM","NSM","AL","AL","NSM","NSM","N","NSM","NSM","NSM","NSM","AL","AL","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","AL","AL","NSM","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","AL","N","N","N","N","N","N","N","N","N","N","N","N","N","N","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","R","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","R","R","N","N","N","N","R","N","N","N","N","N","WS","WS","WS","WS","WS","WS","WS","WS","WS","WS","WS","BN","BN","BN","L","R","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","WS","B","LRE","RLE","PDF","LRO","RLO","CS","ET","ET","ET","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","CS","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","WS","BN","BN","BN","BN","BN","N","LRI","RLI","FSI","PDI","BN","BN","BN","BN","BN","BN","EN","L","N","N","EN","EN","EN","EN","EN","EN","ES","ES","N","N","N","L","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","ES","ES","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","L","L","N","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","N","N","N","N","N","R","NSM","R","R","R","R","R","R","R","R","R","R","ES","R","R","R","R","R","R","R","R","R","R","R","R","R","N","R","R","R","R","R","N","R","N","R","R","N","R","R","N","R","R","R","R","R","R","R","R","R","R","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","NSM","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","CS","N","CS","N","N","CS","N","N","N","N","N","N","N","N","N","ET","N","N","ES","ES","N","N","N","N","N","ET","ET","N","N","N","N","N","AL","AL","AL","AL","AL","N","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","AL","N","N","BN","N","N","N","ET","ET","ET","N","N","N","N","N","ES","CS","ES","CS","CS","EN","EN","EN","EN","EN","EN","EN","EN","EN","EN","CS","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","N","N","N","N","N","N","N","N","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","L","N","N","N","L","L","L","L","L","L","N","N","L","L","L","L","L","L","N","N","L","L","L","L","L","L","N","N","L","L","L","N","N","N","ET","ET","N","N","N","ET","ET","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N","N"],n=new t.__bidiEngine__({isInputVisual:!0});t.API.events.push(["postProcessText",function(t){var e=t.text;t.x,t.y;var r=t.options||{};t.mutex,r.lang;var i=[];if(r.isInputVisual="boolean"!=typeof r.isInputVisual||r.isInputVisual,n.setOptions(r),"[object Array]"===Object.prototype.toString.call(e)){var a=0;for(i=[],a=0;a<e.length;a+=1)"[object Array]"===Object.prototype.toString.call(e[a])?i.push([n.doBidiReorder(e[a][0]),e[a][1],e[a][2]]):i.push([n.doBidiReorder(e[a])]);t.text=i}else t.text=n.doBidiReorder(e);n.setOptions({isInputVisual:!0})}])}(R),R.API.TTFFont=function(){function t(t){var e;if(this.rawData=t,e=this.contents=new Ba(t),this.contents.pos=4,"ttcf"===e.readString(4))throw new Error("TTCF not supported.");e.pos=0,this.parse(),this.subset=new ts(this),this.registerTTF()}return t.open=function(e){return new t(e)},t.prototype.parse=function(){return this.directory=new Ma(this.contents),this.head=new qa(this),this.name=new Ga(this),this.cmap=new za(this),this.toUnicode={},this.hhea=new Ua(this),this.maxp=new Ya(this),this.hmtx=new Za(this),this.post=new Wa(this),this.os2=new Ha(this),this.loca=new Qa(this),this.glyf=new Xa(this),this.ascender=this.os2.exists&&this.os2.ascender||this.hhea.ascender,this.decender=this.os2.exists&&this.os2.decender||this.hhea.decender,this.lineGap=this.os2.exists&&this.os2.lineGap||this.hhea.lineGap,this.bbox=[this.head.xMin,this.head.yMin,this.head.xMax,this.head.yMax]},t.prototype.registerTTF=function(){var t,e,n,r,i;if(this.scaleFactor=1e3/this.head.unitsPerEm,this.bbox=function(){var e,n,r,i;for(i=[],e=0,n=(r=this.bbox).length;e<n;e++)t=r[e],i.push(Math.round(t*this.scaleFactor));return i}.call(this),this.stemV=0,this.post.exists?(n=255&(r=this.post.italic_angle),32768&(e=r>>16)&&(e=-(1+(65535^e))),this.italicAngle=+(e+"."+n)):this.italicAngle=0,this.ascender=Math.round(this.ascender*this.scaleFactor),this.decender=Math.round(this.decender*this.scaleFactor),this.lineGap=Math.round(this.lineGap*this.scaleFactor),this.capHeight=this.os2.exists&&this.os2.capHeight||this.ascender,this.xHeight=this.os2.exists&&this.os2.xHeight||0,this.familyClass=(this.os2.exists&&this.os2.familyClass||0)>>8,this.isSerif=1===(i=this.familyClass)||2===i||3===i||4===i||5===i||7===i,this.isScript=10===this.familyClass,this.flags=0,this.post.isFixedPitch&&(this.flags|=1),this.isSerif&&(this.flags|=2),this.isScript&&(this.flags|=8),0!==this.italicAngle&&(this.flags|=64),this.flags|=32,!this.cmap.unicode)throw new Error("No unicode cmap for font")},t.prototype.characterToGlyph=function(t){var e;return(null!=(e=this.cmap.unicode)?e.codeMap[t]:void 0)||0},t.prototype.widthOfGlyph=function(t){var e;return e=1e3/this.head.unitsPerEm,this.hmtx.forGlyph(t).advance*e},t.prototype.widthOfString=function(t,e,n){var r,i,a,s;for(a=0,i=0,s=(t=""+t).length;0<=s?i<s:i>s;i=0<=s?++i:--i)r=t.charCodeAt(i),a+=this.widthOfGlyph(this.characterToGlyph(r))+n*(1e3/e)||0;return a*(e/1e3)},t.prototype.lineHeight=function(t,e){var n;return null==e&&(e=!1),n=e?this.lineGap:0,(this.ascender+n-this.decender)/1e3*t},t}();var Oa,Ba=function(){function t(t){this.data=null!=t?t:[],this.pos=0,this.length=this.data.length}return t.prototype.readByte=function(){return this.data[this.pos++]},t.prototype.writeByte=function(t){return this.data[this.pos++]=t},t.prototype.readUInt32=function(){return 16777216*this.readByte()+(this.readByte()<<16)+(this.readByte()<<8)+this.readByte()},t.prototype.writeUInt32=function(t){return this.writeByte(t>>>24&255),this.writeByte(t>>16&255),this.writeByte(t>>8&255),this.writeByte(255&t)},t.prototype.readInt32=function(){var t;return(t=this.readUInt32())>=2147483648?t-4294967296:t},t.prototype.writeInt32=function(t){return t<0&&(t+=4294967296),this.writeUInt32(t)},t.prototype.readUInt16=function(){return this.readByte()<<8|this.readByte()},t.prototype.writeUInt16=function(t){return this.writeByte(t>>8&255),this.writeByte(255&t)},t.prototype.readInt16=function(){var t;return(t=this.readUInt16())>=32768?t-65536:t},t.prototype.writeInt16=function(t){return t<0&&(t+=65536),this.writeUInt16(t)},t.prototype.readString=function(t){var e,n;for(n=[],e=0;0<=t?e<t:e>t;e=0<=t?++e:--e)n[e]=String.fromCharCode(this.readByte());return n.join("")},t.prototype.writeString=function(t){var e,n,r;for(r=[],e=0,n=t.length;0<=n?e<n:e>n;e=0<=n?++e:--e)r.push(this.writeByte(t.charCodeAt(e)));return r},t.prototype.readShort=function(){return this.readInt16()},t.prototype.writeShort=function(t){return this.writeInt16(t)},t.prototype.readLongLong=function(){var t,e,n,r,i,a,s,o;return t=this.readByte(),e=this.readByte(),n=this.readByte(),r=this.readByte(),i=this.readByte(),a=this.readByte(),s=this.readByte(),o=this.readByte(),128&t?-1*(72057594037927940*(255^t)+281474976710656*(255^e)+1099511627776*(255^n)+4294967296*(255^r)+16777216*(255^i)+65536*(255^a)+256*(255^s)+(255^o)+1):72057594037927940*t+281474976710656*e+1099511627776*n+4294967296*r+16777216*i+65536*a+256*s+o},t.prototype.writeLongLong=function(t){var e,n;return e=Math.floor(t/4294967296),n=4294967295&t,this.writeByte(e>>24&255),this.writeByte(e>>16&255),this.writeByte(e>>8&255),this.writeByte(255&e),this.writeByte(n>>24&255),this.writeByte(n>>16&255),this.writeByte(n>>8&255),this.writeByte(255&n)},t.prototype.readInt=function(){return this.readInt32()},t.prototype.writeInt=function(t){return this.writeInt32(t)},t.prototype.read=function(t){var e,n;for(e=[],n=0;0<=t?n<t:n>t;n=0<=t?++n:--n)e.push(this.readByte());return e},t.prototype.write=function(t){var e,n,r,i;for(i=[],n=0,r=t.length;n<r;n++)e=t[n],i.push(this.writeByte(e));return i},t}(),Ma=function(){var t;function e(t){var e,n,r;for(this.scalarType=t.readInt(),this.tableCount=t.readShort(),this.searchRange=t.readShort(),this.entrySelector=t.readShort(),this.rangeShift=t.readShort(),this.tables={},n=0,r=this.tableCount;0<=r?n<r:n>r;n=0<=r?++n:--n)e={tag:t.readString(4),checksum:t.readInt(),offset:t.readInt(),length:t.readInt()},this.tables[e.tag]=e}return e.prototype.encode=function(e){var n,r,i,a,s,o,h,l,u,c,f,d,p;for(p in f=Object.keys(e).length,o=Math.log(2),u=16*Math.floor(Math.log(f)/o),a=Math.floor(u/o),l=16*f-u,(r=new Ba).writeInt(this.scalarType),r.writeShort(f),r.writeShort(u),r.writeShort(a),r.writeShort(l),i=16*f,h=r.pos+i,s=null,d=[],e)for(c=e[p],r.writeString(p),r.writeInt(t(c)),r.writeInt(h),r.writeInt(c.length),d=d.concat(c),"head"===p&&(s=h),h+=c.length;h%4;)d.push(0),h++;return r.write(d),n=2981146554-t(r.data),r.pos=s+8,r.writeUInt32(n),r.data},t=function(t){var e,n,r,i;for(t=Ja.call(t);t.length%4;)t.push(0);for(r=new Ba(t),n=0,e=0,i=t.length;e<i;e=e+=4)n+=r.readUInt32();return 4294967295&n},e}(),Ra={}.hasOwnProperty,Ta=function(t,e){for(var n in e)Ra.call(e,n)&&(t[n]=e[n]);function r(){this.constructor=t}return r.prototype=e.prototype,t.prototype=new r,t.__super__=e.prototype,t},qa=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="head",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.revision=t.readInt(),this.checkSumAdjustment=t.readInt(),this.magicNumber=t.readInt(),this.flags=t.readShort(),this.unitsPerEm=t.readShort(),this.created=t.readLongLong(),this.modified=t.readLongLong(),this.xMin=t.readShort(),this.yMin=t.readShort(),this.xMax=t.readShort(),this.yMax=t.readShort(),this.macStyle=t.readShort(),this.lowestRecPPEM=t.readShort(),this.fontDirectionHint=t.readShort(),this.indexToLocFormat=t.readShort(),this.glyphDataFormat=t.readShort()},e.prototype.encode=function(t){var e;return(e=new Ba).writeInt(this.version),e.writeInt(this.revision),e.writeInt(this.checkSumAdjustment),e.writeInt(this.magicNumber),e.writeShort(this.flags),e.writeShort(this.unitsPerEm),e.writeLongLong(this.created),e.writeLongLong(this.modified),e.writeShort(this.xMin),e.writeShort(this.yMin),e.writeShort(this.xMax),e.writeShort(this.yMax),e.writeShort(this.macStyle),e.writeShort(this.lowestRecPPEM),e.writeShort(this.fontDirectionHint),e.writeShort(t),e.writeShort(this.glyphDataFormat),e.data},e}(Oa=function(){function t(t){var e;this.file=t,e=this.file.directory.tables[this.tag],this.exists=!!e,e&&(this.offset=e.offset,this.length=e.length,this.parse(this.file.contents))}return t.prototype.parse=function(){},t.prototype.encode=function(){},t.prototype.raw=function(){return this.exists?(this.file.contents.pos=this.offset,this.file.contents.read(this.length)):null},t}()),Da=function(){function t(t,e){var n,r,i,a,s,o,h,l,u,c,f,d,p,g,m,b,v;switch(this.platformID=t.readUInt16(),this.encodingID=t.readShort(),this.offset=e+t.readInt(),u=t.pos,t.pos=this.offset,this.format=t.readUInt16(),this.length=t.readUInt16(),this.language=t.readUInt16(),this.isUnicode=3===this.platformID&&1===this.encodingID&&4===this.format||0===this.platformID&&4===this.format,this.codeMap={},this.format){case 0:for(o=0;o<256;++o)this.codeMap[o]=t.readByte();break;case 4:for(f=t.readUInt16(),c=f/2,t.pos+=6,i=function(){var e,n;for(n=[],o=e=0;0<=c?e<c:e>c;o=0<=c?++e:--e)n.push(t.readUInt16());return n}(),t.pos+=2,p=function(){var e,n;for(n=[],o=e=0;0<=c?e<c:e>c;o=0<=c?++e:--e)n.push(t.readUInt16());return n}(),h=function(){var e,n;for(n=[],o=e=0;0<=c?e<c:e>c;o=0<=c?++e:--e)n.push(t.readUInt16());return n}(),l=function(){var e,n;for(n=[],o=e=0;0<=c?e<c:e>c;o=0<=c?++e:--e)n.push(t.readUInt16());return n}(),r=(this.length-t.pos+this.offset)/2,s=function(){var e,n;for(n=[],o=e=0;0<=r?e<r:e>r;o=0<=r?++e:--e)n.push(t.readUInt16());return n}(),o=m=0,v=i.length;m<v;o=++m)for(g=i[o],n=b=d=p[o];d<=g?b<=g:b>=g;n=d<=g?++b:--b)0===l[o]?a=n+h[o]:0!==(a=s[l[o]/2+(n-d)-(c-o)]||0)&&(a+=h[o]),this.codeMap[n]=65535&a}t.pos=u}return t.encode=function(t,e){var n,r,i,a,s,o,h,l,u,c,f,d,p,g,m,b,v,w,y,_,x,A,L,N,S,k,P,F,I,C,j,E,O,B,M,R,T,q,D,z,U,H,W,V,G,Y;switch(F=new Ba,a=Object.keys(t).sort(function(t,e){return t-e}),e){case"macroman":for(p=0,g=function(){var t=[];for(d=0;d<256;++d)t.push(0);return t}(),b={0:0},i={},I=0,O=a.length;I<O;I++)null==b[W=t[r=a[I]]]&&(b[W]=++p),i[r]={old:t[r],new:b[t[r]]},g[r]=b[t[r]];return F.writeUInt16(1),F.writeUInt16(0),F.writeUInt32(12),F.writeUInt16(0),F.writeUInt16(262),F.writeUInt16(0),F.write(g),{charMap:i,subtable:F.data,maxGlyphID:p+1};case"unicode":for(k=[],u=[],v=0,b={},n={},m=h=null,C=0,B=a.length;C<B;C++)null==b[y=t[r=a[C]]]&&(b[y]=++v),n[r]={old:y,new:b[y]},s=b[y]-r,null!=m&&s===h||(m&&u.push(m),k.push(r),h=s),m=r;for(m&&u.push(m),u.push(65535),k.push(65535),N=2*(L=k.length),A=2*Math.pow(Math.log(L)/Math.LN2,2),c=Math.log(A/2)/Math.LN2,x=2*L-A,o=[],_=[],f=[],d=j=0,M=k.length;j<M;d=++j){if(S=k[d],l=u[d],65535===S){o.push(0),_.push(0);break}if(S-(P=n[S].new)>=32768)for(o.push(0),_.push(2*(f.length+L-d)),r=E=S;S<=l?E<=l:E>=l;r=S<=l?++E:--E)f.push(n[r].new);else o.push(P-S),_.push(0)}for(F.writeUInt16(3),F.writeUInt16(1),F.writeUInt32(12),F.writeUInt16(4),F.writeUInt16(16+8*L+2*f.length),F.writeUInt16(0),F.writeUInt16(N),F.writeUInt16(A),F.writeUInt16(c),F.writeUInt16(x),U=0,R=u.length;U<R;U++)r=u[U],F.writeUInt16(r);for(F.writeUInt16(0),H=0,T=k.length;H<T;H++)r=k[H],F.writeUInt16(r);for(V=0,q=o.length;V<q;V++)s=o[V],F.writeUInt16(s);for(G=0,D=_.length;G<D;G++)w=_[G],F.writeUInt16(w);for(Y=0,z=f.length;Y<z;Y++)p=f[Y],F.writeUInt16(p);return{charMap:n,subtable:F.data,maxGlyphID:v+1}}},t}(),za=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="cmap",e.prototype.parse=function(t){var e,n,r;for(t.pos=this.offset,this.version=t.readUInt16(),r=t.readUInt16(),this.tables=[],this.unicode=null,n=0;0<=r?n<r:n>r;n=0<=r?++n:--n)e=new Da(t,this.offset),this.tables.push(e),e.isUnicode&&null==this.unicode&&(this.unicode=e);return!0},e.encode=function(t,e){var n,r;return null==e&&(e="macroman"),n=Da.encode(t,e),(r=new Ba).writeUInt16(0),r.writeUInt16(1),n.table=r.data.concat(n.subtable),n},e}(Oa),Ua=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="hhea",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.ascender=t.readShort(),this.decender=t.readShort(),this.lineGap=t.readShort(),this.advanceWidthMax=t.readShort(),this.minLeftSideBearing=t.readShort(),this.minRightSideBearing=t.readShort(),this.xMaxExtent=t.readShort(),this.caretSlopeRise=t.readShort(),this.caretSlopeRun=t.readShort(),this.caretOffset=t.readShort(),t.pos+=8,this.metricDataFormat=t.readShort(),this.numberOfMetrics=t.readUInt16()},e}(Oa),Ha=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="OS/2",e.prototype.parse=function(t){if(t.pos=this.offset,this.version=t.readUInt16(),this.averageCharWidth=t.readShort(),this.weightClass=t.readUInt16(),this.widthClass=t.readUInt16(),this.type=t.readShort(),this.ySubscriptXSize=t.readShort(),this.ySubscriptYSize=t.readShort(),this.ySubscriptXOffset=t.readShort(),this.ySubscriptYOffset=t.readShort(),this.ySuperscriptXSize=t.readShort(),this.ySuperscriptYSize=t.readShort(),this.ySuperscriptXOffset=t.readShort(),this.ySuperscriptYOffset=t.readShort(),this.yStrikeoutSize=t.readShort(),this.yStrikeoutPosition=t.readShort(),this.familyClass=t.readShort(),this.panose=function(){var e,n;for(n=[],e=0;e<10;++e)n.push(t.readByte());return n}(),this.charRange=function(){var e,n;for(n=[],e=0;e<4;++e)n.push(t.readInt());return n}(),this.vendorID=t.readString(4),this.selection=t.readShort(),this.firstCharIndex=t.readShort(),this.lastCharIndex=t.readShort(),this.version>0&&(this.ascent=t.readShort(),this.descent=t.readShort(),this.lineGap=t.readShort(),this.winAscent=t.readShort(),this.winDescent=t.readShort(),this.codePageRange=function(){var e,n;for(n=[],e=0;e<2;e=++e)n.push(t.readInt());return n}(),this.version>1))return this.xHeight=t.readShort(),this.capHeight=t.readShort(),this.defaultChar=t.readShort(),this.breakChar=t.readShort(),this.maxContext=t.readShort()},e}(Oa),Wa=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="post",e.prototype.parse=function(t){var e,n,r;switch(t.pos=this.offset,this.format=t.readInt(),this.italicAngle=t.readInt(),this.underlinePosition=t.readShort(),this.underlineThickness=t.readShort(),this.isFixedPitch=t.readInt(),this.minMemType42=t.readInt(),this.maxMemType42=t.readInt(),this.minMemType1=t.readInt(),this.maxMemType1=t.readInt(),this.format){case 65536:case 196608:break;case 131072:var i;for(n=t.readUInt16(),this.glyphNameIndex=[],i=0;0<=n?i<n:i>n;i=0<=n?++i:--i)this.glyphNameIndex.push(t.readUInt16());for(this.names=[],r=[];t.pos<this.offset+this.length;)e=t.readByte(),r.push(this.names.push(t.readString(e)));return r;case 151552:return n=t.readUInt16(),this.offsets=t.read(n);case 262144:return this.map=function(){var e,n,r;for(r=[],i=e=0,n=this.file.maxp.numGlyphs;0<=n?e<n:e>n;i=0<=n?++e:--e)r.push(t.readUInt32());return r}.call(this)}},e}(Oa),Va=function(t,e){this.raw=t,this.length=t.length,this.platformID=e.platformID,this.encodingID=e.encodingID,this.languageID=e.languageID},Ga=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="name",e.prototype.parse=function(t){var e,n,r,i,a,s,o,h,l,u,c;for(t.pos=this.offset,t.readShort(),e=t.readShort(),s=t.readShort(),n=[],i=0;0<=e?i<e:i>e;i=0<=e?++i:--i)n.push({platformID:t.readShort(),encodingID:t.readShort(),languageID:t.readShort(),nameID:t.readShort(),length:t.readShort(),offset:this.offset+s+t.readShort()});for(o={},i=l=0,u=n.length;l<u;i=++l)r=n[i],t.pos=r.offset,h=t.readString(r.length),a=new Va(h,r),null==o[c=r.nameID]&&(o[c]=[]),o[r.nameID].push(a);this.strings=o,this.copyright=o[0],this.fontFamily=o[1],this.fontSubfamily=o[2],this.uniqueSubfamily=o[3],this.fontName=o[4],this.version=o[5];try{this.postscriptName=o[6][0].raw.replace(/[\x00-\x19\x80-\xff]/g,"")}catch(es){this.postscriptName=o[4][0].raw.replace(/[\x00-\x19\x80-\xff]/g,"")}return this.trademark=o[7],this.manufacturer=o[8],this.designer=o[9],this.description=o[10],this.vendorUrl=o[11],this.designerUrl=o[12],this.license=o[13],this.licenseUrl=o[14],this.preferredFamily=o[15],this.preferredSubfamily=o[17],this.compatibleFull=o[18],this.sampleText=o[19]},e}(Oa),Ya=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="maxp",e.prototype.parse=function(t){return t.pos=this.offset,this.version=t.readInt(),this.numGlyphs=t.readUInt16(),this.maxPoints=t.readUInt16(),this.maxContours=t.readUInt16(),this.maxCompositePoints=t.readUInt16(),this.maxComponentContours=t.readUInt16(),this.maxZones=t.readUInt16(),this.maxTwilightPoints=t.readUInt16(),this.maxStorage=t.readUInt16(),this.maxFunctionDefs=t.readUInt16(),this.maxInstructionDefs=t.readUInt16(),this.maxStackElements=t.readUInt16(),this.maxSizeOfInstructions=t.readUInt16(),this.maxComponentElements=t.readUInt16(),this.maxComponentDepth=t.readUInt16()},e}(Oa),Za=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="hmtx",e.prototype.parse=function(t){var e,n,r,i,a,s,o;for(t.pos=this.offset,this.metrics=[],e=0,s=this.file.hhea.numberOfMetrics;0<=s?e<s:e>s;e=0<=s?++e:--e)this.metrics.push({advance:t.readUInt16(),lsb:t.readInt16()});for(r=this.file.maxp.numGlyphs-this.file.hhea.numberOfMetrics,this.leftSideBearings=function(){var n,i;for(i=[],e=n=0;0<=r?n<r:n>r;e=0<=r?++n:--n)i.push(t.readInt16());return i}(),this.widths=function(){var t,e,n,r;for(r=[],t=0,e=(n=this.metrics).length;t<e;t++)i=n[t],r.push(i.advance);return r}.call(this),n=this.widths[this.widths.length-1],o=[],e=a=0;0<=r?a<r:a>r;e=0<=r?++a:--a)o.push(this.widths.push(n));return o},e.prototype.forGlyph=function(t){return t in this.metrics?this.metrics[t]:{advance:this.metrics[this.metrics.length-1].advance,lsb:this.leftSideBearings[t-this.metrics.length]}},e}(Oa),Ja=[].slice,Xa=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="glyf",e.prototype.parse=function(){return this.cache={}},e.prototype.glyphFor=function(t){var e,n,r,i,a,s,o,h,l,u;return t in this.cache?this.cache[t]:(i=this.file.loca,e=this.file.contents,n=i.indexOf(t),0===(r=i.lengthOf(t))?this.cache[t]=null:(e.pos=this.offset+n,a=(s=new Ba(e.read(r))).readShort(),h=s.readShort(),u=s.readShort(),o=s.readShort(),l=s.readShort(),this.cache[t]=-1===a?new $a(s,h,u,o,l):new Ka(s,a,h,u,o,l),this.cache[t]))},e.prototype.encode=function(t,e,n){var r,i,a,s,o;for(a=[],i=[],s=0,o=e.length;s<o;s++)r=t[e[s]],i.push(a.length),r&&(a=a.concat(r.encode(n)));return i.push(a.length),{table:a,offsets:i}},e}(Oa),Ka=function(){function t(t,e,n,r,i,a){this.raw=t,this.numberOfContours=e,this.xMin=n,this.yMin=r,this.xMax=i,this.yMax=a,this.compound=!1}return t.prototype.encode=function(){return this.raw.data},t}(),$a=function(){function t(t,e,n,r,i){var a,s;for(this.raw=t,this.xMin=e,this.yMin=n,this.xMax=r,this.yMax=i,this.compound=!0,this.glyphIDs=[],this.glyphOffsets=[],a=this.raw;s=a.readShort(),this.glyphOffsets.push(a.pos),this.glyphIDs.push(a.readUInt16()),32&s;)a.pos+=1&s?4:2,128&s?a.pos+=8:64&s?a.pos+=4:8&s&&(a.pos+=2)}return t.prototype.encode=function(){var t,e,n;for(e=new Ba(Ja.call(this.raw.data)),t=0,n=this.glyphIDs.length;t<n;++t)e.pos=this.glyphOffsets[t];return e.data},t}(),Qa=function(t){function e(){return e.__super__.constructor.apply(this,arguments)}return Ta(e,t),e.prototype.tag="loca",e.prototype.parse=function(t){var e,n;return t.pos=this.offset,e=this.file.head.indexToLocFormat,this.offsets=0===e?function(){var e,r;for(r=[],n=0,e=this.length;n<e;n+=2)r.push(2*t.readUInt16());return r}.call(this):function(){var e,r;for(r=[],n=0,e=this.length;n<e;n+=4)r.push(t.readUInt32());return r}.call(this)},e.prototype.indexOf=function(t){return this.offsets[t]},e.prototype.lengthOf=function(t){return this.offsets[t+1]-this.offsets[t]},e.prototype.encode=function(t,e){for(var n=new Uint32Array(this.offsets.length),r=0,i=0,a=0;a<n.length;++a)if(n[a]=r,i<e.length&&e[i]==a){++i,n[a]=r;var s=this.offsets[a],o=this.offsets[a+1]-s;o>0&&(r+=o)}for(var h=new Array(4*n.length),l=0;l<n.length;++l)h[4*l+3]=255&n[l],h[4*l+2]=(65280&n[l])>>8,h[4*l+1]=(16711680&n[l])>>16,h[4*l]=(4278190080&n[l])>>24;return h},e}(Oa),ts=function(){function t(t){this.font=t,this.subset={},this.unicodes={},this.next=33}return t.prototype.generateCmap=function(){var t,e,n,r,i;for(e in r=this.font.cmap.tables[0].codeMap,t={},i=this.subset)n=i[e],t[e]=r[n];return t},t.prototype.glyphsFor=function(t){var e,n,r,i,a,s,o;for(r={},a=0,s=t.length;a<s;a++)r[i=t[a]]=this.font.glyf.glyphFor(i);for(i in e=[],r)(null!=(n=r[i])?n.compound:void 0)&&e.push.apply(e,n.glyphIDs);if(e.length>0)for(i in o=this.glyphsFor(e))n=o[i],r[i]=n;return r},t.prototype.encode=function(t,e){var n,r,i,a,s,o,h,l,u,c,f,d,p,g,m;for(r in n=za.encode(this.generateCmap(),"unicode"),a=this.glyphsFor(t),f={0:0},m=n.charMap)f[(o=m[r]).old]=o.new;for(d in c=n.maxGlyphID,a)d in f||(f[d]=c++);return l=function(t){var e,n;for(e in n={},t)n[t[e]]=e;return n}(f),u=Object.keys(l).sort(function(t,e){return t-e}),p=function(){var t,e,n;for(n=[],t=0,e=u.length;t<e;t++)s=u[t],n.push(l[s]);return n}(),i=this.font.glyf.encode(a,p,f),h=this.font.loca.encode(i.offsets,p),g={cmap:this.font.cmap.raw(),glyf:i.table,loca:h,hmtx:this.font.hmtx.raw(),hhea:this.font.hhea.raw(),maxp:this.font.maxp.raw(),post:this.font.post.raw(),name:this.font.name.raw(),head:this.font.head.encode(e)},this.font.os2.exists&&(g["OS/2"]=this.font.os2.raw()),this.font.directory.encode(g)},t}();R.API.PDFObject=function(){var t;function e(){}return t=function(t,e){return(Array(e+1).join("0")+t).slice(-e)},e.convert=function(n){var r,i,a,s;if(Array.isArray(n))return"["+function(){var t,i,a;for(a=[],t=0,i=n.length;t<i;t++)r=n[t],a.push(e.convert(r));return a}().join(" ")+"]";if("string"==typeof n)return"/"+n;if(null!=n?n.isString:void 0)return"("+n+")";if(n instanceof Date)return"(D:"+t(n.getUTCFullYear(),4)+t(n.getUTCMonth(),2)+t(n.getUTCDate(),2)+t(n.getUTCHours(),2)+t(n.getUTCMinutes(),2)+t(n.getUTCSeconds(),2)+"Z)";if("[object Object]"==={}.toString.call(n)){for(i in a=["<<"],n)s=n[i],a.push("/"+i+" "+e.convert(s));return a.push(">>"),a.join("\n")}return""+n},e}(),t.AcroForm=Nt,t.AcroFormAppearance=At,t.AcroFormButton=mt,t.AcroFormCheckBox=yt,t.AcroFormChoiceField=ft,t.AcroFormComboBox=pt,t.AcroFormEditBox=gt,t.AcroFormListBox=dt,t.AcroFormPasswordField=xt,t.AcroFormPushButton=bt,t.AcroFormRadioButton=vt,t.AcroFormTextField=_t,t.GState=E,t.ShadingPattern=B,t.TilingPattern=M,t.default=R,t.jsPDF=R,Object.defineProperty(t,"__esModule",{value:!0})});
 //# sourceMappingURL=jspdf.umd.min.js.map
 </script>
-<script>window.VERSAO_OFFLINE = "2026-11-11"; window.MODELO_FATURA_BASE64 = "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";</script>
+<script>window.VERSAO_OFFLINE = "2026-11-12"; window.MODELO_FATURA_BASE64 = "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";</script>
 <script>(() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -1112,6 +1120,536 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
   };
+
+  // docs/js/config-regras.js
+  function limparValorRegra(chave, valor) {
+    const def = definicaoRegra(chave);
+    if (!def) throw new ErroRegra(`Regra desconhecida: ${chave}`);
+    const faixa = (n) => {
+      if (def.min !== void 0 && n < def.min) throw new ErroRegra(`${def.rotulo}: o mínimo é ${def.min}.`);
+      if (def.max !== void 0 && n > def.max) throw new ErroRegra(`${def.rotulo}: o máximo é ${def.max}.`);
+      return n;
+    };
+    switch (def.tipo) {
+      case "opcao":
+        if (!def.opcoes.some(([v]) => v === valor)) throw new ErroRegra(`${def.rotulo}: escolha uma das opções.`);
+        return valor;
+      case "simnao":
+        return valor === true || valor === "sim" || valor === "1" || valor === 1;
+      case "indice":
+        return valor ? String(valor).trim().slice(0, 40) : "";
+      case "inteiro":
+      case "pct":
+      case "dinheiro": {
+        if (valor === null || valor === void 0 || valor === "") {
+          if (def.padrao === null) return null;
+          throw new ErroRegra(`${def.rotulo}: informe um número.`);
+        }
+        const n = Number(valor);
+        if (!Number.isFinite(n)) throw new ErroRegra(`${def.rotulo}: informe um número.`);
+        return faixa(def.tipo === "pct" ? Math.round(n * 1e4) / 1e4 : Math.round(n));
+      }
+      case "feriados": {
+        const lista3 = Array.isArray(valor) ? valor : [];
+        const ok = lista3.map((x) => String(x).trim()).filter(Boolean);
+        for (const x of ok) if (!/^(\d{4}-)?(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(x)) throw new ErroRegra(`Feriado inválido: ${x}`);
+        return [...new Set(ok)].sort();
+      }
+      case "regua": {
+        const passos = (Array.isArray(valor) ? valor : []).map((x) => ({ dias: Number(x && x.dias), passo: String(x && x.passo || "").trim().slice(0, 120) }));
+        for (const p2 of passos) {
+          if (!Number.isInteger(p2.dias) || p2.dias < 0 || p2.dias > 3650) throw new ErroRegra("Régua de cobrança: os dias vão de 0 a 3650.");
+          if (!p2.passo) throw new ErroRegra("Régua de cobrança: escreva o que fazer em cada passo.");
+        }
+        if (new Set(passos.map((p2) => p2.dias)).size !== passos.length) throw new ErroRegra("Régua de cobrança: dois passos com o mesmo número de dias.");
+        return passos.sort((a, b) => a.dias - b.dias);
+      }
+      default:
+        return valor;
+    }
+  }
+  function escolhasDe(d2) {
+    const out = {};
+    for (const r of d2 && Array.isArray(d2.config_regras) ? d2.config_regras : []) {
+      if (!r || !POR_CHAVE.has(r.chave)) continue;
+      try {
+        out[r.chave] = limparValorRegra(r.chave, r.valor);
+      } catch {
+      }
+    }
+    return out;
+  }
+  function usarRegras(d2) {
+    emUso = d2 ? regrasDe(d2) : { ...PADRAO_SISTEMA };
+  }
+  function feriadosLocais(ano) {
+    return (regra("feriados_locais") || []).map((x) => x.length === 5 ? `${ano}-${x}` : x).filter((x) => x.startsWith(`${ano}-`));
+  }
+  function lerArquivoDasRegras(texto3) {
+    let j;
+    try {
+      j = typeof texto3 === "string" ? JSON.parse(texto3) : texto3;
+    } catch {
+      throw new ErroRegra("O arquivo não é um arquivo de regras do sistema.");
+    }
+    if (!j || j.formato !== FORMATO_ARQUIVO_REGRAS || !j.regras || typeof j.regras !== "object") throw new ErroRegra("O arquivo não é um arquivo de regras do sistema.");
+    const out = {};
+    for (const [k, v] of Object.entries(j.regras)) if (POR_CHAVE.has(k)) out[k] = limparValorRegra(k, v);
+    return out;
+  }
+  var GRUPOS_REGRAS, LI, DEFINICOES_REGRAS, POR_CHAVE, definicaoRegra, PADRAO_SISTEMA, copia, mesmoValor, ErroRegra, regrasDe, emUso, regra, FORMATO_ARQUIVO_REGRAS, arquivoDasRegras;
+  var init_config_regras = __esm({
+    "docs/js/config-regras.js"() {
+      GRUPOS_REGRAS = [
+        ["aluguel", "Aluguel e cobrança"],
+        ["garantia", "Garantia e FCI"],
+        ["contrato", "Novo contrato (valores que vêm preenchidos)"],
+        ["rotina", "Régua de cobrança e prazos de rotina"]
+      ];
+      LI = "Lei do Inquilinato (Lei 8.245/91)";
+      DEFINICOES_REGRAS = [
+        // ------------------------------------------------------------------ aluguel
+        {
+          chave: "reajuste_inicio",
+          grupo: "aluguel",
+          rotulo: "Mês do reajuste anual",
+          tipo: "opcao",
+          padrao: "mes_entrada",
+          opcoes: [
+            ["mes_entrada", "O mês de entrada conta como 1º mês (padrão do sistema)", "Entrada em 20/03/2026 → o aluguel de 03/2027 já vem corrigido. Legal, com risco pequeno: os dias 01 a 19/03/2027 pagam o valor novo pouco antes de completar 1 ano (Lei 10.192/2001, art. 2º, §1º: reajuste com menos de 1 ano é nulo). A diferença é de centavos."],
+            ["mes_seguinte", "Sugestão: entrada depois do dia 1º, o 1º mês é o seguinte", "Entrada em 20/03/2026 → o aluguel de 04/2027 é o 1º corrigido; entrada em 01/03/2026 → o de 03/2027. Legal e sem risco: o reajuste nunca vem antes de 1 ano (Lei 10.192/2001, art. 2º, §1º)."]
+          ],
+          explica: "Em qual aluguel entra o reajuste de cada ano.",
+          consequencia: "Vale para os reajustes ainda não aplicados de todos os contratos (alerta, tela Reajustes e carta). Os já aplicados não mudam.",
+          lei: "Lei 10.192/2001, art. 2º, §1º (periodicidade mínima de 1 ano); " + LI + ", art. 18 (o reajuste é o combinado no contrato)."
+        },
+        {
+          chave: "feriados_locais",
+          grupo: "aluguel",
+          rotulo: "Feriados da cidade (além dos nacionais)",
+          tipo: "feriados",
+          padrao: [],
+          explica: 'Vencimento em sábado, domingo ou feriado pode ser pago no próximo dia útil sem multa e juros, com a bonificação. O sistema já conhece os feriados nacionais; aqui entram os da cidade ou do estado. Um por linha: "20/01" (todo ano) ou "15/06/2028" (só naquele ano). Ex.: vence em 20/01 (feriado da cidade) → em dia até 21/01.',
+          consequencia: "Muda o último dia para pagar em dia, quando um boleto fica vencido e a inadimplência. Use os feriados da cidade da agência ou do pagador, como faz o banco.",
+          lei: "Código Civil, art. 132, §1º (prazo que vence em feriado passa ao dia útil seguinte). A prorrogação em si não é opção: o banco sempre aceita sem multa no dia útil seguinte."
+        },
+        {
+          chave: "base_multa",
+          grupo: "aluguel",
+          rotulo: "Sobre o que incidem multa e juros do atraso",
+          tipo: "opcao",
+          padrao: "boleto",
+          opcoes: [
+            ["boleto", "Sobre o boleto inteiro: aluguel cheio, IPTU, seguro e tarifa (padrão do sistema)", "Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total."],
+            ["aluguel", "Só sobre o aluguel cheio", "Mesmo boleto: multa de 2% sobre R$ 2.000,00 = R$ 40,00. Legal e mais conservador. No C6 a multa e os juros vão em reais (valor fixo), não em %."]
+          ],
+          explica: "O FCI fica sempre fora da multa e dos juros.",
+          consequencia: "Vale para os pagamentos registrados e os boletos emitidos no banco daqui em diante. Boleto já emitido no C6 continua com a multa com que saiu.",
+          lei: LI + ", arts. 23, I, e 25; Código Civil, art. 395 (o devedor em atraso responde pelos prejuízos, juros e multa)."
+        },
+        {
+          chave: "proporcional",
+          grupo: "aluguel",
+          rotulo: "Aluguel proporcional (mês de entrada e de saída)",
+          tipo: "opcao",
+          padrao: "dias_reais",
+          opcoes: [
+            ["dias_reais", "Pelos dias reais do mês (padrão do sistema)", "Entrada em 15/02/2027, aluguel R$ 1.800,00: 14 dias de 28 = R$ 900,00. Legal: não há lei sobre a conta; é a mais justa e fácil de explicar."],
+            ["mes_30", "Mês comercial de 30 dias", "Mesmo exemplo: 14 ÷ 30 × R$ 1.800,00 = R$ 840,00 (mês inteiro continua o aluguel cheio). Legal, se estiver no contrato."]
+          ],
+          explica: "Como se calcula o aluguel dos dias ocupados no mês de entrada e no de saída.",
+          consequencia: "Vale para os boletos gerados ou recalculados daqui em diante. O IPTU e o FCI do mês continuam pelos dias reais.",
+          lei: "Sem lei específica: vale o combinado no contrato (" + LI + ", art. 17)."
+        },
+        {
+          chave: "dia_gerar_boletos",
+          grupo: "aluguel",
+          rotulo: "Dia de gerar os boletos do mês",
+          tipo: "inteiro",
+          padrao: 20,
+          min: 1,
+          max: 28,
+          explica: "A partir deste dia o fechamento do mês pede para gerar os boletos do próprio mês (que vencem no mês seguinte). Ex.: dia 20 → a partir de 20/10, os de 10/2026.",
+          consequencia: 'Muda só quando a etapa "Gerar boletos" do fechamento aparece.',
+          lei: "Sem lei: é rotina do escritório."
+        },
+        // ------------------------------------------------------------------ garantia
+        {
+          chave: "caucao_base",
+          grupo: "garantia",
+          rotulo: "Valor da caução: base do cálculo",
+          tipo: "opcao",
+          padrao: "bonificado",
+          opcoes: [
+            ["bonificado", "Aluguel com bonificação (padrão do sistema)", "3 × R$ 1.800,00 = R$ 5.400,00. Legal e seguro: fica dentro do limite de 3 aluguéis em qualquer leitura (Lei 8.245/91, art. 38, §2º)."],
+            ["cheio", "Aluguel cheio", "3 × R$ 2.000,00 = R$ 6.000,00. Risco: se o juiz entender que o aluguel é o pago em dia (R$ 1.800,00), passa de 3 aluguéis, o que a lei proíbe (art. 38, §2º) e é contravenção (art. 43, I); o excesso teria de ser devolvido."]
+          ],
+          explica: "Caução sugerida = número de aluguéis do contrato × este aluguel. Sem bonificação no contrato, os dois dão o aluguel cheio.",
+          consequencia: "Vale para a caução sugerida em contratos novos e para o complemento depois dos reajustes. Caução já depositada não muda.",
+          lei: LI + ", art. 38, §2º (caução em dinheiro até 3 meses de aluguel) e art. 43, I."
+        },
+        {
+          chave: "caucao_acompanha",
+          grupo: "garantia",
+          rotulo: "A caução acompanha o reajuste do aluguel",
+          tipo: "simnao",
+          padrao: true,
+          explica: 'Sim: depois do reajuste, a diferença vira boleto à parte ou depósito do inquilino ("Caução a completar" na tela Reajustes). Ex.: caução de R$ 5.400,00, aluguel bonificado passa a R$ 1.881,00 → complemento de R$ 243,00.',
+          consequencia: "Não: a caução fica com o valor do início e a tela Reajustes deixa de pedir o complemento.",
+          lei: "Legal nos dois casos, se o contrato prevê. O total nunca deve passar de 3 aluguéis atuais (" + LI + ", art. 38, §2º)."
+        },
+        {
+          chave: "caucao_limite_aviso",
+          grupo: "garantia",
+          rotulo: "Avisar quando a caução passar de quantos aluguéis",
+          tipo: "inteiro",
+          padrao: 3,
+          min: 1,
+          max: 12,
+          explica: "Ao salvar o contrato, o sistema avisa (não proíbe) se a caução ou o depósito de garantia passa deste número de aluguéis.",
+          consequencia: "Só muda o aviso. Acima de 3 é ilegal para caução em dinheiro (art. 38, §2º) e pedir mais do que a lei permite é contravenção (art. 43, I).",
+          lei: LI + ", art. 38, §2º e art. 43, I."
+        },
+        {
+          chave: "aviso_fiador_deposito",
+          grupo: "garantia",
+          rotulo: 'Avisar ao escolher "Fiador + depósito"',
+          tipo: "simnao",
+          padrao: true,
+          explica: 'A garantia "Fiador + depósito" continua permitida. Com o aviso ligado, ao salvar aparece a explicação do risco.',
+          consequencia: "A lei (art. 37) lista caução, fiança, seguro fiança e cessão de quotas; os tribunais costumam tratar o depósito em dinheiro como caução (art. 38, §2º). Aí fiador + depósito pode ser visto como duas garantias, o que o art. 37, parágrafo único, proíbe: risco de ter de devolver o depósito e de contravenção (art. 43, II).",
+          lei: LI + ", art. 37, parágrafo único, e art. 43, II."
+        },
+        {
+          chave: "fci_percentual_padrao",
+          grupo: "garantia",
+          rotulo: "FCI (fundo de conservação): % que vem preenchido",
+          tipo: "pct",
+          padrao: null,
+          min: 0,
+          max: 100,
+          explica: "Em branco: o Novo contrato vem sem FCI. Ex.: 5% de R$ 1.800,00 = R$ 90,00 por mês no boleto, guardados para os reparos na saída.",
+          consequencia: "Só muda o que vem preenchido no Novo contrato; cada contrato continua com o seu.",
+          lei: "Sem lei própria. Risco: ser visto como segunda garantia (" + LI + ", art. 37, parágrafo único); o contrato diz que o FCI não é garantia e só paga danos."
+        },
+        {
+          chave: "fci_indice_padrao",
+          grupo: "garantia",
+          rotulo: "FCI: índice de correção que vem preenchido",
+          tipo: "opcao",
+          padrao: "",
+          opcoes: [["", "Escolher em cada contrato", "O campo vem vazio."], ["Poupança", "Poupança", ""], ["IPCA", "IPCA", ""], ["IGP-M", "IGP-M", ""], ["INPC", "INPC", ""], ["IGP-DI", "IGP-DI", ""], ["SELIC", "SELIC", ""]],
+          explica: "Índice do Banco Central que corrige o saldo do FCI mês a mês.",
+          consequencia: "Só muda o que vem preenchido no Novo contrato.",
+          lei: "Sem lei: vale o contrato."
+        },
+        // ------------------------------------------------------------------ contrato
+        {
+          chave: "prazo_residencial_padrao",
+          grupo: "contrato",
+          rotulo: "Prazo do contrato residencial (meses)",
+          tipo: "inteiro",
+          padrao: 30,
+          min: 1,
+          max: 600,
+          explica: "Vem preenchido no Novo contrato residencial. Ao salvar um residencial com menos de 30 meses, o sistema avisa.",
+          consequencia: "Com 30 meses ou mais, no fim do contrato o locador pode pedir o imóvel sem dar motivo (art. 46). Com menos, o contrato se prorroga e só se retoma nos casos da lei ou depois de 5 anos (art. 47). Legal nos dois casos.",
+          lei: LI + ", arts. 46 e 47."
+        },
+        {
+          chave: "prazo_comercial_padrao",
+          grupo: "contrato",
+          rotulo: "Prazo do contrato não residencial (meses)",
+          tipo: "inteiro",
+          padrao: null,
+          min: 1,
+          max: 600,
+          explica: "Em branco: digitar em cada contrato.",
+          consequencia: "Com 5 anos ou mais (somando os contratos seguidos), o inquilino ganha o direito de pedir a renovação na Justiça, entre 1 ano e 6 meses antes do fim (art. 51). Legal.",
+          lei: LI + ", art. 51."
+        },
+        {
+          chave: "indice_padrao",
+          grupo: "contrato",
+          rotulo: "Índice de reajuste que vem preenchido",
+          tipo: "indice",
+          padrao: "",
+          explica: "Em branco: escolher em cada contrato (lista de índices do Novo contrato).",
+          consequencia: "Só muda o que vem preenchido. O índice é livre, mas precisa estar no contrato. O IGP-M teve picos de mais de 30% em 12 meses (2021); o IPCA costuma ser o mais aceito.",
+          lei: LI + ", arts. 17 e 18; Lei 10.192/2001, art. 2º."
+        },
+        {
+          chave: "bonificacao_padrao",
+          grupo: "contrato",
+          rotulo: "Novo contrato com bonificação por pontualidade",
+          tipo: "simnao",
+          padrao: true,
+          explica: "Bonificação = desconto para quem paga até o vencimento. Ex.: aluguel R$ 2.000,00 com 10% → R$ 1.800,00 em dia; atrasado paga R$ 2.000,00 mais multa e juros.",
+          consequencia: "Só muda o que vem marcado no Novo contrato.",
+          lei: 'Legal. O STJ aceitou desconto de pontualidade junto com multa (REsp 1.745.916, 2019, caso de escola); alguns tribunais estaduais já trataram como "multa dobrada". Desconto moderado e chamado de bonificação no contrato diminui o risco.'
+        },
+        {
+          chave: "bonificacao_percentual_padrao",
+          grupo: "contrato",
+          rotulo: "Bonificação: % que vem preenchido",
+          tipo: "pct",
+          padrao: null,
+          min: 0,
+          max: 100,
+          explica: "Em branco: digitar o aluguel bonificado ou o % em cada contrato.",
+          consequencia: "Só muda o que vem preenchido.",
+          lei: "Ver a bonificação acima."
+        },
+        {
+          chave: "bonificacao_limite_aviso",
+          grupo: "contrato",
+          rotulo: "Avisar quando a bonificação passar de (%)",
+          tipo: "pct",
+          padrao: 10,
+          min: 0,
+          max: 100,
+          explica: "Ao salvar o contrato, o sistema avisa (não proíbe) se a bonificação passa deste %.",
+          consequencia: "Só muda o aviso. Quanto maior o desconto, maior o risco de um juiz ver a perda do desconto como uma segunda multa e reduzir a cobrança (Código Civil, art. 413).",
+          lei: "Código Civil, art. 413; REsp 1.745.916 (STJ, 2019)."
+        },
+        {
+          chave: "multa_padrao",
+          grupo: "contrato",
+          rotulo: "Multa por atraso (%) que vem preenchida",
+          tipo: "pct",
+          padrao: 2,
+          min: 0,
+          max: 100,
+          explica: "Ex.: boleto de R$ 2.000,00 pago atrasado → multa de 2% = R$ 40,00. Acima de 10%, o sistema avisa ao salvar o contrato.",
+          consequencia: "Só muda o que vem preenchido. O limite de 2% do Código do Consumidor em regra não vale para aluguel; até 10% é aceito (Lei de Usura, art. 9º); acima disso o juiz pode reduzir (Código Civil, art. 413). 2% é o mais seguro e o que o banco usa.",
+          lei: "Decreto 22.626/33 (Lei de Usura), art. 9º; Código Civil, arts. 412 e 413."
+        },
+        {
+          chave: "juros_padrao",
+          grupo: "contrato",
+          rotulo: "Juros por atraso (% ao mês) que vêm preenchidos",
+          tipo: "pct",
+          padrao: 1,
+          min: 0,
+          max: 100,
+          explica: "Contados por dia, como no banco. Ex.: R$ 2.000,00 com 1% ao mês, 10 dias → R$ 0,66 por dia × 10 = R$ 6,60. Acima de 1% ao mês, o sistema avisa ao salvar.",
+          consequencia: "Só muda o que vem preenchido. Com inquilino pessoa física, acima de 1% ao mês pode ser reduzido (Lei de Usura, art. 1º; Código Civil, art. 406).",
+          lei: "Código Civil, art. 406 (com a Lei 14.905/2024); Decreto 22.626/33, art. 1º."
+        },
+        {
+          chave: "mes_seguinte_padrao",
+          grupo: "contrato",
+          rotulo: "O aluguel do mês vence no mês seguinte",
+          tipo: "simnao",
+          padrao: true,
+          explica: "Sim: o aluguel de julho vence em agosto (paga-se depois de usar).",
+          consequencia: "Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).",
+          lei: LI + ", arts. 20, 42 e 43, III."
+        },
+        {
+          chave: "tarifa_padrao",
+          grupo: "contrato",
+          rotulo: "Tarifa do boleto cobrada do inquilino (R$) que vem preenchida",
+          tipo: "dinheiro",
+          padrao: null,
+          min: 0,
+          explica: "Em branco: sem tarifa. Ex.: R$ 3,50 por boleto.",
+          consequencia: "Só muda o que vem preenchido. Os tribunais divergem sobre repassar a tarifa do banco ao inquilino: só com cláusula clara no contrato.",
+          lei: LI + ", art. 22, VII (despesas de administração são do locador)."
+        },
+        {
+          chave: "conta_iptu_padrao",
+          grupo: "contrato",
+          rotulo: "IPTU que vem preenchido",
+          tipo: "opcao",
+          padrao: "Por conta do inquilino",
+          opcoes: [
+            ["Por conta do inquilino", "Por conta do inquilino (padrão do sistema)", "As parcelas entram no boleto, proporcionais aos dias ocupados. Legal com cláusula no contrato (arts. 22, VIII, e 25)."],
+            ["Incluso no aluguel", "Incluso no aluguel", "O locador paga. Legal."],
+            ["Não tem", "Não tem", "Imóvel sem IPTU."]
+          ],
+          explica: "Quem paga o IPTU nos contratos novos.",
+          consequencia: "Só muda o que vem preenchido.",
+          lei: LI + ", art. 22, VIII, e art. 25."
+        },
+        {
+          chave: "conta_seguro_padrao",
+          grupo: "contrato",
+          rotulo: "Seguro contra incêndio que vem preenchido",
+          tipo: "opcao",
+          padrao: "Por conta do inquilino",
+          opcoes: [
+            ["Por conta do inquilino", "Por conta do inquilino (padrão do sistema)", "Legal com cláusula expressa no contrato (art. 22, VIII)."],
+            ["Incluso no aluguel", "Incluso no aluguel", "O locador paga, como diz a lei quando o contrato não fala nada. Legal."],
+            ["Não tem", "Não tem", "Risco: o imóvel fica sem seguro."]
+          ],
+          explica: "Quem paga o seguro obrigatório nos contratos novos.",
+          consequencia: "Só muda o que vem preenchido.",
+          lei: LI + ", art. 22, VIII."
+        },
+        // ------------------------------------------------------------------ rotina
+        {
+          chave: "regua_cobranca",
+          grupo: "rotina",
+          rotulo: "Régua de cobrança",
+          tipo: "regua",
+          padrao: [{ dias: 1, passo: "Mandar o lembrete por e-mail" }, { dias: 10, passo: "Ligar para o inquilino" }, { dias: 30, passo: "Avaliar a negativação" }],
+          explica: 'O que fazer pelo atraso do boleto vencido mais antigo (só aviso, nada é enviado sozinho). Um passo por linha: "dias: o que fazer". Ex.: "10: Ligar para o inquilino".',
+          consequencia: "Muda o passo mostrado no alerta e na tela Inadimplência. Cobrar sem ameaçar nem expor o devedor; para negativar, o órgão avisa a pessoa antes.",
+          lei: "CDC, art. 42 e art. 43, §2º; Súmula 359 do STJ; LGPD, art. 7º, X (dados para proteção do crédito)."
+        },
+        {
+          chave: "meses_documentos_ficha",
+          grupo: "rotina",
+          rotulo: "Ficha reprovada: apagar os documentos depois de (meses)",
+          tipo: "inteiro",
+          padrao: 3,
+          min: 1,
+          max: 24,
+          explica: "Os documentos pessoais da ficha reprovada são apagados este número de meses depois da decisão.",
+          consequencia: "Prazo maior guarda dados sem necessidade, o que a LGPD manda evitar; prazo curto pode apagar o que ainda seria útil numa reclamação.",
+          lei: "LGPD (Lei 13.709/2018), art. 6º, III, e arts. 15 e 16."
+        },
+        {
+          chave: "dias_antecipacao_banco",
+          grupo: "rotina",
+          rotulo: "Extrato: ligar a entrada a boletos que vencem até quantos dias depois",
+          tipo: "inteiro",
+          padrao: 45,
+          min: 1,
+          max: 120,
+          explica: "Ex.: entrada de 10/08 → procura boletos com vencimento até 24/09 (pagamento adiantado).",
+          consequencia: "Mais dias: acha mais pagamentos adiantados, com mais sugestões erradas.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "dias_alerta_banco",
+          grupo: "rotina",
+          rotulo: "Alerta de movimentação do extrato sem destino depois de (dias)",
+          tipo: "inteiro",
+          padrao: 7,
+          min: 1,
+          max: 90,
+          explica: "Movimentação sem destino há mais dias que isto vira alerta no Painel.",
+          consequencia: "Só muda o alerta.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "dias_extrato_recente",
+          grupo: "rotina",
+          rotulo: "Fechamento: extrato buscado há até (dias)",
+          tipo: "inteiro",
+          padrao: 7,
+          min: 0,
+          max: 31,
+          explica: 'No mês corrente, a etapa "Banco" do fechamento fica feita com o extrato buscado nos últimos dias.',
+          consequencia: "Só muda a etapa do fechamento.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "antecedencia_seguro",
+          grupo: "rotina",
+          rotulo: "Alerta do seguro: dias antes do vencimento",
+          tipo: "inteiro",
+          padrao: 60,
+          min: 1,
+          max: 365,
+          explica: "Avisa a renovação da apólice este número de dias antes do fim.",
+          consequencia: "Só muda o alerta.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "antecedencia_vigencia",
+          grupo: "rotina",
+          rotulo: "Alerta do fim do contrato: dias antes",
+          tipo: "inteiro",
+          padrao: 60,
+          min: 1,
+          max: 730,
+          explica: "Avisa o fim do contrato este número de dias antes.",
+          consequencia: "Só muda o alerta. Contrato não residencial com 5 anos ou mais: a renovação na Justiça só pode ser pedida entre 1 ano e 6 meses antes do fim; para esses, 365 dias dá tempo de negociar.",
+          lei: LI + ", art. 51, §5º."
+        },
+        {
+          chave: "dias_sem_imovel",
+          grupo: "rotina",
+          rotulo: "Contrato sem imóvel é apagado depois de (dias)",
+          tipo: "inteiro",
+          padrao: 7,
+          min: 1,
+          max: 90,
+          explica: "Contrato sem imóvel e sem boleto é apagado sozinho depois deste prazo.",
+          consequencia: "Só muda o prazo.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "meses_depois_de_alugar",
+          grupo: "rotina",
+          rotulo: 'Etiqueta "alugado há pouco: veja se ficou conta nossa" por (meses)',
+          tipo: "inteiro",
+          padrao: 2,
+          min: 0,
+          max: 12,
+          explica: "Nas contas do imóvel, lembra de contas do período vago até este número de meses depois da entrada.",
+          consequencia: "Só muda a etiqueta.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "dias_passado",
+          grupo: "rotina",
+          rotulo: "Aviso: data de pagamento de mais de (dias) atrás",
+          tipo: "inteiro",
+          padrao: 90,
+          min: 1,
+          max: 3650,
+          explica: "Avisa antes de salvar (costuma ser ano digitado errado).",
+          consequencia: "Só muda o aviso.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "dias_futuro",
+          grupo: "rotina",
+          rotulo: "Aviso: entrada do inquilino a mais de (dias) no futuro",
+          tipo: "inteiro",
+          padrao: 60,
+          min: 1,
+          max: 3650,
+          explica: "Avisa antes de salvar o contrato.",
+          consequencia: "Só muda o aviso.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "fora_do_padrao",
+          grupo: "rotina",
+          rotulo: "Aviso: aluguel, IPTU ou seguro diferente do anterior em mais de (%)",
+          tipo: "pct",
+          padrao: 30,
+          min: 1,
+          max: 1e3,
+          explica: "Ex.: seguro anterior de R$ 100,00 e novo de R$ 140,00 (40%) → avisa antes de salvar.",
+          consequencia: "Só muda o aviso.",
+          lei: "Sem lei: rotina."
+        }
+      ];
+      POR_CHAVE = new Map(DEFINICOES_REGRAS.map((x) => [x.chave, x]));
+      definicaoRegra = (chave) => POR_CHAVE.get(chave) || null;
+      PADRAO_SISTEMA = Object.freeze(Object.fromEntries(DEFINICOES_REGRAS.map((x) => [x.chave, x.padrao])));
+      copia = (v) => v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v;
+      mesmoValor = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+      ErroRegra = class extends Error {
+        constructor(mensagem) {
+          super(mensagem);
+          this.name = "ErroUsuario";
+          this.esperado = true;
+        }
+      };
+      regrasDe = (d2) => ({ ...copia(PADRAO_SISTEMA), ...escolhasDe(d2) });
+      emUso = { ...PADRAO_SISTEMA };
+      regra = (chave) => chave in emUso ? emUso[chave] : PADRAO_SISTEMA[chave];
+      FORMATO_ARQUIVO_REGRAS = "regras-imoveis-v1";
+      arquivoDasRegras = (d2, salvoPor = "") => ({ formato: FORMATO_ARQUIVO_REGRAS, salvo_em: (/* @__PURE__ */ new Date()).toISOString(), salvo_por: salvoPor, regras: regrasDe(d2) });
+    }
+  });
 
   // docs/js/calculos.js
   var calculos_exports = {};
@@ -1308,7 +1846,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return x;
   }
   function limitePagamento(vencimento) {
-    return proximoDiaUtil(vencimento);
+    let x = proximoDiaUtil(vencimento);
+    while (feriadosLocais(Number(x.slice(0, 4))).includes(x)) x = proximoDiaUtil(somarDias(x, 1));
+    return x;
   }
   function vencido(vencimento, hoje3) {
     return !!vencimento && hoje3 > limitePagamento(vencimento);
@@ -1384,8 +1924,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       reserva_utilizada: reserva,
       a_pagar_pontual: totalPontual - reserva,
       a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
-      // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel)
-      base_multa: Math.max(totalSemDesconto - reserva - (fci || 0), 0)
+      // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel); regra `base_multa`: boleto inteiro
+      // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
+      base_multa: regra("base_multa") === "aluguel" ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0)) - reserva, 0) : Math.max(totalSemDesconto - reserva - (fci || 0), 0)
     };
   }
   function calcularCobranca({
@@ -1400,8 +1941,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     outros = 0,
     reservaDisponivel = 0
   }) {
-    const diasMes = diasNoMes(competencia);
     const dias = diasOcupados(competencia, entrada, saida);
+    const diasMes = regra("proporcional") === "mes_30" && dias < diasNoMes(competencia) ? 30 : diasNoMes(competencia);
     const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
     const desconto = descontoPorPercentual(aluguel, descontoPercentual);
     const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };
@@ -1482,6 +2023,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   var ErroUsuario, FMT_REAIS, FMT_PCT, MS_DIA, FMT_DATA_HORA, agoraBr, FERIADOS, FAIXAS_CEP, maisRecentePrimeiro, maisAntigoPrimeiro, semAcento, paraNomeDeArquivo, COMPETENCIA_RE, DATA_RE, FORMATOS_PARAMETRO;
   var init_calculos = __esm({
     "docs/js/calculos.js"() {
+      init_config_regras();
       ErroUsuario = class extends Error {
         constructor(mensagem) {
           super(mensagem);
@@ -1587,7 +2129,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     if (faltam < 0) {
       return { nivel: "perigo", tipo: "Seguro obrigatório", texto: `Seguro vencido em ${dataBr(fim)}. Renove a apólice.` };
     }
-    if (faltam <= ANTECEDENCIA_SEGURO) {
+    if (faltam <= regra("antecedencia_seguro")) {
       return {
         nivel: "aviso",
         tipo: "Seguro obrigatório",
@@ -1605,7 +2147,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     if (inicio) {
       const [, proximo] = aniversarios(inicio, hoje3);
-      if (diasEntre(hoje3, proximo) <= ANTECEDENCIA_SEGURO && fim <= somarDias(proximo, 15)) {
+      if (diasEntre(hoje3, proximo) <= regra("antecedencia_seguro") && fim <= somarDias(proximo, 15)) {
         return {
           nivel: "aviso",
           tipo: "Seguro obrigatório",
@@ -1638,7 +2180,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         texto: `Vigência terminou em ${dataBr(vigenciaFim)}. Registre a renovação (nova data ou prazo indeterminado, com o novo valor negociado) ou a saída.`
       };
     }
-    if (faltam <= ANTECEDENCIA_VIGENCIA) {
+    if (faltam <= regra("antecedencia_vigencia")) {
       return {
         nivel: "aviso",
         tipo: "Vigência do contrato",
@@ -1647,12 +2189,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     return null;
   }
-  var ANTECEDENCIA_SEGURO, ANTECEDENCIA_VIGENCIA;
   var init_alertas = __esm({
     "docs/js/alertas.js"() {
       init_calculos();
-      ANTECEDENCIA_SEGURO = 60;
-      ANTECEDENCIA_VIGENCIA = 60;
+      init_config_regras();
     }
   });
 
@@ -2942,6 +3482,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     CONFIG_BANCO_PADRAO: () => CONFIG_BANCO_PADRAO,
     CONTA_BANCO_PADRAO: () => CONTA_BANCO_PADRAO,
     CORES_ALERTA: () => CORES_ALERTA,
+    DEFINICOES_REGRAS: () => DEFINICOES_REGRAS,
     DIAS_ADIAR_ALERTA: () => DIAS_ADIAR_ALERTA,
     DIAS_ALERTA_BANCO: () => DIAS_ALERTA_BANCO,
     DIAS_CUIDANDO_ALERTA: () => DIAS_CUIDANDO_ALERTA,
@@ -2954,6 +3495,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ESTILOS_ALERTA_PADRAO: () => ESTILOS_ALERTA_PADRAO,
     ETAPAS_ENTRADA: () => ETAPAS_ENTRADA,
     GARANTIAS_DEPOSITADAS: () => GARANTIAS_DEPOSITADAS,
+    GRUPOS_REGRAS: () => GRUPOS_REGRAS,
     IMPOSTOS: () => IMPOSTOS,
     INICIO_LC224: () => INICIO_LC224,
     LIMITE_ADICIONAL_IRPJ: () => LIMITE_ADICIONAL_IRPJ,
@@ -2969,6 +3511,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     MODOS_FICHA: () => MODOS_FICHA,
     MOMENTOS_NOTIFICACAO: () => MOMENTOS_NOTIFICACAO,
     NOTIFICACAO_CONTRATO: () => NOTIFICACAO_CONTRATO,
+    PADRAO_SISTEMA: () => PADRAO_SISTEMA,
     PRESUNCAO: () => PRESUNCAO,
     REGUA_COBRANCA: () => REGUA_COBRANCA,
     SITUACOES: () => SITUACOES,
@@ -3006,6 +3549,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     alteracaoBoletoC6: () => alteracaoBoletoC6,
     alteracoesDesfaziveis: () => alteracoesDesfaziveis,
     aluguelAtual: () => aluguelAtual,
+    aluguelDaCaucao: () => aluguelDaCaucao,
     analisarAditivoPerdido: () => analisarAditivoPerdido,
     analisarDocumento: () => analisarDocumento,
     anexarComprovante: () => anexarComprovante,
@@ -3019,6 +3563,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     arquivosReferenciados: () => arquivosReferenciados,
     assinarAditivo: () => assinarAditivo,
     atualizar: () => atualizar,
+    avisosLegaisDoContrato: () => avisosLegaisDoContrato,
     baixarEmLote: () => baixarEmLote,
     bancoAtivo: () => bancoAtivo,
     bancoVazio: () => bancoVazio,
@@ -3218,6 +3763,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     montarCobranca: () => montarCobranca,
     motivoBancoInativo: () => motivoBancoInativo,
     motivoNaoDesfazer: () => motivoNaoDesfazer,
+    mudarRegraSistema: () => mudarRegraSistema,
     nfAirbnbDe: () => nfAirbnbDe,
     nomeBate: () => nomeBate,
     normalizar: () => normalizar,
@@ -3230,6 +3776,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ordenarCaixas: () => ordenarCaixas,
     origensDoAcordo: () => origensDoAcordo,
     outrosContratosDaPessoa: () => outrosContratosDaPessoa,
+    padroesNovoContrato: () => padroesNovoContrato,
     parcelasDoAcordo: () => parcelasDoAcordo,
     parcelasIptu: () => parcelasIptu,
     partesDoContrato: () => partesDoContrato,
@@ -3276,6 +3823,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     registrarNfExterna: () => registrarNfExterna,
     registrarPagamento: () => registrarPagamento,
     registrarRenovacao: () => registrarRenovacao,
+    regra: () => regra,
+    regrasDe: () => regrasDe,
+    reguaCobranca: () => reguaCobranca,
     relogiosDoContrato: () => relogiosDoContrato,
     removerAnexo: () => removerAnexo,
     removerArquivoAditivo: () => removerArquivoAditivo,
@@ -3286,6 +3836,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     reservaParaMarcarAbatida: () => reservaParaMarcarAbatida,
     ressarcimentosDo: () => ressarcimentosDo,
     restaurarGarantiaHerdada: () => restaurarGarantiaHerdada,
+    restaurarVersaoRegras: () => restaurarVersaoRegras,
     resultadosFinanceiros: () => resultadosFinanceiros,
     resumoRotinaEntrada: () => resumoRotinaEntrada,
     resumoSolicitacoes: () => resumoSolicitacoes,
@@ -3305,6 +3856,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     salvarEstilosAlertas: () => salvarEstilosAlertas,
     salvarGuiaImposto: () => salvarGuiaImposto,
     salvarOrdemCaixas: () => salvarOrdemCaixas,
+    salvarRegrasSistema: () => salvarRegrasSistema,
+    salvarVersaoRegras: () => salvarVersaoRegras,
     seguroVigente: () => seguroVigente,
     segurosDoContrato: () => segurosDoContrato,
     separarLeitura: () => separarLeitura,
@@ -3346,7 +3899,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     vencimentoDoReajuste: () => vencimentoDoReajuste,
     vencimentoGuia: () => vencimentoGuia,
     vistoriasDo: () => vistoriasDo,
-    voltarAlerta: () => voltarAlerta
+    voltarAlerta: () => voltarAlerta,
+    voltarRegrasAoPadrao: () => voltarRegrasAoPadrao
   });
   function bancoVazio() {
     const agora = (/* @__PURE__ */ new Date()).toISOString();
@@ -3368,6 +3922,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function normalizar(d2) {
     const vazio = bancoVazio();
     for (const [k, v] of Object.entries(vazio)) if (d2[k] === void 0) d2[k] = v;
+    usarRegras(d2);
     for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d2.listas[k])) d2.listas[k] = [...l.padrao];
     d2.config_banco = { ...CONFIG_BANCO_PADRAO, ...d2.config_banco && typeof d2.config_banco === "object" ? d2.config_banco : {} };
     delete d2.config_banco.senha_ponte;
@@ -3503,8 +4058,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function completarCaucao(c) {
     if (!c.caucao_data) c.caucao_data = c.vigencia_inicio || c.data_entrada || null;
     if (!(c.caucao_valor > 0) && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
-      const a = c.aluguel_inicial;
-      c.caucao_valor = c.caucao_meses * (a - descontoPorPercentual(a, percentualBonificacao(c)));
+      c.caucao_valor = c.caucao_meses * aluguelDaCaucao(c.aluguel_inicial, c);
     }
     return c;
   }
@@ -3795,10 +4349,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function caucaoSugerida(d2, c, dataRef = hojeIso()) {
     if (!(c.caucao_meses > 0)) return null;
-    const aluguel = aluguelAtual(d2, c, dataRef);
-    return c.caucao_meses * (aluguel - descontoPorPercentual(aluguel, percentualBonificacao(c)));
+    return c.caucao_meses * aluguelDaCaucao(aluguelAtual(d2, c, dataRef), c);
   }
   function complementoCaucao(d2, c) {
+    if (!regra("caucao_acompanha")) return null;
     const g = herancaAgendada(d2, c) && !garantiaNova(c) ? contratoHerdado(d2, c) : c;
     if (!temCaucao(g) || !g.caucao_valor || !garantiaDepositada(g)) return null;
     const proprias = g === c ? [] : correcoesCaucaoAtual(d2, c);
@@ -4903,7 +5457,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return d2.contratos.filter((x) => x.id !== c.id && contratoAtivo(x, hoje3) && (doc ? String(x.inquilino_cpf || "").replace(/\D/g, "") === doc : x.inquilino_nome.trim().toLocaleLowerCase("pt-BR") === c.inquilino_nome.trim().toLocaleLowerCase("pt-BR")));
   }
   function dataApagarSemImovel(c) {
-    return !c.imovel_id && c.sem_imovel_desde ? somarDias(c.sem_imovel_desde, DIAS_SEM_IMOVEL) : null;
+    return !c.imovel_id && c.sem_imovel_desde ? somarDias(c.sem_imovel_desde, regra("dias_sem_imovel")) : null;
   }
   function contratosSemImovelVencidos(d2, hoje3 = hojeIso()) {
     return d2.contratos.filter((c) => {
@@ -6257,7 +6811,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       valor_com_desconto: t.a_pagar_pontual,
       multa_percentual: cb.multa_percentual,
       // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
-      multa_valor: cb.fci ? arred(t.base_multa * (cb.multa_percentual || 0) / 100) : null,
+      multa_valor: t.base_multa !== valor ? arred(t.base_multa * (cb.multa_percentual || 0) / 100) : null,
       juros_ao_dia: jurosAoDia(t.base_multa, cb.juros_mensal_percentual),
       descricao: linhas2.join("\n")
     };
@@ -6419,7 +6973,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!endereco2.zip_code || !endereco2.city) throw new Error(`Complete o endereço de ${c.inquilino_nome} (cidade/UF e CEP) no cadastro do inquilino ou do imóvel: o banco exige o endereço do pagador.`);
     if (centavosParaReais(b.valor) > L.valor_maximo_reais) throw new Error(`O banco não emite boleto acima de R$ ${L.valor_maximo_reais.toLocaleString("pt-BR")}.`);
     const fees = {};
-    if (cb.fci) {
+    if (cb.fci || b.multa_valor !== null) {
       if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
       if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
     } else {
@@ -6702,7 +7256,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const airbnb = p2.motivo === "vago" || contasPermitidas(d2, imovelId, somarMeses(comp, -1)).motivo === "vago";
     if (p2.motivo === "vago") return { motivo: "vago", rotulo: "vago", classe: "ok", airbnb };
     if (p2.motivo === "alugou") {
-      const ate = limitesCompetencia(somarMeses(competenciaDe(p2.contrato.data_entrada), MESES_DEPOIS_DE_ALUGAR))[1];
+      const ate = limitesCompetencia(somarMeses(competenciaDe(p2.contrato.data_entrada), regra("meses_depois_de_alugar")))[1];
       return { motivo: "alugou", rotulo: `alugado em ${dataBr(p2.contrato.data_entrada)}: veja se ficou conta nossa pendente (aviso até ${dataBr(ate)})`, classe: "aviso", airbnb, ate };
     }
     if (p2.motivo === "incluso") return { motivo: "incluso", rotulo: `${p2.tipos.join(", ")}: incluso no contrato (nosso)`, classe: "info", airbnb };
@@ -6826,7 +7380,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function contasPermitidas(d2, imovelId, comp) {
     const [ini, fim] = limitesCompetencia(comp);
     if (vagoNoPeriodo(d2, imovelId, ini, fim)) return { tipos: [...TIPOS_DESPESA], motivo: "vago" };
-    const limite = limitesCompetencia(somarMeses(comp, -MESES_DEPOIS_DE_ALUGAR))[0];
+    const limite = limitesCompetencia(somarMeses(comp, -regra("meses_depois_de_alugar")))[0];
     const recente = d2.contratos.find((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada >= limite && c.data_entrada <= fim && !ocupadoEm(d2, imovelId, somarDias(c.data_entrada, -1)));
     if (recente) return { tipos: [...TIPOS_DESPESA], motivo: "alugou", contrato: recente };
     const atuais = d2.contratos.filter((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada <= fim && (c.data_saida ? c.data_saida >= ini : c.ativo !== false));
@@ -6913,7 +7467,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const air = airbnbDoMes(d2, mes);
     const airPendente = air.total > 0 && !air.numerada && (!air.nf || air.divergente) ? 1 : 0;
     const nfs = (pendentes || pendentesDeFatura(d2)).filter((x) => String(x.data).slice(0, 7) <= mes).length + airPendente;
-    const dia20 = `${mes}-${String(DIA_GERAR_BOLETOS).padStart(2, "0")}`;
+    const dia20 = `${mes}-${String(regra("dia_gerar_boletos")).padStart(2, "0")}`;
     const lancou = (i) => d2.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || "").slice(0, 7) === mes));
     const comConta = d2.imoveis.filter((i) => contasPermitidas(d2, i.id, mes).tipos.length);
     const contas2 = comConta.filter((i) => !lancou(i));
@@ -6943,7 +7497,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       },
       ...d2.config_banco && d2.config_banco.ativo ? [(() => {
         const b = pendenciasBancoDoMes(d2, mes, hoje3);
-        const buscado = (x) => !x.importadoAte ? "extrato ainda não buscado" : b.mesFechado ? `extrato buscado só até ${dataBr(x.importadoAte)}, falta até o fim do mês` : `extrato buscado em ${dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`;
+        const buscado = (x) => !x.importadoAte ? "extrato ainda não buscado" : b.mesFechado ? `extrato buscado só até ${dataBr(x.importadoAte)}, falta até o fim do mês` : `extrato buscado em ${dataBr(x.importadoAte)}, há mais de ${regra("dias_extrato_recente")} dias: busque de novo`;
         return {
           chave: "banco",
           titulo: `Conferir o extrato de ${compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(" e ") || "banco"}) e dar destino às movimentações`,
@@ -6951,7 +7505,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           link: `#/banco?mes=${mes}`,
           contas: b.porConta,
           // comprovantes não baixados e pagamentos pelo banco sem resposta são só aviso: não seguram a etapa
-          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.semComprovante ? ` · ${b.semComprovante} comprovante(s) não baixado(s)` : "") + (b.pagamentosPendentes ? ` · ${b.pagamentosPendentes} pagamento(s) pelo banco sem confirmação` : "") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : "nenhuma conta configurada"
+          detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : "tudo com destino"}`).join(" · ") + (b.semComprovante ? ` · ${b.semComprovante} comprovante(s) não baixado(s)` : "") + (b.pagamentosPendentes ? ` · ${b.pagamentosPendentes} pagamento(s) pelo banco sem confirmação` : "") + (b.mesFechado ? "" : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${regra("dias_extrato_recente")} dias e tudo com destino)`) : "nenhuma conta configurada"
         };
       })()] : [],
       {
@@ -7132,7 +7686,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function mesDeAniversario(c) {
     const base = dataBaseCorrecao(c);
-    return base ? base.slice(0, 7) : null;
+    if (!base) return null;
+    return regra("reajuste_inicio") === "mes_seguinte" && base.slice(8, 10) !== "01" ? somarMeses(base.slice(0, 7), 1) : base.slice(0, 7);
   }
   function reajusteNaCompetencia(d2, c, comp, hoje3 = hojeIso()) {
     const p2 = mesDeAniversario(c);
@@ -7662,7 +8217,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const contas2 = cfg2.contas || [];
     const fim = limitesCompetencia(mes)[1];
     const mesFechado2 = fim < hoje3;
-    const ate = mesFechado2 ? fim : somarDias(hoje3, -DIAS_EXTRATO_RECENTE);
+    const ate = mesFechado2 ? fim : somarDias(hoje3, -regra("dias_extrato_recente"));
     const movs2 = (d2.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
     const semDestinoDe = (id) => movs2.filter((m) => m.conta_id === id && !m.classificacao).length;
     const porConta = contas2.map((c) => {
@@ -7676,7 +8231,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function alertaBanco(d2, hoje3 = hojeIso()) {
     const cfg2 = d2.config_banco || {};
     if (!cfg2.ativo) return null;
-    const limite = somarDias(hoje3, -DIAS_ALERTA_BANCO);
+    const limite = somarDias(hoje3, -regra("dias_alerta_banco"));
     const semDestino = (d2.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
     const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador && m.data <= limite);
     const enviados = (d2.pagamentos_banco || []).filter((p2) => p2.situacao === "agendado" && (p2.data_pagamento || hoje3) < hoje3);
@@ -7684,7 +8239,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const erros = (d2.pagamentos_banco || []).filter((p2) => p2.situacao === "erro");
     if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length) return null;
     const partes = [];
-    if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
+    if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${regra("dias_alerta_banco")} dias`);
     if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
     if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
     if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
@@ -7871,15 +8426,101 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return { contrato: c, imovel: buscar(d2, "imoveis", c.imovel_id), ano: Number(ano), empresas: [...porEmpresa.values()].sort((a, b) => a.emitente.nome.localeCompare(b.emitente.nome, "pt-BR")), total: nfs.reduce((s, f) => s + f.valor, 0) };
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta;
+  function salvarRegrasSistema(d2, valores, usuario, motivo = "Regras do sistema") {
+    const limpos = {};
+    for (const [k, v] of Object.entries(valores || {})) if (definicaoRegra(k)) limpos[k] = limparValorRegra(k, v);
+    let mudou = 0;
+    for (const def of DEFINICOES_REGRAS) {
+      const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
+      const linha = d2.config_regras.find((r) => r.chave === def.chave);
+      const padrao = mesmoValor(novo, def.padrao);
+      if (linha && padrao) {
+        excluir(d2, "config_regras", linha.id, usuario, `${motivo}: ${def.rotulo} volta ao padrão do sistema`);
+        mudou += 1;
+      } else if (linha && !mesmoValor(linha.valor, novo)) {
+        atualizar(d2, "config_regras", linha.id, { valor: novo }, usuario, `${motivo}: ${def.rotulo}`);
+        mudou += 1;
+      } else if (!linha && !padrao) {
+        inserir(d2, "config_regras", { chave: def.chave, valor: novo }, usuario, `${motivo}: ${def.rotulo}`);
+        mudou += 1;
+      }
+    }
+    usarRegras(d2);
+    return mudou;
+  }
+  function salvarVersaoRegras(d2, nome, usuario) {
+    const n = String(nome || "").trim().slice(0, 80);
+    if (!n) throw new ErroUsuario('Dê um nome à versão das regras (ex.: "Regras de novembro de 2026").');
+    return inserir(d2, "versoes_regras", { nome: n, salvo_em: (/* @__PURE__ */ new Date()).toISOString(), salvo_por: usuario || "", valores: regrasDe(d2) }, usuario, `Versão das regras salva: ${n}`);
+  }
+  function restaurarVersaoRegras(d2, id, usuario) {
+    const v = d2.versoes_regras.find((x) => x.id === Number(id));
+    if (!v) throw new ErroUsuario("Versão das regras não encontrada.");
+    const valores = {};
+    for (const [k, x] of Object.entries(v.valores || {})) if (definicaoRegra(k)) {
+      try {
+        valores[k] = limparValorRegra(k, x);
+      } catch {
+      }
+    }
+    return salvarRegrasSistema(d2, valores, usuario, `Regras do sistema (volta à versão "${v.nome}")`);
+  }
+  function padroesNovoContrato() {
+    const r = (k) => regra(k);
+    const out = {
+      multa_percentual: r("multa_padrao"),
+      juros_mensal_percentual: r("juros_padrao"),
+      bonificacao: r("bonificacao_padrao"),
+      cobranca_mes_seguinte: r("mes_seguinte_padrao"),
+      conta_iptu: r("conta_iptu_padrao"),
+      conta_seguro: r("conta_seguro_padrao")
+    };
+    if (r("bonificacao_percentual_padrao") !== null && r("bonificacao_padrao")) out.desconto_pontualidade_percentual = r("bonificacao_percentual_padrao");
+    if (r("tarifa_padrao") !== null) out.taxa_boleto = r("tarifa_padrao");
+    if (r("fci_percentual_padrao") !== null) {
+      out.fci_percentual = r("fci_percentual_padrao");
+      if (r("fci_indice_padrao")) out.fci_indice = r("fci_indice_padrao");
+    }
+    if (r("indice_padrao")) out.indice_correcao = r("indice_padrao");
+    if (r("prazo_residencial_padrao") !== null) out.prazo_meses = r("prazo_residencial_padrao");
+    return out;
+  }
+  function avisosLegaisDoContrato(dados) {
+    const out = [];
+    const r = (k) => regra(k);
+    const residencial = (dados.finalidade || "Residencial") === "Residencial";
+    if (residencial && dados.prazo_tipo !== "Indeterminado" && dados.prazo_meses > 0 && dados.prazo_meses < 30) {
+      out.push(`Contrato residencial de ${dados.prazo_meses} meses: com menos de 30 meses, no fim o contrato se prorroga e o imóvel só pode ser pedido de volta nos casos da lei ou depois de 5 anos (Lei 8.245/91, arts. 46 e 47).`);
+    }
+    const bon = dados.bonificacao === false ? 0 : Number(dados.desconto_pontualidade_percentual) || 0;
+    if (bon > r("bonificacao_limite_aviso")) out.push(`Bonificação de ${pct(bon)}, acima de ${pct(r("bonificacao_limite_aviso"))}: quanto maior o desconto, maior o risco de um juiz tratar a perda dele como uma segunda multa e reduzir a cobrança (Código Civil, art. 413).`);
+    if (Number(dados.multa_percentual) > 10) out.push(`Multa por atraso de ${pct(dados.multa_percentual)}: acima de 10% o juiz costuma reduzir (Lei de Usura, art. 9º; Código Civil, art. 413).`);
+    if (Number(dados.juros_mensal_percentual) > 1) out.push(`Juros de ${pct(dados.juros_mensal_percentual)} ao mês: com pessoa física, acima de 1% ao mês pode ser reduzido (Código Civil, art. 406; Lei de Usura, art. 1º).`);
+    const aluguel = Number(dados.aluguel_inicial) || 0;
+    const garantia = dados.garantia_tipo === "Caução" ? Number(dados.caucao_valor) || 0 : ["Depósito garantia", "Fiador + depósito"].includes(dados.garantia_tipo) ? Number(dados.deposito_valor) || 0 : 0;
+    const limite = r("caucao_limite_aviso");
+    if (aluguel > 0 && garantia > 0) {
+      const base = aluguelDaCaucao(aluguel, { bonificacao: dados.bonificacao, desconto_pontualidade_percentual: dados.desconto_pontualidade_percentual });
+      if (garantia > limite * base) out.push(`${dados.garantia_tipo === "Caução" ? "Caução" : "Depósito de garantia"} de ${reais(garantia)}, mais de ${limite} aluguéis (${reais(limite * base)}): a caução em dinheiro não pode passar de 3 meses de aluguel (Lei 8.245/91, art. 38, §2º) e pedir mais do que a lei permite é contravenção (art. 43, I).`);
+    } else if (dados.garantia_tipo === "Caução" && Number(dados.caucao_meses) > limite) {
+      out.push(`Caução de ${dados.caucao_meses} aluguéis, mais de ${limite}: a caução em dinheiro não pode passar de 3 meses de aluguel (Lei 8.245/91, art. 38, §2º).`);
+    }
+    if (dados.garantia_tipo === "Fiador + depósito" && r("aviso_fiador_deposito")) {
+      out.push('"Fiador + depósito": os tribunais costumam tratar o depósito em dinheiro como caução; aí são duas garantias, o que a Lei 8.245/91 proíbe (art. 37, parágrafo único): risco de ter de devolver o depósito e de contravenção (art. 43, II).');
+    }
+    return out;
+  }
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
       init_c6_comum();
       init_calculos();
       init_contratos();
+      init_config_regras();
       init_mapa_c6();
       init_modelos_contrato();
+      init_config_regras();
       TABELAS = {
         imoveis: "Imóvel",
         contratos: "Inquilino / contrato",
@@ -7920,6 +8561,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         pagamentos_banco: "Pagamento pelo banco",
         adiamentos_alerta: "Adiamento de alerta",
         acordos: "Acordo de dívida",
+        config_regras: "Regra do sistema",
+        versoes_regras: "Versão salva das regras",
         arquivos: "Arquivo",
         banco: "Banco de dados",
         listas: "Lista de opções"
@@ -7954,7 +8597,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       buscar = (d2, tabela, id) => d2[tabela].find((r) => r.id === Number(id));
       OCULTOS = /* @__PURE__ */ new Set(["senha_hash", "senha_sal", "senha_iteracoes", "sessoes"]);
       visivel = (obj) => Object.fromEntries(Object.entries(obj).filter(([k, v]) => !OCULTOS.has(k) && v !== null && v !== "" && v !== void 0));
-      SEM_DESFAZER = /* @__PURE__ */ new Set(["cobrancas", "faturas", "recebimentos", "avulsas", "usuarios", "banco", "listas", "fechamentos", "arquivos", "movimentacoes_banco", "pagamentos_banco", "acordos"]);
+      SEM_DESFAZER = /* @__PURE__ */ new Set(["cobrancas", "faturas", "recebimentos", "avulsas", "usuarios", "banco", "listas", "fechamentos", "arquivos", "movimentacoes_banco", "pagamentos_banco", "acordos", "config_regras", "versoes_regras"]);
       CAMPOS_SEM_DESFAZER = /* @__PURE__ */ new Set(["pasta"]);
       CAMPOS_PAGAMENTO_BANCO = { despesas: ["data_pagamento", "movimentacao_id", "pagamento_banco_id", "comprovante"], guias_impostos: ["paga_em", "movimentacao_id", "pagamento_banco_id"], iptus: ["pagas", "data_quitacao"] };
       textoComparar = (x) => x === void 0 || x === null ? "" : typeof x === "object" ? JSON.stringify(x) : String(x);
@@ -7976,6 +8619,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       trocaAtual = (d2, c) => (trocasGarantiaDo(d2, c.id)[0] || {}).id || null;
       depositosGarantiaDo = (d2, c, qual) => (d2.depositos_garantia || []).filter((x) => x.contrato_id === c.id && x.qual === qual && (x.troca_id || null) === trocaAtual(d2, c)).sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
       somaDepositos = (d2, c, qual) => depositosGarantiaDo(d2, c, qual).reduce((s, x) => s + x.valor, 0);
+      aluguelDaCaucao = (aluguel, c) => regra("caucao_base") === "cheio" ? aluguel : aluguel - descontoPorPercentual(aluguel, percentualBonificacao(c));
       ehComplementoCaucao = (cb) => cb.caucao_complemento > 0;
       boletoDoMes = (d2, contratoId, comp) => d2.cobrancas.find((x) => x.contrato_id === contratoId && x.competencia === comp && !ehBoletoAvulso(x)) || null;
       ehParcelaAcordo = (cb) => !!cb.acordo_parcela_de;
@@ -8113,7 +8757,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       fichaAberta = (d2, f) => f.situacao === "Em análise" || f.situacao === "Aprovada" && imoveisParaContrato(d2, f).length > 0;
       fichaAbertaDoImovel = (d2, imovelId, excetoId = null) => (d2.fichas || []).find((f) => f.id !== excetoId && fichaAberta(d2, f) && (f.imoveis_ids || []).includes(Number(imovelId))) || null;
       devolucaoPendente = (f) => f.situacao === "Reprovada" && f.reserva_valor > 0 && !f.devolucao_data;
-      dataApagarDocumentosFicha = (f) => f.situacao === "Reprovada" && f.decisao_data && !f.documentos_apagados_em ? somarMesesData(f.decisao_data, MESES_DOCUMENTOS_REPROVADA) : null;
+      dataApagarDocumentosFicha = (f) => f.situacao === "Reprovada" && f.decisao_data && !f.documentos_apagados_em ? somarMesesData(f.decisao_data, regra("meses_documentos_ficha")) : null;
       fichasComDocumentosVencidos = (d2, hoje3 = hojeIso()) => (d2.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje3);
       FICAM_SEM_O_CONTRATO = /* @__PURE__ */ new Set(["contratos", "faturas", "movimentacoes_banco", "pagamentos_banco"]);
       relogiosDoContrato = (c) => RELOGIOS.map(([k]) => k).filter((k) => c[`conta_${k}`] ? c[`conta_${k}`] !== SITUACOES[2] : k !== "gas");
@@ -8288,7 +8932,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         { dias: 10, passo: "Ligar para o inquilino" },
         { dias: 1, passo: "Mandar o lembrete por e-mail" }
       ];
-      passoDaRegua = (dias) => (REGUA_COBRANCA.find((x) => dias >= x.dias) || {}).passo || "";
+      reguaCobranca = () => [...regra("regua_cobranca")].sort((a, b) => b.dias - a.dias);
+      passoDaRegua = (dias) => (reguaCobranca().find((x) => dias >= x.dias) || {}).passo || "";
       parcelasDoAcordo = (d2, a) => d2.cobrancas.filter((cb) => cb.acordo_parcela_de === a.id).sort((x, y) => x.vencimento.localeCompare(y.vencimento) || x.id - y.id);
       origensDoAcordo = (d2, a) => d2.cobrancas.filter((cb) => cb.acordo_id === a.id).sort((x, y) => x.vencimento.localeCompare(y.vencimento));
       nomeNoAcordo = (cb) => ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ""}`.trim() : compBr(cb.competencia);
@@ -8340,6 +8985,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       DIAS_ADIAR_ALERTA = 7;
       DIAS_CUIDANDO_ALERTA = 1;
       chaveAlerta = (a) => [a.tipo, a.contrato_id || "", a.imovel_id || "", a.ancora || ""].join("|");
+      mudarRegraSistema = (d2, chave, valor, usuario) => salvarRegrasSistema(d2, { ...escolhasDe(d2), [chave]: valor }, usuario);
+      voltarRegrasAoPadrao = (d2, usuario) => salvarRegrasSistema(d2, {}, usuario, "Regras do sistema (volta ao padrão)");
     }
   });
 
@@ -9248,7 +9895,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { padrao: 1 }),
         secao("Garantia"),
         campo("garantia_tipo", "Tipo de garantia", "opcao", { obrig: true, opcoes: GARANTIAS }),
-        campo("caucao_meses", "Caução equivale a quantos aluguéis", "inteiro", { ...quando("garantia_tipo", "Caução"), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto")' }),
+        campo("caucao_meses", "Caução equivale a quantos aluguéis", "inteiro", { ...quando("garantia_tipo", "Caução"), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto"). Caução em dinheiro: no máximo 3 aluguéis (Lei 8.245/91, art. 38, §2º)' }),
         campo("caucao_valor", "Valor da caução", "dinheiro", { ...quando("garantia_tipo", "Caução"), autoMsg: true, ajuda: "Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor" }),
         campo("caucao_data", "Data prevista do depósito da caução", "data", { ...quando("garantia_tipo", "Caução"), ajuda: "Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino" }),
         campo("deposito_valor", "Valor do depósito de garantia", "dinheiro", { ...quando("garantia_tipo", "Depósito garantia", "Fiador + depósito"), autoMsg: true }),
@@ -9259,7 +9906,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("vigencia_inicio", "Data do contrato", "data", { obrig: true }),
         campo("data_entrada", "Data de vigência inicial", "data", { obrig: true }),
         campo("prazo_tipo", "Prazo", "opcao", { obrig: true, padrao: "Determinado", opcoes: ["Determinado", "Indeterminado"] }),
-        campo("prazo_meses", "Prazo do contrato (meses)", "inteiro", { ...quando("prazo_tipo", "Determinado"), ajuda: "Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia)" }),
+        campo("prazo_meses", "Prazo do contrato (meses)", "inteiro", { ...quando("prazo_tipo", "Determinado"), ajuda: "Ex.: 30 meses a partir de 05/09/2026 terminam em 05/03/2029 (mesmo dia). Residencial com menos de 30 meses: no fim o contrato se prorroga e o imóvel só volta nos casos da lei ou depois de 5 anos (Lei 8.245/91, arts. 46 e 47)" }),
         campo("renovacao_automatica", "Renovação automática", "simnao"),
         secao("Correção anual"),
         campo("indice_correcao", "Índice de correção previsto no contrato", "opcao", { lista: "indices", ajuda: 'Use "Editar lista" para incluir outro índice (ex.: IGP-M/IPCA, o maior dos dois, como prevê o contrato)' }),
@@ -9493,9 +10140,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function copiar(d2) {
     if (!d2 || typeof d2 !== "object" || !Array.isArray(d2.historico)) return structuredClone(d2);
     const { historico, ...resto } = d2;
-    const copia = structuredClone(resto);
+    const copia2 = structuredClone(resto);
     const c = {};
-    for (const k of Object.keys(d2)) c[k] = k === "historico" ? historico.slice() : copia[k];
+    for (const k of Object.keys(d2)) c[k] = k === "historico" ? historico.slice() : copia2[k];
     return c;
   }
   function diferencas(antes, depois) {
@@ -11661,6 +12308,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
 
 15. USUÁRIOS E SEGURANÇA
+- Regras do sistema (Dados e backup → Regras do sistema, só o administrador muda): reajuste, feriados da cidade, base da multa, proporcional, dia de gerar boletos, caução, valores que o Novo contrato traz, régua de cobrança e prazos. Cada regra mostra a explicação, a consequência e a lei; o sistema avisa quando a escolha tem risco legal, mas não proíbe. As regras deste texto são o padrão do sistema: valem enquanto nada for mudado, e dá para voltar a elas, a uma versão salva ou a um arquivo das regras.
 - Papéis: administrador (tudo, desfaz alterações de cadastro, backup seguro), operador (lança e edita) e consulta (só vê).
 - Senhas guardadas com PBKDF2-SHA256. Todas as alterações ficam no histórico.
 - Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).
@@ -12955,8 +13603,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const antes = arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
     const contratos = new Map(d().contratos.map((c) => [c.id, c]));
     const r = await alterar(fn);
-    const emUso = anexosEmUso();
-    const soltos = antes.filter((a) => a.pasta && !emUso.has(`${a.pasta}|${a.nome}`)).filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n).map((a) => escopoDoContrato(a.escopo) && !buscar2("contratos", a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a);
+    const emUso2 = anexosEmUso();
+    const soltos = antes.filter((a) => a.pasta && !emUso2.has(`${a.pasta}|${a.nome}`)).filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n).map((a) => escopoDoContrato(a.escopo) && !buscar2("contratos", a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a);
     await apagarAnexos(soltos, "Arquivo apagado junto com o lançamento");
     return r;
   }
@@ -12990,8 +13638,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const endereco2 = location.hash;
     const vencidos = podeUsuario("admin") ? contratosSemImovelVencidos(d()) : [];
     if (vencidos.length) {
-      await alterar((db) => vencidos.forEach((c) => excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${DIAS_SEM_IMOVEL} dias sem imóvel`)));
-      aviso(`Apagado(s) por ficar ${DIAS_SEM_IMOVEL} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(", ")}.`, "info");
+      await alterar((db) => vencidos.forEach((c) => excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${regra("dias_sem_imovel")} dias sem imóvel`)));
+      aviso(`Apagado(s) por ficar ${regra("dias_sem_imovel")} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(", ")}.`, "info");
     }
     let sem;
     try {
@@ -13081,10 +13729,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         f.id,
         { documentos_apagados_em: hojeIso(), analise_serasa: null },
         login(),
-        `Documentos da ficha reprovada apagados (${MESES_DOCUMENTOS_REPROVADA} meses depois da decisão)${apagados.length ? `: ${apagados.join(", ")}` : ""}`
+        `Documentos da ficha reprovada apagados (${regra("meses_documentos_ficha")} meses depois da decisão)${apagados.length ? `: ${apagados.join(", ")}` : ""}`
       ));
     }
-    if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${MESES_DOCUMENTOS_REPROVADA} meses: ${vencidas.map((f) => f.inquilino_nome).join(", ")}.`, "info");
+    if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${regra("meses_documentos_ficha")} meses: ${vencidas.map((f) => f.inquilino_nome).join(", ")}.`, "info");
   }
   var arquivosFaltando = [];
   var arquivoSumiu = (escopo, id, nome) => arquivosFaltando.some((a) => a.escopo === escopo && a.contrato_id === Number(id) && a.nome === nome);
@@ -13157,10 +13805,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     if (r.devolvidos.length) aviso(`${r.devolvidos.length} arquivo(s) estavam em outra pasta e voltaram ao lugar: ${r.devolvidos.map((a) => a.nome).join(", ")}.`, "info");
   }
   async function reconferirFaltando() {
-    const emUso = anexosEmUso();
+    const emUso2 = anexosEmUso();
     const ficam = [];
     for (const a of arquivosFaltando) {
-      if (!buscar2("contratos", a.contrato_id) || !emUso.has(`${chavePasta(a.escopo, a.contrato_id)}|${a.nome}`)) continue;
+      if (!buscar2("contratos", a.contrato_id) || !emUso2.has(`${chavePasta(a.escopo, a.contrato_id)}|${a.nome}`)) continue;
       try {
         await (await pastaDoEscopo(a.escopo, a.contrato_id, false)).getFileHandle(a.nome);
       } catch {
@@ -13770,6 +14418,7 @@ ${xref}
   // docs/js/conciliacao.js
   init_c6_comum();
   init_calculos();
+  init_config_regras();
   init_regras();
   var CLASSIFICACOES = {
     conta_imovel: "Conta do imóvel (água, luz, gás, condomínio, internet, outra)",
@@ -14076,7 +14725,6 @@ ${xref}
   var nomePadraoComprovante = (d2, mov2) => nomeComprovante(d2, mov2);
   var emAberto = (cb) => !cb.data_pagamento && cb.situacao !== "Carência" && cb.situacao !== "Em acordo";
   var semDigitos = (t) => maiusculaSemAcento(t).replace(/\d+/g, "").replace(/\s+/g, " ").trim();
-  var DIAS_ANTECIPACAO = 45;
   var ligavel = (cb, movId = null) => !!cb.data_pagamento && (!cb.movimentacao_id || cb.movimentacao_id === movId);
   var pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) => x && x >= de && x <= ate);
   function casarBoletos(d2, valor, data2, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null } = {}) {
@@ -14095,7 +14743,7 @@ ${xref}
     const pagosNaData = pagos.filter((cb) => pagoEntre(cb, data2 < credito ? data2 : credito, data2 > credito ? data2 : credito));
     if (pagosNaData.length) return marcarProvaveis(pagosNaData.map(jaPago));
     const lista3 = [];
-    const limite = somarDias(data2, DIAS_ANTECIPACAO);
+    const limite = somarDias(data2, regra("dias_antecipacao_banco"));
     for (const cb of abertos) {
       if (cb.vencimento > limite) continue;
       const pontual = totais(cb).a_pagar_pontual;
@@ -15852,14 +16500,14 @@ Salvar assim mesmo?`)) {
       throw new Error("Nada foi salvo. Corrija o que precisar e salve de novo.");
     }
   }
-  var DIAS_FUTURO = 60;
-  var FORA_DO_PADRAO = 0.3;
+  var diasFuturo = () => regra("dias_futuro");
+  var foraDoPadrao = () => regra("fora_do_padrao") / 100;
   function conferirContrato(dados, r, q) {
     const out = [];
     const imovelId = r ? r.imovel_id : Number(dados.imovel_id || q.vincular || q.imovel) || null;
     const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id)).sort((a, b) => String(b.data_entrada || "").localeCompare(String(a.data_entrada || "")))[0] : null;
     const base = r ? r.aluguel_inicial : anterior ? aluguelAtual(d(), anterior) : null;
-    if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > FORA_DO_PADRAO && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
+    if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > foraDoPadrao() && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
       const p2 = Math.round((dados.aluguel_inicial - base) / base * 100);
       out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p2)}% ${p2 > 0 ? "acima" : "abaixo"} ${r ? "do valor anterior" : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
     }
@@ -15867,7 +16515,8 @@ Salvar assim mesmo?`)) {
       const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== dados.contrato_anterior_id && x.data_entrada && x.data_entrada < dados.data_entrada && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
       if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : " (sem data de saída)"}.`);
     }
-    if (dados.data_entrada && dados.data_entrada > somarDias(hojeIso(), DIAS_FUTURO)) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${DIAS_FUTURO} dias no futuro.`);
+    if (dados.data_entrada && dados.data_entrada > somarDias(hojeIso(), diasFuturo())) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${diasFuturo()} dias no futuro.`);
+    out.push(...avisosLegaisDoContrato(dados));
     if (!r && imovelId && dados.gerar_nf !== false && !participacoesDo(d(), imovelId).length) {
       out.push(`O imóvel ${(buscar2("imoveis", imovelId) || {}).nome || ""} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
     }
@@ -15889,10 +16538,10 @@ Salvar assim mesmo?`)) {
     }
     return out;
   }
-  var DIAS_PASSADO = 90;
-  var dataMuitoAntiga = (data2, rotulo = "A data") => data2 && data2 < somarDias(hojeIso(), -DIAS_PASSADO) ? `${rotulo} (${dataBr(data2)}) é de mais de ${DIAS_PASSADO} dias atrás. Confira o ano.` : "";
+  var diasPassado = () => regra("dias_passado");
+  var dataMuitoAntiga = (data2, rotulo = "A data") => data2 && data2 < somarDias(hojeIso(), -diasPassado()) ? `${rotulo} (${dataBr(data2)}) é de mais de ${diasPassado()} dias atrás. Confira o ano.` : "";
   var dataNoFuturo = (data2, rotulo = "A data") => data2 && data2 > hojeIso() ? `${rotulo} (${dataBr(data2)}) está no futuro.` : "";
-  var diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > FORA_DO_PADRAO;
+  var diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > foraDoPadrao();
   var pctDif = (novo, base) => {
     const p2 = Math.round((novo - base) / base * 100);
     return `${Math.abs(p2)}% ${p2 > 0 ? "acima" : "abaixo"}`;
@@ -16267,10 +16916,11 @@ Salvar assim mesmo?`)) {
       if (valor.readOnly || !novo && valor.value.trim() !== "") return;
       const n = Number(meses.value);
       const bonif = form.querySelector("[name=bonificacao]");
-      const base = bonif && bonif.checked ? cent((form.querySelector("[name=aluguel_bonificado]") || {}).value) : cent(form.querySelector("[name=aluguel_inicial]").value);
+      const comBonif = bonif && bonif.checked && regra("caucao_base") !== "cheio";
+      const base = comBonif ? cent((form.querySelector("[name=aluguel_bonificado]") || {}).value) : cent(form.querySelector("[name=aluguel_inicial]").value);
       if (!(n > 0) || !Number.isFinite(base)) return;
       valor.value = dinheiroTexto(n * base);
-      mensagemAuto(valor, `${n} × ${reais(base)} (aluguel ${bonif && bonif.checked ? "com bonificação" : "cheio"})`);
+      mensagemAuto(valor, `${n} × ${reais(base)} (aluguel ${comBonif ? "com bonificação" : "cheio"})`);
     };
     meses.addEventListener("input", calcular);
     for (const n of ["aluguel_inicial", "aluguel_bonificado", "desconto_pontualidade_percentual"]) {
@@ -17399,7 +18049,7 @@ Salvar assim mesmo?`)) {
       // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
       // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
       // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
-      padrao: (q) => ({ ...q.pessoa ? dadosDaPessoa(buscar2("contratos", q.pessoa)) : {}, ...fichaDoNovoContrato(q) ? dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}, ...q.imovel ? { imovel_id: Number(q.imovel) } : {} }),
+      padrao: (q) => ({ ...padroesNovoContrato(), ...q.pessoa ? dadosDaPessoa(buscar2("contratos", q.pessoa)) : {}, ...fichaDoNovoContrato(q) ? dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}, ...q.imovel ? { imovel_id: Number(q.imovel) } : {} }),
       compacto: true,
       valores: (r) => ({
         ...r,
@@ -18513,8 +19163,8 @@ Salvar assim mesmo?`)) {
   }
   async function versaoDoSistema() {
     const fmt = (dt) => dt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-    const emUso = new Date(document.lastModified);
-    if (location.protocol === "file:" || Number.isNaN(emUso.getTime())) return `versão PC${window.VERSAO_OFFLINE ? ` de ${dataBr(window.VERSAO_OFFLINE)}` : ""}`;
+    const emUso2 = new Date(document.lastModified);
+    if (location.protocol === "file:" || Number.isNaN(emUso2.getTime())) return `versão PC${window.VERSAO_OFFLINE ? ` de ${dataBr(window.VERSAO_OFFLINE)}` : ""}`;
     let publicada = null;
     try {
       const r = await fetch("index.html", { method: "HEAD", cache: "no-store", credentials: "include" });
@@ -18522,8 +19172,8 @@ Salvar assim mesmo?`)) {
       if (lm) publicada = new Date(lm);
     } catch {
     }
-    const nova = publicada && publicada.getTime() - emUso.getTime() > 6e4;
-    return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
+    const nova = publicada && publicada.getTime() - emUso2.getTime() > 6e4;
+    return `${fmt(emUso2)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
   }
   function lembreteZipNuvem() {
     const ultimo = d().historico.filter((h) => h.acao === "Exportação" && /ZIP/.test(h.descricao || "")).at(-1);
@@ -18541,7 +19191,7 @@ Salvar assim mesmo?`)) {
       modeloProprio = true;
     } catch {
     }
-    return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link("#/empresas", "Empresas", "botao secundario")}${link("#/historico", "Histórico de alterações", "botao secundario")}</div></div>
+    return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link("#/empresas", "Empresas", "botao secundario")}${link("#/regras", "Regras do sistema", "botao secundario")}${link("#/historico", "Histórico de alterações", "botao secundario")}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(", ")}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ""}
     <div class="cartao"><div class="grade">
       ${item("Pasta dos dados", E.nuvem ? "na nuvem (Cloudflare)" : esc(E.pasta.name))}${item("Banco criado em", dataHoraBr(d().criado_em))}
@@ -18566,7 +19216,7 @@ Salvar assim mesmo?`)) {
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao("exportar", "Baixar ZIP com todos os dados", {}, "") : ""}
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao("exportarPlanilhaPdf", "Baixar todos os dados em planilha e PDF", {}, "secundario") : ""}
-      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto.</p>
+      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link("#/regras", "Regras do sistema")}.</p>
       ${botao("baixarRegras", "Baixar regras do sistema (TXT)", {}, "secundario")}</div>
     ${podeUsuario("admin") && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${PASTA_BACKUPS}.</div>
@@ -19761,7 +20411,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function caixaBoleto(cb) {
     const b = dadosBoleto(d(), cb);
-    const linha = (rotulo, valor, copia = valor) => `<tr><td class="suave">${rotulo}</td><td><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: copia })}</td></tr>`;
+    const linha = (rotulo, valor, copia2 = valor) => `<tr><td class="suave">${rotulo}</td><td><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: copia2 })}</td></tr>`;
     const num = (c) => reais(c, false);
     return `<div class="cartao boleto"><h2>Dados para emitir o boleto no banco</h2>
     <table>${linha("Pagador", `${b.pagador}${b.documento_pagador ? ` · ${b.documento_pagador}` : ""}`, b.pagador)}
@@ -19892,7 +20542,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }).join("");
     const decisao = f.situacao === "Em análise" ? "" : `<p>${esc(f.situacao)} em <b>${dataBr(f.decisao_data)}</b>${f.decisao_por ? ` por ${esc(f.decisao_por)}` : ""}${f.decisao_motivo ? `: ${esc(f.decisao_motivo)}` : ""}</p>`;
     const devolucao = f.situacao !== "Reprovada" || !(f.reserva_valor > 0) ? "" : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, "comprovante da devolução") : etiqueta("sem comprovante da devolução", "aviso")}</p>` : `<div class="alerta aviso"><b>Devolver a reserva de ${reais(f.reserva_valor)}.</b> Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
-    const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), "")}.</p>` : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${MESES_DOCUMENTOS_REPROVADA} meses depois da reprovação). Ficaram só os comprovantes da reserva e da devolução.</p>` : "";
+    const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), "")}.</p>` : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${regra("meses_documentos_ficha")} meses depois da reprovação). Ficaram só os comprovantes da reserva e da devolução.</p>` : "";
     return `<p class="suave"><a href="#/inquilinos?ir=fichas">← Inquilinos</a></p>
     <div class="cabecalho"><h1>Ficha em análise: ${esc(f.inquilino_nome)}</h1><div class="acoes">
       ${opera() ? link(`#/editar/fichas/${f.id}`, "Editar") : ""}
@@ -19903,7 +20553,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${link(`#/editar/fichas/${f.id}`, "Reprovar (com o motivo)", "botao perigo pequeno")}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ""}
       ${devolucao}
-      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${MESES_DOCUMENTOS_REPROVADA} meses depois da reprovação).</p>` : ""}</div>
+      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${regra("meses_documentos_ficha")} meses depois da reprovação).</p>` : ""}</div>
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === "Todos juntos" ? "todos juntos" : "apenas um dos imóveis")}</b>.` : ""}</p>
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
@@ -20178,7 +20828,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${e.chave === "contas" && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar2("imoveis", id).nome)}`, "botao secundario pequeno")).join(" ")}</div>` : ""}</div>
         <div class="acoes">${link(e.link, "Abrir", "botao pequeno")}
           ${opera() ? e.marcado ? botao("etapaFechamento", "Desmarcar", { mes, etapa: e.chave, feito: "" }, "link-botao") : !e.feito ? botao("etapaFechamento", "Marcar como feito", { mes, etapa: e.chave, feito: "1" }, "secundario pequeno") : "" : ""}</div></div></li>`).join("")}</ol>
-    <p class="suave">A partir do dia ${DIA_GERAR_BOLETOS} geram-se os boletos de ${compBr(mes)} (mês de uso), que vencem em ${compBr(somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${DIA_GERAR_BOLETOS} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
+    <p class="suave">A partir do dia ${regra("dia_gerar_boletos")} geram-se os boletos de ${compBr(mes)} (mês de uso), que vencem em ${compBr(somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${regra("dia_gerar_boletos")} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
   }
   function cadastrosIncompletos() {
     const hoje3 = hojeIso();
@@ -20278,7 +20928,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${ehParcelaAcordo(b.cobranca) ? esc(`acordo ${b.cobranca.acordo_parcela || ""}`.trim()) : compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join("<br>")}</td>
         <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td>
         <td>${esc(x.passo)}${opera() ? `<br>${botao("lembrete", "Cobrar", { id: x.boletos[0].cobranca.id }, "secundario pequeno")} ${x.boletos.some((b) => !ehComplementoCaucao(b.cobranca)) ? botao("fazerAcordo", "Fazer acordo", { contrato: x.contrato.id }, "secundario pequeno") : ""}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
-      <p class="suave">Mais de ${DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${REGUA_COBRANCA.slice().reverse().map((p2) => `${p2.dias} dia(s) de atraso: ${p2.passo.toLocaleLowerCase("pt-BR")}`).join("; ")}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
+      <p class="suave">Mais de ${DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${reguaCobranca().reverse().map((p2) => `${p2.dias} dia(s) de atraso: ${p2.passo.toLocaleLowerCase("pt-BR")}`).join("; ")}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
     ${caixaAcordos(hoje3)}
     <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
       ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
@@ -20287,7 +20937,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function mesComContas(imovelId) {
     const atual = competenciaDe(hojeIso());
-    for (let k = 0; k <= MESES_DEPOIS_DE_ALUGAR; k += 1) {
+    for (let k = 0; k <= regra("meses_depois_de_alugar"); k += 1) {
       const m = somarMeses(atual, -k);
       if (contasPermitidas(d(), imovelId, m).tipos.length) return m;
     }
@@ -20324,7 +20974,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <h1>Contas pagas por nós · ${esc(i.nome)}</h1>
     <div class="alerta ${permitidas.motivo === "alugou" ? "aviso" : "info"}">${{
       vago: `<b>Imóvel vago em ${compBr(comp)}:</b> as contas são nossas.`,
-      alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : "")} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ""}): até ${MESES_DEPOIS_DE_ALUGAR} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
+      alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : "")} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ""}): até ${regra("meses_depois_de_alugar")} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
       incluso: `<b>Pelo contrato do inquilino</b>, estas contas estão incluídas no aluguel e são nossas: ${esc(permitidas.tipos.join(", "))}.`,
       inquilino: `<b>Em ${compBr(comp)}, pelo contrato, o inquilino paga as contas.</b> Lance aqui só o que for nosso (ex.: débito antigo, troca de titular).`
     }[permitidas.motivo]}
@@ -20881,6 +21531,200 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     async esquecerNaoEnviado(ds) {
       if (!await janela({ titulo: "Esquecer este anexo?", html: "<p>O arquivo some deste aparelho e não está na nuvem.</p>", sim: "Esquecer", forte: true })) return;
       await E.anexos.esquecerNaoEnviado(ds.id);
+      await mostrar();
+    }
+  };
+
+  // docs/js/telas/regras-sistema.js
+  init_calculos();
+  init_calculos();
+  init_config_regras();
+  init_formularios();
+  init_formularios();
+  init_regras();
+  var feriadoTela = (x) => x.length === 5 ? `${x.slice(3)}/${x.slice(0, 2)}` : dataBr(x);
+  function valorRegraTexto(def, v) {
+    switch (def.tipo) {
+      case "opcao":
+        return (def.opcoes.find(([x]) => x === v) || [, String(v)])[1].replace(/ \(padrão do sistema\)$/, "");
+      case "simnao":
+        return v ? "Sim" : "Não";
+      case "pct":
+        return v === null ? "em branco" : pct(v);
+      case "dinheiro":
+        return v === null ? "em branco" : reais(v);
+      case "inteiro":
+        return v === null ? "em branco" : String(v);
+      case "indice":
+        return v || "em branco (escolher em cada contrato)";
+      case "feriados":
+        return v.length ? v.map(feriadoTela).join(", ") : "nenhum";
+      case "regua":
+        return v.map((p2) => `${p2.dias} dia(s): ${p2.passo}`).join("; ");
+      default:
+        return String(v ?? "");
+    }
+  }
+  function campoRegra(def, v, admin) {
+    const nome = `r_${def.chave}`;
+    const des = admin ? "" : " disabled";
+    switch (def.tipo) {
+      case "opcao":
+        return def.opcoes.map(([x, rotulo, explica]) => `<label class="opcao-regra"><input type="radio" name="${nome}" value="${esc(x)}"${x === v ? " checked" : ""}${des}>
+      <span><b>${esc(rotulo)}</b>${explica ? `<br><span class="suave">${esc(explica)}</span>` : ""}</span></label>`).join("");
+      case "simnao":
+        return `<select name="${nome}"${des}><option value="sim"${v ? " selected" : ""}>Sim</option><option value="nao"${v ? "" : " selected"}>Não</option></select>`;
+      case "pct":
+        return `<input name="${nome}" value="${v === null ? "" : esc(pctTexto(v))}" inputmode="decimal" style="width:120px"${des}> %`;
+      case "dinheiro":
+        return `R$ <input name="${nome}" value="${v === null ? "" : esc(dinheiroTexto(v))}" inputmode="decimal" style="width:140px"${des}>`;
+      case "inteiro":
+        return `<input name="${nome}" value="${v === null ? "" : v}" inputmode="numeric" style="width:120px"${des}>`;
+      case "indice": {
+        const lista3 = [...new Set(["", ...d().listas && d().listas.indices || [], v].filter((x) => x !== void 0))];
+        return `<select name="${nome}"${des}>${lista3.map((x) => `<option value="${esc(x)}"${x === v ? " selected" : ""}>${x ? esc(x) : "Escolher em cada contrato"}</option>`).join("")}</select>`;
+      }
+      case "feriados":
+        return `<textarea name="${nome}" rows="3" placeholder="20/01&#10;15/06/2028"${des}>${esc(v.map(feriadoTela).join("\n"))}</textarea>`;
+      case "regua":
+        return `<textarea name="${nome}" rows="4"${des}>${esc(v.map((p2) => `${p2.dias}: ${p2.passo}`).join("\n"))}</textarea>`;
+      default:
+        return "";
+    }
+  }
+  function blocoRegra(def, regras, admin) {
+    const v = regras[def.chave];
+    const mudada = !mesmoValor(v, def.padrao);
+    return `<div class="regra-sistema" id="regra-${def.chave}">
+    <h3>${esc(def.rotulo)} ${mudada ? etiqueta("mudada", "aviso") : etiqueta("padrão do sistema", "neutra")}</h3>
+    <p>${esc(def.explica)}</p>
+    <div class="campo-regra">${campoRegra(def, v, admin)}</div>
+    <p class="suave"><b>Consequência:</b> ${esc(def.consequencia)}</p>
+    <p class="suave"><b>Lei:</b> ${esc(def.lei)}</p>
+    ${mudada ? `<p class="suave">Padrão do sistema: <b>${esc(valorRegraTexto(def, def.padrao))}</b>.</p>` : ""}</div>`;
+  }
+  function telaRegras() {
+    const admin = podeUsuario("admin");
+    const regras = regrasDe(d());
+    const mudadas = DEFINICOES_REGRAS.filter((x) => !mesmoValor(regras[x.chave], x.padrao));
+    const versoes = [...d().versoes_regras || []].sort((a, b) => String(b.salvo_em).localeCompare(String(a.salvo_em)));
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Regras do sistema</h1>
+    <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.
+      ${mudadas.length ? `<br>Hoje <b>${mudadas.length} regra(s)</b> diferente(s) do padrão: ${mudadas.map((x) => esc(x.rotulo)).join("; ")}.` : "<br>Hoje todas as regras estão no padrão do sistema."}</div>
+    ${admin ? "" : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
+    <div class="cartao"><h2>Guardar e recuperar as regras</h2>
+      <p>Salve uma versão antes de mudar: se algo der errado, volte a ela. O arquivo das regras guarda todas as regras em uso, para levar a outro sistema ou guardar fora.</p>
+      ${admin ? `<form data-form="salvarVersaoRegras" class="acoes"><input name="nome" placeholder="Ex.: Regras de novembro de 2026" style="max-width:320px"><button class="secundario">Salvar versão das regras</button></form>` : ""}
+      ${versoes.length ? `<table><tr><th>Versão</th><th>Salva em</th><th>Por</th><th></th></tr>${versoes.map((v) => `<tr><td><b>${esc(v.nome)}</b></td><td>${dataHoraBr(v.salvo_em)}</td><td>${esc(v.salvo_por || "-")}</td>
+        <td class="n">${admin ? `${botao("restaurarVersaoRegras", "Voltar a esta versão", { id: v.id }, "secundario pequeno", `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}
+        ${botao("excluirVersaoRegras", "Excluir", { id: v.id }, "perigo pequeno", `Excluir a versão "${v.nome}"? As regras em uso não mudam.`)}` : ""}</td></tr>`).join("")}</table>` : '<p class="suave">Nenhuma versão salva.</p>'}
+      <p class="acoes">${botao("baixarArquivoRegras", "Baixar arquivo das regras", {}, "secundario pequeno")}
+        ${admin ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
+        ${botao("voltarRegrasPadrao", "Voltar tudo ao padrão do sistema", {}, "perigo pequeno", "Voltar todas as regras ao padrão do sistema? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).")}` : ""}</p></div>
+    <form data-form="regrasSistema">
+      ${GRUPOS_REGRAS.map(([g, titulo2]) => `<div class="cartao"><h2>${esc(titulo2)}</h2>
+        ${DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join("")}</div>`).join("")}
+      ${admin ? '<p class="acoes"><button>Salvar as regras</button></p>' : ""}
+    </form>`;
+  }
+  function feriadoDigitado(t) {
+    const m = String(t).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+    if (!m) throw new ErroUsuario(`Feriado "${t}": escreva o dia e o mês (20/01) ou a data completa (15/06/2028).`);
+    const dm = `${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return m[3] ? `${m[3]}-${dm}` : dm;
+  }
+  function lerFormularioRegras(dados) {
+    const out = {};
+    const numero2 = (t) => {
+      const s = String(t ?? "").trim();
+      return s === "" ? null : Number(s.replace(/\./g, "").replace(",", "."));
+    };
+    for (const def of DEFINICOES_REGRAS) {
+      const nome = `r_${def.chave}`;
+      if (!(nome in dados)) continue;
+      const t = dados[nome];
+      switch (def.tipo) {
+        case "simnao":
+          out[def.chave] = t === "sim";
+          break;
+        case "pct": {
+          const s = String(t ?? "").trim();
+          out[def.chave] = s === "" ? null : Number(s.replace(",", "."));
+          break;
+        }
+        case "dinheiro":
+          out[def.chave] = String(t ?? "").trim() === "" ? null : centavos(t);
+          break;
+        case "inteiro":
+          out[def.chave] = numero2(t);
+          break;
+        case "feriados":
+          out[def.chave] = String(t || "").split(/[\n;,]+/).map((x) => x.trim()).filter(Boolean).map(feriadoDigitado);
+          break;
+        case "regua":
+          out[def.chave] = String(t || "").split("\n").map((x) => x.trim()).filter(Boolean).map((linha) => {
+            const m = linha.match(/^(\d+)\s*(?:dias?)?\s*[:\-–]\s*(.+)$/i);
+            if (!m) throw new ErroUsuario(`Régua de cobrança: escreva "dias: o que fazer" em cada linha (ex.: "10: Ligar para o inquilino"). Linha: "${linha}"`);
+            return { dias: Number(m[1]), passo: m[2].trim() };
+          });
+          break;
+        default:
+          out[def.chave] = t;
+      }
+    }
+    return out;
+  }
+  var soAdmin = () => {
+    if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador muda as regras do sistema.");
+  };
+  var FORMULARIOS_REGRAS = {
+    async regrasSistema(form) {
+      soAdmin();
+      const valores = lerFormularioRegras(Object.fromEntries(new FormData(form)));
+      for (const [k, v] of Object.entries(valores)) valores[k] = limparValorRegra(k, v);
+      const n = await alterar((db) => salvarRegrasSistema(db, valores, login()));
+      aviso(n ? `Regras salvas (${n} mudança(s)).` : "Nada mudou nas regras.", n ? "ok" : "info");
+      await mostrar();
+    },
+    async salvarVersaoRegras(form) {
+      soAdmin();
+      const nome = new FormData(form).get("nome");
+      await alterar((db) => salvarVersaoRegras(db, nome, login()));
+      aviso("Versão das regras salva.", "ok");
+      await mostrar();
+    }
+  };
+  var ACOES_REGRAS = {
+    async restaurarVersaoRegras({ id }) {
+      soAdmin();
+      const n = await alterar((db) => restaurarVersaoRegras(db, id, login()));
+      aviso(`Regras da versão de volta (${n} mudança(s)).`, "ok");
+      await mostrar();
+    },
+    async excluirVersaoRegras({ id }) {
+      soAdmin();
+      await alterar((db) => excluir(db, "versoes_regras", Number(id), login(), "Versão das regras excluída"));
+      await mostrar();
+    },
+    async voltarRegrasPadrao() {
+      soAdmin();
+      const n = await alterar((db) => voltarRegrasAoPadrao(db, login()));
+      aviso(n ? "Todas as regras voltaram ao padrão do sistema." : "As regras já estavam no padrão do sistema.", "ok");
+      await mostrar();
+    },
+    baixarArquivoRegras() {
+      const texto3 = JSON.stringify(arquivoDasRegras(d(), login()), null, 2);
+      baixar(new Blob([texto3], { type: "application/json" }), `Regras do sistema ${hojeIso()}.json`);
+    },
+    async carregarArquivoRegras(_dados, input) {
+      soAdmin();
+      const arquivo = input.files && input.files[0];
+      input.value = "";
+      if (!arquivo) return;
+      const valores = lerArquivoDasRegras(await arquivo.text());
+      if (!confirm("Trocar as regras de agora pelas do arquivo? (Salve uma versão antes, se quiser guardar as de agora.)")) return;
+      const n = await alterar((db) => salvarRegrasSistema(db, valores, login(), "Regras do sistema (arquivo carregado)"));
+      aviso(`Regras do arquivo carregadas (${n} mudança(s)).`, "ok");
       await mostrar();
     }
   };
@@ -21688,7 +22532,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
     /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
     async limparAnexosSoltos() {
       if (!podeUsuario("admin")) throw new Error("Só o administrador apaga arquivos sem lançamento.");
-      const emUso = anexosEmUso();
+      const emUso2 = anexosEmUso();
       const vistas = /* @__PURE__ */ new Set();
       const soltos = [];
       for (const c of d().contratos) {
@@ -21704,7 +22548,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           }
           for (const a of await listar(dir)) {
             if (escopo === "contrato" && !/^(comprovante-|vistoria-(entrada|saida)-)/i.test(a.nome)) continue;
-            if (!emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo, id: c.id, nome: a.nome, quem: c.inquilino_nome });
+            if (!emUso2.has(`${pasta}|${a.nome}`)) soltos.push({ escopo, id: c.id, nome: a.nome, quem: c.inquilino_nome });
           }
         }
       }
@@ -21718,7 +22562,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         } catch {
           continue;
         }
-        for (const a of await listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: "seguro", id: c.id, nome: a.nome, quem: c.inquilino_nome });
+        for (const a of await listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso2.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: "seguro", id: c.id, nome: a.nome, quem: c.inquilino_nome });
       }
       if (!soltos.length) {
         aviso("Nenhum arquivo sobrando: todos os anexos têm lançamento.", "info");
@@ -22929,7 +23773,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await mostrar();
     }
   };
-  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE);
+  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS);
 
   // docs/js/telas/envios.js
   var REGISTRO_EXCLUIDO = "Este registro foi excluído por outra pessoa; nada foi salvo.";
@@ -23548,7 +24392,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await mostrar();
     }
   };
-  Object.assign(FORMULARIOS, FORMULARIOS_BANCO);
+  Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS);
   async function confirmarPagamentoBoleto(id, f) {
     const data2 = String(f.get("data") || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
@@ -23923,6 +24767,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     pendencias: () => telaPendencias(),
     "modelo-contrato": (rota) => telaModelo(rota),
     empresas: () => telaEmpresas(),
+    regras: () => telaRegras(),
     inquilinos: (rota) => telaInquilinos(rota.q),
     ficha: (rota) => telaFicha(Number(rota.partes[1])),
     buscar: (rota) => telaBusca(rota.q),
@@ -24067,14 +24912,14 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       E.d = disco;
       if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || "outra pessoa"} e recarregados antes de gravar.`, "info");
     }
-    const copia = copiar(E.d || disco);
-    const resultado = fn(copia);
-    copia.revisao = (copia.revisao || 0) + 1;
-    copia.revisao_so_sessao = soSessao ? copia.revisao : null;
-    await gravarBanco(E.pasta, copia);
-    E.d = copia;
+    const copia2 = copiar(E.d || disco);
+    const resultado = fn(copia2);
+    copia2.revisao = (copia2.revisao || 0) + 1;
+    copia2.revisao_so_sessao = soSessao ? copia2.revisao : null;
+    await gravarBanco(E.pasta, copia2);
+    E.d = copia2;
     espelharSeguro();
-    backupDoDia(copia);
+    backupDoDia(copia2);
     atualizarFaixa();
     return resultado;
   }

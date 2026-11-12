@@ -419,8 +419,8 @@ export async function limparSemImovel() {
   const endereco = location.hash;
   const vencidos = podeUsuario('admin') ? R.contratosSemImovelVencidos(d()) : [];
   if (vencidos.length) {
-    await alterar((db) => vencidos.forEach((c) => R.excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel`)));
-    aviso(`Apagado(s) por ficar ${R.DIAS_SEM_IMOVEL} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(', ')}.`, 'info');
+    await alterar((db) => vencidos.forEach((c) => R.excluirContrato(db, c.id, login(), `${c.inquilino_nome}: apagado por ficar ${R.regra('dias_sem_imovel')} dias sem imóvel`)));
+    aviso(`Apagado(s) por ficar ${R.regra('dias_sem_imovel')} dias sem imóvel: ${vencidos.map((c) => c.inquilino_nome).join(', ')}.`, 'info');
   }
   let sem;
   try { sem = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_SEM_IMOVEL], false); } catch { return; }
@@ -502,9 +502,9 @@ export async function apagarDocumentosVencidosDasFichas() {
     const apagados = [];
     if (dir) for (const a of await S.listar(dir)) if (!ficam.has(a.nome)) { try { await dir.removeEntry(a.nome); apagados.push(a.nome); } catch { /* tenta de novo amanhã */ } }
     await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso(), analise_serasa: null }, login(),
-      `Documentos da ficha reprovada apagados (${R.MESES_DOCUMENTOS_REPROVADA} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`));
+      `Documentos da ficha reprovada apagados (${R.regra('meses_documentos_ficha')} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`));
   }
-  if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${R.MESES_DOCUMENTOS_REPROVADA} meses: ${vencidas.map((f) => f.inquilino_nome).join(', ')}.`, 'info');
+  if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${R.regra('meses_documentos_ficha')} meses: ${vencidas.map((f) => f.inquilino_nome).join(', ')}.`, 'info');
 }
 
 /** Arquivos ligados a lançamentos que não estão na pasta (conferirArquivos): { contrato_id, nome, rotulo, ancora }. */

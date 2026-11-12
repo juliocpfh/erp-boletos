@@ -192,7 +192,7 @@ export async function telaDados() {
     await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
     modeloProprio = true;
   } catch { /* usa o modelo padrão */ }
-  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
+  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', dataHoraBr(d().criado_em))}
@@ -217,7 +217,7 @@ export async function telaDados() {
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', {}, '') : ''}
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', {}, 'secundario') : ''}
-      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto.</p>
+      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link('#/regras', 'Regras do sistema')}.</p>
       ${botao('baixarRegras', 'Baixar regras do sistema (TXT)', {}, 'secundario')}</div>
     ${podeUsuario('admin') && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>

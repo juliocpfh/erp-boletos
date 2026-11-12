@@ -4,6 +4,7 @@ import * as alertas from './alertas.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
 import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
+import * as CR from './config-regras.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
 
@@ -17,7 +18,7 @@ export const TABELAS = {
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
-  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', acordos: 'Acordo de dívida', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', acordos: 'Acordo de dívida', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -70,6 +71,7 @@ export function bancoVazio() {
 export function normalizar(d) {
   const vazio = bancoVazio();
   for (const [k, v] of Object.entries(vazio)) if (d[k] === undefined) d[k] = v;
+  CR.usarRegras(d); // regras escolhidas pelo administrador (as contas abaixo já usam)
   for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d.listas[k])) d.listas[k] = [...l.padrao];
   // integração com o banco (C6, boleto com Pix): configuração com todos os campos e cada boleto com o campo ``banco`` (nulo = não emitido)
   d.config_banco = { ...CONFIG_BANCO_PADRAO, ...(d.config_banco && typeof d.config_banco === 'object' ? d.config_banco : {}) };
@@ -234,8 +236,7 @@ export function contratoDoSeguro(d, s) {
 export function completarCaucao(c) {
   if (!c.caucao_data) c.caucao_data = c.vigencia_inicio || c.data_entrada || null;
   if (!(c.caucao_valor > 0) && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
-    const a = c.aluguel_inicial;
-    c.caucao_valor = c.caucao_meses * (a - C.descontoPorPercentual(a, percentualBonificacao(c)));
+    c.caucao_valor = c.caucao_meses * aluguelDaCaucao(c.aluguel_inicial, c);
   }
   return c;
 }
@@ -369,7 +370,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos']);
+const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 /** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
 const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };
@@ -619,11 +620,16 @@ function completarPorDepositos(d, c, qual, usuario) {
   return true;
 }
 
-/** Caução sugerida: número de aluguéis × aluguel atual com bonificação. */
+/**
+ * Aluguel que entra na conta da caução (regra `caucao_base`): com bonificação (padrão; sem bonificação, o cheio) ou sempre o cheio.
+ * Ex.: R$ 2.000,00 com 10% → R$ 1.800,00 (padrão) ou R$ 2.000,00.
+ */
+export const aluguelDaCaucao = (aluguel, c) => (CR.regra('caucao_base') === 'cheio' ? aluguel : aluguel - C.descontoPorPercentual(aluguel, percentualBonificacao(c)));
+
+/** Caução sugerida: número de aluguéis × aluguel atual com bonificação (ou cheio, pela regra `caucao_base`). */
 export function caucaoSugerida(d, c, dataRef = C.hojeIso()) {
   if (!(c.caucao_meses > 0)) return null;
-  const aluguel = aluguelAtual(d, c, dataRef);
-  return c.caucao_meses * (aluguel - C.descontoPorPercentual(aluguel, percentualBonificacao(c)));
+  return c.caucao_meses * aluguelDaCaucao(aluguelAtual(d, c, dataRef), c);
 }
 
 /** Boleto à parte só com o complemento da caução: sem tarifa, sem NF, sem multa e juros, não é o boleto do aluguel do mês. */
@@ -645,6 +651,7 @@ export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência'
  * o complemento a depositar e o boleto do complemento ainda não pago. Null quando não há correção pendente.
  */
 export function complementoCaucao(d, c) {
+  if (!CR.regra('caucao_acompanha')) return null; // regra do administrador: a caução fica com o valor do início
   // troca de titular com data futura: até o dia, a caução depositada está no contrato anterior (a correção do aluguel já é do novo)
   const g = herancaAgendada(d, c) && !garantiaNova(c) ? contratoHerdado(d, c) : c;
   if (!temCaucao(g) || !g.caucao_valor || !garantiaDepositada(g)) return null;
@@ -1985,7 +1992,7 @@ export const DIAS_SEM_IMOVEL = 7;
 
 /** Data em que o contrato sem imóvel será apagado (ex.: sem imóvel desde 10/10 → apagado em 17/10), ou null. */
 export function dataApagarSemImovel(c) {
-  return !c.imovel_id && c.sem_imovel_desde ? C.somarDias(c.sem_imovel_desde, DIAS_SEM_IMOVEL) : null;
+  return !c.imovel_id && c.sem_imovel_desde ? C.somarDias(c.sem_imovel_desde, CR.regra('dias_sem_imovel')) : null;
 }
 
 /** Contratos sem imóvel há 7 dias ou mais e sem boleto: são apagados ao abrir o sistema. */
@@ -2033,7 +2040,7 @@ export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas |
 export const devolucaoPendente = (f) => f.situacao === 'Reprovada' && f.reserva_valor > 0 && !f.devolucao_data;
 
 /** Data em que os documentos da ficha reprovada são apagados (3 meses depois da decisão), ou null. */
-export const dataApagarDocumentosFicha = (f) => (f.situacao === 'Reprovada' && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, MESES_DOCUMENTOS_REPROVADA) : null);
+export const dataApagarDocumentosFicha = (f) => (f.situacao === 'Reprovada' && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
 
 /** Fichas reprovadas com os documentos para apagar hoje. */
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
@@ -3775,7 +3782,7 @@ export function dadosBoleto(d, cb) {
     vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
     valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
     // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
-    multa_valor: cb.fci ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
+    multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
   };
 }
@@ -4002,7 +4009,8 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   // calcula. Quem paga atrasado perde o desconto (não é multa). Com FCI, multa e juros não incidem sobre o FCI: vão em valor (R$) e por dia.
   if (centavosParaReais(b.valor) > L.valor_maximo_reais) throw new Error(`O banco não emite boleto acima de R$ ${L.valor_maximo_reais.toLocaleString('pt-BR')}.`);
   const fees = {};
-  if (cb.fci) {
+  // base da multa diferente do valor do boleto (FCI, ou regra `base_multa` = só o aluguel): multa e juros em reais
+  if (cb.fci || b.multa_valor !== null) {
     if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
     if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
   } else {
@@ -4341,7 +4349,7 @@ export function situacaoCustos(d, imovelId, hoje = C.hojeIso()) {
   const airbnb = p.motivo === 'vago' || contasPermitidas(d, imovelId, C.somarMeses(comp, -1)).motivo === 'vago';
   if (p.motivo === 'vago') return { motivo: 'vago', rotulo: 'vago', classe: 'ok', airbnb };
   if (p.motivo === 'alugou') {
-    const ate = C.limitesCompetencia(C.somarMeses(C.competenciaDe(p.contrato.data_entrada), MESES_DEPOIS_DE_ALUGAR))[1];
+    const ate = C.limitesCompetencia(C.somarMeses(C.competenciaDe(p.contrato.data_entrada), CR.regra('meses_depois_de_alugar')))[1];
     return { motivo: 'alugou', rotulo: `alugado em ${C.dataBr(p.contrato.data_entrada)}: veja se ficou conta nossa pendente (aviso até ${C.dataBr(ate)})`, classe: 'aviso', airbnb, ate };
   }
   if (p.motivo === 'incluso') return { motivo: 'incluso', rotulo: `${p.tipos.join(', ')}: incluso no contrato (nosso)`, classe: 'info', airbnb };
@@ -4496,7 +4504,7 @@ const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'G�
 export function contasPermitidas(d, imovelId, comp) {
   const [ini, fim] = C.limitesCompetencia(comp);
   if (vagoNoPeriodo(d, imovelId, ini, fim)) return { tipos: [...TIPOS_DESPESA], motivo: 'vago' };
-  const limite = C.limitesCompetencia(C.somarMeses(comp, -MESES_DEPOIS_DE_ALUGAR))[0];
+  const limite = C.limitesCompetencia(C.somarMeses(comp, -CR.regra('meses_depois_de_alugar')))[0];
   const recente = d.contratos.find((c) => c.imovel_id === imovelId && c.data_entrada && c.data_entrada >= limite && c.data_entrada <= fim
     && !ocupadoEm(d, imovelId, C.somarDias(c.data_entrada, -1)));
   if (recente) return { tipos: [...TIPOS_DESPESA], motivo: 'alugou', contrato: recente };
@@ -4618,7 +4626,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
   // ganhos do Airbnb lançados sem a NF do mês (ou com a soma mudada): conta como 1 pendência da etapa das NFs
   const airPendente = air.total > 0 && !air.numerada && (!air.nf || air.divergente) ? 1 : 0;
   const nfs = (pendentes || pendentesDeFatura(d)).filter((x) => String(x.data).slice(0, 7) <= mes).length + airPendente;
-  const dia20 = `${mes}-${String(DIA_GERAR_BOLETOS).padStart(2, '0')}`;
+  const dia20 = `${mes}-${String(CR.regra('dia_gerar_boletos')).padStart(2, '0')}`;
   // basta uma conta lançada no imóvel (do mês, ou paga no mês): nem todo imóvel tem todas as contas
   const lancou = (i) => d.despesas.some((x) => x.imovel_id === i.id && (x.competencia === mes || String(x.data_pagamento || '').slice(0, 7) === mes));
   const comConta = d.imoveis.filter((i) => contasPermitidas(d, i.id, mes).tipos.length);
@@ -4634,13 +4642,13 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
       const b = pendenciasBancoDoMes(d, mes, hoje);
       // mês já fechado: o extrato precisa chegar ao fim do mês; mês corrente: basta ter sido buscado nos últimos dias
       const buscado = (x) => (!x.importadoAte ? 'extrato ainda não buscado' : b.mesFechado ? `extrato buscado só até ${C.dataBr(x.importadoAte)}, falta até o fim do mês`
-        : `extrato buscado em ${C.dataBr(x.importadoAte)}, há mais de ${DIAS_EXTRATO_RECENTE} dias: busque de novo`);
+        : `extrato buscado em ${C.dataBr(x.importadoAte)}, há mais de ${CR.regra('dias_extrato_recente')} dias: busque de novo`);
       return { chave: 'banco', titulo: `Conferir o extrato de ${C.compBr(mes)} das contas (${b.porConta.map((x) => x.apelido).join(' e ') || 'banco'}) e dar destino às movimentações`,
         pendentes: b.semDestino + b.contasSemImportar.length, link: `#/banco?mes=${mes}`, contas: b.porConta,
         // comprovantes não baixados e pagamentos pelo banco sem resposta são só aviso: não seguram a etapa
         detalhe: b.porConta.length ? b.porConta.map((x) => `${x.apelido}: ${x.semImportar ? buscado(x) : x.semDestino ? `${x.semDestino} sem destino` : 'tudo com destino'}`).join(' · ')
           + (b.semComprovante ? ` · ${b.semComprovante} comprovante(s) não baixado(s)` : '') + (b.pagamentosPendentes ? ` · ${b.pagamentosPendentes} pagamento(s) pelo banco sem confirmação` : '')
-          + (b.mesFechado ? '' : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${DIAS_EXTRATO_RECENTE} dias e tudo com destino)`) : 'nenhuma conta configurada' };
+          + (b.mesFechado ? '' : ` (no mês corrente, a etapa fica feita com o extrato buscado nos últimos ${CR.regra('dias_extrato_recente')} dias e tudo com destino)`) : 'nenhuma conta configurada' };
     })()] : []),
     { chave: 'nfs', titulo: `Lançar as NFs avulsas e do Airbnb de ${C.compBr(mes)} e numerar as NFs de ${C.compBr(mes)}, a partir de ${C.dataBr(`${seguinte}-01`)} (depois da virada do mês)`,
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
@@ -4800,7 +4808,9 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
  */
 export function mesDeAniversario(c) {
   const base = dataBaseCorrecao(c);
-  return base ? base.slice(0, 7) : null;
+  if (!base) return null;
+  // regra do administrador (`reajuste_inicio`): entrada depois do dia 1º → o 1º mês é o seguinte (nunca menos de 1 ano)
+  return CR.regra('reajuste_inicio') === 'mes_seguinte' && base.slice(8, 10) !== '01' ? C.somarMeses(base.slice(0, 7), 1) : base.slice(0, 7);
 }
 
 /** Competência (aluguel de) do n-ésimo reajuste: o 13º mês, o 25º... */
@@ -5107,7 +5117,9 @@ export const REGUA_COBRANCA = [
   { dias: 10, passo: 'Ligar para o inquilino' },
   { dias: 1, passo: 'Mandar o lembrete por e-mail' },
 ];
-export const passoDaRegua = (dias) => (REGUA_COBRANCA.find((x) => dias >= x.dias) || {}).passo || '';
+/** Régua em uso (regra `regua_cobranca`; padrão = REGUA_COBRANCA), do passo de mais dias para o de menos. */
+export const reguaCobranca = () => [...CR.regra('regua_cobranca')].sort((a, b) => b.dias - a.dias);
+export const passoDaRegua = (dias) => (reguaCobranca().find((x) => dias >= x.dias) || {}).passo || '';
 
 // --------------------------------------------------------------------------
 // Acordo de dívida (rotina D8): boletos vencidos viram boletos novos; não existe "baixar como perda"
@@ -5503,7 +5515,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
   const contas = cfg.contas || [];
   const fim = C.limitesCompetencia(mes)[1];
   const mesFechado = fim < hoje;
-  const ate = mesFechado ? fim : C.somarDias(hoje, -DIAS_EXTRATO_RECENTE);
+  const ate = mesFechado ? fim : C.somarDias(hoje, -CR.regra('dias_extrato_recente'));
   const movs = (d.movimentacoes_banco || []).filter((m) => String(m.data).slice(0, 7) === mes);
   const semDestinoDe = (id) => movs.filter((m) => m.conta_id === id && !m.classificacao).length;
   const porConta = contas.map((c) => {
@@ -5522,7 +5534,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
 export function alertaBanco(d, hoje = C.hojeIso()) {
   const cfg = d.config_banco || {};
   if (!cfg.ativo) return null;
-  const limite = C.somarDias(hoje, -DIAS_ALERTA_BANCO);
+  const limite = C.somarDias(hoje, -CR.regra('dias_alerta_banco'));
   const semDestino = (d.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
   const semComprovante = (d.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== 'ignorar' && !m.comprovante && !m.comprovante_contador && m.data <= limite);
   const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
@@ -5530,7 +5542,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
   if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length) return null;
   const partes = [];
-  if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${DIAS_ALERTA_BANCO} dias`);
+  if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${CR.regra('dias_alerta_banco')} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
@@ -5785,4 +5797,94 @@ export function declaracaoAnual(d, contratoId, ano) {
     g.total += f.valor;
   }
   return { contrato: c, imovel: buscar(d, 'imoveis', c.imovel_id), ano: Number(ano), empresas: [...porEmpresa.values()].sort((a, b) => a.emitente.nome.localeCompare(b.emitente.nome, 'pt-BR')), total: nfs.reduce((s, f) => s + f.valor, 0) };
+}
+
+// --------------------------------------------------------------------------
+// Regras do sistema escolhidas pelo administrador (definições e padrão em config-regras.js; tela em Dados e backup → Regras)
+// --------------------------------------------------------------------------
+export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS } from './config-regras.js';
+
+/**
+ * Grava as regras ``valores`` ({ chave: valor }; o que faltar volta ao padrão do sistema): uma linha em ``config_regras`` por
+ * regra diferente do padrão, pelo histórico. Devolve quantas regras mudaram. Ex.: { multa_padrao: 2 } (o padrão) apaga a linha.
+ */
+export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sistema') {
+  const limpos = {};
+  for (const [k, v] of Object.entries(valores || {})) if (CR.definicaoRegra(k)) limpos[k] = CR.limparValorRegra(k, v);
+  let mudou = 0;
+  for (const def of CR.DEFINICOES_REGRAS) {
+    const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
+    const linha = d.config_regras.find((r) => r.chave === def.chave);
+    const padrao = CR.mesmoValor(novo, def.padrao);
+    if (linha && padrao) { excluir(d, 'config_regras', linha.id, usuario, `${motivo}: ${def.rotulo} volta ao padrão do sistema`); mudou += 1; }
+    else if (linha && !CR.mesmoValor(linha.valor, novo)) { atualizar(d, 'config_regras', linha.id, { valor: novo }, usuario, `${motivo}: ${def.rotulo}`); mudou += 1; }
+    else if (!linha && !padrao) { inserir(d, 'config_regras', { chave: def.chave, valor: novo }, usuario, `${motivo}: ${def.rotulo}`); mudou += 1; }
+  }
+  CR.usarRegras(d);
+  return mudou;
+}
+
+/** Muda uma regra só, mantendo as outras como estão. */
+export const mudarRegraSistema = (d, chave, valor, usuario) => salvarRegrasSistema(d, { ...CR.escolhasDe(d), [chave]: valor }, usuario);
+
+/** Volta todas as regras ao padrão do sistema (as regras do dono, no código). */
+export const voltarRegrasAoPadrao = (d, usuario) => salvarRegrasSistema(d, {}, usuario, 'Regras do sistema (volta ao padrão)');
+
+/** Guarda uma cópia das regras em uso com um nome (ex.: "Regras de nov/2026"), para voltar a ela depois. */
+export function salvarVersaoRegras(d, nome, usuario) {
+  const n = String(nome || '').trim().slice(0, 80);
+  if (!n) throw new C.ErroUsuario('Dê um nome à versão das regras (ex.: "Regras de novembro de 2026").');
+  return inserir(d, 'versoes_regras', { nome: n, salvo_em: new Date().toISOString(), salvo_por: usuario || '', valores: CR.regrasDe(d) }, usuario, `Versão das regras salva: ${n}`);
+}
+
+/** Volta às regras de uma versão salva (regra criada depois da versão fica no padrão do sistema). */
+export function restaurarVersaoRegras(d, id, usuario) {
+  const v = d.versoes_regras.find((x) => x.id === Number(id));
+  if (!v) throw new C.ErroUsuario('Versão das regras não encontrada.');
+  const valores = {};
+  for (const [k, x] of Object.entries(v.valores || {})) if (CR.definicaoRegra(k)) { try { valores[k] = CR.limparValorRegra(k, x); } catch { /* fica o padrão */ } }
+  return salvarRegrasSistema(d, valores, usuario, `Regras do sistema (volta à versão "${v.nome}")`);
+}
+
+/** Valores que o Novo contrato traz preenchidos pelas regras (a ficha e a pessoa escolhida vêm por cima). */
+export function padroesNovoContrato() {
+  const r = (k) => CR.regra(k);
+  const out = { multa_percentual: r('multa_padrao'), juros_mensal_percentual: r('juros_padrao'), bonificacao: r('bonificacao_padrao'),
+    cobranca_mes_seguinte: r('mes_seguinte_padrao'), conta_iptu: r('conta_iptu_padrao'), conta_seguro: r('conta_seguro_padrao') };
+  if (r('bonificacao_percentual_padrao') !== null && r('bonificacao_padrao')) out.desconto_pontualidade_percentual = r('bonificacao_percentual_padrao');
+  if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
+  if (r('fci_percentual_padrao') !== null) { out.fci_percentual = r('fci_percentual_padrao'); if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao'); }
+  if (r('indice_padrao')) out.indice_correcao = r('indice_padrao');
+  if (r('prazo_residencial_padrao') !== null) out.prazo_meses = r('prazo_residencial_padrao');
+  return out;
+}
+
+/**
+ * Avisos das regras ao salvar o contrato (só avisam: quem confirma, salva). Ex.: residencial de 24 meses, bonificação de 15%,
+ * caução de 4 aluguéis, "Fiador + depósito".
+ */
+export function avisosLegaisDoContrato(dados) {
+  const out = [];
+  const r = (k) => CR.regra(k);
+  const residencial = (dados.finalidade || 'Residencial') === 'Residencial';
+  if (residencial && dados.prazo_tipo !== 'Indeterminado' && dados.prazo_meses > 0 && dados.prazo_meses < 30) {
+    out.push(`Contrato residencial de ${dados.prazo_meses} meses: com menos de 30 meses, no fim o contrato se prorroga e o imóvel só pode ser pedido de volta nos casos da lei ou depois de 5 anos (Lei 8.245/91, arts. 46 e 47).`);
+  }
+  const bon = dados.bonificacao === false ? 0 : Number(dados.desconto_pontualidade_percentual) || 0;
+  if (bon > r('bonificacao_limite_aviso')) out.push(`Bonificação de ${C.pct(bon)}, acima de ${C.pct(r('bonificacao_limite_aviso'))}: quanto maior o desconto, maior o risco de um juiz tratar a perda dele como uma segunda multa e reduzir a cobrança (Código Civil, art. 413).`);
+  if (Number(dados.multa_percentual) > 10) out.push(`Multa por atraso de ${C.pct(dados.multa_percentual)}: acima de 10% o juiz costuma reduzir (Lei de Usura, art. 9º; Código Civil, art. 413).`);
+  if (Number(dados.juros_mensal_percentual) > 1) out.push(`Juros de ${C.pct(dados.juros_mensal_percentual)} ao mês: com pessoa física, acima de 1% ao mês pode ser reduzido (Código Civil, art. 406; Lei de Usura, art. 1º).`);
+  const aluguel = Number(dados.aluguel_inicial) || 0;
+  const garantia = dados.garantia_tipo === 'Caução' ? Number(dados.caucao_valor) || 0 : ['Depósito garantia', 'Fiador + depósito'].includes(dados.garantia_tipo) ? Number(dados.deposito_valor) || 0 : 0;
+  const limite = r('caucao_limite_aviso');
+  if (aluguel > 0 && garantia > 0) {
+    const base = aluguelDaCaucao(aluguel, { bonificacao: dados.bonificacao, desconto_pontualidade_percentual: dados.desconto_pontualidade_percentual });
+    if (garantia > limite * base) out.push(`${dados.garantia_tipo === 'Caução' ? 'Caução' : 'Depósito de garantia'} de ${C.reais(garantia)}, mais de ${limite} aluguéis (${C.reais(limite * base)}): a caução em dinheiro não pode passar de 3 meses de aluguel (Lei 8.245/91, art. 38, §2º) e pedir mais do que a lei permite é contravenção (art. 43, I).`);
+  } else if (dados.garantia_tipo === 'Caução' && Number(dados.caucao_meses) > limite) {
+    out.push(`Caução de ${dados.caucao_meses} aluguéis, mais de ${limite}: a caução em dinheiro não pode passar de 3 meses de aluguel (Lei 8.245/91, art. 38, §2º).`);
+  }
+  if (dados.garantia_tipo === 'Fiador + depósito' && r('aviso_fiador_deposito')) {
+    out.push('"Fiador + depósito": os tribunais costumam tratar o depósito em dinheiro como caução; aí são duas garantias, o que a Lei 8.245/91 proíbe (art. 37, parágrafo único): risco de ter de devolver o depósito e de contravenção (art. 43, II).');
+  }
+  return out;
 }

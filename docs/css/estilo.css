@@ -633,3 +633,11 @@ body.com-visualizador { overflow: hidden; }
 .icone-controles { flex-wrap: wrap; }
 .icone-controles input[type=range] { width: 140px; max-width: 45vw; }
 .primeira-logo .acoes { display: flex; }
+/* Regras do sistema (#/regras) */
+.regra-sistema { border-top: 1px solid var(--borda); padding: 12px 0 4px; }
+.regra-sistema:first-of-type { border-top: 0; }
+.regra-sistema h3 { margin: 0 0 4px; font-size: 15px; }
+.regra-sistema p { margin: 4px 0; }
+.campo-regra { margin: 8px 0; }
+.opcao-regra { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; font-weight: normal; }
+.opcao-regra input { margin-top: 4px; }

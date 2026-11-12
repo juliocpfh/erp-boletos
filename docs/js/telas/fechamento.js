@@ -24,7 +24,7 @@ export function telaFechamento(mes) {
         ${e.chave === 'contas' && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar('imoveis', id).nome)}`, 'botao secundario pequeno')).join(' ')}</div>` : ''}</div>
         <div class="acoes">${link(e.link, 'Abrir', 'botao pequeno')}
           ${opera() ? (e.marcado ? botao('etapaFechamento', 'Desmarcar', { mes, etapa: e.chave, feito: '' }, 'link-botao') : !e.feito ? botao('etapaFechamento', 'Marcar como feito', { mes, etapa: e.chave, feito: '1' }, 'secundario pequeno') : '') : ''}</div></div></li>`).join('')}</ol>
-    <p class="suave">A partir do dia ${R.DIA_GERAR_BOLETOS} geram-se os boletos de ${compBr(mes)} (mês de uso), que vencem em ${compBr(C.somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(C.somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${R.DIA_GERAR_BOLETOS} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
+    <p class="suave">A partir do dia ${R.regra('dia_gerar_boletos')} geram-se os boletos de ${compBr(mes)} (mês de uso), que vencem em ${compBr(C.somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(C.somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${R.regra('dia_gerar_boletos')} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
 }
 
 /** O que falta nos cadastros para o contrato, a vistoria e a NF saírem completos. */
