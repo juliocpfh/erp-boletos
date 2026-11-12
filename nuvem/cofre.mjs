@@ -35,7 +35,7 @@ const NIVEL = { consulta: 1, operador: 2, admin: 3 };
 export const SO_ADMIN = {
   raiz: ['config_banco', 'logo', 'ordem_caixas', 'ressarcimento_abate_nf', 'estilos_alertas'],
   excluir: ['imoveis', 'contratos', 'encerramentos', 'vistorias', 'modelos_contrato', 'faturas'],
-  tabela: ['emitentes'],
+  tabela: ['emitentes', 'config_regras', 'versoes_regras'],
 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
 /** Tabelas que existem sempre (mesmo antes do primeiro registro): uma mudança "raiz" com esse nome trocaria a tabela inteira. */

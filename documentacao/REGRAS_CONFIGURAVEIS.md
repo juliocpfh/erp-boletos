@@ -2,7 +2,9 @@
 
 Objetivo: para vender o sistema a outros locadores, as regras hoje fixas no código viram opções escolhidas pelo
 administrador. **O padrão de cada opção é o comportamento de hoje**: nada muda nos dados até alguém escolher outra coisa.
-Nada foi programado ainda; o dono aprova item a item (coluna "Aprovado?").
+**Estado (2026-11-12): aprovado e programado** (tela Dados e backup → Regras do sistema, `config-regras.js`). O dono aprovou tudo
+com as explicações e com edição; B4 só avisa (não bloqueia). Ficaram fixos, com o motivo em `DECISOES.md`: A7 (prorrogação; só os
+feriados da cidade são configuráveis, A8), A13 (boleto do C6), B1, B3 e B7. B2 e C3–C6 ficam com outras sessões.
 
 Legenda: **[S]** = seleção (lista de opções), **[C]** = campo aberto (número/texto), **[E]** = já existe por contrato
 (a configuração passa a ser só o valor que vem preenchido no "Novo contrato").

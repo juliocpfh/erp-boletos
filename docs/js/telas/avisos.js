@@ -14,9 +14,9 @@ export function confirmarAvisos(avisos) {
   }
 }
 
-const DIAS_FUTURO = 60;
-
-const FORA_DO_PADRAO = 0.3;
+// números dos avisos: regras do sistema (Dados e backup → Regras), padrão 60 dias, 30% e 90 dias
+const diasFuturo = () => R.regra('dias_futuro');
+const foraDoPadrao = () => R.regra('fora_do_padrao') / 100;
 
 /** Avisos do cadastro do inquilino: aluguel muito diferente do anterior, imóvel ainda ocupado, entrada muito no futuro. */
 export function conferirContrato(dados, r, q) {
@@ -25,7 +25,7 @@ export function conferirContrato(dados, r, q) {
   const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id))
     .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] : null;
   const base = r ? r.aluguel_inicial : anterior ? R.aluguelAtual(d(), anterior) : null;
-  if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > FORA_DO_PADRAO && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
+  if (base && dados.aluguel_inicial && Math.abs(dados.aluguel_inicial - base) / base > foraDoPadrao() && (!r || dados.aluguel_inicial !== r.aluguel_inicial)) {
     const p = Math.round(((dados.aluguel_inicial - base) / base) * 100);
     out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
   }
@@ -34,7 +34,8 @@ export function conferirContrato(dados, r, q) {
       && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
     if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
   }
-  if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), DIAS_FUTURO)) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${DIAS_FUTURO} dias no futuro.`);
+  if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), diasFuturo())) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${diasFuturo()} dias no futuro.`);
+  out.push(...R.avisosLegaisDoContrato(dados)); // prazo, bonificação, multa, juros, caução e garantia, com o artigo da lei
   // inquilino novo que emite NF num imóvel ainda sem empresa emitente: lembrar agora (sem isso a NF não é numerada)
   if (!r && imovelId && dados.gerar_nf !== false && !R.participacoesDo(d(), imovelId).length) {
     out.push(`O imóvel ${(buscar('imoveis', imovelId) || {}).nome || ''} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
@@ -61,13 +62,13 @@ export function conferirBoleto(dados, r) {
 }
 
 /** Pagamento com data muito para trás costuma ser ano digitado errado (ex.: 2025 em vez de 2026). */
-const DIAS_PASSADO = 90;
+const diasPassado = () => R.regra('dias_passado');
 
-export const dataMuitoAntiga = (data, rotulo = 'A data') => (data && data < C.somarDias(C.hojeIso(), -DIAS_PASSADO) ? `${rotulo} (${dataBr(data)}) é de mais de ${DIAS_PASSADO} dias atrás. Confira o ano.` : '');
+export const dataMuitoAntiga = (data, rotulo = 'A data') => (data && data < C.somarDias(C.hojeIso(), -diasPassado()) ? `${rotulo} (${dataBr(data)}) é de mais de ${diasPassado()} dias atrás. Confira o ano.` : '');
 
 export const dataNoFuturo = (data, rotulo = 'A data') => (data && data > C.hojeIso() ? `${rotulo} (${dataBr(data)}) está no futuro.` : '');
 
-const diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > FORA_DO_PADRAO;
+const diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > foraDoPadrao();
 
 const pctDif = (novo, base) => { const p = Math.round(((novo - base) / base) * 100); return `${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'}`; };
 

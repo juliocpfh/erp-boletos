@@ -3,6 +3,7 @@
 // Os dados chegam no formato EXATO do C6 (saldo-extrato.yaml, bolepix.yaml, agendamento-de-pagamentos.yaml).
 import * as K from './c6-comum.js';
 import * as C from './calculos.js';
+import { regra } from './config-regras.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
@@ -328,7 +329,7 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   const pagosNaData = pagos.filter((cb) => pagoEntre(cb, data < credito ? data : credito, data > credito ? data : credito));
   if (pagosNaData.length) return marcarProvaveis(pagosNaData.map(jaPago));
   const lista = [];
-  const limite = C.somarDias(data, DIAS_ANTECIPACAO);
+  const limite = C.somarDias(data, regra('dias_antecipacao_banco'));
   for (const cb of abertos) {
     if (cb.vencimento > limite) continue;
     const pontual = totais(cb).a_pagar_pontual;

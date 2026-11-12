@@ -37,7 +37,7 @@ export function telaInadimplencia() {
         <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td>
         <td>${esc(x.passo)}${opera() ? `<br>${botao('lembrete', 'Cobrar', { id: x.boletos[0].cobranca.id }, 'secundario pequeno')} ${x.boletos.some((b) => !R.ehComplementoCaucao(b.cobranca)) ? botao('fazerAcordo', 'Fazer acordo', { contrato: x.contrato.id }, 'secundario pequeno') : ''}` : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
-      <p class="suave">Mais de ${R.DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${R.REGUA_COBRANCA.slice().reverse().map((p) => `${p.dias} dia(s) de atraso: ${p.passo.toLocaleLowerCase('pt-BR')}`).join('; ')}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
+      <p class="suave">Mais de ${R.DIAS_VERMELHO} dias em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${R.reguaCobranca().reverse().map((p) => `${p.dias} dia(s) de atraso: ${p.passo.toLocaleLowerCase('pt-BR')}`).join('; ')}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
     ${caixaAcordos(hoje)}
     <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
       ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
@@ -50,7 +50,7 @@ export function telaInadimplencia() {
 /** Mês sugerido para lançar contas: o atual, ou o mais recente (até 2 meses atrás) que tenha conta nossa. */
 function mesComContas(imovelId) {
   const atual = C.competenciaDe(C.hojeIso());
-  for (let k = 0; k <= R.MESES_DEPOIS_DE_ALUGAR; k += 1) {
+  for (let k = 0; k <= R.regra('meses_depois_de_alugar'); k += 1) {
     const m = C.somarMeses(atual, -k);
     if (R.contasPermitidas(d(), imovelId, m).tipos.length) return m;
   }
@@ -90,7 +90,7 @@ export function telaContas(rota) {
     <h1>Contas pagas por nós · ${esc(i.nome)}</h1>
     <div class="alerta ${permitidas.motivo === 'alugou' ? 'aviso' : 'info'}">${{
     vago: `<b>Imóvel vago em ${compBr(comp)}:</b> as contas são nossas.`,
-    alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : '')} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ''}): até ${R.MESES_DEPOIS_DE_ALUGAR} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
+    alugou: `<b>Alugado há pouco</b> (entrada de ${esc(permitidas.contrato ? permitidas.contrato.inquilino_nome : '')} em ${permitidas.contrato ? dataBr(permitidas.contrato.data_entrada) : ''}): até ${R.regra('meses_depois_de_alugar')} meses depois de alugar, dá para lançar as contas do período vago que chegam atrasadas.`,
     incluso: `<b>Pelo contrato do inquilino</b>, estas contas estão incluídas no aluguel e são nossas: ${esc(permitidas.tipos.join(', '))}.`,
     inquilino: `<b>Em ${compBr(comp)}, pelo contrato, o inquilino paga as contas.</b> Lance aqui só o que for nosso (ex.: débito antigo, troca de titular).`,
   }[permitidas.motivo]}

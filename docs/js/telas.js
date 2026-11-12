@@ -27,6 +27,7 @@ import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquid
 import { telaImovel } from './telas/imovel.js';
 import { telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
+import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 
 // --------------------------------------------------------------------------
@@ -366,6 +367,7 @@ export const TELAS = {
   pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
+  regras: () => telaRegras(),
   inquilinos: (rota) => telaInquilinos(rota.q),
   ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),

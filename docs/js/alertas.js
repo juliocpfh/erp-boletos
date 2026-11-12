@@ -1,5 +1,6 @@
 // Alertas do painel: seguro, reserva e fim de vigência (o do reajuste fica em regras.js).
 import { compBr, competenciaDe, dataBr, diasEntre, reais, somarAnos, somarDias, somarMeses } from './calculos.js';
+import { regra } from './config-regras.js';
 
 export const ANTECEDENCIA_SEGURO = 60;
 export const ANTECEDENCIA_VIGENCIA = 60;
@@ -25,7 +26,7 @@ export function alertaSeguro(inicio, hoje, seguros) {
   if (faltam < 0) {
     return { nivel: 'perigo', tipo: 'Seguro obrigatório', texto: `Seguro vencido em ${dataBr(fim)}. Renove a apólice.` };
   }
-  if (faltam <= ANTECEDENCIA_SEGURO) {
+  if (faltam <= regra('antecedencia_seguro')) {
     return { nivel: 'aviso', tipo: 'Seguro obrigatório',
       texto: `Seguro vence em ${dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação.` };
   }
@@ -38,7 +39,7 @@ export function alertaSeguro(inicio, hoje, seguros) {
   }
   if (inicio) {
     const [, proximo] = aniversarios(inicio, hoje);
-    if (diasEntre(hoje, proximo) <= ANTECEDENCIA_SEGURO && fim <= somarDias(proximo, 15)) {
+    if (diasEntre(hoje, proximo) <= regra('antecedencia_seguro') && fim <= somarDias(proximo, 15)) {
       return { nivel: 'aviso', tipo: 'Seguro obrigatório',
         texto: `Aniversário do contrato em ${dataBr(proximo)}: confira a renovação do seguro.` };
     }
@@ -65,7 +66,7 @@ export function alertaVigencia(vigenciaFim, hoje) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
       texto: `Vigência terminou em ${dataBr(vigenciaFim)}. Registre a renovação (nova data ou prazo indeterminado, com o novo valor negociado) ou a saída.` };
   }
-  if (faltam <= ANTECEDENCIA_VIGENCIA) {
+  if (faltam <= regra('antecedencia_vigencia')) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
       texto: `Vigência termina em ${dataBr(vigenciaFim)} (faltam ${faltam} dias). Hora de negociar a renovação e o novo valor.` };
   }
