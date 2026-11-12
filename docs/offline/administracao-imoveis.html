@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-kmktVtJsX1TDnNLHV+N88cgqwEvgQO0whTlNtdQtP80=' 'sha256-O8PFh63oLFkliyiFB3SLi71Cr6Dxr+P6jqbouDcqe2A='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-kmktVtJsX1TDnNLHV+N88cgqwEvgQO0whTlNtdQtP80=' 'sha256-83AegcBvW32IO6vj1Tn4A1NuionnSto0UW85mZuX4io='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="544ec43add771327">
+<meta name="fontes" content="9413569cf1c2768a">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2299,9 +2299,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   });
 
   // docs/js/modelos-contrato.js
-  var PARTES, ITENS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, RESTITUICAO, MULTA, RESCISAO, GARANTIA, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, GARANTIA_NOVA_TROCA, ADITIVO_TROCA, MODELOS_PADRAO;
+  function atualizarTextoModelo(texto3) {
+    let t = String(texto3 || "").replace(/\r\n/g, "\n");
+    for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
+    return t;
+  }
+  var VISTORIA_ENTRADA, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, RESTITUICAO, MULTA, RESCISAO, GARANTIA, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, GARANTIA_NOVA_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
+      VISTORIA_ENTRADA = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada feito e assinado pelas partes nessa data, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.
+
+**Parágrafo único** – O LOCATÁRIO terá 10 (dez) dias corridos, contados da entrega das chaves, para comunicar por escrito, por e-mail, defeitos ou divergências não descritos na vistoria de entrada. Passado esse prazo sem comunicação, a vistoria de entrada vale como aceita, ressalvados os vícios ocultos.`;
+      SEM_AVISO = "Caso não proceda desta forma, pagará a quantia correspondente a 1 (um) mês de aluguel e encargos vigentes na data da desocupação, nos termos do art. 6º, parágrafo único, da Lei nº 8.245/91.";
+      REPRESENTACAO = `[se representacao]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS E PRESTADORES DE SERVIÇO: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante {representacao}, no início e ao fim da locação, para solicitar a alteração de titularidade das contas, pedidos de ligação nova e de instalação de relógio, leitura final, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]`;
+      LGPD = `**CLÁUSULA #** – DOS DADOS PESSOAIS: os dados pessoais do LOCATÁRIO[se fiador], {f:do FIADOR|dos FIADORES}[fim][se solidario], do LOCATÁRIO SOLIDÁRIO[fim] e de seus representantes são tratados {l:pela LOCADORA|pelas LOCADORAS} conforme a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados), somente para a análise cadastral, a celebração e a execução deste contrato, a cobrança, a proteção do crédito e o cumprimento de obrigações legais e fiscais, podendo ser compartilhados, na medida do necessário, com instituições financeiras, seguradoras, contador, órgãos de proteção ao crédito, concessionárias de serviços, condomínio e autoridades. Os dados e documentos serão guardados pelo prazo exigido em lei e para a defesa em eventual processo, e depois eliminados. O titular pode pedir acesso, correção e informações sobre o tratamento pelo e-mail da administradora.`;
       PARTES = `**#i. {l:LOCADORA|LOCADORAS}:** {locadoras}, doravante {l:denominada|denominadas} simplesmente {l:LOCADORA|LOCADORAS}.
 
 **#i. LOCATÁRIO:** {locatarios}, doravante denominado simplesmente LOCATÁRIO.
@@ -2315,7 +2326,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
 **#i. DO PRAZO DE LOCAÇÃO**
 
-[se indeterminado]A locação é por prazo indeterminado, a contar da data de {data_inicio}.[senão]O prazo de locação é de {prazo_meses} meses, a contar da data de {data_inicio}, com término em {data_fim}, data em que o LOCATÁRIO restituirá {l:à LOCADORA|às LOCADORAS} o imóvel objeto desta locação inteiramente desocupado e nas mesmas condições e estado em que o recebeu, conforme documento de vistoria em anexo.[fim]
+[se indeterminado]A locação é por prazo indeterminado, a contar da data de {data_inicio}.[senão]O prazo de locação é de {prazo_meses} meses, a contar da data de {data_inicio}, com término em {data_fim}, data em que o LOCATÁRIO restituirá {l:à LOCADORA|às LOCADORAS} o imóvel objeto desta locação inteiramente desocupado e nas mesmas condições e estado em que o recebeu, conforme a vistoria de entrada.[fim]
 
 [se bonificacao]**#i. DO VALOR MENSAL DO ALUGUEL COM BONIFICAÇÃO**
 
@@ -2401,7 +2412,7 @@ Os signatários que contratam nas qualidades indicadas neste contrato têm entre
 **Parágrafo sétimo** – Se o custo dos reparos ultrapassar o saldo do FCI, a diferença continuará devida pelo LOCATÁRIO, nos termos deste contrato.
 
 **Parágrafo oitavo** – Havendo transferência do contrato a novo titular, com a anuência {l:da LOCADORA|das LOCADORAS}, o saldo do FCI acompanha a locação e será acertado com o titular que entregar as chaves, salvo ajuste diverso, por escrito, entre os titulares.[fim]`;
-      RESTITUICAO = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.
+      RESTITUICAO = `${VISTORIA_ENTRADA}
 
 **CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.
 
@@ -2431,7 +2442,7 @@ ${CLAUSULAS_FCI}
 **Parágrafo segundo** – No caso de desocupação do imóvel antes do fim do contrato, será cobrada ${saida}. A desocupação deverá ser comunicada por escrito, com 30 (trinta) dias de antecedência, por e-mail {l:à LOCADORA|às LOCADORAS}.`;
       RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
 
-**CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. Caso não proceda desta forma, incidirá a multa prevista na cláusula {cl:multa}. O imóvel deverá ser entregue conforme a vistoria inicial.
+**CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. ${SEM_AVISO} O imóvel deverá ser entregue conforme a vistoria inicial.
 
 **CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. Para fins de acerto final, considera-se realizada a entrega do imóvel no momento em que ele esteja tal como na vistoria inicial.
 
@@ -2469,13 +2480,15 @@ ${CLAUSULAS_FCI}
 **CLÁUSULA #** – A presente locação é garantida por seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido vigente durante todo o prazo da locação e suas prorrogações, sob pena de rescisão deste contrato.[fim]`;
       FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
-[se residencial]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS DE SERVIÇOS PÚBLICOS: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante a Companhia Paranaense de Energia (COPEL) e a Companhia de Saneamento do Paraná (SANEPAR), para solicitar a alteração de titularidade das contas, pedidos de ligação, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]
+${REPRESENTACAO}
 
 **CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.
 ${extra}
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações ou notificações enviadas por via postal com aviso de recebimento (AR) ou por mensagem eletrônica (e-mail).
 
 **Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.
+
+${LGPD}
 
 ## FORO
 
@@ -2591,13 +2604,13 @@ ${PARTES}
 
 ${ITENS}
 
-${ALUGUEL("honorários advocatícios de 25% (vinte e cinco por cento)")}
+${ALUGUEL("honorários advocatícios de 20% (vinte por cento)")}
 
 ${CONSERVACAO}
 
 ${RESTITUICAO}
 
-${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato", "honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação")}
+${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato", "honorários de advogado de 20% (vinte por cento) sobre o valor da ação")}
 
 ${RESCISAO("72 (setenta e duas) horas")}
 
@@ -2621,7 +2634,7 @@ ${CONDOMINIO}
 
 ${RESTITUICAO}
 
-${MULTA("a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato", "honorários de advogado")}
+${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato", "honorários de advogado")}
 
 ${RESCISAO("48 (quarenta e oito) horas")}
 
@@ -2641,6 +2654,19 @@ ${FINAIS(`
           tipo: "aditivo_troca",
           texto: ADITIVO_TROCA
         }
+      ];
+      ENDERECO_PARAGRAFO = "**Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.";
+      ATUALIZACOES_MODELO = [
+        ["**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.", VISTORIA_ENTRADA],
+        ["conforme documento de vistoria em anexo.[fim]", "conforme a vistoria de entrada.[fim]"],
+        ["Caso não proceda desta forma, incidirá a multa prevista na cláusula {cl:multa}.", SEM_AVISO],
+        ["[se residencial]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS DE SERVIÇOS PÚBLICOS: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante a Companhia Paranaense de Energia (COPEL) e a Companhia de Saneamento do Paraná (SANEPAR), para solicitar a alteração de titularidade das contas, pedidos de ligação, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]", REPRESENTACAO],
+        ["honorários advocatícios de 25% (vinte e cinco por cento)", "honorários advocatícios de 20% (vinte por cento)"],
+        ["honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação", "honorários de advogado de 20% (vinte por cento) sobre o valor da ação"],
+        ["a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato", "a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato"],
+        [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}
+
+${LGPD}`, "DOS DADOS PESSOAIS"]
       ];
     }
   });
@@ -2696,6 +2722,13 @@ ${FINAIS(`
     if (p2.endereco) partes.push(`${gen(p2, "residente e domiciliado", "residente e domiciliada")} à ${p2.endereco}`);
     return partes.filter(Boolean).join(", ");
   }
+  function qualificarFiador(f) {
+    const cj = conjugeDoFiador(f);
+    if (!cj) return qualificarPessoa(f);
+    const docs = [cj.rg && `RG nº ${cj.rg}`, cj.cpf && `CPF nº ${cj.cpf}`].filter(Boolean).join(" e ");
+    const regime = f.regime_bens && !cj.uniao ? `, sob o regime de ${f.regime_bens.replace(/\s*\(.*\)/, "").toLocaleLowerCase("pt-BR")}` : "";
+    return `${qualificarPessoa(f)}${regime}, e ${cj.uniao ? "seu(sua) companheiro(a)" : "seu cônjuge"} ${String(cj.nome).toLocaleUpperCase("pt-BR")}${docs ? `, portador(a) do ${docs}` : ""}, que assina este contrato em anuência à fiança`;
+  }
   function qualificarEmpresa(nome, cnpj, sede, rep, cargo) {
     const partes = [`${String(nome || "").toLocaleUpperCase("pt-BR")}, pessoa jurídica de direito privado`];
     if (cnpj) partes.push(`inscrita no CNPJ sob nº ${cnpj}`);
@@ -2728,6 +2761,19 @@ ${FINAIS(`
     const partes = d2.participacoes.filter((p2) => p2.imovel_id === c.imovel_id).map((p2) => d2.emitentes.find((e) => e.id === p2.emitente_id)).filter(Boolean);
     return partes.length ? partes : d2.emitentes.filter((e) => e.ativo);
   }
+  function representacaoDoContrato(d2, c, imovel = {}) {
+    const fora = (k) => ["Incluso no aluguel", "Não tem"].includes(c[k]);
+    const doInquilino = (k) => c[k] === "Por conta do inquilino";
+    const nums = (...pares) => pares.filter(([, v]) => v).map(([r, v]) => `, ${r} nº ${v}`).join("");
+    const gas = (d2.titularidades || []).filter((x) => x.imovel_id === c.imovel_id && /g[áa]s|ultragaz|liquig|supergas/i.test(x.concessionaria || "")).map((x) => x.concessionaria)[0] || ((d2.listas || {}).concessionarias || ["Supergasbras"]).find((x) => /g[áa]s|ultragaz|liquig|supergas/i.test(x)) || "";
+    const out = [];
+    if (!fora("conta_energia")) out.push(`a Companhia Paranaense de Energia (COPEL)${nums(["unidade consumidora", imovel.copel_uc], ["medidor", imovel.copel_medidor])}`);
+    if (!fora("conta_agua")) out.push(`a Companhia de Saneamento do Paraná (SANEPAR)${nums(["matrícula", imovel.sanepar_matricula], ["hidrômetro", imovel.sanepar_hidrometro])}`);
+    if (doInquilino("conta_gas")) out.push(`a fornecedora de gás${gas ? ` ${gas}` : ""}${nums(["relógio", imovel.gas_relogio])}`);
+    if (doInquilino("conta_internet")) out.push(`o provedor de internet e TV${imovel.internet ? ` (contrato ou telefone ${imovel.internet})` : ""}`);
+    if (doInquilino("conta_condominio")) out.push(`a administradora do condomínio${imovel.administradora_nome ? ` ${imovel.administradora_nome}` : ""}`);
+    return out;
+  }
   function dadosDoContrato(d2, c, extra = {}) {
     const R = { buscar: (t, id) => d2[t].find((x) => x.id === Number(id)) };
     const imovel = R.buscar("imoveis", c.imovel_id) || {};
@@ -2751,7 +2797,7 @@ ${FINAIS(`
       locadoras: locadoras.map((e) => qualificarEmpresa(e.razao_social || e.nome, e.cnpj, e.endereco_sede || e.endereco, pessoaDe(e, "representante_"), e.representante_cargo)).join("; e "),
       locatarios: locatarios.join("; e "),
       solidario: c.solidario_nome ? qualificarPessoa(pessoaDe(c, "solidario_")) : "",
-      fiadores: fiadores.map((f) => qualificarPessoa(f)).join("; e "),
+      fiadores: fiadores.map((f) => qualificarFiador(f)).join("; e "),
       fiadores_imoveis: fiadores.filter((f) => f.imovel_garantia).map((f) => fiadores.length > 1 ? `${f.nome.toLocaleUpperCase("pt-BR")}: ${f.imovel_garantia}` : f.imovel_garantia).join("; "),
       inquilino_nome: String(c.inquilino_nome || "").toLocaleUpperCase("pt-BR"),
       objeto: `${c.descricao_objeto || "o imóvel"}, no endereço ${situado}`,
@@ -2776,6 +2822,7 @@ ${FINAIS(`
       fci_indice: textoIndice(c.fci_indice),
       encargos_inquilino: lista([...inquilinoPaga, "telefone", "dedetização", "limpeza de calhas"]),
       encargos_inclusos: lista(inclusos),
+      representacao: lista(representacaoDoContrato(d2, c, imovel)),
       caucao_valor: valorComExtenso(caucaoValor),
       caucao_meses: numeroComExtenso(caucaoMeses || 0),
       deposito_valor: valorComExtenso(c.deposito_valor || 0),
@@ -2804,6 +2851,7 @@ ${FINAIS(`
       varios_fiadores: fiadores.length > 1,
       varias_locadoras: locadoras.length > 1,
       indeterminado: c.prazo_tipo === "Indeterminado",
+      representacao: representacaoDoContrato(d2, c, imovel).length > 0,
       testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome))
     };
     const assinaturas = [
@@ -2820,7 +2868,14 @@ ${FINAIS(`
         extra: pj && c.representante_nome ? `${c.representante_nome.toLocaleUpperCase("pt-BR")} – REPRESENTANTE` : ""
       },
       ...c.solidario_nome ? [{ nome: c.solidario_nome.toLocaleUpperCase("pt-BR"), doc: c.solidario_cpf ? `CPF ${c.solidario_cpf}` : "", papel: "LOCATÁRIO SOLIDÁRIO" }] : [],
-      ...temFiador2 ? fiadores.map((f, i) => ({ nome: f.nome.toLocaleUpperCase("pt-BR"), doc: f.cpf ? `CPF ${f.cpf}` : "", papel: fiadores.length > 1 ? `FIADOR ${i + 1}` : "FIADOR" })) : [],
+      ...temFiador2 ? fiadores.flatMap((f, i) => {
+        const papel = fiadores.length > 1 ? `FIADOR ${i + 1}` : "FIADOR";
+        const cj = conjugeDoFiador(f);
+        return [
+          { nome: f.nome.toLocaleUpperCase("pt-BR"), doc: f.cpf ? `CPF ${f.cpf}` : "", papel },
+          ...cj ? [{ nome: String(cj.nome).toLocaleUpperCase("pt-BR"), doc: cj.cpf ? `CPF ${cj.cpf}` : "", papel: `${cj.uniao ? "COMPANHEIRO(A)" : "CÔNJUGE"} DO ${papel} (ANUÊNCIA)` }] : []
+        ];
+      }) : [],
       ...(extra.testemunhas || []).filter((t) => t.nome).map((t, i) => ({ nome: t.nome.toLocaleUpperCase("pt-BR"), doc: t.cpf ? `CPF ${t.cpf}` : "", papel: `TESTEMUNHA ${i + 1}` }))
     ];
     return {
@@ -2849,6 +2904,10 @@ ${FINAIS(`
     if (!c.vigencia_inicio || c.prazo_tipo !== "Indeterminado" && !c.vigencia_fim) falta.push("datas do contrato");
     if (!c.indice_correcao) falta.push("índice de correção");
     if (["Fiador", "Fiador + depósito"].includes(c.garantia_tipo) && !d2.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id) && !(c.contrato_anterior_id && fiadoresDaTroca(d2, c).length)) falta.push("fiador");
+    if (["Fiador", "Fiador + depósito"].includes(c.garantia_tipo)) {
+      for (const f of fiadoresNaData(d2, c.id)) if (conjugeFaltando(f)) falta.push(`fiador ${f.nome}: ${f.estado_civil === "União estável" ? "companheiro(a) (recomendado assinar a fiança)" : "cônjuge (casado: precisa assinar a fiança, Código Civil, art. 1.647)"}`);
+    }
+    if (c.garantia_tipo === "Fiador + depósito") falta.push("garantia dupla (fiador + depósito): a Lei 8.245/91, art. 37, permite só uma");
     for (const e of locadorasDoContrato(d2, c)) {
       if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
       if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
@@ -3241,7 +3300,7 @@ ${FINAIS(`
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
@@ -3294,6 +3353,8 @@ ${FINAIS(`
         if (/(o|a)$/.test(n) && !/\(/.test(n)) return n.replace(/(o|a)$/, flexao(p2));
         return n.replace(/o\(a\)$/, flexao(p2));
       };
+      conjugeDoFiador = (f) => f && f.nome_conjuge ? { nome: f.nome_conjuge, cpf: f.cpf_conjuge, rg: f.rg_conjuge, uniao: f.estado_civil === "União estável" } : null;
+      conjugeFaltando = (f) => !f.nome_conjuge && (f.estado_civil === "Casado(a)" && !/pacto/i.test(f.regime_bens || "") || f.estado_civil === "União estável");
       pessoaDe = (r, prefixo) => ({
         nome: r[`${prefixo}nome`],
         genero: r[`${prefixo}genero`],
@@ -3742,6 +3803,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     mapaIptuAvista: () => mapaIptuAvista,
     marcarAditivoPerdido: () => marcarAditivoPerdido,
     marcarAditivos: () => marcarAditivos,
+    marcarArquivoFisico: () => marcarArquivoFisico,
     marcarCartaEnviada: () => marcarCartaEnviada,
     marcarCondominioConferido: () => marcarCondominioConferido,
     marcarDocumento: () => marcarDocumento,
@@ -4003,6 +4065,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       m.texto = m.texto.replace("## RENOVAÇÃO DO CONTRATO", `${CLAUSULAS_FCI}
 
 ## RENOVAÇÃO DO CONTRATO`);
+    }
+    for (const m of d2.modelos_contrato || []) {
+      if (m.tipo || !m.texto) continue;
+      const novo = atualizarTextoModelo(m.texto);
+      if (novo !== m.texto.replace(/\r\n/g, "\n")) m.texto = novo;
     }
     for (const m of d2.modelos_contrato || []) {
       if (m.tipo !== "aditivo_troca" || !m.texto || m.texto.includes("[se garantia_nova]")) continue;
@@ -5935,10 +6002,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       reserva_abatida_comp: null,
       reserva_abatida_valor: null
     };
-    const copiar2 = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
-    if (copiar2.length) res.comprovante_reserva = a.comprovante_reserva;
+    const copiar3 = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
+    if (copiar3.length) res.comprovante_reserva = a.comprovante_reserva;
     atualizar(d2, "contratos", n.id, res, usuario, `${n.inquilino_nome}: reserva de ${reais(a.reserva_valor)} do contrato (já usada ${reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
-    return copiar2;
+    return copiar3;
   }
   function mesesUsoReserva(d2, a) {
     const meses = [...cadeiaDeContratos(d2, a).antes, a].flatMap((x) => [
@@ -6817,13 +6884,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   function bancoAtivo(d2) {
-    const cfg2 = configBanco(d2);
-    return !!(cfg2.ativo && cfg2.contas.length);
+    const cfg3 = configBanco(d2);
+    return !!(cfg3.ativo && cfg3.contas.length);
   }
   function motivoBancoInativo(d2) {
-    const cfg2 = configBanco(d2);
-    if (!cfg2.contas.length) return "Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)";
-    if (!cfg2.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
+    const cfg3 = configBanco(d2);
+    if (!cfg3.contas.length) return "Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)";
+    if (!cfg3.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
     return "";
   }
   function salvarConfigBanco(d2, dados, usuario) {
@@ -6842,14 +6909,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return novo;
   }
   function salvarContaBanco(d2, dados, usuario) {
-    const cfg2 = configBanco(d2);
+    const cfg3 = configBanco(d2);
     const id = limparId(dados.id);
     if (!id) throw new Error("Informe o identificador da conta na ponte (só letras e números, ex.: ank).");
     const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
     if (!emitenteId || !buscar(d2, "emitentes", emitenteId)) throw new Error("Escolha a empresa dona da conta.");
-    const outra = cfg2.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
+    const outra = cfg3.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
     if (outra) throw new Error(`A empresa já está ligada à conta "${outra.id}".`);
-    const antes = cfg2.contas.find((x) => x.id === id) || null;
+    const antes = cfg3.contas.find((x) => x.id === id) || null;
     const ou = (k, conv) => dados[k] === void 0 && antes ? antes[k] : conv(dados[k]);
     const ambiente = ou("ambiente", (v) => v === "producao" ? "producao" : "sandbox");
     const tipo = "EVP";
@@ -6881,26 +6948,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       notificar,
       negativacao: { ativa: dados.negativacao_ativa === void 0 ? antes ? !!antes.negativacao.ativa : false : marcado2(dados.negativacao_ativa), dias_atraso: diasNeg }
     };
-    cfg2.contas = antes ? cfg2.contas.map((x) => x.id === id ? conta : x) : [...cfg2.contas, conta];
-    if (!cfg2.conta_padrao_id || id === "ank" && !cfg2.contas.some((x) => x.id === cfg2.conta_padrao_id && x.id !== "ank" && antes)) cfg2.conta_padrao_id = id;
-    d2.config_banco = cfg2;
+    cfg3.contas = antes ? cfg3.contas.map((x) => x.id === id ? conta : x) : [...cfg3.contas, conta];
+    if (!cfg3.conta_padrao_id || id === "ank" && !cfg3.contas.some((x) => x.id === cfg3.conta_padrao_id && x.id !== "ank" && antes)) cfg3.conta_padrao_id = id;
+    d2.config_banco = cfg3;
     registrar(d2, usuario, antes ? "Alteração" : "Inclusão", "banco", null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? "alterada" : "incluída"} na integração C6`, { conta: { de: antes, para: conta } });
     return conta;
   }
   function excluirContaBanco(d2, contaId, usuario) {
-    const cfg2 = configBanco(d2);
-    const conta = cfg2.contas.find((x) => x.id === contaId);
+    const cfg3 = configBanco(d2);
+    const conta = cfg3.contas.find((x) => x.id === contaId);
     if (!conta) throw new Error("Conta não encontrada.");
     if (d2.cobrancas.some((cb) => cb.banco && cb.banco.conta_id === contaId && cb.banco.situacao === "emitido")) throw new Error("Há boletos emitidos nesta conta ainda em aberto no banco. Cancele-os ou aguarde o pagamento antes de tirar a conta.");
-    cfg2.contas = cfg2.contas.filter((x) => x.id !== contaId);
-    if (cfg2.conta_padrao_id === contaId) cfg2.conta_padrao_id = cfg2.contas.length ? cfg2.contas[0].id : "";
-    if (!cfg2.contas.length) cfg2.ativo = false;
-    d2.config_banco = cfg2;
+    cfg3.contas = cfg3.contas.filter((x) => x.id !== contaId);
+    if (cfg3.conta_padrao_id === contaId) cfg3.conta_padrao_id = cfg3.contas.length ? cfg3.contas[0].id : "";
+    if (!cfg3.contas.length) cfg3.ativo = false;
+    d2.config_banco = cfg3;
     registrar(d2, usuario, "Exclusão", "banco", null, `Conta bancária "${conta.apelido}" (${contaId}) tirada da integração C6`, { conta: { de: conta, para: null } });
   }
   function contaEmissora(d2) {
-    const cfg2 = configBanco(d2);
-    return cfg2.contas.find((x) => x.id === cfg2.conta_padrao_id) || cfg2.contas.find((x) => x.id === "ank") || cfg2.contas[0] || null;
+    const cfg3 = configBanco(d2);
+    return cfg3.contas.find((x) => x.id === cfg3.conta_padrao_id) || cfg3.contas.find((x) => x.id === "ank") || cfg3.contas[0] || null;
   }
   function contasDoImovel(d2, cb) {
     const c = buscar(d2, "contratos", cb.contrato_id);
@@ -6948,13 +7015,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return conta.notificar || CONTA_BANCO_PADRAO.notificar;
   }
   function notificacoesDoPagador(conta, c) {
-    const cfg2 = notificacaoDoContrato(conta, c);
-    if (!cfg2) return [];
-    const destinos = { email: cfg2.email ? String(c.inquilino_email || "").trim() : "", sms: cfg2.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
+    const cfg3 = notificacaoDoContrato(conta, c);
+    if (!cfg3) return [];
+    const destinos = { email: cfg3.email ? String(c.inquilino_email || "").trim() : "", sms: cfg3.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
     const r = [];
     for (const [canal, destino] of Object.entries(destinos)) {
       if (!destino) continue;
-      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg2[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
+      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg3[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
     }
     return r;
   }
@@ -8213,8 +8280,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return `comprovante do banco ${conta}: ${oque} (${data2 ? `${dataBr(data2)}, ` : ""}${valor})`;
   }
   function pendenciasBancoDoMes(d2, mes, hoje3 = hojeIso()) {
-    const cfg2 = d2.config_banco || {};
-    const contas2 = cfg2.contas || [];
+    const cfg3 = d2.config_banco || {};
+    const contas2 = cfg3.contas || [];
     const fim = limitesCompetencia(mes)[1];
     const mesFechado2 = fim < hoje3;
     const ate = mesFechado2 ? fim : somarDias(hoje3, -regra("dias_extrato_recente"));
@@ -8229,8 +8296,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado: mesFechado2 };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
-    const cfg2 = d2.config_banco || {};
-    if (!cfg2.ativo) return null;
+    const cfg3 = d2.config_banco || {};
+    if (!cfg3.ativo) return null;
     const limite = somarDias(hoje3, -regra("dias_alerta_banco"));
     const semDestino = (d2.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
     const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador && m.data <= limite);
@@ -8377,7 +8444,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return [
       { chave: "aviso", titulo: "Aviso prévio: data de saída informada", feito: true, detalhe: `saída em ${dataBr(c.data_saida)}` },
       { chave: "vistoria", titulo: "Vistoria de saída (com a leitura dos relógios)", feito: !!vist, detalhe: vist ? `feita em ${dataBr(vist.data)}` : saiu ? "ainda não registrada" : `a partir de ${dataBr(c.data_saida)}` },
-      { chave: "chaves", titulo: "Entrega das chaves", feito: saiu, detalhe: saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}` : `prevista para ${dataBr(c.data_saida)}` },
+      { chave: "chaves", titulo: "Devolução das chaves", feito: saiu, detalhe: saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}` : `prevista para ${dataBr(c.data_saida)}` },
       {
         chave: "contas",
         titulo: "Contas: titularidade de volta ao proprietário e leitura final",
@@ -8392,8 +8459,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
         detalhe: !ultimo ? "ainda não gerado (tela Boletos)" : ultimo.data_pagamento ? abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${dataBr(ultimo.data_pagamento)}` : `em aberto, vence ${dataBr(ultimo.vencimento)}`,
         cobranca_id: ultimo ? ultimo.id : null
+      },
+      // arquivo físico (pedido do dono em 2026-11-12): imprimir o processo inteiro e guardar em papel por 10 anos depois do fim
+      {
+        chave: "arquivo",
+        titulo: "Arquivo físico: imprimir o processo e guardar em papel",
+        feito: !!c.arquivo_fisico_em,
+        detalhe: c.arquivo_fisico_em ? `arquivado em ${dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${dataBr(somarMesesData(c.data_saida, 120))} (10 anos)`
       }
     ];
+  }
+  function marcarArquivoFisico(d2, contratoId, data2, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new Error("Inquilino não encontrado.");
+    if (data2 && !/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data.");
+    atualizar(d2, "contratos", c.id, { arquivo_fisico_em: data2 || null }, usuario, data2 ? `${c.inquilino_nome}: processo impresso para o arquivo físico em ${dataBr(data2)}` : `${c.inquilino_nome}: arquivo físico desmarcado`);
   }
   function marcarGarantiaDevolvida(d2, encerramentoId, data2, usuario) {
     const e = buscar(d2, "encerramentos", encerramentoId);
@@ -8557,6 +8637,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         ressarcimentos: "Ressarcimento de condomínio",
         fechamentos: "Etapa do fechamento do mês",
         guias_impostos: "Guia de imposto",
+        modelos_email: "Modelo de e-mail",
+        envios_email: "E-mail enviado",
         movimentacoes_banco: "Movimentação bancária",
         pagamentos_banco: "Pagamento pelo banco",
         adiamentos_alerta: "Adiamento de alerta",
@@ -9452,6 +9534,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     LIMITES: () => LIMITES2,
     NOVOS_FIADORES_TROCA: () => NOVOS_FIADORES_TROCA,
     REFORMA: () => REFORMA,
+    REGIMES_BENS: () => REGIMES_BENS,
     RENOVACAO: () => RENOVACAO,
     RESSARCIMENTO: () => RESSARCIMENTO,
     SEGURO: () => SEGURO,
@@ -9678,7 +9761,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return `<div class="formulario${compacto ? " compacto" : ""}">${partes.join("")}</div>`;
   }
-  var esc, campo, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES2, IMOVEL, SOLICITACAO, REFORMA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, TROCA_FIADOR, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, chipDaLista;
+  var esc, campo, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES2, IMOVEL, SOLICITACAO, REFORMA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, TROCA_FIADOR, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, chipDaLista;
   var init_formularios = __esm({
     "docs/js/formularios.js"() {
       init_c6_comum();
@@ -9773,6 +9856,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ];
       GENEROS = ["Masculino", "Feminino", "Neutro – o(a)"];
       ESTADOS_CIVIS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "Separado(a)", "União estável"];
+      REGIMES_BENS = ["Comunhão parcial", "Comunhão universal", "Separação total (pacto antenupcial)", "Separação obrigatória (por lei)", "Participação final nos aquestos"];
       qualificacao = (prefixo, extra = {}, comEndereco = true) => [
         campo(`${prefixo}genero`, "Sexo", "opcao", { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
         campo(`${prefixo}nacionalidade`, "Nacionalidade", "texto", { padrao: "brasileira", ...extra }),
@@ -9790,6 +9874,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         CEP_DA_PESSOA(""),
         campo("endereco", "Endereço", "texto", { largo: true }),
         ...qualificacao("", {}, false),
+        campo("regime_bens", "Regime de bens (se casado)", "opcao", { opcoes: REGIMES_BENS, ajuda: "Casado: o cônjuge assina a fiança, salvo separação total de bens por pacto antenupcial (Código Civil, art. 1.647, III)" }),
+        campo("nome_conjuge", "Cônjuge ou companheiro(a): nome", "texto", { largo: true, ajuda: "Casado ou em união estável: assina o contrato junto. Sem a assinatura do cônjuge a fiança pode ser anulada inteira (Súmula 332 do STJ)" }),
+        campo("cpf_conjuge", "CPF do cônjuge ou companheiro(a)", "cpf"),
+        campo("rg_conjuge", "RG do cônjuge ou companheiro(a)"),
         campo("imovel_garantia", "Imóvel do fiador (endereço, matrícula e registro)", "area", { largo: true, ajuda: "Ex.: Rua Abílio Peixoto, 359, Curitiba/PR, matrícula 53.271 da 9ª Circunscrição. Aparece no contrato" }),
         campo("data_entrada", "Início do vínculo", "data", { ajuda: "Em branco: desde o início do contrato" }),
         campo("data_saida", "Fim do vínculo", "data", { ajuda: 'Em branco: até o fim do contrato. Depois desta data vai para "Fiadores anteriores"' }),
@@ -9894,7 +9982,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("multa_percentual", "Multa por atraso (%)", "pct", { padrao: 2 }),
         campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { padrao: 1 }),
         secao("Garantia"),
-        campo("garantia_tipo", "Tipo de garantia", "opcao", { obrig: true, opcoes: GARANTIAS }),
+        campo("garantia_tipo", "Tipo de garantia", "opcao", { obrig: true, opcoes: GARANTIAS, ajuda: '"Fiador + depósito" são duas garantias: a Lei 8.245/91 permite só uma por contrato (art. 37, parágrafo único)' }),
         campo("caucao_meses", "Caução equivale a quantos aluguéis", "inteiro", { ...quando("garantia_tipo", "Caução"), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto"). Caução em dinheiro: no máximo 3 aluguéis (Lei 8.245/91, art. 38, §2º)' }),
         campo("caucao_valor", "Valor da caução", "dinheiro", { ...quando("garantia_tipo", "Caução"), autoMsg: true, ajuda: "Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor" }),
         campo("caucao_data", "Data prevista do depósito da caução", "data", { ...quando("garantia_tipo", "Caução"), ajuda: "Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino" }),
@@ -12397,8 +12485,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var configuracaoBanco = (d2) => ({ ...configBanco(d2), ...local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: "", senha_ponte: "" } });
   var pontePronta = (d2) => bancoAtivo(d2) && !!local.ponte_url;
   var motivoIndisponivel = (d2) => motivoBancoInativo(d2) || (!local.ponte_url ? "Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6)" : "");
-  function urlDaPonte(cfg2, caminho) {
-    const base = String(cfg2.ponte_url || "").trim().replace(/\/+$/, "");
+  function urlDaPonte(cfg3, caminho) {
+    const base = String(cfg3.ponte_url || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).");
     return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
   }
@@ -12411,8 +12499,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
   };
   async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes2 = {}) {
-    const cfg2 = ponteLocal();
-    const url = urlDaPonte(cfg2, caminho);
+    const cfg3 = ponteLocal();
+    const url = urlDaPonte(cfg3, caminho);
     const f = opcoes2.fetch || fetch;
     const controlador = typeof AbortController === "function" ? new AbortController() : null;
     const timer = controlador ? setTimeout(() => controlador.abort(), opcoes2.tempoLimite || TEMPO_LIMITE_MS) : null;
@@ -12422,12 +12510,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         method: metodo,
         mode: "cors",
         signal: controlador ? controlador.signal : void 0,
-        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg2.senha_ponte ? { [CABECALHO_SENHA]: cfg2.senha_ponte } : {} },
+        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg3.senha_ponte ? { [CABECALHO_SENHA]: cfg3.senha_ponte } : {} },
         body: corpo !== null ? JSON.stringify(corpo) : void 0
       });
     } catch (e) {
-      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg2.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
-      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg2.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
+      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg3.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
+      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg3.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -14166,24 +14254,24 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var marcado = (v) => v ? "checked" : "";
   function caixaContaDosBoletos() {
     if (!podeUsuario("admin")) return "";
-    const cfg2 = configBanco(d());
+    const cfg3 = configBanco(d());
     const emissora = contaEmissora(d());
     const nomeEmp = (x) => esc((buscar2("emitentes", x.emitente_id) || {}).nome || x.apelido);
     return `<div class="cartao" id="conta-boletos"><h2>Emissão de boletos no banco (C6)</h2>
-    ${cfg2.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg2.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
-        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg2.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg2.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
+    ${cfg3.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg3.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
+        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg3.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg3.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
   }
   function caixaConfigBanco() {
     if (!podeUsuario("admin")) return "";
-    const cfg2 = configuracaoBanco(d());
+    const cfg3 = configuracaoBanco(d());
     const emitentes = ordenar(d().emitentes.filter((e) => e.ativo !== false), "nome");
     const nomeEmp = (id) => esc((buscar2("emitentes", id) || {}).nome || "(empresa excluída)");
-    const situacao2 = cfg2.contas.length ? cfg2.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves da API do C6", "aviso");
+    const situacao2 = cfg3.contas.length ? cfg3.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves da API do C6", "aviso");
     const padrao = CONTA_BANCO_PADRAO;
     const emissora = contaEmissora(d());
     const resumoNotif = (x) => {
@@ -14198,12 +14286,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
       <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
-      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg2.ativo)} ${cfg2.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
+      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg3.ativo)} ${cfg3.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}${ponteLocal().configurada ? ` ${botao("esquecerPonteC6", "Esquecer a ponte neste computador", {}, "perigo", "Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.")}` : ""}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
-      ${cfg2.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span></td>
+      ${cfg3.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span></td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa (ex.: ANK e JCK), com o mesmo identificador usado no .env da ponte (CONTAS=ank,jck).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
@@ -14233,8 +14321,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const certificado = (c) => c.certificado_valido_ate ? ` · certificado válido até ${dataBr(c.certificado_valido_ate)}${c.certificado_dias !== null && c.certificado_dias <= 30 ? ` ${etiqueta(c.certificado_dias < 0 ? "vencido" : `vence em ${c.certificado_dias} dia(s)`, "perigo")}` : ""}` : "";
     const escopos = (c) => c.escopos && c.escopos.length ? ` · escopos: ${esc(c.escopos.join(" "))}` : "";
     const linhaConta = (c) => `<li><b>${esc(c.id)}</b> (${c.ambiente === "producao" ? "produção" : "sandbox"}): ${c.simulado ? etiqueta("modo simulado", "aviso") : c.configurado ? `${etiqueta("chaves ok", "ok")} · token ${c.token === "ok" ? etiqueta("ok", "ok") : c.token === "falhou" ? `${etiqueta("falhou", "perigo")} ${esc(c.erro_token || "")}` : etiqueta("não testado", "neutra")}${escopos(c)}` : `${etiqueta("faltam as chaves", "aviso")} ${esc((c.faltam || []).join(", "))}`}${certificado(c)}${(c.avisos || []).map((a) => ` <span class="suave">${esc(a)}</span>`).join("")}</li>`;
-    const cfg2 = configuracaoBanco(d());
-    const semNaPonte = contaId ? [] : cfg2.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
+    const cfg3 = configuracaoBanco(d());
+    const semNaPonte = contaId ? [] : cfg3.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
     return `<div class="alerta ${s.simulado ? "aviso" : s.configurado ? "ok" : "info"}"><b>Ponte respondeu</b>${s.versao ? ` (versão ${esc(s.versao)})` : ""}${s.simulado ? ": <b>modo simulado</b>, os boletos emitidos são fictícios" : s.configurado ? ": pronta para falar com o banco" : ": ainda falta configurar"}${s.senha_exigida === false ? " · <b>sem senha na ponte</b> (defina PONTE_SENHA no .env)" : ""}.
     <ul style="margin:6px 0 0">${Object.values(contas2).map(linhaConta).join("") || "<li>Nenhuma conta na ponte: defina CONTAS=ank,jck no .env dela.</li>"}</ul>
     ${semNaPonte.length ? `<p style="margin:6px 0 0">Contas cadastradas aqui mas não na ponte: <b>${semNaPonte.map(esc).join(", ")}</b>.</p>` : ""}</div>`;
@@ -15878,16 +15966,16 @@ ${xref}
   }
   function caixaConfigBanco2() {
     if (!podeUsuario("admin")) return "";
-    const cfg2 = { ...CONFIG_BANCO_FASE2, ...config() };
+    const cfg3 = { ...CONFIG_BANCO_FASE2, ...config() };
     return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
     <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)".</p>
     <form data-form="configBanco2" class="formulario">
-      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg2.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
-      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg2.limite_pagamento ? esc(reais(cfg2.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
-      <div><label>Tolerância para casar o boleto (dias)</label><input type="number" name="tolerancia_dias" min="0" max="30" value="${Number(cfg2.tolerancia_dias) || 0}"><div class="ajuda">Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto (ex.: 3 → vence dia 10, entrou dia 13).</div></div>
-      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg2.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg2.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
-      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg2.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
-      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg2.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
+      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg3.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
+      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg3.limite_pagamento ? esc(reais(cfg3.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
+      <div><label>Tolerância para casar o boleto (dias)</label><input type="number" name="tolerancia_dias" min="0" max="30" value="${Number(cfg3.tolerancia_dias) || 0}"><div class="ajuda">Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto (ex.: 3 → vence dia 10, entrou dia 13).</div></div>
+      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg3.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg3.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
+      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg3.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
+      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg3.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
       <div class="check"><button>Salvar</button></div></form></div>`;
   }
   var opcoes = (lista3, atual, vazio = "") => `${vazio ? `<option value="">${esc(vazio)}</option>` : ""}${lista3.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(atual ?? "") ? "selected" : ""}>${esc(t)}</option>`).join("")}`;
@@ -16642,31 +16730,31 @@ Salvar assim mesmo?`)) {
     }
     return feitos;
   }
-  async function consultarCep(el, cfg2) {
+  async function consultarCep(el, cfg3) {
     const n = soDigitos(el.value);
     if (n.length !== 8) return;
     mensagemAuto(el, "Consultando o CEP…");
     try {
       const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
       if (r.erro) return mensagemAuto(el, "CEP não encontrado.");
-      if (cfg2.linha) return enderecoNaLinha(el, cfg2, r);
-      const feitos = preencherVazios(el.form, { [cfg2.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg2.bairro]: r.bairro, [cfg2.cidade]: r.localidade });
-      const uf = cfg2.uf && el.form.querySelector(`[name="${cfg2.uf}"]`);
+      if (cfg3.linha) return enderecoNaLinha(el, cfg3, r);
+      const feitos = preencherVazios(el.form, { [cfg3.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg3.bairro]: r.bairro, [cfg3.cidade]: r.localidade });
+      const uf = cfg3.uf && el.form.querySelector(`[name="${cfg3.uf}"]`);
       if (uf && r.uf && uf.value !== r.uf) {
         uf.value = r.uf;
         feitos.push("Estado");
       }
       mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(", "))}. Complete o número.` : "CEP conferido.");
-      const end = el.form.querySelector(`[name="${cfg2.endereco}"]`);
+      const end = el.form.querySelector(`[name="${cfg3.endereco}"]`);
       if (feitos.length && end) end.focus();
     } catch {
-      const uf = cfg2.uf && el.form.querySelector(`[name="${cfg2.uf}"]`);
+      const uf = cfg3.uf && el.form.querySelector(`[name="${cfg3.uf}"]`);
       if (uf && ufDoCep(n)) uf.value = ufDoCep(n);
       mensagemAuto(el, "Não deu para consultar o CEP agora (sem internet?). Preencha à mão.");
     }
   }
-  function enderecoNaLinha(el, cfg2, r) {
-    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg2.linha}"]`);
+  function enderecoNaLinha(el, cfg3, r) {
+    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg3.linha}"]`);
     if (!campo2) return;
     if (campo2.value.trim()) return mensagemAuto(el, "O endereço já está preenchido e ficou como estava. Para usar o do CEP, apague o endereço e digite o CEP de novo.");
     const rua = r.logradouro ? `${r.logradouro}, ` : "";
@@ -16676,7 +16764,7 @@ Salvar assim mesmo?`)) {
     campo2.focus();
     campo2.setSelectionRange(rua.length, rua.length);
   }
-  async function consultarCnpj(el, cfg2) {
+  async function consultarCnpj(el, cfg3) {
     const n = soDigitos(el.value);
     if (n.length !== 14 || !cnpjValido(n)) return;
     mensagemAuto(el, "Consultando o CNPJ…");
@@ -16690,14 +16778,14 @@ Salvar assim mesmo?`)) {
       const unico = admins.length === 1 ? admins[0] : socios.length === 1 ? socios[0] : null;
       const tel = soDigitos(r.ddd_telefone_1 || "");
       const feitos = preencherVazios(el.form, {
-        [cfg2.razao]: r.razao_social,
-        [cfg2.nome]: cfg2.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
-        [cfg2.fantasia]: r.nome_fantasia,
-        [cfg2.endereco]: endereco2,
-        [cfg2.sede]: endereco2,
-        [cfg2.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
-        [cfg2.email]: String(r.email || "").toLowerCase(),
-        [cfg2.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
+        [cfg3.razao]: r.razao_social,
+        [cfg3.nome]: cfg3.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
+        [cfg3.fantasia]: r.nome_fantasia,
+        [cfg3.endereco]: endereco2,
+        [cfg3.sede]: endereco2,
+        [cfg3.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
+        [cfg3.email]: String(r.email || "").toLowerCase(),
+        [cfg3.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
       });
       mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}`);
     } catch {
@@ -17163,13 +17251,775 @@ Salvar assim mesmo?`)) {
         const n = soDigitos(el.value);
         mensagemAuto(el, tipo !== "cep" && tipo !== "tel" && n ? `<span class="etiqueta ok">✓ ${n.length === 11 ? "CPF" : "CNPJ"} válido</span>` : "");
         if (el.dataset.preencher) {
-          const cfg2 = JSON.parse(el.dataset.preencher);
-          if (cfg2.fonte === "cep") consultarCep(el, cfg2);
-          else consultarCnpj(el, cfg2);
+          const cfg3 = JSON.parse(el.dataset.preencher);
+          if (cfg3.fonte === "cep") consultarCep(el, cfg3);
+          else consultarCnpj(el, cfg3);
         }
         if (el.hasAttribute("data-buscar-pessoa")) procurarPessoa(el);
       });
     }
+  }
+
+  // docs/js/telas/emails.js
+  init_calculos();
+  init_calculos();
+
+  // docs/js/email-dados.js
+  init_calculos();
+  init_contratos();
+
+  // docs/js/modelos-email.js
+  var FECHO = `Agradecemos e ficamos à disposição em caso de dúvidas.
+
+Atenciosamente,
+Administradora
+administracao@ankjck.com.br`;
+  var CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
+Pix (CNPJ): 58.492.818/0001-59`;
+  var CONDICOES = `CONDIÇÕES DA LOCAÇÃO
+- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
+- Vencimento: todo dia {vencimento}
+[se iptu]- IPTU: cobrado junto com o aluguel
+[fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel
+[fim][se contas]- Contas de {contas_texto}: por conta do locatário
+[fim]- Garantia: {garantia}
+- Prazo do contrato: {prazo}`;
+  var DOCUMENTOS2 = `[se pj]1. Contrato social e última alteração
+2. Cartão do CNPJ
+3. Documento com foto e CPF do representante
+4. Comprovante de faturamento dos 3 últimos meses
+5. Comprovante de endereço da empresa[senão]1. Documento com foto e CPF
+2. Certidão de casamento ou declaração de união estável, se for o caso
+3. Comprovante de renda dos 3 últimos meses
+4. Comprovante de residência atual[fim][se fiador]
+
+DO FIADOR
+1. Documento com foto e CPF
+2. Comprovante de renda e de residência
+3. Matrícula atualizada de um imóvel em nome dele
+4. Se for casado ou viver em união estável: os mesmos documentos do cônjuge ou companheiro, que também assina o contrato[fim][se seguro_fianca]
+
+SEGURO FIANÇA
+A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]`;
+  var MODELOS_EMAIL = [
+    {
+      chave: "ficha_envio",
+      nome: "Envio de ficha cadastral",
+      etapa: "Ficha",
+      assunto: "{imovel}: ficha cadastral e condições da locação",
+      anexos: "Ficha cadastral (PDF) e recibo da reserva",
+      perguntas: [["prazo", "Prazo do contrato", "texto"]],
+      texto: `Olá, {nome}, tudo bem?
+
+[se reserva]Recebemos o depósito da reserva de {reserva} em {reserva_data} para o imóvel da {endereco}. Ele segura o imóvel durante a análise da ficha: aprovada, o valor é descontado do primeiro aluguel; não aprovada, ou se você desistir antes de assinar o contrato, ele é devolvido por inteiro.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
+
+${CONDICOES}
+
+Estas condições dependem da aprovação da ficha. A locação só se forma com a assinatura do contrato por todas as partes.
+
+DOCUMENTOS PARA A FICHA (responda este e-mail com a ficha anexa preenchida e):
+${DOCUMENTOS2}
+
+COMO FUNCIONA
+1. Análise da ficha em até 2 dias úteis
+2. Envio do contrato para a sua assinatura
+3. Sua assinatura[se dinheiro] e o depósito da {tipo_deposito}[fim]
+4. Nossa assinatura e envio da via assinada por todos
+5. Entrega das chaves com a vistoria de entrada, feita junto com você
+
+Seus dados são tratados conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`
+    },
+    {
+      chave: "ficha_aprovada",
+      nome: "Ficha aprovada",
+      etapa: "Ficha",
+      assunto: "Ficha aprovada – {imovel}: próximos passos",
+      perguntas: [["prazo", "Prazo do contrato", "texto"]],
+      texto: `Olá, {nome},
+
+Sua ficha para o imóvel da {imovel} foi aprovada.
+
+CONFIRA OS DADOS DO CONTRATO
+- Locatário: {locatario}, {documento}
+- Aluguel: {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim] · Vencimento: dia {vencimento}
+- Garantia: {garantia}
+- Prazo: {prazo}
+Se algo estiver diferente, responda antes de prepararmos o contrato.
+
+PRÓXIMOS PASSOS
+- Contrato: enviamos em até 2 dias úteis para você ler e assinar[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
+[se dinheiro]- {Tipo_deposito}: depois da sua assinatura, o depósito de {valor_deposito} na conta da empresa
+[fim][se seguro_fianca]- Seguro fiança: emissão da apólice em seu nome
+[fim]- Nossa assinatura: com tudo recebido, assinamos e enviamos a via assinada por todos
+- Entrega das chaves: combinamos a data; a vistoria de entrada é feita junto, com fotos
+
+[se reserva]A reserva de {reserva} será descontada no primeiro boleto. [fim]A locação só se forma com a assinatura de todos, e o imóvel só pode ser ocupado depois da entrega das chaves.`
+    },
+    {
+      chave: "ficha_reprovada",
+      nome: "Ficha reprovada",
+      etapa: "Ficha",
+      assunto: "Resposta sobre a ficha – {imovel}",
+      texto: `Olá, {nome},
+
+Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
+
+[se reserva]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.
+
+[fim]Os documentos enviados serão apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`
+    },
+    {
+      chave: "contrato_assinar",
+      nome: "Contrato para assinar",
+      etapa: "Gerar o contrato",
+      assunto: "Contrato de locação para assinatura – {imovel}",
+      anexos: "Contrato (PDF)",
+      perguntas: [["prazo_assinatura", "Devolver assinado até", "data"]],
+      texto: `Olá, {nome},
+
+Segue anexo o contrato de locação do imóvel da {imovel}. Leia com atenção antes de assinar. Os pontos principais:
+- Início em {inicio}, prazo de {prazo}
+- Aluguel de {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim], todo dia {vencimento}; depois do vencimento, multa e juros conforme o contrato
+- Reajuste anual pelo {indice}
+[se iptu]- IPTU cobrado junto com o aluguel
+[fim][se seguro_incendio]- Seguro contra incêndio cobrado junto com o aluguel
+[fim]- Boletos e avisos chegam por este e-mail, que vale como meio oficial de comunicação
+
+PASSO A PASSO
+1. Assine o contrato e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
+[se dinheiro]2. Deposite a {tipo_deposito} de {valor_deposito} e envie o comprovante:
+${CONTA_CAUCAO}
+[se caucao]A caução fica aplicada em poupança e é devolvida corrigida no fim do contrato, descontados eventuais débitos (Lei 8.245/91, art. 38).
+[fim]3. Com tudo recebido, assinamos em até 2 dias úteis e enviamos a via assinada por todos
+4. Em seguida combinamos a entrega das chaves[senão]2. Com o contrato assinado, assinamos em até 2 dias úteis e enviamos a via assinada por todos
+3. Em seguida combinamos a entrega das chaves[fim]
+
+Ficou alguma dúvida sobre as cláusulas? Pergunte antes de assinar.`
+    },
+    {
+      chave: "contrato_assinado",
+      nome: "Contrato assinado: entrega das chaves",
+      etapa: "Contrato assinado",
+      assunto: "Contrato assinado – {imovel}: entrega das chaves",
+      anexos: "Contrato assinado por todos (PDF)",
+      perguntas: [["opcoes_entrega", "Opções de data e horário da entrega das chaves", "texto"]],
+      texto: `Olá, {nome},
+
+Segue anexo o contrato assinado por todas as partes. Guarde esta via.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}.[fim]
+
+ENTREGA DAS CHAVES
+Opções: {opcoes_entrega}, no imóvel. Responda com a melhor opção.
+1. Antes de você levar qualquer móvel, fazemos juntos a vistoria de entrada, com fotos[se contas] e a leitura dos relógios[fim]
+2. Você assina a vistoria e o termo de entrega das chaves
+3. Você recebe uma cópia da vistoria
+[se contas]
+CONTAS DE {CONTAS_TEXTO}
+Nós pedimos a troca de titularidade das contas de {contas_concessionarias} para o seu nome, com a autorização que está no contrato. Se a companhia pedir alguma assinatura sua, avisamos.
+[fim]
+O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com o desconto da reserva[fim].`
+    },
+    {
+      chave: "vistoria_assinada",
+      nome: "Vistoria assinada: boas-vindas",
+      etapa: "Vistoria assinada",
+      assunto: "Bem-vindo(a) – {imovel}: vistoria de entrada",
+      anexos: "Vistoria de entrada e termo de entrega das chaves (PDF)",
+      texto: `Olá, {nome},
+
+Seja bem-vindo(a)! As chaves foram entregues em {data_chaves}.
+
+Segue anexa a vistoria de entrada assinada. Ela descreve o estado do imóvel e é a base da comparação na saída.
+
+Confira com calma: se encontrar algum defeito que não esteja na vistoria (ex.: vazamento, tomada sem funcionar), avise por este e-mail até {data_limite_vistoria} (10 dias), com fotos, para incluirmos no registro. Depois desse prazo, a vistoria vale como aceita, salvo defeito oculto.
+
+LEMBRETES
+[se contas]- Contas de {contas_texto}: nós cuidamos da troca de titularidade e avisamos quando estiver concluída
+[fim]- Boletos: chegam por este e-mail; o primeiro: {primeiro_boleto}
+- Reparos: avise sempre por escrito, por este e-mail
+- Obras ou mudanças no imóvel só com autorização por escrito
+- Este e-mail é o canal oficial de comunicação com a administradora`
+    },
+    {
+      chave: "saida_aviso",
+      nome: "Aviso de saída recebido",
+      etapa: "Informar data de saída",
+      assunto: "Aviso de saída recebido – {imovel}",
+      perguntas: [["data_aviso", "Data em que o inquilino avisou", "data"]],
+      texto: `Olá, {nome},
+
+Recebemos em {data_aviso} o seu aviso de que vai desocupar o imóvel. A data de saída fica {data_saida}. Por favor, responda confirmando esta data.
+[se saida_antecipada]
+MULTA DA SAÍDA ANTECIPADA
+Pelo seu contrato, a saída antes do fim do prazo ({fim}) tem multa de 3 aluguéis, proporcional ao tempo que falta, calculada no acerto final. Se a mudança for por transferência do seu empregador, avise: nesse caso a lei dispensa a multa (Lei 8.245/91, art. 4º).
+[fim]
+PRÓXIMOS PASSOS
+- Último aluguel: proporcional aos dias até {data_saida}; o aluguel corre até a devolução das chaves
+- Vistoria de saída: vamos marcar a data e hora com você; a vistoria é feita com a sua presença
+[se contas]- Contas: nós pedimos a leitura final dos relógios no dia da devolução e a volta da titularidade. Mande os comprovantes das contas pagas até a saída. Conta com consumo até a leitura final que chegar depois também é sua e entra no acerto ou é cobrada depois
+[fim]- Devolução das chaves: no dia da vistoria, com o termo de devolução
+- Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], enviado para você conferir
+
+O imóvel deve ser devolvido como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural do uso não conta). O contrato[se tem_garantia] e a garantia continuam[senão] continua[fim] valendo até a devolução das chaves.`
+    },
+    {
+      chave: "saida_vistoria",
+      nome: "Vistoria de saída marcada",
+      etapa: "Vistoria de saída",
+      assunto: "Vistoria de saída – {imovel}: data marcada",
+      anexos: "Vistoria de entrada (PDF)",
+      perguntas: [["data_vistoria", "Data e horário da vistoria de saída", "texto"]],
+      texto: `Olá, {nome},
+
+A vistoria de saída fica marcada para {data_vistoria}, no imóvel. Se não puder, responda com outro horário até 2 dias antes.
+
+A vistoria é feita com você presente: comparamos o imóvel com a vistoria de entrada (anexa) e você pode registrar as suas observações. Se não puder vir, pode mandar alguém com autorização por escrito. Se ninguém comparecer, faremos a vistoria no horário marcado, com fotos, e enviaremos o relatório para você responder em até 5 dias úteis.
+
+DEIXE PRONTO
+- Imóvel vazio e limpo
+- Danos reparados (paredes, pisos, portas, louças, chuveiro, tomadas)
+- Todas as chaves e controles
+[se contas]- Comprovantes das contas de {contas_texto} pagas
+[fim]- A leitura dos relógios fazemos juntos
+
+Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qualidade do que foi entregue, ou [se dinheiro]ter o valor descontado da {tipo_deposito}[senão]pagar o valor do reparo[fim], com orçamento apresentado. O aluguel corre até a devolução das chaves, inclusive nos dias de reparo.`
+    },
+    {
+      chave: "saida_chaves",
+      nome: "Devolução das chaves e vistoria de saída",
+      etapa: "Devolução das chaves",
+      assunto: "Vistoria de saída e devolução das chaves – {imovel}",
+      anexos: "Vistoria de saída, termo de devolução das chaves e orçamentos (PDF)",
+      perguntas: [["pendencias", "Pendências da vistoria (uma por linha, com o orçamento)", "area"]],
+      texto: `Olá, {nome},
+
+Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o termo de devolução das chaves.
+
+PENDÊNCIAS (comparadas com a vistoria de entrada)
+{pendencias}
+
+Se discordar de algum item, responda em até 5 dias úteis, com fotos ou documentos.
+
+O recebimento das chaves não dá quitação: os valores em aberto e as pendências da vistoria entram no acerto final, que enviaremos em seguida.`
+    },
+    {
+      chave: "saida_calculo",
+      nome: "Acerto final",
+      etapa: "Cálculo final",
+      assunto: "Acerto final do contrato – {imovel}",
+      anexos: "Cálculo final e comprovantes (PDF)",
+      texto: `Olá, {nome},
+
+Segue o acerto final do contrato do imóvel da {imovel}:
+
+{acerto}
+
+[se devolver]Se estiver de acordo, informe a chave Pix ou a conta em seu nome; a devolução é feita em até 5 dias úteis da sua resposta.[fim][se cobrar]Segue o boleto do saldo, com o vencimento indicado nele.[fim]
+
+Se discordar de algum item, responda em até 5 dias úteis explicando o motivo.`
+    },
+    {
+      chave: "saida_encerramento",
+      nome: "Encerramento do contrato",
+      etapa: "Devolução da garantia",
+      assunto: "Contrato encerrado – {imovel}",
+      anexos: "Comprovante da devolução (PDF), se houver",
+      texto: `Olá, {nome},
+
+Confirmamos [se devolver]a devolução de {saldo} em {data_devolucao} e [fim]o encerramento do contrato de locação do imóvel da {imovel}. Não há valores pendentes entre as partes referentes a este contrato.
+
+Em fevereiro enviaremos o informe dos aluguéis pagos em {ano_saida}, para a sua declaração do Imposto de Renda.
+
+Seus dados e documentos ficam guardados pelo prazo exigido em lei e depois são apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).
+
+Desejamos sucesso no novo endereço.`
+    },
+    {
+      chave: "informe_ir",
+      nome: "Informe dos aluguéis para o IR",
+      etapa: "Todo ano (fevereiro)",
+      assunto: "Informe de aluguéis pagos em {ano} – Imposto de Renda",
+      anexos: "Comprovante anual de aluguéis pagos (PDF, mês a mês e por empresa)",
+      perguntas: [["ano", "Ano dos pagamentos", "ano"]],
+      texto: `Olá, {nome},
+
+[se pj]Segue o resumo dos aluguéis pagos em {ano} pelo imóvel da {imovel}, para a contabilidade da empresa. Cada pagamento já tem a sua nota fiscal.
+
+{informe}
+
+Não houve retenção de imposto de renda na fonte.[senão]Segue o informe dos aluguéis pagos em {ano} pelo imóvel da {imovel}, para a sua declaração do Imposto de Renda.
+
+COMO DECLARAR
+Ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), um lançamento para cada empresa:
+{informe}
+
+O aluguel de moradia não reduz o imposto; a informação serve para o cruzamento da Receita Federal. Não houve retenção de imposto de renda na fonte.[fim]`
+    }
+  ];
+  function modeloEmail(d2, chave) {
+    const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
+    if (!padrao) return null;
+    const salvo = (d2.modelos_email || []).find((m) => m.chave === chave);
+    return salvo ? { ...padrao, assunto: salvo.assunto ?? padrao.assunto, texto: salvo.texto ?? padrao.texto, id: salvo.id, editado: true } : { ...padrao };
+  }
+  function preencherEmail(texto3, dados) {
+    let t = String(texto3 || "").replace(/\r\n/g, "\n");
+    const valor = (nome) => {
+      const n = nome.toLowerCase();
+      if (n in dados.condicoes) return !!dados.condicoes[n];
+      return !!dados.campos[n];
+    };
+    const re = /\[se ([^\]]+)\]((?:(?!\[se )[\s\S])*?)\[fim\]/;
+    for (let m = re.exec(t); m; m = re.exec(t)) {
+      const [sim2, nao = ""] = m[2].split("[senão]");
+      const e = m[1].trim();
+      const neg = /^não\s+/i.test(e);
+      const ok = valor(e.replace(/^não\s+/i, "").trim());
+      t = t.slice(0, m.index) + ((neg ? !ok : ok) ? sim2 : nao) + t.slice(m.index + m[0].length);
+    }
+    t = t.replace(/\{([A-Za-z_]+)\}/g, (x, nome) => {
+      const v = dados.campos[nome.toLowerCase()];
+      if (v === void 0 || v === null || v === "") return `[preencher: ${nome.toLowerCase()}]`;
+      const s = String(v);
+      if (nome === nome.toUpperCase()) return s.toLocaleUpperCase("pt-BR");
+      if (nome[0] === nome[0].toUpperCase()) return s[0].toLocaleUpperCase("pt-BR") + s.slice(1);
+      return s;
+    });
+    return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function montarEmail(modelo, dados) {
+    return { assunto: preencherEmail(modelo.assunto, dados).replace(/\s+/g, " "), texto: `${preencherEmail(modelo.texto, dados)}
+
+${FECHO}` };
+  }
+
+  // docs/js/email-dados.js
+  init_regras();
+  var PJ2 = "Pessoa jurídica (empresa)";
+  var primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
+  var juntar = (itens) => itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`;
+  function contasDoInquilino(c) {
+    const fora = (k) => ["Incluso no aluguel", "Não tem"].includes(c[k]);
+    const out = [];
+    if (!fora("conta_agua")) out.push(["água", "água (Sanepar)"]);
+    if (!fora("conta_energia")) out.push(["energia", "energia (Copel)"]);
+    if (c.conta_gas === "Por conta do inquilino") out.push(["gás", "gás"]);
+    return out;
+  }
+  function textoGarantia(tipo, valor, meses) {
+    if (tipo === "Caução") return `caução de ${valor ? reais(valor) : "até 3 aluguéis"}${valor && meses ? ` (${meses} aluguéis com bonificação)` : ""}, aplicada em poupança e devolvida corrigida no fim do contrato, descontados eventuais débitos`;
+    if (tipo === "Depósito garantia") return `depósito de garantia${valor ? ` de ${reais(valor)}` : ""}, devolvido no fim do contrato, descontados eventuais débitos`;
+    if (tipo === "Fiador") return "fiador com imóvel próprio";
+    if (tipo === "Fiador + depósito") return `fiador e depósito de garantia${valor ? ` de ${reais(valor)}` : ""}`;
+    if (tipo === "Seguro fiança") return "seguro fiança locatícia, contratado em seu nome";
+    return "sem garantia";
+  }
+  var condicoesDaGarantia = (tipo) => ({
+    caucao: tipo === "Caução",
+    deposito: ["Depósito garantia", "Fiador + depósito"].includes(tipo),
+    dinheiro: ["Caução", "Depósito garantia", "Fiador + depósito"].includes(tipo),
+    fiador: ["Fiador", "Fiador + depósito"].includes(tipo),
+    seguro_fianca: tipo === "Seguro fiança",
+    sem_garantia: !tipo || tipo === "Sem garantia",
+    tem_garantia: !!tipo && tipo !== "Sem garantia"
+  });
+  function textoAcerto(e) {
+    if (!e) return "";
+    const l = [];
+    if (e.garantia_valor > 0) l.push(`Garantia depositada: ${reais(e.garantia_valor)}`, `Garantia corrigida até ${dataBr(e.data_saida)}: ${reais(e.garantia_corrigida || e.garantia_valor)}`);
+    if (e.fci_credito) l.push(`FCI corrigido: ${reais(e.fci_credito)}`);
+    l.push(`(-) Débitos: ${reais(e.debitos || 0)}`);
+    if (e.debitos_descricao) l.push(...String(e.debitos_descricao).split(/\n+/).filter(Boolean).map((x) => `   ${x.trim()}`));
+    l.push(`= Saldo ${e.saldo >= 0 ? "a devolver" : "a pagar"}: ${reais(Math.abs(e.saldo || 0))}`);
+    return l.join("\n");
+  }
+  function textoInforme(d2, c, ano) {
+    let dec;
+    try {
+      dec = declaracaoAnual(d2, c.id, ano);
+    } catch {
+      return "";
+    }
+    if (!dec.empresas.length) return "";
+    const linhas2 = dec.empresas.map((g) => `- ${g.emitente.razao_social || g.emitente.nome}${g.emitente.cnpj ? ` · CNPJ ${g.emitente.cnpj}` : ""} · ${reais(g.total)}`);
+    return [...linhas2, `Total de aluguel em ${ano}: ${reais(dec.total)} (IPTU, seguro e outros encargos não entram neste valor).`].join("\n");
+  }
+  function primeiroBoleto(d2, c) {
+    const inicio = c.data_entrada || c.vigencia_inicio;
+    if (!inicio) return "";
+    const comp = competenciaDe(inicio);
+    const cb = boletoDoMes(d2, c.id, comp);
+    const venc = cb ? cb.vencimento : `${c.cobranca_mes_seguinte !== false ? somarMeses(comp, 1) : comp}-${String(c.dia_vencimento || 10).padStart(2, "0")}`;
+    return `aluguel de ${compBr(comp)}, vence em ${dataBr(venc)}`;
+  }
+  function respostasPadrao(d2, c, hoje3) {
+    const pend = c ? resultadoVistoriaSaida(d2, c).pendencias : [];
+    return {
+      prazo_assinatura: somarDias(hoje3, 7),
+      opcoes_entrega: c && c.data_entrada ? `${dataBr(c.data_entrada)} às 10h` : "",
+      data_aviso: hoje3,
+      data_vistoria: c && c.data_saida ? `${dataBr(c.data_saida)} às 10h` : "",
+      pendencias: pend.length ? pend.map((x) => `- ${x}`).join("\n") : "- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.",
+      ano: String(Number(hoje3.slice(0, 4)) - 1),
+      prazo: "30 meses"
+    };
+  }
+  function dadosDoEmail(d2, alvo, respostas = {}, hoje3 = hojeIso()) {
+    const c = alvo.contrato || null;
+    const f = alvo.ficha || null;
+    const p2 = c || f;
+    const pj = p2.inquilino_tipo === PJ2;
+    const imoveis = c ? [buscar(d2, "imoveis", c.imovel_id)].filter(Boolean) : (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean);
+    const curto2 = (i) => [i.endereco, i.complemento].filter(Boolean).join(" – ");
+    const completo = (i) => [curto2(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", ");
+    const aluguel = p2.aluguel_inicial || 0;
+    const pct2 = p2.bonificacao === false ? 0 : p2.desconto_pontualidade_percentual || 0;
+    const desconto = aluguel ? descontoPorPercentual(aluguel, pct2) : 0;
+    const tipo = p2.garantia_tipo || "";
+    const g = condicoesDaGarantia(tipo);
+    const valorDeposito = c ? g.caucao ? c.caucao_valor || (c.caucao_meses || 0) * (aluguel - desconto) : c.deposito_valor || 0 : 0;
+    const base = c || d2.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a, b) => String(b.data_entrada || "").localeCompare(String(a.data_entrada || "")))[0] || {};
+    const contas2 = contasDoInquilino(base);
+    const e = c ? encerramentoDo(d2, c.id) : null;
+    const fim = c ? fimDoContrato(d2, c) : null;
+    const inicio = c ? c.data_entrada || c.vigencia_inicio : null;
+    const r = { ...respostasPadrao(d2, c, hoje3), ...Object.fromEntries(Object.entries(respostas).filter(([, v]) => v !== void 0 && v !== null && v !== "")) };
+    const data2 = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? dataBr(v) : v;
+    const ano = /^\d{4}$/.test(String(r.ano)) ? Number(r.ano) : Number(hoje3.slice(0, 4)) - 1;
+    const campos = {
+      nome: primeiroNome(pj ? p2.representante_nome || p2.inquilino_nome : p2.inquilino_nome),
+      locatario: p2.inquilino_nome || "",
+      documento: p2.inquilino_cpf ? `${pj ? "CNPJ" : "CPF"} ${p2.inquilino_cpf}` : "",
+      imovel: imoveis.map(curto2).join(" ou "),
+      endereco: imoveis.map(completo).join(" ou "),
+      aluguel: aluguel ? reais(aluguel) : "",
+      aluguel_bonificado: aluguel ? reais(aluguel - desconto) : "",
+      bonificacao: desconto ? reais(desconto) : "",
+      vencimento: String(p2.dia_vencimento || ""),
+      garantia: textoGarantia(tipo, valorDeposito, c ? c.caucao_meses : 0),
+      tipo_deposito: g.caucao ? "caução" : "depósito de garantia",
+      valor_deposito: valorDeposito ? reais(valorDeposito) : "",
+      prazo: c ? c.prazo_tipo === "Indeterminado" ? "prazo indeterminado" : `${prazoDoContrato(d2, c) || c.prazo_meses || ""} meses` : r.prazo,
+      inicio: inicio ? dataBr(inicio) : "",
+      fim: fim ? dataBr(fim) : "",
+      indice: c ? c.indice_correcao || "" : "",
+      reserva: p2.reserva_valor > 0 ? reais(p2.reserva_valor) : "",
+      reserva_data: p2.reserva_data ? dataBr(p2.reserva_data) : "",
+      contas_texto: juntar(contas2.map((x) => x[0])),
+      contas_concessionarias: juntar(contas2.map((x) => x[1])),
+      primeiro_boleto: c ? primeiroBoleto(d2, c) : "",
+      data_chaves: inicio ? dataBr(inicio) : "",
+      data_limite_vistoria: inicio ? dataBr(somarDias(inicio, 10)) : "",
+      data_saida: c && c.data_saida ? dataBr(c.data_saida) : "",
+      ano_saida: c && c.data_saida ? c.data_saida.slice(0, 4) : String(Number(hoje3.slice(0, 4))),
+      acerto: textoAcerto(e),
+      saldo: e ? reais(Math.abs(e.saldo || 0)) : "",
+      data_devolucao: e && e.garantia_devolvida_em ? dataBr(e.garantia_devolvida_em) : "",
+      informe: c ? textoInforme(d2, c, ano) : "",
+      prazo_assinatura: data2(r.prazo_assinatura),
+      opcoes_entrega: r.opcoes_entrega,
+      data_aviso: data2(r.data_aviso),
+      data_vistoria: r.data_vistoria,
+      pendencias: r.pendencias,
+      ano: String(ano)
+    };
+    const condicoes = {
+      ...g,
+      pj,
+      bonificacao: desconto > 0,
+      reserva: p2.reserva_valor > 0,
+      contas: contas2.length > 0,
+      iptu: c ? c.conta_iptu === "Por conta do inquilino" || !!c.cobrar_iptu : true,
+      seguro_incendio: c ? c.conta_seguro === "Por conta do inquilino" : true,
+      saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== "Indeterminado" && fim && c.data_saida < fim),
+      devolver: !!(e && e.saldo > 0),
+      cobrar: !!(e && e.saldo < 0)
+    };
+    return { campos, condicoes, para: p2.inquilino_email || "", perguntas: r };
+  }
+  function informesPendentes(d2, hoje3 = hojeIso()) {
+    const mes = Number(hoje3.slice(5, 7));
+    if (mes < 2 || mes > 3) return { ano: null, contratos: [] };
+    const ano = String(Number(hoje3.slice(0, 4)) - 1);
+    const contratoDoBoleto = new Map(d2.cobrancas.map((x) => [x.id, x.contrato_id]));
+    const ids = /* @__PURE__ */ new Set();
+    for (const f of d2.faturas) {
+      if (f.situacao === "Emitida" && f.origem_tipo === "cobranca" && String(f.emissao).slice(0, 4) === ano && contratoDoBoleto.has(f.origem_id)) ids.add(contratoDoBoleto.get(f.origem_id));
+    }
+    const avisados = new Set((d2.envios_email || []).filter((x) => x.chave === "informe_ir" && String(x.data) >= `${hoje3.slice(0, 4)}-01-01`).map((x) => x.contrato_id));
+    const contratos = [...ids].filter((id) => !avisados.has(id)).map((id) => buscar(d2, "contratos", id)).filter(Boolean).sort((a, b) => String(a.inquilino_nome).localeCompare(String(b.inquilino_nome), "pt-BR"));
+    return { ano: Number(ano), contratos };
+  }
+
+  // docs/js/telas/emails.js
+  init_formularios();
+
+  // docs/js/gmail.js
+  init_calculos();
+  init_nuvem();
+  var MAX_BYTES_ANEXOS = 20 * 1024 * 1024;
+  var TEMPO_ESTADO = 1e4;
+  var TEMPO_ENVIO = 12e4;
+  var SEM_INTERNET = "Sem internet: o e-mail não foi enviado. Use Copiar texto ou Abrir no Gmail.";
+  var cfg2 = { base: "api/", buscar: (...a) => fetch(...a), online: () => globalThis.navigator?.onLine !== false };
+  var estadoGuardado = null;
+  var ehJson = (r) => (r.headers.get("content-type") || "").includes("json");
+  var local2 = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
+  async function estadoEmail() {
+    if (estadoGuardado) return estadoGuardado;
+    if (local2()) return { ligado: false, remetente: null };
+    try {
+      const r = await cfg2.buscar(`${cfg2.base}email/estado`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(TEMPO_ESTADO) });
+      if (!r.ok || r.redirected || !ehJson(r)) return { ligado: false, remetente: null };
+      const d2 = await r.json();
+      estadoGuardado = { ligado: d2.ligado === true, remetente: typeof d2.remetente === "string" ? d2.remetente : null };
+      return estadoGuardado;
+    } catch {
+      return { ligado: false, remetente: null };
+    }
+  }
+  async function emailLigado() {
+    return (await estadoEmail()).ligado;
+  }
+  async function base64DoBlob(blob) {
+    const bytes2 = new Uint8Array(await blob.arrayBuffer());
+    let s = "";
+    for (let i = 0; i < bytes2.length; i += 32768) s += String.fromCharCode.apply(null, bytes2.subarray(i, i + 32768));
+    return btoa(s);
+  }
+  async function enviarEmail({ para, cco = "", assunto, texto: texto3, anexos = [] } = {}) {
+    if (!String(para || "").trim()) throw new ErroUsuario("Informe o e-mail do destinatário.");
+    const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
+    if (total > MAX_BYTES_ANEXOS) throw new ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
+    if (local2() || !cfg2.online()) throw new ErroUsuario(SEM_INTERNET);
+    const lista3 = [];
+    for (const a of anexos) {
+      if (!a?.blob) throw new ErroUsuario(`Anexo sem arquivo: ${a?.nome || ""}`);
+      lista3.push({ nome: String(a.nome || a.blob.name || "anexo"), tipo: a.blob.type || "application/octet-stream", base64: await base64DoBlob(a.blob) });
+    }
+    let r;
+    try {
+      r = await cfg2.buscar(`${cfg2.base}email/enviar`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: limiteDeTempo(TEMPO_ENVIO),
+        headers: { "Content-Type": "application/json", "X-Sistema": "imoveis" },
+        body: JSON.stringify({ para: String(para), cco: String(cco || ""), assunto: String(assunto || ""), texto: String(texto3 || ""), anexos: lista3 })
+      });
+    } catch (e) {
+      if (e?.name === "TimeoutError") throw new ErroUsuario("A nuvem demorou demais para responder. Confira na pasta Enviados do Gmail antes de mandar de novo.");
+      throw new ErroUsuario(SEM_INTERNET);
+    }
+    if (r.redirected || !ehJson(r)) throw new ErroUsuario("Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail). O e-mail não foi enviado.");
+    const d2 = await r.json().catch(() => ({}));
+    if (!r.ok || !d2.ok) throw new ErroUsuario(d2.erro || `O e-mail não foi enviado (erro ${r.status}).`);
+    return { ok: true, id: String(d2.id || "") };
+  }
+
+  // docs/js/telas/emails.js
+  init_regras();
+  var LIMITE_ENDERECO = 7e3;
+  function ultimoEnvio(chave, alvo) {
+    return (d().envios_email || []).filter((x) => x.chave === chave && (alvo.contrato && x.contrato_id === Number(alvo.contrato) || alvo.ficha && x.ficha_id === Number(alvo.ficha))).sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
+  }
+  function botaoEmail(chave, alvo, texto3 = "✉ E-mail") {
+    if (!opera() || !MODELOS_EMAIL.some((m) => m.chave === chave)) return "";
+    const u = ultimoEnvio(chave, alvo);
+    return `${botao("abrirEmail", texto3, { chave, ...alvo }, "secundario mini")}${u ? ` <span class="suave" title="${esc(u.como)}">${u.como === "enviado" ? "enviado" : "aberto"} em ${dataBr(u.data)}</span>` : ""}`;
+  }
+  var registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => inserir(db, "envios_email", {
+    data: hojeIso(),
+    chave,
+    contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
+    ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
+    para,
+    assunto,
+    como,
+    gmail_id: id || null
+  }, login(), `E-mail "${assunto}" ${como === "enviado" ? "enviado" : "aberto no Gmail"} para ${para || "(sem destinatário)"}`));
+  async function copiar2(texto3) {
+    try {
+      await navigator.clipboard.writeText(texto3);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  var campoPergunta = ([nome, rotulo, tipo], valor) => {
+    if (tipo === "area") return `<p><label>${esc(rotulo)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
+    const t = tipo === "data" ? "date" : tipo === "ano" ? "number" : "text";
+    return `<p><label>${esc(rotulo)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
+  };
+  async function janelaEmail(chave, alvo) {
+    const modelo = modeloEmail(d(), chave);
+    const reg = alvo.contrato ? buscar2("contratos", alvo.contrato) : buscar2("fichas", alvo.ficha);
+    if (!modelo || !reg) throw new Error("Inquilino ou ficha não encontrado.");
+    const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
+    const inicio = dadosDoEmail(d(), objeto);
+    const ligado = await emailLigado();
+    const perguntas = (modelo.perguntas || []).map((p2) => campoPergunta(p2, inicio.perguntas[p2[0]] ?? "")).join("");
+    const dlg = document.createElement("dialog");
+    dlg.className = "janela-erro janela-pergunta janela-email";
+    dlg.innerHTML = `<form method="dialog"><h3>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || "")}</h3><div class="corpo">
+    ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ""}
+    <p class="suave">De: Administradora &lt;administracao@ankjck.com.br&gt;${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ""}</p>
+    <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
+    ${inicio.para ? "" : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
+    <p><label>Assunto</label><input name="assunto"></p>
+    <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
+    <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
+    ${ligado ? `<p><label>Anexos para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ""}
+    <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? "Confira no contrato do inquilino a multa da saída antecipada antes de enviar. " : ""}${ligado ? "" : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
+  </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
+    <button type="button" class="secundario" data-fechar>Fechar</button>
+    <button type="button" class="secundario" data-copiar>Copiar texto</button>
+    <button type="button" class="secundario" data-gmail>Abrir no Gmail</button>
+    ${ligado ? '<button type="button" data-enviar>Enviar agora</button>' : ""}</div></form>`;
+    document.body.appendChild(dlg);
+    const q = (s) => dlg.querySelector(s);
+    let editado = false;
+    let registrou = false;
+    const respostas = () => Object.fromEntries((modelo.perguntas || []).map(([n]) => [n, q(`[name=p_${n}]`).value]));
+    const desenhar = () => {
+      const e = montarEmail(modelo, dadosDoEmail(d(), objeto, respostas()));
+      q("[name=assunto]").value = e.assunto;
+      if (!editado) q("[name=texto]").value = e.texto;
+    };
+    desenhar();
+    q("[name=texto]").addEventListener("input", () => {
+      editado = true;
+      q("[data-editado]").hidden = false;
+    });
+    dlg.querySelectorAll("[name^=p_]").forEach((el) => el.addEventListener("input", desenhar));
+    const atual = () => ({ para: q("[name=para]").value.trim(), assunto: q("[name=assunto]").value.trim(), texto: q("[name=texto]").value });
+    const pendente = () => /\[preencher: /.test(atual().texto + atual().assunto) ? 'Ainda há "[preencher: ...]" no texto: complete antes de mandar.' : "";
+    q("[data-fechar]").addEventListener("click", () => dlg.close());
+    q("[data-copiar]").addEventListener("click", async () => {
+      const e = atual();
+      aviso(await copiar2(`${e.assunto}
+
+${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ""}` : "O navegador não deixou copiar: selecione o texto e use Ctrl+C.", pendente() ? "aviso" : "ok");
+    });
+    q("[data-gmail]").addEventListener("click", async () => {
+      const e = atual();
+      const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
+      const cabe = comCorpo.length <= LIMITE_ENDERECO;
+      const copiado = await copiar2(e.texto);
+      window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank", "noopener");
+      await registrar2(chave, alvo, e.para, e.assunto, "aberto no Gmail");
+      registrou = true;
+      aviso(cabe ? "Gmail aberto com o texto. Anexe os arquivos e envie por lá." : copiado ? "Gmail aberto. O texto é comprido para ir pelo endereço: ele foi copiado, cole no corpo do e-mail." : "Gmail aberto. Copie o texto da janela e cole no corpo do e-mail.", cabe ? "ok" : "aviso");
+    });
+    const enviar = q("[data-enviar]");
+    if (enviar) enviar.addEventListener("click", async () => {
+      const e = atual();
+      if (!e.para) {
+        aviso("Digite o e-mail do destinatário.", "aviso");
+        return;
+      }
+      if (pendente()) {
+        aviso(pendente(), "aviso");
+        return;
+      }
+      const arquivos = [...q("[name=anexos]").files || []].map((f) => ({ nome: f.name, blob: f }));
+      if (!confirm(`Enviar agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}?`)) return;
+      enviar.disabled = true;
+      try {
+        const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
+        await registrar2(chave, alvo, e.para, e.assunto, "enviado", r.id);
+        dlg.close();
+        aviso(`E-mail enviado para ${e.para}. Fica em "Enviados" no Gmail.`);
+        await mostrar();
+      } catch (erro) {
+        aviso(erro.message || "O e-mail não foi enviado.", "erro");
+      } finally {
+        enviar.disabled = false;
+      }
+    });
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      if (registrou) mostrar();
+    });
+    dlg.showModal();
+  }
+  var ACOES_EMAILS = {
+    async abrirEmail({ chave, contrato, ficha }) {
+      if (!opera()) throw new Error("Seu usuário não pode enviar e-mails.");
+      await janelaEmail(chave, contrato ? { contrato: Number(contrato) } : { ficha: Number(ficha) });
+    },
+    async restaurarModeloEmail({ chave }) {
+      const m = (d().modelos_email || []).find((x) => x.chave === chave);
+      if (m) await alterar((db) => excluir(db, "modelos_email", m.id, login(), `Modelo de e-mail "${modeloEmail(db, chave).nome}" voltou ao texto padrão`));
+      aviso("Texto padrão restaurado.");
+      await mostrar();
+    },
+    /** Baixa os modelos em uso (para conferir ou guardar) num arquivo de texto. */
+    baixarModelosEmail() {
+      const t = MODELOS_EMAIL.map((p2) => {
+        const m = modeloEmail(d(), p2.chave);
+        return `=== ${m.nome} (${m.etapa}) ===
+Assunto: ${m.assunto}
+
+${m.texto}
+`;
+      }).join("\n");
+      baixar(new Blob([t], { type: "text/plain;charset=utf-8" }), "Modelos de e-mail.txt");
+    }
+  };
+  var FORMULARIOS_EMAILS = {
+    async modeloEmail(form) {
+      if (!opera()) throw new Error("Seu usuário não pode alterar os modelos.");
+      const f = new FormData(form);
+      const chave = String(f.get("chave") || "");
+      const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
+      if (!padrao) throw new Error("Modelo não encontrado.");
+      const assunto = String(f.get("assunto") || "").trim();
+      const texto3 = String(f.get("texto") || "").trim();
+      if (!assunto || !texto3) throw new Error("Preencha o assunto e o texto.");
+      await alterar((db) => {
+        const m = (db.modelos_email || []).find((x) => x.chave === chave);
+        if (m) atualizar(db, "modelos_email", m.id, { assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
+        else inserir(db, "modelos_email", { chave, assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
+      });
+      aviso("Modelo de e-mail salvo.");
+      ir("#/modelos-email");
+    }
+  };
+  var AJUDA = `<div class="cartao"><h2>Como escrever</h2>
+  <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
+  {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
+  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano} e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
+  <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
+  bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>
+  <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
+  function telaModelosEmail() {
+    const etapas = [...new Set(MODELOS_EMAIL.map((m) => m.etapa))];
+    const linha = (p2) => {
+      const m = modeloEmail(d(), p2.chave);
+      return `<tr><td><b>${esc(m.nome)}</b>${m.editado ? ' <span class="suave">(editado)</span>' : ""}<br><span class="suave">${esc(m.assunto)}</span></td><td class="nw">${esc(m.etapa)}</td>
+    <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, "Editar") : ""} ${opera() && m.editado ? botao("restaurarModeloEmail", "Voltar ao texto padrão", { chave: m.chave }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ""}</td></tr>`;
+    };
+    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+    <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao("baixarModelosEmail", "Baixar todos (TXT)", {}, "secundario pequeno")}</div>
+    <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
+    <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join("")).join("")}</table></div>${AJUDA}`;
+  }
+  function telaModeloEmail(chave) {
+    const m = modeloEmail(d(), chave);
+    if (!m) return naoEncontrado("Modelo não encontrado", "#/modelos-email", "Ver os modelos de e-mail");
+    return `<p class="suave"><a href="#/modelos-email">← Modelos de e-mail</a></p><h1>Modelo de e-mail: ${esc(m.nome)}</h1>
+    <form class="cartao" data-form="modeloEmail"><input type="hidden" name="chave" value="${esc(m.chave)}">
+      <p class="suave">Botão na etapa: <b>${esc(m.etapa)}</b>${m.anexos ? ` · lembrete de anexo: ${esc(m.anexos)}` : ""}</p>
+      <p><label>Assunto</label><input name="assunto" value="${esc(m.assunto)}" required></p>
+      <p><label>Texto (o fecho e a assinatura entram sozinhos no fim)</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
+      <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-email">Cancelar</a></div></form>${AJUDA}`;
+  }
+  function alertaInformeIr() {
+    const { ano, contratos } = informesPendentes(d());
+    if (!contratos.length) return "";
+    return `<div class="alerta info"><b>Informe do Imposto de Renda de ${ano}:</b> enviar a ${contratos.length} inquilino(s) (de preferência até o fim de fevereiro):
+    ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
   }
 
   // docs/js/telas/contrato.js
@@ -17275,7 +18125,7 @@ Salvar assim mesmo?`)) {
     const tabelaDepositos = (qual, lista3, podeExcluir) => lista3.length ? `<table class="compacta">${lista3.map((x) => `<tr><td class="nw">${dataBr(x.data)}${x.complementar ? ' <span class="suave">complemento</span>' : ""}</td>
       <td class="n">${reais(x.valor)}</td><td>${linkComprovante(c.id, x.comprovante, anexoDeposito(qual, x))}</td>
       <td class="n nw">${editar(`#/editar/depositos_garantia/${x.id}`)} ${podeExcluir(x) ? excluir2("depositos_garantia", x.id, `Excluir o depósito de ${reais(x.valor)} de ${dataBr(x.data)}? O comprovante também é apagado.`) : ""}</td></tr>`).join("")}</table>` : "";
-    const registrar2 = (qual, nome, prevista) => {
+    const registrar3 = (qual, nome, prevista) => {
       const s = garantiaADepositar(d(), c, qual);
       return `<div class="alerta aviso"><b>Incluir ${nome}:</b> ${reais(s.combinado)} (prevista ${dataBr(prevista)}) · depositado ${reais(s.depositado)} · <b>falta ${reais(s.falta)}</b>
     ${s.corrigida ? `<br><span class="suave">Depois de registrada, completar até ${reais(s.corrigida)} pelos reajustes (+${reais(s.corrigida - s.combinado)}).</span>` : ""}
@@ -17322,7 +18172,7 @@ Salvar assim mesmo?`)) {
       html += `<div class="alerta aviso"><b>${qual === "caucao" ? "Caução" : "Depósito de garantia"} herdada de ${esc(anteriorDaGarantia.inquilino_nome)}:</b> ${reais(qual === "caucao" ? c.caucao_valor : c.deposito_valor)} · sem comprovante.
       Anexe o comprovante do depósito na garantia do contrato anterior: aparece aqui sozinho.${irParaAnterior}</div>${qual === "caucao" ? correcoesHtml() : ""}`;
     } else if (temCaucao(c) && !garantiaDepositada(c)) {
-      html += c.caucao_valor > 0 ? `${registrar2("caucao", "caução", c.caucao_data)}${correcoesHtml()}` : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
+      html += c.caucao_valor > 0 ? `${registrar3("caucao", "caução", c.caucao_data)}${correcoesHtml()}` : '<div class="alerta aviso">Caução sem valor: informe em "Editar".</div>';
     } else if (temCaucao(c)) {
       const comp = complementoCaucao(d(), c);
       const s = garantiaADepositar(d(), c, "caucao");
@@ -17340,7 +18190,7 @@ Salvar assim mesmo?`)) {
       ${parcelas2("caucao")}${correcoesHtml()}`;
     }
     if (temDeposito(c) && !garantiaDepositada(c) && !anteriorDaGarantia) {
-      html += c.deposito_valor > 0 ? registrar2("deposito", "depósito de garantia", c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
+      html += c.deposito_valor > 0 ? registrar3("deposito", "depósito de garantia", c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
     } else if (temDeposito(c)) {
       html += `<p class="linha-garantia">Depósito de garantia <b>${reais(valorGarantia(d(), c))}</b>, pago em ${dataBr(c.deposito_pago_em || c.deposito_data)}${comprovanteDa("deposito", "comprovante_deposito")}${remover("deposito")}
       · uso: ${esc(c.deposito_uso || "não informado")}</p>${parcelas2("deposito")}`;
@@ -17378,6 +18228,8 @@ Salvar assim mesmo?`)) {
     }
     return `${html}</div>`;
   }
+  var EMAIL_ENTRADA = { contrato_gerado: "contrato_assinar", contrato_assinado: "contrato_assinado", vistoria_assinada: "vistoria_assinada" };
+  var EMAIL_SAIDA = { aviso: "saida_aviso", vistoria: "saida_vistoria", chaves: "saida_chaves", calculo: "saida_calculo", garantia: "saida_encerramento" };
   function roteiroSaidaHtml(c, e) {
     const hoje3 = hojeIso();
     const etapas = roteiroSaida(d(), c, hoje3);
@@ -17390,10 +18242,13 @@ Salvar assim mesmo?`)) {
       if (x.chave === "calculo" && c.data_saida <= hoje3) return link(`#/novo/encerramentos?contrato=${c.id}`, "Fazer cálculo final", "botao pequeno");
       if (x.chave === "garantia" && e) return botao("garantiaDevolvida", e.saldo >= 0 ? "Marcar garantia devolvida" : "Marcar saldo cobrado", { id: e.id }, "pequeno");
       if (x.chave === "boleto") return x.cobranca_id ? link(`#/cobranca/${x.cobranca_id}`, "Ver o boleto", "botao pequeno") : link(`#/cobrancas?comp=${competenciaDe(c.data_saida)}`, "Gerar na tela Boletos", "botao pequeno");
+      if (x.chave === "arquivo" && c.data_saida <= hoje3) return `${link(`#/contrato/${c.id}?ir=documentos`, "Ver os documentos", "botao secundario pequeno")} ${botao("arquivoFisico", "Marcar arquivado", { id: c.id }, "pequeno")}`;
       return "";
     };
+    const email = (x) => EMAIL_SAIDA[x.chave] ? botaoEmail(EMAIL_SAIDA[x.chave], { contrato: c.id }) : "";
+    const desfazer = (x) => x.chave === "arquivo" && x.feito && opera() ? botao("arquivoFisico", "Desfazer", { id: c.id, desfazer: "1" }, "link-botao") : "";
     return `<p class="suave">Roteiro da saída: <b>${feitas} de ${etapas.length}</b> etapas feitas. A ordem é a do dia a dia; cada etapa fica marcada sozinha quando o registro dela existe.</p>
-    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? "feito" : ""}"><div class="cabecalho"><div>${x.feito ? "✅" : "⬜"} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)}</div></div></li>`).join("")}</ol>`;
+    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? "feito" : ""}"><div class="cabecalho"><div>${x.feito ? "✅" : "⬜"} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)} ${email(x)} ${desfazer(x)}</div></div></li>`).join("")}</ol>`;
   }
   function caixaSaida(c) {
     const e = encerramentoDo(d(), c.id);
@@ -17563,7 +18418,7 @@ Salvar assim mesmo?`)) {
     const antigos = cobs.slice(BOLETOS_INQUILINO);
     const anoDecl = (/* @__PURE__ */ new Date()).getFullYear() - 1;
     return `<div class="cartao"><div class="cabecalho"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
-      ${geraNf(c) && cobs.some((x) => x.data_pagamento) ? link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, "Declaração anual de aluguéis (IRPF)", "botao secundario pequeno") : ""}</div>
+      ${geraNf(c) && cobs.some((x) => x.data_pagamento) ? `${link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, "Declaração anual de aluguéis (IRPF)", "botao secundario pequeno")} ${botaoEmail("informe_ir", { contrato: c.id })}` : ""}</div>
     <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join("") || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
     ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join("")}</table></div></details>` : ""}
     ${cadeiaDeContratos(d(), c).antes.reverse().map((x) => {
@@ -17641,7 +18496,9 @@ Salvar assim mesmo?`)) {
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
         <input type="date" name="data" value="${hoje3}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
     };
-    const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b></td>
+    const limite = c.data_entrada ? somarDias(c.data_entrada, 10) : null;
+    const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ""}${e.chave === "vistoria_assinada" && limite && hoje3 <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (10 dias da entrega das chaves).</span>` : ""}`;
+    const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join("")}</table></div>`;
     const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
     const titulo2 = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? "✓ concluída" : `${feitas} de ${total} feitas`}</span>`;
@@ -18752,21 +19609,21 @@ Salvar assim mesmo?`)) {
     }
   };
   function telaFormulario(tabela, registro, q, estado2) {
-    const cfg2 = CADASTROS[tabela];
-    if (!cfg2) return naoEncontrado("Página não encontrada");
-    if (!opera() || cfg2.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
-    const campos = cfg2.campos(registro, q);
-    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg2.valores ? cfg2.valores(registro) : registro);
+    const cfg3 = CADASTROS[tabela];
+    if (!cfg3) return naoEncontrado("Página não encontrada");
+    if (!opera() || cfg3.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
+    const campos = cfg3.campos(registro, q);
+    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg3.valores ? cfg3.valores(registro) : registro);
     if (!registro && !estado2) {
       const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== void 0).map((c) => [c.nome, c.padrao]));
-      valores = paraFormulario(campos, { ...padroes, ...cfg2.padrao ? cfg2.padrao(q) : {} });
+      valores = paraFormulario(campos, { ...padroes, ...cfg3.padrao ? cfg3.padrao(q) : {} });
     }
-    const base = cfg2.base ? cfg2.base(registro) : null;
-    const avisoTexto = cfg2.aviso ? cfg2.aviso(registro, q) : "";
-    return `<h1>${esc(cfg2.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
+    const base = cfg3.base ? cfg3.base(registro) : null;
+    const avisoTexto = cfg3.aviso ? cfg3.aviso(registro, q) : "";
+    return `<h1>${esc(cfg3.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== void 0 ? `data-base="${base}"` : ""}>
-      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg2.compacto })}${cfg2.extraHtml ? cfg2.extraHtml(registro, q) : ""}
-      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg2.voltar(registro, q))}">Voltar</a></p></form>`;
+      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg3.compacto })}${cfg3.extraHtml ? cfg3.extraHtml(registro, q) : ""}
+      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg3.voltar(registro, q))}">Voltar</a></p></form>`;
   }
 
   // docs/js/telas/icone.js
@@ -19128,8 +19985,8 @@ Salvar assim mesmo?`)) {
     let recalculados = 0;
     await alterar((db) => {
       for (const { tabela, id } of desfazerAlteracoes(db, itens, login())) {
-        const cfg2 = CADASTROS[tabela];
-        if (cfg2 && cfg2.recalcular) recalculados += recalcularCobrancas(db, cfg2.recalcular(buscar(db, tabela, id), db), login());
+        const cfg3 = CADASTROS[tabela];
+        if (cfg3 && cfg3.recalcular) recalculados += recalcularCobrancas(db, cfg3.recalcular(buscar(db, tabela, id), db), login());
       }
     });
     aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : "Desfeito.");
@@ -19228,6 +20085,7 @@ Salvar assim mesmo?`)) {
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento")}</div>` : ""}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
+    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK)."}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>
@@ -19485,7 +20343,7 @@ Salvar assim mesmo?`)) {
       const ano = Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear() - 1;
       const r = declaracaoAnual(d(), c.id, ano);
       const anos = [...new Set(d().faturas.map((f) => Number(String(f.emissao).slice(0, 4))))].sort((a, b) => b - a);
-      const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? "" : "secundario "}pequeno`)).join(" ")}</div>`;
+      const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? "" : "secundario "}pequeno`)).join(" ")} · ${botaoEmail("informe_ir", { contrato: c.id })}</div>`;
       return `<div class="impressao">${voltar(r.empresas.length ? { seletor: ".impressao .declaracoes", nome: nomeArquivoDoc("Declaracao anual aluguel", c, String(ano)) } : null)}${abas}
       ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join("")}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
     }
@@ -19662,6 +20520,8 @@ Salvar assim mesmo?`)) {
       <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${reais(g.total)}</b></td></tr></table>
     ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ""}
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
+    ${pj ? "" : `<p><b>Como declarar:</b> na ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), com o CNPJ ${esc(e.cnpj || "da empresa")} e o total acima.</p>`}
+    <p>Não houve retenção de imposto de renda na fonte.</p>
     <p class="carta-data">${esc(i && i.cidade || e.municipio || "Curitiba")}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ""}</p></div>`;
   }
@@ -20549,6 +21409,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${podeUsuario("admin") ? botao("excluir", "Excluir", { tabela: "fichas", id: f.id }, "perigo pequeno", `Excluir a ficha de ${f.inquilino_nome}? Os documentos da pasta dela são apagados juntos.`) : ""}</div></div>
     <div class="cartao"><h2>Situação</h2><p>${situacaoDaFicha(f)} <span class="suave">· recebida em ${dataBr(f.data_recebida)}</span></p>
       ${decisao}
+      ${opera() ? `<p class="acoes">${f.reserva_valor > 0 ? botaoEmail("ficha_envio", { ficha: f.id }, "✉ E-mail: envio da ficha cadastral") : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === "Aprovada" ? botaoEmail("ficha_aprovada", { ficha: f.id }, "✉ E-mail: ficha aprovada") : ""} ${f.situacao === "Reprovada" ? botaoEmail("ficha_reprovada", { ficha: f.id }, "✉ E-mail: ficha reprovada") : ""}</p>` : ""}
       ${f.situacao === "Em análise" && opera() ? `<div class="acoes">${botao("decidirFicha", "Aprovar", { id: f.id, situacao: "Aprovada" }, "pequeno", `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
         ${link(`#/editar/fichas/${f.id}`, "Reprovar (com o motivo)", "botao perigo pequeno")}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ""}
@@ -20649,7 +21510,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const texto3 = celular ? "Contrato" : "📄 Contrato";
       return doc && doc.arquivo ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto3}</a>` : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto3}</span>`;
     };
-    const registrar2 = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
+    const registrar3 = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
     const comPais = (tel) => tel.length <= 11 ? `55${tel}` : tel;
     const nomeCelular = (x) => {
       const tel = String(x.c.inquilino_telefone || "").replace(/\D/g, "");
@@ -20663,7 +21524,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
     ${caixaFichas()}
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar2(x.c)}
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar3(x.c)}
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.data_entrada || x.c.vigencia_inicio ? `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || '<tr><td colspan="6" class="suave">Nenhum.</td></tr>'}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
@@ -22501,22 +23362,22 @@ ${MODELO_COMODOS[comodo].join("\n")}
     },
     voltar: () => history.back(),
     async excluir({ tabela, id }) {
-      const cfg2 = TABELAS_EXCLUSAO[tabela] || {};
-      if (cfg2.admin && !podeUsuario("admin")) throw new Error("Só administradores podem excluir.");
+      const cfg3 = TABELAS_EXCLUSAO[tabela] || {};
+      if (cfg3.admin && !podeUsuario("admin")) throw new Error("Só administradores podem excluir.");
       const r = buscar2(tabela, id);
-      const destino = cfg2.voltar ? cfg2.voltar(r) : null;
+      const destino = cfg3.voltar ? cfg3.voltar(r) : null;
       const pastaFicha = tabela === "fichas" && r ? r.pasta || nomePastaFicha(r) : null;
       await (["imoveis", "fichas"].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
         const reg = buscar(db, tabela, id);
-        const problema = cfg2.checar ? cfg2.checar(db, reg) : null;
+        const problema = cfg3.checar ? cfg3.checar(db, reg) : null;
         if (problema) throw new Error(problema);
         if (tabela === "imoveis") {
           for (const t of ["participacoes", "seguros", "leituras", "reformas", "iptus", "titularidades", "despesas", "vistorias"]) db[t].filter((p2) => p2.imovel_id === reg.id).forEach((p2) => excluir(db, t, p2.id, login()));
         }
         if (tabela === "contratos") excluirContrato(db, reg.id, login());
         else excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === "fichas" ? `Ficha de ${reg.inquilino_nome}` : null));
-        if (cfg2.recalcular) recalcularCobrancas(db, cfg2.recalcular(db, reg), login());
-        if (cfg2.depois) cfg2.depois(db, reg);
+        if (cfg3.recalcular) recalcularCobrancas(db, cfg3.recalcular(db, reg), login());
+        if (cfg3.depois) cfg3.depois(db, reg);
       });
       if (pastaFicha) await apagarPastaDaFicha(pastaFicha);
       if (tabela === "contratos") {
@@ -22667,6 +23528,26 @@ ${MODELO_COMODOS[comodo].join("\n")}
       await mostrar();
     },
     /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
+    /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
+    async arquivoFisico({ id, desfazer }) {
+      const c = buscar2("contratos", id);
+      if (!c) throw new Error("Inquilino não encontrado.");
+      if (desfazer === "1") {
+        await alterar((db) => marcarArquivoFisico(db, c.id, "", login()));
+        await mostrar();
+        return;
+      }
+      const r = await janela({
+        titulo: "Arquivo físico",
+        sim: "Marcar arquivado",
+        html: `<p>Imprima e guarde em papel o processo de <b>${esc(c.inquilino_nome)}</b>: contrato, aditivos, vistorias de entrada e saída, termos das chaves, cálculo final e comprovantes (botão "Ver os documentos"). Guarde por 10 anos depois da saída.</p>
+        <label>Data em que foi arquivado</label><input type="date" name="data" value="${hojeIso()}" required>`
+      });
+      if (!r) return;
+      await alterar((db) => marcarArquivoFisico(db, c.id, String((r.data || [])[0] || ""), login()));
+      aviso("Processo marcado como arquivado em papel.");
+      await mostrar();
+    },
     async garantiaDevolvida({ id }) {
       const e = buscar2("encerramentos", id);
       if (!e) throw new Error("Cálculo final não encontrado.");
@@ -23773,7 +24654,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await mostrar();
     }
   };
-  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS);
+  Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS);
 
   // docs/js/telas/envios.js
   var REGISTRO_EXCLUIDO = "Este registro foi excluído por outra pessoa; nada foi salvo.";
@@ -24166,36 +25047,36 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     async cadastro(form, rota) {
       const tabela = rota.partes[1];
-      const cfg2 = CADASTROS[tabela];
+      const cfg3 = CADASTROS[tabela];
       const registro = rota.partes[0] === "editar" ? buscar2(tabela, rota.partes[2]) : null;
       if (rota.partes[0] === "editar" && !registro) throw new ErroUsuario(REGISTRO_EXCLUIDO);
       const antigo = registro ? { ...registro } : null;
-      const campos = cfg2.campos(registro, rota.q);
-      const { dados, erros } = ler(campos, form, registro && cfg2.valores ? cfg2.valores(registro) : registro);
-      if (cfg2.ajustar && !Object.keys(erros).length) cfg2.ajustar(dados, erros, registro, form, rota.q);
-      if (cfg2.confirmar && !Object.keys(erros).length && !await cfg2.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
-      if (cfg2.ajustarAsync && !Object.keys(erros).length) await cfg2.ajustarAsync(dados, erros, registro, form, rota.q);
+      const campos = cfg3.campos(registro, rota.q);
+      const { dados, erros } = ler(campos, form, registro && cfg3.valores ? cfg3.valores(registro) : registro);
+      if (cfg3.ajustar && !Object.keys(erros).length) cfg3.ajustar(dados, erros, registro, form, rota.q);
+      if (cfg3.confirmar && !Object.keys(erros).length && !await cfg3.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
+      if (cfg3.ajustarAsync && !Object.keys(erros).length) await cfg3.ajustarAsync(dados, erros, registro, form, rota.q);
       if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
-      confirmarAvisos(cfg2.conferir ? cfg2.conferir(dados, registro, rota.q) : []);
-      Object.assign(dados, cfg2.fixos ? cfg2.fixos(registro, rota.q) : {});
-      const descricao = cfg2.descricao ? cfg2.descricao(dados, registro, rota.q) : null;
+      confirmarAvisos(cfg3.conferir ? cfg3.conferir(dados, registro, rota.q) : []);
+      Object.assign(dados, cfg3.fixos ? cfg3.fixos(registro, rota.q) : {});
+      const descricao = cfg3.descricao ? cfg3.descricao(dados, registro, rota.q) : null;
       let recalculados = 0;
       const salvo = await alterar((db) => {
         if (registro && !buscar(db, tabela, registro.id)) throw new ErroUsuario(REGISTRO_EXCLUIDO);
         let r;
-        if (cfg2.salvar) r = cfg2.salvar(db, dados, rota.q, registro);
+        if (cfg3.salvar) r = cfg3.salvar(db, dados, rota.q, registro);
         else if (registro) {
           atualizar(db, tabela, registro.id, dados, login(), descricao);
           r = buscar(db, tabela, registro.id);
         } else r = inserir(db, tabela, dados, login(), descricao);
-        if (cfg2.recalcular) recalculados = recalcularCobrancas(db, cfg2.recalcular(r, db), login());
+        if (cfg3.recalcular) recalculados = recalcularCobrancas(db, cfg3.recalcular(r, db), login());
         return r;
       });
-      if (cfg2.depois) await cfg2.depois(salvo, antigo);
+      if (cfg3.depois) await cfg3.depois(salvo, antigo);
       if (["contratos", "depositos_garantia", "correcoes_garantia", "aplicacoes", "devolucoes_garantia"].includes(tabela)) await acertarNomesDosComprovantes(tabela === "contratos" ? salvo.id : salvo.contrato_id);
       if (tabela === "usuarios") renovarUsuario();
       aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : "Salvo.");
-      const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg2.destino ? cfg2.destino(salvo, rota.q) : cfg2.voltar(salvo, rota.q);
+      const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg3.destino ? cfg3.destino(salvo, rota.q) : cfg3.voltar(salvo, rota.q);
       ir(destino);
       return null;
     },
@@ -24392,7 +25273,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await mostrar();
     }
   };
-  Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS);
+  Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS);
   async function confirmarPagamentoBoleto(id, f) {
     const data2 = String(f.get("data") || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
@@ -24670,6 +25551,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${podeUsuario("admin") && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao("reconectarSeguro", "Reconectar o backup seguro", {}, "secundario pequeno")}</div>` : ""}
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
       ${alertaFichas()}
+      ${alertaInformeIr()}
       ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
         ${link("#/conflitos", podeUsuario("admin") ? "Escolher agora" : "Ver (o administrador escolhe)", "botao pequeno")}</div>` : ""}
       ${avisoBackupSeguro()}
@@ -24746,6 +25628,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     "contrato-gerar": (rota) => telaGerarContrato(rota),
     aditivo: (rota) => telaAditivo(rota),
     "modelos-contrato": () => telaModelos(),
+    "modelos-email": () => telaModelosEmail(),
+    "modelo-email": (rota) => telaModeloEmail(String(rota.partes[1] || "")),
     vistoria: (rota) => telaVistoria(rota),
     "modelo-vistoria": (rota) => telaModeloVistoria(rota),
     fechamento: (rota) => telaFechamento(competenciaValida(rota.q.mes, competenciaDe(hojeIso()))),
