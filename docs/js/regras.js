@@ -6,7 +6,7 @@ import * as C from './calculos.js';
 import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
 import * as M from './mapa-c6.js';
-import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA } from './modelos-contrato.js';
+import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
@@ -17,6 +17,7 @@ export const TABELAS = {
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
+  modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', acordos: 'Acordo de dívida', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
@@ -150,6 +151,13 @@ export function normalizar(d) {
   for (const m of d.modelos_contrato || []) {
     if (m.tipo || !m.texto || m.texto.includes('[se fci]') || !m.texto.includes('## RENOVAÇÃO DO CONTRATO')) continue;
     m.texto = m.texto.replace('## RENOVAÇÃO DO CONTRATO', `${CLAUSULAS_FCI}\n\n## RENOVAÇÃO DO CONTRATO`);
+  }
+  // revisão jurídica de 2026-11-12 (vistoria na entrega das chaves com 10 dias, aviso prévio do art. 6º, procuração por imóvel,
+  // honorários de 20%, multa do comercial, LGPD): troca só o texto antigo que continua igual nos modelos já gravados
+  for (const m of d.modelos_contrato || []) {
+    if (m.tipo || !m.texto) continue;
+    const novo = atualizarTextoModelo(m.texto);
+    if (novo !== m.texto.replace(/\r\n/g, '\n')) m.texto = novo;
   }
   // termo de troca de inquilino: a garantia nova (a de quem sai é devolvida) entra nos modelos já gravados; o texto da
   // garantia que continua fica como estava, no [senão]
@@ -5733,14 +5741,25 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   return [
     { chave: 'aviso', titulo: 'Aviso prévio: data de saída informada', feito: true, detalhe: `saída em ${C.dataBr(c.data_saida)}` },
     { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vist ? `feita em ${C.dataBr(vist.data)}` : saiu ? 'ainda não registrada' : `a partir de ${C.dataBr(c.data_saida)}` },
-    { chave: 'chaves', titulo: 'Entrega das chaves', feito: saiu, detalhe: saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}` : `prevista para ${C.dataBr(c.data_saida)}` },
+    { chave: 'chaves', titulo: 'Devolução das chaves', feito: saiu, detalhe: saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}` : `prevista para ${C.dataBr(c.data_saida)}` },
     { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
       detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
     { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
     { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
       detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
+    // arquivo físico (pedido do dono em 2026-11-12): imprimir o processo inteiro e guardar em papel por 10 anos depois do fim
+    { chave: 'arquivo', titulo: 'Arquivo físico: imprimir o processo e guardar em papel', feito: !!c.arquivo_fisico_em,
+      detalhe: c.arquivo_fisico_em ? `arquivado em ${C.dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)` },
   ];
+}
+
+/** Marca o processo do inquilino que saiu como impresso e guardado em papel (``data`` vazia desfaz). */
+export function marcarArquivoFisico(d, contratoId, data, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data.');
+  atualizar(d, 'contratos', c.id, { arquivo_fisico_em: data || null }, usuario, data ? `${c.inquilino_nome}: processo impresso para o arquivo físico em ${C.dataBr(data)}` : `${c.inquilino_nome}: arquivo físico desmarcado`);
 }
 
 /** Marca a garantia como devolvida (ou o saldo cobrado) no cálculo final; ``data`` vazia desfaz. */

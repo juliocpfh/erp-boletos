@@ -4,6 +4,7 @@ import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
 import { esc, pctTexto } from '../formularios.js';
 import * as R from '../regras.js';
+import { botaoEmail } from './emails.js';
 import { botao, buscar, caixaArquivos, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera } from './comum.js';
 
 const COR_SITUACAO = { 'Em análise': 'aviso', Aprovada: 'ok', Reprovada: 'neutra' };
@@ -88,6 +89,7 @@ export function telaFicha(id) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'fichas', id: f.id }, 'perigo pequeno', `Excluir a ficha de ${f.inquilino_nome}? Os documentos da pasta dela são apagados juntos.`) : ''}</div></div>
     <div class="cartao"><h2>Situação</h2><p>${situacaoDaFicha(f)} <span class="suave">· recebida em ${dataBr(f.data_recebida)}</span></p>
       ${decisao}
+      ${opera() ? `<p class="acoes">${f.reserva_valor > 0 ? botaoEmail('ficha_envio', { ficha: f.id }, '✉ E-mail: envio da ficha cadastral') : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === 'Aprovada' ? botaoEmail('ficha_aprovada', { ficha: f.id }, '✉ E-mail: ficha aprovada') : ''} ${f.situacao === 'Reprovada' ? botaoEmail('ficha_reprovada', { ficha: f.id }, '✉ E-mail: ficha reprovada') : ''}</p>` : ''}
       ${f.situacao === 'Em análise' && opera() ? `<div class="acoes">${botao('decidirFicha', 'Aprovar', { id: f.id, situacao: 'Aprovada' }, 'pequeno', `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
         ${link(`#/editar/fichas/${f.id}`, 'Reprovar (com o motivo)', 'botao perigo pequeno')}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ''}

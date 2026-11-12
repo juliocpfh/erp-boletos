@@ -122,6 +122,19 @@ export function qualificarPessoa(p) {
   return partes.filter(Boolean).join(', ');
 }
 
+/** Fiador casado ou em união estável: o cônjuge ou companheiro(a) assina em anuência à fiança (Código Civil, art. 1.647, III). */
+export const conjugeDoFiador = (f) => (f && f.nome_conjuge ? { nome: f.nome_conjuge, cpf: f.cpf_conjuge, rg: f.rg_conjuge, uniao: f.estado_civil === 'União estável' } : null);
+/** Falta o cônjuge na fiança: casado (salvo separação total por pacto antenupcial) ou em união estável (recomendado). */
+export const conjugeFaltando = (f) => !f.nome_conjuge && ((f.estado_civil === 'Casado(a)' && !/pacto/i.test(f.regime_bens || '')) || f.estado_civil === 'União estável');
+/** Qualificação do fiador com o cônjuge que assina junto. Ex.: "JOSÉ, ..., sob o regime de comunhão parcial, e seu cônjuge MARIA, portador(a) do CPF nº 1, que assina este contrato em anuência à fiança". */
+function qualificarFiador(f) {
+  const cj = conjugeDoFiador(f);
+  if (!cj) return qualificarPessoa(f);
+  const docs = [cj.rg && `RG nº ${cj.rg}`, cj.cpf && `CPF nº ${cj.cpf}`].filter(Boolean).join(' e ');
+  const regime = f.regime_bens && !cj.uniao ? `, sob o regime de ${f.regime_bens.replace(/\s*\(.*\)/, '').toLocaleLowerCase('pt-BR')}` : '';
+  return `${qualificarPessoa(f)}${regime}, e ${cj.uniao ? 'seu(sua) companheiro(a)' : 'seu cônjuge'} ${String(cj.nome).toLocaleUpperCase('pt-BR')}${docs ? `, portador(a) do ${docs}` : ''}, que assina este contrato em anuência à fiança`;
+}
+
 /** Pessoa a partir dos campos com prefixo (inquilino_, solidario_, representante_). */
 const pessoaDe = (r, prefixo) => ({ nome: r[`${prefixo}nome`], genero: r[`${prefixo}genero`], nacionalidade: r[`${prefixo}nacionalidade`],
   estado_civil: r[`${prefixo}estado_civil`], profissao: r[`${prefixo}profissao`], rg: r[`${prefixo}rg`], cpf: r[`${prefixo}cpf`],
@@ -177,6 +190,27 @@ export function locadorasDoContrato(d, c) {
   return partes.length ? partes : d.emitentes.filter((e) => e.ativo);
 }
 
+/**
+ * Companhias e prestadores perante os quais a locadora representa o inquilino (cláusula de representação): água e energia
+ * (salvo "incluso no aluguel" ou "não tem"), gás, internet e condomínio quando "por conta do inquilino", com os números do
+ * cadastro do imóvel (unidade consumidora, medidor, matrícula, hidrômetro, relógio do gás). Sem número: só o nome (às vezes
+ * o imóvel ainda vai pedir o relógio novo). Ex.: "a Companhia Paranaense de Energia (COPEL), unidade consumidora nº 123".
+ */
+export function representacaoDoContrato(d, c, imovel = {}) {
+  const fora = (k) => ['Incluso no aluguel', 'Não tem'].includes(c[k]);
+  const doInquilino = (k) => c[k] === 'Por conta do inquilino';
+  const nums = (...pares) => pares.filter(([, v]) => v).map(([r, v]) => `, ${r} nº ${v}`).join('');
+  const gas = (d.titularidades || []).filter((x) => x.imovel_id === c.imovel_id && /g[áa]s|ultragaz|liquig|supergas/i.test(x.concessionaria || '')).map((x) => x.concessionaria)[0]
+    || (((d.listas || {}).concessionarias) || ['Supergasbras']).find((x) => /g[áa]s|ultragaz|liquig|supergas/i.test(x)) || '';
+  const out = [];
+  if (!fora('conta_energia')) out.push(`a Companhia Paranaense de Energia (COPEL)${nums(['unidade consumidora', imovel.copel_uc], ['medidor', imovel.copel_medidor])}`);
+  if (!fora('conta_agua')) out.push(`a Companhia de Saneamento do Paraná (SANEPAR)${nums(['matrícula', imovel.sanepar_matricula], ['hidrômetro', imovel.sanepar_hidrometro])}`);
+  if (doInquilino('conta_gas')) out.push(`a fornecedora de gás${gas ? ` ${gas}` : ''}${nums(['relógio', imovel.gas_relogio])}`);
+  if (doInquilino('conta_internet')) out.push(`o provedor de internet e TV${imovel.internet ? ` (contrato ou telefone ${imovel.internet})` : ''}`);
+  if (doInquilino('conta_condominio')) out.push(`a administradora do condomínio${imovel.administradora_nome ? ` ${imovel.administradora_nome}` : ''}`);
+  return out;
+}
+
 /** Fiadores do contrato que ainda valem na data (sem fim do vínculo antes dela e sem substituto). */
 const fiadoresNaData = (d, contratoId, data) => d.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data || C.hojeIso())));
 
@@ -209,7 +243,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     locadoras: locadoras.map((e) => qualificarEmpresa(e.razao_social || e.nome, e.cnpj, e.endereco_sede || e.endereco, pessoaDe(e, 'representante_'), e.representante_cargo)).join('; e '),
     locatarios: locatarios.join('; e '),
     solidario: c.solidario_nome ? qualificarPessoa(pessoaDe(c, 'solidario_')) : '',
-    fiadores: fiadores.map((f) => qualificarPessoa(f)).join('; e '),
+    fiadores: fiadores.map((f) => qualificarFiador(f)).join('; e '),
     fiadores_imoveis: fiadores.filter((f) => f.imovel_garantia).map((f) => (fiadores.length > 1 ? `${f.nome.toLocaleUpperCase('pt-BR')}: ${f.imovel_garantia}` : f.imovel_garantia)).join('; '),
     inquilino_nome: String(c.inquilino_nome || '').toLocaleUpperCase('pt-BR'),
     objeto: `${c.descricao_objeto || 'o imóvel'}, no endereço ${situado}`,
@@ -233,6 +267,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     fci_indice: textoIndice(c.fci_indice),
     encargos_inquilino: lista([...inquilinoPaga, 'telefone', 'dedetização', 'limpeza de calhas']),
     encargos_inclusos: lista(inclusos),
+    representacao: lista(representacaoDoContrato(d, c, imovel)),
     caucao_valor: valorComExtenso(caucaoValor),
     caucao_meses: numeroComExtenso(caucaoMeses || 0),
     deposito_valor: valorComExtenso(c.deposito_valor || 0),
@@ -247,7 +282,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
     tem_incluso: inclusos.length > 0, tarifa_boleto: false, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
-    indeterminado: c.prazo_tipo === 'Indeterminado', testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
+    indeterminado: c.prazo_tipo === 'Indeterminado', representacao: representacaoDoContrato(d, c, imovel).length > 0, testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
   };
   const assinaturas = [
     ...locadoras.map((e) => ({ nome: (e.razao_social || e.nome).toLocaleUpperCase('pt-BR'), doc: e.cnpj ? `CNPJ ${e.cnpj}` : '', papel: 'LOCADORA',
@@ -255,7 +290,12 @@ export function dadosDoContrato(d, c, extra = {}) {
     { nome: campos.inquilino_nome, doc: c.inquilino_cpf ? `${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : '', papel: 'LOCATÁRIO',
       extra: pj && c.representante_nome ? `${c.representante_nome.toLocaleUpperCase('pt-BR')} – REPRESENTANTE` : '' },
     ...(c.solidario_nome ? [{ nome: c.solidario_nome.toLocaleUpperCase('pt-BR'), doc: c.solidario_cpf ? `CPF ${c.solidario_cpf}` : '', papel: 'LOCATÁRIO SOLIDÁRIO' }] : []),
-    ...(temFiador ? fiadores.map((f, i) => ({ nome: f.nome.toLocaleUpperCase('pt-BR'), doc: f.cpf ? `CPF ${f.cpf}` : '', papel: fiadores.length > 1 ? `FIADOR ${i + 1}` : 'FIADOR' })) : []),
+    ...(temFiador ? fiadores.flatMap((f, i) => {
+      const papel = fiadores.length > 1 ? `FIADOR ${i + 1}` : 'FIADOR';
+      const cj = conjugeDoFiador(f);
+      return [{ nome: f.nome.toLocaleUpperCase('pt-BR'), doc: f.cpf ? `CPF ${f.cpf}` : '', papel },
+        ...(cj ? [{ nome: String(cj.nome).toLocaleUpperCase('pt-BR'), doc: cj.cpf ? `CPF ${cj.cpf}` : '', papel: `${cj.uniao ? 'COMPANHEIRO(A)' : 'CÔNJUGE'} DO ${papel} (ANUÊNCIA)` }] : [])];
+    }) : []),
     ...((extra.testemunhas || []).filter((t) => t.nome).map((t, i) => ({ nome: t.nome.toLocaleUpperCase('pt-BR'), doc: t.cpf ? `CPF ${t.cpf}` : '', papel: `TESTEMUNHA ${i + 1}` }))),
   ];
   // o solidário assina como "LOCATÁRIO SOLIDÁRIO"; no texto o locatário continua no singular
@@ -283,6 +323,10 @@ export function pendenciasDoContrato(d, c) {
   // troca de titular com a garantia que continua: o fiador ainda está no contrato de quem sai (vai ao termo, `fiadoresDaTroca`)
   if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)
     && !(c.contrato_anterior_id && fiadoresDaTroca(d, c).length)) falta.push('fiador');
+  if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo)) {
+    for (const f of fiadoresNaData(d, c.id)) if (conjugeFaltando(f)) falta.push(`fiador ${f.nome}: ${f.estado_civil === 'União estável' ? 'companheiro(a) (recomendado assinar a fiança)' : 'cônjuge (casado: precisa assinar a fiança, Código Civil, art. 1.647)'}`);
+  }
+  if (c.garantia_tipo === 'Fiador + depósito') falta.push('garantia dupla (fiador + depósito): a Lei 8.245/91, art. 37, permite só uma');
   for (const e of locadorasDoContrato(d, c)) {
     if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
     if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);

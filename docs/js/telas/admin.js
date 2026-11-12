@@ -229,6 +229,7 @@ export async function telaDados() {
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento')}</div>` : ''}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
+    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK).'}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>

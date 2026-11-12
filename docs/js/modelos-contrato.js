@@ -1,6 +1,27 @@
 // Modelos padrão de contrato, montados a partir dos contratos da ANK/JCK (residencial e não residencial).
 // Linguagem: veja montarContrato em contratos.js. Os modelos podem ser copiados e editados na tela "Modelos de contrato".
 
+/**
+ * Trechos revisados em 2026-11-12 (documentacao/REVISAO_JURIDICA_CONTRATO.md). Os modelos já gravados recebem cada um
+ * em normalizar() (regras.js), trocando o texto antigo exato (ATUALIZACOES_MODELO); texto editado à mão fica como está.
+ */
+/** Vistoria de entrada na entrega das chaves (não na assinatura) e 10 dias para apontar defeito (Lei 8.245/91, arts. 22, V, e 23, III). */
+export const VISTORIA_ENTRADA = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada feito e assinado pelas partes nessa data, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.
+
+**Parágrafo único** – O LOCATÁRIO terá 10 (dez) dias corridos, contados da entrega das chaves, para comunicar por escrito, por e-mail, defeitos ou divergências não descritos na vistoria de entrada. Passado esse prazo sem comunicação, a vistoria de entrada vale como aceita, ressalvados os vícios ocultos.`;
+
+/** Falta do aviso de 30 dias: um mês de aluguel e encargos (Lei 8.245/91, art. 6º, parágrafo único), não a multa de 3 aluguéis. */
+export const SEM_AVISO = 'Caso não proceda desta forma, pagará a quantia correspondente a 1 (um) mês de aluguel e encargos vigentes na data da desocupação, nos termos do art. 6º, parágrafo único, da Lei nº 8.245/91.';
+
+/**
+ * Representação perante as companhias (água, energia, gás, internet, administradora do condomínio): a lista sai do cadastro
+ * do imóvel e das contas "por conta do inquilino" (`representacao`, em dadosDoContrato), com o número de cada relógio quando há.
+ */
+export const REPRESENTACAO = `[se representacao]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS E PRESTADORES DE SERVIÇO: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante {representacao}, no início e ao fim da locação, para solicitar a alteração de titularidade das contas, pedidos de ligação nova e de instalação de relógio, leitura final, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]`;
+
+/** Tratamento dos dados pessoais (Lei 13.709/2018, arts. 7º, II, V, VI e X, e 16, I). */
+export const LGPD = `**CLÁUSULA #** – DOS DADOS PESSOAIS: os dados pessoais do LOCATÁRIO[se fiador], {f:do FIADOR|dos FIADORES}[fim][se solidario], do LOCATÁRIO SOLIDÁRIO[fim] e de seus representantes são tratados {l:pela LOCADORA|pelas LOCADORAS} conforme a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados), somente para a análise cadastral, a celebração e a execução deste contrato, a cobrança, a proteção do crédito e o cumprimento de obrigações legais e fiscais, podendo ser compartilhados, na medida do necessário, com instituições financeiras, seguradoras, contador, órgãos de proteção ao crédito, concessionárias de serviços, condomínio e autoridades. Os dados e documentos serão guardados pelo prazo exigido em lei e para a defesa em eventual processo, e depois eliminados. O titular pode pedir acesso, correção e informações sobre o tratamento pelo e-mail da administradora.`;
+
 const PARTES = `**#i. {l:LOCADORA|LOCADORAS}:** {locadoras}, doravante {l:denominada|denominadas} simplesmente {l:LOCADORA|LOCADORAS}.
 
 **#i. LOCATÁRIO:** {locatarios}, doravante denominado simplesmente LOCATÁRIO.
@@ -15,7 +36,7 @@ const ITENS = `**#i. DO OBJETO E SUA FINALIDADE DA LOCAÇÃO**
 
 **#i. DO PRAZO DE LOCAÇÃO**
 
-[se indeterminado]A locação é por prazo indeterminado, a contar da data de {data_inicio}.[senão]O prazo de locação é de {prazo_meses} meses, a contar da data de {data_inicio}, com término em {data_fim}, data em que o LOCATÁRIO restituirá {l:à LOCADORA|às LOCADORAS} o imóvel objeto desta locação inteiramente desocupado e nas mesmas condições e estado em que o recebeu, conforme documento de vistoria em anexo.[fim]
+[se indeterminado]A locação é por prazo indeterminado, a contar da data de {data_inicio}.[senão]O prazo de locação é de {prazo_meses} meses, a contar da data de {data_inicio}, com término em {data_fim}, data em que o LOCATÁRIO restituirá {l:à LOCADORA|às LOCADORAS} o imóvel objeto desta locação inteiramente desocupado e nas mesmas condições e estado em que o recebeu, conforme a vistoria de entrada.[fim]
 
 [se bonificacao]**#i. DO VALOR MENSAL DO ALUGUEL COM BONIFICAÇÃO**
 
@@ -111,7 +132,7 @@ export const CLAUSULAS_FCI = `[se fci]## FUNDO DE CONSERVAÇÃO DO IMÓVEL (FCI)
 
 **Parágrafo oitavo** – Havendo transferência do contrato a novo titular, com a anuência {l:da LOCADORA|das LOCADORAS}, o saldo do FCI acompanha a locação e será acertado com o titular que entregar as chaves, salvo ajuste diverso, por escrito, entre os titulares.[fim]`;
 
-const RESTITUICAO = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.
+const RESTITUICAO = `${VISTORIA_ENTRADA}
 
 **CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.
 
@@ -143,7 +164,7 @@ const MULTA = (saida, honorarios) => `## MULTA CONTRATUAL
 
 const RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
 
-**CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. Caso não proceda desta forma, incidirá a multa prevista na cláusula {cl:multa}. O imóvel deverá ser entregue conforme a vistoria inicial.
+**CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. ${SEM_AVISO} O imóvel deverá ser entregue conforme a vistoria inicial.
 
 **CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. Para fins de acerto final, considera-se realizada a entrega do imóvel no momento em que ele esteja tal como na vistoria inicial.
 
@@ -183,13 +204,15 @@ const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 
 const FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
-[se residencial]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS DE SERVIÇOS PÚBLICOS: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante a Companhia Paranaense de Energia (COPEL) e a Companhia de Saneamento do Paraná (SANEPAR), para solicitar a alteração de titularidade das contas, pedidos de ligação, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]
+${REPRESENTACAO}
 
 **CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.
 ${extra}
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações ou notificações enviadas por via postal com aviso de recebimento (AR) ou por mensagem eletrônica (e-mail).
 
 **Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.
+
+${LGPD}
 
 ## FORO
 
@@ -324,13 +347,13 @@ ${PARTES}
 
 ${ITENS}
 
-${ALUGUEL('honorários advocatícios de 25% (vinte e cinco por cento)')}
+${ALUGUEL('honorários advocatícios de 20% (vinte por cento)')}
 
 ${CONSERVACAO}
 
 ${RESTITUICAO}
 
-${MULTA('a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato', 'honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação')}
+${MULTA('a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato', 'honorários de advogado de 20% (vinte por cento) sobre o valor da ação')}
 
 ${RESCISAO('72 (setenta e duas) horas')}
 
@@ -354,7 +377,7 @@ ${CONDOMINIO}
 
 ${RESTITUICAO}
 
-${MULTA('a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato', 'honorários de advogado')}
+${MULTA('a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato', 'honorários de advogado')}
 
 ${RESCISAO('48 (quarenta e oito) horas')}
 
@@ -375,3 +398,26 @@ ${FINAIS(`
     texto: ADITIVO_TROCA,
   },
 ];
+
+const ENDERECO_PARAGRAFO = '**Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.';
+/**
+ * Revisão jurídica de 2026-11-12 nos modelos de contrato já gravados: [texto antigo exato, texto novo]. Só troca o que
+ * ainda está igual ao antigo (texto editado à mão fica como está). Aplicada em normalizar() (regras.js).
+ */
+export const ATUALIZACOES_MODELO = [
+  ['**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.', VISTORIA_ENTRADA],
+  ['conforme documento de vistoria em anexo.[fim]', 'conforme a vistoria de entrada.[fim]'],
+  ['Caso não proceda desta forma, incidirá a multa prevista na cláusula {cl:multa}.', SEM_AVISO],
+  ['[se residencial]**CLÁUSULA #** – DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS DE SERVIÇOS PÚBLICOS: o LOCATÁRIO autoriza expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-lo perante a Companhia Paranaense de Energia (COPEL) e a Companhia de Saneamento do Paraná (SANEPAR), para solicitar a alteração de titularidade das contas, pedidos de ligação, desligamento, religação, parcelamentos de débitos gerados no período da locação, segunda via de faturas e histórico de consumo, obrigando-se a fornecer a documentação necessária e a assinar os formulários exigidos, sob pena de responder por perdas e danos decorrentes do atraso na regularização das contas.[fim]', REPRESENTACAO],
+  ['honorários advocatícios de 25% (vinte e cinco por cento)', 'honorários advocatícios de 20% (vinte por cento)'],
+  ['honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação', 'honorários de advogado de 20% (vinte por cento) sobre o valor da ação'],
+  ['a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato', 'a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato'],
+  [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}\n\n${LGPD}`, 'DOS DADOS PESSOAIS'],
+];
+
+/** Aplica ATUALIZACOES_MODELO num texto de contrato (o 3º item, quando há, é o sinal de que a troca já foi feita). */
+export function atualizarTextoModelo(texto) {
+  let t = String(texto || '').replace(/\r\n/g, '\n');
+  for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
+  return t;
+}

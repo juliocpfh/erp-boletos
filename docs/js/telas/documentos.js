@@ -1,5 +1,6 @@
 // Documentos gerados: impressão, contrato por modelo, vistoria (e o modelo de vistoria), recibo de chaves, termo aditivo,
 // modelos de contrato, PDF/Word e logo.
+import { botaoEmail } from './emails.js';
 import { alterar, bibliotecasPdf, login, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
@@ -49,7 +50,7 @@ export async function telaImprimir(rota) {
     const ano = Number(rota.q.ano) || new Date().getFullYear() - 1;
     const r = R.declaracaoAnual(d(), c.id, ano);
     const anos = [...new Set(d().faturas.map((f) => Number(String(f.emissao).slice(0, 4))))].sort((a, b) => b - a);
-    const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? '' : 'secundario '}pequeno`)).join(' ')}</div>`;
+    const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? '' : 'secundario '}pequeno`)).join(' ')} · ${botaoEmail('informe_ir', { contrato: c.id })}</div>`;
     return `<div class="impressao">${voltar(r.empresas.length ? { seletor: '.impressao .declaracoes', nome: nomeArquivoDoc('Declaracao anual aluguel', c, String(ano)) } : null)}${abas}
       ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join('')}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
   }
@@ -265,6 +266,8 @@ function declaracaoHtml(r, g) {
       <tr><td colspan="3"><b>Total recebido em ${ano}</b></td><td class="n"><b>${C.reais(g.total)}</b></td></tr></table>
     ${r.empresas.length > 1 ? `<p class="suave">O aluguel deste imóvel é dividido entre ${r.empresas.length} empresas; esta declaração traz só a parte de ${esc(e.nome)}. As demais saem em folha própria.</p>` : ''}
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
+    ${pj ? '' : `<p><b>Como declarar:</b> na ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), com o CNPJ ${esc(e.cnpj || 'da empresa')} e o total acima.</p>`}
+    <p>Não houve retenção de imposto de renda na fonte.</p>
     <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
 }

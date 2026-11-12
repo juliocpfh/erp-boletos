@@ -1,5 +1,6 @@
 // Página do inquilino/contrato (#/contrato/ID): selos, garantia, saída, leituras, ressarcimentos, solicitações, boletos,
 // documentos de entrada e termos aditivos.
+import { botaoEmail } from './emails.js';
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import * as K from '../contratos.js';
@@ -241,7 +242,11 @@ function caixaGarantia(c) {
   return `${html}</div>`;
 }
 
-/** Roteiro da saída (D6): as sete etapas na ordem, com ✓ nas feitas e o detalhe de cada uma. */
+/** E-mail de cada etapa da entrada e da saída (modelos-email.js): etapa do sistema → chave do modelo. */
+const EMAIL_ENTRADA = { contrato_gerado: 'contrato_assinar', contrato_assinado: 'contrato_assinado', vistoria_assinada: 'vistoria_assinada' };
+const EMAIL_SAIDA = { aviso: 'saida_aviso', vistoria: 'saida_vistoria', chaves: 'saida_chaves', calculo: 'saida_calculo', garantia: 'saida_encerramento' };
+
+/** Roteiro da saída (D6): as etapas na ordem, com ✓ nas feitas, o detalhe e o e-mail de cada uma. */
 function roteiroSaidaHtml(c, e) {
   const hoje = C.hojeIso();
   const etapas = R.roteiroSaida(d(), c, hoje);
@@ -254,10 +259,13 @@ function roteiroSaidaHtml(c, e) {
     if (x.chave === 'calculo' && c.data_saida <= hoje) return link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno');
     if (x.chave === 'garantia' && e) return botao('garantiaDevolvida', e.saldo >= 0 ? 'Marcar garantia devolvida' : 'Marcar saldo cobrado', { id: e.id }, 'pequeno');
     if (x.chave === 'boleto') return x.cobranca_id ? link(`#/cobranca/${x.cobranca_id}`, 'Ver o boleto', 'botao pequeno') : link(`#/cobrancas?comp=${C.competenciaDe(c.data_saida)}`, 'Gerar na tela Boletos', 'botao pequeno');
+    if (x.chave === 'arquivo' && c.data_saida <= hoje) return `${link(`#/contrato/${c.id}?ir=documentos`, 'Ver os documentos', 'botao secundario pequeno')} ${botao('arquivoFisico', 'Marcar arquivado', { id: c.id }, 'pequeno')}`;
     return '';
   };
+  const email = (x) => (EMAIL_SAIDA[x.chave] ? botaoEmail(EMAIL_SAIDA[x.chave], { contrato: c.id }) : '');
+  const desfazer = (x) => (x.chave === 'arquivo' && x.feito && opera() ? botao('arquivoFisico', 'Desfazer', { id: c.id, desfazer: '1' }, 'link-botao') : '');
   return `<p class="suave">Roteiro da saída: <b>${feitas} de ${etapas.length}</b> etapas feitas. A ordem é a do dia a dia; cada etapa fica marcada sozinha quando o registro dela existe.</p>
-    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? 'feito' : ''}"><div class="cabecalho"><div>${x.feito ? '✅' : '⬜'} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)}</div></div></li>`).join('')}</ol>`;
+    <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? 'feito' : ''}"><div class="cabecalho"><div>${x.feito ? '✅' : '⬜'} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)} ${email(x)} ${desfazer(x)}</div></div></li>`).join('')}</ol>`;
 }
 
 function caixaSaida(c) {
@@ -448,7 +456,7 @@ function caixaBoletosInquilino(c, cobs, hoje) {
   const antigos = cobs.slice(BOLETOS_INQUILINO);
   const anoDecl = new Date().getFullYear() - 1;
   return `<div class="cartao"><div class="cabecalho"><h2>Boletos <span class="suave">· ${cobs.length > BOLETOS_INQUILINO ? `${BOLETOS_INQUILINO} mais recentes de ${cobs.length}` : `${cobs.length}`}</span></h2>
-      ${R.geraNf(c) && cobs.some((x) => x.data_pagamento) ? link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, 'Declaração anual de aluguéis (IRPF)', 'botao secundario pequeno') : ''}</div>
+      ${R.geraNf(c) && cobs.some((x) => x.data_pagamento) ? `${link(`#/imprimir/declaracao?contrato=${c.id}&ano=${anoDecl}`, 'Declaração anual de aluguéis (IRPF)', 'botao secundario pequeno')} ${botaoEmail('informe_ir', { contrato: c.id })}` : ''}</div>
     <div class="rolagem"><table class="compacta">${cab}${recentes.map(linha).join('') || '<tr><td colspan="6" class="suave">Nenhum boleto gerado ainda. Gere na tela "Boletos".</td></tr>'}</table></div>
     ${antigos.length ? `<details><summary>Mostrar os ${antigos.length} boleto(s) anteriores</summary><div class="rolagem"><table class="compacta">${cab}${antigos.map(linha).join('')}</table></div></details>` : ''}
     ${R.cadeiaDeContratos(d(), c).antes.reverse().map((x) => { const l = d().cobrancas.filter((y) => y.contrato_id === x.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
@@ -542,7 +550,10 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
         <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
-  const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b></td>
+  // vistoria de entrada: o inquilino tem 10 dias, desde a entrega das chaves, para apontar defeito não descrito (cláusula da vistoria)
+  const limite = c.data_entrada ? C.somarDias(c.data_entrada, 10) : null;
+  const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}${e.chave === 'vistoria_assinada' && limite && hoje <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (10 dias da entrega das chaves).</span>` : ''}`;
+  const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join('')}</table></div>`;
   const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
   const titulo = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? '✓ concluída' : `${feitas} de ${total} feitas`}</span>`;

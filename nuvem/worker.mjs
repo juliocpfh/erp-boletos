@@ -2,9 +2,11 @@
 // Só entra quem passou pelo Cloudflare Access (lista de e-mails no painel) e tem usuário ativo com esse e-mail no sistema (o cofre confere). Não fala com o C6 (a ponte continua no computador).
 // Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
-// · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE).
+// · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE)
+// · email/estado (GET) e email/enviar (POST): e-mail pela conta Gmail da empresa (gmail.mjs; documentacao/LIGAR_GMAIL.md).
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
+import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
 const SO_LEITURA = ['backups']; // backups só o cofre grava
@@ -311,6 +313,26 @@ async function apagarIcone(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// E-mail pela conta Gmail da empresa (gmail.mjs): qualquer usuário ativo envia; nada é gravado aqui (o site registra o envio)
+// ---------------------------------------------------------------------------
+const simularGmail = (env, url) => env.SIMULAR_GMAIL === '1' && ['localhost', '127.0.0.1'].includes(url.hostname); // só no computador
+
+async function rotaEnviarEmail(request, env, email, url, buscar) {
+  conferirGravacao(request, env);
+  const simular = simularGmail(env, url);
+  if (!estadoEmail(env, { simular }).ligado) throw new ErroHttp(503, 'O envio pelo Gmail ainda não foi ligado.');
+  const excesso = new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
+  if (Number(request.headers.get('Content-Length') || 0) > MAX_PEDIDO) throw excesso;
+  const corpo = await request.arrayBuffer();
+  if (corpo.byteLength > MAX_PEDIDO) throw excesso;
+  let pedido;
+  try { pedido = JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
+  const r = await enviarEmail(env, pedido, { buscar, simular });
+  console.log(`e-mail enviado por ${email} (${r.id})`); // só quem e o código: o conteúdo não fica no registro
+  return json(200, r);
+}
+
+// ---------------------------------------------------------------------------
 export async function atender(request, env, buscar = fetch) {
   const url = new URL(request.url);
   const rota = url.pathname.replace(/^\/api\/?/, '');
@@ -326,6 +348,8 @@ export async function atender(request, env, buscar = fetch) {
     const novoIcone = rota.match(/^icone\/(192|512)$/);
     if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
     if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
+    if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
+    if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'consulta'); return await rotaEnviarEmail(request, env, email, url, buscar); }
     if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
@@ -346,6 +370,7 @@ export async function atender(request, env, buscar = fetch) {
     return json(404, { erro: 'Não encontrado.' });
   } catch (e) {
     if (e instanceof ErroHttp) return json(e.status, { erro: e.message, ...e.extra });
+    if (e instanceof ErroEmail) return json(e.status, { erro: e.message });
     console.error(e);
     return json(500, { erro: 'Erro no servidor da nuvem.' });
   }

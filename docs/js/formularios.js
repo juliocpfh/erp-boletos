@@ -160,6 +160,8 @@ export const LEITURA = [
 /** Sexo para a concordância no contrato; "Neutro" escreve brasileiro(a), solteiro(a), portador(a). */
 export const GENEROS = ['Masculino', 'Feminino', 'Neutro – o(a)'];
 export const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)', 'Separado(a)', 'União estável'];
+/** Regime de bens do fiador casado: só a separação total por pacto antenupcial dispensa o cônjuge na fiança (Código Civil, art. 1.647). */
+export const REGIMES_BENS = ['Comunhão parcial', 'Comunhão universal', 'Separação total (pacto antenupcial)', 'Separação obrigatória (por lei)', 'Participação final nos aquestos'];
 const qualificacao = (prefixo, extra = {}, comEndereco = true) => [
   campo(`${prefixo}genero`, 'Sexo', 'opcao', { opcoes: GENEROS, ajuda: 'Neutro ou em branco: o contrato escreve "brasileiro(a), solteiro(a)"', ...extra }),
   campo(`${prefixo}nacionalidade`, 'Nacionalidade', 'texto', { padrao: 'brasileira', ...extra }),
@@ -178,6 +180,10 @@ export const FIADOR = [
   CEP_DA_PESSOA(''),
   campo('endereco', 'Endereço', 'texto', { largo: true }),
   ...qualificacao('', {}, false),
+  campo('regime_bens', 'Regime de bens (se casado)', 'opcao', { opcoes: REGIMES_BENS, ajuda: 'Casado: o cônjuge assina a fiança, salvo separação total de bens por pacto antenupcial (Código Civil, art. 1.647, III)' }),
+  campo('nome_conjuge', 'Cônjuge ou companheiro(a): nome', 'texto', { largo: true, ajuda: 'Casado ou em união estável: assina o contrato junto. Sem a assinatura do cônjuge a fiança pode ser anulada inteira (Súmula 332 do STJ)' }),
+  campo('cpf_conjuge', 'CPF do cônjuge ou companheiro(a)', 'cpf'),
+  campo('rg_conjuge', 'RG do cônjuge ou companheiro(a)'),
   campo('imovel_garantia', 'Imóvel do fiador (endereço, matrícula e registro)', 'area', { largo: true, ajuda: 'Ex.: Rua Abílio Peixoto, 359, Curitiba/PR, matrícula 53.271 da 9ª Circunscrição. Aparece no contrato' }),
   campo('data_entrada', 'Início do vínculo', 'data', { ajuda: 'Em branco: desde o início do contrato' }),
   campo('data_saida', 'Fim do vínculo', 'data', { ajuda: 'Em branco: até o fim do contrato. Depois desta data vai para "Fiadores anteriores"' }),
@@ -296,7 +302,7 @@ export const CONTRATO = [
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
   secao('Garantia'),
-  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: GARANTIAS }),
+  campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: GARANTIAS, ajuda: '"Fiador + depósito" são duas garantias: a Lei 8.245/91 permite só uma por contrato (art. 37, parágrafo único)' }),
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto"). Caução em dinheiro: no máximo 3 aluguéis (Lei 8.245/91, art. 38, §2º)' }),
   campo('caucao_valor', 'Valor da caução', 'dinheiro', { ...quando('garantia_tipo', 'Caução'), autoMsg: true, ajuda: 'Calculado sozinho (aluguéis × aluguel bonificado); pode ajustar se o depósito for outro valor' }),
   campo('caucao_data', 'Data prevista do depósito da caução', 'data', { ...quando('garantia_tipo', 'Caução'), ajuda: 'Em branco: a data do contrato. Altere só se o depósito for em outra data. A data paga e o comprovante vão na página do inquilino' }),

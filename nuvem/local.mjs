@@ -1,6 +1,8 @@
 // Nuvem de teste no próprio computador (imita o Cloudflare): o site (docs/) e a /api/ do Worker, com o cofre num SQLite local.
 // Uso: node nuvem/local.mjs  →  http://localhost:8787  (sem login do Access: MODO_TESTE só vale em localhost)
 //      PORTA=8787 EMAIL_TESTE=dono@exemplo.com.br NUVEM_DB=nuvem/.local/cofre.sqlite
+//      SIMULAR_GMAIL=1 → o envio de e-mail aparece ligado e só escreve aqui no console (nada vai ao Google);
+//      com GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_REMETENTE (e GMAIL_NOME, GMAIL_CCO) envia de verdade.
 // Os dados ficam em nuvem/.local/ (fora do git). Anexos e backups ficam só na memória (somem ao fechar).
 import fs from 'node:fs';
 import http from 'node:http';
@@ -24,6 +26,8 @@ const R2 = r2Falso();
 const cofre = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: R2 });
 const env = {
   MODO_TESTE: '1', EMAIL_TESTE: process.env.EMAIL_TESTE || 'teste@exemplo.com.br', ORIGEM: `http://localhost:${PORTA}`,
+  SIMULAR_GMAIL: process.env.SIMULAR_GMAIL === '1' ? '1' : '',
+  ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^GMAIL_[A-Z_]+$/.test(k))),
   DADOS: R2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => cofre.fetch(req) }) },
 };
 let semInternet = false; // GET /__internet?ligar=0 simula queda (testes no navegador)

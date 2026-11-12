@@ -2339,8 +2339,10 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.deepEqual(R.roteiroSaida(d, c, '2026-11-07'), []); // sem data de saída, não começou
   R.informarSaida(d, c.id, '2026-11-30', 'julio');
   let r = R.roteiroSaida(d, c, '2026-11-07');
-  assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto']);
-  assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false]);
+  assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto', 'arquivo']);
+  assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false, false]);
+  assert.equal(r[2].titulo, 'Devolução das chaves');
+  assert.match(r[7].detalhe, /guardar até 30\/11\/2036/);
   assert.match(r[2].detalhe, /prevista para 30\/11\/2026/);
   // saiu: chaves feitas; vistoria registrada; leitura e protocolo da titularidade fecham "contas"
   r = R.roteiroSaida(d, c, '2026-12-02');
@@ -2363,6 +2365,8 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.match(r[5].detalhe, /devolvida em 05\/12\/2026/);
   assert.equal(r[6].feito, false); // boleto de 11/2026 ainda não gerado
   assert.match(r[6].detalhe, /não gerado/);
+  R.marcarArquivoFisico(d, c.id, '2026-12-10', 'julio');
+  assert.match(R.roteiroSaida(d, c, '2026-12-11')[7].detalhe, /arquivado em 10\/12\/2026/);
 });
 
 test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago, e inclui o contrato anterior da cadeia', () => {
