@@ -1,6 +1,7 @@
 // Regras de cálculo da cobrança mensal de aluguel.
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
+import { feriadosLocais, regra } from './config-regras.js';
 
 /**
  * Erro "do usuário": o que ele digitou ou pediu não serve (senha errada, valor acima do limite, código de barras curto).
@@ -209,7 +210,10 @@ export function proximoDiaUtil(isoData) {
  * domingo ou feriado nacional, o próximo dia útil (decisão do dono, 09/11/2026). Ex.: sáb 10/10/2026 → ter 13/10/2026.
  */
 export function limitePagamento(vencimento) {
-  return proximoDiaUtil(vencimento);
+  // feriados da cidade cadastrados nas regras do sistema também passam ao dia útil seguinte (ex.: vence 20/01, feriado → 21/01)
+  let x = proximoDiaUtil(vencimento);
+  while (feriadosLocais(Number(x.slice(0, 4))).includes(x)) x = proximoDiaUtil(somarDias(x, 1));
+  return x;
 }
 
 /** Boleto vencido em ``hoje``: só depois do último dia para pagar em dia (``limitePagamento``). */
@@ -329,15 +333,19 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
     reserva_utilizada: reserva,
     a_pagar_pontual: totalPontual - reserva,
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
-    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel)
-    base_multa: Math.max(totalSemDesconto - reserva - (fci || 0), 0),
+    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel); regra `base_multa`: boleto inteiro
+    // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
+    base_multa: regra('base_multa') === 'aluguel'
+      ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0)) - reserva, 0)
+      : Math.max(totalSemDesconto - reserva - (fci || 0), 0),
   };
 }
 
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
   seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0 }) {
-  const diasMes = diasNoMes(competencia);
   const dias = diasOcupados(competencia, entrada, saida);
+  // regra `proporcional`: dias reais do mês (padrão) ou mês comercial de 30 dias no mês incompleto (14/30 em vez de 14/28)
+  const diasMes = regra('proporcional') === 'mes_30' && dias < diasNoMes(competencia) ? 30 : diasNoMes(competencia);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
   const desconto = descontoPorPercentual(aluguel, descontoPercentual);
   const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };

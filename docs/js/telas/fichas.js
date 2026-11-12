@@ -81,7 +81,7 @@ export function telaFicha(id) {
     : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, 'comprovante da devolução') : etiqueta('sem comprovante da devolução', 'aviso')}</p>`
       : `<div class="alerta aviso"><b>Devolver a reserva de ${reais(f.reserva_valor)}.</b> Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
-    : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.MESES_DOCUMENTOS_REPROVADA} meses depois da reprovação). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
+    : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da reprovação). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
   return `<p class="suave"><a href="#/inquilinos?ir=fichas">← Inquilinos</a></p>
     <div class="cabecalho"><h1>Ficha em análise: ${esc(f.inquilino_nome)}</h1><div class="acoes">
       ${opera() ? link(`#/editar/fichas/${f.id}`, 'Editar') : ''}
@@ -92,7 +92,7 @@ export function telaFicha(id) {
         ${link(`#/editar/fichas/${f.id}`, 'Reprovar (com o motivo)', 'botao perigo pequeno')}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ''}
       ${devolucao}
-      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.MESES_DOCUMENTOS_REPROVADA} meses depois da reprovação).</p>` : ''}</div>
+      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da reprovação).</p>` : ''}</div>
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um dos imóveis')}</b>.` : ''}</p>
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>

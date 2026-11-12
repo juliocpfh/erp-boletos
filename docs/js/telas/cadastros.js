@@ -270,7 +270,7 @@ export const CADASTROS = {
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
     // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
     // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
-    padrao: (q) => ({ ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    padrao: (q) => ({ ...R.padroesNovoContrato(), ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),

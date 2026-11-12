@@ -14,6 +14,7 @@ import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
+import { ACOES_REGRAS } from './regras-sistema.js';
 import { ACOES_NUVEM } from './nuvem.js';
 import { ACOES_FICHAS } from './fichas.js';
 import { htmlSaude } from './banco-c6.js';
@@ -2016,4 +2017,4 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE);
+Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS);
