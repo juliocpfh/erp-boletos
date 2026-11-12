@@ -1,4 +1,4 @@
-# Regras configuráveis — proposta (etapa 1, 2026-11-12)
+| Fora: o dono trata em outra sessão || Fora: o dono trata em outra sessão || Fora: o dono trata em outra sessão || Fora: o dono trata em outra sessão || Sim: 30 meses, com o aviso ao lado do campo || B8 | Fiador + depósito de garantia | Opção existe na lista de garantias | Fica permitido | **Não proibir** (decisão do dono). Aviso ao lado: a LI art. 37 lista caução, fiança, seguro fiança e cessão de quotas; o depósito em dinheiro costuma ser tratado pelos tribunais como caução em dinheiro (art. 38, §2º), e aí fiador + depósito pode ser visto como duas garantias (art. 37, parágrafo único): risco de ter de devolver o depósito e de contravenção (art. 43, II) | Sim: permitido, com aviso || Pendente: é proibido (art. 38 §2º; cobrar além do permitido é contravenção, art. 43, I). Bloquear ou só avisar? || B2 | ~~Reserva quando o interessado desiste~~ | — | — | Tratado pelo dono em outra sessão: fora desta lista | — || Sim: aviso acima de 10% || Sim: padrão (1); a (2) aparece como sugestão, com a explicação da lei |# Regras configuráveis — proposta (etapa 1, 2026-11-12)
 
 Objetivo: para vender o sistema a outros locadores, as regras hoje fixas no código viram opções escolhidas pelo
 administrador. **O padrão de cada opção é o comportamento de hoje**: nada muda nos dados até alguém escolher outra coisa.
@@ -7,6 +7,9 @@ Nada foi programado ainda; o dono aprova item a item (coluna "Aprovado?").
 Legenda: **[S]** = seleção (lista de opções), **[C]** = campo aberto (número/texto), **[E]** = já existe por contrato
 (a configuração passa a ser só o valor que vem preenchido no "Novo contrato").
 Leis: LI = Lei do Inquilinato (8.245/91); CC = Código Civil; CDC = Código de Defesa do Consumidor.
+
+**Regra da tela (dono, 2026-11-12):** toda opção aparece com a explicação, a consequência de cada escolha, se é legal ou
+não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do administrador.
 
 > Não é parecer jurídico: os fundamentos são para orientar a escolha; para vender o sistema, vale um advogado revisar
 > os textos de ajuda das opções.
