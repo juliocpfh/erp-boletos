@@ -16,6 +16,7 @@ import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_NUVEM } from './nuvem.js';
 import { ACOES_FICHAS } from './fichas.js';
+import { ACOES_EMAILS } from './emails.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
@@ -987,6 +988,20 @@ export const ACOES = {
   },
 
   /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
+  /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
+  async arquivoFisico({ id, desfazer }) {
+    const c = buscar('contratos', id);
+    if (!c) throw new Error('Inquilino não encontrado.');
+    if (desfazer === '1') { await alterar((db) => R.marcarArquivoFisico(db, c.id, '', login())); await mostrar(); return; }
+    const r = await janela({ titulo: 'Arquivo físico', sim: 'Marcar arquivado',
+      html: `<p>Imprima e guarde em papel o processo de <b>${esc(c.inquilino_nome)}</b>: contrato, aditivos, vistorias de entrada e saída, termos das chaves, cálculo final e comprovantes (botão "Ver os documentos"). Guarde por 10 anos depois da saída.</p>
+        <label>Data em que foi arquivado</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+    if (!r) return;
+    await alterar((db) => R.marcarArquivoFisico(db, c.id, String((r.data || [])[0] || ''), login()));
+    aviso('Processo marcado como arquivado em papel.');
+    await mostrar();
+  },
+
   async garantiaDevolvida({ id }) {
     const e = buscar('encerramentos', id);
     if (!e) throw new Error('Cálculo final não encontrado.');
@@ -2016,4 +2031,4 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE);
+Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_EMAILS);

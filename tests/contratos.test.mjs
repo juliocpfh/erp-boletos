@@ -59,7 +59,11 @@ test('contrato não residencial com fiadores no plural', () => {
   assert.match(t, /finalidade exclusivamente não residencial, para a atividade de escritório/);
   assert.match(t, /SERASA/);
   assert.match(t, /48 \(quarenta e oito\) horas/);
-  assert.doesNotMatch(t, /CAUÇÃO|COPEL|\[[a-z_]+\?\]/);
+  assert.doesNotMatch(t, /CAUÇÃO|\[[a-z_]+\?\]/);
+  // revisão de 2026-11-12: a procuração das companhias vale também no comercial; multa da saída igual à do residencial
+  assert.match(t, /DA REPRESENTAÇÃO PERANTE AS CONCESSIONÁRIAS E PRESTADORES DE SERVIÇO: .*\(COPEL\) e a Companhia de Saneamento/);
+  assert.match(t, /será cobrada a multa de 3 \(três\) meses de aluguel, proporcional ao tempo restante do contrato/);
+  assert.match(t, /DOS DADOS PESSOAIS: os dados pessoais do LOCATÁRIO, dos FIADORES e de seus representantes/);
 });
 
 test('pendências do cadastro antes de gerar', () => {
@@ -319,4 +323,53 @@ test('termo aditivo de vencimento (modelo C): só muda o dia, referência no mê
   assert.match(tb, /referente ao mês de janeiro de 2027/);
   assert.match(tb, /próprio mês do vencimento/);
   assert.doesNotMatch(tb, /TESTEMUNHA/);
+});
+
+test('revisão de 2026-11-12: procuração com os números do imóvel, aviso prévio do art. 6º e vistoria com 10 dias', () => {
+  const { d, c } = base({ conta_gas: 'Por conta do inquilino', conta_condominio: 'Por conta do inquilino', conta_internet: 'Incluso no aluguel' });
+  Object.assign(d.imoveis[0], { copel_uc: '12345', copel_medidor: '', sanepar_matricula: '777', sanepar_hidrometro: 'A9', gas_relogio: '55', administradora_nome: 'Adm Pinheiros' });
+  const rep = K.representacaoDoContrato(d, c, d.imoveis[0]);
+  assert.deepEqual(rep, ['a Companhia Paranaense de Energia (COPEL), unidade consumidora nº 12345', 'a Companhia de Saneamento do Paraná (SANEPAR), matrícula nº 777, hidrômetro nº A9',
+    'a fornecedora de gás Supergasbras, relógio nº 55', 'a administradora do condomínio Adm Pinheiros']);
+  const modelo = K.modelosDe(d).find((m) => m.nome === 'Residencial');
+  const t = texto(K.montarContrato(modelo.texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
+  assert.match(t, /representá-lo perante a Companhia Paranaense de Energia \(COPEL\), unidade consumidora nº 12345, .*hidrômetro nº A9, a fornecedora de gás Supergasbras, relógio nº 55 e a administradora do condomínio Adm Pinheiros, no início e ao fim/);
+  assert.match(t, /pagará a quantia correspondente a 1 \(um\) mês de aluguel e encargos vigentes .*art\. 6º/);
+  assert.match(t, /recebe o imóvel na data da entrega das chaves/);
+  assert.match(t, /10 \(dez\) dias corridos, contados da entrega das chaves/);
+  assert.match(t, /honorários advocatícios de 20% \(vinte por cento\)/);
+  assert.doesNotMatch(t, /25%/);
+  // sem água nem energia por conta do inquilino e sem as outras contas: a cláusula sai
+  const { d: d2, c: c2 } = base({ conta_agua: 'Incluso no aluguel', conta_energia: 'Não tem' });
+  assert.deepEqual(K.representacaoDoContrato(d2, c2, d2.imoveis[0]), []);
+});
+
+test('modelos já gravados recebem a revisão (só o texto antigo que continua igual)', async () => {
+  const M = await import('../docs/js/modelos-contrato.js');
+  const antigo = ['**CLÁUSULA #vistoria** – O LOCATÁRIO recebe, no ato da assinatura do presente contrato, as dependências do imóvel em perfeitas condições de serem ocupadas, conforme relatório de vistoria anexo a este contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento.',
+    'Texto. Caso não proceda desta forma, incidirá a multa prevista na cláusula {cl:multa}.', 'honorários advocatícios de 25% (vinte e cinco por cento)',
+    '**Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.'].join('\n\n');
+  const d = R.bancoVazio();
+  d.modelos_contrato.push({ id: 1, nome: 'Residencial', texto: antigo }, { id: 2, nome: 'Meu', texto: 'honorários de 30%' }, { id: 3, nome: 'Aditivo', tipo: 'aditivo', texto: 'honorários advocatícios de 25% (vinte e cinco por cento)' });
+  R.normalizar(d);
+  const t = d.modelos_contrato[0].texto;
+  assert.ok(t.includes(M.VISTORIA_ENTRADA) && t.includes(M.SEM_AVISO) && t.includes('20% (vinte por cento)') && t.includes('DOS DADOS PESSOAIS'));
+  assert.equal(d.modelos_contrato[1].texto, 'honorários de 30%', 'texto editado à mão fica como está');
+  assert.match(d.modelos_contrato[2].texto, /25%/, 'aditivos não mudam');
+  R.normalizar(d);
+  assert.equal(d.modelos_contrato[0].texto.split('DOS DADOS PESSOAIS').length, 2, 'rodar de novo não repete a LGPD');
+});
+
+test('fiador casado: o cônjuge assina em anuência; sem ele, pendência (salvo separação total por pacto)', () => {
+  const { d, c } = base({ garantia_tipo: 'Fiador' });
+  const f = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'José', cpf: '1', genero: 'Masculino', estado_civil: 'Casado(a)', regime_bens: 'Comunhão parcial' }, 'j');
+  assert.ok(K.pendenciasDoContrato(d, c).some((x) => /fiador José: cônjuge/.test(x)));
+  f.regime_bens = 'Separação total (pacto antenupcial)';
+  assert.ok(!K.pendenciasDoContrato(d, c).some((x) => /cônjuge/.test(x)));
+  Object.assign(f, { regime_bens: 'Comunhão parcial', nome_conjuge: 'Rita', cpf_conjuge: '2' });
+  const dados = K.dadosDoContrato(d, c, { data: '2026-09-01' });
+  assert.match(dados.campos.fiadores, /sob o regime de comunhão parcial, e seu cônjuge RITA, portador\(a\) do CPF nº 2, que assina este contrato em anuência à fiança/);
+  assert.deepEqual(dados.assinaturas.map((a) => a.papel), ['LOCADORA', 'LOCATÁRIO', 'FIADOR', 'CÔNJUGE DO FIADOR (ANUÊNCIA)']);
+  const { d: d2, c: c2 } = base({ garantia_tipo: 'Fiador + depósito' });
+  assert.ok(K.pendenciasDoContrato(d2, c2).some((x) => /garantia dupla/.test(x)));
 });

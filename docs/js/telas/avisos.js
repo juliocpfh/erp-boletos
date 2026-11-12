@@ -40,12 +40,36 @@ export function conferirContrato(dados, r, q) {
     out.push(`O imóvel ${(buscar('imoveis', imovelId) || {}).nome || ''} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
   }
   if (dados.vigencia_inicio && dados.data_entrada && Math.abs(C.diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
+  out.push(...avisosDaGarantia(dados, r));
   const antigo = r ? CADASTROS.contratos.valores(r) : null;
   for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));
   const doc = F.soDigitos(dados.inquilino_cpf || '');
   for (const f of [...fiadoresMudancas.novos, ...fiadoresMudancas.alterados]) {
     out.push(...conferirPessoa(f, f.id ? buscar('fiadores', f.id) : null, '', `do fiador ${f.nome}`));
     if (doc && F.soDigitos(f.cpf || '') === doc) out.push(`O CPF do fiador ${f.nome} é o mesmo do inquilino.`);
+  }
+  return out;
+}
+
+/**
+ * Garantia fora da lei (aviso, não bloqueia; decisão do dono em 2026-11-12): duas garantias no mesmo contrato (art. 37,
+ * parágrafo único, e art. 43, II, da Lei 8.245/91) e caução ou depósito acima de 3 aluguéis (art. 38, § 2º). Só quando muda.
+ * Ex.: aluguel de R$ 2.500,00 e caução de R$ 9.000,00 → "passa de 3 aluguéis (R$ 7.500,00)".
+ */
+export function avisosDaGarantia(dados, r = null) {
+  const out = [];
+  const mudou = (k) => !r || dados[k] !== r[k];
+  if (dados.garantia_tipo === 'Fiador + depósito' && mudou('garantia_tipo')) {
+    out.push('Fiador + depósito são duas garantias no mesmo contrato: a Lei 8.245/91 (art. 37, parágrafo único) permite só uma; a segunda pode ser anulada, e exigir as duas é contravenção (art. 43, II). O melhor é ficar com uma só.');
+  }
+  const aluguel = dados.aluguel_inicial ?? (r && r.aluguel_inicial) ?? 0;
+  const limite = 3 * aluguel;
+  if (dados.garantia_tipo === 'Caução' && (mudou('caucao_meses') || mudou('caucao_valor') || mudou('garantia_tipo'))
+    && (dados.caucao_meses > 3 || (aluguel > 0 && dados.caucao_valor > limite))) {
+    out.push(`A caução${dados.caucao_valor ? ` de ${reais(dados.caucao_valor)}` : ''} passa de 3 aluguéis${aluguel ? ` (${reais(limite)})` : ''}, o máximo da Lei 8.245/91 (art. 38, § 2º). O que passar pode ter de ser devolvido.`);
+  }
+  if (['Depósito garantia', 'Fiador + depósito'].includes(dados.garantia_tipo) && (mudou('deposito_valor') || mudou('garantia_tipo')) && aluguel > 0 && dados.deposito_valor > limite) {
+    out.push(`O depósito de garantia de ${reais(dados.deposito_valor)} passa de 3 aluguéis (${reais(limite)}): é caução em dinheiro, e a Lei 8.245/91 (art. 38, § 2º) limita a 3 aluguéis.`);
   }
   return out;
 }

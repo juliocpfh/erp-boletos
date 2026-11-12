@@ -1,0 +1,81 @@
+# Revisão jurídica do contrato e das rotinas de entrada e saída (2026-11-12)
+
+Revisão feita pelo Claude no papel de advogado de direito imobiliário, a pedido do dono, sobre os modelos de `docs/js/modelos-contrato.js` (residencial e não residencial), as rotinas de entrada e saída e os e-mails por etapa. **Não substitui advogado com OAB:** antes de usar as cláusulas novas, um advogado deve ler a versão final. Situação de cada item: ✅ 12/11: aviso acima de 3 aluguéis (caução e depósito), sem bloquear a fazer · ✅ feito · ✅ 12/11: aviso ao salvar e na ajuda do campo (o sistema continua permitindo, decisão do dono) decisão do dono.
+
+## A. Furos no contrato (por gravidade)
+
+| # | Ponto | Por que é risco | Lei | Sugestão | Situação |
+|---|---|---|---|---|---|
+| A1 | Garantia **"Fiador + depósito"** | É proibido exigir mais de uma garantia no mesmo contrato; a segunda é anulada e a exigência é contravenção penal | Lei 8.245/91, arts. 37 (parágrafo único) e 43, II | Tirar a opção do cadastro de contratos novos; nos que já têm, avisar e escolher qual fica (o depósito pode virar antecipação de aluguel combinada por escrito) | ✅ 12/11: 1 mês de aluguel e encargos (art. 6º) |
+| A2 | **Caução sem limite** de meses no sistema | Caução em dinheiro não pode passar de 3 aluguéis e precisa ficar em poupança, com os rendimentos para o inquilino | art. 38, § 2º | Barrar mais de 3 aluguéis (caução e depósito); escrever "caderneta de poupança" na cláusula | ✅ 12/11: 3 aluguéis proporcionais ao tempo restante (o máximo usual aceito; a lei não fixa teto) |
+| A3 | Residencial com **prazo menor que 30 meses** | Terminado o prazo, o contrato se prorroga e a locadora só retoma o imóvel nos casos da lei (não "a qualquer tempo", como diz o parágrafo único da cláusula do prazo), até 5 anos de locação | arts. 46 e 47 | Avisar ao salvar contrato residencial com menos de 30 meses; parágrafo único da cláusula do prazo só para 30 meses ou mais | ✅ 12/11: cláusula nova + aviso na rotina de entrada + e-mail "Vistoria assinada" |
+| A4 | **Falta de aviso prévio** = multa de 3 aluguéis (cláusula da rescisão remete à multa contratual) | No prazo indeterminado a lei fixa 1 mês de aluguel e encargos; multa maior pode ser derrubada | art. 6º, parágrafo único | Sem aviso: 1 aluguel (prazo indeterminado) ou os dias que faltarem para 30 (prazo determinado) | ✅ 12/11: regime de bens e cônjuge no cadastro do fiador; assina como anuente; pendência antes de gerar |
+| A5 | Multa contratual "sempre devida integralmente, tantas vezes quantas forem as violações" | O juiz é obrigado a reduzir multa excessiva ou de obrigação cumprida em parte; a redação ajuda o inquilino a alegar abuso | Código Civil, art. 413 | "Multa de até 3 aluguéis, proporcional à gravidade e ao tempo restante" | ✅ 12/11: companhias e números do cadastro do imóvel, nos dois modelos, na entrada e na saída |
+| A6 | Multa da saída antecipada no **comercial**: "10% sobre o tempo restante" | Não diz 10% de quê (de um aluguel? da soma dos restantes?) | art. 4º | "10% da soma dos aluguéis que faltam até o fim do contrato" (ou 3 aluguéis proporcionais, como no residencial) | ✅ 12/11: cláusula "Dos dados pessoais" |
+| A7 | Residencial: "3 aluguéis, proporcional ao tempo restante" | Está de acordo com a lei. Falta a exceção: quem é transferido pelo empregador não paga a multa, se avisar com 30 dias | art. 4º, parágrafo único | Escrever a exceção | ✅ 12/11: 20% |
+| A8 | **Bonificação perdida + multa** no atraso | Há decisões que veem multa dobrada quando o desconto de pontualidade se perde e ainda se cobra multa sobre o valor cheio | CC, art. 413; jurisprudência dividida | Opções: multa sobre o aluguel com bonificação; ou bonificação menor e sem multa; ou manter e aceitar o risco. Levar ao advogado | ✅ 12/11 |
+| A9 | **Vistoria de entrada**: "recebe, no ato da assinatura do presente contrato, ... conforme relatório de vistoria anexo" | Na prática a vistoria é feita na entrega das chaves, depois da assinatura: o contrato diz uma coisa e o fluxo faz outra | art. 22, V; art. 23, III | "Recebe na entrega das chaves, conforme a vistoria de entrada assinada nessa data, que passa a fazer parte deste contrato" + **10 dias para o inquilino apontar defeito não descrito; depois disso a vistoria vale como aceita, salvo vício oculto** | ✅ 12/11 |
+| A10 | **Vistoria de saída** feita pela locadora até 72 h (residencial) / 48 h (comercial) **depois** da devolução das chaves | Vistoria sem chamar o inquilino vale pouco como prova; no tribunal o inquilino diz que o dano surgiu depois | art. 23, III | Vistoria na devolução das chaves, com data marcada e o inquilino convidado por escrito; se não vier, a vistoria é feita e o relatório vai por e-mail com prazo para resposta | ✅ 12/11: nos e-mails (recibo da reserva ainda a fazer) |
+| A11 | "Considera-se realizada a entrega do imóvel no momento em que ele esteja tal como na vistoria inicial" | Aluguel sem fim enquanto não se reparar tudo pode ser visto como abusivo | CC, art. 413 | Aluguel até a devolução das chaves + os dias de reparo do orçamento (limite de 30 dias), com comprovante | ✅ 12/11: avisos de A1 e A2 (A3 espera a revisão) |
+| A12 | **Fiador casado sem o cônjuge** | Fiança sem autorização do cônjuge é ineficaz inteira | CC, art. 1.647, III; Súmula 332 do STJ | Cônjuge assina o contrato, com dados na ficha e no contrato (ver B1) | ✅ 12/11: alerta no Painel em fevereiro e março, e-mail e "como declarar" na declaração |
+| A13 | Fiador: falta a **troca do fiador** quando ele pede para sair ou perde os imóveis | A lei permite exigir novo fiador em 30 dias, mas o contrato só fala em morte, insolvência e mudança de cidade | art. 40 e parágrafo único | Incluir exoneração, venda dos imóveis e recuperação judicial | ⬜ |
+| A14 | **Procuração para as concessionárias** só para COPEL e SANEPAR, e só no residencial | A empresa faz as trocas de titularidade de água, energia, gás, condomínio e internet, também na saída | — | Ampliar para gás, condomínio e outros serviços do contrato, na entrada e na saída, nos dois modelos | ⬜ |
+| A15 | **Imóvel abandonado**: tomar posse "independentemente de procedimento judicial" | Sem ação, a retomada pode virar acusação de fazer justiça com as próprias mãos | Lei 8.245, art. 66; Código Penal, art. 345 | Só com abandono comprovado (ata notarial ou testemunhas), inventário dos bens deixados e aviso ao inquilino e ao fiador | ⬜ |
+| A16 | Sem cláusula de **LGPD** | O contrato não diz para que os dados são usados nem com quem são compartilhados (contador, banco, seguradora, birô de crédito, concessionárias) | Lei 13.709/2018, arts. 7º, V, e 16 | Cláusula curta de tratamento de dados | ⬜ |
+| A17 | **Assinatura eletrônica e testemunhas** | "Duas vias" e nenhuma testemunha: para executar o contrato (e não só o aluguel) faltam testemunhas ou assinatura eletrônica com certificação | CPC, art. 784, III e § 4º | Cláusula aceitando assinatura eletrônica + duas testemunhas no papel | ⬜ |
+| A18 | **Negativação** só no comercial, e "todo atraso" | O birô avisa antes de incluir; prometer incluir "todo atraso" pode ser usado contra a empresa | CDC, art. 43, § 2º; Súmula 359 do STJ | Nos dois modelos: "poderá incluir, após o aviso prévio do órgão" | ⬜ |
+| A19 | Honorários de **25%** pré-fixados | Pode ser reduzido como abusivo; o comum é 10% a 20% | CPC, art. 85 | 20% ou "até 20%" | ❓ |
+| A20 | Encargos do inquilino: não diz que **despesas extraordinárias** do condomínio são da locadora | Pode virar discussão no acerto | arts. 22, X, e 23, XII | Frase deixando claro | ⬜ |
+
+O que já está certo: reajuste anual com índice; IPTU e seguro por conta do inquilino com cláusula (art. 22, VIII); renúncia às benfeitorias (Súmula 335 do STJ); fiador "principal pagador até a entrega das chaves" (art. 39); aditivo com o fiador assinando (Súmula 214 do STJ); preferência na venda (art. 27); visitas com agendamento (art. 23, IX); aviso de saída por e-mail; e-mail aceito como meio de notificação; contas apuradas depois da saída continuam devidas.
+
+## B. Mudanças no fluxo do sistema
+
+| # | O que | Situação |
+|---|---|---|
+| B1 | **Cônjuge do fiador**: na ficha e no contrato, estado civil e regime. Casado: o cônjuge assina (salvo separação total de bens por pacto antenupcial). Separação obrigatória: assinar também, por segurança (há divergência). União estável: o STJ já decidiu que não é exigido (REsp 1.299.866, 2014, a confirmar), mas recomendamos a assinatura do companheiro | ⬜ |
+| B2 | **Prazo de 10 dias** para o inquilino apontar defeito depois da entrada (cláusula A9 + etapa na rotina de entrada, com a data limite) | ⬜ |
+| B3 | **Convite para a vistoria de saída** registrado (data, hora, se o inquilino veio) e prazo para ele responder ao relatório | ⬜ |
+| B4 | **Termo de devolução das chaves** na saída, com a ressalva de que receber as chaves não dá quitação (hoje a etapa "Entrega das chaves" fica feita só pela data) | ⬜ |
+| B5 | Pendências da vistoria de saída: já existem (lista "Com pendências" e marcação "Contestada"); faltam o orçamento de cada pendência e a escolha do inquilino entre fazer o reparo ou descontar da caução | ⬜ |
+| B6 | **Reserva**: sempre devolvida (não aprovada ou desistência antes de assinar), com recibo dizendo isso. Decisão do dono em 12/11/2026 | ⬜ |
+| B7 | Barrar caução/depósito acima de 3 aluguéis e a garantia dupla (A1, A2); avisar residencial com menos de 30 meses (A3) | ⬜ |
+| B8 | **Informe anual para o IR**: rotina todo ano para os inquilinos com NF (ver seção D) | ⬜ |
+
+## C. Respostas às perguntas do dono
+
+- **Aprovar a ficha obriga a alugar?** Não vira contrato: só a assinatura de todos forma a locação. Mas a lei exige boa-fé nas negociações (CC, art. 422): desistir depois de aprovar, sem motivo, pode obrigar a pagar despesas que a pessoa teve por confiar na aprovação (ex.: multa do aluguel antigo, frete marcado). Por isso o e-mail de aprovação diz que a locação só se forma com a assinatura de todos, e a desistência precisa de motivo (ex.: documento falso, mudança das condições).
+- **A vistoria de entrada pode ser depois do contrato?** Pode, desde que seja na entrega das chaves, antes de a pessoa levar qualquer coisa, e assinada pelos dois. O contrato precisa dizer isso (A9).
+- **A vistoria precisa ser com o inquilino?** A lei não obriga a presença, mas obriga a locadora a entregar a descrição do imóvel quando ele pedir (art. 22, V) e o inquilino a devolver como recebeu (art. 23, III). Sem o convite e a chance de responder, a vistoria vale pouco como prova. Regra prática: entrada sempre com ele presente e assinando; saída com convite por escrito e, se não vier, relatório enviado com prazo.
+- **Reparo: "você escolhe fazer ou descontar"** é legal e é boa prática: a obrigação é devolver como recebeu (art. 23, III) e a caução cobre os danos (cláusula da caução). Cuidados: o reparo feito pelo inquilino precisa ter a mesma qualidade; o desconto exige orçamento (melhor dois) ou nota do serviço; o aluguel corre até a devolução das chaves, inclusive nos dias de reparo.
+- **Contas depois da saída**: a empresa pede a leitura final e a troca de titularidade (procuração do contrato, A14); conta que chegar depois, com consumo até a leitura do dia da devolução, é do inquilino (cláusula das despesas apuradas depois) e entra no acerto ou é cobrada depois.
+
+## D. Informe anual para o Imposto de Renda
+
+Pesquisa de 12/11/2026, no papel de contador de holding de imóveis. A maior parte veio de fontes secundárias: **confirmar com o contador** antes de fechar o modelo.
+
+- **Inquilino pessoa física:** declara na ficha "Pagamentos Efetuados", **código 70 (Aluguéis de imóveis)**, com o CNPJ e o nome da empresa locadora e o valor pago no ano. Aluguel de moradia **não abate** imposto (só para quem usa o imóvel no trabalho e tem livro-caixa). Entra **só o aluguel**: IPTU, condomínio e seguro vão separados no informe.
+- **Ano pela data do pagamento:** o aluguel de 12/2025 pago em 05/01/2026 entra no informe de 2026.
+- **Atenção:** a declaração do sistema soma as NFs pela **data de emissão** (decisão D9); o IR conta pela **data do pagamento**. A NF de dezembro emitida em janeiro cai no ano seguinte. Confirmar com o contador se muda.
+- **Prazo:** não há regra para locador empresa que não retém imposto; a prática é até o **fim de fevereiro**, como os informes dos empregadores e a DIMOB.
+- **Inquilino pessoa jurídica:** aluguel de empresa para empresa não tem retenção na fonte, nem vai à EFD-Reinf; nada é obrigatório. A NF do mês já comprova; o resumo anual é cortesia (mandar a todos, por decisão do dono).
+- **Conteúdo do informe** (não há modelo oficial): título "Comprovante anual de aluguéis pagos – ano-calendário AAAA"; locador (razão social, CNPJ, endereço) de cada empresa que emitiu NF; locatário (nome, CPF ou CNPJ); endereço do imóvel e início do contrato; mês a mês pela data do pagamento (mês de uso, data paga, aluguel, IPTU, seguro, multa e juros, número da NF); total do aluguel (o valor do código 70) e dos encargos; "não houve retenção de IR na fonte"; onde declarar (Pagamentos Efetuados, código 70, CNPJ do locador); local, data e assinatura do representante. Sem os dados dos fiadores.
+- **Sistema:** a declaração anual já existe (`declaracaoAnual`, por empresa emitente, com as NFs do ano). Falta: separar os encargos, o texto de onde declarar, um alerta todo ano em fevereiro para enviar aos inquilinos que tiveram NF no ano anterior, e o e-mail desse envio.
+- **DIMOB:** o contador já entrega (dono, 12/11/2026).
+- **DIMOB (regra):** pela IN RFB 1.115/2010, art. 1º, IV, a empresa constituída para locação de **patrimônio próprio** é obrigada a entregar a DIMOB (todo ano, até o último dia útil de fevereiro); a que intermedeia aluguel de imóvel de outra empresa também (art. 1º, II). **Conferir com o contador se ANK e JCK já entregam e quem informa cada aluguel.** O sistema pode gerar o arquivo da DIMOB no futuro.
+- **Guarda de documentos (LGPD):** contrato, vistorias, NFs, comprovantes e acertos por **10 anos após o fim do contrato** (prazo geral do Código Civil, art. 205; impostos 5 anos, CTN arts. 173 e 174; aluguéis e danos 3 anos, CC art. 206, § 3º; livros, CC art. 1.195). Base legal para guardar depois do fim: LGPD, arts. 7º, II, V e VI, e 16, I. Ficha que não virou contrato: apagar em 3 meses (decisão de 2026-11-09).
+- **Prazo para contestar vistoria ou acerto:** a Lei 8.245/91 não fixa. A prática é de 5 a 10 dias. A cláusula "X dias, depois vale como aceito" é válida e reforça a prova, mas não impede o inquilino de provar o contrário, e os 3 anos para cobrar continuam. Vistoria de saída sem o inquilino já foi recusada como prova (TJSP, Juizado, 2025, noticiado pelo Conjur em 26/01/2026).
+
+## E. E-mails por etapa (decisões do dono em 12/11/2026; feito na mesma data)
+
+- Código: `docs/js/modelos-email.js` (12 modelos), `docs/js/email-dados.js` (dados), `docs/js/telas/emails.js` (botão ✉ E-mail, janela, tela Modelos de e-mail), envio direto `docs/js/gmail.js` + `nuvem/gmail.mjs` (ligar: `LIGAR_GMAIL.md`). Registro de cada e-mail aberto ou enviado na tabela `envios_email`.
+- Arquivo físico: etapa final do roteiro da saída (imprimir o processo e guardar 10 anos, `arquivo_fisico_em`).
+
+- Remetente "Administradora" `<administracao@ankjck.com.br>`, com cópia oculta para a caixa da empresa; envio direto pelo Gmail da empresa (API do Gmail), por todos os usuários, sempre conferido antes de sair.
+- Todo e-mail fecha com "Agradecemos e ficamos à disposição em caso de dúvidas." antes de "Atenciosamente".
+- O primeiro contato (envio da ficha cadastral) só sai **depois do depósito da reserva**.
+- Conta da caução: ANK ADMINISTRADORA DE BENS LTDA, banco 336 (C6), ag. 0001, c/c 36152656-3; Pix: CNPJ 58.492.818/0001-59.
+- Trechos condicionais: contas (só se houver conta por conta do inquilino), documentos (pessoa física ou jurídica, e os extras de cada garantia), caução (só quando a garantia é caução), multa da saída (sempre a do contrato do inquilino).
+- Troca de titularidade das contas: feita pela empresa (decisão interna), na entrada e na saída.
+- Ficha reprovada: reserva devolvida em até 24 horas úteis; documentos apagados, conforme a LGPD.
+- Nomes das etapas: "Envio de ficha cadastral", "Vistoria assinada" (entrada), "Devolução das chaves" (saída).

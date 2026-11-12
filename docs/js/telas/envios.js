@@ -14,6 +14,7 @@ import { aplicarReajusteNaTela } from './acoes.js';
 import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { FORMULARIOS_BANCO } from './banco.js';
+import { FORMULARIOS_EMAILS } from './emails.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
@@ -655,7 +656,7 @@ export const FORMULARIOS = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): formulários em telas/banco.js
-Object.assign(FORMULARIOS, FORMULARIOS_BANCO);
+Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS);
 
 
 /**

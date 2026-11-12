@@ -22,6 +22,7 @@ import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
 import { alertaFichas, telaFicha } from './telas/fichas.js';
+import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
@@ -260,6 +261,7 @@ export const TELAS = {
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${alertaFichas()}
+      ${alertaInformeIr()}
       ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
         ${link('#/conflitos', podeUsuario('admin') ? 'Escolher agora' : 'Ver (o administrador escolhe)', 'botao pequeno')}</div>` : ''}
       ${avisoBackupSeguro()}
@@ -344,6 +346,8 @@ export const TELAS = {
   'contrato-gerar': (rota) => telaGerarContrato(rota),
   aditivo: (rota) => telaAditivo(rota),
   'modelos-contrato': () => telaModelos(),
+  'modelos-email': () => telaModelosEmail(),
+  'modelo-email': (rota) => telaModeloEmail(String(rota.partes[1] || '')),
   vistoria: (rota) => telaVistoria(rota),
   'modelo-vistoria': (rota) => telaModeloVistoria(rota),
   fechamento: (rota) => telaFechamento(C.competenciaValida(rota.q.mes, C.competenciaDe(C.hojeIso()))),
