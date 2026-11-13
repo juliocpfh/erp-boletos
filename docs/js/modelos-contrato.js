@@ -179,7 +179,7 @@ const RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
 
 **CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. ${SEM_AVISO} O imóvel deverá ser entregue conforme a vistoria inicial.
 
-**CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. O aluguel e os encargos são devidos até a data da devolução das chaves. Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia em dinheiro, quando houver, ou cobrados do LOCATÁRIO, com base em orçamento ou nota do serviço.
+**CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos são devidos até a data da devolução das chaves. Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia em dinheiro, quando houver, ou cobrados do LOCATÁRIO, com base em orçamento ou nota do serviço.
 
 **CLÁUSULA #** – O LOCATÁRIO, ao término da locação, obriga-se a apresentar, na entrega das chaves, a quitação de todos os impostos e taxas (contas de água e esgoto, luz, condomínio, IPTU etc.) que forem de sua responsabilidade durante a vigência da locação.
 
@@ -214,6 +214,9 @@ const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 [se seguro_fianca]## GARANTIA DO CONTRATO – SEGURO FIANÇA
 
 **CLÁUSULA #** – A presente locação é garantida por seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido vigente durante todo o prazo da locação e suas prorrogações, sob pena de rescisão deste contrato.[fim]`;
+
+/** Vistoria de saída (A10 da revisão, 2026-11-13): convite por escrito, sem a presença obrigatória, e 5 dias úteis para contestar. */
+export const CONVITE_SAIDA = "O LOCATÁRIO será convidado por escrito, por e-mail, a acompanhar a vistoria; se aceitar, a acompanhará do início ao fim. Sua ausência ou recusa não impede a vistoria, que será feita com fotos e vídeo, comparando o imóvel com a vistoria de entrada. Na devolução das chaves, o LOCATÁRIO assinará termo registrando se acompanhará a vistoria, e o recebimento das chaves não dá quitação. O relatório da vistoria de saída será enviado ao LOCATÁRIO por e-mail, e ele terá 5 (cinco) dias úteis para contestá-lo por escrito; passado esse prazo, o relatório vale como aceito, ressalvado o direito de provar o contrário.";
 
 /** Negativação nos dois modelos, depois do aviso do próprio órgão (A18; CDC, art. 43, § 2º; Súmula 359 do STJ). */
 export const NEGATIVACAO = '**CLÁUSULA #** – Em caso de atraso no pagamento de aluguéis e encargos, {l:a LOCADORA poderá|as LOCADORAS poderão} incluir o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] nos órgãos de proteção ao crédito (SERASA, SCPC e similares), depois do aviso prévio feito pelo próprio órgão.';
@@ -440,6 +443,7 @@ export const ATUALIZACOES_MODELO = [
   ["\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] ficam cientes de que a administradora do imóvel é associada ao SERASA e ao SCPC e incluirá no cadastro de inadimplentes todo atraso de pagamento de aluguéis e encargos vencidos.\n", '', 'depois do aviso prévio feito pelo próprio órgão'],
   ["**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações", `${NEGATIVACAO}\n\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações`, 'depois do aviso prévio feito pelo próprio órgão'],
   ["assinam em duas vias de igual teor e forma, obrigando-se", "assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se"],
+  [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, 'convidado por escrito, por e-mail, a acompanhar a vistoria'],
 ];
 
 /** Aplica ATUALIZACOES_MODELO num texto de contrato (o 3º item, quando há, é o sinal de que a troca já foi feita). */

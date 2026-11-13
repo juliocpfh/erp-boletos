@@ -185,11 +185,18 @@ Pelo seu contrato, a saída antes do fim do prazo ({fim}) tem multa de 3 alugué
 [fim]
 PRÓXIMOS PASSOS
 - Último aluguel: proporcional aos dias até {data_saida}; o aluguel corre até a devolução das chaves
-- Vistoria de saída: vamos marcar a data e hora com você; a vistoria é feita com a sua presença
-[se contas]- Contas: nós pedimos a leitura final dos relógios no dia da devolução e a volta da titularidade. Mande os comprovantes das contas pagas até a saída. Conta com consumo até a leitura final que chegar depois também é sua e entra no acerto ou é cobrada depois
-[fim]- Devolução das chaves: no dia da vistoria, com o termo de devolução
+- Vistoria de saída: feita por nós logo depois da devolução das chaves, com fotos e vídeo, comparando com a vistoria de entrada. Você é convidado a acompanhar; se vier, acompanha a vistoria inteira. Se não puder, fazemos sem você e mandamos o relatório para você responder em até 5 dias úteis
+[se contas]- Contas de {contas_texto}: são encerradas por você (veja abaixo), e os comprovantes de tudo pago vêm junto com as chaves
+[fim]- Devolução das chaves: com o termo de devolução, em que você diz se vai acompanhar a vistoria
 - Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], enviado para você conferir
-
+[se contas]
+COMO ENCERRAR AS CONTAS ({CONTAS_CONCESSIONARIAS})
+1. No dia da devolução das chaves, tire uma foto de cada relógio (com o número e a leitura aparecendo)
+2. Peça a cada companhia o encerramento da conta no seu nome (ou a troca de titularidade, pela mudança), com a leitura final dessa data: pelo site ou aplicativo da companhia, na área de autoatendimento, ou numa agência. Tenha em mãos o seu documento, o número da conta (está na fatura) e a foto do relógio
+3. Traga, na devolução das chaves, os comprovantes de todas as contas pagas até ali e o protocolo de cada pedido
+4. Quando a conta final chegar, pague e nos mande o comprovante por este e-mail
+Conta com consumo até a leitura final que chegar depois também é sua e entra no acerto ou é cobrada depois. Nós cuidamos de passar as contas para o nome do proprietário ou do próximo inquilino.
+[fim]
 O imóvel deve ser devolvido como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural do uso não conta). O contrato[se tem_garantia] e a garantia continuam[senão] continua[fim] valendo até a devolução das chaves.`,
   },
   {
@@ -201,14 +208,15 @@ O imóvel deve ser devolvido como na vistoria de entrada: vazio, limpo e com os 
 
 A vistoria de saída fica marcada para {data_vistoria}, no imóvel. Se não puder, responda com outro horário até 2 dias antes.
 
-A vistoria é feita com você presente: comparamos o imóvel com a vistoria de entrada (anexa) e você pode registrar as suas observações. Se não puder vir, pode mandar alguém com autorização por escrito. Se ninguém comparecer, faremos a vistoria no horário marcado, com fotos, e enviaremos o relatório para você responder em até 5 dias úteis.
+Você está convidado a acompanhar a vistoria. Se vier, ela é feita do começo ao fim com você, comparando o imóvel com a vistoria de entrada (anexa), e você assina que acompanhou e pode registrar as suas observações; pode também mandar alguém com autorização por escrito. Se não puder ou não quiser, responda este e-mail: faremos a vistoria no horário marcado, com fotos e vídeo de cada cômodo, e enviaremos o relatório para você responder em até 5 dias úteis.
 
 DEIXE PRONTO
 - Imóvel vazio e limpo
 - Danos reparados (paredes, pisos, portas, louças, chuveiro, tomadas)
 - Todas as chaves e controles
 [se contas]- Comprovantes das contas de {contas_texto} pagas
-[fim]- A leitura dos relógios fazemos juntos
+- Protocolo do encerramento de cada conta e a foto dos relógios no dia da saída
+[fim]
 
 Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qualidade do que foi entregue, ou [se dinheiro]ter o valor descontado da {tipo_deposito}[senão]pagar o valor do reparo[fim], com orçamento apresentado. O aluguel corre até a devolução das chaves, inclusive nos dias de reparo.`,
   },

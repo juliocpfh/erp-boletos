@@ -379,6 +379,7 @@ test('revisão de 2026-11-13: prazo menor que 30 meses, multa, entrega, fiador, 
   assert.match(longo, /O aluguel e os encargos são devidos até a data da devolução das chaves/);
   assert.doesNotMatch(longo, /tal como na vistoria inicial|independentemente de procedimento judicial/);
   assert.match(longo, /ata notarial ou declaração de 2 \(duas\) testemunhas/);
+  assert.match(longo, /convidado por escrito, por e-mail, a acompanhar a vistoria; .* 5 \(cinco\) dias úteis para contestá-lo/);
   assert.match(longo, /depois do aviso prévio feito pelo próprio órgão/);
   assert.match(longo, /assinatura eletrônica, que reconhecem como válida .* na presença de 2 \(duas\) testemunhas/);
   assert.match(M.MODELOS_PADRAO[0].texto, /de sua exoneração da fiança, da venda ou oneração dos imóveis/);
