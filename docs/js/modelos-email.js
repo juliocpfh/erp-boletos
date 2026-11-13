@@ -17,9 +17,10 @@ Pix (CNPJ): 58.492.818/0001-59`;
 const CONDICOES = `CONDIÇÕES DA LOCAÇÃO
 - Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
 - Vencimento: todo dia {vencimento}
-[se iptu]- IPTU: cobrado junto com o aluguel
-[fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel
+[se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
+[fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel[se seguro_valor] (cerca de {seguro_valor} por ano)[fim]
 [fim][se contas]- Contas de {contas_texto}: por conta do locatário
+[fim][se inclusos]- Incluso no aluguel: {inclusos}
 [fim]- Garantia: {garantia}
 - Prazo do contrato: {prazo}`;
 
@@ -43,18 +44,19 @@ A análise da seguradora é feita junto; se ela pedir algum documento a mais, av
 
 /**
  * Modelos padrão: ``chave`` (fixa), ``nome`` e ``etapa`` (onde fica o botão), ``assunto``, ``texto`` (sem o fecho, que vai
- * sempre no fim), ``anexos`` (lembrete do que anexar) e ``perguntas`` ([campo, rótulo, tipo]): o que se digita na hora de
+ * sempre no fim), ``anexos`` (lembrete do que anexar à mão), ``prontos`` (o que o sistema anexa sozinho: "recibo:tipo" de recibos.js e
+ * "comprovante:qual" guardado na pasta, email-dados.js anexosProntos) e ``perguntas`` ([campo, rótulo, tipo]): o que se digita na hora de
  * enviar (ex.: as opções de data da entrega das chaves). O valor inicial de cada pergunta vem de dadosDoEmail (email-dados.js).
  */
 export const MODELOS_EMAIL = [
   {
     chave: 'ficha_envio', nome: 'Envio de ficha cadastral', etapa: 'Ficha',
     assunto: '{imovel}: ficha cadastral e condições da locação',
-    anexos: 'Ficha cadastral (PDF) e recibo da reserva',
+    anexos: 'Ficha cadastral (PDF)', prontos: ['recibo:reserva', 'comprovante:reserva'],
     perguntas: [['prazo', 'Prazo do contrato', 'texto']],
     texto: `Olá, {nome}, tudo bem?
 
-[se reserva]Recebemos o depósito da reserva de {reserva} em {reserva_data} para o imóvel da {endereco}. Ele segura o imóvel durante a análise da ficha: aprovada, o valor é descontado do primeiro aluguel; não aprovada, ou se você desistir antes de assinar o contrato, ele é devolvido por inteiro.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
+[se reserva]Recebemos o depósito da reserva de {reserva} em {reserva_data} para o imóvel da {endereco}: seguem anexos o recibo e o comprovante. A reserva segura o imóvel durante a análise da ficha: aprovada, o valor é descontado do primeiro aluguel; não aprovada, ou se você desistir antes de assinar o contrato, ele é devolvido por inteiro.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
 
 ${CONDICOES}
 
@@ -108,6 +110,18 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
 [fim]Os documentos enviados serão apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`,
   },
   {
+    chave: 'ficha_devolucao', nome: 'Devolução da reserva', etapa: 'Ficha',
+    assunto: 'Devolução da reserva – {imovel}',
+    anexos: '', prontos: ['recibo:devolucao_reserva', 'comprovante:devolucao'],
+    texto: `Olá, {nome},
+
+Confirmamos a devolução de {devolucao} em {devolucao_data}, na conta de onde veio o depósito da reserva do imóvel da {imovel}. Seguem anexos o comprovante da transferência e o termo de devolução e quitação.
+
+Com a devolução, a ficha fica encerrada e não há valores pendentes entre as partes. Se puder, responda este e-mail com o termo assinado (pode ser pelo gov.br); o comprovante do banco já vale como prova da devolução.
+
+Os documentos enviados para a análise serão apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`,
+  },
+  {
     chave: 'contrato_assinar', nome: 'Contrato para assinar', etapa: 'Gerar o contrato',
     assunto: 'Contrato de locação para assinatura – {imovel}',
     anexos: 'Contrato (PDF)',
@@ -136,11 +150,11 @@ Ficou alguma dúvida sobre as cláusulas? Pergunte antes de assinar.`,
   {
     chave: 'contrato_assinado', nome: 'Contrato assinado: entrega das chaves', etapa: 'Contrato assinado',
     assunto: 'Contrato assinado – {imovel}: entrega das chaves',
-    anexos: 'Contrato assinado por todos (PDF)',
+    anexos: 'Contrato assinado por todos (PDF)', prontos: ['recibo:garantia', 'comprovante:garantia'],
     perguntas: [['opcoes_entrega', 'Opções de data e horário da entrega das chaves', 'texto']],
     texto: `Olá, {nome},
 
-Segue anexo o contrato assinado por todas as partes. Guarde esta via.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}.[fim]
+Segue anexo o contrato assinado por todas as partes. Guarde esta via.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}: seguem o recibo e o comprovante.[fim]
 
 ENTREGA DAS CHAVES
 Opções: {opcoes_entrega}, no imóvel. Responda com a melhor opção.
@@ -245,10 +259,12 @@ Se discordar de algum item, responda em até 5 dias úteis explicando o motivo.`
   {
     chave: 'saida_encerramento', nome: 'Encerramento do contrato', etapa: 'Devolução da garantia',
     assunto: 'Contrato encerrado – {imovel}',
-    anexos: 'Comprovante da devolução (PDF), se houver',
+    anexos: '', prontos: ['recibo:quitacao', 'comprovante:saida'],
     texto: `Olá, {nome},
 
-Confirmamos [se devolver]a devolução de {saldo} em {data_devolucao} e [fim]o encerramento do contrato de locação do imóvel da {imovel}. Não há valores pendentes entre as partes referentes a este contrato.
+Confirmamos [se devolver]a devolução de {saldo} em {data_devolucao} e [fim]o encerramento do contrato de locação do imóvel da {imovel}. Segue anexo o termo de entrega do imóvel, acerto final e quitação[se devolver], com o comprovante da transferência[fim]. Por favor, responda com o termo assinado (pode ser pelo gov.br).
+
+Com o acerto, não há valores pendentes entre as partes referentes a este contrato, salvo as contas de consumo e os tributos do período da locação que ainda não tenham chegado, que serão enviados com a conta ou a guia.
 
 Em fevereiro enviaremos o informe dos aluguéis pagos em {ano_saida}, para a sua declaração do Imposto de Renda.
 

@@ -87,3 +87,23 @@ Pesquisa de 12/11/2026, no papel de contador de holding de imóveis. A maior par
 - Troca de titularidade das contas: feita pela empresa (decisão interna), na entrada e na saída.
 - Ficha reprovada: reserva devolvida em até 24 horas úteis; documentos apagados, conforme a LGPD.
 - Nomes das etapas: "Envio de ficha cadastral", "Vistoria assinada" (entrada), "Devolução das chaves" (saída).
+
+## G. Recibos e termos de quitação (2026-11-13, pedido do dono depois de uma ficha recusada)
+
+Lição da ficha recusada (novembro de 2026): o contrato de prestação de serviço apresentado como prova de renda tinha a "assinatura" da contratante digitada numa letra cursiva e inserida por ferramenta de inteligência artificial (o PDF trazia o registro de origem "ChatGPT"), os pagamentos de 2 dos 3 meses vinham de outras pessoas e as notas fiscais tinham sido refeitas depois do pedido de documentos. **Regra prática:** contrato de renda só vale com assinatura verificável (gov.br, certificado digital ou firma reconhecida), e os depósitos do extrato precisam vir de quem está nas notas. Recusar por renda não comprovada é legítimo; o motivo escrito é objetivo, sem acusar ninguém.
+
+O que o sistema emite (`docs/js/recibos.js`; botão 🧾 na ficha e na página do inquilino; PDF anexado sozinho no e-mail da etapa, junto com o comprovante do banco):
+
+| Documento | Quando | Base legal | Assinam |
+|---|---|---|---|
+| Recibo da reserva | reserva com valor e data | Código Civil, arts. 319 e 320 (quitação com valor, quem pagou, data e assinatura de quem recebe) | a empresa |
+| Termo de devolução da reserva e quitação | devolução registrada na ficha | CC, arts. 319 e 320; LGPD, art. 16, I (fica só o comprovante do dinheiro) | a empresa e o interessado (o comprovante do banco já prova a devolução) |
+| Recibo da caução ou do depósito de garantia | depósito registrado | CC, arts. 319 e 320; Lei 8.245/91, art. 38, § 2º (caução em poupança, rendimentos do locatário) | a empresa |
+| Termo de entrega do imóvel, acerto final e quitação | cálculo final feito e saldo devolvido (ou pago) | Lei 8.245/91, art. 22, VI (recibo discriminado; proibida a quitação genérica); CC, arts. 319 e 320 | a empresa, o locatário e o solidário |
+
+Cuidados de advogado e de contador:
+- **A reserva não forma a locação** e é devolvida por inteiro se a ficha não for aprovada ou se o interessado desistir antes de assinar (o mesmo que o e-mail da ficha promete). Ela é **adiantamento**: a nota fiscal sai com o aluguel em que é abatida (aluguel cheio, como decidido).
+- **Garantia não é receita**: o recibo diz que não há nota fiscal.
+- **A quitação da saída é específica**: lista garantia, correção, cada débito e o saldo, e vale "nos valores aqui discriminados". Ressalva só as contas de consumo e os tributos do período ainda não lançados (o contrato já permite cobrá-los depois). Estende-se ao solidário e aos fiadores.
+- O comprovante do banco da devolução do saldo da saída passa a ser guardado no cálculo final (`encerramentos.comprovante`); sem ele, aparece "anexar comprovante" (só nas saídas acertadas a partir de 13/11/2026).
+- Assinatura do interessado ou do inquilino nos termos: pedir pelo gov.br (gratuita e verificável) ou em papel.
