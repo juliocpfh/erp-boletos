@@ -498,6 +498,9 @@ function caixaBoletosInquilino(c, cobs, hoje) {
     return l.length ? `<details><summary>Boletos do titular anterior: ${esc(x.inquilino_nome)} (${l.length})</summary><div class="rolagem"><table class="compacta">${cab}${l.map(linha).join('')}</table></div></details>` : ''; }).join('')}</div>`;
 }
 
+/** Termo de novo valor do aluguel (renovação) ou anexado com "reajuste" no assunto: no atalho sai "Termo de reajuste", não "Aditivo". */
+const ehTermoDeReajuste = (a) => a.tipo === K.TIPO_ADITIVO_VALOR || /reajust/i.test(a.assunto || '');
+
 /** Cabeçalho do inquilino: botões para abrir na hora os documentos já anexados (entrada, assinatura faltante e aditivos). */
 function atalhosDocumentos(c) {
   const abrir = (escopo, id, nome, texto) => `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(texto)}</a>`;
@@ -508,7 +511,7 @@ function atalhosDocumentos(c) {
     const p = R.documentoParcial(d(), c, k);
     return p ? abrir('assinados', c.id, p.arquivo, `${curto[k]} (falta assinatura)`) : '';
   }).filter(Boolean);
-  for (const a of [...R.aditivosDo(d(), c.id)].reverse()) botoes.push(abrir('aditivos', a.contrato_id, a.arquivo, `Aditivo ${dataBr(a.data)}`));
+  for (const a of [...R.aditivosDo(d(), c.id)].reverse()) botoes.push(abrir('aditivos', a.contrato_id, a.arquivo, `${ehTermoDeReajuste(a) ? 'Termo de reajuste' : 'Aditivo'} ${dataBr(a.data)}`));
   return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(' ')}</div>` : '';
 }
 
