@@ -186,13 +186,13 @@ Pelo seu contrato, a saída antes do fim do prazo ({fim}) tem multa de 3 alugué
 PRÓXIMOS PASSOS
 - Último aluguel: proporcional aos dias até {data_saida}; o aluguel corre até a devolução das chaves
 - Vistoria de saída: feita por nós logo depois da devolução das chaves, com fotos e vídeo, comparando com a vistoria de entrada. Você é convidado a acompanhar; se vier, acompanha a vistoria inteira. Se não puder, fazemos sem você e mandamos o relatório para você responder em até 5 dias úteis
-[se contas]- Contas de {contas_texto}: são encerradas por você (veja abaixo), e os comprovantes de tudo pago vêm junto com as chaves
+[se contas]- Contas de {contas_texto}: a leitura final e a suspensão são pedidas por você (veja abaixo), e os comprovantes de tudo pago vêm junto com as chaves
 [fim]- Devolução das chaves: com o termo de devolução, em que você diz se vai acompanhar a vistoria
 - Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], enviado para você conferir
 [se contas]
 COMO ENCERRAR AS CONTAS ({CONTAS_CONCESSIONARIAS})
 1. No dia da devolução das chaves, tire uma foto de cada relógio (com o número e a leitura aparecendo)
-2. Peça a cada companhia o encerramento da conta no seu nome (ou a troca de titularidade, pela mudança), com a leitura final dessa data: pelo site ou aplicativo da companhia, na área de autoatendimento, ou numa agência. Tenha em mãos o seu documento, o número da conta (está na fatura) e a foto do relógio
+2. Peça a cada companhia o registro da leitura final de inquilino (consumo final) nessa data e a suspensão temporária do serviço: pelo site ou aplicativo da companhia, na área de autoatendimento, ou numa agência. Tenha em mãos o seu documento, o número da conta (está na fatura) e a foto do relógio
 3. Traga, na devolução das chaves, os comprovantes de todas as contas pagas até ali e o protocolo de cada pedido
 4. Quando a conta final chegar, pague e nos mande o comprovante por este e-mail
 Conta com consumo até a leitura final que chegar depois também é sua e entra no acerto ou é cobrada depois. Nós cuidamos de passar as contas para o nome do proprietário ou do próximo inquilino.
