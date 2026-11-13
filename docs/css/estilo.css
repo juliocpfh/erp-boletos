@@ -167,6 +167,10 @@ a.cartao:hover { text-decoration: none; border-color: var(--primaria); }
 .alerta.com-adiar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
 .alerta.com-adiar > a, .alerta.com-adiar > .adiar-alerta { display: inline; }
 .alerta.com-adiar .adiar-alerta { margin-left: auto; }
+/* Alertas desligados para um inquilino (página do inquilino): linha discreta que abre a lista e a escolha */
+details.alertas-do-inquilino { margin: 0 0 12px; }
+details.alertas-do-inquilino summary, #alertas-desligados > summary { cursor: pointer; }
+details.alertas-do-inquilino form { margin-top: 6px; }
 
 /* Índice das caixas (páginas do inquilino e do imóvel) e botão de recolher cada caixa */
 .indice-caixas { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 0 0 14px; font-size: 14px; }

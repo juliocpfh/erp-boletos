@@ -5,7 +5,7 @@ import { compBr, dataBr } from '../calculos.js';
 import * as K from '../contratos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { alertaAdiado, botao, buscar, classeAlerta, d, etiqueta, gruposDeAlertas, link, nomeAlerta, opera } from './comum.js';
+import { alertaAdiado, alertaDesligado, botao, buscar, classeAlerta, d, etiqueta, gruposDeAlertas, link, nomeAlerta, opera } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Fechamento do mês e cadastros incompletos
@@ -67,19 +67,22 @@ export function telaPendencias() {
   const hoje = C.hojeIso();
   const mesAtual = C.competenciaDe(hoje);
   const alertas = R.alertasComAdiamento(d(), hoje);
-  const ativos = alertas.filter((a) => !a.adiamento);
-  const adiados = alertas.filter((a) => a.adiamento);
+  const ativos = alertas.filter((a) => !a.adiamento && !a.desligado);
+  const adiados = alertas.filter((a) => a.adiamento && !a.desligado);
+  const desligados = R.alertasDesligados(d(), hoje, null, alertas);
   const etapas = [...R.etapasAtrasadas(d(), mesAtual, hoje), ...R.etapasFechamento(d(), mesAtual, hoje).filter((e) => !e.feito && !e.prevista).map((e) => ({ ...e, mes: mesAtual }))];
   const lista = cadastrosIncompletos();
   const grupos = ['Inquilino', 'Imóvel', 'Empresa'].map((t) => [t, lista.filter((x) => x.tipo === t)]).filter(([, l]) => l.length);
   const total = ativos.length + adiados.length + etapas.length + lista.length;
   return `<p class="suave"><a href="#/">← Painel</a></p><h1>Pendências <span class="suave">(${total})</span></h1>
     <p class="suave">Tudo o que espera uma ação, num lugar só: os alertas em vigor, as etapas do fechamento do mês ainda não feitas e os cadastros incompletos.</p>
-    <div class="cartao" id="alertas"><h2>Alertas <span class="suave">(${ativos.length}${alertas.length > ativos.length ? ` em vigor, ${alertas.length - ativos.length} adiado(s)` : ''})</span></h2>
+    <div class="cartao" id="alertas"><h2>Alertas <span class="suave">(${ativos.length}${adiados.length ? ` em vigor, ${adiados.length} adiado(s)` : ''})</span></h2>
       ${gruposDeAlertas(ativos).map(([tipo, l]) => `<h3>${esc(tipo)} <span class="suave">(${l.length})</span></h3>${l.map((a) => `<div class="${classeAlerta(a)}">${nomeAlerta(a)}</div>`).join('')}`).join('') || '<p class="suave">Nenhum alerta em vigor.</p>'}
       ${adiados.length ? `<h3>Adiados ou em cuidado <span class="suave">(${adiados.length})</span></h3>
         ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}` : ''}
-      <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta).</p></div>
+      ${desligados.length ? `<h3>Desligados <span class="suave">(${desligados.length})</span></h3>
+        ${desligados.map((x) => alertaDesligado(x)).join('')}` : ''}
+      <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta). "Desligar" deixa de avisar aquele inquilino ou imóvel até alguém religar.</p></div>
     <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
       ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ''}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ''}</div>`).join('') || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>
     <h2>Cadastros incompletos <span class="suave">(${lista.length})</span></h2>

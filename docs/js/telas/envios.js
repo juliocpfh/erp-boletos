@@ -577,6 +577,16 @@ export const FORMULARIOS = {
     document.getElementById('icone-app')?.scrollIntoView({ block: 'start' });
   },
 
+  /** Página do inquilino → "Alertas deste inquilino": desliga o tipo escolhido para ele (R.desligarAlerta). */
+  async desligarAlerta(form) {
+    const tipo = String(new FormData(form).get('tipo') || '');
+    const c = buscar('contratos', form.dataset.contrato);
+    if (!c || !confirm(`Desligar o alerta "${tipo}" de ${c.inquilino_nome}? O sistema deixa de avisar sobre isso para este inquilino até alguém religar.`)) return;
+    await alterar((db) => R.desligarAlerta(db, tipo, { contrato_id: c.id }, login(), { quem: E.usuario.nome }));
+    aviso(`Alerta "${tipo}" desligado para ${c.inquilino_nome}. Para voltar a avisar, use "Religar" aqui ou no Painel.`);
+    await mostrar();
+  },
+
   async estilosAlertas(form) {
     const f = Object.fromEntries(new FormData(form));
     const estilos = {};

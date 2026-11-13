@@ -848,6 +848,13 @@ export const nomeAlerta = (a) => (a.imovel || a.inquilino ? `<a href="${linkAler
 /** Alerta adiado ou "já estou cuidando": em cinza, com quem marcou, até quando e o botão para voltar a mostrar (Painel e Pendências). */
 export const alertaAdiado = (a, hoje) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === 'cuidando' ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje ? 'hoje (volta amanhã)' : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao('voltarAlerta', 'Voltar a mostrar', { chave: a.chave }, 'secundario mini') : ''}</div>`;
 
+/** Botão "Desligar" do alerta (só o que é de um inquilino ou de um imóvel): deixa de aparecer para ele até alguém religar. */
+export const botaoDesligarAlerta = (a) => (R.alvoDoAlerta(a) ? botao('desligarAlerta', 'Desligar', { tipo: a.tipo, contrato: a.contrato_id || '', imovel: a.contrato_id ? '' : a.imovel_id }, 'secundario mini',
+  `Desligar o alerta "${a.tipo}" de ${[a.imovel, a.inquilino].filter(Boolean).join(' · ')}? O sistema deixa de avisar sobre isso ${a.contrato_id ? 'para este inquilino' : 'neste imóvel'} até alguém religar (em "Alertas desligados", no fim dos alertas do Painel${a.contrato_id ? ', ou na página do inquilino' : ''}).`) : '');
+
+/** Alerta desligado (R.alertasDesligados): de quem é, quem desligou, quando, se teria aviso hoje, e o botão para religar. */
+export const alertaDesligado = (x, comNome = true) => `<div class="alerta cor-cinza com-adiar"><span>${comNome ? `<a href="${x.link}">${esc(x.nome)}</a>: ` : ''}<b>${esc(x.tipo)}</b> <span class="suave">· desligado por ${esc(x.quem)} em ${dataBr(x.em)}</span>${x.pendentes ? ` ${etiqueta('teria aviso hoje', 'aviso')}` : ''}</span> ${opera() ? botao('religarAlerta', 'Religar', { id: x.id }, 'secundario mini') : ''}</div>`;
+
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */
 export const gruposDeAlertas = (alertas) => {
   const grupos = new Map();

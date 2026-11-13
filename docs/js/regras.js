@@ -18,7 +18,7 @@ export const TABELAS = {
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
-  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', acordos: 'Acordo de dívida', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -5433,6 +5433,8 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
   }
   // adiamentos de alerta vencidos (ou de alerta que já não existe): saem, com histórico
   for (const x of adiamentosVencidos(d, hoje)) { n += 1; if (!soConferir) excluir(d, 'adiamentos_alerta', x.id, usuario, `Adiamento do alerta "${x.tipo}" encerrado (até ${C.dataBr(x.ate)})`); }
+  // alerta desligado de inquilino ou imóvel que foi excluído: sai
+  for (const x of desligamentosOrfaos(d)) { n += 1; if (!soConferir) excluir(d, 'alertas_desligados', x.id, usuario, `Alerta "${x.tipo}" desligado: o inquilino ou imóvel não existe mais`); }
   return n;
 }
 
@@ -6186,9 +6188,12 @@ export function adiamentoDe(d, chave, hoje = C.hojeIso()) {
   return (d.adiamentos_alerta || []).find((x) => x.chave === chave && x.ate >= hoje) || null;
 }
 
-/** Todos os alertas com o campo ``adiamento`` preenchido nos adiados (o Painel mostra os demais e guarda os adiados recolhidos). */
+/**
+ * Todos os alertas com o campo ``adiamento`` preenchido nos adiados (o Painel mostra os demais e guarda os adiados recolhidos)
+ * e ``desligado`` nos que alguém desligou para aquele inquilino ou imóvel (não aparecem até religar).
+ */
 export function alertasComAdiamento(d, hoje = C.hojeIso()) {
-  return todosAlertas(d, hoje).map((a) => ({ ...a, chave: chaveAlerta(a), adiamento: adiamentoDe(d, chaveAlerta(a), hoje) }));
+  return todosAlertas(d, hoje).map((a) => ({ ...a, chave: chaveAlerta(a), adiamento: adiamentoDe(d, chaveAlerta(a), hoje), desligado: desligamentoDe(d, a) }));
 }
 
 /**
@@ -6217,6 +6222,71 @@ export function adiamentosVencidos(d, hoje = C.hojeIso()) {
   const chaves = new Set(todosAlertas(d, hoje).map(chaveAlerta));
   return (d.adiamentos_alerta || []).filter((x) => x.ate < hoje || !chaves.has(x.chave));
 }
+
+// --------------------------------------------------------------------------
+// Alertas desligados (pedido do dono, 2026-11-13): um tipo de alerta deixa de aparecer para UM inquilino (ou para um imóvel, nos
+// alertas que são do imóvel) até alguém religar. Ex.: "Seguro obrigatório" desligado para João da Loja 1: o Painel não cobra mais
+// a apólice dele; os outros inquilinos continuam com o alerta, e quem entrar na Loja 1 depois também.
+// --------------------------------------------------------------------------
+/** De quem é o alerta: do inquilino (contrato), quando tem; senão, do imóvel. Alerta geral (ex.: extrato do banco) não tem alvo: não se desliga. */
+export const alvoDoAlerta = (a) => (a.contrato_id ? { contrato_id: Number(a.contrato_id), imovel_id: null } : a.imovel_id ? { contrato_id: null, imovel_id: Number(a.imovel_id) } : null);
+
+const mesmoAlvo = (x, tipo, alvo) => x.tipo === tipo && (x.contrato_id || null) === alvo.contrato_id && (x.imovel_id || null) === alvo.imovel_id;
+
+/** O desligamento que esconde este alerta ({ tipo, contrato_id | imovel_id, quem, em }), ou null. */
+export function desligamentoDe(d, a) {
+  const alvo = alvoDoAlerta(a);
+  return (alvo && (d.alertas_desligados || []).find((x) => mesmoAlvo(x, a.tipo, alvo))) || null;
+}
+
+/** "Loja 1 · João" (inquilino) ou "Loja 1" (imóvel): a quem o desligamento se refere. */
+function nomeDoAlvo(d, alvo) {
+  const c = alvo.contrato_id ? buscar(d, 'contratos', alvo.contrato_id) : null;
+  const i = buscar(d, 'imoveis', c ? c.imovel_id : alvo.imovel_id);
+  return [i && i.nome, c && c.inquilino_nome].filter(Boolean).join(' · ');
+}
+
+/**
+ * Desliga um tipo de alerta para um inquilino (``alvo.contrato_id``) ou um imóvel (``alvo.imovel_id``), com quem desligou e quando.
+ * Já desligado: devolve o que existe. Ex.: "Seguro obrigatório" de João (Loja 1) desligado por Ana em 13/11/2026.
+ */
+export function desligarAlerta(d, tipo, alvo, usuario, { hoje = C.hojeIso(), quem = '' } = {}) {
+  if (!TIPOS_ALERTA.includes(tipo)) throw new Error('Tipo de alerta desconhecido.');
+  const destino = alvoDoAlerta(alvo || {});
+  if (!destino || !buscar(d, destino.contrato_id ? 'contratos' : 'imoveis', destino.contrato_id || destino.imovel_id)) throw new Error('Este alerta não é de um inquilino nem de um imóvel: não dá para desligar (use "Adiar").');
+  const atual = (d.alertas_desligados || []).find((x) => mesmoAlvo(x, tipo, destino));
+  if (atual) return atual;
+  return inserir(d, 'alertas_desligados', { tipo, ...destino, quem: quem || usuario, em: hoje }, usuario, `Alerta "${tipo}" desligado para ${nomeDoAlvo(d, destino)}`);
+}
+
+/** Religa o alerta (apaga o desligamento): volta a aparecer se ainda estiver pendente. */
+export function religarAlerta(d, id, usuario) {
+  const atual = (d.alertas_desligados || []).find((x) => x.id === Number(id));
+  if (atual) excluir(d, 'alertas_desligados', atual.id, usuario, `Alerta "${atual.tipo}" religado para ${nomeDoAlvo(d, alvoDoAlerta(atual))}`);
+  return !!atual;
+}
+
+/**
+ * Alertas desligados, para a lista de onde se religa: cada um com ``nome`` ("Loja 1 · João"), ``link`` e ``pendentes``
+ * (quantos alertas ele está escondendo hoje; 0 = nada a avisar no momento). Com ``alvo``, só os daquele inquilino ou imóvel.
+ */
+export function alertasDesligados(d, hoje = C.hojeIso(), alvo = null, alertasDeHoje = null) {
+  const destino = alvo && alvoDoAlerta(alvo);
+  const regras = (d.alertas_desligados || []).filter((x) => !destino || mesmoAlvo(x, x.tipo, destino));
+  if (!regras.length) return [];
+  const hojeAlertas = alertasDeHoje || todosAlertas(d, hoje);
+  return regras.map((x) => {
+    const a = alvoDoAlerta(x);
+    return { ...x, nome: nomeDoAlvo(d, a), link: a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`,
+      pendentes: hojeAlertas.filter((al) => { const b = alvoDoAlerta(al); return b && mesmoAlvo(x, al.tipo, b); }).length };
+  }).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR') || x.tipo.localeCompare(y.tipo, 'pt-BR'));
+}
+
+/** Desligamentos de inquilino ou imóvel que já não existe: apagados na rotina de abertura. */
+export const desligamentosOrfaos = (d) => (d.alertas_desligados || []).filter((x) => !(x.contrato_id ? buscar(d, 'contratos', x.contrato_id) : buscar(d, 'imoveis', x.imovel_id)));
+
+/** Tipos de alerta que são do imóvel (os demais são do inquilino). */
+export const TIPOS_ALERTA_DO_IMOVEL = ['IPTU do proprietário', 'Titularidade'];
 
 // --------------------------------------------------------------------------
 // Roteiro de saída do inquilino (D6): aviso prévio → vistoria → chaves → contas → cálculo final → garantia → último boleto
