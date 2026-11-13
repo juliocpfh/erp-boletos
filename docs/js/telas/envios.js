@@ -576,8 +576,10 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const estilos = {};
     for (let n = 0; f[`tipo_${n}`] !== undefined; n += 1) estilos[f[`tipo_${n}`]] = { cor: f[`cor_${n}`], enfase: f[`enfase_${n}`], prioridade: f[`prioridade_${n}`] };
-    await alterar((db) => R.salvarEstilosAlertas(db, estilos, login()));
-    aviso('Aparência dos alertas salva.');
+    const antecedencias = {};
+    for (let n = 0; f[`tipo_${n}`] !== undefined; n += 1) if (f[`antecedencia_${n}`] !== undefined) antecedencias[f[`tipo_${n}`]] = f[`antecedencia_${n}`];
+    await alterar((db) => R.salvarEstilosAlertas(db, estilos, login(), antecedencias));
+    aviso('Alertas salvos.');
     ir('#/');
   },
 

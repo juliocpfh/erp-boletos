@@ -355,17 +355,25 @@ export const TELAS = {
   'alertas-config'() {
     if (!podeUsuario('admin')) return '<div class="alerta erro">Só administradores mudam a aparência dos alertas.</div>';
     const opcoes = (lista, v) => lista.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const antecedencia = (t, n) => {
+      const a = R.antecedenciaAlerta(t);
+      if (!a) return '<span class="suave" title="Este alerta não tem prazo: aparece quando a situação acontece.">quando acontece</span>';
+      return `<input type="number" name="antecedencia_${n}" min="${a.min}" max="${a.max}" value="${a.valor}" style="width:70px" title="Padrão do sistema: ${a.padrao} ${a.unidade}"> ${a.unidade} antes`;
+    };
     const linhas = R.TIPOS_ALERTA.map((t) => [t, R.estiloAlerta(d(), t)]).sort((a, b) => a[1].prioridade - b[1].prioridade).map(([t, e], n) => `<tr>
       <td><b>${esc(t)}</b><input type="hidden" name="tipo_${n}" value="${esc(t)}"></td>
-      <td><select name="cor_${n}" data-previa="${n}">${opcoes(R.CORES_ALERTA, e.cor)}</select></td>
-      <td><select name="enfase_${n}" data-previa="${n}">${opcoes(R.ENFASES_ALERTA, e.enfase)}</select></td>
+      <td><select name="cor_${n}" data-previa="${n}" style="min-width:110px">${opcoes(R.CORES_ALERTA, e.cor)}</select></td>
+      <td><select name="enfase_${n}" data-previa="${n}" style="min-width:100px">${opcoes(R.ENFASES_ALERTA, e.enfase)}</select></td>
       <td><input type="number" name="prioridade_${n}" min="1" max="99" value="${e.prioridade}" style="width:70px"></td>
+      <td style="white-space:nowrap">${antecedencia(t, n)}</td>
       <td style="min-width:260px"><div class="${classeEstilo('aviso', e)}" id="previa_${n}" style="margin:0"><b>${esc(t)}</b> exemplo de aviso</div></td></tr>`).join('');
-    return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência dos alertas</h1>
+    return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência e prazos dos alertas</h1>
       <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
+        "Aparece" diz quanto tempo antes do prazo o alerta surge no Painel (ex.: IPTU com 15 dias: a guia de 10/03 aparece em 23/02); o atrasado continua aparecendo.
+        Esses prazos também ficam em Dados e backup → Regras do sistema.
         Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
-      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Como fica</th></tr>${linhas}</table></div>
-        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao('estilosAlertasPadrao', 'Voltar ao padrão do sistema', {}, 'secundario', 'Voltar todos os alertas para a aparência padrão?')} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
+      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Aparece</th><th>Como fica</th></tr>${linhas}</table></div>
+        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao('estilosAlertasPadrao', 'Voltar ao padrão do sistema', {}, 'secundario', 'Voltar todos os alertas para a aparência e os prazos padrão?')} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
   },
 
   pendencias: () => telaPendencias(),

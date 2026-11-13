@@ -2,9 +2,6 @@
 import { compBr, competenciaDe, dataBr, diasEntre, reais, somarAnos, somarDias, somarMeses } from './calculos.js';
 import { regra } from './config-regras.js';
 
-export const ANTECEDENCIA_SEGURO = 60;
-export const ANTECEDENCIA_VIGENCIA = 60;
-
 /** [último aniversário já ocorrido (ou null no 1º ano), próximo aniversário]. */
 export function aniversarios(inicio, hoje) {
   let anos = 1;
@@ -49,7 +46,7 @@ export function alertaSeguro(inicio, hoje, seguros) {
 
 export function alertaReserva(reservaValor, saldo, competenciaAlvo, hoje) {
   if (!(reservaValor > 0) || !(saldo > 0) || !competenciaAlvo) return null;
-  const proxima = somarMeses(competenciaDe(hoje), 1);
+  const proxima = somarMeses(competenciaDe(hoje), regra('antecedencia_reserva'));
   // reserva marcada para um mês que já passou: não fica mais nos alertas
   if (competenciaAlvo < somarMeses(competenciaDe(hoje), -1)) return null;
   if (competenciaAlvo <= proxima) {

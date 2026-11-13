@@ -602,7 +602,7 @@ export const ACOES = {
   },
 
   async estilosAlertasPadrao() {
-    await alterar((db) => R.salvarEstilosAlertas(db, {}, login()));
+    await alterar((db) => R.salvarEstilosAlertas(db, {}, login(), 'padrao'));
     aviso('Alertas de volta ao padrão do sistema.');
     await mostrar();
   },
