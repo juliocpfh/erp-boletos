@@ -118,3 +118,38 @@ test('termo da troca com garantia nova: valor devolvido a quem sai com a poupan�
   assert.equal(atualizado, modelo.texto.replace(/\r\n/g, '\n'));
   assert.equal(atualizarTextoModelo(atualizado), atualizado);
 });
+
+test('decisão da direção: caução nunca passa adiante; na troca de garantia, volta ao inquilino com a poupança', () => {
+  const { d, c } = base();
+  assert.equal(R.garantiaDevolvidaNaTroca(c), true, 'caução: na troca de titular é sempre devolvida');
+  assert.equal(R.garantiaDevolvidaNaTroca({ garantia_tipo: 'Fiador' }), false, 'fiança: continua podendo passar');
+  R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2025-01-10', valor: 360000, arquivo: 'cau.pdf' }, 'j');
+  R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2026-01-15', valor_anterior: 360000, valor_novo: 380000, complemento: 20000 }, 'j');
+  // caução → fiador em 01/12/2026: a troca guarda os depósitos da caução que sai
+  const t = R.trocarGarantia(d, c.id, { data: '2026-12-01', garantia_tipo: 'Fiador' }, 'j', { novos: [{ nome: 'Ana Lima', cpf: '529.982.247-25' }] });
+  assert.equal(t.valor_anterior, 380000);
+  assert.deepEqual(t.devolucao_movimentos, [{ data: '2025-01-10', valor: 360000 }, { data: '2026-01-15', valor: 20000 }]);
+  assert.deepEqual(R.devolucoesDeTrocaPendentes(d, c).map((x) => x.valor), [380000]);
+  assert.match(R.alertaDevolucaoGarantia(d, c, '2026-12-02').texto, /Garantia trocada em 01\/12\/2026 \(Caução → Fiador\): devolva R\$ 3\.800,00 a João Souza, com a correção da poupança/);
+  // devolução com a poupança (0,60% ao mês: R$ 3.800,00 → R$ 4.318,70)
+  const r = P.corrigirPelaPoupanca(t.devolucao_movimentos, '2026-12-01', TAXA_FIXA);
+  const dev = R.salvarDevolucaoGarantia(d, c.id, { data: '2026-12-01', garantia_valor: 380000, indice_percentual: r.percentual, debitos: 0, troca_id: t.id }, 'j');
+  assert.equal(dev.troca_id, t.id);
+  assert.equal(dev.saldo, 431870);
+  assert.equal(R.devolucaoDaTrocaDeGarantia(d, t.id).id, dev.id);
+  assert.deepEqual(R.devolucoesDeTrocaPendentes(d, c), []);
+  assert.deepEqual(R.devolucoesDaTrocaDeTitular(d, c.id), [], 'não se confunde com a devolução da troca de titular');
+  assert.match(R.alertaDevolucaoGarantia(d, c, '2026-12-02').texto, /Anexe o comprovante: devolução da garantia/);
+  assert.throws(() => R.salvarDevolucaoGarantia(d, c.id, { data: '2026-12-02', garantia_valor: 380000, troca_id: t.id }, 'j'), /já foi registrada/);
+  // editar mantém a ligação com a troca; cancelar a troca pede excluir a devolução antes
+  assert.equal(R.salvarDevolucaoGarantia(d, c.id, { data: '2026-12-03', garantia_valor: 380000, indice_percentual: 0, debitos: 0 }, 'j', dev.id).troca_id, t.id);
+  assert.throws(() => R.cancelarTrocaGarantia(d, t.id, 'j'), /exclua a devolução antes/);
+  R.excluir(d, 'devolucoes_garantia', dev.id, 'j', 'teste');
+  R.cancelarTrocaGarantia(d, t.id, 'j');
+  assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 380000, 'a caução volta como estava');
+  // troca só de fiador (sem dinheiro saindo): nada a devolver
+  R.trocarGarantia(d, c.id, { data: '2026-12-05', garantia_tipo: 'Fiador' }, 'j', { novos: [{ nome: 'Ana Lima', cpf: '529.982.247-25' }] });
+  const t3 = R.trocarGarantia(d, c.id, { data: '2026-12-10', garantia_tipo: 'Fiador' }, 'j', { novos: [{ nome: 'Rui Prado', cpf: '529.982.247-25' }] });
+  assert.equal(t3.devolucao_movimentos, undefined);
+  assert.deepEqual(R.devolucoesDeTrocaPendentes(d, c).map((x) => x.troca.data), ['2026-12-05'], 'só a troca em que saiu a caução');
+});

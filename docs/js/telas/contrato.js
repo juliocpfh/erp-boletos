@@ -173,7 +173,7 @@ function caixaGarantia(c) {
   // troca de titular com garantia nova: a garantia daqui não passou ao novo titular; a caução ou o depósito volta a este inquilino
   const seguinte = R.continuadoPor(d(), c);
   if (R.garantiaNova(seguinte)) {
-    const dev = R.devolucoesGarantiaDo(d(), c.id)[0];
+    const dev = R.devolucoesDaTrocaDeTitular(d(), c.id)[0];
     const pend = R.devolucaoGarantiaPendente(d(), c);
     const quem = `<a href="#/contrato/${seguinte.id}?ir=garantia">${esc(seguinte.inquilino_nome)}</a>`;
     if (dev) {
@@ -241,6 +241,21 @@ function caixaGarantia(c) {
     html += `${subtitulo('Trocas de garantia')}<table class="compacta suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>Obs.</th><th></th></tr>
       ${trocas.map((t, i) => `<tr><td class="nw">${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || '-')}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : '-'}</td><td>${esc(t.observacoes || '')}</td>
         <td class="n">${opera() && i === 0 ? botao('cancelarTrocaGarantia', 'Cancelar troca', { id: t.id }, 'perigo mini', `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || 'não informada'}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ''}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ''}</td></tr>`).join('')}</table>`;
+  }
+  // troca de garantia em que saiu caução ou depósito: a devolução ao inquilino, com a poupança (decisão da direção, 2026-11-13)
+  for (const t of trocas.filter((x) => x.devolucao_movimentos)) {
+    const dev = R.devolucaoDaTrocaDeGarantia(d(), t.id);
+    if (dev) {
+      html += `${subtitulo(`Devolução da garantia (troca de ${dataBr(t.data)})`, '', `${t.tipo_anterior} → ${t.tipo_novo}`)}
+        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}</td>
+          <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
+          <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
+          <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
+    } else if (t.valor_anterior > 0) {
+      html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
+        com a correção da poupança. Devolva e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}&troca=${t.id}`, 'Registrar devolução', 'botao mini') : ''}</div>`;
+    }
   }
   // caução ou depósito em dinheiro: a aplicação aparece também enquanto não foi depositado tudo (aplica o que já entrou)
   // troca de titular: a garantia passou ao novo titular; as aplicações são dele (lançadas e mostradas lá)
