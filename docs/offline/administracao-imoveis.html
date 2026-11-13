@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-M7YqpfrQDFYpK7KDwOJOgPL5vMsvoDWhQw7o9j5Lu44='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-AcN0vW2PSH/vMI1razQFFw1qg6FiR7iW2Vuobiq81Gk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="568e983d56cca88f">
+<meta name="fontes" content="fcb7c1f30d737192">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2365,7 +2365,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
     return t;
   }
-  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
+  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
       VISTORIA_ENTRADA = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada, com fotos, feito {l:pela LOCADORA|pelas LOCADORAS} com o imóvel desocupado, antes da entrega, e entregue ao LOCATÁRIO junto com as chaves, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.
@@ -2615,7 +2615,12 @@ E por estarem de acordo, as partes assinam este Termo Aditivo por assinatura ele
 > {cidade}, {data_assinatura}.
 
 [assinaturas]`;
-      GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #** – A garantia prestada no contrato {a:pelo LOCATÁRIO SAINTE|pelos LOCATÁRIOS SAINTES}, {garantia_anterior}, não passa {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}: será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato, descontados os débitos do período até {data_vespera} de sua responsabilidade.[fim]
+      ACERTO_POUPANCA = "[se garantia_corrigida] Para esse acerto, o valor depositado, de {garantia_depositada}, com os rendimentos da caderneta de poupança até {data_vespera}, soma {garantia_corrigida}, que {s:o LOCATÁRIO ENTRANTE paga|os LOCATÁRIOS ENTRANTES pagam} diretamente {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}; os rendimentos já creditados e os futuros passam a pertencer {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} e serão devolvidos com a garantia ao fim da locação.[fim]";
+      DEVOLUCAO_POUPANCA = "[se garantia_corrigida] (com os rendimentos da caderneta de poupança até {data_vespera}, {garantia_corrigida})[fim]";
+      ACERTO_CAUCAO_ANTIGO = "o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.";
+      ACERTO_DEPOSITO_ANTIGO = "o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.";
+      DEVOLUCAO_ANTIGA = "será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato, descontados";
+      GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #** – A garantia prestada no contrato {a:pelo LOCATÁRIO SAINTE|pelos LOCATÁRIOS SAINTES}, {garantia_anterior}, não passa {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}: será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato${DEVOLUCAO_POUPANCA}, descontados os débitos do período até {data_vespera} de sua responsabilidade.[fim]
 
 [se garantia_anterior_fianca]**CLÁUSULA #** – A garantia prestada no contrato ({garantia_anterior}) responde só pelas obrigações do período até {data_vespera} e não se estende {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}.[fim]
 
@@ -2672,11 +2677,11 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 ## DA GARANTIA
 
-[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão][se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
+[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão][se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.${ACERTO_POUPANCA}
 
 **Parágrafo único** – A caução continua a ser atualizada a cada reajuste anual do aluguel, conforme o contrato, e será devolvida {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
 
-[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.[fim]
+[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.${ACERTO_POUPANCA}[fim]
 
 [se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} conhecer e aceitar a substituição do locatário e {f:garante|garantem} as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, nas condições do contrato, até a entrega real e definitiva das chaves.[fim]
 
@@ -2785,6 +2790,10 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
         ["assinam em duas vias de igual teor e forma, obrigando-se", "assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se"],
         // aditivo da troca de titular (2026-11-13): contas de consumo trocadas pela empresa, com a autorização de quem sai e de quem entra
         [CONTAS_TROCA_ANTIGA, CONTAS_TROCA, "DAS CONTAS DE CONSUMO"],
+        // aditivo da troca de titular (2026-11-13): valor da garantia com os rendimentos da poupança (acerto entre os inquilinos ou devolução)
+        [ACERTO_CAUCAO_ANTIGO, `${ACERTO_CAUCAO_ANTIGO}${ACERTO_POUPANCA}`],
+        [ACERTO_DEPOSITO_ANTIGO, `${ACERTO_DEPOSITO_ANTIGO}${ACERTO_POUPANCA}`],
+        [DEVOLUCAO_ANTIGA, `será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato${DEVOLUCAO_POUPANCA}, descontados`],
         [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, "convidado por escrito, por e-mail, a acompanhar a vistoria"]
       ];
     }
@@ -3299,6 +3308,9 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     dados.condicoes.garantia_anterior_dinheiro = nova && dinheiroAnt;
     dados.condicoes.garantia_anterior_fianca = nova && !dinheiroAnt && ["Fiador", "Seguro fiança"].includes(tipoAnt);
     dados.campos.garantia_anterior = !nova ? "" : dinheiroAnt ? `${tipoAnt === "Caução" ? "caução" : "depósito de garantia"} de ${valorComExtenso(valorAnt)}` : tipoAnt === "Fiador" ? "fiança" : tipoAnt.toLocaleLowerCase("pt-BR");
+    dados.condicoes.garantia_corrigida = a.garantia_corrigida > 0;
+    dados.campos.garantia_corrigida = a.garantia_corrigida > 0 ? valorComExtenso(a.garantia_corrigida) : "";
+    dados.campos.garantia_depositada = a.garantia_depositada > 0 ? valorComExtenso(a.garantia_depositada) : "";
     dados.quantidades.locatarios = Math.max(entrantes.length, 1);
     dados.quantidades.saintes = Math.max(saintes.length, 1);
     const papel = (x, quem) => ["LOCATÁRIO", "LOCATÁRIO SOLIDÁRIO"].includes(x.papel) ? { ...x, papel: `LOCATÁRIO ${quem}` } : x;
@@ -3826,6 +3838,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     contasPermitidas: () => contasPermitidas,
     continuadoPor: () => continuadoPor,
     contratoAtivo: () => contratoAtivo,
+    contratoDaGarantiaNaTroca: () => contratoDaGarantiaNaTroca,
     contratoDoSeguro: () => contratoDoSeguro,
     contratoEncerrado: () => contratoEncerrado,
     contratoHerdado: () => contratoHerdado,
@@ -3978,6 +3991,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     motivoBancoInativo: () => motivoBancoInativo,
     motivoNaoDesfazer: () => motivoNaoDesfazer,
     motivoSemDesistencia: () => motivoSemDesistencia,
+    movimentosGarantia: () => movimentosGarantia,
     mudarGarantiaNaTroca: () => mudarGarantiaNaTroca,
     mudarRegraSistema: () => mudarRegraSistema,
     nfAirbnbDe: () => nfAirbnbDe,
@@ -4552,6 +4566,33 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const inicial = (qual === "caucao" ? c.caucao_valor : c.deposito_valor) || 0;
     if (garantiaDepositada(c) && !c[`${qual}_por_depositos`]) return inicial + extras;
     return (soma(deps.filter((x) => !x.complementar)) || inicial) + extras;
+  }
+  function movimentosGarantia(d2, c) {
+    const qual = temCaucao(c) ? "caucao" : temDeposito(c) ? "deposito" : null;
+    if (!qual) return [];
+    const g = GARANTIAS_DEPOSITADAS[qual];
+    const pagador = pagadorDaGarantia(d2, c, qual);
+    const inicial = (qual === "caucao" ? c.caucao_valor : c.deposito_valor) || 0;
+    const dataInicial = c[g.pago] || pagador[g.pago] || c[`${qual}_data`] || null;
+    const soma = (l) => l.reduce((s, x) => s + x.valor, 0);
+    const deps = depositosGarantiaDo(d2, c, qual);
+    let partes = deps.filter((x) => !x.complementar);
+    if (!partes.length && pagador.id !== c.id) partes = depositosGarantiaDo(d2, pagador, qual).filter((x) => !x.complementar);
+    const peloComprovante = garantiaDepositada(c) && !c[`${qual}_por_depositos`];
+    const out = !peloComprovante && partes.length && (pagador.id === c.id || soma(partes) === inicial) ? partes.map((x) => ({ data: x.data, valor: x.valor })) : inicial ? [{ data: dataInicial, valor: inicial }] : [];
+    const eventos = [
+      ...deps.filter((x) => x.complementar).map((x) => ({ data: x.data, ordem: 0, valor: x.valor })),
+      ...(qual === "caucao" ? correcoesCaucaoAtual(d2, c) : []).map((x) => ({ data: x.data, ordem: 1, novo: x.valor_novo }))
+    ].sort((a, b) => a.data.localeCompare(b.data) || a.ordem - b.ordem);
+    let total = soma(out);
+    for (const e of eventos) {
+      const valor = e.ordem ? e.novo - total : e.valor;
+      if (valor) out.push({ data: e.data, valor });
+      total += valor;
+    }
+    const resto = valorGarantia(d2, c) - total;
+    if (resto) out.push({ data: (out[out.length - 1] || {}).data || dataInicial, valor: resto });
+    return out;
   }
   function garantiaADepositar(d2, c, qual, hoje3 = hojeIso()) {
     const inicial = (qual === "caucao" ? c.caucao_valor : c.deposito_valor) || 0;
@@ -6423,6 +6464,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       texto: `Anexe o comprovante: devolução da garantia a ${a.inquilino_nome} de ${reais(x.saldo)} (${dataBr(x.data)}).`
     } : null;
   }
+  function contratoDaGarantiaNaTroca(d2, n) {
+    const a = contratoHerdado(d2, n);
+    if (!a) return null;
+    const c = !garantiaNova(n) && garantiaHerdada(d2, n) ? n : a;
+    return temCaucao(c) || temDeposito(c) ? c : null;
+  }
   function garantiaHerdadaDesfeita(d2, c) {
     if (!garantiaHerdada(d2, c) || !(temCaucao(c) || temDeposito(c))) return null;
     const a = contratoHerdado(d2, c);
@@ -7045,6 +7092,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       data: f.data,
       aluguel: aluguelAtual(d2, c, troca),
       garantia_anterior: garantiaNova(c) ? valorGarantia(d2, ant) : null,
+      // garantia em dinheiro de quem sai com os rendimentos da poupança até a troca: o que quem entra paga a quem sai (a
+      // garantia continua) ou o que é devolvido a quem sai (garantia nova). Vem do Banco Central na tela e pode ser corrigido
+      garantia_corrigida: f.garantia_corrigida > 0 ? f.garantia_corrigida : null,
+      garantia_depositada: f.garantia_corrigida > 0 && contratoDaGarantiaNaTroca(d2, c) ? valorGarantia(d2, contratoDaGarantiaNaTroca(d2, c)) : null,
       testemunhas: (f.testemunhas || []).filter((t) => t && t.nome),
       modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null),
       texto: String(f.texto),
@@ -10566,7 +10617,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       DEVOLUCAO_GARANTIA = [
         campo("data", "Data da devolução", "data", { obrig: true }),
         campo("garantia_valor", "Valor da garantia a devolver (caução ou depósito)", "dinheiro", { obrig: true }),
-        campo("indice_percentual", "Correção da garantia: índice da poupança no período (%)", "pct", { ajuda: "Em branco: sem correção" }),
+        campo("indice_percentual", "Correção da garantia: índice da poupança no período (%)", "pct", { autoMsg: true, ajuda: "Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança). Em branco: sem correção" }),
         campo("debitos", "Débitos do inquilino a descontar", "dinheiro", { ajuda: "Aluguéis e encargos até a véspera da troca em aberto, reparos etc." }),
         campo("debitos_descricao", "Descrição dos débitos", "area"),
         comprovante("comprovante", "Comprovante da devolução", { ajuda: `PDF ou foto da transferência. ${SEM_COMPROVANTE}` }),
@@ -10585,7 +10636,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ENCERRAMENTO = [
         ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
         campo("garantia_valor", "Valor da garantia a devolver (caução ou depósito)", "dinheiro"),
-        campo("indice_percentual", "Correção da garantia: índice da poupança no período (%)", "pct"),
+        campo("indice_percentual", "Correção da garantia: índice da poupança no período (%)", "pct", { autoMsg: true, ajuda: "Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança)" }),
         campo("debitos", "Débitos do inquilino a descontar", "dinheiro", { ajuda: "Aluguéis e encargos em aberto, reparos da vistoria etc." }),
         campo("debitos_descricao", "Descrição dos débitos", "area"),
         campo("fci_credito", "FCI corrigido: crédito do inquilino", "dinheiro", { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
@@ -17217,6 +17268,76 @@ Salvar assim mesmo?`)) {
   init_contratos();
   init_formularios();
   init_formularios();
+
+  // docs/js/poupanca.js
+  init_calculos();
+  var SERIE_POUPANCA = 195;
+  function inicioPoupanca(data2) {
+    return Number(data2.slice(8, 10)) > 28 ? `${somarMeses(data2.slice(0, 7), 1)}-01` : data2;
+  }
+  function periodosPoupanca(data2, ate) {
+    const ini = inicioPoupanca(data2);
+    const out = [];
+    for (let k = 0; somarMesesData(ini, k + 1) <= ate; k += 1) out.push(somarMesesData(ini, k));
+    return out;
+  }
+  function corrigirPelaPoupanca(movimentos, ate, taxas = {}) {
+    const falta = /* @__PURE__ */ new Set();
+    const depositos = (movimentos || []).filter((m) => m.valor && (!m.data || m.data <= ate)).map((m) => {
+      const periodos = m.data ? periodosPoupanca(m.data, ate) : [];
+      let fator = 1;
+      for (const p2 of periodos) {
+        if (Number.isFinite(taxas[p2])) fator *= 1 + taxas[p2] / 100;
+        else falta.add(p2);
+      }
+      return { data: m.data || null, valor: m.valor, meses: periodos.length, corrigido: arred(m.valor * fator) };
+    });
+    const total = depositos.reduce((s, x) => s + x.valor, 0);
+    const corrigido = depositos.reduce((s, x) => s + x.corrigido, 0);
+    return { depositos, total, corrigido, rendimento: corrigido - total, percentual: percentualDaCorrecao(total, corrigido), falta: [...falta].sort() };
+  }
+  function percentualDaCorrecao(total, corrigido) {
+    if (!(total > 0)) return 0;
+    const base = Math.round((corrigido / total - 1) * 1e6) / 1e4;
+    const erro = (p2) => Math.abs(arred(total * (1 + p2 / 100)) - corrigido);
+    return [base, base - 1e-4, base + 1e-4].map((p2) => Math.round(p2 * 1e4) / 1e4).sort((a, b) => erro(a) - erro(b))[0];
+  }
+  var trazidas = {};
+  var trazidoDe = null;
+  var trazidoAte = null;
+  async function taxasPoupanca(de, ate, buscar3 = fetch) {
+    if (trazidoDe && trazidoDe <= de && trazidoAte >= ate) return trazidas;
+    if (trazidoDe) [de, ate] = [de < trazidoDe ? de : trazidoDe, ate > trazidoAte ? ate : trazidoAte];
+    const br = (x) => `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}`;
+    for (let ini = de; ini <= ate; ini = somarDias(somarAnos(ini, 5), 1)) {
+      const fim = [somarAnos(ini, 5), ate].sort()[0];
+      let lista3 = null;
+      for (let n = 1; n <= 3 && !lista3; n += 1) {
+        try {
+          const resp = await buscar3(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${SERIE_POUPANCA}/dados?formato=json&dataInicial=${br(ini)}&dataFinal=${br(fim)}`);
+          if (resp.ok) lista3 = await resp.json();
+        } catch {
+        }
+        if (!lista3 && n < 3) await new Promise((ok) => {
+          setTimeout(ok, 1500 * n);
+        });
+      }
+      if (!Array.isArray(lista3)) throw new Error("Não deu para consultar a poupança no Banco Central agora (sem internet ou o site deles está ocupado).");
+      for (const x of lista3) {
+        const taxa = Number(x.valor);
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(x.data || "") && Number.isFinite(taxa)) trazidas[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}-${x.data.slice(0, 2)}`] = taxa;
+      }
+    }
+    [trazidoDe, trazidoAte] = [de, ate];
+    return trazidas;
+  }
+  async function poupancaDaGarantia(movimentos, ate, buscar3 = fetch) {
+    const datas = (movimentos || []).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
+    const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar3) : {};
+    return corrigirPelaPoupanca(movimentos, ate, taxas);
+  }
+
+  // docs/js/telas/campos.js
   init_regras();
   var CAMPOS_PESSOA_FORM = ["nome", "rg", "telefone", "email", "endereco", "genero", "nacionalidade", "estado_civil", "profissao", "nascimento"];
   var titulo = (t) => String(t || "").toLocaleLowerCase("pt-BR").replace(/(^|[\s/(-])(\p{L})/gu, (x, a, b) => a + b.toLocaleUpperCase("pt-BR")).replace(/\b(De|Da|Do|Das|Dos|E)\b/g, (x) => x.toLowerCase());
@@ -17732,7 +17853,64 @@ Salvar assim mesmo?`)) {
     form.querySelector("[name=mes_ref]").addEventListener("change", buscar3);
     buscar3();
   }
+  function resumoPoupanca(r, ate) {
+    const linhas2 = r.depositos.map((x) => `${x.data ? dataBr(x.data) : "sem data"}: ${reais(x.valor)}, ${x.meses} ${x.meses === 1 ? "mês" : "meses"} → ${reais(x.corrigido)}`);
+    return `Poupança (Banco Central) até ${dataBr(ate)}: <b>${reais(r.total)} → ${reais(r.corrigido)}</b> (${pct(r.percentual)}). ${esc(linhas2.join("; "))}.
+    Rende no aniversário de cada depósito; mês incompleto não rende, como no banco. Confira com o extrato da poupança e corrija se precisar.`;
+  }
+  var faltaPoupanca = (r) => `A poupança a partir de ${dataBr(r.falta[0])} ainda não saiu no Banco Central (data futura): refaça mais perto da data ou digite o valor.`;
+  function ligarPoupancaDoAditivo(raiz) {
+    const el = raiz.querySelector("form[data-form=aditivoTroca] [name=garantia_corrigida]");
+    const n = el && buscar2("contratos", el.form.querySelector("[name=contrato]").value);
+    const g = n && contratoDaGarantiaNaTroca(d(), n);
+    const troca = n && (n.data_entrada || n.vigencia_inicio);
+    if (!g || !troca) return;
+    mensagemAuto(el, "Buscando a poupança no Banco Central…");
+    poupancaDaGarantia(movimentosGarantia(d(), g), troca).then((r) => {
+      if (!el.isConnected) return;
+      if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
+      if (!r.total) return mensagemAuto(el, "A garantia de quem sai ainda não tem depósito registrado: sem valor para corrigir.");
+      if (!el.value.trim()) el.value = reais(r.corrigido, false);
+      mensagemAuto(el, resumoPoupanca(r, troca));
+    }).catch((e) => {
+      if (el.isConnected) mensagemAuto(el, `${esc(e.message)} Digite o valor (saldo do extrato da poupança) ou deixe em branco.`);
+    });
+  }
+  function ligarPoupancaDaGarantia(raiz) {
+    const form = raiz.querySelector("form[data-form=cadastro]");
+    const [, tabela, consulta2] = location.hash.match(/^#\/novo\/(devolucoes_garantia|encerramentos)\?(.*)$/) || [];
+    const el = form && tabela && form.querySelector("[name=indice_percentual]");
+    const c = el && buscar2("contratos", new URLSearchParams(consulta2).get("contrato"));
+    if (!c || !(temCaucao(c) || temDeposito(c))) return;
+    const movimentos = movimentosGarantia(d(), c);
+    const dataEl = form.querySelector("[name=data]");
+    let pedido = 0;
+    let trazido = null;
+    const trazer = async () => {
+      const ate = tabela === "encerramentos" ? c.data_saida : dataEl && dataEl.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ate || "")) return;
+      const n = pedido += 1;
+      mensagemAuto(el, "Buscando a poupança no Banco Central…");
+      try {
+        const r = await poupancaDaGarantia(movimentos, ate);
+        if (n !== pedido || !el.isConnected) return;
+        if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
+        if (!r.total) return mensagemAuto(el, "");
+        if (!el.value.trim() || el.value === trazido) {
+          el.value = pctTexto(r.percentual);
+          trazido = el.value;
+        }
+        mensagemAuto(el, resumoPoupanca(r, ate));
+      } catch (e) {
+        if (n === pedido && el.isConnected) mensagemAuto(el, `${esc(e.message)} Digite o % (pelo extrato da poupança).`);
+      }
+    };
+    if (dataEl) dataEl.addEventListener("change", trazer);
+    trazer();
+  }
   function ligarCamposAutomaticos(raiz) {
+    ligarPoupancaDoAditivo(raiz);
+    ligarPoupancaDaGarantia(raiz);
     ligarReajusteManual(raiz);
     ligarRascunhoVistoria(raiz);
     ligarNaoSeAplica(raiz);
@@ -19771,6 +19949,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ...pendenciasDoContrato(d(), c)
     ];
     const troca = c.data_entrada || c.vigencia_inicio;
+    const emDinheiro = !!contratoDaGarantiaNaTroca(d(), c);
     return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : "Gerar termo aditivo: troca de inquilino"}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join("; ")}.</div>` : ""}
@@ -19785,6 +19964,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${a ? "" : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join("")}</select></div>`}
         <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || "")}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || "")}"></div>
         <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || "")}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || "")}"></div>
+        ${emDinheiro ? `<div><label>Garantia de quem sai com a poupança até a troca (R$)</label><input name="garantia_corrigida" inputmode="decimal" data-dinheiro value="${a && a.garantia_corrigida ? reais(a.garantia_corrigida, false) : ""}">
+          <div class="ajuda">${garantiaNova(c) ? `Valor devolvido a ${esc(ant.inquilino_nome)}, antes dos débitos` : `Valor que ${esc(c.inquilino_nome)} paga a ${esc(ant.inquilino_nome)}; a caução depositada não muda e o rendimento passa a ser de quem entra`}. Entra no termo. Em branco: o termo sai sem o valor.</div>
+          <div class="ajuda-auto" data-auto-msg></div></div>` : ""}
       </div>
       <p class="suave">A data da troca é a entrada de ${esc(c.inquilino_nome)} no cadastro (${dataBr(troca)}); para mudar, use "Editar contrato".
         Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
@@ -19807,7 +19989,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.
       Garantia escolhida na troca: a condição <code>garantia_nova</code> (quem entra presta a sua; sem ela, a garantia continua),
       <code>garantia_anterior_dinheiro</code> (caução ou depósito de quem sai, a devolver), <code>garantia_anterior_fianca</code> (fiança ou seguro fiança de quem sai)
-      e o campo <code>{garantia_anterior}</code> (ex.: "caução de R$ 5.670,00 (...)"). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
+      e o campo <code>{garantia_anterior}</code> (ex.: "caução de R$ 5.670,00 (...)"). Com o valor da poupança informado ao gerar o termo: a condição <code>garantia_corrigida</code>
+      e os campos <code>{garantia_depositada}</code> e <code>{garantia_corrigida}</code> (o depositado e o depositado com os rendimentos da poupança até a troca). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>
@@ -21708,7 +21891,7 @@ ${m.texto}
       aviso: (r, q) => {
         const c = buscar2("contratos", r ? r.contrato_id : q.contrato);
         const n = continuadoPor(d(), c);
-        return `${n ? n.inquilino_nome : "O novo titular"} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pelo índice da poupança que você informar, descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
+        return `${n ? n.inquilino_nome : "O novo titular"} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
       },
       voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
       descricao: (dados) => `Garantia devolvida: ${reais(dados.garantia_valor)}`,
@@ -21853,7 +22036,7 @@ ${m.texto}
         const c = buscar2("contratos", q.contrato);
         const v = resultadoVistoriaSaida(d(), c);
         const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase("pt-BR")}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join("; ")}${v.pendencias.length > 5 ? "…" : ""}): confira os débitos` : ""}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
-        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
+        return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
       },
       // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
       fixos: (r, q) => ({ data_saida: buscar2("contratos", q.contrato).data_saida }),
@@ -26003,6 +26186,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const dados = {
         data: f.data,
         testemunhas,
+        garantia_corrigida: String(f.garantia_corrigida || "").trim() ? centavos(f.garantia_corrigida) : null,
         ...modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }
       };
       let a;
