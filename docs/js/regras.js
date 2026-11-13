@@ -12,7 +12,7 @@ export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Boleto', recebimentos: 'Recebimento Airbnb',
   faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
-  fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução', depositos_garantia: 'Depósito da caução / garantia',
+  fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Complementação de caução', depositos_garantia: 'Depósito da caução / garantia',
   devolucoes_garantia: 'Devolução da garantia (troca de titular)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
@@ -95,6 +95,11 @@ export function normalizar(d) {
   if (d.estilos_alertas && d.estilos_alertas['Correção do aluguel']) {
     d.estilos_alertas['Reajuste do aluguel'] = d.estilos_alertas['Reajuste do aluguel'] || d.estilos_alertas['Correção do aluguel'];
     delete d.estilos_alertas['Correção do aluguel'];
+  }
+  // "Correção da caução" passou a "Complementação de caução" (2026-11-13)
+  if (d.estilos_alertas && d.estilos_alertas['Correção da caução']) {
+    d.estilos_alertas['Complementação de caução'] = d.estilos_alertas['Complementação de caução'] || d.estilos_alertas['Correção da caução'];
+    delete d.estilos_alertas['Correção da caução'];
   }
   // o anúncio passou a ser só uma descrição (o link antigo vira o texto)
   for (const i of d.imoveis) {
@@ -548,7 +553,7 @@ export const fiadoresAnterioresDo =(d, contratoId, hoje = C.hojeIso()) => d.fiad
   .sort((a, b) => b.data_saida.localeCompare(a.data_saida));
 export const trocasGarantiaDo = (d, contratoId) => d.trocas_garantia.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id);
-/** Correções da caução atual (as anteriores a uma nova caução, após troca de garantia, não contam). */
+/** Complementações de caução atual (as anteriores a uma nova caução, após troca de garantia, não contam). */
 const correcoesCaucaoAtual = (d, c) => correcoesGarantiaDo(d, c.id).filter((x) => x.data >= (c.caucao_data || ''));
 export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filter((x) => x.contrato_id === contratoId)
   .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
@@ -565,7 +570,7 @@ export const garantiaDepositada = (c) => (temCaucao(c) ? !!(c.comprovante_caucao
 
 export function valorGarantia(d, c) {
   // registrada em depósitos (parcelas): vale a soma do que foi depositado; depósitos para completar (depois de registrada)
-  // somam ao valor (os de antes da última correção da caução já estão nela)
+  // somam ao valor (os de antes da última complementação de caução já estão nela)
   const qual = temCaucao(c) ? 'caucao' : temDeposito(c) ? 'deposito' : null;
   if (!qual) return 0;
   const deps = depositosGarantiaDo(d, c, qual);
@@ -606,7 +611,7 @@ export function garantiaADepositar(d, c, qual, hoje = C.hojeIso()) {
   const sugerida = qual === 'caucao' && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
   const corrigida = sugerida > combinado ? sugerida : null;
   // antes de registrada: o primeiro depósito é o da caução do contrato (ou da troca de garantia), sem os reajustes;
-  // a diferença dos reajustes vem depois, como complemento (correção da caução, boleto ou depósito para completar)
+  // a diferença dos reajustes vem depois, como complemento (complementação de caução, boleto ou depósito para completar)
   const necessaria = registrada ? (corrigida || combinado) : inicial;
   const depositado = registrada ? valorGarantia(d, c) : depositos.filter((x) => !x.complementar).reduce((s, x) => s + x.valor, 0);
   return { combinado, corrigida, necessaria, depositos, depositado, falta: Math.max(necessaria - depositado, 0) };
@@ -697,7 +702,7 @@ export function complementosCaucaoPendentes(d, comp) {
 export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencimento = null, parcelas = 1, plano = null } = {}) {
   const c = buscar(d, 'contratos', contratoId);
   const x = complementoCaucao(d, c);
-  if (!x) throw new Error('Não há correção do aluguel esperando a correção da caução.');
+  if (!x) throw new Error('Não há correção do aluguel esperando a complementação de caução.');
   if (x.boleto) throw new Error('O boleto do complemento da caução já foi gerado.');
   if (x.necessaria === null) throw new Error('Informe no contrato a quantos aluguéis a caução equivale.');
   if (!(x.complemento > 0)) throw new Error('A caução depositada já cobre o valor necessário.');
@@ -751,7 +756,7 @@ export function confirmarCaucaoSemComplemento(d, contratoId, usuario) {
 }
 
 /**
- * Data da correção da caução: nunca antes da data pedida, da última correção nem dos depósitos para completar
+ * Data da complementação de caução: nunca antes da data pedida, da última correção nem dos depósitos para completar
  * (o novo valor já inclui esses depósitos; depois dela eles somariam de novo).
  */
 function dataDaCorrecaoCaucao(d, c, data) {
@@ -1474,7 +1479,7 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
       valor_anterior: atual, valor_novo: atual + cb.caucao_complemento, complemento: cb.caucao_complemento,
       observacoes: `Boleto do complemento${cb.caucao_parcela ? ` (${cb.caucao_parcela})` : ''} pago em ${C.dataBr(dataContabil)}` },
     usuario, `Caução corrigida para ${C.reais(atual + cb.caucao_complemento)} (complemento pago)`);
-    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: x.id }, usuario, 'Correção da caução registrada');
+    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: x.id }, usuario, 'Complementação de caução registrada');
   }
   return r;
 }
@@ -1484,8 +1489,8 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   if (cb && cb.caucao_correcao_id) {
     const depois = d.correcoes_garantia.find((x) => x.contrato_id === cb.contrato_id && x.id > cb.caucao_correcao_id);
     if (depois) throw new Error(`A caução foi corrigida de novo depois deste pagamento (${C.dataBr(depois.data)}): desfaça antes o pagamento da parcela mais recente.`);
-    if (buscar(d, 'correcoes_garantia', cb.caucao_correcao_id)) excluir(d, 'correcoes_garantia', cb.caucao_correcao_id, usuario, 'Correção da caução desfeita (pagamento do complemento desfeito)');
-    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: null }, usuario, 'Correção da caução desfeita');
+    if (buscar(d, 'correcoes_garantia', cb.caucao_correcao_id)) excluir(d, 'correcoes_garantia', cb.caucao_correcao_id, usuario, 'Complementação de caução desfeita (pagamento do complemento desfeito)');
+    atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: null }, usuario, 'Complementação de caução desfeita');
   }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
@@ -2334,7 +2339,7 @@ function alertaCaucao(d, c) {
     : x.necessaria === null ? `${inicio} Corrija também a caução (atual ${C.reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.`
       : x.complemento > 0 ? `${inicio} A caução deve passar a ${C.reais(x.necessaria)} (${c.caucao_meses} aluguéis com bonificação); já depositado ${C.reais(x.atual)}. Gere o boleto do complemento de ${C.reais(x.complemento)} na tela Reajustes.`
         : `${inicio} A caução depositada (${C.reais(x.atual)}) já cobre o necessário (${C.reais(x.necessaria)}). Confirme a caução na tela Reajustes para tirar este aviso.`;
-  return { nivel: 'aviso', tipo: 'Correção da caução', ancora: 'garantia', texto };
+  return { nivel: 'aviso', tipo: 'Complementação de caução', ancora: 'garantia', texto };
 }
 
 function alertaAplicacao(d, c) {
@@ -2448,7 +2453,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
   if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
   if (!c[g.comprovante] && !c[`${qual}_por_depositos`]) throw new Error('Não há depósito registrado para remover.');
   if (garantiaHerdada(d, c)) throw new Error('Garantia herdada do contrato anterior: para mudar, use "Corrigir caução".');
-  if (!podeRemoverComprovanteGarantia(d, c, qual)) throw new Error('Exclua antes as correções da caução.');
+  if (!podeRemoverComprovanteGarantia(d, c, qual)) throw new Error('Exclua antes as complementações de caução.');
   const ultimo = c[`${qual}_por_depositos`] ? depositosGarantiaDo(d, c, qual).filter((x) => !x.complementar).pop() : null;
   if (ultimo) excluir(d, 'depositos_garantia', ultimo.id, usuario, `${c.inquilino_nome}: depósito de ${C.reais(ultimo.valor)} de ${C.dataBr(ultimo.data)} removido`);
   atualizar(d, 'contratos', c.id, { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null }, usuario,
@@ -2753,7 +2758,7 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   for (const x of correcoesDo(d, a.id).filter((y) => y.data_vigencia >= data)) { passa('correcoes', x, `Correção do aluguel de ${C.dataBr(x.data_vigencia)}`); out.correcoes += 1; }
   // garantia em dinheiro (e fiadores atuais)
   const garantiaPropria = n.comprovante_caucao || n.comprovante_deposito || n.caucao_por_depositos || n.deposito_por_depositos
-    // a correção da caução feita antes do dia da troca completa a garantia herdada: não é garantia própria
+    // a complementação de caução feita antes do dia da troca completa a garantia herdada: não é garantia própria
     || TABELAS_GARANTIA.some((t) => t !== 'correcoes_garantia' && (d[t] || []).some((x) => x.contrato_id === n.id));
   // garantia nova (a do anterior é devolvida a ele): nada da garantia passa; o anterior registra a devolução
   if (!garantiaPropria && !garantiaNova(n) && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
@@ -2885,7 +2890,7 @@ const garantiaAHerdar = (d, a) => !!(a && (temCaucao(a) || temDeposito(a)) && !a
 
 /**
  * Garantia já passada ao herdeiro (``garantia_transferida_para``) com lançamentos que ainda ficaram no contrato anterior:
- * aplicações e correções da caução registradas lá depois da troca (ex.: aplicação lançada pela página do titular anterior).
+ * aplicações e complementações de caução registradas lá depois da troca (ex.: aplicação lançada pela página do titular anterior).
  * Os depósitos não entram: o comprovante deles aparece no herdeiro por sincronizarGarantiaHerdeiro.
  */
 const LANCAMENTOS_GARANTIA_HERDADA = ['aplicacoes', 'correcoes_garantia'];
@@ -2920,7 +2925,7 @@ export function completarHeranca(d, novoId, usuario) {
   if (!falta) return null;
   const a = contratoHerdado(d, n);
   const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0 };
-  // lançamentos da garantia já herdada feitos depois no anterior (aplicação, correção da caução): passam, com o comprovante
+  // lançamentos da garantia já herdada feitos depois no anterior (aplicação, complementação de caução): passam, com o comprovante
   for (const { tabela, registro: x } of lancamentosNoAnterior(d, n, a)) {
     if (x.comprovante) out.arquivos.push(x.comprovante);
     atualizar(d, tabela, x.id, { contrato_id: n.id }, usuario, `${TABELAS[tabela]} de ${C.dataBr(x.data)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (garantia herdada)`);
@@ -3976,7 +3981,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
-  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
+  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Complementação de caução', 'Devolver garantia',
   'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
@@ -5360,7 +5365,7 @@ export function desfazerReajuste(d, correcaoId, usuario) {
   const boletos = boletosCaucaoDa(d, x);
   if (boletos.some((cb) => cb.data_pagamento)) throw new Error('Há boleto do complemento da caução já pago para este reajuste: desfaça o pagamento antes.');
   for (const cb of boletos) excluir(d, 'cobrancas', cb.id, usuario, `Boleto do complemento da caução${cb.caucao_parcela ? ` (${cb.caucao_parcela})` : ''} excluído (reajuste desfeito)`);
-  for (const g of d.correcoes_garantia.filter((y) => y.contrato_id === x.contrato_id && y.data >= x.data_vigencia)) excluir(d, 'correcoes_garantia', g.id, usuario, 'Correção da caução desfeita (reajuste desfeito)');
+  for (const g of d.correcoes_garantia.filter((y) => y.contrato_id === x.contrato_id && y.data >= x.data_vigencia)) excluir(d, 'correcoes_garantia', g.id, usuario, 'Complementação de caução desfeita (reajuste desfeito)');
   excluir(d, 'correcoes', x.id, usuario, `Reajuste de ${C.compBr(x.data_vigencia.slice(0, 7))} desfeito: volta a ${C.reais(x.valor_anterior)}`);
   return x;
 }

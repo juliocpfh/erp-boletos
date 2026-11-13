@@ -112,7 +112,7 @@ function caixaGarantia(c) {
     html += `<div class="alerta info">Esta garantia também vale para <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a> (troca de titular em ${dataBr(herdeiro.data_entrada)}).
       O comprovante e o depósito anexados aqui aparecem lá. ${opera() ? botao('sincronizarGarantia', `Atualizar em ${esc(herdeiro.inquilino_nome)}`, { id: c.id }, 'mini') : ''}</div>`;
   }
-  /** Título de uma parte com o botão na mesma linha (ex.: "Correções da caução · Corrigir caução"). */
+  /** Título de uma parte com o botão na mesma linha (ex.: "Complementações de caução · Corrigir caução"). */
   const subtitulo = (titulo, acao = '', dica = '') => `<div class="sub-garantia"><h3${dica ? ` title="${esc(dica)}"` : ''}>${titulo}</h3>${acao}</div>`;
   // "Excluir" apaga o lançamento inteiro (com o arquivo); o "×" ao lado do 📎 apaga só o arquivo; "Editar" muda os dados
   const excluir = (tabela, id, pergunta) => (opera() ? botao('excluir', '×', { tabela, id }, 'x-excluir', pergunta) : '');
@@ -165,9 +165,9 @@ function caixaGarantia(c) {
   // contrato anterior: a garantia segue com o herdeiro (o valor atual, com as correções, é o de lá)
   const atual = herdeiro ? `segue com <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, atual <b>${reais(R.valorGarantia(d(), herdeiro))}</b>` : null;
   const parcelas = (qual) => tabelaDepositos(qual, R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
-  // correções da caução: aparecem também enquanto a caução não foi depositada inteira
+  // complementações de caução: aparecem também enquanto a caução não foi depositada inteira
   // histórico: a caução é corrigida junto com o reajuste, na tela Reajustes
-  const correcoesHtml = () => `${subtitulo('Correções da caução', link(`#/reajustes?contrato=${c.id}`, 'Corrigir em Reajustes'))}
+  const correcoesHtml = () => `${subtitulo('Complementações de caução', link(`#/reajustes?contrato=${c.id}`, 'Corrigir em Reajustes'))}
     ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th></tr>
       ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: 'correcoes_garantia', id: x.id, campo: 'comprovante', tipo: 'complemento-caucao', data: x.data }) : ''} ${esc(x.observacoes || '')}</td></tr>`).join('')}</table>` : ''}`;
   // troca de titular com garantia nova: a garantia daqui não passou ao novo titular; a caução ou o depósito volta a este inquilino

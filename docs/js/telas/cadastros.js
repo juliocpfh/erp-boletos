@@ -687,7 +687,7 @@ export const CADASTROS = {
     ajustarAsync: (dados, erros, r, form) => guardarComprovantes(comprovanteDoDeposito(r), dados, form, () => pastaDoEscopo('contrato', r.contrato_id)),
   },
   correcoes_garantia: {
-    titulo: (r, q) => `Correção da caução - ${buscar('contratos', q.contrato).inquilino_nome}`,
+    titulo: (r, q) => `Complementação de caução - ${buscar('contratos', q.contrato).inquilino_nome}`,
     campos: () => F.CORRECAO_GARANTIA,
     fixos: (r, q) => ({ contrato_id: Number(q.contrato) }),
     padrao: (q) => {

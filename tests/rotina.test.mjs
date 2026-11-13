@@ -191,7 +191,7 @@ test('troca com data futura: reserva já aparece no novo; reajuste calcula o com
   R.registrarComplementoDepositado(d, novo.id, { data: '2098-12-25' }, 'julio');
   assert.equal(R.complementoCaucao(d, novo), null, 'complemento registrado');
   const r2 = R.transferirHeranca(d, novo.id, 'julio', '2099-01-01');
-  assert.equal(r2.garantia, true, 'a correção da caução não impede a garantia de passar');
+  assert.equal(r2.garantia, true, 'a complementação de caução não impede a garantia de passar');
   assert.equal(R.valorGarantia(d, novo), 270000);
   assert.equal(novo.comprovante_reserva, 'res.pdf');
 });

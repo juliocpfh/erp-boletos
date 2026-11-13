@@ -170,9 +170,9 @@ test('bonificação desligada, renovação com novo valor, caução e saída', (
   assert.equal(d.cobrancas[0].desconto, 0);
   // aluguel corrigido: a caução precisa ser corrigida também
   R.inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: '2025-10-01', indice: 'IPCA', percentual: 5.13, valor_anterior: 492800, valor_novo: 518083 }, 'julio');
-  assert.ok(R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Correção da caução'));
+  assert.ok(R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Complementação de caução'));
   R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2025-10-01', valor_novo: 1413255 }, 'julio');
-  assert.ok(!R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Correção da caução'));
+  assert.ok(!R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Complementação de caução'));
   assert.equal(R.valorGarantia(d, c), 1413255);
   // aplicação: pode ser toda numa empresa; alerta enquanto não aplicar o valor integral
   assert.ok(R.alertasContrato(d, c, '2026-08-01').some((a) => a.tipo === 'Aplicação da garantia'));
@@ -261,7 +261,7 @@ test('troca de garantia e de fiador ficam no histórico', () => {
   assert.deepEqual(R.fiadoresDo(d, c.id).map((f) => f.nome), ['Fiador B']);
   assert.deepEqual(R.fiadoresAnterioresDo(d, c.id).map((f) => [f.nome, f.data_saida]), [['Fiador A', '2026-05-01']]);
   assert.throws(() => R.trocarFiador(d, f1.id, { data_troca: '2026-06-01', nome: 'C' }, 'julio'));
-  // volta para caução: correções da caução antiga não contam
+  // volta para caução: complementações de caução antiga não contam
   R.trocarGarantia(d, c.id, { data: '2026-07-01', garantia_tipo: 'Caução', caucao_valor: 700000, caucao_data: '2026-07-01' }, 'julio');
   assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 700000);
 });
@@ -1037,7 +1037,7 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   const x = R.complementoCaucao(d, c);
   assert.equal(x.necessaria, 567000);
   assert.equal(x.complemento, 27000);
-  assert.match(R.alertasContrato(d, c, '2026-03-05').find((a) => a.tipo === 'Correção da caução').texto, /boleto do complemento de R\$ 270,00/);
+  assert.match(R.alertasContrato(d, c, '2026-03-05').find((a) => a.tipo === 'Complementação de caução').texto, /boleto do complemento de R\$ 270,00/);
   const [cb] = R.gerarBoletosCaucao(d, c.id, 'julio');
   assert.equal(cb.vencimento, '2026-04-10');
   assert.equal(cb.taxa_boleto, 0);
@@ -1053,7 +1053,7 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   assert.ok(!R.pendentesDeFatura(d).some((p) => p.registro.id === cb.id));
   assert.equal(R.valorGarantia(d, c), 567000);
   assert.equal(R.complementoCaucao(d, c), null);
-  // desfazer o pagamento desfaz a correção da caução
+  // desfazer o pagamento desfaz a complementação de caução
   R.estornarPagamento(d, cb.id, 'julio');
   assert.equal(R.valorGarantia(d, c), 540000);
 });
@@ -1585,7 +1585,7 @@ test('remover o comprovante do depósito da caução: só sem correções; em de
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07', caucao_pago_em: '2026-06-07', comprovante_caucao: 'a.pdf' });
   const cg = R.inserir(d, 'correcoes_garantia', { contrato_id: c.id, data: '2026-08-01', valor_novo: 320000, complemento: 20000 }, 'julio');
   assert.equal(R.podeRemoverComprovanteGarantia(d, c, 'caucao'), false);
-  assert.throws(() => R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio'), /correções/);
+  assert.throws(() => R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio'), /complementações/);
   R.excluir(d, 'correcoes_garantia', cg.id, 'julio');
   R.removerComprovanteGarantia(d, c.id, 'caucao', 'julio');
   assert.equal(R.garantiaDepositada(c), false);
