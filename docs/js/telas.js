@@ -11,7 +11,7 @@ import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
-import { avisoBackupSeguro, ligarGarantiasCorrigidas, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
+import { avisoBackupSeguro, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
 import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
@@ -24,7 +24,7 @@ import { telaFaturas } from './telas/faturas.js';
 import { alertaFichas, telaFicha } from './telas/fichas.js';
 import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
-import { telaContas, telaFinanceiro, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
+import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { telaImovel } from './telas/imovel.js';
 import { telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
@@ -344,6 +344,7 @@ export const TELAS = {
   contas: (rota) => telaContas(rota),
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
+  garantias: () => telaGarantias(),
   reajustes: (rota) => telaReajustes(rota.q),
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
