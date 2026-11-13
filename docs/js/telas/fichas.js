@@ -3,6 +3,7 @@ import { alterar, aviso, login, mostrar, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
 import { esc, pctTexto } from '../formularios.js';
+import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { botaoEmail } from './emails.js';
 import { botao, buscar, caixaArquivos, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera } from './comum.js';
@@ -62,10 +63,12 @@ export function telaFicha(id) {
   ].join('');
   // proposta combinada (vai preenchida para o contrato)
   const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - C.descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
+  const incluso = REC.itensDaProposta(f).filter(([rot]) => ['Prazo do contrato', 'IPTU', 'Seguro contra incêndio', 'Contas'].includes(rot));
   const proposta = [
     item('Aluguel', f.aluguel_inicial > 0 ? reais(f.aluguel_inicial) : ''),
     item('Aluguel bonificado', bonificado !== null ? `${reais(bonificado)} <span class="suave">(${esc(pctTexto(Math.round(f.desconto_pontualidade_percentual * 100) / 100))}% de bonificação)</span>` : ''),
     item('Dia do vencimento', f.dia_vencimento ? `dia ${esc(f.dia_vencimento)}` : ''), item('Garantia', esc(f.garantia_tipo)),
+    ...incluso.map(([rot, valor]) => item(rot, esc(valor))),
   ].join('');
   // contratos feitos e por fazer, um por imóvel
   const contratos = (f.imoveis_ids || []).map((iid) => {
@@ -79,7 +82,9 @@ export function telaFicha(id) {
   }).join('');
   const decisao = f.situacao === 'Em análise' ? '' : `<p>${esc(f.situacao)} em <b>${dataBr(f.decisao_data)}</b>${f.decisao_por ? ` por ${esc(f.decisao_por)}` : ''}${f.decisao_motivo ? `: ${esc(f.decisao_motivo)}` : ''}</p>`;
   const devolucao = f.situacao !== 'Reprovada' || !(f.reserva_valor > 0) ? ''
-    : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, 'comprovante da devolução') : etiqueta('sem comprovante da devolução', 'aviso')}</p>`
+    : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, 'comprovante da devolução') : etiqueta('sem comprovante da devolução', 'aviso')}
+        · ${link(`#/imprimir/recibo?tipo=devolucao_reserva&ficha=${f.id}`, '🧾 Termo de devolução e quitação', '')}</p>
+        ${opera() ? `<p class="acoes">${botaoEmail('ficha_devolucao', { ficha: f.id }, '✉ E-mail: devolução da reserva')}</p>` : ''}`
       : `<div class="alerta aviso"><b>Devolver a reserva de ${reais(f.reserva_valor)}.</b> Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
     : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da reprovação). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
@@ -100,8 +105,10 @@ export function telaFicha(id) {
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
       ${f.situacao === 'Aprovada' && paraFazer.length ? `<p class="suave">${primeiro ? 'O contrato abre com os dados da pessoa já preenchidos (a reserva e os documentos ficaram no primeiro contrato).' : 'O contrato abre com os dados da pessoa e a reserva já preenchidos. Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}</p>` : ''}</div>
     <div class="cartao"><h2>${esc(pj ? 'Empresa' : 'Interessado')}</h2><div class="grade">${pessoa || '<p class="suave">Só o nome foi preenchido.</p>'}</div></div>
-    <div class="cartao"><h2>Proposta</h2>${proposta ? `<div class="grade">${proposta}</div>` : '<p class="suave">Aluguel, vencimento, bonificação e garantia ainda não preenchidos (em "Editar"). Eles vão preenchidos para o contrato.</p>'}</div>
-    <div class="cartao"><h2>Reserva</h2>${f.reserva_valor > 0 ? `<p>${reais(f.reserva_valor)}${f.reserva_data ? ` em ${dataBr(f.reserva_data)}` : ''} ${f.comprovante_reserva ? abrir(f.comprovante_reserva, 'comprovante') : primeiro ? '<span class="suave">(o comprovante foi para a pasta do inquilino)</span>' : etiqueta('sem comprovante', 'aviso')}</p>` : '<p class="suave">Sem reserva.</p>'}</div>
+    <div class="cartao"><h2>Proposta</h2>${proposta ? `<div class="grade">${proposta}</div>` : '<p class="suave">Aluguel, vencimento, bonificação, garantia e o que está incluso ainda não preenchidos (em "Editar"). Eles vão no e-mail da ficha, no recibo da reserva e preenchidos para o contrato.</p>'}</div>
+    <div class="cartao"><h2>Reserva</h2>${f.reserva_valor > 0 ? `<p>${reais(f.reserva_valor)}${f.reserva_data ? ` em ${dataBr(f.reserva_data)}` : ''} ${f.comprovante_reserva ? abrir(f.comprovante_reserva, 'comprovante') : primeiro ? '<span class="suave">(o comprovante foi para a pasta do inquilino)</span>' : etiqueta('sem comprovante', 'aviso')}
+      ${REC.reciboDisponivel(d(), 'reserva', { ficha: f }).ok ? ` · ${link(`#/imprimir/recibo?tipo=reserva&ficha=${f.id}`, '🧾 Recibo da reserva', '')}` : ''}</p>
+      <p class="suave">O recibo e o comprovante vão anexos no e-mail de envio da ficha cadastral, com as condições propostas.</p>` : '<p class="suave">Sem reserva.</p>'}</div>
     <div class="cartao"><h2>Documentos</h2>
       <p>${[sim(f.doc_ficha, 'Ficha cadastral'), sim(f.doc_pessoais, 'Documentos pessoais'), sim(f.doc_renda, 'Comprovante de renda'), sim(f.doc_residencia, 'Comprovante de residência')].join(' · ')}</p>
       ${f.analise_serasa ? `<p>Análise do Serasa: ${abrir(f.analise_serasa, f.analise_serasa)}</p>` : primeiro || f.documentos_apagados_em ? '' : '<p class="suave">Sem a análise do Serasa (anexe em "Editar").</p>'}

@@ -94,7 +94,8 @@ export function telaInquilinos(q) {
   // ao lado do imóvel, o botão que abre o arquivo da matrícula
   const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');
   const resumo = R.resumoSolicitacoes(d());
-  return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao') : ''}</div>
+  // 1ª etapa de um inquilino novo: a ficha do interessado (proposta, reserva e e-mail da ficha); dela sai o contrato
+  return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? `<div class="acoes">${link('#/novo/fichas', 'Novo interessado (ficha)', 'botao')} ${link('#/novo/contratos', 'Novo contrato', 'botao secundario')}</div>` : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a></div>
     ${caixaFichas()}

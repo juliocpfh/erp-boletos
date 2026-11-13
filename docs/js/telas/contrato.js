@@ -7,6 +7,7 @@ import * as K from '../contratos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
+import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { caixaReservaAbatida, linkComprovante, xAnexo } from './cadastros.js';
 import { alertaArquivosFaltando, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
@@ -239,7 +240,17 @@ function caixaGarantia(c) {
         <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
   }
-  return `${html}</div>`;
+  return `${html}${linkRecibo('garantia', c, `Recibo da ${R.temCaucao(c) ? 'caução' : 'garantia'} (para o inquilino)`)}</div>`;
+}
+
+/**
+ * Link do recibo ou termo (recibos.js) que já pode sair: abre a página para imprimir, baixar o PDF ou mandar por e-mail.
+ * Ex.: caução paga → "🧾 Recibo da caução (para o inquilino)". ``solto``: só o link, sem parágrafo.
+ */
+function linkRecibo(tipo, c, texto, solto = false) {
+  if (!REC.reciboDisponivel(d(), tipo, { contrato: c }).ok) return '';
+  const a = link(`#/imprimir/recibo?tipo=${tipo}&contrato=${c.id}`, `🧾 ${texto}`, '');
+  return solto ? a : `<p class="suave">${a}</p>`;
 }
 
 /** E-mail de cada etapa da entrada e da saída (modelos-email.js): etapa do sistema → chave do modelo. */
@@ -303,6 +314,8 @@ function caixaSaida(c) {
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
     ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
+    ${e.saldo !== 0 && e.garantia_devolvida_em ? `<p>${e.saldo > 0 ? 'Comprovante da devolução do saldo' : 'Comprovante do pagamento do saldo'}: ${linkComprovante(c.id, e.comprovante, { tabela: 'encerramentos', id: e.id, campo: 'comprovante', tipo: e.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', data: e.garantia_devolvida_em })}</p>` : ''}
+    ${linkRecibo('quitacao', c, 'Termo de entrega do imóvel, acerto final e quitação (assinam a locadora e o inquilino)')}
     ${podeUsuario('admin') ? botao('excluir', 'Desfazer cálculo final', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo final da saída? A data de saída e a leitura dos relógios continuam.') : ''}</div>`;
 }
 
@@ -725,7 +738,7 @@ export function telaContrato(c) {
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${compBr(car[0])} a ${compBr(car[1])} · cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>
-      ${c.reserva_valor > 0 ? `<div class="cabecalho"><h3 id="reserva">Reserva dada na visita</h3>${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao secundario mini') : ''}</div><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}<br>${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${!c.reserva_competencia ? ' (primeiro aluguel)' : c.reserva_competencia !== R.competenciaReserva(c) ? ` (o mês marcado, ${compBr(c.reserva_competencia)}, é de carência)` : ''}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
+      ${c.reserva_valor > 0 ? `<div class="cabecalho"><h3 id="reserva">Reserva dada na visita</h3>${opera() ? link(`#/editar/contratos/${c.id}`, 'Editar', 'botao secundario mini') : ''}</div><div class="grade">${item('Valor / data', `${reais(c.reserva_valor)} em ${dataBr(c.reserva_data)}<br>${linkComprovante(c.id, c.comprovante_reserva, { tabela: 'contratos', id: c.id, campo: 'comprovante_reserva', tipo: 'reserva', data: c.reserva_data })} ${linkRecibo('reserva', c, 'recibo', true)}`)}${item('Usar no aluguel de', `${compBr(R.competenciaReserva(c))}${!c.reserva_competencia ? ' (primeiro aluguel)' : c.reserva_competencia !== R.competenciaReserva(c) ? ` (o mês marcado, ${compBr(c.reserva_competencia)}, é de carência)` : ''}`)}${item('Saldo ainda não usado', reais(R.saldoReserva(d(), c)))}</div>
         ${caixaReservaAbatida(c)}` : ''}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaRessarcimentos(c)}

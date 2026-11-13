@@ -10,6 +10,7 @@ import { faturaHtml } from '../fatura.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
+import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { demonstrativo } from './cobrancas.js';
 import { botao, buscar, d, link, naoEncontrado, opera, ordenar, pastaDoEscopo, urls } from './comum.js';
@@ -53,6 +54,15 @@ export async function telaImprimir(rota) {
     const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? '' : 'secundario '}pequeno`)).join(' ')} · ${botaoEmail('informe_ir', { contrato: c.id })}</div>`;
     return `<div class="impressao">${voltar(r.empresas.length ? { seletor: '.impressao .declaracoes', nome: nomeArquivoDoc('Declaracao anual aluguel', c, String(ano)) } : null)}${abas}
       ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join('')}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
+  }
+  if (tipo === 'recibo') {
+    const alvo = alvoDoRecibo(rota.q);
+    if (!alvo) return naoEncontrado('Ficha ou inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
+    const volta = alvo.ficha ? `#/ficha/${alvo.ficha.id}` : `#/contrato/${alvo.contrato.id}`;
+    const disp = REC.reciboDisponivel(d(), rota.q.tipo, alvo);
+    if (!disp.ok) return `<p class="suave"><a href="${volta}">← Voltar</a></p><div class="alerta aviso">${esc(disp.motivo)}</div>`;
+    const r = REC.montarRecibo(d(), rota.q.tipo, alvo);
+    return `<div class="impressao">${voltar({ seletor: '.impressao .carta', nome: S.limparNome(r.arquivo) })}${reciboHtml(r)}</div>`;
   }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
@@ -270,6 +280,46 @@ function declaracaoHtml(r, g) {
     <p>Não houve retenção de imposto de renda na fonte.</p>
     <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
+}
+
+/** Ficha ou contrato do recibo pelo endereço (?ficha=ID ou ?contrato=ID): { ficha } ou { contrato }, ou null. */
+export function alvoDoRecibo(q) {
+  if (q.ficha) { const f = buscar('fichas', q.ficha); return f ? { ficha: f } : null; }
+  const c = buscar('contratos', q.contrato);
+  return c ? { contrato: c } : null;
+}
+
+/** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */
+export function reciboHtml(r) {
+  const e = r.emitente;
+  const par = (t) => `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`;
+  const linha = ([a, b]) => (b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>`
+    // texto (proposta) à esquerda e quebrando; valor em reais à direita
+    : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, '&nbsp;&nbsp;&nbsp;')}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ';text-align:right' : ''}">${esc(b)}</td></tr>`);
+  return `<div class="carta recibo">
+    ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
+    <p style="text-align:center"><b>${esc(e.razao_social || e.nome || '')}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}${e.endereco ? `<br>${esc(e.endereco)}` : ''}</p>
+    <h2 style="text-align:center;margin:18px 0">${esc(r.titulo)}</h2>
+    ${r.paragrafos.map(par).join('')}
+    ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join('')}</table>` : ''}
+    ${r.depois.map(par).join('')}
+    <p class="carta-data">${esc(r.cidade)}, ${K.dataPorExtenso(r.data, { zero: false })}.</p>
+    ${r.assinaturas.map((a) => `<p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
+}
+
+/** PDF do recibo ou termo (desenhado fora da tela), para anexar no e-mail: { blob, nome }. */
+export async function pdfDoRecibo(tipo, alvo) {
+  const r = REC.montarRecibo(d(), tipo, alvo);
+  const caixa = document.createElement('div');
+  caixa.className = 'impressao';
+  caixa.style.cssText = 'position:absolute;left:-10000px;top:0;width:860px';
+  caixa.innerHTML = reciboHtml(r);
+  document.body.append(caixa);
+  try {
+    return { blob: await pdfDoDocumento(caixa.querySelector('.carta'), [], { margemLado: 15 }), nome: `${S.limparNome(r.arquivo)}.pdf` };
+  } finally {
+    caixa.remove();
+  }
 }
 
 export function nomeArquivoDoc(documento, c, fim = String(c.data_entrada || c.vigencia_inicio || '').slice(0, 4)) {

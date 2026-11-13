@@ -2,14 +2,16 @@
 // texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Dados e backup).
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
 import { alterar, aviso, baixar, ir, login, mostrar } from '../app.js';
+import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
-import { dadosDoEmail, informesPendentes } from '../email-dados.js';
+import { anexosProntos, dadosDoEmail, informesPendentes } from '../email-dados.js';
 import { esc } from '../formularios.js';
 import { emailLigado, enviarEmail } from '../gmail.js';
 import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
-import { ACEITA_DOCUMENTOS, botao, buscar, d, link, naoEncontrado, opera } from './comum.js';
+import { ACEITA_DOCUMENTOS, botao, buscar, d, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
+import { pdfDoRecibo } from './documentos.js';
 
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
 const LIMITE_ENDERECO = 7000;
@@ -35,6 +37,27 @@ async function copiar(texto) {
   try { await navigator.clipboard.writeText(texto); return true; } catch { return false; }
 }
 
+/** Lista dos anexos do sistema na janela: recibo (PDF) e comprovantes, marcados; recibo que ainda não pode sair diz o motivo. */
+function listaProntos(prontos, ligado) {
+  if (!prontos.length) return '';
+  const linha = (a, k) => (a.tipo === 'recibo' && !a.ok ? `<p class="suave">🧾 ${esc(a.rotulo)}: ${esc(a.motivo)}</p>`
+    : `<p><label class="check"><input type="checkbox" name="pronto" value="${k}" checked> ${a.tipo === 'recibo' ? `🧾 ${esc(a.rotulo)} (PDF)` : `📎 ${esc(a.rotulo)}`}</label></p>`);
+  const algum = prontos.some((a) => a.tipo !== 'recibo' || a.ok);
+  return `<div class="cartao" style="margin:0 0 8px"><p><b>Anexos do sistema</b></p>${prontos.map(linha).join('')}
+    ${algum ? `<p><button type="button" class="secundario mini" data-baixar-prontos>Baixar os marcados</button> <span class="suave">${ligado ? 'Vão juntos no "Enviar agora".' : 'Para o Gmail: baixe e anexe por lá.'}</span></p>` : ''}</div>`;
+}
+
+/** Arquivos dos anexos marcados: o recibo vira PDF na hora; o comprovante é lido da pasta. [{ nome, blob }] */
+async function arquivosProntos(dlg, prontos, objeto) {
+  const out = [];
+  for (const el of dlg.querySelectorAll('[name=pronto]:checked')) {
+    const a = prontos[Number(el.value)];
+    if (a.tipo === 'recibo') { const r = await pdfDoRecibo(a.recibo, objeto); out.push({ nome: r.nome, blob: r.blob }); }
+    else out.push({ nome: a.nome, blob: await S.abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome) });
+  }
+  return out;
+}
+
 const campoPergunta = ([nome, rotulo, tipo], valor) => {
   if (tipo === 'area') return `<p><label>${esc(rotulo)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
   const t = tipo === 'data' ? 'date' : tipo === 'ano' ? 'number' : 'text';
@@ -53,17 +76,19 @@ async function janelaEmail(chave, alvo) {
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
   const perguntas = (modelo.perguntas || []).map((p) => campoPergunta(p, inicio.perguntas[p[0]] ?? '')).join('');
+  const prontos = anexosProntos(d(), modelo, objeto);
   const dlg = document.createElement('dialog');
   dlg.className = 'janela-erro janela-pergunta janela-email';
   dlg.innerHTML = `<form method="dialog"><h3>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || '')}</h3><div class="corpo">
     ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ''}
     <p class="suave">De: Administradora &lt;administracao@ankjck.com.br&gt;${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ''}</p>
+    ${listaProntos(prontos, ligado)}
     <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
     ${inicio.para ? '' : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
     <p><label>Assunto</label><input name="assunto"></p>
     <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
     <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
-    ${ligado ? `<p><label>Anexos para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ''}
+    ${ligado ? `<p><label>${prontos.length ? 'Outros anexos' : 'Anexos'} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ''}
     <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? 'Confira no contrato do inquilino a multa da saída antecipada antes de enviar. ' : ''}${ligado ? '' : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
   </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
     <button type="button" class="secundario" data-fechar>Fechar</button>
@@ -86,6 +111,17 @@ async function janelaEmail(chave, alvo) {
   const atual = () => ({ para: q('[name=para]').value.trim(), assunto: q('[name=assunto]').value.trim(), texto: q('[name=texto]').value });
   const pendente = () => (/\[preencher: /.test(atual().texto + atual().assunto) ? 'Ainda há "[preencher: ...]" no texto: complete antes de mandar.' : '');
   q('[data-fechar]').addEventListener('click', () => dlg.close());
+  const baixarProntos = q('[data-baixar-prontos]');
+  if (baixarProntos) baixarProntos.addEventListener('click', async () => {
+    baixarProntos.disabled = true;
+    try {
+      const lista = await arquivosProntos(dlg, prontos, objeto);
+      if (!lista.length) { aviso('Marque pelo menos um anexo.', 'aviso'); return; }
+      for (const a of lista) baixar(a.blob, a.nome);
+    } catch (erro) {
+      aviso(erro.message || 'Não consegui preparar os anexos.', 'erro');
+    } finally { baixarProntos.disabled = false; }
+  });
   q('[data-copiar]').addEventListener('click', async () => {
     const e = atual();
     aviso(await copiar(`${e.assunto}\n\n${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ''}` : 'O navegador não deixou copiar: selecione o texto e use Ctrl+C.', pendente() ? 'aviso' : 'ok');
@@ -105,7 +141,10 @@ async function janelaEmail(chave, alvo) {
     const e = atual();
     if (!e.para) { aviso('Digite o e-mail do destinatário.', 'aviso'); return; }
     if (pendente()) { aviso(pendente(), 'aviso'); return; }
-    const arquivos = [...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }));
+    let arquivos;
+    try {
+      arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }))];
+    } catch (erro) { aviso(`Não consegui preparar os anexos: ${erro.message}`, 'erro'); return; }
     if (!confirm(`Enviar agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}?`)) return;
     enviar.disabled = true;
     try {

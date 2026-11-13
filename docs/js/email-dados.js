@@ -3,9 +3,12 @@
 import * as C from './calculos.js';
 import * as K from './contratos.js';
 import { MODELOS_EMAIL } from './modelos-email.js';
+import * as REC from './recibos.js';
 import * as R from './regras.js';
 
 const PJ = 'Pessoa jurídica (empresa)';
+const NOMES_CONTA = { conta_agua: 'água', conta_energia: 'energia', conta_gas: 'gás', conta_internet: 'internet', conta_condominio: 'condomínio' };
+const CONTAS_FICHA = Object.keys(NOMES_CONTA);
 const primeiroNome = (n) => String(n || '').trim().split(/\s+/)[0] || '';
 const juntar = (itens) => (itens.length <= 1 ? itens.join('') : `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`);
 
@@ -99,13 +102,15 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const tipo = p.garantia_tipo || '';
   const g = condicoesDaGarantia(tipo);
   const valorDeposito = c ? (g.caucao ? (c.caucao_valor || (c.caucao_meses || 0) * (aluguel - desconto)) : c.deposito_valor || 0) : 0;
-  // contas: do contrato; na ficha, as do último contrato do imóvel (água e energia, se não houver)
-  const base = c || d.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] || {};
+  // contas: do contrato; na ficha, as da proposta (o que está incluso) ou, sem ela, as do último contrato do imóvel
+  const fichaDiz = f && CONTAS_FICHA.some((k) => f[k]);
+  const base = c || (fichaDiz ? f : d.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] || {});
+  const inclusos = CONTAS_FICHA.filter((k) => base[k] === 'Incluso no aluguel').map((k) => NOMES_CONTA[k]);
   const contas = contasDoInquilino(base);
   const e = c ? R.encerramentoDo(d, c.id) : null;
   const fim = c ? R.fimDoContrato(d, c) : null;
   const inicio = c ? (c.data_entrada || c.vigencia_inicio) : null;
-  const r = { ...respostasPadrao(d, c, hoje), ...Object.fromEntries(Object.entries(respostas).filter(([, v]) => v !== undefined && v !== null && v !== '')) };
+  const r = { ...respostasPadrao(d, c, hoje), ...(f && f.prazo_meses ? { prazo: `${f.prazo_meses} meses` } : {}), ...Object.fromEntries(Object.entries(respostas).filter(([, v]) => v !== undefined && v !== null && v !== '')) };
   const data = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? C.dataBr(v) : v);
   const ano = /^\d{4}$/.test(String(r.ano)) ? Number(r.ano) : Number(hoje.slice(0, 4)) - 1;
   const campos = {
@@ -126,14 +131,55 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     informe: c ? textoInforme(d, c, ano) : '',
     prazo_assinatura: data(r.prazo_assinatura), opcoes_entrega: r.opcoes_entrega, data_aviso: data(r.data_aviso), data_vistoria: r.data_vistoria,
     pendencias: r.pendencias, ano: String(ano),
+    inclusos: juntar(inclusos), iptu_valor: f && f.iptu_estimado > 0 ? C.reais(f.iptu_estimado) : '', seguro_valor: f && f.seguro_estimado > 0 ? C.reais(f.seguro_estimado) : '',
+    devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
-    iptu: c ? (c.conta_iptu === 'Por conta do inquilino' || !!c.cobrar_iptu) : true, seguro_incendio: c ? c.conta_seguro === 'Por conta do inquilino' : true,
+    iptu: c ? (c.conta_iptu === 'Por conta do inquilino' || !!c.cobrar_iptu) : (!f.conta_iptu || f.conta_iptu === 'Por conta do inquilino'),
+    seguro_incendio: c ? c.conta_seguro === 'Por conta do inquilino' : (!f.conta_seguro || f.conta_seguro === 'Por conta do inquilino'),
+    inclusos: inclusos.length > 0, iptu_valor: !!(f && f.iptu_estimado > 0), seguro_valor: !!(f && f.seguro_estimado > 0),
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
     devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0),
   };
   return { campos, condicoes, para: p.inquilino_email || '', perguntas: r };
+}
+
+/**
+ * Anexos que o sistema junta sozinho ao e-mail (``prontos`` do modelo): o recibo ou termo (PDF gerado de recibos.js) e os
+ * comprovantes do banco guardados na pasta. Cada item: { tipo: 'recibo', recibo, rotulo, ok, motivo } ou
+ * { tipo: 'arquivo', escopo, id, nome, rotulo }. Comprovante que não foi anexado no sistema não entra (e o recibo diz o motivo).
+ * Ex.: ficha com reserva paga e comprovante → [recibo da reserva, "comprovante da reserva (comprovante-reserva-2026-11-10.pdf)"].
+ */
+export function anexosProntos(d, modelo, alvo) {
+  const f = alvo.ficha || null;
+  const c = alvo.contrato || null;
+  const out = [];
+  const arquivo = (escopo, id, nome, rotulo) => { if (nome && id) out.push({ tipo: 'arquivo', escopo, id, nome, rotulo: `${rotulo} (${nome})` }); };
+  // comprovante guardado no contrato: pode estar na pasta do contrato anterior (troca de titular, campo_contrato)
+  const doContrato = (campo, rotulo) => arquivo('contrato', c[`${campo}_contrato`] || c.id, c[campo], rotulo);
+  for (const item of modelo.prontos || []) {
+    const [tipo, qual] = item.split(':');
+    if (tipo === 'recibo') {
+      const disp = REC.reciboDisponivel(d, qual, alvo);
+      out.push({ tipo: 'recibo', recibo: qual, rotulo: REC.TIPOS_RECIBO[qual], ok: disp.ok, motivo: disp.motivo || '' });
+    } else if (qual === 'reserva') {
+      if (f) arquivo(f.documentos_no_contrato ? 'contrato' : 'ficha', f.documentos_no_contrato || f.id, f.comprovante_reserva, 'comprovante da reserva');
+      else if (c) doContrato('comprovante_reserva', 'comprovante da reserva');
+    } else if (qual === 'devolucao' && f) {
+      arquivo(f.documentos_no_contrato ? 'contrato' : 'ficha', f.documentos_no_contrato || f.id, f.comprovante_devolucao, 'comprovante da devolução da reserva');
+    } else if (qual === 'garantia' && c) {
+      const g = R.temCaucao(c) ? 'caucao' : R.temDeposito(c) ? 'deposito' : null;
+      if (!g) continue;
+      const deps = R.depositosGarantiaDo(d, c, g).filter((x) => x.comprovante);
+      if (deps.length) deps.forEach((x) => arquivo('contrato', x.contrato_id, x.comprovante, `comprovante do depósito de ${C.dataBr(x.data)}`));
+      else doContrato(g === 'caucao' ? 'comprovante_caucao' : 'comprovante_deposito', `comprovante da ${g === 'caucao' ? 'caução' : 'garantia'}`);
+    } else if (qual === 'saida' && c) {
+      const e = R.encerramentoDo(d, c.id);
+      if (e) arquivo('contrato', c.id, e.comprovante, `comprovante ${e.saldo > 0 ? 'da devolução' : 'do pagamento'} do saldo`);
+    }
+  }
+  return out;
 }
 
 /** Modelos de uma etapa do sistema (ficha, entrada, saída, anual), na ordem. */

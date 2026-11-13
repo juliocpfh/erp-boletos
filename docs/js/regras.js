@@ -542,7 +542,8 @@ export const correcoesGarantiaDo = (d, contratoId) => d.correcoes_garantia.filte
 export const aplicacoesDo = (d, contratoId) => d.aplicacoes.filter((x) => x.contrato_id === contratoId)
   .sort(C.maisAntigoPrimeiro);
 /** Lançamentos ligados ao contrato que têm o campo ``comprovante`` (arquivo na pasta do inquilino). */
-const TABELAS_COMPROVANTE = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia'];
+// encerramentos: comprovante da devolução (ou do pagamento) do saldo do cálculo final da saída (2026-11-13)
+const TABELAS_COMPROVANTE = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia', 'encerramentos'];
 
 /** Valor atual da garantia em dinheiro (caução corrigida ou depósito). */
 /** Caução ou depósito já depositado, com o comprovante anexado: só então conta (caução atual, aplicação, complemento). */
@@ -2012,8 +2013,9 @@ export const MESES_DOCUMENTOS_REPROVADA = 3;
 export const CAMPOS_ARQUIVO_FICHA = ['comprovante_reserva', 'comprovante_devolucao', 'analise_serasa'];
 /** Comprovantes de dinheiro da ficha: ficam mesmo depois de apagados os documentos pessoais da reprovada. */
 export const COMPROVANTES_DINHEIRO_FICHA = ['comprovante_reserva', 'comprovante_devolucao'];
-/** Proposta combinada na ficha (aluguel, vencimento, bonificação e garantia): vai preenchida para cada contrato feito dela. */
-export const CAMPOS_PROPOSTA_FICHA = ['aluguel_inicial', 'dia_vencimento', 'bonificacao', 'desconto_pontualidade_percentual', 'garantia_tipo'];
+/** Proposta combinada na ficha (aluguel, vencimento, bonificação, garantia, prazo e o que está incluso): vai preenchida para cada contrato feito dela. */
+export const CAMPOS_PROPOSTA_FICHA = ['aluguel_inicial', 'dia_vencimento', 'bonificacao', 'desconto_pontualidade_percentual', 'garantia_tipo', 'prazo_meses',
+  'conta_iptu', 'conta_seguro', 'conta_agua', 'conta_energia', 'conta_gas', 'conta_internet', 'conta_condominio'];
 
 /** Imóveis da ficha que já têm contrato feito a partir dela: { imovel_id: contrato_id }. */
 export function contratosDaFicha(d, f) {
@@ -2229,9 +2231,11 @@ function alertaAplicacao(d, c) {
     texto: `Garantia de ${C.reais(s.total)} não foi aplicada integralmente: ${s.soma ? `aplicado ${C.reais(s.soma)} (${s.linhas.map((l) => `${l.emitente.nome.split(/\s+/)[0]} ${C.reais(l.aplicado)}`).join(', ')}), ` : ''}falta aplicar ${C.reais(s.falta)}.` };
 }
 
+/** Saldo da saída acertado a partir deste dia sem comprovante vira aviso (antes não havia onde anexar). */
+export const COMPROVANTE_SAIDA_DESDE = '2026-11-13';
 /**
- * Depósitos registrados sem o comprovante (caução, depósito de garantia, reserva, complemento da caução e aplicação):
- * [{ texto, valor, data, tabela, id, campo, tipo }]. ``tipo`` dá o nome do arquivo (comprovante-caucao-AAAA-MM-DD.pdf).
+ * Depósitos registrados sem o comprovante (caução, depósito de garantia, reserva, complemento da caução, aplicação e o
+ * saldo da saída): [{ texto, valor, data, tabela, id, campo, tipo }]. ``tipo`` dá o nome do arquivo (comprovante-caucao-AAAA-MM-DD.pdf).
  */
 export function comprovantesPendentes(d, c) {
   const out = [];
@@ -2252,6 +2256,10 @@ export function comprovantesPendentes(d, c) {
   for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
   for (const x of devolucoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'devolução da garantia', x.saldo, x.data, 'devolucoes_garantia', x.id, 'comprovante', 'devolucao-garantia');
+  // saída: saldo do cálculo final já devolvido ao inquilino (ou pago por ele), sem o comprovante do banco; só as saídas
+  // acertadas desde que o campo existe (as antigas não tinham onde anexar e não viram aviso)
+  const e = encerramentoDo(d, c.id);
+  if (e && e.garantia_devolvida_em >= COMPROVANTE_SAIDA_DESDE) falta(!e.comprovante, e.saldo > 0 ? 'devolução do saldo da saída' : 'pagamento do saldo da saída', Math.abs(e.saldo || 0), e.garantia_devolvida_em, 'encerramentos', e.id, 'comprovante', e.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo');
   return out;
 }
 
@@ -3349,6 +3357,7 @@ export function comprovantesComNome(d) {
   for (const x of d.correcoes_garantia) usa(x.contrato_id, x.comprovante, 'complemento-caucao', x.data, `comprovante do complemento da caução (${C.dataBr(x.data)})`);
   for (const x of d.aplicacoes) usa(x.contrato_id, x.comprovante, 'aplicacao-garantia', x.data, `comprovante da aplicação da garantia (${C.dataBr(x.data)})`);
   for (const x of d.devolucoes_garantia || []) usa(x.contrato_id, x.comprovante, 'devolucao-garantia', x.data, `comprovante da devolução da garantia (${C.dataBr(x.data)})`);
+  for (const x of d.encerramentos) usa(x.contrato_id, x.comprovante, x.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', x.garantia_devolvida_em, `comprovante ${x.saldo > 0 ? 'da devolução' : 'do pagamento'} do saldo da saída (${C.dataBr(x.garantia_devolvida_em)})`);
   return out;
 }
 
