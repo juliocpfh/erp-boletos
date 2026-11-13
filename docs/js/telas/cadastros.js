@@ -59,7 +59,7 @@ const comprovanteDoDeposito = (r) => [{ campo: 'comprovante', valor: 'valor', da
 const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
 const COMPROVANTES_FICHA = [
   { campo: 'comprovante_reserva', valor: 'reserva_valor', data: 'reserva_data', nome: 'reserva', texto: 'da reserva', vale: () => true },
-  { campo: 'comprovante_devolucao', valor: 'devolucao_valor', data: 'devolucao_data', nome: 'devolucao-reserva', texto: 'da devolução da reserva', vale: (x) => x.situacao === 'Reprovada' },
+  { campo: 'comprovante_devolucao', valor: 'devolucao_valor', data: 'devolucao_data', nome: 'devolucao-reserva', texto: 'da devolução da reserva', vale: (x) => R.fichaSemContrato(x) },
 ];
 const COMPROVANTE_DEVOLUCAO = [{ campo: 'comprovante', valor: 'garantia_valor', data: 'data', nome: 'devolucao-garantia', texto: 'da devolução da garantia', vale: () => true }];
 
@@ -474,20 +474,20 @@ export const CADASTROS = {
       if (ocupado) erros.modo_imoveis = `${buscar('imoveis', ocupado).nome} está ocupado: a ficha é só para imóvel vago`;
       if (comContrato.some((id) => !ids.includes(id))) erros.modo_imoveis = 'Um imóvel desmarcado já tem contrato feito a partir desta ficha';
       // cada imóvel tem no máximo uma ficha aberta (em análise ou aprovada sem contrato)
-      if (dados.situacao !== 'Reprovada') {
+      if (!R.fichaSemContrato(dados)) {
         for (const id of ids.filter((x) => !comContrato.includes(x))) {
           const outra = R.fichaAbertaDoImovel(d(), id, r && r.id);
           if (outra) { erros.modo_imoveis = `${buscar('imoveis', id).nome} já tem a ficha de ${outra.inquilino_nome} em aberto. Cada imóvel fica com uma ficha por vez: decida aquela antes, ou desmarque o imóvel.`; break; }
         }
       }
-      if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = 'Esta ficha já virou contrato: a situação fica "Aprovada"';
+      if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = dados.situacao === 'Desistiu' ? 'Esta ficha já virou contrato: use o botão "Desistiu antes de assinar" na página da ficha (ele cancela o contrato não assinado)' : 'Esta ficha já virou contrato: a situação fica "Aprovada"';
       // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
       if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
         dados.decisao_data = dados.decisao_data || hoje;
         dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
         if (dados.decisao_data > hoje) erros.decisao_data = 'A decisão não pode ser numa data futura';
       }
-      if (dados.situacao !== 'Reprovada') { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
+      if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
         if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;

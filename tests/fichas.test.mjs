@@ -124,3 +124,47 @@ test('Novo contrato aberto pelo imóvel acha a ficha aprovada que espera o contr
   R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Interessado Teste', ficha_id: f.id }, 'teste');
   assert.equal(R.fichaAprovadaDoImovel(d, a.id), null, 'com o contrato feito, a ficha não é usada de novo');
 });
+
+test('desistência antes de assinar: contrato não assinado cancelado, ficha "Desistiu" e reserva para devolver por inteiro', () => {
+  const { d, a, ficha } = base();
+  const f = ficha({ situacao: 'Aprovada', decisao_data: '2026-11-12', reserva_valor: 100000, reserva_data: '2026-11-05', comprovante_reserva: 'comprovante-reserva-2026-11-05.pdf' });
+  const c = R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Interessado Teste', ficha_id: f.id, reserva_valor: 100000, reserva_data: '2026-11-05',
+    comprovante_reserva: 'comprovante-reserva-2026-11-05.pdf', aluguel_inicial: 200000 }, 'teste');
+  R.atualizar(d, 'fichas', f.id, { documentos_no_contrato: c.id, comprovante_reserva: null }, 'teste');
+  R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-12', vencimento: '2026-12-10', valor_total: 100000 }, 'teste');
+  assert.equal(R.motivoSemDesistencia(d, c), null);
+  const salva = R.desistirAntesDeAssinar(d, { fichaId: f.id, data: '2026-11-13', motivo: 'Achou outro imóvel', arquivos: ['comprovante-reserva-2026-11-05.pdf', 'analise-serasa-2026-11-06.pdf'] }, 'teste', '2026-11-13');
+  assert.equal(salva.situacao, 'Desistiu');
+  assert.equal(salva.comprovante_reserva, 'comprovante-reserva-2026-11-05.pdf', 'o comprovante volta para a ficha');
+  assert.equal(salva.analise_serasa, 'analise-serasa-2026-11-06.pdf');
+  assert.equal(salva.documentos_no_contrato, null);
+  assert.match(salva.decisao_motivo, /Achou outro imóvel.*cancelado/);
+  assert.ok(!R.buscar(d, 'contratos', c.id), 'contrato cancelado');
+  assert.ok(!d.cobrancas.some((x) => x.contrato_id === c.id), 'boletos não pagos saem junto');
+  assert.ok(R.devolucaoPendente(salva));
+  assert.match(R.pendenciasDasFichas(d).map((p) => p.texto).join(), /desistência: registrar a devolução da reserva de R\$ 1\.000,00/);
+  assert.equal(R.dataApagarDocumentosFicha(salva), '2027-02-13', 'documentos apagados 3 meses depois, como na reprovada');
+  assert.equal(R.fichaAbertaDoImovel(d, a.id), null, 'o imóvel fica livre');
+});
+
+test('desistência: contrato assinado ou com boleto pago não se cancela; contrato sem ficha vira ficha "Desistiu"', () => {
+  const { d, a } = base();
+  const assinado = R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Assinado Teste', doc_contrato_em: '2026-11-10' }, 'teste');
+  assert.match(R.motivoSemDesistencia(d, assinado), /já foi assinado/);
+  const pago = R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Pago Teste' }, 'teste');
+  R.inserir(d, 'cobrancas', { contrato_id: pago.id, competencia: '2026-12', vencimento: '2026-12-10', valor_total: 100000, data_pagamento: '2026-12-10' }, 'teste');
+  assert.match(R.motivoSemDesistencia(d, pago), /boleto pago/);
+  assert.throws(() => R.desistirAntesDeAssinar(d, { contratoId: pago.id, data: '2026-11-13' }, 'teste', '2026-11-13'), /boleto pago/);
+
+  const solto = R.inserir(d, 'contratos', { imovel_id: a.id, inquilino_nome: 'Direto Teste', inquilino_cpf: '529.982.247-25', reserva_valor: 50000, reserva_data: '2026-11-01',
+    comprovante_reserva: 'comprovante-reserva-2026-11-01.pdf', aluguel_inicial: 150000 }, 'teste');
+  assert.throws(() => R.desistirAntesDeAssinar(d, { contratoId: solto.id, data: '2026-11-20' }, 'teste', '2026-11-13'), /data futura/);
+  const f = R.desistirAntesDeAssinar(d, { contratoId: solto.id, data: '2026-11-13', pasta: 'Direto Teste (ficha 01-11-2026)', arquivos: ['comprovante-reserva-2026-11-01.pdf'] }, 'teste', '2026-11-13');
+  assert.equal(f.situacao, 'Desistiu');
+  assert.equal(f.inquilino_cpf, '529.982.247-25');
+  assert.equal(f.reserva_valor, 50000);
+  assert.equal(f.comprovante_reserva, 'comprovante-reserva-2026-11-01.pdf');
+  assert.equal(f.aluguel_inicial, 150000);
+  assert.deepEqual(f.imoveis_ids, [a.id]);
+  assert.ok(!R.buscar(d, 'contratos', solto.id));
+});

@@ -104,7 +104,7 @@ O que o sistema emite (`docs/js/recibos.js`; botão 🧾 na ficha e na página d
 | Termo de entrega do imóvel, acerto final e quitação | cálculo final feito e saldo devolvido (ou pago) | Lei 8.245/91, art. 22, VI (recibo discriminado; proibida a quitação genérica); CC, arts. 319 e 320 | a empresa, o locatário e o solidário |
 
 Cuidados de advogado e de contador:
-- **A reserva não forma a locação** e é devolvida por inteiro se a ficha não for aprovada ou se o interessado desistir antes de assinar (o mesmo que o e-mail da ficha promete). Ela é **adiantamento**: a nota fiscal sai com o aluguel em que é abatida (aluguel cheio, como decidido).
+- **A reserva não forma a locação** e é devolvida por inteiro se a ficha não for aprovada ou se o interessado desistir antes de assinar (o mesmo que o e-mail da ficha promete). Ela é **adiantamento**: a nota fiscal sai com o aluguel em que é abatida (aluguel cheio, como decidido); a frase saiu do recibo a pedido do dono (13/11).
 - **Garantia não é receita**: o recibo diz que não há nota fiscal.
 - **A quitação da saída é específica**: lista garantia, correção, cada débito e o saldo, e vale "nos valores aqui discriminados". Ressalva só as contas de consumo e os tributos do período ainda não lançados (o contrato já permite cobrá-los depois). Estende-se ao solidário e aos fiadores.
 - O comprovante do banco da devolução do saldo da saída passa a ser guardado no cálculo final (`encerramentos.comprovante`); sem ele, aparece "anexar comprovante" (só nas saídas acertadas a partir de 13/11/2026).

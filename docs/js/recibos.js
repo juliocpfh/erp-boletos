@@ -136,7 +136,6 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         '1. A reserva não forma a locação: o contrato só existe depois de assinado por todas as partes.',
         '2. Aprovada a ficha e assinado o contrato, o valor é abatido do primeiro aluguel.',
         '3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito.',
-        'O valor é um adiantamento: a nota fiscal sai com o aluguel em que ele for abatido.',
       ],
       tabela: proposta.length ? [['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta] : [],
       depois: ['Dou quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
@@ -153,7 +152,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
       ...base, titulo: 'TERMO DE DEVOLUÇÃO DA RESERVA E QUITAÇÃO',
       paragrafos: [
         `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, devolveu em ${C.dataBr(f.devolucao_data)} a ${quem}, a importância de ${K.valorComExtenso(devolvido)}, ${integral ? 'correspondente à integralidade' : `parte`} da reserva de ${C.reais(f.reserva_valor)} recebida em ${C.dataBr(f.reserva_data)} para o imóvel situado na ${endereco}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
-        `Com a devolução, a ficha cadastral fica encerrada${f.situacao === 'Reprovada' ? ', sem a formação de contrato de locação' : ''}.`,
+        `Com a devolução, a ficha cadastral fica encerrada${R.fichaSemContrato(f) ? ', sem a formação de contrato de locação' : ''}.`,
         integral
           ? 'As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320).'
           : `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
