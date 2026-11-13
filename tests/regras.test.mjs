@@ -1796,6 +1796,41 @@ test('herança do seguro: a apólice em vigência na troca (com os arquivos) pas
   assert.equal(R.buscar(d, 'seguros', atual.id).contrato_id, novo.id);
 });
 
+test('herança do seguro: a apólice que passou ao herdeiro continua no histórico do anterior (também nas trocas antigas)', () => {
+  const { d, c } = base();
+  const atual = R.inserir(d, 'seguros', { imovel_id: c.imovel_id, contrato_id: c.id, vigencia_inicio: '2025-10-16', vigencia_fim: '2026-10-16', arquivo_apolice: 'apolice-atual.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Herdeira', contrato_anterior_id: c.id, data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01' }, 'julio');
+  R.inserir(d, 'aditivos', { contrato_id: novo.id, imovel_id: novo.imovel_id, tipo: 'Troca de titular', data: '2026-01-01', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
+  R.transferirHeranca(d, novo.id, 'julio');
+  assert.equal(R.buscar(d, 'seguros', atual.id).contrato_id, novo.id, 'as parcelas seguem com a herdeira');
+  assert.deepEqual(R.segurosPassadosAoHerdeiro(d, c.id).map((s) => s.id), [atual.id], 'aparece no anterior como histórico');
+  assert.deepEqual(R.segurosPassadosAoHerdeiro(d, novo.id), []);
+  // troca feita antes desta regra (sem herdado_de): normalizar marca pela vigência começando antes da troca
+  delete R.buscar(d, 'seguros', atual.id).herdado_de;
+  R.normalizar(d);
+  assert.equal(R.buscar(d, 'seguros', atual.id).herdado_de, c.id);
+  const resumo = R.resumoDaHeranca(d, R.buscar(d, 'contratos', novo.id)).join(' | ');
+  assert.match(resumo, /Contas de consumo: a empresa troca a titularidade para o nome de Herdeira/);
+});
+
+test('novo valor negociado: dá baixa no reajuste em aberto (sem carta) e gera o termo para o aceite', () => {
+  const { d, c } = base();
+  const pend = R.reajustePendente(d, c, '2027-06-20');
+  assert.ok(pend, 'reajuste do aniversário em aberto');
+  R.registrarRenovacao(d, c.id, { data: '2027-07-01', tipo: 'Novo valor negociado', novo_valor: 150000, novo_percentual: 10 }, 'julio');
+  assert.equal(R.reajustePendente(d, c, '2027-07-20'), null, 'o novo valor substitui o reajuste');
+  const termo = d.aditivos.find((a) => a.tipo === 'Novo valor');
+  assert.ok(termo && !termo.arquivo, 'termo aditivo aguardando o aceite assinado');
+  assert.equal(termo.valor_novo, 150000);
+  assert.equal(termo.percentual, 10);
+  assert.ok(R.aditivosAguardando(d, c.id).some((a) => a.id === termo.id));
+  const r = d.renovacoes[d.renovacoes.length - 1];
+  assert.equal(R.aditivoDaRenovacao(d, r.id).id, termo.id);
+  R.excluirRenovacao(d, r.id, 'julio');
+  assert.ok(!d.aditivos.some((a) => a.id === termo.id), 'termo ainda sem assinatura sai com a renovação');
+});
+
 test('herança já feita sem a garantia e a reserva do anterior: completa (comprovante, aplicação e reserva vêm para o herdeiro)', () => {
   const { d, c } = base(); // reserva R$ 500,00
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', caucao_pago_em: '2025-02-01', comprovante_caucao: 'caucao.pdf' });
@@ -2414,4 +2449,30 @@ test('NFs: numera só os pagamentos marcados (mês fechado) e lembra do Airbnb a
   assert.deepEqual(r.numeradas.map((n) => [n.numero, n.data]), [[200, '2026-10-10'], [201, '2026-10-31']]);
   assert.deepEqual(R.pendentesDeFatura(d).map(R.chavePendente), ['cobranca:2']);
   assert.equal(R.airbnbDoMes(d, '2026-10').numerada, 201);
+});
+
+test('novo valor negociado: o complemento da caução continua (caução acompanha o aluguel novo)', () => {
+  const d = R.bancoVazio();
+  const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 9', endereco: 'Rua Teste, 9', cidade: 'Curitiba' }, 'julio');
+  const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Joana Teste', inquilino_cpf: '529.982.247-25',
+    data_entrada: '2025-03-01', vigencia_inicio: '2025-03-01', aluguel_inicial: 200000, dia_vencimento: 10, cobranca_mes_seguinte: true,
+    desconto_pontualidade_percentual: 10, garantia_tipo: 'Caução', caucao_valor: 540000, caucao_data: '2025-03-01', caucao_meses: 3, comprovante_caucao: 'c.pdf' }, 'julio');
+  R.registrarRenovacao(d, c.id, { data: '2026-03-01', tipo: 'Novo valor negociado', novo_valor: 220000, novo_percentual: 10 }, 'julio');
+  const x = R.complementoCaucao(d, c);
+  assert.ok(x && x.complemento > 0, 'continua pedindo o complemento da caução');
+  assert.equal(x.correcao.indice, 'Negociado');
+});
+
+test('aditivo da troca já gravado: a cláusula antiga das contas de consumo vira a nova (empresa troca, com autorização)', () => {
+  const d = R.bancoVazio();
+  const antiga = '**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE transferirá|Os LOCATÁRIOS ENTRANTES transferirão} para o seu nome, em até 30 (trinta) dias, a titularidade das contas de consumo que estejam a seu cargo no contrato, com a colaboração {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.[se seguro_inquilino] O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]';
+  d.modelos_contrato.push({ id: 7, nome: 'Troca (meu)', tipo: 'aditivo_troca', texto: `## DISPOSIÇÕES FINAIS\n\n${antiga}\n\nfim` });
+  R.normalizar(d);
+  const t = d.modelos_contrato.find((m) => m.id === 7).texto;
+  assert.ok(!t.includes('em até 30 (trinta) dias, a titularidade'));
+  assert.match(t, /DAS CONTAS DE CONSUMO/);
+  assert.match(t, /autorizam expressamente/);
+  assert.match(t, /O seguro contra incêndio em vigor continua/);
+  R.normalizar(d);
+  assert.equal(d.modelos_contrato.find((m) => m.id === 7).texto, t, 'não troca duas vezes');
 });

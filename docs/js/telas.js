@@ -96,7 +96,8 @@ export const TELAS = {
     const valEl = raiz.querySelector('[data-vinculo="desconto"][data-tipo="dinheiro"]');
     if (!pctEl || !valEl) return;
     const form = pctEl.closest('form');
-    const aluguel = raiz.querySelector('[name=aluguel_inicial]');
+    // aluguel cheio: o do contrato ou, em outro formulário (renovação), o campo marcado com data-vinculo-base
+    const aluguel = raiz.querySelector('[name=aluguel_inicial]') || raiz.querySelector('[data-vinculo-base]');
     const num = (t) => { try { return t.trim() === '' ? NaN : C.numero(t); } catch { return NaN; } };
     const cent = (t) => { try { return t.trim() === '' ? NaN : C.centavos(t); } catch { return NaN; } };
     // aluguel sobre o qual vale o %: o atual, quando já houve correção (fixo: o aluguel nunca é o calculado); senão, o cheio digitado

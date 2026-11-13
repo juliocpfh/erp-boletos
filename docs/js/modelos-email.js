@@ -187,6 +187,24 @@ LEMBRETES
 - Este e-mail é o canal oficial de comunicação com a administradora`,
   },
   {
+    // novo valor negociado (pedido do dono, 2026-11-13): o termo aditivo vai para assinar; a assinatura é o aceite, anexado no sistema
+    chave: 'novo_valor', nome: 'Novo valor do aluguel: termo para assinar', etapa: 'Novo valor negociado',
+    assunto: 'Novo valor do aluguel: termo para assinatura – {imovel}',
+    anexos: 'Termo aditivo do novo valor (PDF)',
+    perguntas: [['prazo_assinatura', 'Devolver assinado até', 'data']],
+    texto: `Olá, {nome},
+
+Conforme combinado, o aluguel do imóvel da {imovel} passa de {valor_anterior} para {valor_novo} a partir de {novo_inicio}[se novo_bonificacao] ({novo_bonificado} para pagamento até o vencimento)[fim]. O dia do vencimento, o prazo do contrato e o índice de reajuste continuam os mesmos.
+
+Segue anexo o termo aditivo com o novo valor. A sua assinatura no termo é o aceite do novo valor.
+
+PASSO A PASSO
+1. Assine o termo e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam: sem a assinatura dele, a fiança não cobre o novo valor)[fim]
+2. Com o termo assinado, assinamos e enviamos a via assinada por todos
+[se caucao]3. A caução acompanha o novo valor: o boleto da diferença chega separado
+[fim]`,
+  },
+  {
     chave: 'aditivo_assinado', nome: 'Termo aditivo assinado por todos', etapa: 'Termo aditivo',
     assunto: 'Termo aditivo assinado – {imovel}',
     anexos: 'Termo aditivo assinado por todos (PDF)', prontos: ['assinado:aditivo'],

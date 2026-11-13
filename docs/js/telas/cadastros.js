@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -414,10 +414,15 @@ export const CADASTROS = {
       if (!antigo && cont && cont.arquivo && salvo.contrato_anterior_id === cont.anteriorId) {
         const anterior = buscar('contratos', cont.anteriorId);
         const assunto = `Troca de titular: ${anterior ? anterior.inquilino_nome : 'inquilino anterior'} → ${salvo.inquilino_nome}`;
-        const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
-        await alterar((db) => R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome, tipo: TIPO_ADITIVO_TROCA }, login()));
-        await trazerHerancaAssinada(salvo.id);
-        aviso('Termo aditivo da troca de titular registrado.');
+        // ciência de quem anexa (todo o vínculo passa ao novo); cancelou: o contrato fica salvo e o termo, para anexar depois
+        const ciencia = await cienciaDaTroca(salvo.id);
+        if (!ciencia) aviso('Termo da troca não anexado: anexe em "Termos aditivos" na página do inquilino.', 'aviso');
+        else {
+          const nome = await salvarAssinado('aditivos', salvo.id, cont.arquivo, `termo aditivo ${cont.data} troca de titular`);
+          await alterar((db) => { const a = R.registrarAditivo(db, salvo.id, { data: cont.data, assunto, arquivo: nome, tipo: TIPO_ADITIVO_TROCA }, login()); registrarCiencia(db, a, ciencia); });
+          await trazerHerancaAssinada(salvo.id);
+          aviso('Termo aditivo da troca de titular registrado.');
+        }
       }
       if (!antigo || !antigo.pasta) return;
       const paiAntigo = pastaPaiContrato(antigo);
@@ -803,15 +808,28 @@ export const CADASTROS = {
   renovacoes: {
     titulo: (r, q) => `Renovação / novo valor - ${buscar('contratos', q.contrato).inquilino_nome}`,
     campos: () => F.RENOVACAO,
-    padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término' }; },
+    padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término', novo_percentual: R.percentualBonificacao(c) || null }; },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
-    ajustar(dados, erros) {
+    ajustar(dados, erros, r, form) {
       if (dados.tipo === 'Renovado com nova data de término' && !dados.nova_vigencia_fim) erros.nova_vigencia_fim = 'Informe a nova data de término';
       if (dados.tipo === 'Passou a prazo indeterminado') dados.nova_vigencia_fim = null;
       if (dados.tipo === 'Novo valor negociado' && !(dados.novo_valor > 0)) erros.novo_valor = 'Informe o novo valor';
+      // aluguel bonificado digitado (sem o %): o % sai dele, como no contrato. Ex.: cheio R$ 2.200,00 e bonificado R$ 1.980,00 → 10%
+      const bonificadoTexto = String(new FormData(form).get('novo_bonificado') || '').trim();
+      if (dados.novo_valor > 0 && bonificadoTexto) {
+        let v = NaN;
+        try { v = C.centavos(bonificadoTexto); } catch { /* inválido */ }
+        if (!Number.isFinite(v) || v < 0 || v > dados.novo_valor) erros.novo_bonificado = `Informe um valor entre R$ 0,00 e ${reais(dados.novo_valor)} (aluguel cheio)`;
+        else dados.novo_percentual = C.percentualPorBonificado(dados.novo_valor, v);
+      }
+      if (!(dados.novo_valor > 0)) dados.novo_percentual = null;
+      if (dados.novo_percentual !== null && dados.novo_percentual !== undefined && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = 'Informe um percentual entre 0 e 100';
     },
     salvar: (db, dados, q) => R.registrarRenovacao(db, Number(q.contrato), dados, login()),
+    async depois(salvo) {
+      if (salvo.novo_valor > 0) aviso('Termo aditivo do novo valor gerado: mande para assinar pelo "✉ E-mail: termo para assinar" (em Termos aditivos) e anexe o termo assinado (o aceite) quando voltar.', 'info');
+    },
   },
   encerramentos: {
     titulo: (r, q) => `Saída e cálculo final - ${buscar('contratos', q.contrato).inquilino_nome}`,

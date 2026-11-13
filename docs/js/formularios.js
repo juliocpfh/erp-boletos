@@ -505,7 +505,10 @@ export const RENOVACAO = [
   campo('data', 'Data', 'data', { obrig: true, ajuda: 'O novo valor (se houver) vale a partir desta data' }),
   campo('tipo', 'O que aconteceu', 'opcao', { obrig: true, opcoes: ['Renovado com nova data de término', 'Passou a prazo indeterminado', 'Novo valor negociado'] }),
   campo('nova_vigencia_fim', 'Nova data de término', 'data', { ajuda: 'Só para renovação com prazo determinado' }),
-  campo('novo_valor', 'Novo valor do aluguel negociado (valor cheio)', 'dinheiro'),
+  // como no contrato (pedido do dono, 2026-11-13): aluguel cheio, bonificado e %; preenchidos dois, o terceiro é calculado
+  campo('novo_valor', 'Novo aluguel negociado (valor cheio)', 'dinheiro', { base: true, ajuda: 'Em branco: o aluguel continua o mesmo' }),
+  campo('novo_bonificado', 'Novo aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'O valor que o inquilino paga em dia. Preencha dois dos três (cheio, bonificado, %): o terceiro é calculado' }),
+  campo('novo_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Vem a bonificação atual do contrato' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -735,7 +738,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       const tipo = { data: 'date', mes: 'month', email: 'email', tel: 'tel' }[c.tipo] || 'text';
       const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ['pct', 'inteiro'].includes(c.tipo) ? 'inputmode="decimal"'
         : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
-      const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : '';
+      const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : c.base ? 'data-vinculo-base' : '';
       // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)
       const lista = c.sugestoes ? `list="${id}_sugestoes" autocomplete="off"` : '';
       entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${lista} ${max} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;

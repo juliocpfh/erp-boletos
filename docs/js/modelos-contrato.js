@@ -273,6 +273,35 @@ E por estarem de acordo, as partes assinam este Termo Aditivo em duas vias de ig
 [assinaturas]`;
 
 /**
+ * Termo aditivo de novo valor do aluguel (pedido do dono, 2026-11-13): sai sozinho ao registrar "Novo valor negociado" e fica
+ * aguardando a assinatura (o aceite), que é anexada no sistema. O fiador assina concordando: sem a anuência dele, a fiança não
+ * cobre o aumento (Código Civil, art. 819; STJ, Súmula 214).
+ */
+const ADITIVO_VALOR = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
+
+## NOVO VALOR DO ALUGUEL
+
+${PARTES}
+
+As partes acima, já qualificadas no Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, resolvem, de comum acordo, fixar novo valor para o aluguel, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+
+**CLÁUSULA #** – A partir de {data_novo_valor}, o aluguel mensal passa de {aluguel_anterior} para **{aluguel_novo}**[se bonificacao], com bonificação de {bonificacao_novo} para pagamento até o vencimento, ficando em {aluguel_bonificado_novo}[fim].
+
+**CLÁUSULA #** – O novo valor vale para o aluguel referente ao mês de {mes_novo_valor} em diante. O dia do vencimento, o prazo da locação e o índice de reajuste continuam os do contrato; o próximo reajuste anual incide sobre o novo valor.
+
+[se caucao]**CLÁUSULA #** – A caução acompanha o novo valor, nos termos do contrato: o LOCATÁRIO deposita a diferença para completá-la, conforme o boleto que receber.[fim]
+
+[se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} estar de acordo com o novo valor do aluguel e {f:mantém|mantêm} a fiança prestada no contrato de locação, que passa a garantir o novo valor, nas mesmas condições.[fim]
+
+**CLÁUSULA #** – Permanecem em vigor todas as demais cláusulas e condições do contrato de locação não alteradas por este Termo Aditivo, que passa a fazer parte integrante dele.
+
+E por estarem de acordo, as partes assinam este Termo Aditivo por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020), ou, no papel, em duas vias de igual teor e forma[se testemunhas], na presença das testemunhas abaixo[fim].
+
+> {cidade}, {data_assinatura}.
+
+[assinaturas]`;
+
+/**
  * Garantia no termo de troca quando quem entra presta garantia nova (escolha na troca de titular): a caução ou o depósito
  * de quem sai é devolvido a ele (corrigido, descontados os débitos até a véspera); fiança ou seguro fiança de quem sai vale
  * só até a véspera; a garantia de quem entra é a do cadastro dele (caução, depósito, fiador, seguro fiança ou nenhuma).
@@ -300,6 +329,20 @@ export const GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #
  * Débitos até a véspera ficam com quem sai (sem quitação). Garantia, conforme a escolha na troca: continua na locação e passa
  * a ser devolvida a quem entra, ou (garantia_nova) a de quem sai é devolvida a ele e quem entra presta a sua (GARANTIA_NOVA_TROCA).
  */
+/** Contas de consumo na troca, texto até 2026-11-13 (o novo inquilino transferia sozinho): sai dos modelos gravados (ATUALIZACOES_MODELO). */
+const CONTAS_TROCA_ANTIGA = '**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE transferirá|Os LOCATÁRIOS ENTRANTES transferirão} para o seu nome, em até 30 (trinta) dias, a titularidade das contas de consumo que estejam a seu cargo no contrato, com a colaboração {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.[se seguro_inquilino] O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]';
+/**
+ * Contas de consumo na troca (pedido do dono, 2026-11-13): a troca da titularidade para quem entra é feita pela empresa
+ * (decisão de 2026-11-12), com a autorização de quem sai e de quem entra junto às concessionárias ({representacao}).
+ */
+const CONTAS_TROCA = `**CLÁUSULA #** – DAS CONTAS DE CONSUMO: a partir de {data_troca}, a titularidade das contas de consumo que estejam a cargo do locatário no contrato passa para o nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}. A troca é providenciada {l:pela LOCADORA|pelas LOCADORAS} (ou por seu administrador), com a leitura dos relógios na data da troca.
+
+[se representacao]**Parágrafo** – Para isso, {a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES} e {s:o LOCATÁRIO ENTRANTE|os LOCATÁRIOS ENTRANTES} autorizam expressamente {l:a LOCADORA|as LOCADORAS} (ou seu administrador devidamente constituído) a representá-los perante {representacao}, para pedir a alteração de titularidade das contas para o nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, a leitura na data da troca, segunda via de faturas, histórico de consumo e o parcelamento de débitos do período de cada um, obrigando-se a fornecer os documentos necessários e a assinar os formulários exigidos.[fim]
+
+**Parágrafo** – Enquanto a troca não for concluída, as contas que chegarem em nome {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES} pelo consumo a partir de {data_troca} são pagas {s:pelo LOCATÁRIO ENTRANTE|pelos LOCATÁRIOS ENTRANTES}; as do consumo até {data_vespera} continuam {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.
+
+[se seguro_inquilino]**CLÁUSULA #** – O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]`;
+
 const ADITIVO_TROCA = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
 
 ## SUBSTITUIÇÃO DO LOCATÁRIO (TRANSFERÊNCIA DO CONTRATO)
@@ -348,7 +391,7 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 ## DISPOSIÇÕES FINAIS
 
-**CLÁUSULA #** – {s:O LOCATÁRIO ENTRANTE transferirá|Os LOCATÁRIOS ENTRANTES transferirão} para o seu nome, em até 30 (trinta) dias, a titularidade das contas de consumo que estejam a seu cargo no contrato, com a colaboração {a:do LOCATÁRIO SAINTE|dos LOCATÁRIOS SAINTES}.[se seguro_inquilino] O seguro contra incêndio em vigor continua até o fim da apólice e será renovado em nome {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}.[fim]
+${CONTAS_TROCA}
 
 **CLÁUSULA #** – Permanecem em vigor todas as demais cláusulas e condições do contrato de locação não alteradas por este Termo Aditivo, que passa a fazer parte integrante dele.
 
@@ -416,6 +459,11 @@ ${FINAIS('')}`,
     tipo: 'aditivo_troca',
     texto: ADITIVO_TROCA,
   },
+  {
+    nome: 'Aditivo de novo valor do aluguel (negociado)',
+    tipo: 'aditivo_valor',
+    texto: ADITIVO_VALOR,
+  },
 ];
 
 const ENDERECO_PARAGRAFO = '**Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.';
@@ -443,6 +491,8 @@ export const ATUALIZACOES_MODELO = [
   ["\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] ficam cientes de que a administradora do imóvel é associada ao SERASA e ao SCPC e incluirá no cadastro de inadimplentes todo atraso de pagamento de aluguéis e encargos vencidos.\n", '', 'depois do aviso prévio feito pelo próprio órgão'],
   ["**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações", `${NEGATIVACAO}\n\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações`, 'depois do aviso prévio feito pelo próprio órgão'],
   ["assinam em duas vias de igual teor e forma, obrigando-se", "assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se"],
+  // aditivo da troca de titular (2026-11-13): contas de consumo trocadas pela empresa, com a autorização de quem sai e de quem entra
+  [CONTAS_TROCA_ANTIGA, CONTAS_TROCA, 'DAS CONTAS DE CONSUMO'],
   [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, 'convidado por escrito, por e-mail, a acompanhar a vistoria'],
 ];
 

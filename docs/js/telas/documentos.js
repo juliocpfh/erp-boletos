@@ -38,7 +38,7 @@ export async function telaImprimir(rota) {
     return `<div class="impressao">
       <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao('documentoPdf', 'Baixar PDF', {}, 'secundario')}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
-        ${tipo === 'aditivo' && opera() && !m.a.arquivo ? link(`#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
+        ${tipo === 'aditivo' && opera() && !m.a.arquivo && m.a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
       ${tipo === 'vistoria' && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ''}
@@ -352,7 +352,7 @@ export async function documentoMontado(tipo, q) {
     if (!c || !a.texto) return null;
     const dados = K.dadosDoAditivo(d(), c, a);
     return { c, a, blocos: K.montarContrato(a.texto, dados), rodape: dados.rodape, nome: 'Termo aditivo',
-      arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca de inquilino' : 'vencimento'}`, c, String(a.data || '').slice(0, 4)) };
+      arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca de inquilino' : a.tipo === K.TIPO_ADITIVO_VALOR ? 'novo valor' : 'vencimento'}`, c, String(a.data || '').slice(0, 4)) };
   }
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
@@ -688,8 +688,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;
 
-const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)', aditivo_troca: 'Termos aditivos (troca de inquilino)' };
-const NOVO_MODELO = { contrato: 'Novo modelo de contrato', aditivo: 'Novo modelo de aditivo de vencimento', aditivo_troca: 'Novo modelo de aditivo de troca' };
+const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)', aditivo_troca: 'Termos aditivos (troca de inquilino)', aditivo_valor: 'Termos aditivos (novo valor do aluguel)' };
+const NOVO_MODELO = { contrato: 'Novo modelo de contrato', aditivo: 'Novo modelo de aditivo de vencimento', aditivo_troca: 'Novo modelo de aditivo de troca', aditivo_valor: 'Novo modelo de aditivo de novo valor' };
 
 export function telaModelos() {
   const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">

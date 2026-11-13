@@ -419,7 +419,12 @@ function caixaSolicitacoes(c) {
 export function caixaSeguros(c) {
   const i = buscar('imoveis', c.imovel_id);
   const seguros = R.segurosDoContrato(d(), c.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
-  if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length)) return '';
+  // apólices que passaram ao novo titular na troca: continuam aqui, só para consulta (o histórico do anterior)
+  const passados = R.segurosPassadosAoHerdeiro(d(), c.id).sort((a, b) => String(b.vigencia_inicio).localeCompare(String(a.vigencia_inicio)));
+  const tabelaPassados = !passados.length ? '' : `<h3 style="margin:12px 0 4px">Passaram ao novo titular na troca</h3><div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Vigência</th><th class="n">Valor</th><th>Agora com</th></tr>
+      ${passados.map((s) => { const novo = buscar('contratos', s.contrato_id); return `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.arquivo_apolice && novo ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${novo.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : ''}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${novo ? link(`#/contrato/${novo.id}?ir=seguros`, esc(novo.inquilino_nome), '') : '-'}</td></tr>`; }).join('')}</table></div>
+    <p class="suave">Histórico: a apólice continuou valendo para a locação e passou ao novo titular (as parcelas seguem nos boletos dele). Para mudar, abra a página dele.</p>`;
+  if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length && !passados.length)) return '';
   const alerta = [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
   const vigente = R.seguroVigente(d(), c.id); // o × da apólice vigente apaga direto; o das anteriores pede para conferir o arquivo
   const agendada = R.herancaAgendada(d(), c);
@@ -429,7 +434,8 @@ export function caixaSeguros(c) {
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? '' : vigente && vigente.id === s.id ? ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, 'x-excluir', `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}`
         : ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice, conferir: '1' }, 'x-excluir')}`}</span>` : `<br>${etiqueta('sem arquivo da apólice', 'aviso')}`}</td><td>${dataBr(s.data_contratacao)}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${s.num_parcelas}x a partir de ${compBr(s.primeira_competencia)}</td>
-        <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'seguros', id: s.id }, 'x-excluir', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhuma apólice cadastrada.</td></tr>'}</table></div>
+        <td class="n">${opera() ? `${link(`#/editar/seguros/${s.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'seguros', id: s.id }, 'x-excluir', 'Excluir esta apólice?')}` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="suave">${passados.length ? 'Nenhuma apólice com este inquilino agora.' : 'Nenhuma apólice cadastrada.'}</td></tr>`}</table></div>
+    ${tabelaPassados}
     <p class="suave">As parcelas entram nos boletos deste inquilino (se o contrato dele inclui o seguro). A apólice é dele: quando ele sai, ela vai junto, e quem entra precisa de uma apólice nova.</p>
     ${caixaArquivos('seguro', c.id, 'Documentos', 'apolices', 'Apólices e outros documentos do seguro (boleto, proposta, comprovante), com a vigência ao lado. A apólice vigente se apaga pelo × ao lado dela, acima.', true)}</div>`;
 }
@@ -652,13 +658,13 @@ function caixaAditivos(c) {
     ${faltaTroca ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.some((a) => a.tipo === K.TIPO_ADITIVO_TROCA) ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${ver(a)} ${opera() ? `${a.texto ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
+      <td class="n nw">${a.tipo === K.TIPO_ADITIVO_VALOR ? `${botaoEmail('novo_valor', { contrato: c.id, aditivo: a.id }, '✉ E-mail: termo para assinar')} ` : ''}${ver(a)} ${opera() ? `${a.texto && a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
         ${a.tipo === 'Troca de titular' ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? ' (a troca do dia só vale depois da confirmação)' : ''}.`}`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
-    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
       <td class="n nw">${a.arquivo ? `${botaoEmail('aditivo_assinado', { contrato: c.id, aditivo: a.id })} ` : ''}${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
@@ -687,6 +693,12 @@ export function telaContrato(c) {
   const anteriorAgendado = agendada && R.contratoHerdado(d(), c);
   const cobs = d().cobrancas.filter((x) => x.contrato_id === c.id).sort((a, b) => b.competencia.localeCompare(a.competencia));
   const renovs = d().renovacoes.filter((r) => r.contrato_id === c.id).sort((a, b) => b.data.localeCompare(a.data));
+  // novo valor: o aceite é o termo aditivo assinado (gerado ao registrar; anexado em "Termos aditivos")
+  const aceiteDaRenovacao = (r) => {
+    const t = R.aditivoDaRenovacao(d(), r.id);
+    if (!t) return '';
+    return t.arquivo || t.perdido_em ? `<br>${etiqueta('aceite assinado', 'ok')}` : `<br>${etiqueta('aguardando o aceite assinado', 'aviso')} <a href="#/contrato/${c.id}?ir=aditivos">termo para assinar</a>`;
+  };
   const cadeia = R.cadeiaDeContratos(d(), c);
   const tel = (c.inquilino_telefone || '').replace(/\D/g, '');
   const lig = (x) => `<a href="#/contrato/${x.id}">${esc(x.inquilino_nome)}</a> (${dataBr(x.data_entrada)} a ${dataBr(x.data_saida)})`;
@@ -765,7 +777,7 @@ export function telaContrato(c) {
     <div class="cartao" id="renovacoes"><div class="cabecalho"><h2>Renovação e novo valor negociado</h2>${opera() ? link(`#/novo/renovacoes?contrato=${c.id}`, 'Registrar renovação / novo valor') : ''}</div>
       <p class="suave">No aniversário vale a correção pelo índice do contrato. No fim do prazo, o novo valor é negociado com o inquilino e registrado aqui.</p>
       <table><tr><th>Data</th><th>O que aconteceu</th><th>Novo término</th><th class="n">Novo valor</th><th>Obs.</th><th></th></tr>
-      ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}</td><td>${esc(r.observacoes || '')}</td>
+      ${renovs.map((r) => `<tr><td>${dataBr(r.data)}</td><td>${esc(r.tipo)}</td><td>${dataBr(r.nova_vigencia_fim)}</td><td class="n">${r.novo_valor ? reais(r.novo_valor) : '-'}${r.novo_percentual > 0 ? `<br><span class="suave">bonificado ${reais(r.novo_valor - C.descontoPorPercentual(r.novo_valor, r.novo_percentual))}</span>` : ''}</td><td>${esc(r.observacoes || '')}${aceiteDaRenovacao(r)}</td>
         <td class="n">${opera() ? botao('excluirRenovacao', '×', { id: r.id }, 'x-excluir', `Excluir este registro${r.novo_valor ? ' e o novo valor negociado' : ''}? A data de término do contrato não volta sozinha: confira em "Editar".`) : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma renovação registrada.</td></tr>'}</table></div>
     ${caixaDocumentos(c)}
