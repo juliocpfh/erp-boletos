@@ -1580,6 +1580,27 @@ test('aplicação da garantia na conta de outra pessoa: soma no aplicado e a dev
   assert.deepEqual(R.devolucaoPorRecebedor(d, c, 594000).map((x) => [x.nome, x.valor]), [[ank.nome, 330000], ['Maria Silva (PF)', 264000]]);
 });
 
+test('garantias por empresa: quanto tem em cada empresa, de quem é, datas; devolvida sai da lista', () => {
+  const { d, c } = base();
+  Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 540000, caucao_pago_em: '2025-01-10', comprovante_caucao: 'c.pdf' });
+  const ank = d.emitentes[0];
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: ank.id, data: '2025-01-12', valor: 300000 }, 'julio');
+  R.inserir(d, 'aplicacoes', { contrato_id: c.id, emitente_id: null, recebedor: 'Maria Silva (PF)', data: '2025-01-12', valor: 200000 }, 'julio');
+  let g = R.garantiasPorEmpresa(d);
+  assert.deepEqual(g.lugares.map((l) => [l.nome, l.total, l.pessoa]), [[ank.nome, 300000, false], ['Maria Silva (PF)', 200000, true]]);
+  assert.equal(g.lugares[0].itens[0].contrato.id, c.id);
+  assert.deepEqual(g.lugares[0].itens[0].movimentos, [{ data: '2025-01-10', valor: 540000 }]);
+  assert.deepEqual(g.semAplicar.map((x) => [x.contrato.id, x.falta]), [[c.id, 40000]]);
+  assert.equal(g.aplicado, 500000);
+  assert.equal(g.total, 540000);
+  // devolvida na saída: não está mais com a empresa
+  R.encerrarContrato(d, c.id, { data_saida: '2027-12-31', garantia_valor: 540000, indice_percentual: 0, debitos: 0, leitura_agua: '1', leitura_energia: '1' }, 'julio');
+  R.marcarGarantiaDevolvida(d, R.encerramentoDo(d, c.id).id, '2028-01-05', 'julio');
+  g = R.garantiasPorEmpresa(d);
+  assert.equal(g.lugares.length, 0);
+  assert.equal(g.semAplicar.length, 0);
+});
+
 test('remover o comprovante do depósito da caução: só sem correções; em depósitos, sai o último', () => {
   const { d, c } = base();
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2026-06-07', caucao_pago_em: '2026-06-07', comprovante_caucao: 'a.pdf' });
