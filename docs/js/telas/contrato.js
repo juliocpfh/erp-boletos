@@ -316,6 +316,7 @@ function caixaSaida(c) {
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
     ${e.saldo !== 0 && e.garantia_devolvida_em ? `<p>${e.saldo > 0 ? 'Comprovante da devolução do saldo' : 'Comprovante do pagamento do saldo'}: ${linkComprovante(c.id, e.comprovante, { tabela: 'encerramentos', id: e.id, campo: 'comprovante', tipo: e.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', data: e.garantia_devolvida_em })}</p>` : ''}
     ${linkRecibo('quitacao', c, 'Termo de entrega do imóvel, acerto final e quitação (assinam a locadora e o inquilino)')}
+    <p>Termo de quitação assinado por todos: ${linkComprovante(c.id, e.termo_assinado, { tabela: 'encerramentos', id: e.id, campo: 'termo_assinado', tipo: 'termo-quitacao-assinado', data: e.garantia_devolvida_em || e.data_saida })} <span class="suave">(anexe o termo assinado pelo inquilino e por nós: vai junto no e-mail do encerramento)</span></p>
     ${podeUsuario('admin') ? botao('excluir', 'Desfazer cálculo final', { tabela: 'encerramentos', id: e.id }, 'perigo pequeno', 'Apagar o cálculo final da saída? A data de saída e a leitura dos relógios continuam.') : ''}</div>`;
 }
 
@@ -658,7 +659,7 @@ function caixaAditivos(c) {
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
-      <td class="n nw">${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
+      <td class="n nw">${a.arquivo ? `${botaoEmail('aditivo_assinado', { contrato: c.id, aditivo: a.id })} ` : ''}${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}

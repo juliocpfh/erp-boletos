@@ -88,7 +88,7 @@ async function guardarComprovantes(lista, dados, form, pasta) {
 export const xAnexo = (acao, dados, confirmar) => (opera() ? botao(acao, '×', dados, 'x-excluir', confirmar).replace('<button ', '<button title="Apagar só o arquivo" ') : '');
 
 /** Campos de comprovante que o "×" apaga sozinho (caução e depósito pagos de uma vez têm o próprio: removerComprovanteGarantia). */
-export const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'], devolucoes_garantia: ['comprovante'], encerramentos: ['comprovante'] };
+export const ANEXOS_COM_X = { contratos: ['comprovante_reserva'], correcoes_garantia: ['comprovante'], aplicacoes: ['comprovante'], depositos_garantia: ['comprovante'], devolucoes_garantia: ['comprovante'], encerramentos: ['comprovante', 'termo_assinado'] };
 
 /**
  * Link para abrir o comprovante guardado na pasta do inquilino, com o "×" que apaga só o arquivo. Sem comprovante:
