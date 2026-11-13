@@ -145,11 +145,25 @@ function caixaGarantia(c) {
       ? xAnexo('removerComprovanteGarantia', { contrato: c.id, qual }, `Apagar o comprovante "${c[campo]}"? A garantia volta a "anexar comprovante".`) : '';
     // contrato anterior da troca de titular: comprovante anexado aqui (vale para o novo titular), mesmo se os depósitos passaram para lá
     if (herdeiro && !R.depositosGarantiaDo(d(), c, qual).some((x) => x.comprovante)) {
-      return ` · ${linkComprovante(c.id, c[campo] || null, { tabela: 'contratos', id: c.id, campo, tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: c[`${qual}_pago_em`] || c[`${qual}_data`] || '' })}${x}`;
+      return ` · ${linkComprovante(c[`${campo}_contrato`] || c.id, c[campo] || null, { tabela: 'contratos', id: c.id, campo, tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: c[`${qual}_pago_em`] || c[`${qual}_data`] || '' })}${x}`;
     }
+    // herdada, paga pelo anterior em depósitos ainda sem comprovante: anexa-se lá
+    if (c[`${qual}_por_depositos`] && c[`${campo}_contrato`] && !c[campo]) return ` · ${etiqueta('sem comprovante', 'aviso')}${irParaAnterior}`;
     if (c[`${qual}_por_depositos`]) return '';
     return ` · ${c[campo] ? `<span class="nw">${linkComprovante(c[`${campo}_contrato`] || c.id, c[campo])}${x}</span>` : `${etiqueta('sem comprovante', 'aviso')}${irParaAnterior}`}`;
   };
+  /** "paga em 08/06/2026 ✎": a data em que foi paga, com o botão de corrigir (na herdada, é a do pagamento de quem pagou). */
+  const pagaEm = (qual) => {
+    const g = R.GARANTIAS_DEPOSITADAS[qual];
+    const quem = R.pagadorDaGarantia(d(), c, qual);
+    const data = c[g.pago] || quem[g.pago];
+    const deQuem = quem.id !== c.id ? ` por <a href="#/contrato/${quem.id}?ir=garantia">${esc(quem.inquilino_nome)}</a>` : '';
+    const corrigir = opera() ? ` ${botao('corrigirDataGarantia', '✎ corrigir data', { contrato: c.id, qual }, 'link-botao')}` : '';
+    return `paga${deQuem} em ${data ? dataBr(data) : etiqueta('data não informada', 'aviso')}${corrigir}`;
+  };
+  const herdadaDe = anteriorDaGarantia ? ` herdada de <a href="#/contrato/${anteriorDaGarantia.id}?ir=garantia">${esc(anteriorDaGarantia.inquilino_nome)}</a>` : '';
+  // contrato anterior: a garantia segue com o herdeiro (o valor atual, com as correções, é o de lá)
+  const atual = herdeiro ? `segue com <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, atual <b>${reais(R.valorGarantia(d(), herdeiro))}</b>` : null;
   const parcelas = (qual) => tabelaDepositos(qual, R.depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
   // correções da caução: aparecem também enquanto a caução não foi depositada inteira
   // histórico: a caução é corrigida junto com o reajuste, na tela Reajustes
@@ -200,14 +214,14 @@ function caixaGarantia(c) {
         ${link(`#/reajustes?contrato=${c.id}`, 'Completar em Reajustes', 'botao mini')}</div>`;
     }
     const inicial = R.depositosGarantiaDo(d(), c, 'caucao').filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor;
-    html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>, paga em ${dataBr(c.caucao_pago_em || c.caucao_data)}${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}
-      · atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ''}</p>
+    html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>${herdadaDe}, ${pagaEm('caucao')}${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}
+      · ${atual || `atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ''}`}</p>
       ${parcelas('caucao')}${correcoesHtml()}`;
   }
   if (R.temDeposito(c) && !R.garantiaDepositada(c) && !anteriorDaGarantia) {
     html += c.deposito_valor > 0 ? registrar('deposito', 'depósito de garantia', c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
   } else if (R.temDeposito(c)) {
-    html += `<p class="linha-garantia">Depósito de garantia <b>${reais(R.valorGarantia(d(), c))}</b>, pago em ${dataBr(c.deposito_pago_em || c.deposito_data)}${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}
+    html += `<p class="linha-garantia">Depósito de garantia <b>${reais(R.valorGarantia(d(), c))}</b>${herdadaDe}, ${pagaEm('deposito').replace(/^paga/, 'pago')}${comprovanteDa('deposito', 'comprovante_deposito')}${remover('deposito')}${atual ? ` · ${atual}` : ''}
       · uso: ${esc(c.deposito_uso || 'não informado')}</p>${parcelas('deposito')}`;
   }
   if (R.temFiador(c) || fiadores.length) {

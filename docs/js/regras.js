@@ -2365,6 +2365,11 @@ export function comprovantesPendentes(d, c) {
   for (const [qual, texto, tipo] of [['caucao', 'depósito da caução', 'caucao'], ['deposito', 'depósito de garantia', 'deposito-garantia']]) {
     const coberto = c[GARANTIAS_DEPOSITADAS[qual].comprovante] && !c[`${qual}_por_depositos`];
     if ((qual === 'caucao' ? temCaucao(c) : temDeposito(c))) for (const x of depositosGarantiaDo(d, c, qual)) falta(!x.comprovante && !(coberto && !x.complementar), texto, x.valor, x.data, 'depositos_garantia', x.id, 'comprovante', tipo);
+    // herdada, paga pelo anterior em depósitos ainda sem comprovante: cobrado aqui (o contrato de quem pagou já não tem alertas)
+    const p = pagadorDaGarantia(d, c, qual);
+    if (p.id !== c.id && c[`${qual}_por_depositos`]) {
+      for (const x of depositosGarantiaDo(d, p, qual).filter((y) => !y.complementar)) falta(!x.comprovante, `${texto} pago por ${p.inquilino_nome}`, x.valor, x.data, 'depositos_garantia', x.id, 'comprovante', tipo);
+    }
   }
   for (const x of correcoesGarantiaDo(d, c.id)) falta(!x.comprovante, 'complemento da caução', x.complemento, x.data, 'correcoes_garantia', x.id, 'comprovante', 'complemento-caucao');
   for (const x of d.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, 'aplicação da garantia', x.valor, x.data, 'aplicacoes', x.id, 'comprovante', 'aplicacao-garantia');
@@ -2448,6 +2453,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
   if (ultimo) excluir(d, 'depositos_garantia', ultimo.id, usuario, `${c.inquilino_nome}: depósito de ${C.reais(ultimo.valor)} de ${C.dataBr(ultimo.data)} removido`);
   atualizar(d, 'contratos', c.id, { [g.pago]: null, [g.comprovante]: null, [`${qual}_por_depositos`]: null }, usuario,
     `${c.inquilino_nome}: comprovante de ${g.nome} removido (volta a depositar)`);
+  sincronizarGarantiaHerdeiro(d, c.id, usuario);
 }
 
 /**
@@ -2699,6 +2705,12 @@ function exigirAditivoDaTroca(d, c) {
  */
 /** Registros da garantia que pertencem ao contrato (passam ao novo titular junto com a caução ou o depósito). */
 const TABELAS_GARANTIA = ['depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'trocas_garantia'];
+/**
+ * Pagamento da garantia (decisão de 2026-11-13): o comprovante, a data paga e os depósitos iniciais ficam no contrato de quem
+ * pagou; o herdeiro mostra "caução herdada de Fulano, paga em …" apontando para o arquivo do anterior (``*_contrato``).
+ */
+const CAMPOS_PAGAMENTO_GARANTIA = ['comprovante_caucao', 'caucao_por_depositos', 'caucao_pago_em', 'comprovante_deposito', 'deposito_por_depositos', 'deposito_pago_em'];
+const pagamentoDoAnterior = (t, x) => t === 'depositos_garantia' && !x.complementar;
 
 /**
  * Contrato herdado (troca de titular): traz do titular anterior, a partir da data da troca (a entrada do novo), o que é
@@ -2745,20 +2757,21 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
     || TABELAS_GARANTIA.some((t) => t !== 'correcoes_garantia' && (d[t] || []).some((x) => x.contrato_id === n.id));
   // garantia nova (a do anterior é devolvida a ele): nada da garantia passa; o anterior registra a devolução
   if (!garantiaPropria && !garantiaNova(n) && a.garantia_tipo && a.garantia_tipo !== 'Sem garantia' && !a.garantia_transferida_para) {
-    for (const k of CAMPOS_GARANTIA) mud[k] = a[k] ?? null;
-    for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k]) out.arquivos.push(a[k]);
+    // o pagamento (comprovante, data paga e depósitos iniciais) é de quem pagou: fica no anterior e aparece no novo
+    // (sincronizarGarantiaHerdeiro, logo abaixo); correções, complementos, aplicações e trocas passam ao novo
+    for (const k of CAMPOS_GARANTIA) mud[k] = CAMPOS_PAGAMENTO_GARANTIA.includes(k) ? null : a[k] ?? null;
     for (const t of TABELAS_GARANTIA) {
-      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id)) {
+      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id && !pagamentoDoAnterior(t, y))) {
         if (x.comprovante) out.arquivos.push(x.comprovante);
         passa(t, x, TABELAS[t]);
       }
     }
     for (const f of d.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || x.data_saida >= data))) passa('fiadores', f, `Fiador ${f.nome}`);
-    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id, comprovante_caucao: null, comprovante_deposito: null }, usuario,
-      `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id }, usuario, `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
     out.garantia = true;
   }
   atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: dados do contrato trazidos de ${a.inquilino_nome} (troca de titular em ${C.dataBr(data)})`);
+  if (out.garantia) sincronizarGarantiaHerdeiro(d, a.id, usuario);
   // boletos a partir do mês seguinte ao fim do vínculo
   for (const cb of d.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
     if (ehComplementoCaucao(cb) && !out.garantia) continue;
@@ -2815,9 +2828,8 @@ export function resumoDaHeranca(d, n) {
   const out = [`Contrato, prazo e reajuste: continuam os de ${a.inquilino_nome} (o prazo não recomeça; reajuste no aniversário do contrato original)`];
   const boletos = comp ? d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia >= comp && !faturasDe(d, 'cobranca', cb.id, false).length) : [];
   out.push(boletos.length ? `Boletos a partir de ${C.compBr(comp)} sem NF (${boletos.length}): passam para o nome de ${n.inquilino_nome}` : `Boletos: a partir de ${data ? C.dataBr(data) : 'a troca'} saem no nome de ${n.inquilino_nome}`);
-  if (garantiaNova(n)) out.push(`Garantia: nova (a de ${a.inquilino_nome} é devolvida a ele; ${n.inquilino_nome} presta a sua)`);
-  else if (temCaucao(a) || temDeposito(a)) out.push(`Garantia: ${temCaucao(a) ? 'caução' : 'depósito de garantia'} de ${C.reais(valorGarantia(d, a))} passa a garantir ${n.inquilino_nome}, com o comprovante, as correções e a aplicação`);
-  else if (a.garantia_tipo && a.garantia_tipo !== 'Sem garantia') out.push(`Garantia: ${a.garantia_tipo} continua (os fiadores garantem ${n.inquilino_nome})`);
+  const g = textoGarantiaNaTroca(d, n, a);
+  if (g) out.push(garantiaNova(n) ? g.nova : g.continua);
   const reserva = a.reserva_valor > 0 ? saldoReserva(d, a) : 0;
   if (reserva > 0) out.push(`Reserva: saldo de ${C.reais(reserva)} passa para ${n.inquilino_nome}`);
   const seguros = segurosAHerdar(d, n, a);
@@ -2825,6 +2837,23 @@ export function resumoDaHeranca(d, n) {
   out.push(`${a.inquilino_nome} fica com fim do vínculo em ${data ? C.dataBr(C.somarDias(data, -1)) : 'a véspera da troca'} e continua respondendo pelo período até essa data`);
   out.push(`Contas de consumo: a empresa troca a titularidade para o nome de ${n.inquilino_nome} (autorização no termo)`);
   return out;
+}
+
+/**
+ * Os dois textos da garantia na troca de titular (a janela de confirmação do termo mostra os dois para escolher), ou null
+ * (sem garantia). Ex.: { continua: "Garantia: a mesma caução de R$ 2.430,00, paga por Ana em 08/06/2026 …", nova: "Garantia: nova …" }.
+ */
+export function textoGarantiaNaTroca(d, n, a = contratoHerdado(d, n)) {
+  if (!a || !a.garantia_tipo || a.garantia_tipo === 'Sem garantia') return null;
+  const dinheiro = temCaucao(a) || temDeposito(a);
+  const qual = temCaucao(a) ? 'caucao' : 'deposito';
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  const pago = dinheiro && garantiaDepositada(a) ? (a[g.pago] || (depositosGarantiaDo(d, a, qual).filter((x) => !x.complementar).pop() || {}).data) : null;
+  const continua = dinheiro
+    ? `Garantia: a mesma ${g.nome} de ${C.reais(valorGarantia(d, a))}${pago ? `, paga por ${a.inquilino_nome} em ${C.dataBr(pago)}` : ` (ainda sem comprovante: anexe no contrato de ${a.inquilino_nome})`}, passa a garantir ${n.inquilino_nome}. O comprovante e a data do pagamento continuam no contrato de ${a.inquilino_nome} e aparecem em ${n.inquilino_nome} como "herdada"; correções, complemento e aplicação passam a ser lançados em ${n.inquilino_nome}`
+    : `Garantia: ${a.garantia_tipo} continua (os fiadores garantem ${n.inquilino_nome})`;
+  const nova = `Garantia: nova (${dinheiro ? `a ${g.nome} de ${a.inquilino_nome} é devolvida a ele, com a correção; ` : ''}${n.inquilino_nome} presta a sua, com a data e o comprovante do depósito na página dele)`;
+  return { continua, nova, dinheiro };
 }
 
 /** Apólices que passaram deste contrato ao novo titular na troca (continuam no histórico do anterior, só para consulta). */
@@ -2872,11 +2901,12 @@ export function herancaIncompleta(d, c) {
   const a = (feita || herancaAgendada(d, c)) && contratoHerdado(d, c);
   if (!a) return null;
   const reserva = a.reserva_valor > 0 && (!(c.reserva_valor > 0) || (a.comprovante_reserva && !c.comprovante_reserva) || c.reserva_usada_anterior === undefined);
-  if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0 } : null;
+  if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0, anterior: false } : null;
   const garantia = !garantiaNova(c) && garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const lancamentos = lancamentosNoAnterior(d, c, a).length;
-  return garantia || reserva || seguro || lancamentos ? { garantia, reserva, seguro, lancamentos } : null;
+  const anterior = !!pagamentoPerdidoNoAnterior(d, c, a);
+  return garantia || reserva || seguro || lancamentos || anterior ? { garantia, reserva, seguro, lancamentos, anterior } : null;
 }
 
 /**
@@ -2906,13 +2936,13 @@ export function completarHeranca(d, novoId, usuario) {
     const mud = {};
     // comprovante que o herdeiro já tem (anexado nele) fica; o do anterior só vem se faltar no herdeiro
     const proprio = (k) => ['comprovante_caucao', 'comprovante_deposito'].includes(k) && n[k];
-    for (const k of CAMPOS_GARANTIA) if (a[k] !== undefined && a[k] !== null && a[k] !== '' && !proprio(k)) mud[k] = a[k];
-    for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (a[k] && !n[k]) out.arquivos.push(a[k]);
+    // o pagamento (comprovante, data, depósitos iniciais) fica no anterior e aparece no herdeiro (sincronizarGarantiaHerdeiro)
+    for (const k of CAMPOS_GARANTIA) if (a[k] !== undefined && a[k] !== null && a[k] !== '' && !proprio(k) && !CAMPOS_PAGAMENTO_GARANTIA.includes(k)) mud[k] = a[k];
     const data = n.data_entrada || n.vigencia_inicio;
     const proprios = (d.depositos_garantia || []).filter((y) => y.contrato_id === n.id && !y.complementar);
     const passa = (t, x, texto) => atualizar(d, t, x.id, { contrato_id: n.id }, usuario, `${texto} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
     for (const t of TABELAS_GARANTIA) {
-      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id)) {
+      for (const x of (d[t] || []).filter((y) => y.contrato_id === a.id && !pagamentoDoAnterior(t, y))) {
         if (x.comprovante) out.arquivos.push(x.comprovante);
         passa(t, x, TABELAS[t]);
       }
@@ -2920,14 +2950,14 @@ export function completarHeranca(d, novoId, usuario) {
     for (const f of d.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || !data || x.data_saida >= data))) passa('fiadores', f, `Fiador ${f.nome}`);
     // depósitos que o herdeiro tinha lançado por conta própria repetiam a caução (que é a herdada): saem, sem somar
     for (const x of proprios) excluir(d, 'depositos_garantia', x.id, usuario, `${n.inquilino_nome}: depósito de ${C.reais(x.valor)} de ${C.dataBr(x.data)} substituído pela caução herdada de ${a.inquilino_nome}`);
-    mud.caucao_por_depositos = a.caucao_por_depositos || null;
-    mud.deposito_por_depositos = a.deposito_por_depositos || null;
+    // o comprovante próprio do herdeiro (anexado nele) fica; sem ele, vale o do anterior
+    for (const [qual, g] of Object.entries(GARANTIAS_DEPOSITADAS)) if (!n[g.comprovante]) { mud[`${qual}_por_depositos`] = null; mud[g.pago] = null; }
     atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia trazida de ${a.inquilino_nome} (troca de titular)`);
-    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id, ...(n.comprovante_caucao && n.comprovante_caucao !== a.comprovante_caucao ? {} : { comprovante_caucao: null }),
-      ...(n.comprovante_deposito && n.comprovante_deposito !== a.comprovante_deposito ? {} : { comprovante_deposito: null }) }, usuario,
-      `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+    atualizar(d, 'contratos', a.id, { garantia_transferida_para: n.id }, usuario, `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+    sincronizarGarantiaHerdeiro(d, a.id, usuario);
     out.garantia = true;
   }
+  if (falta.anterior) out.comprovanteAnterior = restaurarPagamentoDoAnterior(d, n, a, usuario);
   if (falta.reserva) {
     out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
     recalcularCobrancas(d, (cb) => cb.contrato_id === n.id, usuario);
@@ -3058,24 +3088,147 @@ export function restaurarGarantiaHerdada(d, contratoId, usuario) {
  * depósito de garantia, data do depósito) aparece no novo titular. O arquivo fica na pasta do anterior
  * (``comprovante_caucao_contrato`` / ``comprovante_deposito_contrato`` = id do anterior). Devolve o herdeiro atualizado ou null.
  */
-export function sincronizarGarantiaHerdeiro(d, anteriorId, usuario) {
+export function sincronizarGarantiaHerdeiro(d, anteriorId, usuario, vistos = new Set()) {
   const a = buscar(d, 'contratos', anteriorId);
   const n = a && a.garantia_transferida_para && buscar(d, 'contratos', a.garantia_transferida_para);
-  if (!n) return null;
+  if (!n || vistos.has(a.id)) return null;
+  vistos.add(a.id);
   const mud = {};
   for (const [qual, g] of Object.entries(GARANTIAS_DEPOSITADAS)) {
-    // comprovante do anterior: o do contrato ou o do último depósito com comprovante
+    // comprovante do anterior: o do contrato (que pode já vir de outro anterior, na 2ª troca) ou o do último depósito
     const dep = depositosGarantiaDo(d, a, qual).filter((x) => x.comprovante && !x.complementar).pop();
     const nome = a[g.comprovante] || (dep && dep.comprovante);
-    if (!nome) continue;
+    const origem = a[g.comprovante] ? (a[`${g.comprovante}_contrato`] || a.id) : a.id;
+    const apontava = n[`${g.comprovante}_contrato`];
+    // o herdeiro tem o arquivo dele (garantia própria ou troca antiga, em que o comprovante foi para a pasta dele): só a data, se faltar
+    if (n[g.comprovante] && !apontava && n[g.comprovante] !== nome) {
+      if (!n[g.pago] && a[g.pago]) mud[g.pago] = a[g.pago];
+      continue;
+    }
+    if (!nome) {
+      // paga em depósitos com o comprovante ainda a buscar no banco: o herdeiro mostra "paga por Ana em …" (o comprovante
+      // é cobrado no contrato de quem pagou: comprovantesPendentes)
+      const ult = depositosGarantiaDo(d, a, qual).filter((x) => !x.complementar).pop();
+      const pagoPeloAnterior = a[`${qual}_por_depositos`] && (ult || a[`${g.comprovante}_contrato`]) && (qual === 'caucao' ? temCaucao(a) : temDeposito(a));
+      if (pagoPeloAnterior) {
+        Object.assign(mud, { [g.comprovante]: null, [`${g.comprovante}_contrato`]: a[`${g.comprovante}_contrato`] || a.id, [g.pago]: a[g.pago] || (ult && ult.data) || null, [`${qual}_por_depositos`]: true });
+        continue;
+      }
+      // o anterior não tem mais o pagamento (comprovante apagado, depósito desfeito): o herdeiro, que só apontava para ele,
+      // volta a "sem comprovante" (também na 2ª troca: aponta para quem pagou, que já não tem o arquivo)
+      const p = apontava && apontava !== n.id && buscar(d, 'contratos', apontava);
+      const aindaTem = p && (n[g.comprovante]
+        ? p[g.comprovante] === n[g.comprovante] || (d.depositos_garantia || []).some((x) => x.contrato_id === p.id && x.comprovante === n[g.comprovante])
+        : !!p[`${qual}_por_depositos`]);
+      if (apontava && apontava !== n.id && !aindaTem) Object.assign(mud, { [g.comprovante]: null, [`${g.comprovante}_contrato`]: null, [g.pago]: null, [`${qual}_por_depositos`]: null });
+      continue;
+    }
+    // dados antigos: o arquivo foi para a pasta do herdeiro e ele o guarda como dele (com os depósitos): só a data, se faltar
+    if (origem === n.id) {
+      if (!n[g.pago] && a[g.pago] && n[g.comprovante]) mud[g.pago] = a[g.pago];
+      continue;
+    }
     mud[g.comprovante] = nome;
-    mud[`${g.comprovante}_contrato`] = a.id;
+    mud[`${g.comprovante}_contrato`] = origem;
     mud[g.pago] = a[g.pago] || (dep && dep.data) || n[g.pago] || null;
     mud[`${qual}_por_depositos`] = null;
   }
-  if (!Object.keys(mud).length) return null;
-  atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
-  return n;
+  const mudou = Object.keys(mud).length > 0;
+  if (mudou) atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
+  // 2ª troca (Ana → Bruno → Carla): o que chega a Bruno segue para Carla
+  if (n.garantia_transferida_para) sincronizarGarantiaHerdeiro(d, n.id, usuario, vistos);
+  return mudou ? n : null;
+}
+
+/**
+ * Trocas de titular feitas antes de 2026-11-13: o comprovante da garantia saiu do contrato anterior (ficou só no herdeiro).
+ * Pelo histórico ("garantia passa para…"), o comprovante que o anterior tinha; o arquivo fica onde está (na pasta do herdeiro,
+ * ``*_contrato``). Também a data paga que faltou no herdeiro. { contrato: {campos do anterior}, herdeiro: {campos} } ou null.
+ */
+function pagamentoPerdidoNoAnterior(d, n, a) {
+  if (!a || a.garantia_transferida_para !== n.id || !(temCaucao(a) || temDeposito(a))) return null;
+  const contrato = {};
+  const herdeiro = {};
+  for (const g of Object.values(GARANTIAS_DEPOSITADAS)) {
+    if (!a[g.comprovante]) {
+      const h = [...d.historico].reverse().find((x) => x.acao === 'Alteração' && x.tabela === 'contratos' && x.registro_id === a.id && /garantia passa para/.test(x.descricao || '')
+        && x.detalhes && x.detalhes[g.comprovante] && x.detalhes[g.comprovante].de && !x.detalhes[g.comprovante].para);
+      const nome = h && h.detalhes[g.comprovante].de;
+      if (nome) {
+        // onde o arquivo está hoje: no herdeiro (campo ou depósito que passou para ele) ou no contrato que o aponta
+        const dep = (d.depositos_garantia || []).find((x) => x.comprovante === nome && x.contrato_id !== a.id);
+        const onde = n[g.comprovante] === nome ? (n[`${g.comprovante}_contrato`] || n.id) : dep ? dep.contrato_id : n.id;
+        contrato[g.comprovante] = nome;
+        contrato[`${g.comprovante}_contrato`] = onde === a.id ? null : onde;
+      }
+    }
+    if (a[g.pago] && !n[g.pago] && n[g.comprovante]) herdeiro[g.pago] = a[g.pago];
+  }
+  return Object.keys(contrato).length || Object.keys(herdeiro).length ? { contrato, herdeiro } : null;
+}
+
+/** Devolve ao contrato anterior o comprovante que saiu dele na troca (pagamentoPerdidoNoAnterior). Devolve os campos acertados. */
+function restaurarPagamentoDoAnterior(d, n, a, usuario) {
+  const x = pagamentoPerdidoNoAnterior(d, n, a);
+  if (!x) return [];
+  if (Object.keys(x.contrato).length) atualizar(d, 'contratos', a.id, x.contrato, usuario, `${a.inquilino_nome}: comprovante da garantia volta a aparecer aqui (é de quem pagou; vale também para ${n.inquilino_nome})`);
+  if (Object.keys(x.herdeiro).length) atualizar(d, 'contratos', n.id, x.herdeiro, usuario, `${n.inquilino_nome}: data paga da garantia herdada de ${a.inquilino_nome}`);
+  return [...Object.keys(x.contrato).filter((k) => !k.endsWith('_contrato')), ...Object.keys(x.herdeiro)];
+}
+
+/**
+ * Contrato de quem pagou a garantia que este contrato usa: o anterior da troca de titular (o comprovante aponta para ele,
+ * também na 2ª troca) ou o próprio contrato. Ex.: Bruno herdou a caução de Ana → Ana.
+ */
+export function pagadorDaGarantia(d, c, qual) {
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  const id = g && c[`${g.comprovante}_contrato`];
+  return (id && id !== c.id && buscar(d, 'contratos', id)) || c;
+}
+
+/**
+ * "Corrigir data" da caução ou do depósito de garantia: a data em que foi paga. Na garantia herdada, a data é a do
+ * pagamento feito pelo titular anterior: muda lá (no contrato de quem pagou) e aparece no herdeiro. Paga em depósitos:
+ * muda a data do último depósito. Ex.: caução de Ana paga em 05/03/2024, aparecia 01/10/2026 → corrige para 05/03/2024.
+ */
+export function corrigirDataGarantiaPaga(d, contratoId, qual, data, usuario, hoje = C.hojeIso()) {
+  const c = buscar(d, 'contratos', contratoId);
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
+  if (!data || C.dataValida(data) !== data) throw new Error('Informe a data em que foi paga.');
+  if (data > hoje) throw new Error('A data paga não pode ser depois de hoje.');
+  const origem = pagadorDaGarantia(d, c, qual);
+  if (!garantiaDepositada(origem) && !garantiaDepositada(c)) throw new Error(`Registre antes o depósito da ${g.nome}.`);
+  const ultimo = origem[`${qual}_por_depositos`] ? depositosGarantiaDo(d, origem, qual).filter((x) => !x.complementar).pop() : null;
+  if (ultimo) atualizar(d, 'depositos_garantia', ultimo.id, { data }, usuario, `${origem.inquilino_nome}: data do depósito de ${C.reais(ultimo.valor)} corrigida para ${C.dataBr(data)}`);
+  atualizar(d, 'contratos', origem.id, { [g.pago]: data }, usuario, `${origem.inquilino_nome}: ${g.nome} paga em ${C.dataBr(data)} (data corrigida)`);
+  if (origem.id !== c.id) atualizar(d, 'contratos', c.id, { [g.pago]: data }, usuario, `${c.inquilino_nome}: ${g.nome} herdada de ${origem.inquilino_nome}, paga em ${C.dataBr(data)} (data corrigida)`);
+  sincronizarGarantiaHerdeiro(d, origem.id, usuario);
+  return { origem };
+}
+
+/**
+ * Na confirmação do termo da troca (antes de a troca acontecer): a garantia continua a mesma do anterior ou é nova.
+ * Ex.: caução de Ana (R$ 3.000,00, paga em 05/03/2024) → "continua": Bruno mostra "caução herdada de Ana, paga em 05/03/2024";
+ * "nova": a de Ana é devolvida a ela e Bruno deposita a sua (data e comprovante na página dele).
+ */
+export function mudarGarantiaNaTroca(d, novoId, escolha, usuario) {
+  const n = buscar(d, 'contratos', novoId);
+  const a = n && contratoHerdado(d, n);
+  if (!a || !['continua', 'nova'].includes(escolha)) return false;
+  if ((escolha === 'nova') === garantiaNova(n)) return false;
+  if (n.heranca_transferida) throw new Error('A troca de titular já foi feita: a garantia não muda mais por aqui (use "Trocar garantia ou fiador").');
+  const proprios = TABELAS_GARANTIA.some((t) => (d[t] || []).some((x) => x.contrato_id === n.id))
+    || Object.values(GARANTIAS_DEPOSITADAS).some((g) => n[g.comprovante] && !n[`${g.comprovante}_contrato`]);
+  if (escolha === 'continua' && proprios) throw new Error(`${n.inquilino_nome} já tem garantia própria registrada (depósito ou comprovante): exclua antes, ou mantenha a garantia nova.`);
+  const mud = { garantia_na_troca: escolha };
+  const entrada = n.data_entrada || n.vigencia_inicio || null;
+  if (escolha === 'continua') for (const k of CAMPOS_GARANTIA) mud[k] = CAMPOS_PAGAMENTO_GARANTIA.includes(k) ? null : a[k] ?? null;
+  else Object.assign(mud, { caucao_pago_em: null, deposito_pago_em: null, ...(temCaucao(n) ? { caucao_data: entrada } : {}), ...(temDeposito(n) ? { deposito_data: entrada } : {}) });
+  atualizar(d, 'contratos', n.id, mud, usuario, escolha === 'nova'
+    ? `${n.inquilino_nome}: garantia nova na troca de titular (a de ${a.inquilino_nome} é devolvida a ele)`
+    : `${n.inquilino_nome}: a garantia continua a de ${a.inquilino_nome} (troca de titular)`);
+  return true;
 }
 
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
