@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-b/RYNzOzD/ufGqYUAiEYJ2LdqkIxhBZ56K67VOUWRhU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-M7YqpfrQDFYpK7KDwOJOgPL5vMsvoDWhQw7o9j5Lu44='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ce9e85f4ef5700d4">
+<meta name="fontes" content="568e983d56cca88f">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3835,6 +3835,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     correcoesDo: () => correcoesDo,
     correcoesGarantiaDo: () => correcoesGarantiaDo,
     correcoesRecalculadas: () => correcoesRecalculadas,
+    corrigirDataGarantiaPaga: () => corrigirDataGarantiaPaga,
     corrigirImovel: () => corrigirImovel,
     dadosBoleto: () => dadosBoleto,
     dadosDaFicha: () => dadosDaFicha,
@@ -3977,6 +3978,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     motivoBancoInativo: () => motivoBancoInativo,
     motivoNaoDesfazer: () => motivoNaoDesfazer,
     motivoSemDesistencia: () => motivoSemDesistencia,
+    mudarGarantiaNaTroca: () => mudarGarantiaNaTroca,
     mudarRegraSistema: () => mudarRegraSistema,
     nfAirbnbDe: () => nfAirbnbDe,
     nomeBate: () => nomeBate,
@@ -3991,6 +3993,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     origensDoAcordo: () => origensDoAcordo,
     outrosContratosDaPessoa: () => outrosContratosDaPessoa,
     padroesNovoContrato: () => padroesNovoContrato,
+    pagadorDaGarantia: () => pagadorDaGarantia,
     parcelasDoAcordo: () => parcelasDoAcordo,
     parcelasIptu: () => parcelasIptu,
     partesDoContrato: () => partesDoContrato,
@@ -4089,6 +4092,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     temFci: () => temFci,
     temFiador: () => temFiador,
     textoDeBusca: () => textoDeBusca,
+    textoGarantiaNaTroca: () => textoGarantiaNaTroca,
     textoLeitura: () => textoLeitura,
     textoLembrete: () => textoLembrete,
     textoParte: () => textoParte,
@@ -5968,6 +5972,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const [qual, texto3, tipo] of [["caucao", "depósito da caução", "caucao"], ["deposito", "depósito de garantia", "deposito-garantia"]]) {
       const coberto = c[GARANTIAS_DEPOSITADAS[qual].comprovante] && !c[`${qual}_por_depositos`];
       if (qual === "caucao" ? temCaucao(c) : temDeposito(c)) for (const x of depositosGarantiaDo(d2, c, qual)) falta(!x.comprovante && !(coberto && !x.complementar), texto3, x.valor, x.data, "depositos_garantia", x.id, "comprovante", tipo);
+      const p2 = pagadorDaGarantia(d2, c, qual);
+      if (p2.id !== c.id && c[`${qual}_por_depositos`]) {
+        for (const x of depositosGarantiaDo(d2, p2, qual).filter((y) => !y.complementar)) falta(!x.comprovante, `${texto3} pago por ${p2.inquilino_nome}`, x.valor, x.data, "depositos_garantia", x.id, "comprovante", tipo);
+      }
     }
     for (const x of correcoesGarantiaDo(d2, c.id)) falta(!x.comprovante, "complemento da caução", x.complemento, x.data, "correcoes_garantia", x.id, "comprovante", "complemento-caucao");
     for (const x of d2.aplicacoes.filter((a) => a.contrato_id === c.id)) falta(!x.comprovante, "aplicação da garantia", x.valor, x.data, "aplicacoes", x.id, "comprovante", "aplicacao-garantia");
@@ -6041,6 +6049,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       usuario,
       `${c.inquilino_nome}: comprovante de ${g.nome} removido (volta a depositar)`
     );
+    sincronizarGarantiaHerdeiro(d2, c.id, usuario);
   }
   function removerAnexo(d2, tabela, id, campo2, usuario) {
     const ok = { contratos: ["comprovante_reserva"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"] };
@@ -6223,26 +6232,19 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     const garantiaPropria = n.comprovante_caucao || n.comprovante_deposito || n.caucao_por_depositos || n.deposito_por_depositos || TABELAS_GARANTIA.some((t) => t !== "correcoes_garantia" && (d2[t] || []).some((x) => x.contrato_id === n.id));
     if (!garantiaPropria && !garantiaNova(n) && a.garantia_tipo && a.garantia_tipo !== "Sem garantia" && !a.garantia_transferida_para) {
-      for (const k of CAMPOS_GARANTIA) mud[k] = a[k] ?? null;
-      for (const k of ["comprovante_caucao", "comprovante_deposito"]) if (a[k]) out.arquivos.push(a[k]);
+      for (const k of CAMPOS_GARANTIA) mud[k] = CAMPOS_PAGAMENTO_GARANTIA.includes(k) ? null : a[k] ?? null;
       for (const t of TABELAS_GARANTIA) {
-        for (const x of (d2[t] || []).filter((y) => y.contrato_id === a.id)) {
+        for (const x of (d2[t] || []).filter((y) => y.contrato_id === a.id && !pagamentoDoAnterior(t, y))) {
           if (x.comprovante) out.arquivos.push(x.comprovante);
           passa(t, x, TABELAS[t]);
         }
       }
       for (const f of d2.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || x.data_saida >= data2))) passa("fiadores", f, `Fiador ${f.nome}`);
-      atualizar(
-        d2,
-        "contratos",
-        a.id,
-        { garantia_transferida_para: n.id, comprovante_caucao: null, comprovante_deposito: null },
-        usuario,
-        `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`
-      );
+      atualizar(d2, "contratos", a.id, { garantia_transferida_para: n.id }, usuario, `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
       out.garantia = true;
     }
     atualizar(d2, "contratos", n.id, mud, usuario, `${n.inquilino_nome}: dados do contrato trazidos de ${a.inquilino_nome} (troca de titular em ${dataBr(data2)})`);
+    if (out.garantia) sincronizarGarantiaHerdeiro(d2, a.id, usuario);
     for (const cb of d2.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
       if (ehComplementoCaucao(cb) && !out.garantia) continue;
       if (faturasDe(d2, "cobranca", cb.id).length) {
@@ -6295,9 +6297,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const out = [`Contrato, prazo e reajuste: continuam os de ${a.inquilino_nome} (o prazo não recomeça; reajuste no aniversário do contrato original)`];
     const boletos = comp ? d2.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia >= comp && !faturasDe(d2, "cobranca", cb.id, false).length) : [];
     out.push(boletos.length ? `Boletos a partir de ${compBr(comp)} sem NF (${boletos.length}): passam para o nome de ${n.inquilino_nome}` : `Boletos: a partir de ${data2 ? dataBr(data2) : "a troca"} saem no nome de ${n.inquilino_nome}`);
-    if (garantiaNova(n)) out.push(`Garantia: nova (a de ${a.inquilino_nome} é devolvida a ele; ${n.inquilino_nome} presta a sua)`);
-    else if (temCaucao(a) || temDeposito(a)) out.push(`Garantia: ${temCaucao(a) ? "caução" : "depósito de garantia"} de ${reais(valorGarantia(d2, a))} passa a garantir ${n.inquilino_nome}, com o comprovante, as correções e a aplicação`);
-    else if (a.garantia_tipo && a.garantia_tipo !== "Sem garantia") out.push(`Garantia: ${a.garantia_tipo} continua (os fiadores garantem ${n.inquilino_nome})`);
+    const g = textoGarantiaNaTroca(d2, n, a);
+    if (g) out.push(garantiaNova(n) ? g.nova : g.continua);
     const reserva = a.reserva_valor > 0 ? saldoReserva(d2, a) : 0;
     if (reserva > 0) out.push(`Reserva: saldo de ${reais(reserva)} passa para ${n.inquilino_nome}`);
     const seguros = segurosAHerdar(d2, n, a);
@@ -6305,6 +6306,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     out.push(`${a.inquilino_nome} fica com fim do vínculo em ${data2 ? dataBr(somarDias(data2, -1)) : "a véspera da troca"} e continua respondendo pelo período até essa data`);
     out.push(`Contas de consumo: a empresa troca a titularidade para o nome de ${n.inquilino_nome} (autorização no termo)`);
     return out;
+  }
+  function textoGarantiaNaTroca(d2, n, a = contratoHerdado(d2, n)) {
+    if (!a || !a.garantia_tipo || a.garantia_tipo === "Sem garantia") return null;
+    const dinheiro = temCaucao(a) || temDeposito(a);
+    const qual = temCaucao(a) ? "caucao" : "deposito";
+    const g = GARANTIAS_DEPOSITADAS[qual];
+    const pago = dinheiro && garantiaDepositada(a) ? a[g.pago] || (depositosGarantiaDo(d2, a, qual).filter((x) => !x.complementar).pop() || {}).data : null;
+    const continua = dinheiro ? `Garantia: a mesma ${g.nome} de ${reais(valorGarantia(d2, a))}${pago ? `, paga por ${a.inquilino_nome} em ${dataBr(pago)}` : ` (ainda sem comprovante: anexe no contrato de ${a.inquilino_nome})`}, passa a garantir ${n.inquilino_nome}. O comprovante e a data do pagamento continuam no contrato de ${a.inquilino_nome} e aparecem em ${n.inquilino_nome} como "herdada"; correções, complemento e aplicação passam a ser lançados em ${n.inquilino_nome}` : `Garantia: ${a.garantia_tipo} continua (os fiadores garantem ${n.inquilino_nome})`;
+    const nova = `Garantia: nova (${dinheiro ? `a ${g.nome} de ${a.inquilino_nome} é devolvida a ele, com a correção; ` : ""}${n.inquilino_nome} presta a sua, com a data e o comprovante do depósito na página dele)`;
+    return { continua, nova, dinheiro };
   }
   function herdarSeguros(d2, n, a, usuario) {
     const arquivos = [];
@@ -6319,11 +6330,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const a = (feita || herancaAgendada(d2, c)) && contratoHerdado(d2, c);
     if (!a) return null;
     const reserva = a.reserva_valor > 0 && (!(c.reserva_valor > 0) || a.comprovante_reserva && !c.comprovante_reserva || c.reserva_usada_anterior === void 0);
-    if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0 } : null;
+    if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0, anterior: false } : null;
     const garantia = !garantiaNova(c) && garantiaAHerdar(d2, a) && continuadoPor(d2, a) && continuadoPor(d2, a).id === c.id;
     const seguro = segurosAHerdar(d2, c, a).length > 0 && continuadoPor(d2, a) && continuadoPor(d2, a).id === c.id;
     const lancamentos = lancamentosNoAnterior(d2, c, a).length;
-    return garantia || reserva || seguro || lancamentos ? { garantia, reserva, seguro, lancamentos } : null;
+    const anterior = !!pagamentoPerdidoNoAnterior(d2, c, a);
+    return garantia || reserva || seguro || lancamentos || anterior ? { garantia, reserva, seguro, lancamentos, anterior } : null;
   }
   function completarHeranca(d2, novoId, usuario) {
     const n = buscar(d2, "contratos", novoId);
@@ -6345,36 +6357,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (falta.garantia) {
       const mud = {};
       const proprio = (k) => ["comprovante_caucao", "comprovante_deposito"].includes(k) && n[k];
-      for (const k of CAMPOS_GARANTIA) if (a[k] !== void 0 && a[k] !== null && a[k] !== "" && !proprio(k)) mud[k] = a[k];
-      for (const k of ["comprovante_caucao", "comprovante_deposito"]) if (a[k] && !n[k]) out.arquivos.push(a[k]);
+      for (const k of CAMPOS_GARANTIA) if (a[k] !== void 0 && a[k] !== null && a[k] !== "" && !proprio(k) && !CAMPOS_PAGAMENTO_GARANTIA.includes(k)) mud[k] = a[k];
       const data2 = n.data_entrada || n.vigencia_inicio;
       const proprios = (d2.depositos_garantia || []).filter((y) => y.contrato_id === n.id && !y.complementar);
       const passa = (t, x, texto3) => atualizar(d2, t, x.id, { contrato_id: n.id }, usuario, `${texto3} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
       for (const t of TABELAS_GARANTIA) {
-        for (const x of (d2[t] || []).filter((y) => y.contrato_id === a.id)) {
+        for (const x of (d2[t] || []).filter((y) => y.contrato_id === a.id && !pagamentoDoAnterior(t, y))) {
           if (x.comprovante) out.arquivos.push(x.comprovante);
           passa(t, x, TABELAS[t]);
         }
       }
       for (const f of d2.fiadores.filter((x) => x.contrato_id === a.id && (!x.data_saida || !data2 || x.data_saida >= data2))) passa("fiadores", f, `Fiador ${f.nome}`);
       for (const x of proprios) excluir(d2, "depositos_garantia", x.id, usuario, `${n.inquilino_nome}: depósito de ${reais(x.valor)} de ${dataBr(x.data)} substituído pela caução herdada de ${a.inquilino_nome}`);
-      mud.caucao_por_depositos = a.caucao_por_depositos || null;
-      mud.deposito_por_depositos = a.deposito_por_depositos || null;
+      for (const [qual, g] of Object.entries(GARANTIAS_DEPOSITADAS)) if (!n[g.comprovante]) {
+        mud[`${qual}_por_depositos`] = null;
+        mud[g.pago] = null;
+      }
       atualizar(d2, "contratos", n.id, mud, usuario, `${n.inquilino_nome}: garantia trazida de ${a.inquilino_nome} (troca de titular)`);
-      atualizar(
-        d2,
-        "contratos",
-        a.id,
-        {
-          garantia_transferida_para: n.id,
-          ...n.comprovante_caucao && n.comprovante_caucao !== a.comprovante_caucao ? {} : { comprovante_caucao: null },
-          ...n.comprovante_deposito && n.comprovante_deposito !== a.comprovante_deposito ? {} : { comprovante_deposito: null }
-        },
-        usuario,
-        `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`
-      );
+      atualizar(d2, "contratos", a.id, { garantia_transferida_para: n.id }, usuario, `${a.inquilino_nome}: garantia passa para ${n.inquilino_nome} (troca de titular)`);
+      sincronizarGarantiaHerdeiro(d2, a.id, usuario);
       out.garantia = true;
     }
+    if (falta.anterior) out.comprovanteAnterior = restaurarPagamentoDoAnterior(d2, n, a, usuario);
     if (falta.reserva) {
       out.arquivosReserva = herdarReserva(d2, n, a, usuario, true);
       recalcularCobrancas(d2, (cb) => cb.contrato_id === n.id, usuario);
@@ -6472,23 +6476,107 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const k of ["comprovante_caucao", "comprovante_deposito"]) if (x.campos[k]) arquivos.push(x.campos[k]);
     return { registros: x.registros.length + x.desmarcar.length, duplicados: x.duplicados.length, campos: Object.keys(x.campos), arquivos: [...new Set(arquivos)] };
   }
-  function sincronizarGarantiaHerdeiro(d2, anteriorId, usuario) {
+  function sincronizarGarantiaHerdeiro(d2, anteriorId, usuario, vistos = /* @__PURE__ */ new Set()) {
     const a = buscar(d2, "contratos", anteriorId);
     const n = a && a.garantia_transferida_para && buscar(d2, "contratos", a.garantia_transferida_para);
-    if (!n) return null;
+    if (!n || vistos.has(a.id)) return null;
+    vistos.add(a.id);
     const mud = {};
     for (const [qual, g] of Object.entries(GARANTIAS_DEPOSITADAS)) {
       const dep = depositosGarantiaDo(d2, a, qual).filter((x) => x.comprovante && !x.complementar).pop();
       const nome = a[g.comprovante] || dep && dep.comprovante;
-      if (!nome) continue;
+      const origem = a[g.comprovante] ? a[`${g.comprovante}_contrato`] || a.id : a.id;
+      const apontava = n[`${g.comprovante}_contrato`];
+      if (n[g.comprovante] && !apontava && n[g.comprovante] !== nome) {
+        if (!n[g.pago] && a[g.pago]) mud[g.pago] = a[g.pago];
+        continue;
+      }
+      if (!nome) {
+        const ult = depositosGarantiaDo(d2, a, qual).filter((x) => !x.complementar).pop();
+        const pagoPeloAnterior = a[`${qual}_por_depositos`] && (ult || a[`${g.comprovante}_contrato`]) && (qual === "caucao" ? temCaucao(a) : temDeposito(a));
+        if (pagoPeloAnterior) {
+          Object.assign(mud, { [g.comprovante]: null, [`${g.comprovante}_contrato`]: a[`${g.comprovante}_contrato`] || a.id, [g.pago]: a[g.pago] || ult && ult.data || null, [`${qual}_por_depositos`]: true });
+          continue;
+        }
+        const p2 = apontava && apontava !== n.id && buscar(d2, "contratos", apontava);
+        const aindaTem = p2 && (n[g.comprovante] ? p2[g.comprovante] === n[g.comprovante] || (d2.depositos_garantia || []).some((x) => x.contrato_id === p2.id && x.comprovante === n[g.comprovante]) : !!p2[`${qual}_por_depositos`]);
+        if (apontava && apontava !== n.id && !aindaTem) Object.assign(mud, { [g.comprovante]: null, [`${g.comprovante}_contrato`]: null, [g.pago]: null, [`${qual}_por_depositos`]: null });
+        continue;
+      }
+      if (origem === n.id) {
+        if (!n[g.pago] && a[g.pago] && n[g.comprovante]) mud[g.pago] = a[g.pago];
+        continue;
+      }
       mud[g.comprovante] = nome;
-      mud[`${g.comprovante}_contrato`] = a.id;
+      mud[`${g.comprovante}_contrato`] = origem;
       mud[g.pago] = a[g.pago] || dep && dep.data || n[g.pago] || null;
       mud[`${qual}_por_depositos`] = null;
     }
-    if (!Object.keys(mud).length) return null;
-    atualizar(d2, "contratos", n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
-    return n;
+    const mudou = Object.keys(mud).length > 0;
+    if (mudou) atualizar(d2, "contratos", n.id, mud, usuario, `${n.inquilino_nome}: garantia atualizada pelo contrato de ${a.inquilino_nome} (troca de titular)`);
+    if (n.garantia_transferida_para) sincronizarGarantiaHerdeiro(d2, n.id, usuario, vistos);
+    return mudou ? n : null;
+  }
+  function pagamentoPerdidoNoAnterior(d2, n, a) {
+    if (!a || a.garantia_transferida_para !== n.id || !(temCaucao(a) || temDeposito(a))) return null;
+    const contrato = {};
+    const herdeiro = {};
+    for (const g of Object.values(GARANTIAS_DEPOSITADAS)) {
+      if (!a[g.comprovante]) {
+        const h = [...d2.historico].reverse().find((x) => x.acao === "Alteração" && x.tabela === "contratos" && x.registro_id === a.id && /garantia passa para/.test(x.descricao || "") && x.detalhes && x.detalhes[g.comprovante] && x.detalhes[g.comprovante].de && !x.detalhes[g.comprovante].para);
+        const nome = h && h.detalhes[g.comprovante].de;
+        if (nome) {
+          const dep = (d2.depositos_garantia || []).find((x) => x.comprovante === nome && x.contrato_id !== a.id);
+          const onde = n[g.comprovante] === nome ? n[`${g.comprovante}_contrato`] || n.id : dep ? dep.contrato_id : n.id;
+          contrato[g.comprovante] = nome;
+          contrato[`${g.comprovante}_contrato`] = onde === a.id ? null : onde;
+        }
+      }
+      if (a[g.pago] && !n[g.pago] && n[g.comprovante]) herdeiro[g.pago] = a[g.pago];
+    }
+    return Object.keys(contrato).length || Object.keys(herdeiro).length ? { contrato, herdeiro } : null;
+  }
+  function restaurarPagamentoDoAnterior(d2, n, a, usuario) {
+    const x = pagamentoPerdidoNoAnterior(d2, n, a);
+    if (!x) return [];
+    if (Object.keys(x.contrato).length) atualizar(d2, "contratos", a.id, x.contrato, usuario, `${a.inquilino_nome}: comprovante da garantia volta a aparecer aqui (é de quem pagou; vale também para ${n.inquilino_nome})`);
+    if (Object.keys(x.herdeiro).length) atualizar(d2, "contratos", n.id, x.herdeiro, usuario, `${n.inquilino_nome}: data paga da garantia herdada de ${a.inquilino_nome}`);
+    return [...Object.keys(x.contrato).filter((k) => !k.endsWith("_contrato")), ...Object.keys(x.herdeiro)];
+  }
+  function pagadorDaGarantia(d2, c, qual) {
+    const g = GARANTIAS_DEPOSITADAS[qual];
+    const id = g && c[`${g.comprovante}_contrato`];
+    return id && id !== c.id && buscar(d2, "contratos", id) || c;
+  }
+  function corrigirDataGarantiaPaga(d2, contratoId, qual, data2, usuario, hoje3 = hojeIso()) {
+    const c = buscar(d2, "contratos", contratoId);
+    const g = GARANTIAS_DEPOSITADAS[qual];
+    if (!c || !g) throw new Error("Contrato ou garantia não encontrados.");
+    if (!data2 || dataValida(data2) !== data2) throw new Error("Informe a data em que foi paga.");
+    if (data2 > hoje3) throw new Error("A data paga não pode ser depois de hoje.");
+    const origem = pagadorDaGarantia(d2, c, qual);
+    if (!garantiaDepositada(origem) && !garantiaDepositada(c)) throw new Error(`Registre antes o depósito da ${g.nome}.`);
+    const ultimo = origem[`${qual}_por_depositos`] ? depositosGarantiaDo(d2, origem, qual).filter((x) => !x.complementar).pop() : null;
+    if (ultimo) atualizar(d2, "depositos_garantia", ultimo.id, { data: data2 }, usuario, `${origem.inquilino_nome}: data do depósito de ${reais(ultimo.valor)} corrigida para ${dataBr(data2)}`);
+    atualizar(d2, "contratos", origem.id, { [g.pago]: data2 }, usuario, `${origem.inquilino_nome}: ${g.nome} paga em ${dataBr(data2)} (data corrigida)`);
+    if (origem.id !== c.id) atualizar(d2, "contratos", c.id, { [g.pago]: data2 }, usuario, `${c.inquilino_nome}: ${g.nome} herdada de ${origem.inquilino_nome}, paga em ${dataBr(data2)} (data corrigida)`);
+    sincronizarGarantiaHerdeiro(d2, origem.id, usuario);
+    return { origem };
+  }
+  function mudarGarantiaNaTroca(d2, novoId, escolha, usuario) {
+    const n = buscar(d2, "contratos", novoId);
+    const a = n && contratoHerdado(d2, n);
+    if (!a || !["continua", "nova"].includes(escolha)) return false;
+    if (escolha === "nova" === garantiaNova(n)) return false;
+    if (n.heranca_transferida) throw new Error('A troca de titular já foi feita: a garantia não muda mais por aqui (use "Trocar garantia ou fiador").');
+    const proprios = TABELAS_GARANTIA.some((t) => (d2[t] || []).some((x) => x.contrato_id === n.id)) || Object.values(GARANTIAS_DEPOSITADAS).some((g) => n[g.comprovante] && !n[`${g.comprovante}_contrato`]);
+    if (escolha === "continua" && proprios) throw new Error(`${n.inquilino_nome} já tem garantia própria registrada (depósito ou comprovante): exclua antes, ou mantenha a garantia nova.`);
+    const mud = { garantia_na_troca: escolha };
+    const entrada = n.data_entrada || n.vigencia_inicio || null;
+    if (escolha === "continua") for (const k of CAMPOS_GARANTIA) mud[k] = CAMPOS_PAGAMENTO_GARANTIA.includes(k) ? null : a[k] ?? null;
+    else Object.assign(mud, { caucao_pago_em: null, deposito_pago_em: null, ...temCaucao(n) ? { caucao_data: entrada } : {}, ...temDeposito(n) ? { deposito_data: entrada } : {} });
+    atualizar(d2, "contratos", n.id, mud, usuario, escolha === "nova" ? `${n.inquilino_nome}: garantia nova na troca de titular (a de ${a.inquilino_nome} é devolvida a ele)` : `${n.inquilino_nome}: a garantia continua a de ${a.inquilino_nome} (troca de titular)`);
+    return true;
   }
   function encerrarVinculoPorContinuacao(d2, anteriorId, data2, novoNome, usuario) {
     const a = buscar(d2, "contratos", anteriorId);
@@ -8897,7 +8985,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -9197,6 +9285,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       aditivoDaTroca = (d2, c) => aditivosDo(d2, c.id).find((a) => !a.tipo || a.tipo === TIPO_ADITIVO_TROCA) || null;
       trocaAguardaAditivo = (d2, c) => !!(c.contrato_anterior_id && !c.heranca_transferida && contratoHerdado(d2, c) && !aditivoDaTroca(d2, c));
       TABELAS_GARANTIA = ["depositos_garantia", "correcoes_garantia", "aplicacoes", "trocas_garantia"];
+      CAMPOS_PAGAMENTO_GARANTIA = ["comprovante_caucao", "caucao_por_depositos", "caucao_pago_em", "comprovante_deposito", "deposito_por_depositos", "deposito_pago_em"];
+      pagamentoDoAnterior = (t, x) => t === "depositos_garantia" && !x.complementar;
       segurosPassadosAoHerdeiro = (d2, contratoId) => d2.seguros.filter((s) => contratoId && s.herdado_de === contratoId && s.contrato_id !== contratoId);
       segurosAHerdar = (d2, n, a) => {
         const data2 = n.data_entrada || n.vigencia_inicio;
@@ -13955,13 +14045,15 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosSeguro, true, "seguro");
     await organizarPastas([r.anterior.id]);
     const c = buscar2("contratos", id);
-    aviso(`${c.inquilino_nome}: ${[
-      r.garantia && "garantia (comprovantes, depósitos e aplicações)",
+    const trazidos = [
+      r.garantia && "garantia (correções, complementos e aplicações)",
       r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
       r.correcoes && `${r.correcoes} correção(ões) da caução`,
       r.reserva && `reserva de ${reais(c.reserva_valor)}`,
       r.seguro && "seguro (apólice e documentos)"
-    ].filter(Boolean).join(", ")} trazido(s) do contrato de ${r.anterior.inquilino_nome}.`, "info");
+    ].filter(Boolean);
+    const pagamento = (r.comprovanteAnterior || []).length ? ` O comprovante e a data do pagamento da garantia voltaram a aparecer no contrato de ${r.anterior.inquilino_nome} (quem pagou) e continuam aqui como herdados.` : "";
+    aviso(`${c.inquilino_nome}: ${trazidos.length ? `${trazidos.join(", ")} trazido(s) do contrato de ${r.anterior.inquilino_nome}.` : "troca de titular conferida."}${pagamento}`, "info");
     return r;
   }
   var formularioAberto = () => !!document.querySelector("main form[data-form]");
@@ -13974,22 +14066,28 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const c = buscar2("contratos", contratoId);
     const a = c && contratoHerdado(d(), c);
     if (!a) return {};
+    const g = !c.heranca_transferida && textoGarantiaNaTroca(d(), c, a);
+    const linhas2 = resumoDaHeranca(d(), c).filter((t) => !g || ![g.continua, g.nova].includes(t));
+    const opcao = (valor, texto3) => `<label class="check" style="padding-top:0;font-weight:normal"><input type="radio" name="garantia" value="${valor}" ${valor === "nova" === garantiaNova(c) ? "checked" : ""} required> ${esc(texto3)}</label>`;
     const r = await janela({
       titulo: "Termo da troca de titular: todo o vínculo será herdado",
       sim: "Estou ciente: anexar",
       forte: true,
       html: `<p>Com o termo assinado, <b>todo o vínculo</b> de ${esc(a.inquilino_nome)} passa para <b>${esc(c.inquilino_nome)}</b>:</p>
-      <ul>${resumoDaHeranca(d(), c).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <ul>${linhas2.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      ${g ? `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao("continua", g.continua)}${opcao("nova", g.nova)}` : ""}
       <p><label class="check" style="padding-top:0;font-weight:normal"><input type="checkbox" name="ciente" value="1" required>
         Eu, <b>${esc(E.usuario && E.usuario.nome || login())}</b>, conferi o termo assinado por todos e estou ciente de que todo o vínculo passa para ${esc(c.inquilino_nome)}.</label></p>
       <p class="suave">A ciência fica registrada no termo (quem e quando).</p>`
     });
-    return r ? { ciencia_por: login(), ciencia_em: (/* @__PURE__ */ new Date()).toISOString() } : null;
+    if (!r) return null;
+    return { ciencia_por: login(), ciencia_em: (/* @__PURE__ */ new Date()).toISOString(), ...g && r.garantia ? { ciencia_garantia: String(r.garantia[0]) } : {} };
   }
   function registrarCiencia(db, aditivo, ciencia) {
     if (!aditivo || !ciencia || !ciencia.ciencia_por) return;
     const c = buscar(db, "contratos", aditivo.contrato_id);
-    atualizar(db, "aditivos", aditivo.id, ciencia, login(), `${c ? c.inquilino_nome : "Contrato"}: ciência de ${ciencia.ciencia_por} de que todo o vínculo passa ao novo titular`);
+    if (ciencia.ciencia_garantia) mudarGarantiaNaTroca(db, aditivo.contrato_id, ciencia.ciencia_garantia, login());
+    atualizar(db, "aditivos", aditivo.id, ciencia, login(), `${c ? c.inquilino_nome : "Contrato"}: ciência de ${ciencia.ciencia_por} de que todo o vínculo passa ao novo titular${ciencia.ciencia_garantia ? ` (garantia ${ciencia.ciencia_garantia === "nova" ? "nova" : "a mesma do anterior"})` : ""}`);
   }
   async function trazerHerancaAssinada(id) {
     const c = buscar2("contratos", id);
@@ -20321,11 +20419,22 @@ ${m.texto}
     const comprovanteDa = (qual, campo2) => {
       const x = c[campo2] && !c[`${qual}_por_depositos`] && podeRemoverComprovanteGarantia(d(), c, qual) ? xAnexo("removerComprovanteGarantia", { contrato: c.id, qual }, `Apagar o comprovante "${c[campo2]}"? A garantia volta a "anexar comprovante".`) : "";
       if (herdeiro && !depositosGarantiaDo(d(), c, qual).some((x2) => x2.comprovante)) {
-        return ` · ${linkComprovante(c.id, c[campo2] || null, { tabela: "contratos", id: c.id, campo: campo2, tipo: qual === "caucao" ? "caucao" : "deposito-garantia", data: c[`${qual}_pago_em`] || c[`${qual}_data`] || "" })}${x}`;
+        return ` · ${linkComprovante(c[`${campo2}_contrato`] || c.id, c[campo2] || null, { tabela: "contratos", id: c.id, campo: campo2, tipo: qual === "caucao" ? "caucao" : "deposito-garantia", data: c[`${qual}_pago_em`] || c[`${qual}_data`] || "" })}${x}`;
       }
+      if (c[`${qual}_por_depositos`] && c[`${campo2}_contrato`] && !c[campo2]) return ` · ${etiqueta("sem comprovante", "aviso")}${irParaAnterior}`;
       if (c[`${qual}_por_depositos`]) return "";
       return ` · ${c[campo2] ? `<span class="nw">${linkComprovante(c[`${campo2}_contrato`] || c.id, c[campo2])}${x}</span>` : `${etiqueta("sem comprovante", "aviso")}${irParaAnterior}`}`;
     };
+    const pagaEm = (qual) => {
+      const g = GARANTIAS_DEPOSITADAS[qual];
+      const quem = pagadorDaGarantia(d(), c, qual);
+      const data2 = c[g.pago] || quem[g.pago];
+      const deQuem = quem.id !== c.id ? ` por <a href="#/contrato/${quem.id}?ir=garantia">${esc(quem.inquilino_nome)}</a>` : "";
+      const corrigir = opera() ? ` ${botao("corrigirDataGarantia", "✎ corrigir data", { contrato: c.id, qual }, "link-botao")}` : "";
+      return `paga${deQuem} em ${data2 ? dataBr(data2) : etiqueta("data não informada", "aviso")}${corrigir}`;
+    };
+    const herdadaDe = anteriorDaGarantia ? ` herdada de <a href="#/contrato/${anteriorDaGarantia.id}?ir=garantia">${esc(anteriorDaGarantia.inquilino_nome)}</a>` : "";
+    const atual = herdeiro ? `segue com <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, atual <b>${reais(valorGarantia(d(), herdeiro))}</b>` : null;
     const parcelas2 = (qual) => tabelaDepositos(qual, depositosGarantiaDo(d(), c, qual).filter((x) => c[`${qual}_por_depositos`] || x.complementar), (x) => x.complementar);
     const correcoesHtml = () => `${subtitulo("Correções da caução", link(`#/reajustes?contrato=${c.id}`, "Corrigir em Reajustes"))}
     ${correcoes.length ? `<table class="compacta"><tr><th>Data</th><th class="n">Novo valor</th><th class="n">Complemento</th><th>Comprovante / obs.</th></tr>
@@ -20369,14 +20478,14 @@ ${m.texto}
         ${link(`#/reajustes?contrato=${c.id}`, "Completar em Reajustes", "botao mini")}</div>`;
       }
       const inicial = depositosGarantiaDo(d(), c, "caucao").filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor;
-      html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>, paga em ${dataBr(c.caucao_pago_em || c.caucao_data)}${comprovanteDa("caucao", "comprovante_caucao")}${remover("caucao")}
-      · atual <b class="maior">${reais(valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ""}</p>
+      html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>${herdadaDe}, ${pagaEm("caucao")}${comprovanteDa("caucao", "comprovante_caucao")}${remover("caucao")}
+      · ${atual || `atual <b class="maior">${reais(valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${c.caucao_meses} aluguéis; sugerido hoje ${reais(sug)})</span>` : ""}`}</p>
       ${parcelas2("caucao")}${correcoesHtml()}`;
     }
     if (temDeposito(c) && !garantiaDepositada(c) && !anteriorDaGarantia) {
       html += c.deposito_valor > 0 ? registrar3("deposito", "depósito de garantia", c.deposito_data) : '<div class="alerta aviso">Depósito de garantia sem valor: informe em "Editar".</div>';
     } else if (temDeposito(c)) {
-      html += `<p class="linha-garantia">Depósito de garantia <b>${reais(valorGarantia(d(), c))}</b>, pago em ${dataBr(c.deposito_pago_em || c.deposito_data)}${comprovanteDa("deposito", "comprovante_deposito")}${remover("deposito")}
+      html += `<p class="linha-garantia">Depósito de garantia <b>${reais(valorGarantia(d(), c))}</b>${herdadaDe}, ${pagaEm("deposito").replace(/^paga/, "pago")}${comprovanteDa("deposito", "comprovante_deposito")}${remover("deposito")}${atual ? ` · ${atual}` : ""}
       · uso: ${esc(c.deposito_uso || "não informado")}</p>${parcelas2("deposito")}`;
     }
     if (temFiador(c) || fiadores.length) {
@@ -24170,6 +24279,26 @@ ${MODELO_COMODOS[comodo].join("\n")}
         n = sincronizarGarantiaHerdeiro(db, Number(id), login());
       });
       aviso(n ? `Garantia atualizada em ${n.inquilino_nome}.` : "Anexe primeiro aqui o comprovante do depósito (ou registre o depósito com o comprovante).", n ? "ok" : "aviso");
+      await mostrar();
+    },
+    /** "✎ corrigir data" da caução ou do depósito: a data em que foi paga (na herdada, muda no contrato de quem pagou). */
+    async corrigirDataGarantia({ contrato, qual }) {
+      const c = buscar2("contratos", contrato);
+      const g = GARANTIAS_DEPOSITADAS[qual];
+      if (!c || !g) throw new Error("Contrato não encontrado.");
+      const quem = pagadorDaGarantia(d(), c, qual);
+      const atual = c[g.pago] || quem[g.pago] || "";
+      const r = await janela({
+        titulo: `Data em que a ${g.nome} foi paga`,
+        sim: "Gravar data",
+        html: `<p>${quem.id !== c.id ? `${esc(c.inquilino_nome)} herdou a ${g.nome} de <b>${esc(quem.inquilino_nome)}</b>: a data é a do pagamento feito por ${esc(quem.inquilino_nome)}. Ela muda lá (no contrato de quem pagou) e aqui.` : `Data em que ${esc(c.inquilino_nome)} pagou a ${g.nome}.`}</p>
+        ${quem[`${qual}_por_depositos`] ? '<p class="suave">Paga em depósitos: muda a data do último depósito.</p>' : ""}
+        <label>Paga em</label><input type="date" name="data" value="${esc(atual)}" max="${hojeIso()}" required>`
+      });
+      if (!r) return;
+      const data2 = String((r.data || [])[0] || "");
+      await alterar((db) => corrigirDataGarantiaPaga(db, c.id, qual, data2, login()));
+      aviso(`Data da ${g.nome} corrigida: paga em ${dataBr(data2)}${quem.id !== c.id ? ` (no contrato de ${quem.inquilino_nome} e aqui)` : ""}.`, "ok");
       await mostrar();
     },
     async removerComprovanteGarantia({ contrato, qual }) {
