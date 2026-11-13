@@ -99,3 +99,41 @@ export async function poupancaDaGarantia(movimentos, ate, buscar = fetch) {
   const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar) : {};
   return corrigirPelaPoupanca(movimentos, ate, taxas);
 }
+
+/**
+ * Página Empresas: a garantia de cada inquilino corrigida pela poupança até ``ate`` e o corrigido de cada aplicação,
+ * na proporção do valor aplicado. ``garantias`` = R.garantiasPorEmpresa (só os depósitos com data até ``ate``; mês
+ * incompleto não rende). Ex.: caução de R$ 3.800,00 que vale R$ 4.318,70 hoje; R$ 2.000,00 aplicados na ANK →
+ * R$ 2.273,00 corrigidos na ANK. Devolve { contratos: Map(id → { total, corrigido }), lugares: [{ chave, corrigido,
+ * itens: [corrigido] }], semAplicar: [corrigido da falta], aplicado, falta: [dias sem taxa] }.
+ */
+export function corrigirGarantiasPorEmpresa(garantias, ate, taxas = {}) {
+  const contratos = new Map();
+  const falta = new Set();
+  const doContrato = (x) => {
+    if (!contratos.has(x.contrato.id)) {
+      const r = corrigirPelaPoupanca(x.movimentos, ate, taxas);
+      r.falta.forEach((p) => falta.add(p));
+      contratos.set(x.contrato.id, { total: r.total, corrigido: r.corrigido });
+    }
+    return contratos.get(x.contrato.id);
+  };
+  const proporcional = (valor, r) => (r.total > 0 ? C.arred((valor * r.corrigido) / r.total) : valor);
+  let aplicado = 0;
+  const lugares = garantias.lugares.map((l) => {
+    const itens = l.itens.map((x) => proporcional(x.valor, doContrato(x)));
+    const corrigido = itens.reduce((s, v) => s + v, 0);
+    aplicado += corrigido;
+    return { chave: l.chave, corrigido, itens };
+  });
+  const semAplicar = garantias.semAplicar.map((x) => proporcional(x.falta, doContrato(x)));
+  return { contratos, lugares, semAplicar, aplicado, faltaAplicar: semAplicar.reduce((s, v) => s + v, 0), falta: [...falta].sort() };
+}
+
+/** Busca as taxas no Banco Central (desde o depósito mais antigo) e corrige (corrigirGarantiasPorEmpresa). */
+export async function garantiasCorrigidasHoje(garantias, ate, buscar = fetch) {
+  const datas = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar]
+    .flatMap((x) => x.movimentos).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
+  const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar) : {};
+  return corrigirGarantiasPorEmpresa(garantias, ate, taxas);
+}

@@ -11,7 +11,7 @@ import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
-import { avisoBackupSeguro, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
+import { avisoBackupSeguro, ligarGarantiasCorrigidas, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
 import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
@@ -47,6 +47,7 @@ export const TELAS = {
   _ligarDesconto(raiz) {
     ligarCamposAutomaticos(raiz);
     ligarEditorIcone(raiz);
+    ligarGarantiasCorrigidas(raiz);
     ligarIndiceBancoCentral(raiz);
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];

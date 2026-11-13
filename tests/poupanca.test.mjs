@@ -153,3 +153,29 @@ test('decisão da direção: caução nunca passa adiante; na troca de garantia,
   assert.equal(t3.devolucao_movimentos, undefined);
   assert.deepEqual(R.devolucoesDeTrocaPendentes(d, c).map((x) => x.troca.data), ['2026-12-05'], 'só a troca em que saiu a caução');
 });
+
+test('garantias por empresa corrigidas pela poupança: proporção do aplicado, mês incompleto não rende', async () => {
+  const taxas = {};
+  for (let x = '2025-01-01'; x <= '2026-12-31'; x = new Date(Date.parse(`${x}T12:00:00Z`) + 86400000).toISOString().slice(0, 10)) taxas[x] = 0.6;
+  const contrato = { id: 1, inquilino_nome: 'Ana' };
+  const movimentos = [{ data: '2025-01-10', valor: 360000 }, { data: '2026-01-15', valor: 20000 }];
+  const g = { lugares: [{ chave: 'e:1', itens: [{ contrato, valor: 200000, movimentos }] }], semAplicar: [{ contrato, falta: 180000, movimentos }] };
+  const r = P.corrigirGarantiasPorEmpresa(g, '2026-12-01', taxas);
+  assert.deepEqual(r.contratos.get(1), { total: 380000, corrigido: 431870 });
+  assert.equal(r.lugares[0].corrigido, 227300, 'R$ 2.000,00 × 431.870/380.000');
+  assert.equal(r.semAplicar[0], 204570);
+  assert.equal(r.aplicado, 227300);
+  assert.deepEqual(r.falta, []);
+  // em 09/12/2026 o período de 10/11 a 10/12 não fechou: o mesmo valor
+  assert.equal(P.corrigirGarantiasPorEmpresa(g, '2026-12-09', taxas).lugares[0].corrigido, 227300);
+  // busca as taxas uma vez, desde o depósito mais antigo
+  const pedidos = [];
+  const buscar = async (url) => { pedidos.push(url); return { ok: true, json: async () => [] }; };
+  const s = await P.garantiasCorrigidasHoje(g, '2026-12-01', buscar);
+  assert.match(pedidos[0], /dataInicial=10\/01\/2025/);
+  assert.ok(s.lugares[0].corrigido >= 200000);
+  // dia sem taxa do Banco Central: esse mês fica sem rendimento (e é avisado)
+  const sem = P.corrigirGarantiasPorEmpresa(g, '2026-12-01', {});
+  assert.equal(sem.lugares[0].corrigido, 200000);
+  assert.ok(sem.falta.length > 0);
+});
