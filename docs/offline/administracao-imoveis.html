@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-jwa+ni394jqIxnUErr/05Y1cClV9/OIkW870E3+iXf0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-bc/e1/DyPelyyl0DUe8QpM/Rpyrdv9FrZv1vplmgds8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="13f57d8125ac0c6d">
+<meta name="fontes" content="c32a6fc5ef2024f4">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -20964,6 +20964,7 @@ ${m.texto}
       return l.length ? `<details><summary>Boletos do titular anterior: ${esc(x.inquilino_nome)} (${l.length})</summary><div class="rolagem"><table class="compacta">${cab}${l.map(linha).join("")}</table></div></details>` : "";
     }).join("")}</div>`;
   }
+  var ehTermoDeReajuste = (a) => a.tipo === TIPO_ADITIVO_VALOR || /reajust/i.test(a.assunto || "");
   function atalhosDocumentos(c) {
     const abrir = (escopo, id, nome, texto3) => `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(texto3)}</a>`;
     const curto2 = { doc_contrato_em: "Contrato", doc_vistoria_em: "Vistoria de entrada", doc_chaves_em: "Termo das chaves" };
@@ -20973,7 +20974,7 @@ ${m.texto}
       const p2 = documentoParcial(d(), c, k);
       return p2 ? abrir("assinados", c.id, p2.arquivo, `${curto2[k]} (falta assinatura)`) : "";
     }).filter(Boolean);
-    for (const a of [...aditivosDo(d(), c.id)].reverse()) botoes.push(abrir("aditivos", a.contrato_id, a.arquivo, `Aditivo ${dataBr(a.data)}`));
+    for (const a of [...aditivosDo(d(), c.id)].reverse()) botoes.push(abrir("aditivos", a.contrato_id, a.arquivo, `${ehTermoDeReajuste(a) ? "Termo de reajuste" : "Aditivo"} ${dataBr(a.data)}`));
     return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(" ")}</div>` : "";
   }
   function faixaDocumentosEntrada(c) {
