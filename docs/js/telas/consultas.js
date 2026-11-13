@@ -179,7 +179,9 @@ export function telaIptu(ano) {
   const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
   const meses = [];
   for (let m = `${ano}-01`; m <= ultimo; m = C.somarMeses(m, 1)) meses.push(m);
-  const soma = { inquilino: 0, sua: 0, aberto: 0 };
+  // resumo do ano: o que os inquilinos pagam, o IPTU que você paga à prefeitura, a sobra (desconto à vista que fica com você),
+  // o que fica por sua conta (imóvel vazio, IPTU não cobrado) e o que está em aberto
+  const soma = { inquilino: 0, sua: 0, aberto: 0, custo: 0, sobra: 0, parte: 0 };
   // negativo = o desconto do pagamento à vista sobrou para você (o inquilino paga o valor parcelado, maior)
   const suaParte = (v, aberto) => (!v ? '-' : v < 0 ? `<span class="suave">sobra ${reais(-v)} para você</span>` : `<b class="${aberto ? 'texto-perigo' : ''}">${reais(v)}</b>`);
   const linhas = imoveis.map((i) => {
@@ -192,6 +194,7 @@ export function telaIptu(ano) {
     const mapa = mapas.get(i.id);
     const t = R.totaisIptu(d(), p);
     soma.inquilino += t.inquilino; soma.sua += t.proprietario; soma.aberto += t.emAberto;
+    soma.custo += t.custo; if (t.proprietario < 0) soma.sobra -= t.proprietario; else soma.parte += t.proprietario;
     return `<tr><td>${nome}</td><td class="nw">${valor(p)}${primeira(p)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p, m)).join('')}</td>
       <td class="n nw">${t.inquilino ? reais(t.inquilino) : '-'}</td><td class="n nw">${suaParte(t.proprietario, t.emAberto)}</td>
       <td class="n">${opera() ? link(`#/editar/iptus/${p.id}?de=iptu`, 'Editar') : ''}</td></tr>`;
@@ -214,6 +217,13 @@ export function telaIptu(ano) {
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${m.startsWith(String(ano)) ? rotuloMes(m) : `${rotuloMes(m).split('/')[0]}<br>/${m.slice(2, 4)}`}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ''}</td><td></td></tr>` : ''}</table>
+    ${linhas ? `<h3>Resumo de ${ano}</h3><table class="compacta resumo-iptu">
+      <tr><td>Inquilinos pagam nos boletos</td><td class="n nw"><b>${reais(soma.inquilino)}</b></td></tr>
+      <tr><td>Você paga à prefeitura (guias e cotas únicas)</td><td class="n nw"><b>${reais(soma.custo)}</b></td></tr>
+      <tr><td>Sobra para você <span class="suave">(desconto do IPTU pago à vista: o inquilino paga parcelado)</span></td><td class="n nw"><b>${reais(soma.sobra)}</b></td></tr>
+      <tr><td>Fica por sua conta <span class="suave">(imóvel vazio, mês de entrada ou saída, IPTU não cobrado)</span></td><td class="n nw"><b>${reais(soma.parte)}</b></td></tr>
+      <tr><td>Em aberto <span class="suave">(guias suas ainda não pagas)</span></td><td class="n nw">${soma.aberto ? `<b class="texto-perigo">${reais(soma.aberto)}</b>` : reais(0)}</td></tr>
+      <tr class="total"><td>${soma.sua < 0 ? 'Resultado: sobra para você' : 'Resultado: sai do seu bolso'}</td><td class="n nw">${reais(Math.abs(soma.sua))}</td></tr></table>` : ''}
     <div class="legenda-iptu">${legenda}</div>
     <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
 }
