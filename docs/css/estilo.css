@@ -594,8 +594,8 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .vis-topo { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #0f172a; color: #fff; }
 .vis-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .vis-corpo { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; -webkit-overflow-scrolling: touch; }
-.vis-corpo canvas, .vis-corpo img { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
-.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
+/* flex: none — no iPhone (Safari) as páginas numa coluna flex encolhiam a cada página nova e a tela pulava ao rolar */
+.vis-corpo canvas, .vis-corpo img { flex: none; max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
 body.com-visualizador { overflow: hidden; }
 /* botão sem destino (ex.: "Contrato" sem o arquivo assinado anexado): apagado, só com a explicação ao passar o mouse */
 .botao.desligado { opacity: .45; cursor: default; pointer-events: auto; filter: grayscale(1); }

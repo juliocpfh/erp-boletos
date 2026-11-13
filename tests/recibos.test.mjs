@@ -29,7 +29,7 @@ test('recibo da reserva: valor por extenso, condições da reserva e a proposta 
   assert.match(r.paragrafos[0], /^Recebemos de Maria Souza, CPF 529\.982\.247-25, a importância de R\$ 4\.150,00 \(quatro mil cento e cinquenta reais\), em 10\/11\/2026/);
   assert.match(r.paragrafos[0], /Rua das Flores, 120, Apto 3, Centro, Curitiba\/PR/);
   assert.ok(r.paragrafos.some((p) => /devolvido por inteiro/.test(p)));
-  assert.ok(r.paragrafos.some((p) => /nota fiscal sai com o aluguel/.test(p)), 'contador: reserva é adiantamento, sem NF agora');
+  assert.ok(!r.paragrafos.some((p) => /nota fiscal/.test(p)), 'o recibo da reserva não fala da NF (pedido do dono, 13/11)');
   const tab = Object.fromEntries(r.tabela);
   assert.equal(tab.Aluguel, 'R$ 4.611,11 por mês (R$ 4.150,00 pagando até o vencimento)');
   assert.equal(tab.IPTU, 'por conta do locatário, no boleto (cerca de R$ 153,00 por mês)');

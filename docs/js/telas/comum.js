@@ -506,6 +506,41 @@ export async function levarDocumentosDaFicha(fichaId, contratoId) {
   return nomes.length;
 }
 
+/**
+ * Desistência antes de assinar: copia os arquivos da pasta de cada contrato a cancelar (e das subpastas de assinados e
+ * aditivos) para a pasta da ficha, sem apagar nada ainda. Nome repetido ganha o nome do imóvel na frente.
+ * Devolve { nomes, apagarOriginais } — ``apagarOriginais()`` só depois de gravada a desistência (se a gravação falhar,
+ * os arquivos continuam onde estavam).
+ */
+export async function copiarDocumentosParaFicha(contratos, pastaNome) {
+  const para = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, pastaNome]);
+  const usados = new Set((await S.listar(para)).map((a) => a.nome));
+  const nomes = [];
+  const copiados = [];
+  for (const c of contratos) {
+    for (const escopo of ['contrato', 'assinados', 'aditivos']) {
+      let de;
+      try { de = await pastaDoEscopo(escopo, c.id, false); } catch { continue; }
+      for (const a of await S.listar(de)) {
+        let nome = a.nome;
+        if (usados.has(nome)) nome = S.limparNome(`${(buscar('imoveis', c.imovel_id) || {}).nome || c.id} - ${a.nome}`);
+        await S.escreverTexto(para, nome, await S.lerConteudo(await de.getFileHandle(a.nome)));
+        usados.add(nome);
+        nomes.push(nome);
+        copiados.push({ de, nome: a.nome });
+      }
+    }
+  }
+  const registros = contratos.map((c) => ({ ...c }));
+  async function apagarOriginais() {
+    for (const x of copiados) await x.de.removeEntry(x.nome).catch(() => {});
+    for (const c of registros) {
+      try { await S.apagarPastaVazia(await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS), pastaPaiContrato(c), false), c.pasta || nomePastaContrato(c)); } catch { /* pasta nem existia */ }
+    }
+  }
+  return { nomes, apagarOriginais };
+}
+
 /** Exclusão da ficha: apaga todos os arquivos da pasta dela (documentos pessoais não ficam soltos). */
 export async function apagarPastaDaFicha(pastaNome) {
   const dir = await pastaDaFicha(pastaNome);
