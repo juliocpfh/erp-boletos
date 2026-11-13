@@ -254,7 +254,7 @@ async function completarHeranca(id) {
   await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
   const trazidos = [r.garantia && 'garantia (correções, complementos e aplicações)', r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
-    r.correcoes && `${r.correcoes} correção(ões) da caução`, r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean);
+    r.correcoes && `${r.correcoes} correção(ões) da caução`, r.boletos && `${r.boletos} boleto(s) de depois da troca (pagamentos passam a constar do titular)`, r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean);
   const pagamento = (r.comprovanteAnterior || []).length ? ` O comprovante e a data do pagamento da garantia voltaram a aparecer no contrato de ${r.anterior.inquilino_nome} (quem pagou) e continuam aqui como herdados.` : '';
   aviso(`${c.inquilino_nome}: ${trazidos.length ? `${trazidos.join(', ')} trazido(s) do contrato de ${r.anterior.inquilino_nome}.` : 'troca de titular conferida.'}${pagamento}`, 'info');
   return r;
