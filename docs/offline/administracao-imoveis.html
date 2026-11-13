@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-Tfg8Et7qQ9rgMP0GrxTkjRrb8U2LJ4bAZKE9ac8aIG0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-b/RYNzOzD/ufGqYUAiEYJ2LdqkIxhBZ56K67VOUWRhU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b956c7f4d2eadf7c">
+<meta name="fontes" content="ce9e85f4ef5700d4">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1571,6 +1571,54 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           lei: LI + ", art. 51, §5º."
         },
         {
+          chave: "antecedencia_iptu",
+          grupo: "rotina",
+          rotulo: "Alerta do IPTU do proprietário: dias antes do vencimento",
+          tipo: "inteiro",
+          padrao: 15,
+          min: 0,
+          max: 365,
+          explica: "Avisa a guia do IPTU que o proprietário paga este número de dias antes do vencimento. Ex.: 15 → guia de 10/03 aparece em 23/02.",
+          consequencia: "Só muda o alerta (guia vencida continua aparecendo).",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "antecedencia_fiador",
+          grupo: "rotina",
+          rotulo: "Alerta do fim do vínculo do fiador: dias antes",
+          tipo: "inteiro",
+          padrao: 60,
+          min: 1,
+          max: 730,
+          explica: "Avisa o fim do vínculo do fiador (sem outro fiador no contrato) este número de dias antes.",
+          consequencia: "Só muda o alerta.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "antecedencia_reajuste",
+          grupo: "rotina",
+          rotulo: "Alerta do reajuste do aluguel: meses antes",
+          tipo: "inteiro",
+          padrao: 1,
+          min: 0,
+          max: 3,
+          explica: "Avisa o reajuste este número de meses antes do mês do aluguel corrigido. Ex.: 1 → reajuste de 03/2027 aparece em 02/2027; 0 → só em 03/2027.",
+          consequencia: "Só muda o alerta (a correção continua no mesmo mês). O índice só sai no começo do mês do reajuste.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "antecedencia_reserva",
+          grupo: "rotina",
+          rotulo: "Alerta do uso da reserva: meses antes",
+          tipo: "inteiro",
+          padrao: 1,
+          min: 0,
+          max: 6,
+          explica: "Avisa que a reserva vai abater o boleto este número de meses antes do mês dele. Ex.: 1 → reserva para 03/2027 aparece em 02/2027.",
+          consequencia: "Só muda o alerta.",
+          lei: "Sem lei: rotina."
+        },
+        {
           chave: "dias_sem_imovel",
           grupo: "rotina",
           rotulo: "Contrato sem imóvel é apagado depois de (dias)",
@@ -2172,7 +2220,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   }
   function alertaReserva(reservaValor, saldo, competenciaAlvo, hoje3) {
     if (!(reservaValor > 0) || !(saldo > 0) || !competenciaAlvo) return null;
-    const proxima = somarMeses(competenciaDe(hoje3), 1);
+    const proxima = somarMeses(competenciaDe(hoje3), regra("antecedencia_reserva"));
     if (competenciaAlvo < somarMeses(competenciaDe(hoje3), -1)) return null;
     if (competenciaAlvo <= proxima) {
       return {
@@ -3625,6 +3673,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   // docs/js/regras.js
   var regras_exports = {};
   __export(regras_exports, {
+    ANTECEDENCIA_ALERTA: () => ANTECEDENCIA_ALERTA,
     ASSINATURA_LEMBRETE: () => ASSINATURA_LEMBRETE,
     CAMPOS_ARQUIVO_FICHA: () => CAMPOS_ARQUIVO_FICHA,
     CAMPOS_MODELO_AIRBNB: () => CAMPOS_MODELO_AIRBNB,
@@ -3713,6 +3762,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     analisarDocumento: () => analisarDocumento,
     anexarComprovante: () => anexarComprovante,
     anexarDocumentoParcial: () => anexarDocumentoParcial,
+    antecedenciaAlerta: () => antecedenciaAlerta,
     apagarCanceladas: () => apagarCanceladas,
     apelidoDaConta: () => apelidoDaConta,
     aplicacoesDo: () => aplicacoesDo,
@@ -5003,7 +5053,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function alertasIptu(d2, hoje3 = hojeIso()) {
     const lista3 = [];
-    for (const { iptu: p2, parcela: pc, imovel: i, venc, faltam } of guiasIptuAPagar(d2, hoje3, 15)) {
+    for (const { iptu: p2, parcela: pc, imovel: i, venc, faltam } of guiasIptuAPagar(d2, hoje3, regra("antecedencia_iptu"))) {
       lista3.push({
         nivel: faltam < 0 ? "perigo" : "aviso",
         tipo: "IPTU do proprietário",
@@ -6061,7 +6111,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (atuais.some((f) => !f.data_saida)) return null;
     const fim = atuais.map((f) => f.data_saida).sort().pop();
     const faltam = diasEntre(hoje3, fim);
-    return faltam <= 60 ? { nivel: "aviso", tipo: "Fiador", texto: `O vínculo do fiador termina em ${dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação ou outra garantia.` } : null;
+    return faltam <= regra("antecedencia_fiador") ? { nivel: "aviso", tipo: "Fiador", texto: `O vínculo do fiador termina em ${dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação ou outra garantia.` } : null;
   }
   function alertaTitularidade(d2, c, hoje3 = hojeIso()) {
     if (fimDeVinculo(d2, c)) return null;
@@ -7053,7 +7103,20 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return lista3.sort((a, b) => estiloAlerta(d2, a.tipo).prioridade - estiloAlerta(d2, b.tipo).prioridade || ordem[a.nivel] - ordem[b.nivel]);
   }
-  function salvarEstilosAlertas(d2, estilos, usuario) {
+  function antecedenciaAlerta(tipo) {
+    const chave = ANTECEDENCIA_ALERTA[tipo];
+    const def = chave && definicaoRegra(chave);
+    return def ? { chave, valor: regra(chave), padrao: def.padrao, unidade: /meses/.test(def.rotulo) ? "meses" : "dias", min: def.min, max: def.max } : null;
+  }
+  function salvarEstilosAlertas(d2, estilos, usuario, antecedencias = null) {
+    if (antecedencias) {
+      const valores = { ...escolhasDe(d2) };
+      for (const [tipo, chave] of Object.entries(ANTECEDENCIA_ALERTA)) {
+        if (antecedencias === "padrao") delete valores[chave];
+        else if (tipo in antecedencias) valores[chave] = antecedencias[tipo];
+      }
+      salvarRegrasSistema(d2, valores, usuario, "Antecedência dos alertas");
+    }
     const novo = {};
     for (const [tipo, e] of Object.entries(estilos)) {
       const p2 = Math.round(Number(e.prioridade));
@@ -8015,10 +8078,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const cb = boletoDoMes(d2, c.id, comp);
     return cb ? cb.vencimento : vencimentoDoContrato(d2, c, comp);
   }
-  function reajustePendente(d2, c, hoje3 = hojeIso()) {
+  function reajustePendente(d2, c, hoje3 = hojeIso(), meses = 1) {
     const p2 = mesDeAniversario(c);
     if (!p2) return null;
-    const limite = somarMeses(competenciaDe(hoje3), 1);
+    const limite = somarMeses(competenciaDe(hoje3), meses);
     const n = Math.floor(mesesEntre(p2, limite) / 12);
     if (n < 1) return null;
     const r = reajusteNaCompetencia(d2, c, competenciaDoReajuste(c, n), hoje3);
@@ -8079,7 +8142,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return n;
   }
   function alertaReajuste(d2, c, hoje3) {
-    const r = reajustePendente(d2, c, hoje3);
+    const r = reajustePendente(d2, c, hoje3, regra("antecedencia_reajuste"));
     if (!r) return null;
     const mesHoje = competenciaDe(hoje3);
     const indice = c.indice_correcao || "índice do contrato";
@@ -8834,7 +8897,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -9214,6 +9277,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Vigência do contrato": { cor: "Vermelho", enfase: "Forte", prioridade: 1 },
         "Reajuste do aluguel": { cor: "Laranja", enfase: "Forte", prioridade: 2 },
         "A verificar": { cor: "Amarelo", enfase: "Normal", prioridade: 3 }
+      };
+      ANTECEDENCIA_ALERTA = {
+        "Vigência do contrato": "antecedencia_vigencia",
+        "Reajuste do aluguel": "antecedencia_reajuste",
+        "Seguro obrigatório": "antecedencia_seguro",
+        "IPTU do proprietário": "antecedencia_iptu",
+        "Reserva do imóvel": "antecedencia_reserva",
+        "Fiador": "antecedencia_fiador"
       };
       estiloAlerta = (d2, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...(d2 && d2.estilos_alertas || {})[tipo] });
       ordemGuardada = (d2, pagina, grupo2) => ((d2 && d2.ordem_caixas || {})[pagina] || {})[grupo2] || [];
@@ -12671,7 +12742,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
 
 14. ALERTAS E AVISOS
 - Régua de cobrança (só aviso, nada é enviado sozinho): pelo boleto vencido mais antigo, a partir de 1 dia de atraso mandar o lembrete por e-mail, de 10 dias ligar para o inquilino, de 30 dias avaliar a negativação. Aparece no alerta de Inadimplência e na tela Inadimplência.
-- Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor e prioridade são editáveis pelo administrador.
+- Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor, prioridade e quanto tempo antes cada alerta com prazo aparece (fim do contrato e seguro 60 dias, fiador 60 dias, IPTU do proprietário 15 dias, reajuste e uso da reserva 1 mês) são editáveis pelo administrador.
 - Avisos antes de salvar: data de pagamento de mais de 90 dias atrás, datas no futuro, endereço sem número, telefone sem DDD, e-mail com erro, leitura menor que a anterior, IPTU ou seguro 30% fora do anterior, lançamento repetido.
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
 
@@ -23991,7 +24062,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
       await mostrar();
     },
     async estilosAlertasPadrao() {
-      await alterar((db) => salvarEstilosAlertas(db, {}, login()));
+      await alterar((db) => salvarEstilosAlertas(db, {}, login(), "padrao"));
       aviso("Alertas de volta ao padrão do sistema.");
       await mostrar();
     },
@@ -26058,8 +26129,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const f = Object.fromEntries(new FormData(form));
       const estilos = {};
       for (let n = 0; f[`tipo_${n}`] !== void 0; n += 1) estilos[f[`tipo_${n}`]] = { cor: f[`cor_${n}`], enfase: f[`enfase_${n}`], prioridade: f[`prioridade_${n}`] };
-      await alterar((db) => salvarEstilosAlertas(db, estilos, login()));
-      aviso("Aparência dos alertas salva.");
+      const antecedencias = {};
+      for (let n = 0; f[`tipo_${n}`] !== void 0; n += 1) if (f[`antecedencia_${n}`] !== void 0) antecedencias[f[`tipo_${n}`]] = f[`antecedencia_${n}`];
+      await alterar((db) => salvarEstilosAlertas(db, estilos, login(), antecedencias));
+      aviso("Alertas salvos.");
       ir("#/");
     },
     async proximaFatura(form) {
@@ -26493,17 +26566,25 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     "alertas-config"() {
       if (!podeUsuario("admin")) return '<div class="alerta erro">Só administradores mudam a aparência dos alertas.</div>';
       const opcoes2 = (lista3, v) => lista3.map((x) => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+      const antecedencia = (t, n) => {
+        const a = antecedenciaAlerta(t);
+        if (!a) return '<span class="suave" title="Este alerta não tem prazo: aparece quando a situação acontece.">quando acontece</span>';
+        return `<input type="number" name="antecedencia_${n}" min="${a.min}" max="${a.max}" value="${a.valor}" style="width:70px" title="Padrão do sistema: ${a.padrao} ${a.unidade}"> ${a.unidade} antes`;
+      };
       const linhas2 = TIPOS_ALERTA.map((t) => [t, estiloAlerta(d(), t)]).sort((a, b) => a[1].prioridade - b[1].prioridade).map(([t, e], n) => `<tr>
       <td><b>${esc(t)}</b><input type="hidden" name="tipo_${n}" value="${esc(t)}"></td>
-      <td><select name="cor_${n}" data-previa="${n}">${opcoes2(CORES_ALERTA, e.cor)}</select></td>
-      <td><select name="enfase_${n}" data-previa="${n}">${opcoes2(ENFASES_ALERTA, e.enfase)}</select></td>
+      <td><select name="cor_${n}" data-previa="${n}" style="min-width:110px">${opcoes2(CORES_ALERTA, e.cor)}</select></td>
+      <td><select name="enfase_${n}" data-previa="${n}" style="min-width:100px">${opcoes2(ENFASES_ALERTA, e.enfase)}</select></td>
       <td><input type="number" name="prioridade_${n}" min="1" max="99" value="${e.prioridade}" style="width:70px"></td>
+      <td style="white-space:nowrap">${antecedencia(t, n)}</td>
       <td style="min-width:260px"><div class="${classeEstilo("aviso", e)}" id="previa_${n}" style="margin:0"><b>${esc(t)}</b> exemplo de aviso</div></td></tr>`).join("");
-      return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência dos alertas</h1>
+      return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência e prazos dos alertas</h1>
       <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
+        "Aparece" diz quanto tempo antes do prazo o alerta surge no Painel (ex.: IPTU com 15 dias: a guia de 10/03 aparece em 23/02); o atrasado continua aparecendo.
+        Esses prazos também ficam em Dados e backup → Regras do sistema.
         Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
-      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Como fica</th></tr>${linhas2}</table></div>
-        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao("estilosAlertasPadrao", "Voltar ao padrão do sistema", {}, "secundario", "Voltar todos os alertas para a aparência padrão?")} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
+      <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Aparece</th><th>Como fica</th></tr>${linhas2}</table></div>
+        <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao("estilosAlertasPadrao", "Voltar ao padrão do sistema", {}, "secundario", "Voltar todos os alertas para a aparência e os prazos padrão?")} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
     },
     pendencias: () => telaPendencias(),
     "modelo-contrato": (rota) => telaModelo(rota),
