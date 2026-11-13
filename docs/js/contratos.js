@@ -741,6 +741,11 @@ function dadosDoAditivoTroca(d, c, a) {
   dados.condicoes.garantia_anterior_fianca = nova && !dinheiroAnt && ['Fiador', 'Seguro fiança'].includes(tipoAnt);
   dados.campos.garantia_anterior = !nova ? '' : dinheiroAnt ? `${tipoAnt === 'Caução' ? 'caução' : 'depósito de garantia'} de ${valorComExtenso(valorAnt)}`
     : tipoAnt === 'Fiador' ? 'fiança' : tipoAnt.toLocaleLowerCase('pt-BR');
+  // garantia em dinheiro com os rendimentos da poupança até a troca (guardada no termo): o acerto entre quem sai e quem
+  // entra (a garantia continua) ou o valor devolvido a quem sai (garantia nova)
+  dados.condicoes.garantia_corrigida = a.garantia_corrigida > 0;
+  dados.campos.garantia_corrigida = a.garantia_corrigida > 0 ? valorComExtenso(a.garantia_corrigida) : '';
+  dados.campos.garantia_depositada = a.garantia_depositada > 0 ? valorComExtenso(a.garantia_depositada) : '';
   dados.quantidades.locatarios = Math.max(entrantes.length, 1);
   dados.quantidades.saintes = Math.max(saintes.length, 1);
   // assinam: locadora, quem sai, quem entra, fiadores e testemunhas

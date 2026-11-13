@@ -313,7 +313,7 @@ export const FORMULARIOS = {
     const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo_troca').find((m) => String(m.id) === f.modelo);
     if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
-    const dados = { data: f.data, testemunhas,
+    const dados = { data: f.data, testemunhas, garantia_corrigida: String(f.garantia_corrigida || '').trim() ? C.centavos(f.garantia_corrigida) : null,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
     await alterar((db) => { a = R.salvarAditivoTroca(db, Number(f.contrato), dados, login(), f.id ? Number(f.id) : null); });

@@ -729,7 +729,7 @@ export const CADASTROS = {
     aviso: (r, q) => {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       const n = R.continuadoPor(d(), c);
-      return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pelo índice da poupança que você informar, descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
+      return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
     },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
     descricao: (dados) => `Garantia devolvida: ${reais(dados.garantia_valor)}`,
@@ -851,7 +851,7 @@ export const CADASTROS = {
       // o "Vistoria de saída" não é digitado: vem da vistoria registrada (fonte única) e é guardado ao salvar
       const v = resultadoVistoriaSaida(d(), c);
       const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): confira os débitos` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pelo índice da poupança que você informar.`;
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
     fixos: (r, q) => ({ data_saida: buscar('contratos', q.contrato).data_saida }),

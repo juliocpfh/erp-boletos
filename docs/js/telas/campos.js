@@ -7,6 +7,7 @@ import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
+import { poupancaDaGarantia } from '../poupanca.js';
 import * as R from '../regras.js';
 import { buscar, d, endereco, memoria } from './comum.js';
 
@@ -529,7 +530,70 @@ export function ligarIndiceBancoCentral(raiz) {
   buscar();
 }
 
+// --------------------------------------------------------------------------
+// Poupança da garantia em dinheiro (caução ou depósito), trazida do Banco Central: no termo da troca de titular, na
+// devolução da garantia (troca com garantia nova) e no cálculo final da saída. O usuário confere e pode corrigir.
+// --------------------------------------------------------------------------
+/** Explica a conta: total → corrigido e cada depósito com os meses completos (HTML). */
+function resumoPoupanca(r, ate) {
+  const linhas = r.depositos.map((x) => `${x.data ? dataBr(x.data) : 'sem data'}: ${reais(x.valor)}, ${x.meses} ${x.meses === 1 ? 'mês' : 'meses'} → ${reais(x.corrigido)}`);
+  return `Poupança (Banco Central) até ${dataBr(ate)}: <b>${reais(r.total)} → ${reais(r.corrigido)}</b> (${pct(r.percentual)}). ${esc(linhas.join('; '))}.
+    Rende no aniversário de cada depósito; mês incompleto não rende, como no banco. Confira com o extrato da poupança e corrija se precisar.`;
+}
+
+const faltaPoupanca = (r) => `A poupança a partir de ${dataBr(r.falta[0])} ainda não saiu no Banco Central (data futura): refaça mais perto da data ou digite o valor.`;
+
+/** Termo da troca de titular: traz o valor da garantia de quem sai com a poupança até a data da troca (só se o campo está vazio). */
+function ligarPoupancaDoAditivo(raiz) {
+  const el = raiz.querySelector('form[data-form=aditivoTroca] [name=garantia_corrigida]');
+  const n = el && buscar('contratos', el.form.querySelector('[name=contrato]').value);
+  const g = n && R.contratoDaGarantiaNaTroca(d(), n);
+  const troca = n && (n.data_entrada || n.vigencia_inicio);
+  if (!g || !troca) return;
+  mensagemAuto(el, 'Buscando a poupança no Banco Central…');
+  poupancaDaGarantia(R.movimentosGarantia(d(), g), troca).then((r) => {
+    if (!el.isConnected) return;
+    if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
+    if (!r.total) return mensagemAuto(el, 'A garantia de quem sai ainda não tem depósito registrado: sem valor para corrigir.');
+    if (!el.value.trim()) el.value = reais(r.corrigido, false);
+    mensagemAuto(el, resumoPoupanca(r, troca));
+  }).catch((e) => { if (el.isConnected) mensagemAuto(el, `${esc(e.message)} Digite o valor (saldo do extrato da poupança) ou deixe em branco.`); });
+}
+
+/** Devolução da garantia (troca com garantia nova) e cálculo final da saída: traz o % da poupança até a data. */
+function ligarPoupancaDaGarantia(raiz) {
+  const form = raiz.querySelector('form[data-form=cadastro]');
+  const [, tabela, consulta] = location.hash.match(/^#\/novo\/(devolucoes_garantia|encerramentos)\?(.*)$/) || [];
+  const el = form && tabela && form.querySelector('[name=indice_percentual]');
+  const c = el && buscar('contratos', new URLSearchParams(consulta).get('contrato'));
+  if (!c || !(R.temCaucao(c) || R.temDeposito(c))) return;
+  const movimentos = R.movimentosGarantia(d(), c);
+  const dataEl = form.querySelector('[name=data]');
+  let pedido = 0;
+  let trazido = null; // % que veio do Banco Central: troca quando a data muda, salvo se o usuário digitou outro
+  const trazer = async () => {
+    const ate = tabela === 'encerramentos' ? c.data_saida : dataEl && dataEl.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ate || '')) return;
+    const n = (pedido += 1);
+    mensagemAuto(el, 'Buscando a poupança no Banco Central…');
+    try {
+      const r = await poupancaDaGarantia(movimentos, ate);
+      if (n !== pedido || !el.isConnected) return;
+      if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
+      if (!r.total) return mensagemAuto(el, '');
+      if (!el.value.trim() || el.value === trazido) { el.value = F.pctTexto(r.percentual); trazido = el.value; }
+      mensagemAuto(el, resumoPoupanca(r, ate));
+    } catch (e) {
+      if (n === pedido && el.isConnected) mensagemAuto(el, `${esc(e.message)} Digite o % (pelo extrato da poupança).`);
+    }
+  };
+  if (dataEl) dataEl.addEventListener('change', trazer);
+  trazer();
+}
+
 export function ligarCamposAutomaticos(raiz) {
+  ligarPoupancaDoAditivo(raiz);
+  ligarPoupancaDaGarantia(raiz);
   ligarReajusteManual(raiz);
   ligarRascunhoVistoria(raiz);
   ligarNaoSeAplica(raiz);

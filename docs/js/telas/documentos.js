@@ -642,6 +642,8 @@ function telaAditivoTroca(c, a) {
   const falta = [...K.pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
     ...K.pendenciasDoContrato(d(), c)];
   const troca = c.data_entrada || c.vigencia_inicio;
+  // garantia em dinheiro de quem sai: o valor com os rendimentos da poupança até a troca entra no termo (campos.js busca no Banco Central)
+  const emDinheiro = !!R.contratoDaGarantiaNaTroca(d(), c);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : 'Gerar termo aditivo: troca de inquilino'}</h1>
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
@@ -657,6 +659,9 @@ function telaAditivoTroca(c, a) {
         ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
         <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
         <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+        ${emDinheiro ? `<div><label>Garantia de quem sai com a poupança até a troca (R$)</label><input name="garantia_corrigida" inputmode="decimal" data-dinheiro value="${a && a.garantia_corrigida ? C.reais(a.garantia_corrigida, false) : ''}">
+          <div class="ajuda">${R.garantiaNova(c) ? `Valor devolvido a ${esc(ant.inquilino_nome)}, antes dos débitos` : `Valor que ${esc(c.inquilino_nome)} paga a ${esc(ant.inquilino_nome)}; a caução depositada não muda e o rendimento passa a ser de quem entra`}. Entra no termo. Em branco: o termo sai sem o valor.</div>
+          <div class="ajuda-auto" data-auto-msg></div></div>` : ''}
       </div>
       <p class="suave">A data da troca é a entrada de ${esc(c.inquilino_nome)} no cadastro (${dataBr(troca)}); para mudar, use "Editar contrato".
         Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
@@ -680,7 +685,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       a condição <code>varios_entrantes</code> e <code>{a:o LOCATÁRIO SAINTE|os LOCATÁRIOS SAINTES}</code> (quem sai); <code>{s:...|...}</code> escolhe por quem entra.
       Garantia escolhida na troca: a condição <code>garantia_nova</code> (quem entra presta a sua; sem ela, a garantia continua),
       <code>garantia_anterior_dinheiro</code> (caução ou depósito de quem sai, a devolver), <code>garantia_anterior_fianca</code> (fiança ou seguro fiança de quem sai)
-      e o campo <code>{garantia_anterior}</code> (ex.: "caução de R$ 5.670,00 (...)"). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
+      e o campo <code>{garantia_anterior}</code> (ex.: "caução de R$ 5.670,00 (...)"). Com o valor da poupança informado ao gerar o termo: a condição <code>garantia_corrigida</code>
+      e os campos <code>{garantia_depositada}</code> e <code>{garantia_corrigida}</code> (o depositado e o depositado com os rendimentos da poupança até a troca). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
       <code>#i.</code> numera os itens do início.</li>

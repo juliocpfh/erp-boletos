@@ -302,12 +302,24 @@ E por estarem de acordo, as partes assinam este Termo Aditivo por assinatura ele
 [assinaturas]`;
 
 /**
+ * Valor da garantia em dinheiro com os rendimentos da poupança até a troca ({garantia_corrigida}, guardado no termo com o depositado, {garantia_depositada};
+ * decisão de 2026-11-13). A garantia continua: é o que quem entra paga a quem sai, e os rendimentos passam a ser de quem
+ * entra (a caução depositada não muda: o complemento nos reajustes segue o contrato). Garantia nova: é o valor devolvido
+ * a quem sai, antes dos débitos. Sem o valor no termo, o texto não aparece.
+ */
+const ACERTO_POUPANCA = '[se garantia_corrigida] Para esse acerto, o valor depositado, de {garantia_depositada}, com os rendimentos da caderneta de poupança até {data_vespera}, soma {garantia_corrigida}, que {s:o LOCATÁRIO ENTRANTE paga|os LOCATÁRIOS ENTRANTES pagam} diretamente {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}; os rendimentos já creditados e os futuros passam a pertencer {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} e serão devolvidos com a garantia ao fim da locação.[fim]';
+const DEVOLUCAO_POUPANCA = '[se garantia_corrigida] (com os rendimentos da caderneta de poupança até {data_vespera}, {garantia_corrigida})[fim]';
+const ACERTO_CAUCAO_ANTIGO = 'o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.';
+const ACERTO_DEPOSITO_ANTIGO = 'o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.';
+const DEVOLUCAO_ANTIGA = 'será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato, descontados';
+
+/**
  * Garantia no termo de troca quando quem entra presta garantia nova (escolha na troca de titular): a caução ou o depósito
  * de quem sai é devolvido a ele (corrigido, descontados os débitos até a véspera); fiança ou seguro fiança de quem sai vale
  * só até a véspera; a garantia de quem entra é a do cadastro dele (caução, depósito, fiador, seguro fiança ou nenhuma).
  * Também entra nos modelos de troca já gravados (normalizar, em regras.js).
  */
-export const GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #** – A garantia prestada no contrato {a:pelo LOCATÁRIO SAINTE|pelos LOCATÁRIOS SAINTES}, {garantia_anterior}, não passa {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}: será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato, descontados os débitos do período até {data_vespera} de sua responsabilidade.[fim]
+export const GARANTIA_NOVA_TROCA = `[se garantia_anterior_dinheiro]**CLÁUSULA #** – A garantia prestada no contrato {a:pelo LOCATÁRIO SAINTE|pelos LOCATÁRIOS SAINTES}, {garantia_anterior}, não passa {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}: será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato${DEVOLUCAO_POUPANCA}, descontados os débitos do período até {data_vespera} de sua responsabilidade.[fim]
 
 [se garantia_anterior_fianca]**CLÁUSULA #** – A garantia prestada no contrato ({garantia_anterior}) responde só pelas obrigações do período até {data_vespera} e não se estende {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES}.[fim]
 
@@ -377,11 +389,11 @@ As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Loc
 
 ## DA GARANTIA
 
-[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão][se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.
+[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão][se caucao]**CLÁUSULA #** – A caução de {caucao_valor} prestada no contrato continua depositada como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito à devolução da caução, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.${ACERTO_POUPANCA}
 
 **Parágrafo único** – A caução continua a ser atualizada a cada reajuste anual do aluguel, conforme o contrato, e será devolvida {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} ao fim da locação, com os rendimentos, observadas as condições do contrato.[fim]
 
-[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.[fim]
+[se deposito]**CLÁUSULA #** – O depósito de garantia de {deposito_valor} prestado no contrato continua como garantia da locação e passa a garantir as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, sem prejuízo de seu uso para os débitos do período anterior a esta data. {a:O LOCATÁRIO SAINTE transfere|Os LOCATÁRIOS SAINTES transferem} {s:ao LOCATÁRIO ENTRANTE|aos LOCATÁRIOS ENTRANTES} o direito ao saldo do depósito, {a:declara|declaram} ter feito diretamente com {s:ele|eles} o acerto desse valor e nada ter a reclamar {l:da LOCADORA|das LOCADORAS} a esse respeito.${ACERTO_POUPANCA}[fim]
 
 [se fiador]**CLÁUSULA #** – {f:O FIADOR declara|Os FIADORES declaram} conhecer e aceitar a substituição do locatário e {f:garante|garantem} as obrigações {s:do LOCATÁRIO ENTRANTE|dos LOCATÁRIOS ENTRANTES}, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, nas condições do contrato, até a entrega real e definitiva das chaves.[fim]
 
@@ -493,6 +505,10 @@ export const ATUALIZACOES_MODELO = [
   ["assinam em duas vias de igual teor e forma, obrigando-se", "assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se"],
   // aditivo da troca de titular (2026-11-13): contas de consumo trocadas pela empresa, com a autorização de quem sai e de quem entra
   [CONTAS_TROCA_ANTIGA, CONTAS_TROCA, 'DAS CONTAS DE CONSUMO'],
+  // aditivo da troca de titular (2026-11-13): valor da garantia com os rendimentos da poupança (acerto entre os inquilinos ou devolução)
+  [ACERTO_CAUCAO_ANTIGO, `${ACERTO_CAUCAO_ANTIGO}${ACERTO_POUPANCA}`],
+  [ACERTO_DEPOSITO_ANTIGO, `${ACERTO_DEPOSITO_ANTIGO}${ACERTO_POUPANCA}`],
+  [DEVOLUCAO_ANTIGA, `será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato${DEVOLUCAO_POUPANCA}, descontados`],
   [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, 'convidado por escrito, por e-mail, a acompanhar a vistoria'],
 ];
 
