@@ -859,7 +859,7 @@ function garantiaJaSaiu(d, c) {
 }
 
 /**
- * Onde está guardada a caução e o depósito de garantia de cada inquilino (página Empresas): por empresa (ou outra pessoa),
+ * Onde está guardada a caução e o depósito de garantia de cada inquilino (aba Caução do Financeiro): por empresa (ou outra pessoa),
  * quanto tem e de quem é, com a data de cada aplicação e de cada depósito do inquilino (depósito inicial, complementos e
  * correções da caução). Só as garantias que ainda estão com a empresa (devolvidas ficam de fora). Ex.: caução de Ana
  * R$ 3.800,00 (3.600,00 em 10/01/2025 + 200,00 em 15/01/2026) aplicada toda na ANK → ANK: Ana R$ 3.800,00.

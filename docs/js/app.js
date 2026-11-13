@@ -623,7 +623,7 @@ function atualizarFaixa() {
 const MENU = [
   ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
   ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca'], ['#/faturas', 'NF', 'fatura'], ['#/banco', 'Banco', '^banco'],
-  ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia'],
+  ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^backup|^empresas'],
 ];
 

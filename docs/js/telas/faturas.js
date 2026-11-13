@@ -75,7 +75,10 @@ export function telaFaturas(mes) {
       ${[...new Set(doMes.filter((f) => f.situacao === 'Emitida').map((f) => f.emitente_id))].map((id) => buscar('emitentes', id)).filter(Boolean)
     .map((e) => botao('pdfMes', `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(' ')}
       ${botao('excelMes', 'Baixar todas em Excel (ZIP)', { mes })}</div>` : ''}
-    ${podeUsuario('admin') && ultima ? caixaRenumerar() : ''}`;
+    ${podeUsuario('admin') && ultima ? caixaRenumerar() : ''}
+    <div class="cartao" id="numeracao-nf"><h2>Numeração das NFs</h2>
+      <p>Próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
+      ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
 }
 
 /** Fila de NF separada por mês do pagamento: [['AAAA-MM', [pendentes]]], do mais antigo ao mais novo. */

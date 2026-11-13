@@ -1,11 +1,13 @@
-// Financeiro: visão geral do mês (extratos), resultado bruto e líquido por imóvel (custos e Airbnb lançados ali), impostos, inadimplência e contas pagas por nós.
+// Financeiro: visão geral do mês (extratos), resultado bruto e líquido por imóvel (custos e Airbnb lançados ali), impostos, inadimplência, onde está a caução e contas pagas por nós.
 import * as C from '../calculos.js';
 import * as Z from '../conciliacao.js';
-import { compBr, dataBr, pct, reais } from '../calculos.js';
+import { compBr, dataBr, hojeIso, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
+import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import { caixaPagarPeloBanco } from './banco.js';
+import { linkComprovante } from './cadastros.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 
 /** Acordos em andamento (com boleto ainda em aberto): o que falta pagar de cada um. */
@@ -113,7 +115,7 @@ export function telaContas(rota) {
 
 /** Abas da página Financeiro. */
 const abasFinanceiro = (atual) => `<div class="abas">${[['financeiro', '#/financeiro', 'Visão geral'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
-  ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência']]
+  ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência'], ['garantias', '#/garantias', 'Caução']]
   .map(([k, h, t]) => `<a href="${h}" class="${k === atual ? 'ativo' : ''}">${t}</a>`).join('')}</div>`;
 
 /**
@@ -339,3 +341,59 @@ export function telaFinanceiro(q) {
         <tr class="total"><td>Lucro depois das reformas</td><td class="n nw">${reais(tot('lucro'))}</td></tr></table>
       <p class="suave">Pelo dia em que o dinheiro entrou ou saiu. Por imóvel: abas Resultado bruto e Resultado líquido.</p></div>`;
 }
+
+// --------------------------------------------------------------------------
+// Caução e depósito de garantia (aba do Financeiro; antes ficava em Empresas)
+// --------------------------------------------------------------------------
+/** Datas e valores dos depósitos da garantia do inquilino (o 1º é o depósito; os seguintes, complementos e correções). */
+const datasDosDepositos = (movimentos) => movimentos.map((m, i) => `<span class="nw">${m.data ? dataBr(m.data) : 'sem data'} ${reais(m.valor)}${i ? ' <span class="suave">(complemento)</span>' : ''}</span>`).join('<br>') || '<span class="suave">sem depósito</span>';
+const linkInquilino = (c) => `<a href="#/contrato/${c.id}?ir=garantia">${esc(c.inquilino_nome)}</a>`;
+
+/**
+ * Aba Caução do Financeiro: onde está aplicada cada caução, correção da caução e depósito de garantia, por empresa (ou outra pessoa),
+ * quanto tem em cada uma, de quem é e as datas (R.garantiasPorEmpresa). A coluna "Corrigido hoje" chega depois do desenho:
+ * a poupança é buscada no Banco Central (ligarGarantiasCorrigidas), com os meses completos até hoje.
+ */
+const BUSCANDO = '<span class="suave">buscando…</span>';
+const corrigida = (alvo) => `<span data-corrigido="${alvo}">${BUSCANDO}</span>`;
+function caixaGarantiasPorEmpresa() {
+  const g = R.garantiasPorEmpresa(d());
+  if (!g.lugares.length && !g.semAplicar.length) return '<div class="cartao"><p class="suave">Nenhuma caução ou depósito de garantia com a empresa.</p></div>';
+  const resumo = g.lugares.map((l, i) => `<b>${esc(l.nome)}</b> ${reais(l.total)} (corrigido ${corrigida(`l${i}`)})`).join(' · ');
+  return `<div class="cartao" id="garantias-por-empresa" data-garantias-corrigidas><h2>Onde está a caução e o depósito de garantia</h2>
+    <p>Depositado: <b>${reais(g.aplicado)}</b> · corrigido hoje pela poupança: <b>${corrigida('aplicado')}</b>${g.total > g.aplicado ? ` · falta aplicar <b>${reais(g.total - g.aplicado)}</b> (corrigido ${corrigida('faltaAplicar')})` : ''}.</p>
+    ${resumo ? `<p class="suave">${resumo}</p>` : ''}
+    <p class="suave" data-corrigido="aviso"></p>
+    ${g.lugares.map((l, i) => `<h3>${esc(l.nome)}${l.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''} · ${reais(l.total)} <span class="suave">(${new Set(l.itens.map((x) => x.contrato.id)).size} inquilino(s))</span></h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th>Aplicado em</th><th class="n">Valor aplicado</th><th class="n">Corrigido hoje</th><th>Depósitos do inquilino</th><th></th></tr>
+      ${l.itens.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : '-')}</td><td>${esc(x.tipo)}</td><td class="nw">${x.data ? dataBr(x.data) : '-'}</td>
+        <td class="n">${reais(x.valor)}</td><td class="n">${corrigida(`l${i}-${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td><td>${linkComprovante(x.contrato.id, x.comprovante)}${x.observacoes ? ` <span class="suave">${esc(x.observacoes)}</span>` : ''}</td></tr>`).join('')}
+      <tr class="total"><td colspan="4">Total em ${esc(l.nome)}</td><td class="n">${reais(l.total)}</td><td class="n">${corrigida(`l${i}`)}</td><td colspan="2"></td></tr></table></div>`).join('')}
+    ${g.semAplicar.length ? `<h3>Ainda não aplicado ${etiqueta(`${g.semAplicar.length} inquilino(s)`, 'aviso')}</h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th class="n">Valor</th><th class="n">Aplicado</th><th class="n">Falta aplicar</th><th class="n">Falta corrigida hoje</th><th>Depósitos do inquilino</th></tr>
+      ${g.semAplicar.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : '-')}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.total)}</td><td class="n">${reais(x.aplicado)}</td><td class="n"><b>${reais(x.falta)}</b></td><td class="n">${corrigida(`s${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td></tr>`).join('')}</table></div>` : ''}
+    <p class="suave">Mostra só as garantias que ainda estão com a empresa (as devolvidas na saída ou na troca de titular saem daqui). "Corrigido hoje" é uma base: a poupança do Banco Central rende pelo aniversário de cada depósito e só nos meses completos (o mês que ainda não fechou não rende: esses dias ficam sem rendimento); na aplicação, a correção é dividida na proporção do valor aplicado. O valor certo da devolução é calculado no dia, no cálculo final ou na devolução. Para registrar ou mudar uma aplicação, abra o inquilino (Garantia → "Onde o valor foi aplicado").</p></div>`;
+}
+
+/** Preenche a coluna "Corrigido hoje" da aba Caução com a poupança do Banco Central (sem internet: avisa e deixa em branco). */
+export async function ligarGarantiasCorrigidas(raiz) {
+  const caixa = raiz.querySelector('[data-garantias-corrigidas]');
+  if (!caixa) return;
+  const preencher = (alvo, html) => { for (const el of caixa.querySelectorAll(`[data-corrigido="${alvo}"]`)) el.innerHTML = html; };
+  const g = R.garantiasPorEmpresa(d());
+  try {
+    const r = await P.garantiasCorrigidasHoje(g, hojeIso());
+    if (!caixa.isConnected) return;
+    r.lugares.forEach((l, i) => { preencher(`l${i}`, reais(l.corrigido)); l.itens.forEach((v, j) => preencher(`l${i}-${j}`, reais(v))); });
+    r.semAplicar.forEach((v, j) => preencher(`s${j}`, reais(v)));
+    preencher('aplicado', reais(r.aplicado));
+    preencher('faltaAplicar', reais(r.faltaAplicar));
+    preencher('aviso', r.falta.length ? `O Banco Central ainda não tem a taxa de ${r.falta.length} período(s) (${r.falta.slice(0, 3).map(dataBr).join(', ')}${r.falta.length > 3 ? '…' : ''}): esses meses ficaram sem rendimento.` : '');
+  } catch (e) {
+    if (!caixa.isConnected) return;
+    for (const el of caixa.querySelectorAll('[data-corrigido]')) el.innerHTML = '<span class="suave">-</span>';
+    preencher('aviso', `${esc(e.message)} O corrigido aparece quando abrir de novo com internet.`);
+  }
+}
+
+export const telaGarantias = () => `<h1>Financeiro</h1>${abasFinanceiro('garantias')}${caixaGarantiasPorEmpresa()}`;
