@@ -494,7 +494,7 @@ export const CORRECAO_GARANTIA = [
 export const DEVOLUCAO_GARANTIA = [
   campo('data', 'Data da devolução', 'data', { obrig: true }),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro', { obrig: true }),
-  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { ajuda: 'Em branco: sem correção' }),
+  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { autoMsg: true, ajuda: 'Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança). Em branco: sem correção' }),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos até a véspera da troca em aberto, reparos etc.' }),
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
   comprovante('comprovante', 'Comprovante da devolução', { ajuda: `PDF ou foto da transferência. ${SEM_COMPROVANTE}` }),
@@ -518,7 +518,7 @@ export const RENOVACAO = [
 export const ENCERRAMENTO = [
   ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
-  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct'),
+  campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { autoMsg: true, ajuda: 'Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança)' }),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
   campo('fci_credito', 'FCI corrigido: crédito do inquilino', 'dinheiro', { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),

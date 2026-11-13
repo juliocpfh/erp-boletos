@@ -592,6 +592,45 @@ export const depositosGarantiaDo = (d, c, qual) => (d.depositos_garantia || [])
 export const somaDepositos = (d, c, qual) => depositosGarantiaDo(d, c, qual).reduce((s, x) => s + x.valor, 0);
 
 /**
+ * Depósitos da garantia em dinheiro, um a um, com a data em que cada valor entrou: [{ data, valor }]. A soma é o valor
+ * atual da garantia (valorGarantia). É a base da correção pela poupança (poupanca.js), que rende pelo aniversário de cada um.
+ * Na garantia herdada (troca de titular), os depósitos iniciais são os de quem pagou: a poupança conta desde lá.
+ * Ex.: caução de R$ 3.600,00 paga em 10/01/2025 e complemento de R$ 200,00 pago em 15/01/2026 →
+ * [{ data: '2025-01-10', valor: 360000 }, { data: '2026-01-15', valor: 20000 }].
+ */
+export function movimentosGarantia(d, c) {
+  const qual = temCaucao(c) ? 'caucao' : temDeposito(c) ? 'deposito' : null;
+  if (!qual) return [];
+  const g = GARANTIAS_DEPOSITADAS[qual];
+  const pagador = pagadorDaGarantia(d, c, qual);
+  const inicial = (qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0;
+  const dataInicial = c[g.pago] || pagador[g.pago] || c[`${qual}_data`] || null;
+  const soma = (l) => l.reduce((s, x) => s + x.valor, 0);
+  const deps = depositosGarantiaDo(d, c, qual);
+  // depósitos iniciais (parcelas): os do contrato ou, na herdada, os de quem pagou; registrada pelo comprovante, o valor do contrato
+  let partes = deps.filter((x) => !x.complementar);
+  if (!partes.length && pagador.id !== c.id) partes = depositosGarantiaDo(d, pagador, qual).filter((x) => !x.complementar);
+  const peloComprovante = garantiaDepositada(c) && !c[`${qual}_por_depositos`];
+  const out = !peloComprovante && partes.length && (pagador.id === c.id || soma(partes) === inicial)
+    ? partes.map((x) => ({ data: x.data, valor: x.valor }))
+    : inicial ? [{ data: dataInicial, valor: inicial }] : [];
+  // complementos: depósitos para completar e correções da caução (cada correção leva a caução ao novo valor)
+  const eventos = [...deps.filter((x) => x.complementar).map((x) => ({ data: x.data, ordem: 0, valor: x.valor })),
+    ...(qual === 'caucao' ? correcoesCaucaoAtual(d, c) : []).map((x) => ({ data: x.data, ordem: 1, novo: x.valor_novo }))]
+    .sort((a, b) => a.data.localeCompare(b.data) || a.ordem - b.ordem);
+  let total = soma(out);
+  for (const e of eventos) {
+    const valor = e.ordem ? e.novo - total : e.valor;
+    if (valor) out.push({ data: e.data, valor });
+    total += valor;
+  }
+  // o que não fecha com o valor atual (dados antigos) entra na última data, para a soma ser sempre a da garantia
+  const resto = valorGarantia(d, c) - total;
+  if (resto) out.push({ data: (out[out.length - 1] || {}).data || dataInicial, valor: resto });
+  return out;
+}
+
+/**
  * Quanto falta depositar: o valor combinado (caução ou depósito do contrato ou da troca) ou, na caução com o aluguel já
  * corrigido, aluguéis × aluguel atual com bonificação, se for maior. Ex.: caução combinada R$ 5.400,00; aluguel corrigido
  * pede R$ 5.670,00; depositados R$ 2.000,00 e R$ 1.500,00 → falta R$ 2.170,00.
@@ -3018,6 +3057,18 @@ export function alertaDevolucaoGarantia(d, a, hoje = C.hojeIso()) {
     texto: `Anexe o comprovante: devolução da garantia a ${a.inquilino_nome} de ${C.reais(x.saldo)} (${C.dataBr(x.data)}).` } : null;
 }
 
+/**
+ * Contrato que guarda a garantia em dinheiro de quem sai na troca de titular: o anterior, ou o novo quando a garantia já
+ * passou a ele (a mesma garantia, com as correções e os complementos). Null sem caução nem depósito.
+ * É de onde sai o valor com os rendimentos da poupança que entra no termo da troca (movimentosGarantia).
+ */
+export function contratoDaGarantiaNaTroca(d, n) {
+  const a = contratoHerdado(d, n);
+  if (!a) return null;
+  const c = !garantiaNova(n) && garantiaHerdada(d, n) ? n : a;
+  return temCaucao(c) || temDeposito(c) ? c : null;
+}
+
 /** Garantia do herdeiro que veio do contrato anterior (não se remove nem se desfaz: muda só por "Corrigir caução"). */
 export const garantiaHerdada = (d, c) => { const a = contratoHerdado(d, c); return !!(a && a.garantia_transferida_para === c.id); };
 
@@ -3819,6 +3870,10 @@ export function salvarAditivoTroca(d, contratoId, f, usuario, id = null) {
   // garantia nova: o valor da garantia do anterior (a devolver a ele) entra no termo
   const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: 'Troca de titular', data: f.data, aluguel: aluguelAtual(d, c, troca),
     garantia_anterior: garantiaNova(c) ? valorGarantia(d, ant) : null,
+    // garantia em dinheiro de quem sai com os rendimentos da poupança até a troca: o que quem entra paga a quem sai (a
+    // garantia continua) ou o que é devolvido a quem sai (garantia nova). Vem do Banco Central na tela e pode ser corrigido
+    garantia_corrigida: f.garantia_corrigida > 0 ? f.garantia_corrigida : null,
+    garantia_depositada: f.garantia_corrigida > 0 && contratoDaGarantiaNaTroca(d, c) ? valorGarantia(d, contratoDaGarantiaNaTroca(d, c)) : null,
     testemunhas: (f.testemunhas || []).filter((t) => t && t.nome), modelo_id: f.modelo_id ?? (atual ? atual.modelo_id : null), texto: String(f.texto),
     assunto: `Troca de titular: ${ant.inquilino_nome} → ${c.inquilino_nome}, a partir de ${C.dataBr(troca)}`, arquivo: null };
   if (atual) {
