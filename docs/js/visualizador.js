@@ -69,6 +69,9 @@ export async function visualizar(blob, nome, tipo, baixar) {
     corpo.replaceChildren();
     const largura = Math.max(320, corpo.clientWidth - 16);
     const nitidez = Math.min(window.devicePixelRatio || 1, 2);
+    // Primeiro reserva o lugar de TODAS as páginas (tamanho certo, em branco) e só depois desenha uma a uma. Antes cada
+    // página entrava na tela só quando ficava pronta: rolando, a próxima "carregava" no fim e a tela pulava.
+    const paginas = [];
     for (let n = 1; n <= pdf.numPages; n += 1) {
       if (!janela.isConnected) return; // fechou no meio
       const pagina = await pdf.getPage(n);
@@ -76,8 +79,14 @@ export async function visualizar(blob, nome, tipo, baixar) {
       const vista = pagina.getViewport({ scale: escala * nitidez });
       const tela = document.createElement('canvas');
       tela.width = Math.floor(vista.width); tela.height = Math.floor(vista.height);
+      // largura e altura fixas na tela: o tamanho não muda quando o desenho termina
       tela.style.width = `${Math.floor(vista.width / nitidez)}px`;
+      tela.style.height = `${Math.floor(vista.height / nitidez)}px`;
       corpo.appendChild(tela);
+      paginas.push({ pagina, vista, tela });
+    }
+    for (const { pagina, vista, tela } of paginas) {
+      if (!janela.isConnected) return;
       await pagina.render({ canvasContext: tela.getContext('2d'), viewport: vista }).promise;
     }
     pdf.destroy?.();

@@ -2038,11 +2038,20 @@ export const fichaAberta = (d, f) => f.situacao === 'Em análise' || (f.situacao
 /** Outra ficha aberta para o imóvel (cada imóvel tem no máximo uma). */
 export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas || []).find((f) => f.id !== excetoId && fichaAberta(d, f) && (f.imoveis_ids || []).includes(Number(imovelId))) || null;
 
-/** Reserva de ficha reprovada que ainda não teve a devolução registrada. */
-export const devolucaoPendente = (f) => f.situacao === 'Reprovada' && f.reserva_valor > 0 && !f.devolucao_data;
+/**
+ * Situações da ficha. "Desistiu" (pedido do dono, 2026-11-13): o interessado desistiu antes de assinar o contrato. Como na
+ * reprovada, a reserva volta por inteiro (decisão de 2026-11-12) e os documentos pessoais são apagados depois do prazo.
+ */
+export const SITUACOES_FICHA = ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'];
 
-/** Data em que os documentos da ficha reprovada são apagados (3 meses depois da decisão), ou null. */
-export const dataApagarDocumentosFicha = (f) => (f.situacao === 'Reprovada' && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
+/** Ficha encerrada sem contrato: reprovada ou desistência. A reserva é devolvida e os documentos pessoais saem depois. */
+export const fichaSemContrato = (f) => f.situacao === 'Reprovada' || f.situacao === 'Desistiu';
+
+/** Reserva de ficha reprovada (ou com desistência) que ainda não teve a devolução registrada. */
+export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data;
+
+/** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
+export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
 
 /** Fichas reprovadas com os documentos para apagar hoje. */
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
@@ -2053,7 +2062,7 @@ export function pendenciasDasFichas(d) {
   for (const f of d.fichas || []) {
     if (f.situacao === 'Em análise') out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} em análise desde ${C.dataBr(f.data_recebida)}` });
     else if (imoveisParaContrato(d, f).length) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} aprovada: falta fazer o contrato` });
-    if (devolucaoPendente(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} reprovada: registrar a devolução da reserva de ${C.reais(f.reserva_valor)}` });
+    if (devolucaoPendente(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução da reserva de ${C.reais(f.reserva_valor)}` });
   }
   return out;
 }
@@ -2075,6 +2084,74 @@ export function dadosDaFicha(d, f) {
 export function fichaAprovadaDoImovel(d, imovelId) {
   const f = fichaAbertaDoImovel(d, imovelId);
   return f && imoveisParaContrato(d, f).includes(Number(imovelId)) ? f : null;
+}
+
+/**
+ * Por que o contrato não pode ser cancelado por desistência antes da assinatura (null = pode). Cancelar apaga o contrato
+ * e o que é dele (boletos ainda não pagos etc.); por isso só vale enquanto nada de dinheiro ou assinatura passou por ele.
+ * Ex.: contrato gerado em 10/11/2026, ainda sem assinatura e sem boleto pago → null (pode cancelar).
+ */
+export function motivoSemDesistencia(d, c) {
+  if (!c) return 'Inquilino não encontrado.';
+  if (c.doc_contrato_em) return `O contrato de ${c.inquilino_nome} já foi assinado: a desistência agora é uma saída do inquilino (rescisão), não um cancelamento.`;
+  if (c.contrato_anterior_id || d.contratos.some((x) => x.contrato_anterior_id === c.id)) return `O contrato de ${c.inquilino_nome} faz parte de uma troca de titular: não dá para cancelar por desistência.`;
+  if (c.data_saida) return `O contrato de ${c.inquilino_nome} já tem data de saída.`;
+  const boletos = d.cobrancas.filter((cb) => cb.contrato_id === c.id);
+  if (boletos.some((cb) => cb.data_pagamento)) return `O contrato de ${c.inquilino_nome} tem boleto pago: desfaça o pagamento antes (ou trate como saída do inquilino).`;
+  if (boletos.some((cb) => faturasDe(d, 'cobranca', cb.id, false).length)) return `O contrato de ${c.inquilino_nome} tem NF emitida.`;
+  if (boletos.some((cb) => cb.banco && cb.banco.situacao === 'emitido')) return `O contrato de ${c.inquilino_nome} tem boleto emitido no C6 em aberto: cancele no banco antes.`;
+  if (garantiaDepositada(c) || (d.depositos_garantia || []).some((x) => x.contrato_id === c.id)) return `O contrato de ${c.inquilino_nome} tem caução ou depósito de garantia registrado: devolva e exclua o registro antes.`;
+  return null;
+}
+
+/** Contratos que caem juntos na desistência: os da ficha (todos os imóveis dela) ou só o contrato informado. */
+export function contratosDaDesistencia(d, { fichaId = null, contratoId = null }) {
+  const f = fichaId ? buscar(d, 'fichas', fichaId) : null;
+  if (f) return d.contratos.filter((c) => c.ficha_id === f.id);
+  const c = contratoId ? buscar(d, 'contratos', contratoId) : null;
+  if (!c) return [];
+  return c.ficha_id ? d.contratos.filter((x) => x.ficha_id === c.ficha_id) : [c];
+}
+
+/**
+ * Desistência antes de assinar (pedido do dono, 2026-11-13): o interessado não segue. A ficha fica "Desistiu", com a
+ * reserva para devolver por inteiro (devolução registrada depois, com data e comprovante, como na reprovada), e os
+ * contratos feitos dela e ainda não assinados são cancelados (apagados com os boletos não pagos). Contrato sem ficha
+ * (feito direto em Novo contrato): vira uma ficha "Desistiu" com os dados da pessoa, a proposta e a reserva.
+ * ``arquivos``: nomes dos arquivos já copiados da pasta do inquilino para a pasta da ficha (a tela copia antes).
+ * Ex.: reserva de R$ 1.000,00 em 05/11/2026, contrato gerado e não assinado, desistiu em 13/11/2026 → contrato apagado,
+ * ficha "Desistiu" em 13/11/2026 e o alerta "registrar a devolução da reserva de R$ 1.000,00". Devolve a ficha.
+ */
+export function desistirAntesDeAssinar(d, { fichaId = null, contratoId = null, data, motivo = '', pasta = null, arquivos = [] }, usuario, hoje = C.hojeIso()) {
+  let f = fichaId ? buscar(d, 'fichas', fichaId) : null;
+  if (fichaId && !f) throw new C.ErroUsuario('Ficha não encontrada.');
+  const contratos = contratosDaDesistencia(d, { fichaId, contratoId });
+  if (!f && contratos[0] && contratos[0].ficha_id) f = buscar(d, 'fichas', contratos[0].ficha_id);
+  if (!f && !contratos.length) throw new C.ErroUsuario('Inquilino não encontrado.');
+  if (f && fichaSemContrato(f)) throw new C.ErroUsuario(`A ficha de ${f.inquilino_nome} já está encerrada (${f.situacao}).`);
+  for (const c of contratos) { const m = motivoSemDesistencia(d, c); if (m) throw new C.ErroUsuario(m); }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || ''))) throw new C.ErroUsuario('Informe a data da desistência.');
+  if (data > hoje) throw new C.ErroUsuario('A desistência não pode ser numa data futura.');
+  // a reserva e o comprovante dela ficaram no primeiro contrato (dadosDaFicha): voltam para a ficha
+  const comReserva = contratos.find((c) => c.reserva_valor > 0) || null;
+  const reserva = comReserva ? { reserva_valor: comReserva.reserva_valor, reserva_data: comReserva.reserva_data || null,
+    comprovante_reserva: comReserva.comprovante_reserva && arquivos.includes(comReserva.comprovante_reserva) ? comReserva.comprovante_reserva : null } : {};
+  const cancelados = contratos.map((c) => `${c.inquilino_nome}${c.imovel_id ? ` (${(buscar(d, 'imoveis', c.imovel_id) || {}).nome || 'imóvel'})` : ''}`);
+  const nota = cancelados.length ? `Contrato não assinado cancelado: ${cancelados.join('; ')}.` : '';
+  const decisao = { situacao: 'Desistiu', decisao_data: data, decisao_por: usuario, decisao_motivo: [String(motivo || '').trim(), nota].filter(Boolean).join(' ') };
+  if (f) {
+    const voltam = f.documentos_no_contrato ? { documentos_no_contrato: null, comprovante_reserva: f.comprovante_reserva || reserva.comprovante_reserva || null,
+      analise_serasa: f.analise_serasa || arquivos.find((n) => /^analise-serasa-/i.test(n)) || null } : {};
+    atualizar(d, 'fichas', f.id, { ...decisao, ...(comReserva ? { reserva_valor: reserva.reserva_valor, reserva_data: reserva.reserva_data } : {}), ...voltam }, usuario,
+      `Ficha de ${f.inquilino_nome}: desistiu antes de assinar`);
+  } else {
+    const c = contratos[0];
+    const proposta = Object.fromEntries(CAMPOS_PROPOSTA_FICHA.filter((k) => c[k] !== undefined && c[k] !== null && c[k] !== '').map((k) => [k, c[k]]));
+    f = inserir(d, 'fichas', { ...dadosDaPessoa(c), ...proposta, ...reserva, data_recebida: c.reserva_data || data, imoveis_ids: c.imovel_id ? [c.imovel_id] : [],
+      modo_imoveis: MODOS_FICHA[0], pasta, ...decisao, observacoes: 'Ficha criada na desistência, a partir do contrato não assinado.' }, usuario, `Ficha de ${c.inquilino_nome}: desistiu antes de assinar`);
+  }
+  for (const c of contratos) excluirContrato(d, c.id, usuario, `${c.inquilino_nome} (desistiu antes de assinar)`);
+  return buscar(d, 'fichas', f.id);
 }
 
 /** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */

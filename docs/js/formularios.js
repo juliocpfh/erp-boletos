@@ -351,9 +351,9 @@ export function camposDaPessoa(nomesDaPessoa) {
 export const FICHA_INICIO = [
   secao('Ficha'),
   campo('data_recebida', 'Ficha recebida em', 'data', { obrig: true }),
-  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato' }),
-  campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada'), ajuda: 'Em branco: hoje' }),
-  campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada') }),
+  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida por inteiro (com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
+  campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: hoje' }),
+  campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu') }),
 ];
 
 export const FICHA_FIM = [
@@ -383,10 +383,10 @@ export const FICHA_FIM = [
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino' }),
-  { secao: 'Devolução da reserva (ficha reprovada)', ...quando('situacao', 'Reprovada') },
-  campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada')),
-  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada'), ajuda: 'Em branco: o valor da reserva' }),
-  comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada'), ajuda: 'PDF ou foto do comprovante da devolução' }),
+  { secao: 'Devolução da reserva (ficha reprovada ou desistência)', ...quando('situacao', 'Reprovada', 'Desistiu') },
+  campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada', 'Desistiu')),
+  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor da reserva' }),
+  comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'PDF ou foto do comprovante da devolução' }),
   secao('Observações'),
   campo('observacoes', 'Observações da análise', 'area'),
 ];
