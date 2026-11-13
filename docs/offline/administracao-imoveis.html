@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-vUKSZgqaOI2hfeCY5D+MjSA2zDEQ4D6hMWZhQR7Nv4M='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-JN8ZiiN0Qz9OTFx0I84w95eVnNoym3comvi5GXpTWC0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="8bacb46a9214dcde">
+<meta name="fontes" content="a2423621a952b37b">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5031,6 +5031,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return valor > 0 ? { contrato: c, comp, dias: cb.dias_cobrados, diasMes: cb.dias_mes, valor } : null;
     }
     if (c.ativo === false || !c.cobrar_iptu) return null;
+    if (base.contratos.some((o) => o.id !== c.id && (base.boletos.get(`${o.id}|${comp}`) || {}).iptu > 0)) return null;
     const dias = diasOcupados(comp, c.data_entrada, c.data_saida);
     if (!dias || emCarencia(c, comp) && !c.carencia_cobrar_iptu) return null;
     return { contrato: c, comp, dias, diasMes: diasNoMes(comp), valor: aluguelProporcional(v, dias, diasNoMes(comp)) };
@@ -6411,6 +6412,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return [...new Set(arquivos)];
   }
+  function boletosNoAnterior(d2, n, a) {
+    if (!n.heranca_transferida || !a || (continuadoPor(d2, a) || {}).id !== n.id) return [];
+    const ultimoMes = somarDias(n.heranca_transferida, -1).slice(0, 7);
+    return d2.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia > ultimoMes && !(ehComplementoCaucao(cb) && a.garantia_transferida_para !== n.id) && (ehBoletoAvulso(cb) || !boletoDoMes(d2, n.id, cb.competencia)));
+  }
   function herancaIncompleta(d2, c) {
     const feita = !!c.heranca_transferida;
     const a = (feita || herancaAgendada(d2, c)) && contratoHerdado(d2, c);
@@ -6421,14 +6427,25 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const seguro = segurosAHerdar(d2, c, a).length > 0 && continuadoPor(d2, a) && continuadoPor(d2, a).id === c.id;
     const lancamentos = lancamentosNoAnterior(d2, c, a).length;
     const anterior = !!pagamentoPerdidoNoAnterior(d2, c, a);
-    return garantia || reserva || seguro || lancamentos || anterior ? { garantia, reserva, seguro, lancamentos, anterior } : null;
+    const boletos = boletosNoAnterior(d2, c, a).length;
+    return garantia || reserva || seguro || lancamentos || anterior || boletos ? { garantia, reserva, seguro, lancamentos, anterior, boletos } : null;
   }
   function completarHeranca(d2, novoId, usuario) {
     const n = buscar(d2, "contratos", novoId);
     const falta = n && herancaIncompleta(d2, n);
     if (!falta) return null;
     const a = contratoHerdado(d2, n);
-    const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0 };
+    const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0, boletos: 0 };
+    if (falta.boletos) {
+      let reservaUsada = 0;
+      for (const cb of boletosNoAnterior(d2, n, a)) {
+        reservaUsada += cb.reserva_utilizada || 0;
+        atualizar(d2, "cobrancas", cb.id, { contrato_id: n.id }, usuario, `Boleto ${compBr(cb.competencia)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (titular desde ${dataBr(n.heranca_transferida)})`);
+        out.boletos += 1;
+      }
+      if (reservaUsada && n.reserva_usada_anterior > 0) atualizar(d2, "contratos", n.id, { reserva_usada_anterior: Math.max(n.reserva_usada_anterior - reservaUsada, 0) }, usuario, `${n.inquilino_nome}: reserva usada nos boletos trazidos de ${a.inquilino_nome}`);
+      recalcularCobrancas(d2, (cb) => cb.contrato_id === n.id, usuario);
+    }
     for (const { tabela, registro: x } of lancamentosNoAnterior(d2, n, a)) {
       if (x.comprovante) out.arquivos.push(x.comprovante);
       atualizar(d2, tabela, x.id, { contrato_id: n.id }, usuario, `${TABELAS[tabela]} de ${dataBr(x.data)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (garantia herdada)`);
@@ -14262,6 +14279,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       r.garantia && "garantia (correções, complementos e aplicações)",
       r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
       r.correcoes && `${r.correcoes} correção(ões) da caução`,
+      r.boletos && `${r.boletos} boleto(s) de depois da troca (pagamentos passam a constar do titular)`,
       r.reserva && `reserva de ${reais(c.reserva_valor)}`,
       r.seguro && "seguro (apólice e documentos)"
     ].filter(Boolean);
