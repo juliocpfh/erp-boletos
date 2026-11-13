@@ -142,6 +142,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
     devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0),
   };
+  const a = alvo.aditivo || null;
+  if (a) Object.assign(campos, { aditivo_data: C.dataBr(a.data), aditivo_assunto: a.assunto || 'alteração do contrato' });
   return { campos, condicoes, para: p.inquilino_email || '', perguntas: r };
 }
 
@@ -160,6 +162,22 @@ export function anexosProntos(d, modelo, alvo) {
   const doContrato = (campo, rotulo) => arquivo('contrato', c[`${campo}_contrato`] || c.id, c[campo], rotulo);
   for (const item of modelo.prontos || []) {
     const [tipo, qual] = item.split(':');
+    if (tipo === 'assinado') {
+      // documento assinado por todos (só o completo: com assinatura faltante não vai)
+      if (qual === 'aditivo') {
+        const a = alvo.aditivo || null;
+        if (a && a.arquivo) arquivo('aditivos', a.contrato_id, a.arquivo, `termo aditivo de ${C.dataBr(a.data)} assinado por todos`);
+      } else if (qual === 'quitacao' && c) {
+        const e = R.encerramentoDo(d, c.id);
+        if (e) arquivo('contrato', c.id, e.termo_assinado, 'termo de quitação assinado por todos');
+      } else if (c) {
+        const campo = `${qual}_em`;
+        const doc = R.documentoEntrada(d, c, campo);
+        const nome = (R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo) || [])[1] || 'documento';
+        if (doc && doc.arquivo) arquivo('assinados', doc.contrato.id, doc.arquivo, `${nome.toLowerCase()} assinado por todos`);
+      }
+      continue;
+    }
     if (tipo === 'recibo') {
       const disp = REC.reciboDisponivel(d, qual, alvo);
       out.push({ tipo: 'recibo', recibo: qual, rotulo: REC.TIPOS_RECIBO[qual], ok: disp.ok, motivo: disp.motivo || '' });

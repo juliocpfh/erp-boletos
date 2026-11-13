@@ -94,3 +94,21 @@ test('informe do IR: em fevereiro e março, inquilinos com NF no ano anterior qu
   assert.deepEqual(informesPendentes(d, '2027-02-05').contratos, []);
   assert.equal(informesPendentes(d, '2027-04-01').ano, null, 'depois de março sai do Painel');
 });
+
+test('documento assinado por todos vai anexo: contrato, vistoria, chaves, termo aditivo e termo de quitação', async () => {
+  const { anexosProntos } = await import('../docs/js/email-dados.js');
+  const { d, c } = base();
+  const nomes = (chave, alvo = { contrato: c }) => anexosProntos(d, modeloEmail(d, chave), alvo).filter((a) => a.tipo === 'arquivo').map((a) => `${a.escopo}:${a.nome}`);
+  assert.deepEqual(nomes('contrato_assinado'), [], 'sem o arquivo assinado, nada');
+  c.doc_contrato_parcial = { data: '2026-11-20', arquivo: 'contrato-parcial.pdf', falta: ['LOCADORA'] };
+  assert.deepEqual(nomes('contrato_assinado'), [], 'faltando assinatura, não vai');
+  Object.assign(c, { doc_contrato_em: '2026-11-21', doc_contrato_arquivo: 'contrato-assinado.pdf', doc_vistoria_em: '2026-12-01', doc_vistoria_arquivo: 'vistoria.pdf', doc_chaves_em: '2026-12-01', doc_chaves_arquivo: 'chaves.pdf' });
+  assert.deepEqual(nomes('contrato_assinado'), ['assinados:contrato-assinado.pdf']);
+  assert.deepEqual(nomes('vistoria_assinada'), ['assinados:vistoria.pdf', 'assinados:chaves.pdf']);
+  assert.match(texto(d, 'contrato_assinado', { contrato: c }).texto, /assinado por todas as partes: você e a locadora/);
+  const a = R.inserir(d, 'aditivos', { contrato_id: c.id, data: '2027-03-01', assunto: 'troca do dia do vencimento', arquivo: 'aditivo.pdf', assinado_em: '2027-03-02' }, 'j');
+  assert.deepEqual(nomes('aditivo_assinado', { contrato: c, aditivo: a }), ['aditivos:aditivo.pdf']);
+  assert.match(texto(d, 'aditivo_assinado', { contrato: c, aditivo: a }).texto, /termo aditivo de 01\/03\/2027 \(troca do dia do vencimento\) foi assinado por todas as partes/);
+  const e = R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2029-06-01', saldo: 0, termo_assinado: 'comprovante-termo-quitacao-assinado-2029-06-01.pdf' }, 'j');
+  assert.deepEqual(nomes('saida_encerramento'), [`contrato:${e.termo_assinado}`]);
+});

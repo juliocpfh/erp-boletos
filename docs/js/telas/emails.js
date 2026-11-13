@@ -16,13 +16,14 @@ import { pdfDoRecibo } from './documentos.js';
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
 const LIMITE_ENDERECO = 7000;
 
-/** Último envio registrado deste e-mail para o contrato ou a ficha (ou null). */
+/** Último envio registrado deste e-mail para o contrato ou a ficha (ou null); com ``alvo.aditivo``, só o daquele termo aditivo. */
 export function ultimoEnvio(chave, alvo) {
-  return (d().envios_email || []).filter((x) => x.chave === chave && ((alvo.contrato && x.contrato_id === Number(alvo.contrato)) || (alvo.ficha && x.ficha_id === Number(alvo.ficha))))
+  return (d().envios_email || []).filter((x) => x.chave === chave && ((alvo.contrato && x.contrato_id === Number(alvo.contrato)) || (alvo.ficha && x.ficha_id === Number(alvo.ficha)))
+    && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
 }
 
-/** Botão "E-mail" de uma etapa, com a data do último envio. ``alvo``: { contrato: id } ou { ficha: id }. */
+/** Botão "E-mail" de uma etapa, com a data do último envio. ``alvo``: { contrato: id } ou { ficha: id } (e { aditivo: id } no termo aditivo). */
 export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
   if (!opera() || !MODELOS_EMAIL.some((m) => m.chave === chave)) return '';
   const u = ultimoEnvio(chave, alvo);
@@ -30,7 +31,7 @@ export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
 }
 
 const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => R.inserir(db, 'envios_email', {
-  data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, para, assunto, como, gmail_id: id || null,
+  data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null,
 }, login(), `E-mail "${assunto}" ${como === 'enviado' ? 'enviado' : 'aberto no Gmail'} para ${para || '(sem destinatário)'}`));
 
 async function copiar(texto) {
@@ -73,6 +74,10 @@ async function janelaEmail(chave, alvo) {
   const reg = alvo.contrato ? buscar('contratos', alvo.contrato) : buscar('fichas', alvo.ficha);
   if (!modelo || !reg) throw new Error('Inquilino ou ficha não encontrado.');
   const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
+  if (alvo.aditivo) {
+    objeto.aditivo = buscar('aditivos', alvo.aditivo);
+    if (!objeto.aditivo) throw new Error('Termo aditivo não encontrado.');
+  }
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
   const perguntas = (modelo.perguntas || []).map((p) => campoPergunta(p, inicio.perguntas[p[0]] ?? '')).join('');
@@ -163,9 +168,9 @@ async function janelaEmail(chave, alvo) {
 }
 
 export const ACOES_EMAILS = {
-  async abrirEmail({ chave, contrato, ficha }) {
+  async abrirEmail({ chave, contrato, ficha, aditivo }) {
     if (!opera()) throw new Error('Seu usuário não pode enviar e-mails.');
-    await janelaEmail(chave, contrato ? { contrato: Number(contrato) } : { ficha: Number(ficha) });
+    await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}) } : { ficha: Number(ficha) });
   },
   async restaurarModeloEmail({ chave }) {
     const m = (d().modelos_email || []).find((x) => x.chave === chave);

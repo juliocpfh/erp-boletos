@@ -150,11 +150,11 @@ Ficou alguma dúvida sobre as cláusulas? Pergunte antes de assinar.`,
   {
     chave: 'contrato_assinado', nome: 'Contrato assinado: entrega das chaves', etapa: 'Contrato assinado',
     assunto: 'Contrato assinado – {imovel}: entrega das chaves',
-    anexos: 'Contrato assinado por todos (PDF)', prontos: ['recibo:garantia', 'comprovante:garantia'],
+    anexos: 'Contrato assinado por todos (PDF)', prontos: ['assinado:doc_contrato', 'recibo:garantia', 'comprovante:garantia'],
     perguntas: [['opcoes_entrega', 'Opções de data e horário da entrega das chaves', 'texto']],
     texto: `Olá, {nome},
 
-Segue anexo o contrato assinado por todas as partes. Guarde esta via.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}: seguem o recibo e o comprovante.[fim]
+Confirmamos que o contrato foi assinado por todas as partes: você[se fiador], o(s) fiador(es)[fim] e a locadora. Segue anexa a via assinada por todos: guarde junto com os seus documentos.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}: seguem o recibo e o comprovante.[fim]
 
 ENTREGA DAS CHAVES
 Opções: {opcoes_entrega}, no imóvel. Responda com a melhor opção.
@@ -170,7 +170,7 @@ O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com
   {
     chave: 'vistoria_assinada', nome: 'Vistoria assinada: boas-vindas', etapa: 'Vistoria assinada',
     assunto: 'Bem-vindo(a) – {imovel}: vistoria de entrada',
-    anexos: 'Vistoria de entrada e termo de entrega das chaves (PDF)',
+    anexos: 'Vistoria de entrada e termo de entrega das chaves (PDF)', prontos: ['assinado:doc_vistoria', 'assinado:doc_chaves'],
     texto: `Olá, {nome},
 
 Seja bem-vindo(a)! As chaves foram entregues em {data_chaves}.
@@ -185,6 +185,16 @@ LEMBRETES
 - Reparos: avise sempre por escrito, por este e-mail
 - Obras ou mudanças no imóvel só com autorização por escrito
 - Este e-mail é o canal oficial de comunicação com a administradora`,
+  },
+  {
+    chave: 'aditivo_assinado', nome: 'Termo aditivo assinado por todos', etapa: 'Termo aditivo',
+    assunto: 'Termo aditivo assinado – {imovel}',
+    anexos: 'Termo aditivo assinado por todos (PDF)', prontos: ['assinado:aditivo'],
+    texto: `Olá, {nome},
+
+Confirmamos que o termo aditivo de {aditivo_data} ({aditivo_assunto}) foi assinado por todas as partes. Segue anexa a via assinada por todos: guarde junto com o seu contrato.
+
+As demais cláusulas do contrato continuam valendo como estão.`,
   },
   {
     chave: 'saida_aviso', nome: 'Aviso de saída recebido', etapa: 'Informar data de saída',
@@ -267,7 +277,7 @@ Se discordar de algum item, responda em até 5 dias úteis explicando o motivo.`
   {
     chave: 'saida_encerramento', nome: 'Encerramento do contrato', etapa: 'Devolução da garantia',
     assunto: 'Contrato encerrado – {imovel}',
-    anexos: '', prontos: ['recibo:quitacao', 'comprovante:saida'],
+    anexos: '', prontos: ['assinado:quitacao', 'recibo:quitacao', 'comprovante:saida'],
     texto: `Olá, {nome},
 
 Confirmamos [se devolver]a devolução de {saldo} em {data_devolucao} e [fim]o encerramento do contrato de locação do imóvel da {imovel}. Segue anexo o termo de entrega do imóvel, acerto final e quitação[se devolver], com o comprovante da transferência[fim]. Por favor, responda com o termo assinado (pode ser pelo gov.br).
