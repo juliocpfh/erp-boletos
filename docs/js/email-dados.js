@@ -120,7 +120,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     reserva: p.reserva_valor > 0 ? C.reais(p.reserva_valor) : '', reserva_data: p.reserva_data ? C.dataBr(p.reserva_data) : '',
     contas_texto: juntar(contas.map((x) => x[0])), contas_concessionarias: juntar(contas.map((x) => x[1])),
     primeiro_boleto: c ? primeiroBoleto(d, c) : '', data_chaves: inicio ? C.dataBr(inicio) : '',
-    data_limite_vistoria: inicio ? C.dataBr(C.somarDias(inicio, 10)) : '',
+    data_limite_vistoria: inicio ? C.dataBr(C.limiteVistoriaEntrada(inicio)) : '',
     data_saida: c && c.data_saida ? C.dataBr(c.data_saida) : '', ano_saida: c && c.data_saida ? c.data_saida.slice(0, 4) : String(Number(hoje.slice(0, 4))),
     acerto: textoAcerto(e), saldo: e ? C.reais(Math.abs(e.saldo || 0)) : '', data_devolucao: e && e.garantia_devolvida_em ? C.dataBr(e.garantia_devolvida_em) : '',
     informe: c ? textoInforme(d, c, ano) : '',

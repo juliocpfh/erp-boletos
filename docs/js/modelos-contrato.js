@@ -5,10 +5,16 @@
  * Trechos revisados em 2026-11-12 (documentacao/REVISAO_JURIDICA_CONTRATO.md). Os modelos já gravados recebem cada um
  * em normalizar() (regras.js), trocando o texto antigo exato (ATUALIZACOES_MODELO); texto editado à mão fica como está.
  */
-/** Vistoria de entrada na entrega das chaves (não na assinatura) e 10 dias para apontar defeito (Lei 8.245/91, arts. 22, V, e 23, III). */
-export const VISTORIA_ENTRADA = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada feito e assinado pelas partes nessa data, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.
+/**
+ * Vistoria de entrada (revisão de 2026-11-13): feita pela locadora com o imóvel vazio, antes da entrega das chaves, e entregue
+ * ao inquilino com as chaves; ele tem 5 dias úteis para apontar o que não estiver descrito (Lei 8.245/91, arts. 22, V, e 23, III).
+ */
+export const VISTORIA_ENTRADA = `**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada, com fotos, feito {l:pela LOCADORA|pelas LOCADORAS} com o imóvel desocupado, antes da entrega, e entregue ao LOCATÁRIO junto com as chaves, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.
 
-**Parágrafo único** – O LOCATÁRIO terá 10 (dez) dias corridos, contados da entrega das chaves, para comunicar por escrito, por e-mail, defeitos ou divergências não descritos na vistoria de entrada. Passado esse prazo sem comunicação, a vistoria de entrada vale como aceita, ressalvados os vícios ocultos.`;
+**Parágrafo único** – O LOCATÁRIO terá 5 (cinco) dias úteis, contados da entrega das chaves, para comunicar por escrito, por e-mail, defeitos ou divergências não descritos na vistoria de entrada, de preferência com fotos. Passado esse prazo sem comunicação, a vistoria de entrada vale como aceita, ressalvados os vícios ocultos.`;
+
+/** Texto da vistoria de entrada da revisão de 2026-11-12 (10 dias): sai dos modelos já gravados em ATUALIZACOES_MODELO. */
+const VISTORIA_ENTRADA_1211 = "**CLÁUSULA #vistoria** – O LOCATÁRIO recebe o imóvel na data da entrega das chaves, em perfeitas condições de ser ocupado, conforme o relatório de vistoria de entrada feito e assinado pelas partes nessa data, que passa a fazer parte deste contrato, obrigando-se a manter tudo como recebeu e a restituí-lo no mesmo estado de conservação, higiene e perfeito funcionamento, ressalvado o desgaste natural decorrente do uso normal.\n\n**Parágrafo único** – O LOCATÁRIO terá 10 (dez) dias corridos, contados da entrega das chaves, para comunicar por escrito, por e-mail, defeitos ou divergências não descritos na vistoria de entrada. Passado esse prazo sem comunicação, a vistoria de entrada vale como aceita, ressalvados os vícios ocultos.";
 
 /** Falta do aviso de 30 dias: um mês de aluguel e encargos (Lei 8.245/91, art. 6º, parágrafo único), não a multa de 3 aluguéis. */
 export const SEM_AVISO = 'Caso não proceda desta forma, pagará a quantia correspondente a 1 (um) mês de aluguel e encargos vigentes na data da desocupação, nos termos do art. 6º, parágrafo único, da Lei nº 8.245/91.';
@@ -58,11 +64,18 @@ O pagamento dos aluguéis será feito mediante boleto bancário, que será envia
 
 Os signatários que contratam nas qualidades indicadas neste contrato têm entre si ajustada a presente locação, mediante as seguintes cláusulas e condições, celebrada conforme a Lei nº 8.245/91, na qual as partes contratadas se obrigam mutuamente:`;
 
+/** Fim do prazo: com menos de 30 meses no residencial, a retomada só nos casos do art. 47 (A3 da revisão, 2026-11-13). */
+const PRAZO_ANTIGO = "**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel sem que seja assinado novo contrato, a locação passará a vigorar por prazo indeterminado, podendo {l:a LOCADORA|as LOCADORAS} rescindi-la a qualquer tempo, mediante notificação por escrito ao LOCATÁRIO, que ficará obrigado a desocupar o imóvel no prazo de 30 (trinta) dias, a contar do recebimento da notificação, continuando em vigor as demais cláusulas e condições do presente contrato.";
+const PRAZO_PARAGRAFO = `[se retomada_livre]${PRAZO_ANTIGO}[senão]**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel por mais de 30 (trinta) dias sem oposição {l:da LOCADORA|das LOCADORAS}, a locação prorroga-se por prazo indeterminado, mantidas as demais cláusulas e condições do presente contrato, e o imóvel só poderá ser retomado nas hipóteses do art. 47 da Lei nº 8.245/91.[fim]`;
+
+/** Despesas extraordinárias do condomínio são da locadora (A20; Lei 8.245/91, art. 22, X e parágrafo único). */
+export const EXTRAORDINARIAS = '[se condominio]**Parágrafo** – As despesas extraordinárias de condomínio, como obras de reforma ou acréscimo à estrutura do prédio, pintura das fachadas e áreas externas, indenizações trabalhistas anteriores ao início da locação, equipamentos de segurança, lazer e esporte e a constituição do fundo de reserva, são de responsabilidade {l:da LOCADORA|das LOCADORAS} (Lei nº 8.245/91, art. 22, X).[fim]\n\n';
+
 const ALUGUEL = (honorarios) => `## ALUGUEL E ENCARGOS
 
 [se indeterminado]**CLÁUSULA #** – A locação é por prazo indeterminado, a contar de {data_inicio}, podendo qualquer das partes encerrá-la mediante notificação por escrito com 30 (trinta) dias de antecedência, devendo o imóvel ser restituído nas mesmas condições em que o LOCATÁRIO o recebeu, conforme relatório de vistoria.[senão]**CLÁUSULA #** – O prazo de locação é de {prazo_meses} meses, a contar de {data_inicio}, com término em {data_fim}, data esta em que cessará de pleno direito a presente locação, independentemente de qualquer aviso ou notificação judicial ou extrajudicial, devendo o imóvel ser restituído nas mesmas condições em que o LOCATÁRIO o recebeu, conforme relatório de vistoria.
 
-**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel sem que seja assinado novo contrato, a locação passará a vigorar por prazo indeterminado, podendo {l:a LOCADORA|as LOCADORAS} rescindi-la a qualquer tempo, mediante notificação por escrito ao LOCATÁRIO, que ficará obrigado a desocupar o imóvel no prazo de 30 (trinta) dias, a contar do recebimento da notificação, continuando em vigor as demais cláusulas e condições do presente contrato.[fim]
+${PRAZO_PARAGRAFO}[fim]
 
 **CLÁUSULA #** – O aluguel mensal é de {aluguel_cheio}[se bonificacao], passível de bonificação para pagamento pontual conforme os itens do início deste contrato,[fim] e será reajustado anualmente pela variação d{indice}. Os reajustes ocorrerão sempre a cada 12 (doze) meses, com base de cálculo sobre o valor do aluguel anteriormente corrigido.
 
@@ -74,7 +87,7 @@ const ALUGUEL = (honorarios) => `## ALUGUEL E ENCARGOS
 
 [se tem_incluso]**Parágrafo** – Tarifas e taxas adicionais além das contas incluídas, como contratações adicionais, serviços solicitados unilateralmente, multas aplicadas pelo condomínio e pelo poder público e a responsabilidade civil e criminal perante o condomínio e terceiros, são de responsabilidade do LOCATÁRIO, que se obriga a ter consumo responsável de energia elétrica, água e gás e a comunicar imediatamente qualquer vazamento.[fim]
 
-[se iptu_inquilino]**Parágrafo** – Fica estabelecido entre as partes que o Imposto Predial e Territorial Urbano (IPTU) correrá por conta do LOCATÁRIO e será cobrado junto com o vencimento do aluguel[se seguro_inquilino], bem como o seguro incêndio do imóvel[fim].[fim]
+${EXTRAORDINARIAS}[se iptu_inquilino]**Parágrafo** – Fica estabelecido entre as partes que o Imposto Predial e Territorial Urbano (IPTU) correrá por conta do LOCATÁRIO e será cobrado junto com o vencimento do aluguel[se seguro_inquilino], bem como o seguro incêndio do imóvel[fim].[fim]
 
 **Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo, mesmo após a rescisão do contrato e a restituição do imóvel, quando forem detectadas despesas, reparações de danos, multas, contas em atraso, execuções judiciais ou extrajudiciais e tudo o mais concernente ao período em que o imóvel foi ocupado pelo LOCATÁRIO.`;
 
@@ -144,7 +157,7 @@ const RESTITUICAO = `${VISTORIA_ENTRADA}
 
 **CLÁUSULA #** – No caso de o imóvel ser colocado à venda, obedecido o direito de preferência do LOCATÁRIO na compra, conforme valor e condições apresentadas, este se obriga a permitir a visita de possíveis interessados, em horário de no mínimo duas horas diárias, nunca antes das 8h nem após as 20h.
 
-**Parágrafo único** – Com o objetivo de defender o imóvel e acautelar sua integridade contra possíveis esbulhos e depredações, {l:fica a LOCADORA autorizada|ficam as LOCADORAS autorizadas} a tomar posse do imóvel independentemente de procedimento judicial prévio, se ficar comprovado o abandono do imóvel pelo LOCATÁRIO.
+**Parágrafo único** – Com o objetivo de defender o imóvel e acautelar sua integridade contra possíveis esbulhos e depredações, {l:fica a LOCADORA autorizada|ficam as LOCADORAS autorizadas} a retomar a posse do imóvel se ficar comprovado o abandono pelo LOCATÁRIO, por ata notarial ou declaração de 2 (duas) testemunhas, depois de notificar o LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] por escrito, com prazo de 5 (cinco) dias úteis para se manifestar. Os bens deixados no imóvel serão relacionados em inventário, com fotos, e ficarão à disposição do LOCATÁRIO por 30 (trinta) dias.
 
 ${CLAUSULAS_FCI}
 
@@ -158,7 +171,7 @@ const MULTA = (saida, honorarios) => `## MULTA CONTRATUAL
 
 **CLÁUSULA #multa** – Fica estipulada a multa no valor de três meses de aluguel, a ser paga pela parte que infringir qualquer cláusula do contrato[se fiador], obrigando também {f:o FIADOR|os FIADORES} a pagar pelo LOCATÁRIO[fim][se caucao], autorizado o pagamento desta multa com o valor dado em caução[fim], inclusive no caso de despejo por falta de pagamento de aluguel, com a faculdade, para a parte inocente, de considerar simultaneamente rescindida a locação, independentemente de qualquer formalidade.
 
-**Parágrafo primeiro** – A multa contratual será sempre devida integralmente, seja qual for o tempo decorrido do presente contrato e tantas vezes quantas forem as violações, além de a parte infratora arcar com todas as despesas e custas judiciais ou extrajudiciais, juros de mora e ${honorarios}.
+**Parágrafo primeiro** – Além da multa, a parte infratora arcará com todas as despesas e custas judiciais ou extrajudiciais, juros de mora e ${honorarios}.
 
 **Parágrafo segundo** – No caso de desocupação do imóvel antes do fim do contrato, será cobrada ${saida}. A desocupação deverá ser comunicada por escrito, com 30 (trinta) dias de antecedência, por e-mail {l:à LOCADORA|às LOCADORAS}.`;
 
@@ -166,11 +179,11 @@ const RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
 
 **CLÁUSULA #** – Findo o prazo contratual e não tendo interesse na renovação da locação, ou havendo interesse na rescisão antes do término do prazo, assume o LOCATÁRIO o compromisso formal de comunicar por escrito {l:à LOCADORA|às LOCADORAS}, com 30 (trinta) dias de antecedência, a desocupação do imóvel. ${SEM_AVISO} O imóvel deverá ser entregue conforme a vistoria inicial.
 
-**CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. Para fins de acerto final, considera-se realizada a entrega do imóvel no momento em que ele esteja tal como na vistoria inicial.
+**CLÁUSULA #** – Desocupado completamente o imóvel e devolvidas as chaves, {l:a LOCADORA terá|as LOCADORAS terão} o prazo de ${horas} úteis para providenciar a vistoria do imóvel. O aluguel e os encargos são devidos até a data da devolução das chaves. Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia em dinheiro, quando houver, ou cobrados do LOCATÁRIO, com base em orçamento ou nota do serviço.
 
 **CLÁUSULA #** – O LOCATÁRIO, ao término da locação, obriga-se a apresentar, na entrega das chaves, a quitação de todos os impostos e taxas (contas de água e esgoto, luz, condomínio, IPTU etc.) que forem de sua responsabilidade durante a vigência da locação.
 
-**CLÁUSULA #** – O presente contrato considerar-se-á rescindido de pleno direito, independentemente de qualquer formalidade judicial ou extrajudicial, nos casos de desapropriação, incêndio ou desabamento do imóvel locado[se fiador], bem como de falecimento ou insolvência do fiador, ou de sua transferência para outra localidade, se não for substituído em até 30 (trinta) dias por outro idôneo a critério {l:da LOCADORA|das LOCADORAS}, ficando neste caso o LOCATÁRIO em mora e sujeito a imediata ação de despejo[fim].`;
+**CLÁUSULA #** – O presente contrato considerar-se-á rescindido de pleno direito, independentemente de qualquer formalidade judicial ou extrajudicial, nos casos de desapropriação, incêndio ou desabamento do imóvel locado[se fiador], bem como de falecimento, insolvência, recuperação judicial ou falência do fiador, de sua exoneração da fiança, da venda ou oneração dos imóveis que garantiam a fiança, ou de sua mudança para outra localidade, se não for substituído em até 30 (trinta) dias, contados da notificação ao LOCATÁRIO, por outro idôneo a critério {l:da LOCADORA|das LOCADORAS}, ficando neste caso o LOCATÁRIO em mora e sujeito a imediata ação de despejo[fim].`;
 
 const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 
@@ -202,12 +215,17 @@ const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 
 **CLÁUSULA #** – A presente locação é garantida por seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido vigente durante todo o prazo da locação e suas prorrogações, sob pena de rescisão deste contrato.[fim]`;
 
+/** Negativação nos dois modelos, depois do aviso do próprio órgão (A18; CDC, art. 43, § 2º; Súmula 359 do STJ). */
+export const NEGATIVACAO = '**CLÁUSULA #** – Em caso de atraso no pagamento de aluguéis e encargos, {l:a LOCADORA poderá|as LOCADORAS poderão} incluir o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] nos órgãos de proteção ao crédito (SERASA, SCPC e similares), depois do aviso prévio feito pelo próprio órgão.';
+
 const FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
 ${REPRESENTACAO}
 
 **CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.
 ${extra}
+${NEGATIVACAO}
+
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações ou notificações enviadas por via postal com aviso de recebimento (AR) ou por mensagem eletrônica (e-mail).
 
 **Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.
@@ -218,7 +236,7 @@ ${LGPD}
 
 **CLÁUSULA #** – Para todas as questões oriundas deste contrato será competente o foro da situação do imóvel, com renúncia a qualquer outro, por mais especial que se apresente.
 
-E por assim estarem justos e contratados, e após terem os contratantes lido e esclarecido todos os itens, cientes e de inteiro acordo com as condições e responsabilidades assumidas neste contrato, assinam em duas vias de igual teor e forma, obrigando-se ao seu fiel cumprimento não só os contratantes, como solidariamente seus herdeiros e sucessores a qualquer título.
+E por assim estarem justos e contratados, e após terem os contratantes lido e esclarecido todos os itens, cientes e de inteiro acordo com as condições e responsabilidades assumidas neste contrato, assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se ao seu fiel cumprimento não só os contratantes, como solidariamente seus herdeiros e sucessores a qualquer título.
 
 > {cidade}, {data_assinatura}.
 
@@ -383,9 +401,7 @@ ${RESCISAO('48 (quarenta e oito) horas')}
 
 ${GARANTIA}
 
-${FINAIS(`
-**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] ficam cientes de que a administradora do imóvel é associada ao SERASA e ao SCPC e incluirá no cadastro de inadimplentes todo atraso de pagamento de aluguéis e encargos vencidos.
-`)}`,
+${FINAIS('')}`,
   },
   {
     nome: 'Aditivo de vencimento (a pedido do inquilino)',
@@ -413,6 +429,17 @@ export const ATUALIZACOES_MODELO = [
   ['honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação', 'honorários de advogado de 20% (vinte por cento) sobre o valor da ação'],
   ['a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato', 'a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato'],
   [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}\n\n${LGPD}`, 'DOS DADOS PESSOAIS'],
+  // revisão de 2026-11-13 (respostas do dono no artefato da revisão jurídica)
+  [VISTORIA_ENTRADA_1211, VISTORIA_ENTRADA],
+  [`${PRAZO_ANTIGO}[fim]`, `${PRAZO_PARAGRAFO}[fim]`, '[se retomada_livre]'],
+  ["[se iptu_inquilino]**Parágrafo** – Fica estabelecido", `${EXTRAORDINARIAS}[se iptu_inquilino]**Parágrafo** – Fica estabelecido`, 'despesas extraordinárias de condomínio'],
+  ["A multa contratual será sempre devida integralmente, seja qual for o tempo decorrido do presente contrato e tantas vezes quantas forem as violações, além de a parte infratora arcar com todas", "Além da multa, a parte infratora arcará com todas"],
+  ["Para fins de acerto final, considera-se realizada a entrega do imóvel no momento em que ele esteja tal como na vistoria inicial.", "O aluguel e os encargos são devidos até a data da devolução das chaves. Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia em dinheiro, quando houver, ou cobrados do LOCATÁRIO, com base em orçamento ou nota do serviço."],
+  ["bem como de falecimento ou insolvência do fiador, ou de sua transferência para outra localidade, se não for substituído em até 30 (trinta) dias por outro idôneo", "bem como de falecimento, insolvência, recuperação judicial ou falência do fiador, de sua exoneração da fiança, da venda ou oneração dos imóveis que garantiam a fiança, ou de sua mudança para outra localidade, se não for substituído em até 30 (trinta) dias, contados da notificação ao LOCATÁRIO, por outro idôneo"],
+  ["a tomar posse do imóvel independentemente de procedimento judicial prévio, se ficar comprovado o abandono do imóvel pelo LOCATÁRIO.", "a retomar a posse do imóvel se ficar comprovado o abandono pelo LOCATÁRIO, por ata notarial ou declaração de 2 (duas) testemunhas, depois de notificar o LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] por escrito, com prazo de 5 (cinco) dias úteis para se manifestar. Os bens deixados no imóvel serão relacionados em inventário, com fotos, e ficarão à disposição do LOCATÁRIO por 30 (trinta) dias."],
+  ["\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] ficam cientes de que a administradora do imóvel é associada ao SERASA e ao SCPC e incluirá no cadastro de inadimplentes todo atraso de pagamento de aluguéis e encargos vencidos.\n", '', 'depois do aviso prévio feito pelo próprio órgão'],
+  ["**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações", `${NEGATIVACAO}\n\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações`, 'depois do aviso prévio feito pelo próprio órgão'],
+  ["assinam em duas vias de igual teor e forma, obrigando-se", "assinam este contrato por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020 e Medida Provisória nº 2.200-2/2001), ou, no papel, em duas vias de igual teor e forma, na presença de 2 (duas) testemunhas, obrigando-se"],
 ];
 
 /** Aplica ATUALIZACOES_MODELO num texto de contrato (o 3º item, quando há, é o sinal de que a troca já foi feita). */

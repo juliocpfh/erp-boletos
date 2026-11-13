@@ -68,7 +68,7 @@ COMO FUNCIONA
 2. Envio do contrato para a sua assinatura
 3. Sua assinatura[se dinheiro] e o depósito da {tipo_deposito}[fim]
 4. Nossa assinatura e envio da via assinada por todos
-5. Entrega das chaves com a vistoria de entrada, feita junto com você
+5. Entrega das chaves com a vistoria de entrada, feita por nós com o imóvel vazio
 
 Seus dados são tratados conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`,
   },
@@ -92,7 +92,7 @@ PRÓXIMOS PASSOS
 [se dinheiro]- {Tipo_deposito}: depois da sua assinatura, o depósito de {valor_deposito} na conta da empresa
 [fim][se seguro_fianca]- Seguro fiança: emissão da apólice em seu nome
 [fim]- Nossa assinatura: com tudo recebido, assinamos e enviamos a via assinada por todos
-- Entrega das chaves: combinamos a data; a vistoria de entrada é feita junto, com fotos
+- Entrega das chaves: combinamos a data; você recebe junto a vistoria de entrada, feita por nós com o imóvel vazio, com fotos
 
 [se reserva]A reserva de {reserva} será descontada no primeiro boleto. [fim]A locação só se forma com a assinatura de todos, e o imóvel só pode ser ocupado depois da entrega das chaves.`,
   },
@@ -144,9 +144,9 @@ Segue anexo o contrato assinado por todas as partes. Guarde esta via.[se dinheir
 
 ENTREGA DAS CHAVES
 Opções: {opcoes_entrega}, no imóvel. Responda com a melhor opção.
-1. Antes de você levar qualquer móvel, fazemos juntos a vistoria de entrada, com fotos[se contas] e a leitura dos relógios[fim]
-2. Você assina a vistoria e o termo de entrega das chaves
-3. Você recebe uma cópia da vistoria
+1. Você recebe as chaves e a vistoria de entrada, feita por nós com o imóvel vazio, com fotos[se contas] e a leitura dos relógios[fim]
+2. Você assina o termo de entrega das chaves e o recebimento da vistoria
+3. Você tem 5 dias úteis para conferir o imóvel e nos avisar, por e-mail, o que não estiver na vistoria
 [se contas]
 CONTAS DE {CONTAS_TEXTO}
 Nós pedimos a troca de titularidade das contas de {contas_concessionarias} para o seu nome, com a autorização que está no contrato. Se a companhia pedir alguma assinatura sua, avisamos.
@@ -161,9 +161,9 @@ O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com
 
 Seja bem-vindo(a)! As chaves foram entregues em {data_chaves}.
 
-Segue anexa a vistoria de entrada assinada. Ela descreve o estado do imóvel e é a base da comparação na saída.
+Segue anexa a vistoria de entrada, feita com o imóvel vazio antes da entrega das chaves. Ela descreve o estado do imóvel e é a base da comparação na saída.
 
-Confira com calma: se encontrar algum defeito que não esteja na vistoria (ex.: vazamento, tomada sem funcionar), avise por este e-mail até {data_limite_vistoria} (10 dias), com fotos, para incluirmos no registro. Depois desse prazo, a vistoria vale como aceita, salvo defeito oculto.
+Confira com calma: se encontrar algum defeito que não esteja na vistoria (ex.: vazamento, tomada sem funcionar), avise por este e-mail até {data_limite_vistoria} (5 dias úteis), com fotos, para incluirmos no registro. Depois desse prazo, a vistoria vale como aceita, salvo defeito oculto.
 
 LEMBRETES
 [se contas]- Contas de {contas_texto}: nós cuidamos da troca de titularidade e avisamos quando estiver concluída

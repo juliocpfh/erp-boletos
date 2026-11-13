@@ -550,9 +550,9 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
         <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
-  // vistoria de entrada: o inquilino tem 10 dias, desde a entrega das chaves, para apontar defeito não descrito (cláusula da vistoria)
-  const limite = c.data_entrada ? C.somarDias(c.data_entrada, 10) : null;
-  const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}${e.chave === 'vistoria_assinada' && limite && hoje <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (10 dias da entrega das chaves).</span>` : ''}`;
+  // vistoria de entrada: o inquilino tem 5 dias úteis, desde a entrega das chaves, para apontar defeito não descrito (cláusula da vistoria)
+  const limite = c.data_entrada ? C.limiteVistoriaEntrada(c.data_entrada) : null;
+  const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}${e.chave === 'vistoria_assinada' && limite && hoje <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (5 dias úteis da entrega das chaves).</span>` : ''}`;
   const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join('')}</table></div>`;
   const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;

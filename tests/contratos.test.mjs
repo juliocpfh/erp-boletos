@@ -325,7 +325,7 @@ test('termo aditivo de vencimento (modelo C): só muda o dia, referência no mê
   assert.doesNotMatch(tb, /TESTEMUNHA/);
 });
 
-test('revisão de 2026-11-12: procuração com os números do imóvel, aviso prévio do art. 6º e vistoria com 10 dias', () => {
+test('revisão de 2026-11-12: procuração com os números do imóvel, aviso prévio do art. 6º e vistoria de entrada', () => {
   const { d, c } = base({ conta_gas: 'Por conta do inquilino', conta_condominio: 'Por conta do inquilino', conta_internet: 'Incluso no aluguel' });
   Object.assign(d.imoveis[0], { copel_uc: '12345', copel_medidor: '', sanepar_matricula: '777', sanepar_hidrometro: 'A9', gas_relogio: '55', administradora_nome: 'Adm Pinheiros' });
   const rep = K.representacaoDoContrato(d, c, d.imoveis[0]);
@@ -336,7 +336,8 @@ test('revisão de 2026-11-12: procuração com os números do imóvel, aviso pr�
   assert.match(t, /representá-lo perante a Companhia Paranaense de Energia \(COPEL\), unidade consumidora nº 12345, .*hidrômetro nº A9, a fornecedora de gás Supergasbras, relógio nº 55 e a administradora do condomínio Adm Pinheiros, no início e ao fim/);
   assert.match(t, /pagará a quantia correspondente a 1 \(um\) mês de aluguel e encargos vigentes .*art\. 6º/);
   assert.match(t, /recebe o imóvel na data da entrega das chaves/);
-  assert.match(t, /10 \(dez\) dias corridos, contados da entrega das chaves/);
+  assert.match(t, /5 \(cinco\) dias úteis, contados da entrega das chaves/);
+  assert.match(t, /feito pela LOCADORA com o imóvel desocupado, antes da entrega/);
   assert.match(t, /honorários advocatícios de 20% \(vinte por cento\)/);
   assert.doesNotMatch(t, /25%/);
   // sem água nem energia por conta do inquilino e sem as outras contas: a cláusula sai
@@ -358,6 +359,41 @@ test('modelos já gravados recebem a revisão (só o texto antigo que continua i
   assert.match(d.modelos_contrato[2].texto, /25%/, 'aditivos não mudam');
   R.normalizar(d);
   assert.equal(d.modelos_contrato[0].texto.split('DOS DADOS PESSOAIS').length, 2, 'rodar de novo não repete a LGPD');
+});
+
+test('revisão de 2026-11-13: prazo menor que 30 meses, multa, entrega, fiador, abandono, negativação, assinatura e condomínio', async () => {
+  const M = await import('../docs/js/modelos-contrato.js');
+  const gera = (extra, nome = 'Residencial') => {
+    const { d, c } = base(extra);
+    return texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === nome).texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
+  };
+  const curto = gera({ prazo_meses: 12, vigencia_fim: '2027-09-05' });
+  assert.match(curto, /só poderá ser retomado nas hipóteses do art\. 47/);
+  assert.doesNotMatch(curto, /rescindi-la a qualquer tempo/);
+  const longo = gera({ conta_condominio: 'Por conta do inquilino' });
+  assert.match(longo, /rescindi-la a qualquer tempo/);
+  assert.match(longo, /despesas extraordinárias de condomínio/);
+  assert.doesNotMatch(gera({}), /despesas extraordinárias/, 'sem condomínio, sem o parágrafo');
+  assert.match(gera({ prazo_meses: 12, finalidade: 'Não residencial' }, 'Não residencial (comercial)'), /rescindi-la a qualquer tempo/, 'comercial não tem o art. 47');
+  assert.doesNotMatch(longo, /sempre devida integralmente|tantas vezes/);
+  assert.match(longo, /O aluguel e os encargos são devidos até a data da devolução das chaves/);
+  assert.doesNotMatch(longo, /tal como na vistoria inicial|independentemente de procedimento judicial/);
+  assert.match(longo, /ata notarial ou declaração de 2 \(duas\) testemunhas/);
+  assert.match(longo, /depois do aviso prévio feito pelo próprio órgão/);
+  assert.match(longo, /assinatura eletrônica, que reconhecem como válida .* na presença de 2 \(duas\) testemunhas/);
+  assert.match(M.MODELOS_PADRAO[0].texto, /de sua exoneração da fiança, da venda ou oneração dos imóveis/);
+  const com = gera({}, 'Não residencial (comercial)');
+  assert.doesNotMatch(com, /todo atraso/);
+  assert.equal(com.split('órgãos de proteção ao crédito (SERASA').length, 2);
+  // modelo gravado na versão anterior recebe as trocas; rodar de novo não repete
+  const antigo = M.MODELOS_PADRAO[1].texto.split(M.NEGATIVACAO + '\n\n').join('').split(M.EXTRAORDINARIAS).join('');
+  const d = R.bancoVazio();
+  d.modelos_contrato.push({ id: 1, nome: 'Comercial', texto: antigo });
+  R.normalizar(d);
+  R.normalizar(d);
+  const novo = d.modelos_contrato[0].texto;
+  assert.equal(novo.split('depois do aviso prévio feito pelo próprio órgão').length, 2);
+  assert.equal(novo.split('despesas extraordinárias de condomínio').length, 2);
 });
 
 test('fiador casado: o cônjuge assina em anuência; sem ele, pendência (salvo separação total por pacto)', () => {
