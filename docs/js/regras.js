@@ -13,7 +13,7 @@ export const TABELAS = {
   iptus: 'IPTU', titularidades: 'Troca de titularidade', cobrancas: 'Boleto', recebimentos: 'Recebimento Airbnb',
   faturas: 'NF', emitentes: 'Empresa', participacoes: 'Empresa no imóvel', usuarios: 'Usuário',
   fiadores: 'Fiador', aplicacoes: 'Aplicação da garantia', correcoes_garantia: 'Correção da caução', depositos_garantia: 'Depósito da caução / garantia',
-  devolucoes_garantia: 'Devolução da garantia (troca de titular)',
+  devolucoes_garantia: 'Devolução da garantia (troca de titular ou de garantia)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
@@ -1923,7 +1923,11 @@ export function trocarGarantia(d, contratoId, dados, usuario, fiadores = {}) {
   const novos = comFiador ? (fiadores.novos || []) : [];
   const nomes = [...saem.map((f) => `sai ${f.nome}`), ...novos.map((f) => `entra ${f.nome}`)];
   const texto = `Garantia: ${c.garantia_tipo || 'não informada'} → ${dados.garantia_tipo}${nomes.length ? ` (${nomes.join(', ')})` : ''}`;
+  // garantia em dinheiro que sai (decisão da direção, 2026-11-13): é devolvida ao inquilino com a poupança; a troca guarda os
+  // depósitos um a um (para a correção) e fica o alerta "Devolver garantia" até registrar a devolução
+  const devolver = (temCaucao(c) || temDeposito(c)) && valorGarantia(d, c) > 0 && (garantiaDepositada(c) || somaDepositos(d, c, temCaucao(c) ? 'caucao' : 'deposito') > 0);
   const r = inserir(d, 'trocas_garantia', { contrato_id: c.id, data: dados.data, tipo_anterior: c.garantia_tipo || '', tipo_novo: dados.garantia_tipo,
+    ...(devolver ? { devolucao_movimentos: movimentosGarantia(d, c) } : {}),
     valor_anterior: valorGarantia(d, c), anterior, observacoes: dados.observacoes || '', fiadores_saida: [], fiadores_novos: [], fiadores_alterados: [] }, usuario, texto);
   const novo = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, dados[k] ?? null]));
   atualizar(d, 'contratos', c.id, novo, usuario, texto);
@@ -1951,6 +1955,7 @@ export function cancelarTrocaGarantia(d, trocaId, usuario) {
   const t = buscar(d, 'trocas_garantia', trocaId);
   if (!t) throw new Error('Registro não encontrado.');
   if (trocasGarantiaDo(d, t.contrato_id)[0].id !== t.id) throw new Error('Só a troca de garantia mais recente pode ser cancelada.');
+  if (devolucaoDaTrocaDeGarantia(d, t.id)) throw new Error('A devolução da garantia anterior já foi registrada: exclua a devolução antes de cancelar a troca.');
   const texto = `Troca de garantia cancelada: volta para ${t.tipo_anterior || 'não informada'}`;
   const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, (t.anterior || {})[k] ?? null]));
   if (!t.anterior) anterior.garantia_tipo = t.tipo_anterior || null;
@@ -3012,6 +3017,26 @@ export function completarHeranca(d, novoId, usuario) {
  */
 export const garantiaNova = (c) => !!(c && c.garantia_na_troca === 'nova');
 export const devolucoesGarantiaDo = (d, contratoId) => (d.devolucoes_garantia || []).filter((x) => x.contrato_id === contratoId);
+/** Devolução na troca de titular (a do contrato anterior); as das trocas de garantia têm ``troca_id``. */
+export const devolucoesDaTrocaDeTitular = (d, contratoId) => devolucoesGarantiaDo(d, contratoId).filter((x) => !x.troca_id);
+export const devolucaoDaTrocaDeGarantia = (d, trocaId) => (d.devolucoes_garantia || []).find((x) => x.troca_id === trocaId) || null;
+
+/**
+ * Decisão da direção (2026-11-13): garantia em dinheiro (caução ou depósito) nunca passa de um inquilino a outro nem de uma
+ * garantia a outra. Na troca de titular e na troca de garantia, a empresa saca o valor com a poupança e devolve a quem
+ * depositou; quem entra (ou a garantia nova) faz o depósito do valor certo. Ex.: caução de João, R$ 3.800,00 depositados,
+ * R$ 4.371,39 com a poupança → devolve R$ 4.371,39 a João; Maria deposita 2 × R$ 1.900,00 = R$ 3.800,00.
+ * Diz se a garantia do contrato é das que se devolvem (a tela da troca de titular não oferece "continua a mesma").
+ */
+export const garantiaDevolvidaNaTroca = (c) => !!c && (temCaucao(c) || temDeposito(c));
+
+/**
+ * Trocas de garantia em que saiu caução ou depósito ainda não devolvido: [{ troca, valor }]. Só as trocas feitas depois da
+ * decisão (guardam ``devolucao_movimentos``): as antigas ficam como estavam (o que houve está nas observações da troca).
+ */
+export const devolucoesDeTrocaPendentes = (d, c) => trocasGarantiaDo(d, c.id)
+  .filter((t) => t.devolucao_movimentos && t.valor_anterior > 0 && !devolucaoDaTrocaDeGarantia(d, t.id))
+  .map((t) => ({ troca: t, valor: t.valor_anterior }));
 
 /**
  * Contrato anterior (troca de titular com garantia nova) com caução ou depósito ainda não devolvido: { herdeiro, valor } ou null.
@@ -3019,7 +3044,7 @@ export const devolucoesGarantiaDo = (d, contratoId) => (d.devolucoes_garantia ||
  */
 export function devolucaoGarantiaPendente(d, a) {
   const n = continuadoPor(d, a);
-  if (!garantiaNova(n) || !(temCaucao(a) || temDeposito(a)) || devolucoesGarantiaDo(d, a.id).length) return null;
+  if (!garantiaNova(n) || !(temCaucao(a) || temDeposito(a)) || devolucoesDaTrocaDeTitular(d, a.id).length) return null;
   const depositado = garantiaDepositada(a) || somaDepositos(d, a, temCaucao(a) ? 'caucao' : 'deposito') > 0;
   const valor = valorGarantia(d, a);
   return depositado && valor > 0 ? { herdeiro: n, valor } : null;
@@ -3028,15 +3053,23 @@ export function devolucaoGarantiaPendente(d, a) {
 /**
  * Devolução da garantia ao titular anterior (troca com garantia nova): como no cálculo final da saída, a garantia corrigida
  * pela poupança menos os débitos dele. Ex.: R$ 5.670,00 + 1,20% = R$ 5.738,04; débitos R$ 300,00 → devolve R$ 5.438,04.
- * ``id``: edita a devolução já registrada.
+ * ``id``: edita a devolução já registrada. Com ``dados.troca_id``: devolução da caução ou do depósito que saiu numa troca de
+ * garantia do mesmo inquilino (ex.: caução → fiador), do mesmo jeito.
  */
 export function salvarDevolucaoGarantia(d, contratoId, dados, usuario, id = null) {
   const a = buscar(d, 'contratos', contratoId);
-  if (!garantiaNova(continuadoPor(d, a))) throw new Error('A garantia deste contrato continua com o novo titular: não há devolução na troca.');
-  if (!id && devolucoesGarantiaDo(d, a.id).length) throw new Error('A devolução da garantia já foi registrada.');
+  const trocaId = dados.troca_id || (id && (buscar(d, 'devolucoes_garantia', id) || {}).troca_id) || null;
+  const troca = trocaId ? buscar(d, 'trocas_garantia', trocaId) : null;
+  if (trocaId) {
+    if (!troca || troca.contrato_id !== a.id || !(troca.valor_anterior > 0)) throw new Error('Troca de garantia não encontrada, ou sem caução nem depósito a devolver.');
+    if (!id && devolucaoDaTrocaDeGarantia(d, troca.id)) throw new Error('A devolução da garantia desta troca já foi registrada.');
+  } else {
+    if (!garantiaNova(continuadoPor(d, a))) throw new Error('A garantia deste contrato continua com o novo titular: não há devolução na troca.');
+    if (!id && devolucoesDaTrocaDeTitular(d, a.id).length) throw new Error('A devolução da garantia já foi registrada.');
+  }
   const { garantia_corrigida, saldo } = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
-  const reg = { ...dados, contrato_id: a.id, garantia_corrigida, saldo };
-  const texto = `${a.inquilino_nome}: garantia devolvida em ${C.dataBr(dados.data)}, ${C.reais(saldo)} (troca de titular com garantia nova)`;
+  const reg = { ...dados, contrato_id: a.id, troca_id: trocaId, garantia_corrigida, saldo };
+  const texto = `${a.inquilino_nome}: garantia devolvida em ${C.dataBr(dados.data)}, ${C.reais(saldo)} (${troca ? `troca de garantia de ${C.dataBr(troca.data)}` : 'troca de titular com garantia nova'})`;
   if (!id) return inserir(d, 'devolucoes_garantia', reg, usuario, texto);
   atualizar(d, 'devolucoes_garantia', id, reg, usuario, texto);
   return buscar(d, 'devolucoes_garantia', id);
@@ -3051,6 +3084,12 @@ export function alertaDevolucaoGarantia(d, a, hoje = C.hojeIso()) {
   if (p && (p.herdeiro.data_entrada || p.herdeiro.vigencia_inicio || hoje) <= hoje) {
     return { nivel: 'aviso', tipo: 'Devolver garantia', ancora: 'garantia',
       texto: `${p.herdeiro.inquilino_nome} assumiu o contrato com garantia nova: devolva ${temCaucao(a) ? 'a caução' : 'o depósito de garantia'} de ${C.reais(p.valor)} a ${a.inquilino_nome} (com a correção, descontados os débitos) e registre a devolução.` };
+  }
+  // troca de garantia do mesmo inquilino: a caução ou o depósito que saiu volta a ele, com a poupança
+  const t = devolucoesDeTrocaPendentes(d, a)[0];
+  if (t) {
+    return { nivel: 'aviso', tipo: 'Devolver garantia', ancora: 'garantia',
+      texto: `Garantia trocada em ${C.dataBr(t.troca.data)} (${t.troca.tipo_anterior} → ${t.troca.tipo_novo}): devolva ${C.reais(t.valor)} a ${a.inquilino_nome}, com a correção da poupança, e registre a devolução.` };
   }
   const x = devolucoesGarantiaDo(d, a.id).find((y) => !y.comprovante && y.saldo > 0);
   return x ? { nivel: 'aviso', tipo: 'Comprovante a buscar no banco', ancora: 'garantia',

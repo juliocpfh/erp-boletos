@@ -288,7 +288,8 @@ export const CADASTROS = {
       const anteriorHerdado = r ? R.contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar('contratos', dados.contrato_anterior_id);
       const herdado = !!anteriorHerdado;
       // garantia nova na troca (escolha na janela "Continuar o contrato"): o novo titular presta a sua, livre
-      if (!r && herdado) dados.garantia_na_troca = (memoria.continuacao && memoria.continuacao.garantia) || 'continua';
+      // (decisão da direção, 2026-11-13: caução ou depósito do anterior é sempre devolvido a ele; o novo deposita a sua)
+      if (!r && herdado) dados.garantia_na_troca = R.garantiaDevolvidaNaTroca(anteriorHerdado) ? 'nova' : (memoria.continuacao && memoria.continuacao.garantia) || 'continua';
       if (r && herdado && !R.garantiaNova(r)) for (const k of CAMPOS_GARANTIA_HERDADA) dados[k] = r[k] ?? null;
       if (herdado) {
         const fonte = r || { ...anteriorHerdado, ...R.condicoesDoContrato(d(), anteriorHerdado, dados.data_entrada) };
@@ -717,11 +718,14 @@ export const CADASTROS = {
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
   },
   devolucoes_garantia: {
-    titulo: (r, q) => `Devolução da garantia (troca de titular) - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    titulo: (r, q) => `Devolução da garantia (${(r ? r.troca_id : q.troca) ? 'troca de garantia' : 'troca de titular'}) - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
     campos: () => F.DEVOLUCAO_GARANTIA,
     // como no cálculo final da saída: a garantia atual e os boletos em aberto como débitos
     padrao: (q) => {
       const c = buscar('contratos', q.contrato);
+      // troca de garantia do mesmo inquilino: o valor que saiu na troca; ele continua no imóvel (os boletos em aberto seguem sendo cobrados)
+      const t = q.troca && buscar('trocas_garantia', q.troca);
+      if (t) return { data: C.hojeIso(), garantia_valor: t.valor_anterior };
       const aberto = R.cobrancasEmAberto(d(), c.id);
       return { data: C.hojeIso(), garantia_valor: R.valorGarantia(d(), c), debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0) || null,
         debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n') };
@@ -729,6 +733,8 @@ export const CADASTROS = {
     aviso: (r, q) => {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       const n = R.continuadoPor(d(), c);
+      const t = buscar('trocas_garantia', r ? r.troca_id : q.troca);
+      if (t) return `Garantia trocada em ${dataBr(t.data)} (${t.tipo_anterior} → ${t.tipo_novo}): ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} é devolvid${t.tipo_anterior === 'Caução' ? 'a' : 'o'} a ${c.inquilino_nome}, corrigid${t.tipo_anterior === 'Caução' ? 'a' : 'o'} pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar). Devolva pela conta em que foi aplicada.`;
       return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
     },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
@@ -738,7 +744,7 @@ export const CADASTROS = {
       return conferirComprovantes(COMPROVANTE_DEVOLUCAO, dados, r, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_DEVOLUCAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
-    salvar: (db, dados, q, r) => R.salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), dados, login(), r ? r.id : null),
+    salvar: (db, dados, q, r) => R.salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), { ...dados, ...(!r && q.troca ? { troca_id: Number(q.troca) } : {}) }, login(), r ? r.id : null),
   },
   trocas_garantia: {
     titulo: (r, q) => `Trocar garantia ou fiador - ${buscar('contratos', q.contrato).inquilino_nome}`,

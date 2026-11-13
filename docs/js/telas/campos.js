@@ -151,7 +151,11 @@ function ligarContinuacaoDeContrato(raiz) {
     const r = await janela({ titulo: `Continuar o contrato de ${anterior.inquilino_nome}`, sim: 'Continuar o contrato',
       html: `<p>O novo inquilino assume o contrato de <b>${nomeAnt}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${C.hojeIso()}" required></p>
-        ${temGarantia ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ''}</label></p>
+        ${dinheiro ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ''}</label></p>
+        <p>É <b>devolvida a ${nomeAnt}</b>, com a correção da poupança, descontados os débitos até a véspera (registre a devolução na página de ${nomeAnt}).
+          O novo inquilino <b>deposita a garantia dele</b>, no valor certo pelo aluguel de hoje, com data e comprovante próprios (pode ser de outro tipo).</p>
+        <p class="suave">Garantia em dinheiro não passa de um inquilino a outro. Isso entra no termo aditivo da troca, para quem sai e quem entra darem ciência.</p>`
+    : temGarantia ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ''}</label></p>
         <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="continua" checked> Continua a mesma: passa para o novo inquilino${dinheiro ? ', com o comprovante do depósito, as correções e a aplicação' : ''}</label></p>
         <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="nova"> Garantia nova: ${dinheiro ? `a de ${nomeAnt} é devolvida a ${nomeAnt} (corrigida, descontados os débitos)` : `a de ${nomeAnt} vale só até a véspera`}
           e o novo inquilino presta a sua, com depósito e comprovante próprios (pode ser de outro tipo)</label></p>
@@ -164,7 +168,7 @@ function ligarContinuacaoDeContrato(raiz) {
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
-    const garantia = temGarantia && (r.garantia || [])[0] === 'nova' ? 'nova' : 'continua';
+    const garantia = dinheiro || (temGarantia && (r.garantia || [])[0] === 'nova') ? 'nova' : 'continua';
     memoria.continuacao = { anteriorId: anterior.id, data, arquivo: arq && arq.size ? arq : null, garantia };
     const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
     const cond = R.condicoesDoContrato(d(), anterior, data);
@@ -566,8 +570,10 @@ function ligarPoupancaDaGarantia(raiz) {
   const [, tabela, consulta] = location.hash.match(/^#\/novo\/(devolucoes_garantia|encerramentos)\?(.*)$/) || [];
   const el = form && tabela && form.querySelector('[name=indice_percentual]');
   const c = el && buscar('contratos', new URLSearchParams(consulta).get('contrato'));
-  if (!c || !(R.temCaucao(c) || R.temDeposito(c))) return;
-  const movimentos = R.movimentosGarantia(d(), c);
+  // troca de garantia do mesmo inquilino: os depósitos da garantia que saiu ficaram guardados na troca
+  const troca = c && tabela === 'devolucoes_garantia' && buscar('trocas_garantia', new URLSearchParams(consulta).get('troca'));
+  if (!c || !(troca ? troca.devolucao_movimentos : R.temCaucao(c) || R.temDeposito(c))) return;
+  const movimentos = troca ? troca.devolucao_movimentos : R.movimentosGarantia(d(), c);
   const dataEl = form.querySelector('[name=data]');
   let pedido = 0;
   let trazido = null; // % que veio do Banco Central: troca quando a data muda, salvo se o usuário digitou outro

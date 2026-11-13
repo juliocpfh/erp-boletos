@@ -293,7 +293,8 @@ export async function cienciaDaTroca(contratoId) {
     titulo: 'Termo da troca de titular: todo o vínculo será herdado', sim: 'Estou ciente: anexar', forte: true,
     html: `<p>Com o termo assinado, <b>todo o vínculo</b> de ${esc(a.inquilino_nome)} passa para <b>${esc(c.inquilino_nome)}</b>:</p>
       <ul>${linhas.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
-      ${g ? `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao('continua', g.continua)}${opcao('nova', g.nova)}` : ''}
+      ${!g ? '' : g.dinheiro && R.garantiaNova(c) ? `<p><b>Garantia:</b> ${esc(g.nova.replace(/^Garantia: /, ''))}. Garantia em dinheiro não passa de um inquilino a outro.</p><input type="hidden" name="garantia" value="nova">`
+    : `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao('continua', g.continua)}${opcao('nova', g.nova)}`}
       <p><label class="check" style="padding-top:0;font-weight:normal"><input type="checkbox" name="ciente" value="1" required>
         Eu, <b>${esc((E.usuario && E.usuario.nome) || login())}</b>, conferi o termo assinado por todos e estou ciente de que todo o vínculo passa para ${esc(c.inquilino_nome)}.</label></p>
       <p class="suave">A ciência fica registrada no termo (quem e quando).</p>`,
