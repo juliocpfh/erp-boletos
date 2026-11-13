@@ -980,6 +980,28 @@ test('documentos de entrada: quem continua o contrato de outro herda os document
   assert.equal(R.aditivosDo(d, R.cadeiaDeContratos(d, novo).antes[0].id).length, 2, 'mais de um aditivo no histórico');
 });
 
+test('antecedência dos alertas: editada na tela dos alertas, guardada nas regras do sistema', () => {
+  const d = R.bancoVazio();
+  try {
+    assert.deepEqual(R.antecedenciaAlerta('IPTU do proprietário'), { chave: 'antecedencia_iptu', valor: 15, padrao: 15, unidade: 'dias', min: 0, max: 365 });
+    assert.equal(R.antecedenciaAlerta('Reajuste do aluguel').unidade, 'meses');
+    assert.equal(R.antecedenciaAlerta('Inadimplência'), null, 'alerta sem prazo');
+    const c = R.inserir(d, 'contratos', { inquilino_nome: 'X', data_entrada: '2025-03-15', vigencia_inicio: '2025-03-15', aluguel_inicial: 100000, dia_vencimento: 10 }, 'j');
+    const reajuste = (hoje) => R.alertasContrato(d, c, hoje).some((x) => x.tipo === 'Reajuste do aluguel');
+    assert.ok(!reajuste('2026-01-20'), 'padrão: 1 mês antes (só em 02/2026)');
+    assert.ok(reajuste('2026-02-05'));
+    R.salvarEstilosAlertas(d, {}, 'julio', { 'Reajuste do aluguel': '2', 'IPTU do proprietário': 30 });
+    assert.ok(reajuste('2026-01-20'), '2 meses antes: já em 01/2026');
+    assert.equal(R.regra('antecedencia_iptu'), 30);
+    assert.deepEqual(d.config_regras.map((x) => x.chave).sort(), ['antecedencia_iptu', 'antecedencia_reajuste']);
+    assert.throws(() => R.salvarEstilosAlertas(d, {}, 'julio', { 'Reajuste do aluguel': 9 }), /máximo é 3/);
+    R.salvarEstilosAlertas(d, {}, 'julio', { 'Reajuste do aluguel': 0 });
+    assert.ok(!reajuste('2026-02-05') && reajuste('2026-03-05'), '0: só no mês do reajuste');
+    R.salvarEstilosAlertas(d, {}, 'julio', 'padrao');
+    assert.equal(d.config_regras.length, 0, 'voltar ao padrão apaga os prazos escolhidos');
+  } finally { R.salvarEstilosAlertas(d, {}, 'julio', 'padrao'); }
+});
+
 test('aparência dos alertas: padrão do sistema, escolha do usuário e ordem pela prioridade', () => {
   const { d } = base();
   assert.deepEqual(R.estiloAlerta(d, 'Vigência do contrato'), { cor: 'Vermelho', enfase: 'Forte', prioridade: 1 });

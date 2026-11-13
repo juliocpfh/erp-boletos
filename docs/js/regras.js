@@ -1261,7 +1261,7 @@ export function guiasIptuAPagar(d, hoje = C.hojeIso(), dias = 60) {
 
 export function alertasIptu(d, hoje = C.hojeIso()) {
   const lista = [];
-  for (const { iptu: p, parcela: pc, imovel: i, venc, faltam } of guiasIptuAPagar(d, hoje, 15)) {
+  for (const { iptu: p, parcela: pc, imovel: i, venc, faltam } of guiasIptuAPagar(d, hoje, CR.regra('antecedencia_iptu'))) {
     lista.push({ nivel: faltam < 0 ? 'perigo' : 'aviso', tipo: 'IPTU do proprietário', imovel_id: i.id, imovel: i.nome, inquilino: '', ancora: 'iptu',
       texto: `IPTU ${p.ano} ${pc.rotulo} ${pc.n ? 'parcela' : ''} de ${C.reais(pc.valor)} ${faltam < 0 ? `venceu em ${C.dataBr(venc)}` : `vence em ${C.dataBr(venc)}`}${pc.vencimento ? '' : ' (vencimento estimado)'}. ${pc.n === 0 ? 'Pago à vista pelo proprietário.' : pc.valorInquilino ? `Sua parte: ${C.reais(pc.valorProprietario)} (o inquilino paga ${C.reais(pc.valorInquilino)} no boleto, pelos dias em que ocupou).` : 'Imóvel vazio ou sem cobrança de IPTU: a parcela é toda sua.'}`.replace('  ', ' ') });
   }
@@ -2525,7 +2525,7 @@ function alertaFiador(d, c, hoje) {
   if (atuais.some((f) => !f.data_saida)) return null;
   const fim = atuais.map((f) => f.data_saida).sort().pop();
   const faltam = C.diasEntre(hoje, fim);
-  return faltam <= 60 ? { nivel: 'aviso', tipo: 'Fiador', texto: `O vínculo do fiador termina em ${C.dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação ou outra garantia.` } : null;
+  return faltam <= CR.regra('antecedencia_fiador') ? { nivel: 'aviso', tipo: 'Fiador', texto: `O vínculo do fiador termina em ${C.dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação ou outra garantia.` } : null;
 }
 
 /**
@@ -3835,10 +3835,33 @@ export const ESTILOS_ALERTA_PADRAO = {
   'Reajuste do aluguel': { cor: 'Laranja', enfase: 'Forte', prioridade: 2 },
   'A verificar': { cor: 'Amarelo', enfase: 'Normal', prioridade: 3 },
 };
+/** Quanto tempo antes aparece cada alerta com prazo: a regra do sistema que o guarda (também em Regras do sistema). */
+export const ANTECEDENCIA_ALERTA = {
+  'Vigência do contrato': 'antecedencia_vigencia', 'Reajuste do aluguel': 'antecedencia_reajuste', 'Seguro obrigatório': 'antecedencia_seguro',
+  'IPTU do proprietário': 'antecedencia_iptu', 'Reserva do imóvel': 'antecedencia_reserva', 'Fiador': 'antecedencia_fiador',
+};
+/** Antecedência do alerta do tipo: { chave, valor, padrao, unidade ('dias' | 'meses'), min, max } (null: alerta sem prazo). */
+export function antecedenciaAlerta(tipo) {
+  const chave = ANTECEDENCIA_ALERTA[tipo];
+  const def = chave && CR.definicaoRegra(chave);
+  return def ? { chave, valor: CR.regra(chave), padrao: def.padrao, unidade: /meses/.test(def.rotulo) ? 'meses' : 'dias', min: def.min, max: def.max } : null;
+}
 export const estiloAlerta = (d, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...((d && d.estilos_alertas) || {})[tipo] });
 
-/** Grava a aparência escolhida para cada tipo de alerta (só o que difere do padrão do sistema). */
-export function salvarEstilosAlertas(d, estilos, usuario) {
+/**
+ * Grava a aparência escolhida para cada tipo de alerta (só o que difere do padrão do sistema) e, com ``antecedencias``
+ * ({ tipo: número }), quanto tempo antes cada alerta com prazo aparece (fica nas Regras do sistema; ``'padrao'``: todas voltam ao padrão).
+ * Ex.: { 'IPTU do proprietário': 30 } → a guia de 10/03 aparece em 08/02.
+ */
+export function salvarEstilosAlertas(d, estilos, usuario, antecedencias = null) {
+  if (antecedencias) {
+    const valores = { ...CR.escolhasDe(d) };
+    for (const [tipo, chave] of Object.entries(ANTECEDENCIA_ALERTA)) {
+      if (antecedencias === 'padrao') delete valores[chave];
+      else if (tipo in antecedencias) valores[chave] = antecedencias[tipo];
+    }
+    salvarRegrasSistema(d, valores, usuario, 'Antecedência dos alertas');
+  }
   const novo = {};
   for (const [tipo, e] of Object.entries(estilos)) {
     const p = Math.round(Number(e.prioridade));
@@ -5007,10 +5030,10 @@ export function vencimentoDoReajuste(d, c, comp) {
 }
 
 /** Próximo reajuste a tratar: o último que já devia ter acontecido (ou acontece no mês seguinte), sem correção ou sem carta. */
-export function reajustePendente(d, c, hoje = C.hojeIso()) {
+export function reajustePendente(d, c, hoje = C.hojeIso(), meses = 1) {
   const p = mesDeAniversario(c);
   if (!p) return null;
-  const limite = C.somarMeses(C.competenciaDe(hoje), 1);
+  const limite = C.somarMeses(C.competenciaDe(hoje), meses);
   const n = Math.floor(C.mesesEntre(p, limite) / 12);
   if (n < 1) return null;
   const r = reajusteNaCompetencia(d, c, competenciaDoReajuste(c, n), hoje);
@@ -5089,7 +5112,7 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
  * no mês X, corrigir antes de gerar o boleto de X e mandar a carta junto com ele; depois disso, atrasado.
  */
 function alertaReajuste(d, c, hoje) {
-  const r = reajustePendente(d, c, hoje);
+  const r = reajustePendente(d, c, hoje, CR.regra('antecedencia_reajuste'));
   if (!r) return null;
   const mesHoje = C.competenciaDe(hoje);
   const indice = c.indice_correcao || 'índice do contrato';

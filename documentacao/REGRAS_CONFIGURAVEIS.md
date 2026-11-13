@@ -71,6 +71,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | D4 | Movimentação do banco sem destino vira alerta | Depois de 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D5 | Extrato "recente" no fechamento do mês | Buscado há até 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D6 | Antecedência dos alertas de seguro e de fim do contrato | 60 dias | [C] dias (cada um) | 60 (hoje). Contrato comercial com direito a renovação: a ação tem de entrar entre 1 ano e 6 meses antes do fim (LI art. 51, §5º); sugerir 365 dias para esses | |
+| D6b | Antecedência dos outros alertas com prazo (13/11/2026) | IPTU do proprietário 15 dias; fim do vínculo do fiador 60 dias; reajuste 1 mês; uso da reserva 1 mês | [C] cada um (`antecedencia_iptu`, `antecedencia_fiador`, `antecedencia_reajuste` 0–3 meses, `antecedencia_reserva`) | Hoje. Rotina. Editáveis também na tela dos alertas (Painel → Alertas → Editar, coluna "Aparece"), junto com os de D6 (`ANTECEDENCIA_ALERTA`, `regras.js`) | |
 | D7 | Contrato sem imóvel é apagado | Depois de 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D8 | Etiqueta "alugado em X: veja se ficou conta nossa" | Até 2 meses depois da entrada | [C] meses | 2 (hoje). Rotina | |
 | D9 | Avisos antes de salvar | Pagamento de mais de 90 dias atrás; data até 60 dias no futuro; IPTU/seguro 30% fora do anterior | [C] cada número | Hoje. Rotina | |
