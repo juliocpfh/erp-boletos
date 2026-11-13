@@ -3,7 +3,7 @@
 import * as alertas from './alertas.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato, TIPO_ADITIVO_TROCA, vistoriaDeEntrada } from './contratos.js';
+import { locadorasDoContrato, modelosDe, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
@@ -170,6 +170,12 @@ export function normalizar(d) {
     const corpo = ini + '## DA GARANTIA\n'.length;
     m.texto = `${t.slice(0, corpo)}\n[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
   }
+  // termo de troca de inquilino (2026-11-13): contas de consumo trocadas pela empresa, com a autorização de quem sai e de quem entra
+  for (const m of d.modelos_contrato || []) {
+    if (m.tipo !== 'aditivo_troca' || !m.texto) continue;
+    const novo = atualizarTextoModelo(m.texto);
+    if (novo !== m.texto.replace(/\r\n/g, '\n')) m.texto = novo;
+  }
   // o Estado (UF) do imóvel passou a ser guardado: vem do CEP
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
   // contrato sem imóvel passou a ter prazo para ser vinculado: os que já existiam contam a partir de hoje
@@ -204,6 +210,13 @@ export function normalizar(d) {
   const movimentacoes = new Set(d.movimentacoes_banco.map((m) => m.id));
   for (const x of d.despesas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
   for (const x of d.cobrancas) if (x.movimentacao_id && !movimentacoes.has(x.movimentacao_id)) x.movimentacao_id = null;
+  // troca de titular (2026-11-13): a apólice que passou ao novo titular guarda de quem veio (`herdado_de`), para continuar no
+  // histórico do anterior. Trocas antigas: apólice do novo com vigência começando antes da troca só pode ter vindo do anterior.
+  for (const n of d.contratos) {
+    const inicio = n.data_entrada || n.vigencia_inicio;
+    if (!n.contrato_anterior_id || !n.heranca_transferida || !inicio) continue;
+    for (const s of d.seguros) if (s.contrato_id === n.id && s.herdado_de === undefined && s.vigencia_inicio && s.vigencia_inicio < inicio) s.herdado_de = n.contrato_anterior_id;
+  }
   return d;
 }
 
@@ -1817,14 +1830,37 @@ export function registrarRenovacao(d, contratoId, dados, usuario) {
     inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: dados.data, indice: 'Negociado', renovacao_id: r.id,
       percentual: anterior ? C.percentualPorDesconto(anterior, dados.novo_valor - anterior) : 0,
       valor_anterior: anterior, valor_novo: dados.novo_valor, observacoes: dados.tipo }, usuario, `Novo valor negociado: ${C.reais(dados.novo_valor)}`);
+    // bonificação combinada junto com o novo valor (cheio, bonificado e %, como no contrato): vale para o contrato
+    const pctNovo = dados.novo_percentual;
+    if (pctNovo !== null && pctNovo !== undefined && pctNovo !== percentualBonificacao(c)) {
+      atualizar(d, 'contratos', c.id, { desconto_pontualidade_percentual: pctNovo, bonificacao: pctNovo > 0 }, usuario, `Bonificação passa a ${String(pctNovo).replace('.', ',')}% (novo valor negociado)`);
+    }
+    // termo aditivo do novo valor (pedido do dono, 2026-11-13): fica aguardando a assinatura (o aceite), anexada depois em
+    // "Termos aditivos"; o e-mail da etapa manda o termo para assinar
+    const modelo = modelosDe(d, 'aditivo_valor')[0];
+    const pctFinal = pctNovo !== null && pctNovo !== undefined ? pctNovo : percentualBonificacao(c);
+    if (modelo) {
+      inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: TIPO_ADITIVO_VALOR, data: C.hojeIso() < dados.data ? C.hojeIso() : dados.data,
+        data_vigencia: dados.data, valor_anterior: anterior, valor_novo: dados.novo_valor, percentual: pctFinal, renovacao_id: r.id, numero: proximoNumeroAditivo(d, c),
+        testemunhas: [], modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto, arquivo: null,
+        assunto: `Novo valor do aluguel: ${C.reais(anterior)} → ${C.reais(dados.novo_valor)}, a partir de ${C.dataBr(dados.data)}` },
+      usuario, `${c.inquilino_nome}: termo aditivo do novo valor gerado (aguardando o aceite assinado)`);
+    }
   }
   return r;
 }
+
+/** Termo aditivo do novo valor criado com a renovação (o aceite), ou null. */
+export const aditivoDaRenovacao = (d, renovacaoId) => d.aditivos.find((a) => a.renovacao_id === renovacaoId && a.tipo === TIPO_ADITIVO_VALOR) || null;
 
 /** Exclui um registro de renovação e o novo valor negociado que ele criou. O prazo do contrato não volta sozinho. */
 export function excluirRenovacao(d, renovacaoId, usuario) {
   const r = buscar(d, 'renovacoes', renovacaoId);
   if (!r) throw new Error('Registro não encontrado.');
+  // o termo do novo valor ainda sem assinatura sai junto; já assinado (aceite anexado), precisa ser excluído antes, à mão
+  const termo = aditivoDaRenovacao(d, r.id);
+  if (termo && (termo.arquivo || termo.assinado_em || termo.perdido_em)) throw new Error('O termo aditivo do novo valor já foi assinado: exclua o termo em "Termos aditivos" antes.');
+  if (termo) excluir(d, 'aditivos', termo.id, usuario, 'Termo aditivo do novo valor excluído com a renovação');
   for (const x of d.correcoes.filter((y) => y.renovacao_id === r.id)) excluir(d, 'correcoes', x.id, usuario, 'Novo valor negociado excluído com a renovação');
   excluir(d, 'renovacoes', r.id, usuario, `${r.tipo} excluído`);
 }
@@ -2767,6 +2803,33 @@ export function mesesUsoReserva(d, a) {
   return [...new Set(meses)].sort();
 }
 
+/**
+ * O que passa ao novo titular quando o termo da troca é anexado (para a janela de ciência de quem anexa): textos curtos.
+ * Ex.: ["Contrato, prazo e reajuste: continuam os de Fulano (o prazo não recomeça)", "Caução de R$ 4.000,00 …", …].
+ */
+export function resumoDaHeranca(d, n) {
+  const a = contratoHerdado(d, n);
+  if (!a) return [];
+  const data = n.data_entrada || n.vigencia_inicio;
+  const comp = data ? data.slice(0, 7) : null;
+  const out = [`Contrato, prazo e reajuste: continuam os de ${a.inquilino_nome} (o prazo não recomeça; reajuste no aniversário do contrato original)`];
+  const boletos = comp ? d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia >= comp && !faturasDe(d, 'cobranca', cb.id, false).length) : [];
+  out.push(boletos.length ? `Boletos a partir de ${C.compBr(comp)} sem NF (${boletos.length}): passam para o nome de ${n.inquilino_nome}` : `Boletos: a partir de ${data ? C.dataBr(data) : 'a troca'} saem no nome de ${n.inquilino_nome}`);
+  if (garantiaNova(n)) out.push(`Garantia: nova (a de ${a.inquilino_nome} é devolvida a ele; ${n.inquilino_nome} presta a sua)`);
+  else if (temCaucao(a) || temDeposito(a)) out.push(`Garantia: ${temCaucao(a) ? 'caução' : 'depósito de garantia'} de ${C.reais(valorGarantia(d, a))} passa a garantir ${n.inquilino_nome}, com o comprovante, as correções e a aplicação`);
+  else if (a.garantia_tipo && a.garantia_tipo !== 'Sem garantia') out.push(`Garantia: ${a.garantia_tipo} continua (os fiadores garantem ${n.inquilino_nome})`);
+  const reserva = a.reserva_valor > 0 ? saldoReserva(d, a) : 0;
+  if (reserva > 0) out.push(`Reserva: saldo de ${C.reais(reserva)} passa para ${n.inquilino_nome}`);
+  const seguros = segurosAHerdar(d, n, a);
+  if (seguros.length) out.push(`Seguro: apólice em vigência (${seguros.map((s) => `${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}`).join('; ')}) passa para ${n.inquilino_nome}; no histórico de ${a.inquilino_nome} ela continua aparecendo`);
+  out.push(`${a.inquilino_nome} fica com fim do vínculo em ${data ? C.dataBr(C.somarDias(data, -1)) : 'a véspera da troca'} e continua respondendo pelo período até essa data`);
+  out.push(`Contas de consumo: a empresa troca a titularidade para o nome de ${n.inquilino_nome} (autorização no termo)`);
+  return out;
+}
+
+/** Apólices que passaram deste contrato ao novo titular na troca (continuam no histórico do anterior, só para consulta). */
+export const segurosPassadosAoHerdeiro = (d, contratoId) => d.seguros.filter((s) => contratoId && s.herdado_de === contratoId && s.contrato_id !== contratoId);
+
 /** Apólices do anterior ainda em vigência na troca de titular (fim da vigência na data da troca ou depois): vão ao herdeiro. */
 const segurosAHerdar = (d, n, a) => {
   const data = n.data_entrada || n.vigencia_inicio;
@@ -2782,7 +2845,7 @@ export function herdarSeguros(d, n, a, usuario) {
   const arquivos = [];
   for (const s of segurosAHerdar(d, n, a)) {
     arquivos.push(...[s.arquivo_apolice, ...(s.outros_arquivos || [])].filter(Boolean));
-    atualizar(d, 'seguros', s.id, { contrato_id: n.id }, usuario, `Seguro (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}) passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
+    atualizar(d, 'seguros', s.id, { contrato_id: n.id, herdado_de: a.id }, usuario, `Seguro (vigência ${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}) passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
   }
   return [...new Set(arquivos)];
 }
@@ -4908,7 +4971,10 @@ export const competenciaDoReajuste = (c, n) => { const p = mesDeAniversario(c); 
  * Correção já registrada para o reajuste da competência: aceita registro de até 3 meses antes até 1 mês depois
  * (contratos que entraram no meio do mês e foram corrigidos pela regra antiga, no mês seguinte).
  */
-const correcaoDoReajuste = (d, c, comp) => correcoesDo(d, c.id).find((x) => x.data_vigencia >= `${C.somarMeses(comp, -3)}-01` && x.data_vigencia <= `${C.somarMeses(comp, 1)}-31`) || null;
+const correcaoDoReajuste = (d, c, comp) => correcoesDo(d, c.id).find((x) => x.data_vigencia >= `${C.somarMeses(comp, -3)}-01` && x.data_vigencia <= `${C.somarMeses(comp, 1)}-31`)
+  // novo valor negociado (pedido do dono, 2026-11-13): substitui o reajuste em aberto, mesmo combinado meses depois do aniversário
+  // (até o próximo). Ex.: reajuste de 08/2026 em aberto, novo valor negociado a partir de 01/11/2026 → o reajuste de 08/2026 sai da lista
+  || correcoesDo(d, c.id).find((x) => x.indice === 'Negociado' && x.data_vigencia >= `${comp}-01` && x.data_vigencia < `${C.somarMeses(comp, 12)}-01`) || null;
 const cartaDoReajuste = (d, c, comp) => d.cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp) || null;
 
 /**
@@ -4931,7 +4997,7 @@ export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso()) {
   const corrigido = correcaoDoReajuste(d, c, comp);
   const carta = cartaDoReajuste(d, c, comp);
   const comCarta = comp.slice(0, 4) >= hoje.slice(0, 4);
-  return { n, anos: n, competencia: comp, corrigido, carta, comCarta, faltaCarta: comCarta && !carta && (!corrigido || comp >= CARTA_COM_BOLETO_CORRIGIDO_DESDE) };
+  return { n, anos: n, competencia: comp, corrigido, carta, comCarta, faltaCarta: comCarta && !carta && !(corrigido && corrigido.indice === 'Negociado') && (!corrigido || comp >= CARTA_COM_BOLETO_CORRIGIDO_DESDE) };
 }
 
 /** Vencimento do boleto do aluguel corrigido (é com ele que vai a carta). */

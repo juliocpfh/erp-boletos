@@ -647,6 +647,7 @@ export function modelosDe(d, tipo = 'contrato') {
  */
 export function dadosDoAditivo(d, c, a) {
   if (a.tipo === TIPO_ADITIVO_TROCA) return dadosDoAditivoTroca(d, c, a);
+  if (a.tipo === TIPO_ADITIVO_VALOR) return dadosDoAditivoValor(d, c, a);
   const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
   const ref = mesSeguinte ? C.somarMeses(a.primeiro_vencimento.slice(0, 7), -1) : a.primeiro_vencimento.slice(0, 7);
@@ -663,6 +664,32 @@ export function dadosDoAditivo(d, c, a) {
 }
 
 export const TIPO_ADITIVO_TROCA = 'Troca de titular';
+/** Termo aditivo do novo valor negociado (renovação): o aceite do inquilino (e do fiador) é este termo assinado. */
+export const TIPO_ADITIVO_VALOR = 'Novo valor';
+
+/**
+ * Termo aditivo de novo valor: ``a`` guarda data_vigencia, valor_anterior, valor_novo e percentual (bonificação combinada).
+ * Ex.: R$ 2.000,00 → R$ 2.200,00 a partir de 01/12/2026, 10% → bonificado R$ 1.980,00.
+ */
+function dadosDoAditivoValor(d, c, a) {
+  const dados = dadosDoContrato(d, c, { data: a.data, testemunhas: a.testemunhas || [] });
+  const pct = a.percentual || 0;
+  const bonificado = a.valor_novo - C.descontoPorPercentual(a.valor_novo, pct);
+  const mesSeguinte = c.cobranca_mes_seguinte !== false;
+  Object.assign(dados.campos, {
+    numero_aditivo: `${a.numero || 1}º`,
+    data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
+    data_novo_valor: dataPorExtenso(a.data_vigencia),
+    mes_novo_valor: mesPorExtenso(String(a.data_vigencia || '').slice(0, 7)),
+    aluguel_anterior: valorComExtenso(a.valor_anterior || 0),
+    aluguel_novo: valorComExtenso(a.valor_novo || 0),
+    bonificacao_novo: percentualComExtenso(pct),
+    aluguel_bonificado_novo: valorComExtenso(bonificado),
+  });
+  dados.condicoes.bonificacao = pct > 0;
+  dados.condicoes.mes_seguinte = mesSeguinte;
+  return dados;
+}
 
 /**
  * Fiadores do termo da troca de titular: os do contrato de quem entra; com a garantia que continua e quem entra ainda sem

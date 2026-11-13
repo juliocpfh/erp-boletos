@@ -144,6 +144,12 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   };
   const a = alvo.aditivo || null;
   if (a) Object.assign(campos, { aditivo_data: C.dataBr(a.data), aditivo_assunto: a.assunto || 'alteração do contrato' });
+  // termo do novo valor negociado: os valores combinados (cheio, bonificado) e a data em que passam a valer
+  if (a && a.valor_novo > 0) {
+    Object.assign(campos, { valor_anterior: C.reais(a.valor_anterior || 0), valor_novo: C.reais(a.valor_novo), novo_inicio: C.dataBr(a.data_vigencia),
+      novo_bonificado: C.reais(a.valor_novo - C.descontoPorPercentual(a.valor_novo, a.percentual || 0)) });
+    condicoes.novo_bonificacao = (a.percentual || 0) > 0;
+  }
   return { campos, condicoes, para: p.inquilino_email || '', perguntas: r };
 }
 

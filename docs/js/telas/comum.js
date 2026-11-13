@@ -1,6 +1,6 @@
 // Peças usadas por todas as telas: componentes de HTML (botão, link, etiqueta), acesso ao banco em memória, histórico,
 // pastas e arquivos anexados (nomes, herança na troca de titular, limpeza), estilo dos alertas e caixa de arquivos.
-import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, E, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr, pct, reais } from '../calculos.js';
@@ -273,6 +273,33 @@ export function redesenharSeLivre(endereco) {
 
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */
 let herancasFeitas = false;
+
+/**
+ * Ciência ao anexar o termo assinado da troca de titular (pedido do dono, 2026-11-13): a janela mostra tudo o que passa ao
+ * novo titular e só segue com a caixa "estou ciente" marcada. Devolve { ciencia_por, ciencia_em } para gravar no termo, ou
+ * null se cancelou (aí nada é gravado).
+ */
+export async function cienciaDaTroca(contratoId) {
+  const c = buscar('contratos', contratoId);
+  const a = c && R.contratoHerdado(d(), c);
+  if (!a) return {};
+  const r = await janela({
+    titulo: 'Termo da troca de titular: todo o vínculo será herdado', sim: 'Estou ciente: anexar', forte: true,
+    html: `<p>Com o termo assinado, <b>todo o vínculo</b> de ${esc(a.inquilino_nome)} passa para <b>${esc(c.inquilino_nome)}</b>:</p>
+      <ul>${R.resumoDaHeranca(d(), c).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      <p><label class="check" style="padding-top:0;font-weight:normal"><input type="checkbox" name="ciente" value="1" required>
+        Eu, <b>${esc((E.usuario && E.usuario.nome) || login())}</b>, conferi o termo assinado por todos e estou ciente de que todo o vínculo passa para ${esc(c.inquilino_nome)}.</label></p>
+      <p class="suave">A ciência fica registrada no termo (quem e quando).</p>`,
+  });
+  return r ? { ciencia_por: login(), ciencia_em: new Date().toISOString() } : null;
+}
+
+/** Grava no termo a ciência dada na janela (dentro de alterar). Sem ciência (não é termo da troca): nada. */
+export function registrarCiencia(db, aditivo, ciencia) {
+  if (!aditivo || !ciencia || !ciencia.ciencia_por) return;
+  const c = R.buscar(db, 'contratos', aditivo.contrato_id);
+  R.atualizar(db, 'aditivos', aditivo.id, ciencia, login(), `${c ? c.inquilino_nome : 'Contrato'}: ciência de ${ciencia.ciencia_por} de que todo o vínculo passa ao novo titular`);
+}
 
 /** Termo aditivo assinado: a troca de titular anda (fim do vínculo do anterior ou, passada a data, o contrato passa ao novo). */
 export async function trazerHerancaAssinada(id) {

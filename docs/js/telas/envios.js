@@ -18,7 +18,7 @@ import { FORMULARIOS_EMAILS } from './emails.js';
 import { FORMULARIOS_REGRAS } from './regras-sistema.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
-import { acertarNomesDosComprovantes, buscar, d, memoria, pastaDoEscopo, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
+import { acertarNomesDosComprovantes, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
@@ -210,10 +210,13 @@ export const FORMULARIOS = {
     if (!f.data) throw new Error('Informe a data do termo aditivo.');
     if (!String(f.assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
-    const nome = await salvarAssinado('aditivos', Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
     // novo titular esperando o termo da troca: a caixa diz se este é o termo da troca (só ele faz o contrato passar)
     const tipo = f.pergunta_troca ? (f.troca === '1' ? K.TIPO_ADITIVO_TROCA : 'Outro') : null;
-    await alterar((db) => R.registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome, tipo }, login()));
+    // termo da troca: antes de gravar, quem anexa dá ciência de que todo o vínculo passa ao novo titular
+    const ciencia = tipo === K.TIPO_ADITIVO_TROCA ? await cienciaDaTroca(Number(f.contrato)) : {};
+    if (!ciencia) return;
+    const nome = await salvarAssinado('aditivos', Number(f.contrato), arquivo, `termo aditivo ${f.data} ${f.assunto}`.slice(0, 80));
+    await alterar((db) => { const a = R.registrarAditivo(db, Number(f.contrato), { data: f.data, assunto: f.assunto, arquivo: nome, tipo }, login()); registrarCiencia(db, a, ciencia); });
     await trazerHerancaAssinada(Number(f.contrato));
     aviso('Termo aditivo registrado.');
     await mostrar();
@@ -324,8 +327,10 @@ export const FORMULARIOS = {
     const a = buscar('aditivos', f.id);
     if (!f.data) throw new Error('Informe a data da assinatura.');
     if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+    const ciencia = a.tipo === K.TIPO_ADITIVO_TROCA ? await cienciaDaTroca(a.contrato_id) : {};
+    if (!ciencia) return;
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
-    await alterar((db) => R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()));
+    await alterar((db) => { R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()); registrarCiencia(db, a, ciencia); });
     await trazerHerancaAssinada(a.contrato_id);
     aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${C.dataBr(a.primeiro_vencimento)} já saem no dia novo.` : 'Termo aditivo assinado e registrado.');
     await mostrar();
