@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-AcN0vW2PSH/vMI1razQFFw1qg6FiR7iW2Vuobiq81Gk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-jwa+ni394jqIxnUErr/05Y1cClV9/OIkW870E3+iXf0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="fcb7c1f30d737192">
+<meta name="fontes" content="13f57d8125ac0c6d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2155,6 +2155,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         custo: /^\d+$/,
         airbnb: /^\d+$/,
         id: /^\d+$/,
+        troca: /^\d+$/,
         ids: /^\d+(,\d+)*$/,
         numeros: /^\d+(,\d+)*$/,
         ordem: /^[a-z_]+$/,
@@ -3871,9 +3872,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     desmarcarReservaAbatida: () => desmarcarReservaAbatida,
     despesasDo: () => despesasDo,
     deveDesativar: () => deveDesativar,
+    devolucaoDaTrocaDeGarantia: () => devolucaoDaTrocaDeGarantia,
     devolucaoGarantiaPendente: () => devolucaoGarantiaPendente,
     devolucaoPendente: () => devolucaoPendente,
     devolucaoPorRecebedor: () => devolucaoPorRecebedor,
+    devolucoesDaTrocaDeTitular: () => devolucoesDaTrocaDeTitular,
+    devolucoesDeTrocaPendentes: () => devolucoesDeTrocaPendentes,
     devolucoesGarantiaDo: () => devolucoesGarantiaDo,
     diaUtilAteh: () => diaUtilAteh2,
     divergenciaBancaria: () => divergenciaBancaria,
@@ -3925,6 +3929,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ganhosAirbnbDo: () => ganhosAirbnbDo,
     garantiaADepositar: () => garantiaADepositar,
     garantiaDepositada: () => garantiaDepositada,
+    garantiaDevolvidaNaTroca: () => garantiaDevolvidaNaTroca,
     garantiaHerdada: () => garantiaHerdada,
     garantiaHerdadaDesfeita: () => garantiaHerdadaDesfeita,
     garantiaNova: () => garantiaNova,
@@ -5672,11 +5677,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const novos = comFiador ? fiadores.novos || [] : [];
     const nomes = [...saem.map((f) => `sai ${f.nome}`), ...novos.map((f) => `entra ${f.nome}`)];
     const texto3 = `Garantia: ${c.garantia_tipo || "não informada"} → ${dados.garantia_tipo}${nomes.length ? ` (${nomes.join(", ")})` : ""}`;
+    const devolver = (temCaucao(c) || temDeposito(c)) && valorGarantia(d2, c) > 0 && (garantiaDepositada(c) || somaDepositos(d2, c, temCaucao(c) ? "caucao" : "deposito") > 0);
     const r = inserir(d2, "trocas_garantia", {
       contrato_id: c.id,
       data: dados.data,
       tipo_anterior: c.garantia_tipo || "",
       tipo_novo: dados.garantia_tipo,
+      ...devolver ? { devolucao_movimentos: movimentosGarantia(d2, c) } : {},
       valor_anterior: valorGarantia(d2, c),
       anterior,
       observacoes: dados.observacoes || "",
@@ -5705,6 +5712,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const t = buscar(d2, "trocas_garantia", trocaId);
     if (!t) throw new Error("Registro não encontrado.");
     if (trocasGarantiaDo(d2, t.contrato_id)[0].id !== t.id) throw new Error("Só a troca de garantia mais recente pode ser cancelada.");
+    if (devolucaoDaTrocaDeGarantia(d2, t.id)) throw new Error("A devolução da garantia anterior já foi registrada: exclua a devolução antes de cancelar a troca.");
     const texto3 = `Troca de garantia cancelada: volta para ${t.tipo_anterior || "não informada"}`;
     const anterior = Object.fromEntries(CAMPOS_GARANTIA.map((k) => [k, (t.anterior || {})[k] ?? null]));
     if (!t.anterior) anterior.garantia_tipo = t.tipo_anterior || null;
@@ -6430,18 +6438,25 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function devolucaoGarantiaPendente(d2, a) {
     const n = continuadoPor(d2, a);
-    if (!garantiaNova(n) || !(temCaucao(a) || temDeposito(a)) || devolucoesGarantiaDo(d2, a.id).length) return null;
+    if (!garantiaNova(n) || !(temCaucao(a) || temDeposito(a)) || devolucoesDaTrocaDeTitular(d2, a.id).length) return null;
     const depositado = garantiaDepositada(a) || somaDepositos(d2, a, temCaucao(a) ? "caucao" : "deposito") > 0;
     const valor = valorGarantia(d2, a);
     return depositado && valor > 0 ? { herdeiro: n, valor } : null;
   }
   function salvarDevolucaoGarantia(d2, contratoId, dados, usuario, id = null) {
     const a = buscar(d2, "contratos", contratoId);
-    if (!garantiaNova(continuadoPor(d2, a))) throw new Error("A garantia deste contrato continua com o novo titular: não há devolução na troca.");
-    if (!id && devolucoesGarantiaDo(d2, a.id).length) throw new Error("A devolução da garantia já foi registrada.");
+    const trocaId = dados.troca_id || id && (buscar(d2, "devolucoes_garantia", id) || {}).troca_id || null;
+    const troca = trocaId ? buscar(d2, "trocas_garantia", trocaId) : null;
+    if (trocaId) {
+      if (!troca || troca.contrato_id !== a.id || !(troca.valor_anterior > 0)) throw new Error("Troca de garantia não encontrada, ou sem caução nem depósito a devolver.");
+      if (!id && devolucaoDaTrocaDeGarantia(d2, troca.id)) throw new Error("A devolução da garantia desta troca já foi registrada.");
+    } else {
+      if (!garantiaNova(continuadoPor(d2, a))) throw new Error("A garantia deste contrato continua com o novo titular: não há devolução na troca.");
+      if (!id && devolucoesDaTrocaDeTitular(d2, a.id).length) throw new Error("A devolução da garantia já foi registrada.");
+    }
     const { garantia_corrigida, saldo } = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
-    const reg = { ...dados, contrato_id: a.id, garantia_corrigida, saldo };
-    const texto3 = `${a.inquilino_nome}: garantia devolvida em ${dataBr(dados.data)}, ${reais(saldo)} (troca de titular com garantia nova)`;
+    const reg = { ...dados, contrato_id: a.id, troca_id: trocaId, garantia_corrigida, saldo };
+    const texto3 = `${a.inquilino_nome}: garantia devolvida em ${dataBr(dados.data)}, ${reais(saldo)} (${troca ? `troca de garantia de ${dataBr(troca.data)}` : "troca de titular com garantia nova"})`;
     if (!id) return inserir(d2, "devolucoes_garantia", reg, usuario, texto3);
     atualizar(d2, "devolucoes_garantia", id, reg, usuario, texto3);
     return buscar(d2, "devolucoes_garantia", id);
@@ -6454,6 +6469,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         tipo: "Devolver garantia",
         ancora: "garantia",
         texto: `${p2.herdeiro.inquilino_nome} assumiu o contrato com garantia nova: devolva ${temCaucao(a) ? "a caução" : "o depósito de garantia"} de ${reais(p2.valor)} a ${a.inquilino_nome} (com a correção, descontados os débitos) e registre a devolução.`
+      };
+    }
+    const t = devolucoesDeTrocaPendentes(d2, a)[0];
+    if (t) {
+      return {
+        nivel: "aviso",
+        tipo: "Devolver garantia",
+        ancora: "garantia",
+        texto: `Garantia trocada em ${dataBr(t.troca.data)} (${t.troca.tipo_anterior} → ${t.troca.tipo_novo}): devolva ${reais(t.valor)} a ${a.inquilino_nome}, com a correção da poupança, e registre a devolução.`
       };
     }
     const x = devolucoesGarantiaDo(d2, a.id).find((y) => !y.comprovante && y.saldo > 0);
@@ -9036,7 +9060,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -9064,7 +9088,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         aplicacoes: "Aplicação da garantia",
         correcoes_garantia: "Correção da caução",
         depositos_garantia: "Depósito da caução / garantia",
-        devolucoes_garantia: "Devolução da garantia (troca de titular)",
+        devolucoes_garantia: "Devolução da garantia (troca de titular ou de garantia)",
         renovacoes: "Renovação / novo valor",
         trocas_garantia: "Troca de garantia",
         leituras: "Leitura dos relógios",
@@ -9348,6 +9372,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       lancamentosNoAnterior = (d2, n, a) => a && a.garantia_transferida_para === n.id ? LANCAMENTOS_GARANTIA_HERDADA.flatMap((t) => (d2[t] || []).filter((x) => x.contrato_id === a.id).map((x) => ({ tabela: t, registro: x }))) : [];
       garantiaNova = (c) => !!(c && c.garantia_na_troca === "nova");
       devolucoesGarantiaDo = (d2, contratoId) => (d2.devolucoes_garantia || []).filter((x) => x.contrato_id === contratoId);
+      devolucoesDaTrocaDeTitular = (d2, contratoId) => devolucoesGarantiaDo(d2, contratoId).filter((x) => !x.troca_id);
+      devolucaoDaTrocaDeGarantia = (d2, trocaId) => (d2.devolucoes_garantia || []).find((x) => x.troca_id === trocaId) || null;
+      garantiaDevolvidaNaTroca = (c) => !!c && (temCaucao(c) || temDeposito(c));
+      devolucoesDeTrocaPendentes = (d2, c) => trocasGarantiaDo(d2, c.id).filter((t) => t.devolucao_movimentos && t.valor_anterior > 0 && !devolucaoDaTrocaDeGarantia(d2, t.id)).map((t) => ({ troca: t, valor: t.valor_anterior }));
       garantiaHerdada = (d2, c) => {
         const a = contratoHerdado(d2, c);
         return !!(a && a.garantia_transferida_para === c.id);
@@ -14126,7 +14154,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       forte: true,
       html: `<p>Com o termo assinado, <b>todo o vínculo</b> de ${esc(a.inquilino_nome)} passa para <b>${esc(c.inquilino_nome)}</b>:</p>
       <ul>${linhas2.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
-      ${g ? `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao("continua", g.continua)}${opcao("nova", g.nova)}` : ""}
+      ${!g ? "" : g.dinheiro && garantiaNova(c) ? `<p><b>Garantia:</b> ${esc(g.nova.replace(/^Garantia: /, ""))}. Garantia em dinheiro não passa de um inquilino a outro.</p><input type="hidden" name="garantia" value="nova">` : `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao("continua", g.continua)}${opcao("nova", g.nova)}`}
       <p><label class="check" style="padding-top:0;font-weight:normal"><input type="checkbox" name="ciente" value="1" required>
         Eu, <b>${esc(E.usuario && E.usuario.nome || login())}</b>, conferi o termo assinado por todos e estou ciente de que todo o vínculo passa para ${esc(c.inquilino_nome)}.</label></p>
       <p class="suave">A ciência fica registrada no termo (quem e quando).</p>`
@@ -17462,7 +17490,10 @@ Salvar assim mesmo?`)) {
         sim: "Continuar o contrato",
         html: `<p>O novo inquilino assume o contrato de <b>${nomeAnt}</b>: os inquilinos ficam ligados e as condições do contrato anterior entram no formulário.</p>
         <p><label>Data da alteração <span class="suave">(novo início do contrato e da vigência)</span></label><input type="date" name="data" value="${hojeIso()}" required></p>
-        ${temGarantia ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ""}</label></p>
+        ${dinheiro ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ""}</label></p>
+        <p>É <b>devolvida a ${nomeAnt}</b>, com a correção da poupança, descontados os débitos até a véspera (registre a devolução na página de ${nomeAnt}).
+          O novo inquilino <b>deposita a garantia dele</b>, no valor certo pelo aluguel de hoje, com data e comprovante próprios (pode ser de outro tipo).</p>
+        <p class="suave">Garantia em dinheiro não passa de um inquilino a outro. Isso entra no termo aditivo da troca, para quem sai e quem entra darem ciência.</p>` : temGarantia ? `<p><label>Garantia de ${nomeAnt}: ${esc(anterior.garantia_tipo)}${valorAnt ? ` de ${reais(valorAnt)}` : ""}</label></p>
         <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="continua" checked> Continua a mesma: passa para o novo inquilino${dinheiro ? ", com o comprovante do depósito, as correções e a aplicação" : ""}</label></p>
         <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="nova"> Garantia nova: ${dinheiro ? `a de ${nomeAnt} é devolvida a ${nomeAnt} (corrigida, descontados os débitos)` : `a de ${nomeAnt} vale só até a véspera`}
           e o novo inquilino presta a sua, com depósito e comprovante próprios (pode ser de outro tipo)</label></p>
@@ -17479,7 +17510,7 @@ Salvar assim mesmo?`)) {
       }
       const data2 = (r.data || [])[0] || hojeIso();
       const arq = (r.arquivo || [])[0];
-      const garantia = temGarantia && (r.garantia || [])[0] === "nova" ? "nova" : "continua";
+      const garantia = dinheiro || temGarantia && (r.garantia || [])[0] === "nova" ? "nova" : "continua";
       memoria.continuacao = { anteriorId: anterior.id, data: data2, arquivo: arq && arq.size ? arq : null, garantia };
       const campos = CONTRATO.filter((c) => c.nome && c.tipo !== "simnao");
       const cond = condicoesDoContrato(d(), anterior, data2);
@@ -17881,8 +17912,9 @@ Salvar assim mesmo?`)) {
     const [, tabela, consulta2] = location.hash.match(/^#\/novo\/(devolucoes_garantia|encerramentos)\?(.*)$/) || [];
     const el = form && tabela && form.querySelector("[name=indice_percentual]");
     const c = el && buscar2("contratos", new URLSearchParams(consulta2).get("contrato"));
-    if (!c || !(temCaucao(c) || temDeposito(c))) return;
-    const movimentos = movimentosGarantia(d(), c);
+    const troca = c && tabela === "devolucoes_garantia" && buscar2("trocas_garantia", new URLSearchParams(consulta2).get("troca"));
+    if (!c || !(troca ? troca.devolucao_movimentos : temCaucao(c) || temDeposito(c))) return;
+    const movimentos = troca ? troca.devolucao_movimentos : movimentosGarantia(d(), c);
     const dataEl = form.querySelector("[name=data]");
     let pedido = 0;
     let trazido = null;
@@ -20624,7 +20656,7 @@ ${m.texto}
       ${correcoes.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td><td class="n">${reais(x.valor_novo)}</td><td class="n">${reais(x.complemento)}</td><td>${x.comprovante || x.complemento > 0 ? linkComprovante(c.id, x.comprovante, { tabela: "correcoes_garantia", id: x.id, campo: "comprovante", tipo: "complemento-caucao", data: x.data }) : ""} ${esc(x.observacoes || "")}</td></tr>`).join("")}</table>` : ""}`;
     const seguinte = continuadoPor(d(), c);
     if (garantiaNova(seguinte)) {
-      const dev = devolucoesGarantiaDo(d(), c.id)[0];
+      const dev = devolucoesDaTrocaDeTitular(d(), c.id)[0];
       const pend = devolucaoGarantiaPendente(d(), c);
       const quem = `<a href="#/contrato/${seguinte.id}?ir=garantia">${esc(seguinte.inquilino_nome)}</a>`;
       if (dev) {
@@ -20687,6 +20719,20 @@ ${m.texto}
       html += `${subtitulo("Trocas de garantia")}<table class="compacta suave"><tr><th>Data</th><th>De</th><th>Para</th><th class="n">Valor anterior</th><th>Obs.</th><th></th></tr>
       ${trocas.map((t, i) => `<tr><td class="nw">${dataBr(t.data)}</td><td>${esc(t.tipo_anterior || "-")}</td><td>${esc(t.tipo_novo)}${mudancaFiadores(t)}</td><td class="n">${t.valor_anterior ? reais(t.valor_anterior) : "-"}</td><td>${esc(t.observacoes || "")}</td>
         <td class="n">${opera() && i === 0 ? botao("cancelarTrocaGarantia", "Cancelar troca", { id: t.id }, "perigo mini", `Cancelar esta troca? O contrato volta para a garantia anterior (${t.tipo_anterior || "não informada"}${t.valor_anterior ? ` de ${reais(t.valor_anterior)}` : ""}), com os mesmos valores, datas e comprovantes. Fiadores cadastrados depois da troca continuam no cadastro.`) : ""}</td></tr>`).join("")}</table>`;
+    }
+    for (const t of trocas.filter((x) => x.devolucao_movimentos)) {
+      const dev = devolucaoDaTrocaDeGarantia(d(), t.id);
+      if (dev) {
+        html += `${subtitulo(`Devolução da garantia (troca de ${dataBr(t.data)})`, "", `${t.tipo_anterior} → ${t.tipo_novo}`)}
+        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ""}</td>
+          <td class="n nw"><b>${dev.saldo >= 0 ? "devolvido" : "a cobrar"} ${reais(Math.abs(dev.saldo))}</b></td>
+          <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: "devolucoes_garantia", id: dev.id, campo: "comprovante", tipo: "devolucao-garantia", data: dev.data }) : ""}</td>
+          <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir2("devolucoes_garantia", dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ""}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ""}`;
+      } else if (t.valor_anterior > 0) {
+        html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === "Caução" ? "a caução" : "o depósito"} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
+        com a correção da poupança. Devolva e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}&troca=${t.id}`, "Registrar devolução", "botao mini") : ""}</div>`;
+      }
     }
     if (herdeiro && (temCaucao(c) || temDeposito(c))) {
       html += `${subtitulo("Onde o valor foi aplicado", opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : "")}
@@ -21425,7 +21471,7 @@ ${m.texto}
       ajustar(dados, erros, r, form, q = {}) {
         const anteriorHerdado = r ? contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar2("contratos", dados.contrato_anterior_id);
         const herdado = !!anteriorHerdado;
-        if (!r && herdado) dados.garantia_na_troca = memoria.continuacao && memoria.continuacao.garantia || "continua";
+        if (!r && herdado) dados.garantia_na_troca = garantiaDevolvidaNaTroca(anteriorHerdado) ? "nova" : memoria.continuacao && memoria.continuacao.garantia || "continua";
         if (r && herdado && !garantiaNova(r)) for (const k of CAMPOS_GARANTIA_HERDADA) dados[k] = r[k] ?? null;
         if (herdado) {
           const fonte = r || { ...anteriorHerdado, ...condicoesDoContrato(d(), anteriorHerdado, dados.data_entrada) };
@@ -21875,11 +21921,13 @@ ${m.texto}
       ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo("contrato", Number(q.contrato)))
     },
     devolucoes_garantia: {
-      titulo: (r, q) => `Devolução da garantia (troca de titular) - ${buscar2("contratos", r ? r.contrato_id : q.contrato).inquilino_nome}`,
+      titulo: (r, q) => `Devolução da garantia (${(r ? r.troca_id : q.troca) ? "troca de garantia" : "troca de titular"}) - ${buscar2("contratos", r ? r.contrato_id : q.contrato).inquilino_nome}`,
       campos: () => DEVOLUCAO_GARANTIA,
       // como no cálculo final da saída: a garantia atual e os boletos em aberto como débitos
       padrao: (q) => {
         const c = buscar2("contratos", q.contrato);
+        const t = q.troca && buscar2("trocas_garantia", q.troca);
+        if (t) return { data: hojeIso(), garantia_valor: t.valor_anterior };
         const aberto = cobrancasEmAberto(d(), c.id);
         return {
           data: hojeIso(),
@@ -21891,6 +21939,8 @@ ${m.texto}
       aviso: (r, q) => {
         const c = buscar2("contratos", r ? r.contrato_id : q.contrato);
         const n = continuadoPor(d(), c);
+        const t = buscar2("trocas_garantia", r ? r.troca_id : q.troca);
+        if (t) return `Garantia trocada em ${dataBr(t.data)} (${t.tipo_anterior} → ${t.tipo_novo}): ${t.tipo_anterior === "Caução" ? "a caução" : "o depósito"} de ${reais(t.valor_anterior)} é devolvid${t.tipo_anterior === "Caução" ? "a" : "o"} a ${c.inquilino_nome}, corrigid${t.tipo_anterior === "Caução" ? "a" : "o"} pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar). Devolva pela conta em que foi aplicada.`;
         return `${n ? n.inquilino_nome : "O novo titular"} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
       },
       voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
@@ -21900,7 +21950,7 @@ ${m.texto}
         return conferirComprovantes(COMPROVANTE_DEVOLUCAO, dados, r, form);
       },
       ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_DEVOLUCAO, dados, form, () => pastaDoEscopo("contrato", r ? r.contrato_id : Number(q.contrato))),
-      salvar: (db, dados, q, r) => salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), dados, login(), r ? r.id : null)
+      salvar: (db, dados, q, r) => salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), { ...dados, ...!r && q.troca ? { troca_id: Number(q.troca) } : {} }, login(), r ? r.id : null)
     },
     trocas_garantia: {
       titulo: (r, q) => `Trocar garantia ou fiador - ${buscar2("contratos", q.contrato).inquilino_nome}`,
