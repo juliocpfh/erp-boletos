@@ -847,6 +847,57 @@ export function situacaoAplicacao(d, c) {
 }
 
 /**
+ * Garantia em dinheiro do contrato que já saiu da empresa: devolvida na saída (cálculo final), na troca de titular com
+ * garantia nova, ou passada ao novo titular (as aplicações são lançadas lá). A troca de garantia sem caução nem depósito
+ * agora (ex.: caução → fiador) com a devolução registrada também conta.
+ */
+function garantiaJaSaiu(d, c) {
+  if (c.garantia_transferida_para) return true;
+  if (d.encerramentos.some((e) => e.contrato_id === c.id && e.garantia_devolvida_em)) return true;
+  if (devolucoesDaTrocaDeTitular(d, c.id).length) return true;
+  return !temCaucao(c) && !temDeposito(c) && trocasGarantiaDo(d, c.id).some((t) => devolucaoDaTrocaDeGarantia(d, t.id));
+}
+
+/**
+ * Onde está guardada a caução e o depósito de garantia de cada inquilino (página Empresas): por empresa (ou outra pessoa),
+ * quanto tem e de quem é, com a data de cada aplicação e de cada depósito do inquilino (depósito inicial, complementos e
+ * correções da caução). Só as garantias que ainda estão com a empresa (devolvidas ficam de fora). Ex.: caução de Ana
+ * R$ 3.800,00 (3.600,00 em 10/01/2025 + 200,00 em 15/01/2026) aplicada toda na ANK → ANK: Ana R$ 3.800,00.
+ * Devolve { lugares: [{ chave, nome, pessoa, total, itens: [{ contrato, imovel, tipo, data, valor, comprovante, movimentos }] }],
+ * semAplicar: [{ contrato, imovel, tipo, total, aplicado, falta, movimentos }], total, aplicado }.
+ */
+export function garantiasPorEmpresa(d) {
+  const lugares = new Map();
+  const semAplicar = [];
+  let total = 0;
+  let aplicado = 0;
+  for (const c of d.contratos) {
+    const aplic = aplicacoesDo(d, c.id);
+    if (!(temCaucao(c) || temDeposito(c) || aplic.length) || garantiaJaSaiu(d, c)) continue;
+    const imovel = d.imoveis.find((i) => i.id === c.imovel_id) || null;
+    const tipo = temCaucao(c) ? 'Caução' : temDeposito(c) ? 'Depósito de garantia' : (c.garantia_tipo || 'Garantia');
+    const movimentos = movimentosGarantia(d, c);
+    const sit = situacaoAplicacao(d, c);
+    total += Math.max(sit.total, sit.soma);
+    aplicado += sit.soma;
+    for (const a of aplic) {
+      const rec = recebedorDaAplicacao(d, a);
+      const chave = a.recebedor ? `p:${a.recebedor}` : `e:${a.emitente_id}`;
+      const l = lugares.get(chave) || { chave, nome: rec.nome, pessoa: !!rec.pessoa, total: 0, itens: [] };
+      l.total += a.valor;
+      l.itens.push({ contrato: c, imovel, tipo, data: a.data, valor: a.valor, comprovante: a.comprovante || null, observacoes: a.observacoes || '', movimentos });
+      lugares.set(chave, l);
+    }
+    if (sit.falta > 0) semAplicar.push({ contrato: c, imovel, tipo, total: sit.total, aplicado: sit.soma, falta: sit.falta, movimentos });
+  }
+  const porNome = (a, b) => a.localeCompare(b, 'pt-BR');
+  const lista = [...lugares.values()].sort((a, b) => a.pessoa - b.pessoa || porNome(a.nome, b.nome));
+  for (const l of lista) l.itens.sort((a, b) => porNome(a.contrato.inquilino_nome, b.contrato.inquilino_nome) || String(a.data).localeCompare(String(b.data)));
+  semAplicar.sort((a, b) => porNome(a.contrato.inquilino_nome, b.contrato.inquilino_nome));
+  return { lugares: lista, semAplicar, total, aplicado };
+}
+
+/**
  * Aluguel em que a reserva começa: o mês marcado ("Usar a reserva no aluguel de"); em branco, o primeiro aluguel, que é o
  * mês de entrada. Mês (marcado ou de entrada) dentro da carência não tem aluguel: vale o 1º mês depois dela, senão a reserva
  * ficaria parada sem aviso. Ex.: entrada 07/06/2026 com 1 mês de carência → 07/2026 (em branco ou marcado 06/2026).

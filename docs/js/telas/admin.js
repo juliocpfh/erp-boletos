@@ -2,12 +2,12 @@
 import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr } from '../calculos.js';
+import { dataBr, dataHoraBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
 import { caixaConfigBanco2 } from './banco.js';
-import { CADASTROS } from './cadastros.js';
+import { CADASTROS, linkComprovante } from './cadastros.js';
 import { botao, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 import { caixaIcone } from './icone.js';
 
@@ -90,6 +90,7 @@ export function telaEmpresas() {
     ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
     || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
+    ${caixaGarantiasPorEmpresa()}
     <div class="cartao" id="logo-empresa"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema e como marca-d'água nos contratos, vistorias e cartas. Envie em boa resolução (PNG ou SVG, de preferência com 1.000 pixels de largura ou mais).</p>
       ${d().logo && larguraLogo(d().logo) && larguraLogo(d().logo) < 800 ? `<div class="alerta aviso">A logo atual está em baixa resolução (${larguraLogo(d().logo)} pixels de largura): a marca-d'água sai serrilhada. Envie a logo de novo em "Trocar logo".</div>` : ''}
@@ -106,6 +107,31 @@ export function telaEmpresas() {
     <div class="cartao"><h2>Numeração das NFs</h2>
       <p>Próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
       ${podeUsuario('admin') ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ''}</div>`;
+}
+
+/** Datas e valores dos depósitos da garantia do inquilino (o 1º é o depósito; os seguintes, complementos e correções). */
+const datasDosDepositos = (movimentos) => movimentos.map((m, i) => `<span class="nw">${m.data ? dataBr(m.data) : 'sem data'} ${reais(m.valor)}${i ? ' <span class="suave">(complemento)</span>' : ''}</span>`).join('<br>') || '<span class="suave">sem depósito</span>';
+const linkInquilino = (c) => `<a href="#/contrato/${c.id}?ir=garantia">${esc(c.inquilino_nome)}</a>`;
+
+/**
+ * Página Empresas: onde está aplicada cada caução, correção da caução e depósito de garantia, por empresa (ou outra pessoa),
+ * quanto tem em cada uma, de quem é e as datas (R.garantiasPorEmpresa).
+ */
+function caixaGarantiasPorEmpresa() {
+  const g = R.garantiasPorEmpresa(d());
+  if (!g.lugares.length && !g.semAplicar.length) return '';
+  const resumo = g.lugares.map((l) => `<b>${esc(l.nome)}</b> ${reais(l.total)}`).join(' · ');
+  return `<div class="cartao" id="garantias-por-empresa"><h2>Onde está a caução e o depósito de garantia</h2>
+    <p>Total guardado: <b>${reais(g.aplicado)}</b>${resumo ? ` (${resumo})` : ''}${g.total > g.aplicado ? ` · falta aplicar <b>${reais(g.total - g.aplicado)}</b>` : ''}.</p>
+    ${g.lugares.map((l) => `<h3>${esc(l.nome)}${l.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''} · ${reais(l.total)} <span class="suave">(${new Set(l.itens.map((x) => x.contrato.id)).size} inquilino(s))</span></h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th>Aplicado em</th><th class="n">Valor aplicado</th><th>Depósitos do inquilino</th><th></th></tr>
+      ${l.itens.map((x) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : '-')}</td><td>${esc(x.tipo)}</td><td class="nw">${x.data ? dataBr(x.data) : '-'}</td>
+        <td class="n">${reais(x.valor)}</td><td>${datasDosDepositos(x.movimentos)}</td><td>${linkComprovante(x.contrato.id, x.comprovante)}${x.observacoes ? ` <span class="suave">${esc(x.observacoes)}</span>` : ''}</td></tr>`).join('')}
+      <tr class="total"><td colspan="4">Total em ${esc(l.nome)}</td><td class="n">${reais(l.total)}</td><td colspan="2"></td></tr></table></div>`).join('')}
+    ${g.semAplicar.length ? `<h3>Ainda não aplicado ${etiqueta(`${g.semAplicar.length} inquilino(s)`, 'aviso')}</h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th class="n">Valor</th><th class="n">Aplicado</th><th class="n">Falta aplicar</th><th>Depósitos do inquilino</th></tr>
+      ${g.semAplicar.map((x) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : '-')}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.total)}</td><td class="n">${reais(x.aplicado)}</td><td class="n"><b>${reais(x.falta)}</b></td><td>${datasDosDepositos(x.movimentos)}</td></tr>`).join('')}</table></div>` : ''}
+    <p class="suave">Mostra só as garantias que ainda estão com a empresa (as devolvidas na saída ou na troca de titular saem daqui). Os valores são os depositados, sem a correção da poupança, que é calculada na devolução. Para registrar ou mudar uma aplicação, abra o inquilino (Garantia → "Onde o valor foi aplicado").</p></div>`;
 }
 
 /** Desfaz as alterações escolhidas no Histórico (só administrador) e recalcula os boletos em aberto ligados a elas. */
