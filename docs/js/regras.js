@@ -1225,6 +1225,9 @@ function iptuDoInquilino(c, p, comp, v, base) {
     return valor > 0 ? { contrato: c, comp, dias: cb.dias_cobrados, diasMes: cb.dias_mes, valor } : null;
   }
   if (c.ativo === false || !c.cobrar_iptu) return null;
+  // o mês já tem boleto do aluguel em outro contrato do imóvel com IPTU (ex.: troca de titular com boletos no anterior):
+  // a parcela já está nele, não se prevê de novo (a soma dos inquilinos passava do IPTU)
+  if (base.contratos.some((o) => o.id !== c.id && (base.boletos.get(`${o.id}|${comp}`) || {}).iptu > 0)) return null;
   const dias = C.diasOcupados(comp, c.data_entrada, c.data_saida);
   if (!dias || (emCarencia(c, comp) && !c.carencia_cobrar_iptu)) return null;
   return { contrato: c, comp, dias, diasMes: C.diasNoMes(comp), valor: C.aluguelProporcional(v, dias, C.diasNoMes(comp)) };
@@ -2988,6 +2991,21 @@ const lancamentosNoAnterior = (d, n, a) => (a && a.garantia_transferida_para ===
   ? LANCAMENTOS_GARANTIA_HERDADA.flatMap((t) => (d[t] || []).filter((x) => x.contrato_id === a.id).map((x) => ({ tabela: t, registro: x }))) : []);
 
 /**
+ * Boletos que ficaram no contrato anterior depois de a troca de titular já ter sido feita (ex.: importados depois, no nome
+ * de quem saiu): os de competência depois do fim do vínculo são do novo titular, também os pagos e com NF (a NF guarda o
+ * tomador de quando foi emitida). Ficam: o complemento da caução que não passou ao novo, e o boleto do aluguel de um mês
+ * que o novo já tem (repetido: conferir à mão). Ex.: Bruno continua o contrato de Ana desde 01/07/2025; boletos de
+ * 07/2025 a 08/2026 importados em Ana → passam a Bruno.
+ */
+function boletosNoAnterior(d, n, a) {
+  if (!n.heranca_transferida || !a || (continuadoPor(d, a) || {}).id !== n.id) return [];
+  const ultimoMes = C.somarDias(n.heranca_transferida, -1).slice(0, 7);
+  return d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia > ultimoMes
+    && !(ehComplementoCaucao(cb) && a.garantia_transferida_para !== n.id)
+    && (ehBoletoAvulso(cb) || !boletoDoMes(d, n.id, cb.competencia)));
+}
+
+/**
  * Herança já feita em que ficou faltando a garantia (ou lançamentos dela), a reserva (valor, comprovante ou o já usado) ou o
  * seguro do contrato anterior. Troca com data futura: só a reserva; o resto passa no dia.
  */
@@ -3001,7 +3019,8 @@ export function herancaIncompleta(d, c) {
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const lancamentos = lancamentosNoAnterior(d, c, a).length;
   const anterior = !!pagamentoPerdidoNoAnterior(d, c, a);
-  return garantia || reserva || seguro || lancamentos || anterior ? { garantia, reserva, seguro, lancamentos, anterior } : null;
+  const boletos = boletosNoAnterior(d, c, a).length;
+  return garantia || reserva || seguro || lancamentos || anterior || boletos ? { garantia, reserva, seguro, lancamentos, anterior, boletos } : null;
 }
 
 /**
@@ -3014,7 +3033,19 @@ export function completarHeranca(d, novoId, usuario) {
   const falta = n && herancaIncompleta(d, n);
   if (!falta) return null;
   const a = contratoHerdado(d, n);
-  const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0 };
+  const out = { anterior: a, arquivos: [], arquivosReserva: [], arquivosSeguro: [], garantia: false, reserva: false, seguro: false, aplicacoes: 0, correcoes: 0, boletos: 0 };
+  // boletos depois da troca que ficaram no anterior: passam ao novo titular (o pagamento consta de quem é o titular)
+  if (falta.boletos) {
+    let reservaUsada = 0;
+    for (const cb of boletosNoAnterior(d, n, a)) {
+      reservaUsada += cb.reserva_utilizada || 0;
+      atualizar(d, 'cobrancas', cb.id, { contrato_id: n.id }, usuario, `Boleto ${C.compBr(cb.competencia)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (titular desde ${C.dataBr(n.heranca_transferida)})`);
+      out.boletos += 1;
+    }
+    // a reserva usada nesses boletos agora aparece neles, no novo: não conta de novo como usada pelo anterior
+    if (reservaUsada && n.reserva_usada_anterior > 0) atualizar(d, 'contratos', n.id, { reserva_usada_anterior: Math.max(n.reserva_usada_anterior - reservaUsada, 0) }, usuario, `${n.inquilino_nome}: reserva usada nos boletos trazidos de ${a.inquilino_nome}`);
+    recalcularCobrancas(d, (cb) => cb.contrato_id === n.id, usuario);
+  }
   // lançamentos da garantia já herdada feitos depois no anterior (aplicação, correção da caução): passam, com o comprovante
   for (const { tabela, registro: x } of lancamentosNoAnterior(d, n, a)) {
     if (x.comprovante) out.arquivos.push(x.comprovante);

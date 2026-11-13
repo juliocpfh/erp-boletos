@@ -497,6 +497,37 @@ test('IPTU pago à vista pelo proprietário: o mapa mostra os meses em que o inq
   assert.deepEqual(R.mesesIptuAvista(d, p), []);
 });
 
+test('troca de titular com boletos depois da troca no anterior: IPTU à vista não conta em dobro e os boletos passam ao titular', () => {
+  const { d, c } = base();
+  // Ana até 30/06/2025; Bruno continua desde 01/07/2025; boletos de 2026 importados na Ana (com NF em nome dele)
+  Object.assign(c, { inquilino_nome: 'Ana', data_entrada: '2024-09-01', vigencia_inicio: '2024-09-01', data_saida: '2025-06-30', ativo: false, reserva_valor: 0 });
+  const { id, ...resto } = c;
+  const bruno = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Bruno', contrato_anterior_id: c.id, data_entrada: '2025-07-01', vigencia_inicio: '2025-07-01',
+    data_saida: null, ativo: true, heranca_transferida: '2025-07-01' }, 'julio');
+  // IPTU 2026: 10 × R$ 337,00 nos boletos de 04/2026 a 01/2027; pago à vista R$ 3.033,33
+  const p = d.iptus[0];
+  Object.assign(p, { valor_total: 337037, num_parcelas: 10, valor_parcela: 33700, primeira_competencia: '2026-04', primeiro_vencimento_boleto: '2026-04',
+    pago_avista: true, valor_avista: 303333, data_quitacao: '2026-03-20', cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[0] });
+  const boleto = (contrato, comp, iptu) => R.inserir(d, 'cobrancas', { contrato_id: contrato.id, competencia: comp, vencimento: `${comp}-28`,
+    aluguel: 100000, iptu, valor_total: 100000 + iptu, data_pagamento: `${comp}-28`, situacao: 'Paga em dia' }, 'julio');
+  for (const comp of ['2026-01', '2026-02']) boleto(c, comp, 0);
+  for (const comp of ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08']) boleto(c, comp, 33700);
+  for (const comp of ['2026-09', '2026-10']) boleto(bruno, comp, 33700);
+  // antes: Bruno (sem boleto de 03 a 08/2026) contava de novo a parcela do mês → R$ 5.392,00 contra R$ 3.033,33
+  assert.deepEqual(R.totaisIptu(d, p), { custo: 303333, inquilino: 337000, proprietario: -33667, emAberto: 0 });
+  // a herança já feita confere: os 8 boletos de depois da troca passam a Bruno
+  assert.equal(R.herancaIncompleta(d, bruno).boletos, 8);
+  const r = R.completarHeranca(d, bruno.id, 'julio');
+  assert.equal(r.boletos, 8);
+  assert.equal(d.cobrancas.filter((x) => x.contrato_id === c.id).length, 0);
+  assert.equal(d.cobrancas.filter((x) => x.contrato_id === bruno.id).length, 10);
+  assert.equal(R.herancaIncompleta(d, bruno), null);
+  assert.deepEqual(R.totaisIptu(d, p), { custo: 303333, inquilino: 337000, proprietario: -33667, emAberto: 0 });
+  // boleto do mês que o Bruno já tem fica no anterior (repetido: conferir à mão)
+  boleto(c, '2026-09', 33700);
+  assert.equal(R.herancaIncompleta(d, bruno), null);
+});
+
 test('fiador com fim de vínculo vai para anteriores e gera alerta antes de terminar', () => {
   const d = R.bancoVazio();
   const c = R.inserir(d, 'contratos', { imovel_id: 1, inquilino_nome: 'X', data_entrada: '2026-01-01', garantia_tipo: 'Fiador', aluguel_inicial: 100000 }, 'julio');
@@ -1892,7 +1923,7 @@ test('herança já feita sem a garantia e a reserva do anterior: completa (compr
     data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', heranca_transferida: '2026-10-01', reserva_usada_anterior: 0 }, 'julio');
   R.inserir(d, 'depositos_garantia', { contrato_id: novo.id, qual: 'caucao', troca_id: null, data: '2026-10-02', valor: 1000 }, 'julio');
   c.data_saida = '2026-09-30';
-  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true, seguro: false, lancamentos: 0, anterior: false });
+  assert.deepEqual(R.herancaIncompleta(d, novo), { garantia: true, reserva: true, seguro: false, lancamentos: 0, anterior: false, boletos: 0 });
   const r = R.completarHeranca(d, novo.id, 'julio');
   assert.deepEqual(r.arquivos.sort(), ['apl.pdf']);
   assert.equal(novo.comprovante_caucao, 'caucao.pdf');
