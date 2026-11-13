@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-6SDjnjDV0E9DtJj/fkHqNrdf76dWV9NnxC78efKhgO0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-aKLGTstOZ6/I1lE3KTY2ZDE7skzp04htP1XalPasGAY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="8136e2b0efeebf39">
+<meta name="fontes" content="e8b429a52eaf5744">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -13982,103 +13982,6 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   // docs/js/telas/admin.js
   init_armazenamento();
   init_calculos();
-
-  // docs/js/poupanca.js
-  init_calculos();
-  var SERIE_POUPANCA = 195;
-  function inicioPoupanca(data2) {
-    return Number(data2.slice(8, 10)) > 28 ? `${somarMeses(data2.slice(0, 7), 1)}-01` : data2;
-  }
-  function periodosPoupanca(data2, ate) {
-    const ini = inicioPoupanca(data2);
-    const out = [];
-    for (let k = 0; somarMesesData(ini, k + 1) <= ate; k += 1) out.push(somarMesesData(ini, k));
-    return out;
-  }
-  function corrigirPelaPoupanca(movimentos, ate, taxas = {}) {
-    const falta = /* @__PURE__ */ new Set();
-    const depositos = (movimentos || []).filter((m) => m.valor && (!m.data || m.data <= ate)).map((m) => {
-      const periodos = m.data ? periodosPoupanca(m.data, ate) : [];
-      let fator = 1;
-      for (const p2 of periodos) {
-        if (Number.isFinite(taxas[p2])) fator *= 1 + taxas[p2] / 100;
-        else falta.add(p2);
-      }
-      return { data: m.data || null, valor: m.valor, meses: periodos.length, corrigido: arred(m.valor * fator) };
-    });
-    const total = depositos.reduce((s, x) => s + x.valor, 0);
-    const corrigido = depositos.reduce((s, x) => s + x.corrigido, 0);
-    return { depositos, total, corrigido, rendimento: corrigido - total, percentual: percentualDaCorrecao(total, corrigido), falta: [...falta].sort() };
-  }
-  function percentualDaCorrecao(total, corrigido) {
-    if (!(total > 0)) return 0;
-    const base = Math.round((corrigido / total - 1) * 1e6) / 1e4;
-    const erro = (p2) => Math.abs(arred(total * (1 + p2 / 100)) - corrigido);
-    return [base, base - 1e-4, base + 1e-4].map((p2) => Math.round(p2 * 1e4) / 1e4).sort((a, b) => erro(a) - erro(b))[0];
-  }
-  var trazidas = {};
-  var trazidoDe = null;
-  var trazidoAte = null;
-  async function taxasPoupanca(de, ate, buscar3 = fetch) {
-    if (trazidoDe && trazidoDe <= de && trazidoAte >= ate) return trazidas;
-    if (trazidoDe) [de, ate] = [de < trazidoDe ? de : trazidoDe, ate > trazidoAte ? ate : trazidoAte];
-    const br = (x) => `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}`;
-    for (let ini = de; ini <= ate; ini = somarDias(somarAnos(ini, 5), 1)) {
-      const fim = [somarAnos(ini, 5), ate].sort()[0];
-      let lista3 = null;
-      for (let n = 1; n <= 3 && !lista3; n += 1) {
-        try {
-          const resp = await buscar3(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${SERIE_POUPANCA}/dados?formato=json&dataInicial=${br(ini)}&dataFinal=${br(fim)}`);
-          if (resp.ok) lista3 = await resp.json();
-        } catch {
-        }
-        if (!lista3 && n < 3) await new Promise((ok) => {
-          setTimeout(ok, 1500 * n);
-        });
-      }
-      if (!Array.isArray(lista3)) throw new Error("Não deu para consultar a poupança no Banco Central agora (sem internet ou o site deles está ocupado).");
-      for (const x of lista3) {
-        const taxa = Number(x.valor);
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(x.data || "") && Number.isFinite(taxa)) trazidas[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}-${x.data.slice(0, 2)}`] = taxa;
-      }
-    }
-    [trazidoDe, trazidoAte] = [de, ate];
-    return trazidas;
-  }
-  async function poupancaDaGarantia(movimentos, ate, buscar3 = fetch) {
-    const datas = (movimentos || []).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
-    const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar3) : {};
-    return corrigirPelaPoupanca(movimentos, ate, taxas);
-  }
-  function corrigirGarantiasPorEmpresa(garantias, ate, taxas = {}) {
-    const contratos = /* @__PURE__ */ new Map();
-    const falta = /* @__PURE__ */ new Set();
-    const doContrato = (x) => {
-      if (!contratos.has(x.contrato.id)) {
-        const r = corrigirPelaPoupanca(x.movimentos, ate, taxas);
-        r.falta.forEach((p2) => falta.add(p2));
-        contratos.set(x.contrato.id, { total: r.total, corrigido: r.corrigido });
-      }
-      return contratos.get(x.contrato.id);
-    };
-    const proporcional = (valor, r) => r.total > 0 ? arred(valor * r.corrigido / r.total) : valor;
-    let aplicado = 0;
-    const lugares = garantias.lugares.map((l) => {
-      const itens = l.itens.map((x) => proporcional(x.valor, doContrato(x)));
-      const corrigido = itens.reduce((s, v) => s + v, 0);
-      aplicado += corrigido;
-      return { chave: l.chave, corrigido, itens };
-    });
-    const semAplicar = garantias.semAplicar.map((x) => proporcional(x.falta, doContrato(x)));
-    return { contratos, lugares, semAplicar, aplicado, faltaAplicar: semAplicar.reduce((s, v) => s + v, 0), falta: [...falta].sort() };
-  }
-  async function garantiasCorrigidasHoje(garantias, ate, buscar3 = fetch) {
-    const datas = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar].flatMap((x) => x.movimentos).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
-    const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar3) : {};
-    return corrigirGarantiasPorEmpresa(garantias, ate, taxas);
-  }
-
-  // docs/js/telas/admin.js
   init_formularios();
   init_regras();
 
@@ -17448,6 +17351,103 @@ Salvar assim mesmo?`)) {
   init_contratos();
   init_formularios();
   init_formularios();
+
+  // docs/js/poupanca.js
+  init_calculos();
+  var SERIE_POUPANCA = 195;
+  function inicioPoupanca(data2) {
+    return Number(data2.slice(8, 10)) > 28 ? `${somarMeses(data2.slice(0, 7), 1)}-01` : data2;
+  }
+  function periodosPoupanca(data2, ate) {
+    const ini = inicioPoupanca(data2);
+    const out = [];
+    for (let k = 0; somarMesesData(ini, k + 1) <= ate; k += 1) out.push(somarMesesData(ini, k));
+    return out;
+  }
+  function corrigirPelaPoupanca(movimentos, ate, taxas = {}) {
+    const falta = /* @__PURE__ */ new Set();
+    const depositos = (movimentos || []).filter((m) => m.valor && (!m.data || m.data <= ate)).map((m) => {
+      const periodos = m.data ? periodosPoupanca(m.data, ate) : [];
+      let fator = 1;
+      for (const p2 of periodos) {
+        if (Number.isFinite(taxas[p2])) fator *= 1 + taxas[p2] / 100;
+        else falta.add(p2);
+      }
+      return { data: m.data || null, valor: m.valor, meses: periodos.length, corrigido: arred(m.valor * fator) };
+    });
+    const total = depositos.reduce((s, x) => s + x.valor, 0);
+    const corrigido = depositos.reduce((s, x) => s + x.corrigido, 0);
+    return { depositos, total, corrigido, rendimento: corrigido - total, percentual: percentualDaCorrecao(total, corrigido), falta: [...falta].sort() };
+  }
+  function percentualDaCorrecao(total, corrigido) {
+    if (!(total > 0)) return 0;
+    const base = Math.round((corrigido / total - 1) * 1e6) / 1e4;
+    const erro = (p2) => Math.abs(arred(total * (1 + p2 / 100)) - corrigido);
+    return [base, base - 1e-4, base + 1e-4].map((p2) => Math.round(p2 * 1e4) / 1e4).sort((a, b) => erro(a) - erro(b))[0];
+  }
+  var trazidas = {};
+  var trazidoDe = null;
+  var trazidoAte = null;
+  async function taxasPoupanca(de, ate, buscar3 = fetch) {
+    if (trazidoDe && trazidoDe <= de && trazidoAte >= ate) return trazidas;
+    if (trazidoDe) [de, ate] = [de < trazidoDe ? de : trazidoDe, ate > trazidoAte ? ate : trazidoAte];
+    const br = (x) => `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}`;
+    for (let ini = de; ini <= ate; ini = somarDias(somarAnos(ini, 5), 1)) {
+      const fim = [somarAnos(ini, 5), ate].sort()[0];
+      let lista3 = null;
+      for (let n = 1; n <= 3 && !lista3; n += 1) {
+        try {
+          const resp = await buscar3(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${SERIE_POUPANCA}/dados?formato=json&dataInicial=${br(ini)}&dataFinal=${br(fim)}`);
+          if (resp.ok) lista3 = await resp.json();
+        } catch {
+        }
+        if (!lista3 && n < 3) await new Promise((ok) => {
+          setTimeout(ok, 1500 * n);
+        });
+      }
+      if (!Array.isArray(lista3)) throw new Error("Não deu para consultar a poupança no Banco Central agora (sem internet ou o site deles está ocupado).");
+      for (const x of lista3) {
+        const taxa = Number(x.valor);
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(x.data || "") && Number.isFinite(taxa)) trazidas[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}-${x.data.slice(0, 2)}`] = taxa;
+      }
+    }
+    [trazidoDe, trazidoAte] = [de, ate];
+    return trazidas;
+  }
+  async function poupancaDaGarantia(movimentos, ate, buscar3 = fetch) {
+    const datas = (movimentos || []).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
+    const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar3) : {};
+    return corrigirPelaPoupanca(movimentos, ate, taxas);
+  }
+  function corrigirGarantiasPorEmpresa(garantias, ate, taxas = {}) {
+    const contratos = /* @__PURE__ */ new Map();
+    const falta = /* @__PURE__ */ new Set();
+    const doContrato = (x) => {
+      if (!contratos.has(x.contrato.id)) {
+        const r = corrigirPelaPoupanca(x.movimentos, ate, taxas);
+        r.falta.forEach((p2) => falta.add(p2));
+        contratos.set(x.contrato.id, { total: r.total, corrigido: r.corrigido });
+      }
+      return contratos.get(x.contrato.id);
+    };
+    const proporcional = (valor, r) => r.total > 0 ? arred(valor * r.corrigido / r.total) : valor;
+    let aplicado = 0;
+    const lugares = garantias.lugares.map((l) => {
+      const itens = l.itens.map((x) => proporcional(x.valor, doContrato(x)));
+      const corrigido = itens.reduce((s, v) => s + v, 0);
+      aplicado += corrigido;
+      return { chave: l.chave, corrigido, itens };
+    });
+    const semAplicar = garantias.semAplicar.map((x) => proporcional(x.falta, doContrato(x)));
+    return { contratos, lugares, semAplicar, aplicado, faltaAplicar: semAplicar.reduce((s, v) => s + v, 0), falta: [...falta].sort() };
+  }
+  async function garantiasCorrigidasHoje(garantias, ate, buscar3 = fetch) {
+    const datas = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar].flatMap((x) => x.movimentos).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
+    const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar3) : {};
+    return corrigirGarantiasPorEmpresa(garantias, ate, taxas);
+  }
+
+  // docs/js/telas/campos.js
   init_regras();
   var CAMPOS_PESSOA_FORM = ["nome", "rg", "telefone", "email", "endereco", "genero", "nacionalidade", "estado_civil", "profissao", "nascimento"];
   var titulo = (t) => String(t || "").toLocaleLowerCase("pt-BR").replace(/(^|[\s/(-])(\p{L})/gu, (x, a, b) => a + b.toLocaleUpperCase("pt-BR")).replace(/\b(De|Da|Do|Das|Dos|E)\b/g, (x) => x.toLowerCase());
@@ -19007,7 +19007,10 @@ ${FECHO}` };
     ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" rel="noopener" href="#/imprimir/faturas?mes=${esc(mes)}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao("pdfMes", "Baixar todas em PDF (ZIP)", { mes })}
       ${[...new Set(doMes.filter((f) => f.situacao === "Emitida").map((f) => f.emitente_id))].map((id) => buscar2("emitentes", id)).filter(Boolean).map((e) => botao("pdfMes", `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(" ")}
       ${botao("excelMes", "Baixar todas em Excel (ZIP)", { mes })}</div>` : ""}
-    ${podeUsuario("admin") && ultima ? caixaRenumerar() : ""}`;
+    ${podeUsuario("admin") && ultima ? caixaRenumerar() : ""}
+    <div class="cartao" id="numeracao-nf"><h2>Numeração das NFs</h2>
+      <p>Próximo número: <b>${numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
+      ${podeUsuario("admin") ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ""}</div>`;
   }
   function porMes(pend) {
     const m = /* @__PURE__ */ new Map();
@@ -22614,7 +22617,6 @@ ${m.texto}
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, "nome").map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || "-")}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta("Ativa", "ok") : etiqueta("Inativa", "neutra")}</td><td class="n">${podeUsuario("admin") ? link(`#/editar/emitentes/${e.id}`, "Editar") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
-    ${caixaGarantiasPorEmpresa()}
     <div class="cartao" id="logo-empresa"><h2>Logo da empresa</h2>
       <p class="suave">Aparece no topo de todas as páginas do sistema e como marca-d'água nos contratos, vistorias e cartas. Envie em boa resolução (PNG ou SVG, de preferência com 1.000 pixels de largura ou mais).</p>
       ${d().logo && larguraLogo(d().logo) && larguraLogo(d().logo) < 800 ? `<div class="alerta aviso">A logo atual está em baixa resolução (${larguraLogo(d().logo)} pixels de largura): a marca-d'água sai serrilhada. Envie a logo de novo em "Trocar logo".</div>` : ""}
@@ -22626,56 +22628,7 @@ ${m.texto}
       <p>Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. ${d().ressarcimento_abate_nf ? "<b>Hoje: o ressarcimento sai do valor da NF</b> (a NF fica com o aluguel menos a taxa) e não conta de novo como gasto." : "<b>Hoje: a NF sai com o aluguel cheio</b> e o ressarcimento conta como gasto do imóvel nos Resultados."}</p>
       <p class="suave">Confirme com o contador qual forma usar. A mudança vale para os boletos gerados ou recalculados daqui em diante.</p>
       ${podeUsuario("admin") ? botao("ressarcimentoNaNf", d().ressarcimento_abate_nf ? "Passar a emitir a NF com o aluguel cheio" : "Passar a abater o ressarcimento da NF", { valor: d().ressarcimento_abate_nf ? "" : "1" }, "secundario pequeno", "Mudar a forma da NF nos ressarcimentos de condomínio?") : ""}</div>
-    ${caixaContaDosBoletos()}
-    <div class="cartao"><h2>Numeração das NFs</h2>
-      <p>Próximo número: <b>${numeroFatura(d().proxima_fatura)}</b>. As empresas de um mesmo pagamento recebem o mesmo número.</p>
-      ${podeUsuario("admin") ? `<form data-form="proximaFatura" class="acoes"><input type="number" name="numero" min="1" value="${d().proxima_fatura}" style="width:140px"><button class="secundario">Alterar próximo número</button></form>` : ""}</div>`;
-  }
-  var datasDosDepositos = (movimentos) => movimentos.map((m, i) => `<span class="nw">${m.data ? dataBr(m.data) : "sem data"} ${reais(m.valor)}${i ? ' <span class="suave">(complemento)</span>' : ""}</span>`).join("<br>") || '<span class="suave">sem depósito</span>';
-  var linkInquilino = (c) => `<a href="#/contrato/${c.id}?ir=garantia">${esc(c.inquilino_nome)}</a>`;
-  var BUSCANDO = '<span class="suave">buscando…</span>';
-  var corrigida = (alvo) => `<span data-corrigido="${alvo}">${BUSCANDO}</span>`;
-  function caixaGarantiasPorEmpresa() {
-    const g = garantiasPorEmpresa(d());
-    if (!g.lugares.length && !g.semAplicar.length) return "";
-    const resumo = g.lugares.map((l, i) => `<b>${esc(l.nome)}</b> ${reais(l.total)} (corrigido ${corrigida(`l${i}`)})`).join(" · ");
-    return `<div class="cartao" id="garantias-por-empresa" data-garantias-corrigidas><h2>Onde está a caução e o depósito de garantia</h2>
-    <p>Depositado: <b>${reais(g.aplicado)}</b> · corrigido hoje pela poupança: <b>${corrigida("aplicado")}</b>${g.total > g.aplicado ? ` · falta aplicar <b>${reais(g.total - g.aplicado)}</b> (corrigido ${corrigida("faltaAplicar")})` : ""}.</p>
-    ${resumo ? `<p class="suave">${resumo}</p>` : ""}
-    <p class="suave" data-corrigido="aviso"></p>
-    ${g.lugares.map((l, i) => `<h3>${esc(l.nome)}${l.pessoa ? ` ${etiqueta("outra pessoa", "info")}` : ""} · ${reais(l.total)} <span class="suave">(${new Set(l.itens.map((x) => x.contrato.id)).size} inquilino(s))</span></h3>
-      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th>Aplicado em</th><th class="n">Valor aplicado</th><th class="n">Corrigido hoje</th><th>Depósitos do inquilino</th><th></th></tr>
-      ${l.itens.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : "-")}</td><td>${esc(x.tipo)}</td><td class="nw">${x.data ? dataBr(x.data) : "-"}</td>
-        <td class="n">${reais(x.valor)}</td><td class="n">${corrigida(`l${i}-${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td><td>${linkComprovante(x.contrato.id, x.comprovante)}${x.observacoes ? ` <span class="suave">${esc(x.observacoes)}</span>` : ""}</td></tr>`).join("")}
-      <tr class="total"><td colspan="4">Total em ${esc(l.nome)}</td><td class="n">${reais(l.total)}</td><td class="n">${corrigida(`l${i}`)}</td><td colspan="2"></td></tr></table></div>`).join("")}
-    ${g.semAplicar.length ? `<h3>Ainda não aplicado ${etiqueta(`${g.semAplicar.length} inquilino(s)`, "aviso")}</h3>
-      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th class="n">Valor</th><th class="n">Aplicado</th><th class="n">Falta aplicar</th><th class="n">Falta corrigida hoje</th><th>Depósitos do inquilino</th></tr>
-      ${g.semAplicar.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : "-")}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.total)}</td><td class="n">${reais(x.aplicado)}</td><td class="n"><b>${reais(x.falta)}</b></td><td class="n">${corrigida(`s${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td></tr>`).join("")}</table></div>` : ""}
-    <p class="suave">Mostra só as garantias que ainda estão com a empresa (as devolvidas na saída ou na troca de titular saem daqui). "Corrigido hoje" é uma base: a poupança do Banco Central rende pelo aniversário de cada depósito e só nos meses completos (o mês que ainda não fechou não rende: esses dias ficam sem rendimento); na aplicação, a correção é dividida na proporção do valor aplicado. O valor certo da devolução é calculado no dia, no cálculo final ou na devolução. Para registrar ou mudar uma aplicação, abra o inquilino (Garantia → "Onde o valor foi aplicado").</p></div>`;
-  }
-  async function ligarGarantiasCorrigidas(raiz) {
-    const caixa = raiz.querySelector("[data-garantias-corrigidas]");
-    if (!caixa) return;
-    const preencher = (alvo, html) => {
-      for (const el of caixa.querySelectorAll(`[data-corrigido="${alvo}"]`)) el.innerHTML = html;
-    };
-    const g = garantiasPorEmpresa(d());
-    try {
-      const r = await garantiasCorrigidasHoje(g, hojeIso());
-      if (!caixa.isConnected) return;
-      r.lugares.forEach((l, i) => {
-        preencher(`l${i}`, reais(l.corrigido));
-        l.itens.forEach((v, j) => preencher(`l${i}-${j}`, reais(v)));
-      });
-      r.semAplicar.forEach((v, j) => preencher(`s${j}`, reais(v)));
-      preencher("aplicado", reais(r.aplicado));
-      preencher("faltaAplicar", reais(r.faltaAplicar));
-      preencher("aviso", r.falta.length ? `O Banco Central ainda não tem a taxa de ${r.falta.length} período(s) (${r.falta.slice(0, 3).map(dataBr).join(", ")}${r.falta.length > 3 ? "…" : ""}): esses meses ficaram sem rendimento.` : "");
-    } catch (e) {
-      if (!caixa.isConnected) return;
-      for (const el of caixa.querySelectorAll("[data-corrigido]")) el.innerHTML = '<span class="suave">-</span>';
-      preencher("aviso", `${esc(e.message)} O corrigido aparece quando abrir de novo com internet.`);
-    }
+    ${caixaContaDosBoletos()}`;
   }
   async function desfazerItens(itens) {
     if (!podeUsuario("admin")) throw new Error("Só o administrador desfaz alterações.");
@@ -23259,7 +23212,8 @@ ${m.texto}
     ["resultados", "#/resultados", "Resultado bruto"],
     ["liquido", "#/liquido", "Resultado líquido"],
     ["impostos", "#/impostos", "Impostos"],
-    ["inadimplencia", "#/inadimplencia", "Inadimplência"]
+    ["inadimplencia", "#/inadimplencia", "Inadimplência"],
+    ["garantias", "#/garantias", "Caução"]
   ].map(([k, h, t]) => `<a href="${h}" class="${k === atual ? "ativo" : ""}">${t}</a>`).join("")}</div>`;
   function telaImpostos(comp) {
     const lista3 = impostosDoMes(d(), comp);
@@ -23473,6 +23427,53 @@ ${m.texto}
         <tr class="total"><td>Lucro depois das reformas</td><td class="n nw">${reais(tot("lucro"))}</td></tr></table>
       <p class="suave">Pelo dia em que o dinheiro entrou ou saiu. Por imóvel: abas Resultado bruto e Resultado líquido.</p></div>`;
   }
+  var datasDosDepositos = (movimentos) => movimentos.map((m, i) => `<span class="nw">${m.data ? dataBr(m.data) : "sem data"} ${reais(m.valor)}${i ? ' <span class="suave">(complemento)</span>' : ""}</span>`).join("<br>") || '<span class="suave">sem depósito</span>';
+  var linkInquilino = (c) => `<a href="#/contrato/${c.id}?ir=garantia">${esc(c.inquilino_nome)}</a>`;
+  var BUSCANDO = '<span class="suave">buscando…</span>';
+  var corrigida = (alvo) => `<span data-corrigido="${alvo}">${BUSCANDO}</span>`;
+  function caixaGarantiasPorEmpresa() {
+    const g = garantiasPorEmpresa(d());
+    if (!g.lugares.length && !g.semAplicar.length) return '<div class="cartao"><p class="suave">Nenhuma caução ou depósito de garantia com a empresa.</p></div>';
+    const resumo = g.lugares.map((l, i) => `<b>${esc(l.nome)}</b> ${reais(l.total)} (corrigido ${corrigida(`l${i}`)})`).join(" · ");
+    return `<div class="cartao" id="garantias-por-empresa" data-garantias-corrigidas><h2>Onde está a caução e o depósito de garantia</h2>
+    <p>Depositado: <b>${reais(g.aplicado)}</b> · corrigido hoje pela poupança: <b>${corrigida("aplicado")}</b>${g.total > g.aplicado ? ` · falta aplicar <b>${reais(g.total - g.aplicado)}</b> (corrigido ${corrigida("faltaAplicar")})` : ""}.</p>
+    ${resumo ? `<p class="suave">${resumo}</p>` : ""}
+    <p class="suave" data-corrigido="aviso"></p>
+    ${g.lugares.map((l, i) => `<h3>${esc(l.nome)}${l.pessoa ? ` ${etiqueta("outra pessoa", "info")}` : ""} · ${reais(l.total)} <span class="suave">(${new Set(l.itens.map((x) => x.contrato.id)).size} inquilino(s))</span></h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th>Aplicado em</th><th class="n">Valor aplicado</th><th class="n">Corrigido hoje</th><th>Depósitos do inquilino</th><th></th></tr>
+      ${l.itens.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : "-")}</td><td>${esc(x.tipo)}</td><td class="nw">${x.data ? dataBr(x.data) : "-"}</td>
+        <td class="n">${reais(x.valor)}</td><td class="n">${corrigida(`l${i}-${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td><td>${linkComprovante(x.contrato.id, x.comprovante)}${x.observacoes ? ` <span class="suave">${esc(x.observacoes)}</span>` : ""}</td></tr>`).join("")}
+      <tr class="total"><td colspan="4">Total em ${esc(l.nome)}</td><td class="n">${reais(l.total)}</td><td class="n">${corrigida(`l${i}`)}</td><td colspan="2"></td></tr></table></div>`).join("")}
+    ${g.semAplicar.length ? `<h3>Ainda não aplicado ${etiqueta(`${g.semAplicar.length} inquilino(s)`, "aviso")}</h3>
+      <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th class="n">Valor</th><th class="n">Aplicado</th><th class="n">Falta aplicar</th><th class="n">Falta corrigida hoje</th><th>Depósitos do inquilino</th></tr>
+      ${g.semAplicar.map((x, j) => `<tr><td>${linkInquilino(x.contrato)}</td><td>${esc(x.imovel ? x.imovel.nome : "-")}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.total)}</td><td class="n">${reais(x.aplicado)}</td><td class="n"><b>${reais(x.falta)}</b></td><td class="n">${corrigida(`s${j}`)}</td><td>${datasDosDepositos(x.movimentos)}</td></tr>`).join("")}</table></div>` : ""}
+    <p class="suave">Mostra só as garantias que ainda estão com a empresa (as devolvidas na saída ou na troca de titular saem daqui). "Corrigido hoje" é uma base: a poupança do Banco Central rende pelo aniversário de cada depósito e só nos meses completos (o mês que ainda não fechou não rende: esses dias ficam sem rendimento); na aplicação, a correção é dividida na proporção do valor aplicado. O valor certo da devolução é calculado no dia, no cálculo final ou na devolução. Para registrar ou mudar uma aplicação, abra o inquilino (Garantia → "Onde o valor foi aplicado").</p></div>`;
+  }
+  async function ligarGarantiasCorrigidas(raiz) {
+    const caixa = raiz.querySelector("[data-garantias-corrigidas]");
+    if (!caixa) return;
+    const preencher = (alvo, html) => {
+      for (const el of caixa.querySelectorAll(`[data-corrigido="${alvo}"]`)) el.innerHTML = html;
+    };
+    const g = garantiasPorEmpresa(d());
+    try {
+      const r = await garantiasCorrigidasHoje(g, hojeIso());
+      if (!caixa.isConnected) return;
+      r.lugares.forEach((l, i) => {
+        preencher(`l${i}`, reais(l.corrigido));
+        l.itens.forEach((v, j) => preencher(`l${i}-${j}`, reais(v)));
+      });
+      r.semAplicar.forEach((v, j) => preencher(`s${j}`, reais(v)));
+      preencher("aplicado", reais(r.aplicado));
+      preencher("faltaAplicar", reais(r.faltaAplicar));
+      preencher("aviso", r.falta.length ? `O Banco Central ainda não tem a taxa de ${r.falta.length} período(s) (${r.falta.slice(0, 3).map(dataBr).join(", ")}${r.falta.length > 3 ? "…" : ""}): esses meses ficaram sem rendimento.` : "");
+    } catch (e) {
+      if (!caixa.isConnected) return;
+      for (const el of caixa.querySelectorAll("[data-corrigido]")) el.innerHTML = '<span class="suave">-</span>';
+      preencher("aviso", `${esc(e.message)} O corrigido aparece quando abrir de novo com internet.`);
+    }
+  }
+  var telaGarantias = () => `<h1>Financeiro</h1>${abasFinanceiro("garantias")}${caixaGarantiasPorEmpresa()}`;
 
   // docs/js/telas/imovel.js
   init_calculos();
@@ -27057,6 +27058,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     contas: (rota) => telaContas(rota),
     banco: (rota) => telaBanco(rota),
     inadimplencia: () => telaInadimplencia(),
+    garantias: () => telaGarantias(),
     reajustes: (rota) => telaReajustes(rota.q),
     imprimir: (rota) => telaImprimir(rota),
     "contrato-gerar": (rota) => telaGerarContrato(rota),
@@ -27662,7 +27664,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     ["#/faturas", "NF", "fatura"],
     ["#/banco", "Banco", "^banco"],
     ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
-    ["#/financeiro", "Financeiro", "^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia"],
+    ["#/financeiro", "Financeiro", "^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias"],
     ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^backup|^empresas"]
   ];
   var versaoIcone = 0;
