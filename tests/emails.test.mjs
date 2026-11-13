@@ -74,7 +74,7 @@ test('contrato para assinar: conta da caução só com caução; saída antecipa
   assert.match(s, /Pintura da sala/);
   assert.match(s, /informe a chave Pix/);
   const v = texto(d, 'vistoria_assinada', { contrato: c }).texto;
-  assert.match(v, /até 11\/12\/2026 \(10 dias\)/);
+  assert.match(v, /até 08\/12\/2026 \(5 dias úteis\)/);
 });
 
 test('modelo editado em Dados e backup vale no lugar do padrão', () => {

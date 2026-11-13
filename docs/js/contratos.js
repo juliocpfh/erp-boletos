@@ -282,7 +282,11 @@ export function dadosDoContrato(d, c, extra = {}) {
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
     tem_incluso: inclusos.length > 0, tarifa_boleto: false, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
-    indeterminado: c.prazo_tipo === 'Indeterminado', representacao: representacaoDoContrato(d, c, imovel).length > 0, testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
+    indeterminado: c.prazo_tipo === 'Indeterminado',
+    // residencial com menos de 30 meses: depois do prazo, a retomada só nos casos do art. 47 (sem "a qualquer tempo")
+    retomada_livre: c.finalidade === 'Não residencial' || !(Number(c.prazo_meses) > 0 && Number(c.prazo_meses) < 30),
+    condominio: !!c.conta_condominio && c.conta_condominio !== 'Não tem',
+    representacao: representacaoDoContrato(d, c, imovel).length > 0, testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome)),
   };
   const assinaturas = [
     ...locadoras.map((e) => ({ nome: (e.razao_social || e.nome).toLocaleUpperCase('pt-BR'), doc: e.cnpj ? `CNPJ ${e.cnpj}` : '', papel: 'LOCADORA',

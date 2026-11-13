@@ -191,6 +191,17 @@ export function diaUtil(isoData) {
   return dia !== 0 && dia !== 6 && !feriados(Number(isoData.slice(0, 4))).has(isoData.slice(0, 10));
 }
 
+/** Soma dias úteis (sem sábado, domingo e feriado nacional). Ex.: sexta 13/11/2026 + 5 → segunda 23/11/2026 (20/11 é feriado nacional). */
+export function somarDiasUteis(isoData, dias) {
+  let x = isoData;
+  for (let n = 0; n < dias;) { x = somarDias(x, 1); if (diaUtil(x)) n += 1; }
+  return x;
+}
+
+/** Prazo do inquilino para apontar defeito na vistoria de entrada: 5 dias úteis da entrega das chaves (cláusula da vistoria). */
+export const PRAZO_VISTORIA_ENTRADA = 5;
+export const limiteVistoriaEntrada = (entrada) => somarDiasUteis(entrada, PRAZO_VISTORIA_ENTRADA);
+
 /** Dia útil igual ou anterior à data (vencimento de tributo federal que cai em dia sem expediente bancário antecipa). */
 export function diaUtilAteh(isoData) {
   let x = isoData;
