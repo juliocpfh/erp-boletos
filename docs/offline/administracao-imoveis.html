@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-JN8ZiiN0Qz9OTFx0I84w95eVnNoym3comvi5GXpTWC0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-/4RRRB1JF9tMDA+jZo/s/WQ9eXXAPY184EMKBt17eh0=' 'sha256-6SDjnjDV0E9DtJj/fkHqNrdf76dWV9NnxC78efKhgO0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a2423621a952b37b">
+<meta name="fontes" content="8136e2b0efeebf39">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -22986,7 +22986,7 @@ ${m.texto}
     const ultimo = [...mapas.values()].flatMap((m) => [...m.keys()]).filter((m) => m > `${ano}-12`).sort().pop() || `${ano}-12`;
     const meses = [];
     for (let m = `${ano}-01`; m <= ultimo; m = somarMeses(m, 1)) meses.push(m);
-    const soma = { inquilino: 0, sua: 0, aberto: 0 };
+    const soma = { inquilino: 0, sua: 0, aberto: 0, custo: 0, sobra: 0, parte: 0 };
     const suaParte = (v, aberto) => !v ? "-" : v < 0 ? `<span class="suave">sobra ${reais(-v)} para você</span>` : `<b class="${aberto ? "texto-perigo" : ""}">${reais(v)}</b>`;
     const linhas2 = imoveis.map((i) => {
       const p2 = doAno(i);
@@ -22999,6 +22999,9 @@ ${m.texto}
       soma.inquilino += t.inquilino;
       soma.sua += t.proprietario;
       soma.aberto += t.emAberto;
+      soma.custo += t.custo;
+      if (t.proprietario < 0) soma.sobra -= t.proprietario;
+      else soma.parte += t.proprietario;
       return `<tr><td>${nome}</td><td class="nw">${valor(p2)}${primeira(p2)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p2, m)).join("")}</td>
       <td class="n nw">${t.inquilino ? reais(t.inquilino) : "-"}</td><td class="n nw">${suaParte(t.proprietario, t.emAberto)}</td>
       <td class="n">${opera() ? link(`#/editar/iptus/${p2.id}?de=iptu`, "Editar") : ""}</td></tr>`;
@@ -23019,6 +23022,13 @@ ${m.texto}
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ""}<span>${m.startsWith(String(ano)) ? rotuloMes(m) : `${rotuloMes(m).split("/")[0]}<br>/${m.slice(2, 4)}`}</span>`).join("")}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
       ${linhas2 || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
       ${linhas2 ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ""}</td><td></td></tr>` : ""}</table>
+    ${linhas2 ? `<h3>Resumo de ${ano}</h3><table class="compacta resumo-iptu">
+      <tr><td>Inquilinos pagam nos boletos</td><td class="n nw"><b>${reais(soma.inquilino)}</b></td></tr>
+      <tr><td>Você paga à prefeitura (guias e cotas únicas)</td><td class="n nw"><b>${reais(soma.custo)}</b></td></tr>
+      <tr><td>Sobra para você <span class="suave">(desconto do IPTU pago à vista: o inquilino paga parcelado)</span></td><td class="n nw"><b>${reais(soma.sobra)}</b></td></tr>
+      <tr><td>Fica por sua conta <span class="suave">(imóvel vazio, mês de entrada ou saída, IPTU não cobrado)</span></td><td class="n nw"><b>${reais(soma.parte)}</b></td></tr>
+      <tr><td>Em aberto <span class="suave">(guias suas ainda não pagas)</span></td><td class="n nw">${soma.aberto ? `<b class="texto-perigo">${reais(soma.aberto)}</b>` : reais(0)}</td></tr>
+      <tr class="total"><td>${soma.sua < 0 ? "Resultado: sobra para você" : "Resultado: sai do seu bolso"}</td><td class="n nw">${reais(Math.abs(soma.sua))}</td></tr></table>` : ""}
     <div class="legenda-iptu">${legenda}</div>
     <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
   }
