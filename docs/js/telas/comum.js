@@ -253,8 +253,10 @@ async function completarHeranca(id) {
   await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosSeguro, true, 'seguro');
   await organizarPastas([r.anterior.id]);
   const c = buscar('contratos', id);
-  aviso(`${c.inquilino_nome}: ${[r.garantia && 'garantia (comprovantes, depósitos e aplicações)', r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
-    r.correcoes && `${r.correcoes} correção(ões) da caução`, r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean).join(', ')} trazido(s) do contrato de ${r.anterior.inquilino_nome}.`, 'info');
+  const trazidos = [r.garantia && 'garantia (correções, complementos e aplicações)', r.aplicacoes && `${r.aplicacoes} aplicação(ões) da garantia, com o comprovante`,
+    r.correcoes && `${r.correcoes} correção(ões) da caução`, r.reserva && `reserva de ${reais(c.reserva_valor)}`, r.seguro && 'seguro (apólice e documentos)'].filter(Boolean);
+  const pagamento = (r.comprovanteAnterior || []).length ? ` O comprovante e a data do pagamento da garantia voltaram a aparecer no contrato de ${r.anterior.inquilino_nome} (quem pagou) e continuam aqui como herdados.` : '';
+  aviso(`${c.inquilino_nome}: ${trazidos.length ? `${trazidos.join(', ')} trazido(s) do contrato de ${r.anterior.inquilino_nome}.` : 'troca de titular conferida.'}${pagamento}`, 'info');
   return r;
 }
 
@@ -283,22 +285,30 @@ export async function cienciaDaTroca(contratoId) {
   const c = buscar('contratos', contratoId);
   const a = c && R.contratoHerdado(d(), c);
   if (!a) return {};
+  // a garantia: às vezes é a mesma (segue do anterior), às vezes é nova; quem anexa confirma qual é (antes de a troca acontecer)
+  const g = !c.heranca_transferida && R.textoGarantiaNaTroca(d(), c, a);
+  const linhas = R.resumoDaHeranca(d(), c).filter((t) => !g || ![g.continua, g.nova].includes(t));
+  const opcao = (valor, texto) => `<label class="check" style="padding-top:0;font-weight:normal"><input type="radio" name="garantia" value="${valor}" ${(valor === 'nova') === R.garantiaNova(c) ? 'checked' : ''} required> ${esc(texto)}</label>`;
   const r = await janela({
     titulo: 'Termo da troca de titular: todo o vínculo será herdado', sim: 'Estou ciente: anexar', forte: true,
     html: `<p>Com o termo assinado, <b>todo o vínculo</b> de ${esc(a.inquilino_nome)} passa para <b>${esc(c.inquilino_nome)}</b>:</p>
-      <ul>${R.resumoDaHeranca(d(), c).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      <ul>${linhas.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      ${g ? `<p><b>Garantia: confirme o que diz o termo</b></p>${opcao('continua', g.continua)}${opcao('nova', g.nova)}` : ''}
       <p><label class="check" style="padding-top:0;font-weight:normal"><input type="checkbox" name="ciente" value="1" required>
         Eu, <b>${esc((E.usuario && E.usuario.nome) || login())}</b>, conferi o termo assinado por todos e estou ciente de que todo o vínculo passa para ${esc(c.inquilino_nome)}.</label></p>
       <p class="suave">A ciência fica registrada no termo (quem e quando).</p>`,
   });
-  return r ? { ciencia_por: login(), ciencia_em: new Date().toISOString() } : null;
+  if (!r) return null;
+  return { ciencia_por: login(), ciencia_em: new Date().toISOString(), ...(g && r.garantia ? { ciencia_garantia: String(r.garantia[0]) } : {}) };
 }
 
 /** Grava no termo a ciência dada na janela (dentro de alterar). Sem ciência (não é termo da troca): nada. */
 export function registrarCiencia(db, aditivo, ciencia) {
   if (!aditivo || !ciencia || !ciencia.ciencia_por) return;
   const c = R.buscar(db, 'contratos', aditivo.contrato_id);
-  R.atualizar(db, 'aditivos', aditivo.id, ciencia, login(), `${c ? c.inquilino_nome : 'Contrato'}: ciência de ${ciencia.ciencia_por} de que todo o vínculo passa ao novo titular`);
+  // garantia escolhida na janela (a mesma do anterior ou nova): vale antes de a troca acontecer
+  if (ciencia.ciencia_garantia) R.mudarGarantiaNaTroca(db, aditivo.contrato_id, ciencia.ciencia_garantia, login());
+  R.atualizar(db, 'aditivos', aditivo.id, ciencia, login(), `${c ? c.inquilino_nome : 'Contrato'}: ciência de ${ciencia.ciencia_por} de que todo o vínculo passa ao novo titular${ciencia.ciencia_garantia ? ` (garantia ${ciencia.ciencia_garantia === 'nova' ? 'nova' : 'a mesma do anterior'})` : ''}`);
 }
 
 /** Termo aditivo assinado: a troca de titular anda (fim do vínculo do anterior ou, passada a data, o contrato passa ao novo). */

@@ -724,6 +724,24 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** "✎ corrigir data" da caução ou do depósito: a data em que foi paga (na herdada, muda no contrato de quem pagou). */
+  async corrigirDataGarantia({ contrato, qual }) {
+    const c = buscar('contratos', contrato);
+    const g = R.GARANTIAS_DEPOSITADAS[qual];
+    if (!c || !g) throw new Error('Contrato não encontrado.');
+    const quem = R.pagadorDaGarantia(d(), c, qual);
+    const atual = c[g.pago] || quem[g.pago] || '';
+    const r = await janela({ titulo: `Data em que a ${g.nome} foi paga`, sim: 'Gravar data',
+      html: `<p>${quem.id !== c.id ? `${esc(c.inquilino_nome)} herdou a ${g.nome} de <b>${esc(quem.inquilino_nome)}</b>: a data é a do pagamento feito por ${esc(quem.inquilino_nome)}. Ela muda lá (no contrato de quem pagou) e aqui.` : `Data em que ${esc(c.inquilino_nome)} pagou a ${g.nome}.`}</p>
+        ${quem[`${qual}_por_depositos`] ? '<p class="suave">Paga em depósitos: muda a data do último depósito.</p>' : ''}
+        <label>Paga em</label><input type="date" name="data" value="${esc(atual)}" max="${C.hojeIso()}" required>` });
+    if (!r) return;
+    const data = String((r.data || [])[0] || '');
+    await alterar((db) => R.corrigirDataGarantiaPaga(db, c.id, qual, data, login()));
+    aviso(`Data da ${g.nome} corrigida: paga em ${dataBr(data)}${quem.id !== c.id ? ` (no contrato de ${quem.inquilino_nome} e aqui)` : ''}.`, 'ok');
+    await mostrar();
+  },
+
   async removerComprovanteGarantia({ contrato, qual }) {
     await alterarApagandoAnexos((db) => R.removerComprovanteGarantia(db, Number(contrato), qual, login()));
     aviso('Comprovante removido: anexe o certo em "Incluir … e anexar comprovante".');
