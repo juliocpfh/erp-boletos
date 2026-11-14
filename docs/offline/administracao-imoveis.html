@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-KZD44dbT1LEi/fwTZr2vs6uVSMzm6JThaAYTg485wJs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-aCh5d9IIIeCpwkkwzA0ceWeC6pfkyywkm9fmONTAI2E='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a170a08f1b2b7407">
+<meta name="fontes" content="ec16ee6998c2327a">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1532,6 +1532,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           lei: "LGPD (Lei 13.709/2018), art. 6º, III, e arts. 15 e 16."
         },
         {
+          chave: "dias_ficha_parada",
+          grupo: "rotina",
+          rotulo: "Ficha pela internet: avisar link sem resposta depois de (dias)",
+          tipo: "inteiro",
+          padrao: 2,
+          min: 1,
+          max: 7,
+          explica: 'Link da ficha mandado e sem nenhum dado ou documento depois deste número de dias vira alerta no Painel, com o botão "Lembrar". O link vale 7 dias.',
+          consequencia: "Só muda o alerta: nada é mandado sem alguém apertar o botão.",
+          lei: "Sem lei: rotina."
+        },
+        {
           chave: "dias_antecipacao_banco",
           grupo: "rotina",
           rotulo: "Extrato: ligar a entrada a boletos que vencem até quantos dias depois",
@@ -3020,7 +3032,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       representacao: representacaoDoContrato(d2, c, imovel).length > 0,
       testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome))
     };
-    const assinaturas = [
+    const assinaturas2 = [
       ...locadoras.map((e) => ({
         nome: (e.razao_social || e.nome).toLocaleUpperCase("pt-BR"),
         doc: e.cnpj ? `CNPJ ${e.cnpj}` : "",
@@ -3048,7 +3060,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       campos,
       condicoes,
       quantidades: { locatarios: 1, locadoras: locadoras.length, fiadores: fiadores.length },
-      assinaturas,
+      assinaturas: assinaturas2,
       locadoras,
       rodape: locadoras.map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase("pt-BR")} – CNPJ ${e.cnpj || ""}`)
     };
@@ -14660,12 +14672,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const rotulos = rotulosDosArquivos(d());
     const vistos = /* @__PURE__ */ new Set();
     const sumidos = [];
-    let conferidos = 0;
+    let conferidos2 = 0;
     for (const a of arquivosReferenciados(d())) {
       const chave = `${chavePasta(a.escopo, a.id)}|${a.nome}`;
       if (vistos.has(chave) || a.escopo === "ficha" || !buscar2("contratos", a.id)) continue;
       vistos.add(chave);
-      conferidos += 1;
+      conferidos2 += 1;
       try {
         await (await pastaDoEscopo(a.escopo, Number(a.id), false)).getFileHandle(a.nome);
       } catch {
@@ -14704,7 +14716,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const mudou = JSON.stringify(faltando) !== JSON.stringify(arquivosFaltando);
     arquivosFaltando = faltando;
     if (mudou || devolvidos.length) await redesenharSeLivre(endereco2);
-    return { conferidos, devolvidos, faltando };
+    return { conferidos: conferidos2, devolvidos, faltando };
   }
   var arquivosConferidos = false;
   async function conferirArquivosUmaVez() {
@@ -20801,6 +20813,192 @@ ${m.texto}
     ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
   }
 
+  // docs/js/telas/fichas.js
+  init_armazenamento();
+
+  // docs/js/conferir-pdf.js
+  var EDITORES = /canva|ilovepdf|smallpdf|sejda|pdfescape|pdfelement|wondershare|pdf24|pdf-xchange|nitro|foxit (phantom|pdf editor)|photoshop|gimp|inkscape|pixelmator|soda ?pdf|pdffiller|dochub|online2pdf|pdf ?candy|pdfsam|pdf editor|corel|affinity|paint\.net|gerador|fake|acrobat (pro|standard|dc)|pdf expert|xodo|lightpdf|pdfgear|pdf2go|hipdf|sodapdf|libreoffice draw/i;
+  var ESCRITORIO = /microsoft.*(word|excel|powerpoint)|libreoffice|openoffice|google docs|wps office|pages|keynote|numbers/i;
+  var IMPRESSAO = /skia\/pdf|chrom|microsoft: print to pdf|quartz pdfcontext|mac os x .*quartz|cairo|wkhtmltopdf|safari|firefox/i;
+  var latin = (bytes2) => {
+    let s = "";
+    for (let i = 0; i < bytes2.length; i += 1) s += String.fromCharCode(bytes2[i]);
+    return s;
+  };
+  function textoDoPdf(bruto) {
+    let b = [];
+    const t = String(bruto || "").trim();
+    if (t.startsWith("<") && !t.startsWith("<<")) {
+      const h = t.slice(1, t.indexOf(">") > 0 ? t.indexOf(">") : void 0).replace(/\s+/g, "");
+      for (let i = 0; i < h.length; i += 2) b.push(parseInt(h.slice(i, i + 2).padEnd(2, "0"), 16));
+    } else {
+      const s = t.startsWith("(") ? t.slice(1, t.lastIndexOf(")") > 0 ? t.lastIndexOf(")") : void 0) : t;
+      for (let i = 0; i < s.length; i += 1) {
+        const c = s[i];
+        if (c !== "\\") {
+          b.push(s.charCodeAt(i) & 255);
+          continue;
+        }
+        const n = s[i + 1];
+        i += 1;
+        if (/[0-7]/.test(n)) {
+          let o = n;
+          while (o.length < 3 && /[0-7]/.test(s[i + 1])) {
+            i += 1;
+            o += s[i];
+          }
+          b.push(parseInt(o, 8) & 255);
+        } else b.push({ n: 10, r: 13, t: 9, b: 8, f: 12 }[n] ?? n.charCodeAt(0));
+      }
+    }
+    if (b[0] === 254 && b[1] === 255) {
+      let s = "";
+      for (let i = 2; i + 1 < b.length; i += 2) s += String.fromCharCode(b[i] << 8 | b[i + 1]);
+      return s.trim();
+    }
+    return new TextDecoder("latin1").decode(new Uint8Array(b)).trim();
+  }
+  function dataDoPdf(t) {
+    const x = String(t || "");
+    const iso2 = x.match(/(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (iso2) {
+      const [, a2, me2, d3, h2 = "00", mi2 = "00", s2 = "00"] = iso2;
+      return `${a2}-${me2}-${d3}T${h2}:${mi2}:${s2}`;
+    }
+    const m = x.match(/(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
+    if (!m) return null;
+    const [, a, me = "01", d2 = "01", h = "00", mi = "00", s = "00"] = m;
+    return `${a}-${me}-${d2}T${h}:${mi}:${s}`;
+  }
+  function chaveDoPdf(texto3, chave) {
+    const re = new RegExp(`/${chave}\\s*(\\((?:\\\\.|[^\\\\)])*\\)|<[0-9A-Fa-f\\s]*>)`, "g");
+    const out = [];
+    for (let m = re.exec(texto3); m; m = re.exec(texto3)) out.push(textoDoPdf(m[1]));
+    return out;
+  }
+  async function abrirTrechos(bytes2, texto3, limite = 4 * 1024 * 1024) {
+    if (typeof DecompressionStream === "undefined") return "";
+    const out = [];
+    let total = 0;
+    const re = /(?<!end)stream\r?\n/g;
+    for (let m = re.exec(texto3); m && total < limite; m = re.exec(texto3)) {
+      const ini = m.index + m[0].length;
+      let fim = texto3.indexOf("endstream", ini);
+      if (fim < 0) break;
+      const depois = fim;
+      while (fim > ini && /[\r\n]/.test(texto3[fim - 1])) fim -= 1;
+      const antes = texto3.slice(Math.max(0, m.index - 300), m.index);
+      if (!/\/FlateDecode/.test(antes) || !/\/(ObjStm|Metadata|XRef)|\/Type\s*\/Metadata/.test(antes)) {
+        re.lastIndex = depois;
+        continue;
+      }
+      try {
+        const ds = new DecompressionStream("deflate");
+        const w = ds.writable.getWriter();
+        w.write(bytes2.slice(ini, fim)).catch(() => {
+        });
+        w.close().catch(() => {
+        });
+        const buf = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+        total += buf.length;
+        out.push(latin(buf));
+      } catch {
+      }
+      re.lastIndex = depois;
+    }
+    return out.join("\n");
+  }
+  function nomesDoCertificado(hex2) {
+    const h = String(hex2 || "").replace(/[^0-9a-f]/gi, "").toLowerCase();
+    const nomes = [];
+    for (let i = h.indexOf("0603550403"); i >= 0; i = h.indexOf("0603550403", i + 10)) {
+      const tipo = h.slice(i + 10, i + 12);
+      const tam = parseInt(h.slice(i + 12, i + 14), 16);
+      if (!tam || tam > 120) continue;
+      const bytes2 = h.slice(i + 14, i + 14 + tam * 2).match(/../g) || [];
+      const b = Uint8Array.from(bytes2.map((x) => parseInt(x, 16)));
+      const nome = tipo === "1e" ? String.fromCharCode(...Array.from({ length: b.length / 2 }, (_, k) => b[2 * k] << 8 | b[2 * k + 1])) : new TextDecoder().decode(b);
+      if (nome && !nomes.includes(nome)) nomes.push(nome);
+    }
+    return nomes;
+  }
+  var ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
+  async function assinaturas(texto3) {
+    const out = [];
+    const re = /\/Type\s*\/Sig\b|\/ByteRange\s*\[/g;
+    const vistos = /* @__PURE__ */ new Set();
+    for (let m = re.exec(texto3); m; m = re.exec(texto3)) {
+      const ini = texto3.lastIndexOf("<<", m.index);
+      const obj = Math.max(texto3.lastIndexOf(" obj", m.index), 0);
+      const fimObj = texto3.indexOf("endobj", m.index);
+      const trecho = texto3.slice(obj, fimObj < 0 ? m.index + 2e5 : fimObj);
+      const rel = trecho.indexOf("/Contents");
+      const contents = rel < 0 ? -1 : obj + rel;
+      if (contents < 0) continue;
+      const abre = texto3.indexOf("<", contents + 9);
+      const fecha = texto3.indexOf(">", abre + 1);
+      if (abre < 0 || fecha < 0 || vistos.has(abre)) continue;
+      vistos.add(abre);
+      const hex2 = texto3.slice(abre + 1, fecha);
+      const dic = texto3.slice(ini, Math.min(texto3.length, Math.max(fecha + 400, m.index + 400)));
+      const certs = nomesDoCertificado(hex2);
+      const emissores = certs.filter(ehAutoridade);
+      const govbr = emissores.some((c) => /governo federal do brasil/i.test(c));
+      const icp = !govbr && emissores.some((c) => /icp-brasil|serasa|certisign|soluti|valid|serpro|safeweb|digitalsign|caixa|receita federal|\brfb\b/i.test(c));
+      const pessoa2 = certs.find((c) => !ehAutoridade(c)) || "";
+      const nome = (pessoa2.replace(/:\d{11,14}$/, "") || chaveDoPdf(dic, "Name")[0] || "").trim();
+      out.push({ nome, data: dataDoPdf(chaveDoPdf(dic, "M")[0]), govbr, icp, certificados: certs, fim: fecha });
+    }
+    return out;
+  }
+  async function conferirArquivo(entrada) {
+    const bytes2 = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
+    const sinais = [];
+    if (bytes2[0] === 255 && bytes2[1] === 216 || bytes2[0] === 137 && bytes2[1] === 80) {
+      const t = latin(bytes2.slice(0, 256 * 1024));
+      const prog = (t.match(/(Adobe Photoshop[^\0<]{0,40}|GIMP[^\0<]{0,20}|Canva|Pixelmator[^\0<]{0,20}|Snapseed|PicsArt|Lightroom[^\0<]{0,20})/i) || [])[1] || "";
+      if (prog) sinais.push({ nivel: "alerta", texto: `Foto passou pelo programa "${prog.trim()}" (edição de imagem). Peça o documento original.` });
+      return { tipo: bytes2[0] === 255 ? "jpg" : "png", programa: prog.trim(), criado: null, alterado: null, sinais, assinaturas: [] };
+    }
+    if (!(bytes2[0] === 37 && bytes2[1] === 80 && bytes2[2] === 68 && bytes2[3] === 70)) return { tipo: null, programa: "", criado: null, alterado: null, sinais: [{ nivel: "atencao", texto: "Não é PDF nem foto." }], assinaturas: [] };
+    const texto3 = latin(bytes2);
+    const dentro = await abrirTrechos(bytes2, texto3);
+    const tudo = `${texto3}
+${dentro}`;
+    const xmp = (re) => (tudo.match(re) || [])[1] || "";
+    const produtor = [...chaveDoPdf(tudo, "Producer"), xmp(/<pdf:Producer>([^<]+)</)].filter(Boolean);
+    const criador = [...chaveDoPdf(tudo, "Creator"), xmp(/<xmp:CreatorTool>([^<]+)</)].filter(Boolean);
+    const programas = [...new Set([...criador, ...produtor].map((x) => x.trim()).filter(Boolean))];
+    const criado = dataDoPdf(chaveDoPdf(tudo, "CreationDate")[0] || xmp(/<xmp:CreateDate>([^<]+)</));
+    const alterado = dataDoPdf(chaveDoPdf(tudo, "ModDate")[0] || xmp(/<xmp:ModifyDate>([^<]+)</));
+    const editor = programas.find((p2) => EDITORES.test(p2));
+    const escritorio = programas.find((p2) => ESCRITORIO.test(p2));
+    const impressao = programas.find((p2) => IMPRESSAO.test(p2));
+    if (editor) sinais.push({ nivel: "alerta", texto: `Feito ou alterado no programa "${editor}" (editor de PDF ou de imagem). Extrato e holerite saem do aplicativo do banco ou do sistema do empregador: peça o arquivo original e confira com a fonte.` });
+    else if (escritorio) sinais.push({ nivel: "atencao", texto: `Feito no programa "${escritorio}" (editor de texto ou planilha). Holerite de empresa pequena pode sair assim; extrato de banco, não. Confira com a fonte.` });
+    else if (impressao) sinais.push({ nivel: "info", texto: `PDF "impresso" de uma página (${impressao}). Comum no extrato tirado do site do banco; confira o valor com a fonte.` });
+    const sig = await assinaturas(texto3 + (dentro ? `
+${dentro}` : ""));
+    if (criado && alterado && !sig.length && Date.parse(alterado) - Date.parse(criado) > 864e5) {
+      sinais.push({ nivel: "info", texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
+    }
+    const posicoes = [...texto3.matchAll(/%%EOF/g)].map((x) => x.index);
+    const ultimaAssinatura = sig.length ? Math.max(...sig.map((s) => s.fim)) : -1;
+    const linearizado = /\/Linearized\b/.test(texto3.slice(0, 2048)) ? 1 : 0;
+    const extras = sig.length ? posicoes.filter((p2) => p2 < ultimaAssinatura).length - linearizado - sig.length : posicoes.length - 1 - linearizado;
+    if (extras > 0 && !editor) sinais.push({ nivel: "atencao", texto: `O arquivo foi salvo de novo ${extras} vez(es) depois de gerado.` });
+    return { tipo: "pdf", programa: programas.join(" · "), criado, alterado, sinais, assinaturas: sig.map(({ fim, ...s }) => s) };
+  }
+  var nomeComparavel = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  function mesmoNome(a, b) {
+    const pal = (t) => nomeComparavel(t).split(" ").filter((p2) => p2.length > 2 && !["das", "dos", "del"].includes(p2));
+    const x = pal(a);
+    const y = pal(b);
+    if (!x.length || !y.length) return false;
+    const comuns = x.filter((p2) => y.includes(p2)).length;
+    return comuns >= (x.length === 1 && y.length === 1 ? 1 : 2) && (x.every((p2) => y.includes(p2)) || y.every((p2) => x.includes(p2)));
+  }
+
   // docs/js/ficha-online.js
   init_calculos();
   init_formularios();
@@ -20886,11 +21084,38 @@ ${m.texto}
     const formulario = formularioDaFicha(f, pessoa2);
     return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
   }
-  function textoWhatsapp(f, pessoa2, link2) {
+  function textoWhatsapp(f, pessoa2, link2, { lembrete = false, faltando = [] } = {}) {
     const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
     const fiador = pessoa2 !== "interessado";
-    return `Olá${nome ? `, ${nome}` : ""}! Segue o link ${fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral"}, que vale até ${dataBr(String(link2.vence_em).slice(0, 10))}: ${link2.url}
+    const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral";
+    const validade = dataBr(String(link2.vence_em).slice(0, 10));
+    if (lembrete) {
+      return `Olá${nome ? `, ${nome}` : ""}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join("; ")}` : ""}. O link vale até ${validade}: ${link2.url}
+Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ": a reserva é devolvida por inteiro" : ""}.`;
+    }
+    return `Olá${nome ? `, ${nome}` : ""}! Segue o link ${qual}, que vale até ${validade}: ${link2.url}
 Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
+  }
+  function documentosDoLink(f, l) {
+    if (l.pessoa !== "interessado") return documentosDoFiador(fiadorDaFicha(f, l.pessoa.slice(6)));
+    return documentosDaFicha(f);
+  }
+  function dadosParaFicha(f, l) {
+    const ultimo = (l.respostas || []).at(-1);
+    const campos = new Set((l.formulario || []).filter((c) => c.nome).map((c) => c.nome));
+    const out = {};
+    if (ultimo) {
+      for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== void 0 && v !== "") out[k] = v;
+    }
+    if (l.pessoa === "interessado") {
+      const docs = (l.arquivos || []).map((a) => a.documento);
+      const renda = /* @__PURE__ */ new Set([...Object.values(DOCUMENTOS_RENDA).flat(), ...PARTES_DOCUMENTOS_PF.renda_padrao, "Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)"]);
+      if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
+      if (docs.some((x) => renda.has(x))) out.doc_renda = true;
+      if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
+      if (docs.some((x) => /assinada/.test(x))) out.doc_ficha = true;
+    }
+    return out;
   }
   function telefoneWhatsapp(f, pessoa2) {
     const t = String((pessoa2 === "interessado" ? f.inquilino_telefone : fiadorDaFicha(f, pessoa2.slice(6)).telefone) || "").replace(/\D/g, "");
@@ -20913,6 +21138,47 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   var criarLinkNaNuvem = (corpo) => pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
   var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob });
   var linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => r.links || []);
+  var atualizarLinkNaNuvem = (corpo) => pedir("atualizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  var chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(t).length / 4) * 4, "=")), (c) => c.charCodeAt(0));
+  var temPush = () => typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof PushManager !== "undefined" && typeof Notification !== "undefined";
+  async function estadoDoAviso() {
+    if (!temPush()) return { possivel: false };
+    const nuvem = await pedir("push").catch(() => ({ ligado: false }));
+    const reg = await navigator.serviceWorker.getRegistration();
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    return { possivel: true, ligadoNaNuvem: !!nuvem.ligado, ligadoAqui: !!inscricao && mesmaChave(inscricao, nuvem.chave), negado: Notification.permission === "denied", chave: nuvem.chave };
+  }
+  var mesmaChave = (inscricao, chave) => {
+    const k = inscricao && inscricao.options && inscricao.options.applicationServerKey;
+    if (!k || !chave) return true;
+    const a = new Uint8Array(k);
+    const b = chaveDoServidor(chave);
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  };
+  async function ligarAviso() {
+    if (!temPush()) throw new ErroUsuario("Este navegador não recebe avisos. No iPhone: instale o aplicativo (Compartilhar → Adicionar à Tela de Início) e abra por ele.");
+    const permissao = await Notification.requestPermission();
+    const e = await estadoDoAviso();
+    if (!e.ligadoNaNuvem) throw new ErroUsuario("O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).");
+    if (permissao !== "granted") throw new ErroUsuario("Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.");
+    const reg = await navigator.serviceWorker.ready;
+    let inscricao = await reg.pushManager.getSubscription();
+    if (inscricao && !mesmaChave(inscricao, e.chave)) {
+      await inscricao.unsubscribe().catch(() => {
+      });
+      inscricao = null;
+    }
+    inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
+    await pedir("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inscricao.toJSON()) });
+  }
+  async function desligarAviso() {
+    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    if (!inscricao) return;
+    await pedir("push-sair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) }).catch(() => {
+    });
+    await inscricao.unsubscribe();
+  }
 
   // docs/js/telas/fichas.js
   init_calculos();
@@ -20942,9 +21208,10 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   }
   function alertaFichas() {
     const p2 = pendenciasDasFichas(d());
-    if (!p2.length) return "";
+    const online = E.nuvem && opera() ? "<div data-alertas-ficha-online></div>" : "";
+    if (!p2.length) return online;
     const devolver = p2.some((x) => /devolução/.test(x.texto));
-    return `<div class="alerta ${devolver ? "aviso" : "info"}"><b>Fichas em análise:</b> ${p2.map((x) => `<a href="#/ficha/${x.ficha.id}">${esc(x.texto)}</a>`).join("; ")}.</div>`;
+    return `<div class="alerta ${devolver ? "aviso" : "info"}"><b>Fichas em análise:</b> ${p2.map((x) => `<a href="#/ficha/${x.ficha.id}">${esc(x.texto)}</a>`).join("; ")}.</div>${online}`;
   }
   var item2 = (rotulo, valor) => valor ? item(rotulo, valor) : "";
   var sim = (v, texto3) => `${v ? "✓" : '<span class="suave">✗</span>'} ${esc(texto3)}`;
@@ -21080,11 +21347,16 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }).join("");
     return `<div class="cartao" data-ficha-online="${f.id}">${titulo2}
     <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
-    <ul style="padding-left:18px">${linhas2}</ul><div data-respostas-link></div></div>`;
+    <ul style="padding-left:18px">${linhas2}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
   }
   async function ligarFichaOnline(raiz) {
+    const painel = raiz.querySelector("[data-alertas-ficha-online]");
+    if (painel && E.nuvem) await avisosDoPainel(painel).catch(() => {
+    });
     const caixa = raiz.querySelector("[data-ficha-online]");
     if (!caixa || !E.nuvem) return;
+    linhaDoAvisoNoAparelho(caixa.querySelector("[data-aviso-aparelho]")).catch(() => {
+    });
     let links;
     try {
       links = await linksNaNuvem(Number(caixa.dataset.fichaOnline));
@@ -21101,6 +21373,14 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       <span class="suave">${ultimo ? ` · dados enviados em ${dataHoraBr(ultimo.em)}` : ""}${(l.arquivos || []).length ? ` · ${l.arquivos.length} arquivo(s)` : ""} · link até ${new Date(l.vence_em).toLocaleDateString("pt-BR")}</span>`;
     }
     caixa._links = links;
+    const fichaAqui = buscar2("fichas", Number(caixa.dataset.fichaOnline));
+    const area = caixa.querySelector("[data-respostas-link]");
+    if (area && fichaAqui) {
+      area.innerHTML = links.filter((l) => l.situacao !== "Encerrado" || (l.respostas || []).length).map((l) => blocoDoLink(fichaAqui, l)).join("");
+      conferirArquivosDoLink(area, fichaAqui).catch((e) => console.warn("conferência dos arquivos do link", e));
+      for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) atualizarLinkNaNuvem({ ficha_id: fichaAqui.id, pessoa: l.pessoa, visto: true }).catch(() => {
+      });
+    }
     const id = Number(caixa.dataset.fichaOnline);
     const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
     if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
@@ -21113,9 +21393,134 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
   }
   var arquivosDoLinkVistos = /* @__PURE__ */ new Map();
-  async function janelaDoLink(f, pessoa2, link2) {
+  async function linhaDoAvisoNoAparelho(el) {
+    if (!el) return;
+    const e = await estadoDoAviso();
+    if (!e.possivel) {
+      el.innerHTML = "🔔 Aviso no celular: abra pelo aplicativo instalado (no iPhone: Compartilhar → Adicionar à Tela de Início).";
+      return;
+    }
+    if (!e.ligadoNaNuvem) {
+      el.innerHTML = "🔔 Aviso no celular: ainda não ligado na nuvem (o administrador cadastra as chaves; o Painel e o e-mail continuam avisando).";
+      return;
+    }
+    el.innerHTML = e.ligadoAqui ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao("desligarAvisoFicha", "Desligar neste aparelho", {}, "secundario mini")}` : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao("ligarAvisoFicha", "Ligar", {}, "mini")}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ""}`;
+  }
+  function valorDoCampo(c, v) {
+    if (v === null || v === void 0 || v === "") return '<span class="suave">-</span>';
+    if (c.tipo === "dinheiro") return reais(v);
+    if (c.tipo === "data") return dataBr(v);
+    if (c.tipo === "mes") return compBr(v);
+    if (c.tipo === "simnao") return v ? "Sim" : "Não";
+    return esc(v).replace(/\n/g, "<br>");
+  }
+  function diferencasDoEnvio(f, l) {
+    const ultimo = (l.respostas || []).at(-1);
+    if (!ultimo) return [];
+    return (l.formulario || []).filter((c) => c.nome && ultimo.valores[c.nome] !== null && ultimo.valores[c.nome] !== void 0 && String(ultimo.valores[c.nome]) !== String(f[c.nome] ?? "")).map((c) => ({ campo: c, na_ficha: f[c.nome], enviado: ultimo.valores[c.nome] }));
+  }
+  function blocoDoLink(f, l) {
+    const p2 = l.pessoa;
+    const nome = nomeDaPessoa(f, p2);
+    const ultimo = (l.respostas || []).at(-1);
+    const guardado = (f.links_ficha || {})[p2] || {};
+    const trazido = ultimo && guardado.trazido_em === ultimo.em;
+    const partes = [];
+    if (l.situacao === "Desistiu" && p2 === "interessado" && !fichaSemContrato(f)) {
+      partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : ""}.</div><p>${botaoDesistencia(f)}</p>`);
+    }
+    if (ultimo && !trazido) {
+      const dif = diferencasDoEnvio(f, l);
+      partes.push(`<p><b>Dados enviados em ${dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>
+      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join("")}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
+      <p class="acoes">${botao("trazerRespostaFicha", dif.length ? "Trazer para a ficha…" : "Marcar como conferido…", { id: f.id, pessoa: p2 }, "pequeno")}</p>`);
+    } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
+    if ((l.arquivos || []).length) {
+      partes.push(`<p><b>Documentos mandados pelo link</b> <span class="suave">(estão na pasta da ficha, abaixo; a conferência olha por dentro de cada arquivo)</span></p>
+      <ul style="padding-left:18px">${l.arquivos.map((a) => `<li data-conferir="${esc(a.arquivo)}" data-nome-pessoa="${esc(nome)}">${esc(a.documento)}: <a href="#" data-acao="abrirArquivo" data-escopo="ficha" data-id="${f.id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.nome_original || a.arquivo)}</a> <span class="suave">${dataHoraBr(a.em)}</span> <span data-sinais class="suave">conferindo…</span></li>`).join("")}</ul>`);
+    }
+    if (l.faltando && l.faltando.length && l.situacao === "Falta documento") partes.push(`<p class="suave">Pedido à pessoa: ${esc(l.faltando.join("; "))}.</p>`);
+    const ativo = !["Encerrado", "Desistiu"].includes(l.situacao);
+    if (ativo) {
+      partes.push(`<p class="acoes">${botao("pedirDocumentoFicha", "Pedir o que falta", { id: f.id, pessoa: p2 })}
+      ${botao("mandarAssinarFicha", "Mandar a ficha para assinar", { id: f.id, pessoa: p2 }, "secundario pequeno", `Gerar a ficha em PDF com os dados de agora e pedir a assinatura de ${nome} pelo link?`)}
+      ${botao("lembrarFicha", "Lembrar", { id: f.id, pessoa: p2 })}
+      ${botao("encerrarLinkFicha", "Encerrar o link", { id: f.id, pessoa: p2 }, "secundario pequeno", `Encerrar o link de ${nome}? A pessoa não consegue mais abrir nem mandar nada (o que já mandou continua guardado).`)}</p>`);
+    }
+    if (!partes.length) return "";
+    return `<div class="cartao" style="margin:8px 0"><h3>${esc(nome)}${p2 === "interessado" ? "" : " (fiador)"}</h3>${partes.join("")}</div>`;
+  }
+  var conferidos = /* @__PURE__ */ new Map();
+  async function conferirArquivosDoLink(area, f) {
+    const itens = [...area.querySelectorAll("[data-conferir]")];
+    if (!itens.length) return;
+    const pasta = await pastaDoEscopo("ficha", f.id, false);
+    for (const li of itens) {
+      const nome = li.dataset.conferir;
+      const chave = `${f.id}|${nome}`;
+      if (!conferidos.has(chave)) {
+        let html;
+        try {
+          const blob = await abrirArquivo(pasta, nome);
+          const r = await conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
+          html = sinaisHtml(r, li.dataset.nomePessoa);
+        } catch {
+          html = '<span class="suave">não foi possível conferir o arquivo</span>';
+        }
+        conferidos.set(chave, html);
+      }
+      const alvo = li.querySelector("[data-sinais]");
+      if (alvo) {
+        alvo.className = "";
+        alvo.innerHTML = conferidos.get(chave);
+      }
+    }
+  }
+  function sinaisHtml(r, nomePessoa) {
+    const cor = { alerta: "perigo", atencao: "aviso", info: "neutra" };
+    const titulo2 = { alerta: "⚠ possível montagem", atencao: "atenção", info: "impresso de página" };
+    const out = r.sinais.map((s) => `<span class="etiqueta ${cor[s.nivel]}" title="${esc(s.texto)}">${titulo2[s.nivel]}</span> <span class="suave">${esc(s.texto)}</span>`);
+    for (const a of r.assinaturas) {
+      const bate = mesmoNome(a.nome, nomePessoa);
+      out.push(`${etiqueta(`✓ assinado${a.govbr ? " pelo gov.br" : a.icp ? " (ICP-Brasil)" : ""}`, bate ? "ok" : "aviso")} <span class="suave">por ${esc(a.nome || "nome não lido")}${a.data ? ` em ${dataBr(a.data.slice(0, 10))}` : ""}${bate ? "" : ` · o nome não bate com a ficha (${esc(nomePessoa)})`}</span>`);
+    }
+    if (r.assinaturas.length) out.push('<span class="suave">confirme a assinatura em validar.iti.gov.br</span>');
+    if (!r.sinais.length) out.push(`<span class="suave">nenhum sinal de edição encontrado${r.programa ? ` (feito em: ${esc(r.programa)})` : ""}: isso não prova que é verdadeiro, confira com a fonte</span>`);
+    return out.join("<br>");
+  }
+  async function avisosDoPainel(el) {
+    const links = await linksNaNuvem();
+    const agora = Date.now();
+    const dias = regra("dias_ficha_parada");
+    const linhas2 = [];
+    for (const l of links) {
+      const f = buscar2("fichas", l.ficha_id);
+      if (!f || l.situacao === "Encerrado" || f.documentos_no_contrato) continue;
+      const nome = esc(l.nome || nomeDaPessoa(f, l.pessoa));
+      const ir2 = `<a href="#/ficha/${f.id}">${nome}${l.pessoa === "interessado" ? "" : " (fiador)"}</a>`;
+      if (l.situacao === "Desistiu" && !fichaSemContrato(f)) {
+        linhas2.push(`${ir2} avisou pelo link que não vai seguir: registre a desistência${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)}` : ""}`);
+        continue;
+      }
+      if (fichaSemContrato(f)) continue;
+      const novo = !l.visto_em && (l.ultimo_envio || l.arquivos);
+      const esperando = !l.ultimo_envio && !l.arquivos || ["Falta documento", "Assinar"].includes(l.situacao);
+      if (novo) linhas2.push(`${ir2} ${l.situacao === "Assinada" ? "mandou a ficha assinada" : l.ultimo_envio ? "mandou dados pelo link" : "mandou documentos pelo link"}: conferir`);
+      else if (esperando) {
+        const vencido2 = Date.parse(l.vence_em) < agora;
+        const lembrado = ((f.links_ficha || {})[l.pessoa] || {}).lembrado_em;
+        const desde = Math.max(...[l.criado_em, ["Falta documento", "Assinar"].includes(l.situacao) ? l.mudou_em : null, lembrado].filter(Boolean).map(Date.parse));
+        const parado = Number.isFinite(desde) ? Math.floor((agora - desde) / 864e5) : 0;
+        const oque = l.situacao === "Falta documento" ? "pedido de documento sem resposta" : l.situacao === "Assinar" ? "ficha para assinar sem resposta" : "link sem resposta";
+        if (vencido2) linhas2.push(`${ir2}: o link venceu (${oque}; gere um novo na ficha)`);
+        else if (parado >= dias) linhas2.push(`${ir2}: ${oque} há ${parado} dia(s) ${botao("lembrarFicha", "Lembrar", { id: f.id, pessoa: l.pessoa }, "secundario mini")}`);
+      }
+    }
+    el.innerHTML = linhas2.length ? `<div class="alerta info"><b>Ficha pela internet:</b> ${linhas2.join("; ")}.</div>` : "";
+  }
+  async function janelaDoLink(f, pessoa2, link2, { lembrete = false, faltando = [] } = {}) {
     const tel = telefoneWhatsapp(f, pessoa2);
-    const texto3 = textoWhatsapp(f, pessoa2, link2);
+    const texto3 = textoWhatsapp(f, pessoa2, link2, { lembrete, faltando });
     await janela({
       titulo: `Link da ficha: ${nomeDaPessoa(f, pessoa2)}`,
       sim: "Fechar",
@@ -21163,6 +21568,104 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       ));
       await mostrar();
       await janelaDoLink(buscar2("fichas", id), pessoa2, guardado);
+    },
+    /** Traz para a ficha os dados do último envio pelo link (só os preenchidos) e marca os documentos recebidos. */
+    async trazerRespostaFicha({ id, pessoa: pessoa2 }) {
+      if (!opera()) throw new ErroUsuario("Seu usuário não pode mudar a ficha.");
+      const f = buscar2("fichas", id);
+      const l = (await linksNaNuvem(id)).find((x) => x.pessoa === pessoa2);
+      const ultimo = l && (l.respostas || []).at(-1);
+      if (!f || !ultimo) throw new ErroUsuario("Não há dados enviados por este link.");
+      const sugestao = dadosParaFicha(f, l);
+      const dif = diferencasDoEnvio(f, l);
+      const marcas = [["doc_ficha", "Ficha cadastral assinada"], ["doc_pessoais", "Documentos pessoais"], ["doc_renda", "Comprovante de renda"], ["doc_residencia", "Comprovante de residência"]].filter(([k]) => sugestao[k] && !f[k]);
+      const resp = await janela({
+        titulo: `Trazer para a ficha: ${nomeDaPessoa(f, pessoa2)}`,
+        sim: "Trazer os marcados",
+        html: `${dif.length ? `<p><b>Dados</b> (desmarque o que a ficha já tem certo):</p>${dif.map((x) => `<p><label class="check"><input type="checkbox" name="campo" value="${esc(x.campo.nome)}" checked> ${esc(x.campo.rotulo)}: ${valorDoCampo(x.campo, x.na_ficha)} → <b>${valorDoCampo(x.campo, x.enviado)}</b></label></p>`).join("")}` : "<p>Os dados enviados já estão na ficha.</p>"}
+        ${marcas.length ? `<p><b>Marcar como recebido</b> (só o que está completo e conferido; veja os avisos de cada documento):</p>${marcas.map(([k, t]) => `<p><label class="check"><input type="checkbox" name="marca" value="${k}"> ${esc(t)}</label></p>`).join("")}` : ""}`
+      });
+      if (!resp) return;
+      const campos = new Set(resp.campo || []);
+      const dados = Object.fromEntries([...Object.entries(sugestao).filter(([k]) => campos.has(k)), ...(resp.marca || []).map((k) => [k, true])]);
+      await alterar((db) => {
+        const atual = buscar(db, "fichas", f.id);
+        const links = { ...atual.links_ficha || {} };
+        links[pessoa2] = { ...links[pessoa2] || {}, trazido_em: ultimo.em };
+        atualizar(db, "fichas", f.id, { ...dados, links_ficha: links }, login(), `Dados enviados pelo link por ${nomeDaPessoa(f, pessoa2)} trazidos para a ficha`);
+      });
+      atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, visto: true }).catch(() => {
+      });
+      aviso(`Dados de ${nomeDaPessoa(f, pessoa2)} trazidos para a ficha. Confira e, se estiver tudo certo, mande a ficha para assinar.`);
+      await mostrar();
+    },
+    /** Marca na nuvem o que falta (a pessoa vê no link) e abre a mensagem para avisar. */
+    async pedirDocumentoFicha({ id, pessoa: pessoa2 }) {
+      const f = buscar2("fichas", id);
+      const l = f && (await linksNaNuvem(id)).find((x) => x.pessoa === pessoa2);
+      if (!l) throw new ErroUsuario("Gere o link antes.");
+      const docs = documentosDoLink(f, l);
+      const resp = await janela({
+        titulo: `O que falta: ${nomeDaPessoa(f, pessoa2)}`,
+        sim: "Pedir pelo link",
+        html: `<p>A pessoa vê a lista no link e manda por lá.</p>${docs.map((t, k) => `<p><label class="check"><input type="checkbox" name="doc" value="${k}"> ${esc(t)}</label></p>`).join("")}
+        <p><label>Outro (escreva)</label><textarea name="outro" rows="2"></textarea></p>`
+      });
+      if (!resp) return;
+      const faltando = [...(resp.doc || []).map((k) => docs[Number(k)]), ...String((resp.outro || [])[0] || "").split(/\n+/).map((x) => x.trim()).filter(Boolean)];
+      if (!faltando.length) throw new ErroUsuario("Marque ou escreva o que falta.");
+      await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Falta documento", faltando });
+      aviso("Pedido registrado no link.");
+      const link2 = linkValido(f, pessoa2);
+      if (link2) await janelaDoLink(f, pessoa2, link2, { lembrete: true, faltando });
+      await mostrar();
+    },
+    /** Gera a ficha em PDF com os dados de agora, guarda no link e pede a assinatura (gov.br ou à mão). */
+    async mandarAssinarFicha({ id, pessoa: pessoa2 }) {
+      const f = buscar2("fichas", id);
+      if (!f) throw new ErroUsuario("Ficha não encontrada.");
+      const tipo = pessoa2 === "interessado" ? "ficha" : "ficha_fiador";
+      const pdf = await pdfDoRecibo(tipo, { ficha: f, ...tipo === "ficha_fiador" ? { fiador: Number(pessoa2.slice(6)) } : {} });
+      await guardarPdfNaNuvem(f.id, pessoa2, pdf.blob);
+      await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Assinar", faltando: [] });
+      aviso("A ficha com os dados de agora está no link para assinar.");
+      const link2 = linkValido(f, pessoa2);
+      if (link2) await janelaDoLink(f, pessoa2, link2, { lembrete: true, faltando: ["assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)"] });
+      await mostrar();
+    },
+    async lembrarFicha({ id, pessoa: pessoa2 }) {
+      const f = buscar2("fichas", id);
+      const l = f && linkValido(f, pessoa2);
+      if (!l) throw new ErroUsuario("O link venceu: gere um novo na página da ficha.");
+      await janelaDoLink(f, pessoa2, l, { lembrete: true });
+      await alterar((db) => {
+        const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
+        links[pessoa2] = { ...links[pessoa2], lembrado_em: (/* @__PURE__ */ new Date()).toISOString() };
+        atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Lembrete da ficha mandado a ${nomeDaPessoa(f, pessoa2)}`);
+      });
+      await mostrar();
+    },
+    async encerrarLinkFicha({ id, pessoa: pessoa2 }) {
+      const f = buscar2("fichas", id);
+      if (!f) throw new ErroUsuario("Ficha não encontrada.");
+      await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Encerrado" });
+      await alterar((db) => {
+        const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
+        if (links[pessoa2]) links[pessoa2] = { ...links[pessoa2], vence_em: (/* @__PURE__ */ new Date()).toISOString(), encerrado: true };
+        atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Link da ficha de ${nomeDaPessoa(f, pessoa2)} encerrado`);
+      });
+      aviso("Link encerrado.");
+      await mostrar();
+    },
+    async ligarAvisoFicha() {
+      await ligarAviso();
+      aviso("Pronto: este aparelho avisa quando chegar algo pelos links da ficha.");
+      await mostrar();
+    },
+    async desligarAvisoFicha() {
+      await desligarAviso();
+      aviso("Aviso desligado neste aparelho.");
+      await mostrar();
     },
     async compartilharLinkFicha({ id, pessoa: pessoa2 }) {
       const f = buscar2("fichas", id);
