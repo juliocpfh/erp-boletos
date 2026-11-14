@@ -111,7 +111,7 @@ export function caixaBancoC6(cb) {
     ${qr ? `<div class="qr-pix"><img src="${qr}" alt="QR Code do Pix" width="180" height="180"><div class="suave">QR Code do Pix: o inquilino lê com o app do banco.</div></div>` : ''}
     ${tabelaNotificacoes(b)}
     ${blocoNegativacao(cb, conta)}
-    ${opera() ? `<div class="acoes">${botao('consultarBoletoC6', 'Consultar situação no banco', { id: cb.id })}
+    ${opera() ? `<div class="acoes">${b.situacao === 'pago' && !cb.data_pagamento ? '' : botao('consultarBoletoC6', 'Consultar situação no banco', { id: cb.id })}
       ${b.situacao === 'emitido' ? botao('cancelarBoletoC6', 'Cancelar no banco', { id: cb.id }, 'perigo pequeno', 'Cancelar este boleto no C6? O inquilino não conseguirá mais pagar por ele; depois dá para emitir outro.') : ''}
       ${b.situacao === 'emitido' && b.simulado ? botao('pagarSimuladoC6', 'Simular pagamento (teste)', { id: cb.id }, 'secundario pequeno') : ''}
       ${b.situacao !== 'cancelado' && !b.simulado ? botao('abrirPdfC6', 'Abrir PDF do boleto', { id: cb.id }) : ''}</div>` : ''}</div>`;

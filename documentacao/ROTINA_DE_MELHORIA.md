@@ -138,16 +138,16 @@ Três varreduras só de leitura (desempenho, dados e fluxo, conflitos). Medido n
 - [x] **R1.** "Nova NF avulsa do Airbnb" abria o formulário em branco (`modelo=airbnb` barrado por `sanearParametros`) e, se funcionasse, criava uma NF em dobro: botão retirado; a NF do Airbnb nasce só em "Gerar a NF do Airbnb" e o padrão do cliente se guarda ao editá-la.
 - [x] **R2.** Carta de reajuste com o vencimento do boleto de verdade (`R.vencimentoDoReajuste`), como a tela Reajustes.
 - [x] **R3.** Caução na carta e na prévia de Reajustes pelas regras `caucao_acompanha` e `caucao_base` (`R.aluguelDaCaucao`), como o boleto do complemento.
-- [ ] **R4.** "Baixar regras do sistema (TXT)" com as regras em uso; nome diferente de "Baixar arquivo das regras".
-- [ ] **R5.** Texto da pasta do contador (Banco) na nuvem.
-- [ ] **R6.** Tela NF: nome do botão citado no texto.
-- [ ] **R7.** Filtro "Vencidos e não pagos" (Boletos) avisa que conta inquilinos encerrados (Inadimplência não conta).
+- [x] **R4.** "Baixar as regras para ler (TXT)" termina com as regras em uso hoje (`textoDasRegrasEmUso`, com "MUDADA" no que difere do padrão); o outro botão virou "Baixar cópia das regras (para carregar depois)"; os textos de Reajustes e da página do inquilino seguem a regra `reajuste_inicio`.
+- [x] **R5.** Texto da pasta do contador (Banco) na nuvem aponta para o botão do ZIP do mês.
+- [x] **R6.** Tela NF: o texto cita "Numerar as NFs marcadas".
+- [x] **R7.** Filtro "Vencidos e não pagos" (Boletos) avisa que conta inquilinos encerrados (Inadimplência não conta).
 - [ ] **R8.** Conferência de pagamentos no banco: fica a da tela Banco; o botão de Boletos leva até ela (dono: "sim").
 - [ ] **R9.** Ressarcimento na NF e tolerância de dias do boleto passam para Regras do sistema (dono: "corrija").
 - [x] **R10.** "Emite NF" continua mudando em três lugares (dono: "mantenha e coloque justificativa na documentação"): ver `DECISOES.md`, 2026-11-13.
 - [ ] **R11.** "Movimentações sem destino" em Financeiro e Banco: fica como está até o C6 entrar em uso (o dono ainda não conhece o módulo).
-- [ ] **R12-R15.** Botões com nomes diferentes para o mesmo lugar (Boletos, Painel, página do boleto, impressões).
-- [ ] **R16.** Limpeza interna (código sem uso, listas repetidas).
+- [x] **R12-R15.** Boletos: "Tela NF" no lugar de "Ver NFs"; Painel: "Ver os cadastros incompletos" abre as Pendências já nessa parte; página do boleto: com o pagamento informado pelo banco fica só "Registrar o pagamento"; contrato, vistoria e aditivo: "Imprimir" ao lado de "Baixar PDF".
+- [ ] **R16.** Limpeza interna: feito o menu (Regras do sistema e Modelos de e-mail destacam "Dados e backup") e `decodificarIdContador` num lugar só; falta o código sem uso (`compacto` de `formPagamento`, `modelosDaEtapa`, `SITUACOES_FICHA`, constantes antigas que só um teste lê) e `SITUACOES` = `SITUACOES_CONTA`.
 
 **Desempenho** (5 propostas apresentadas em 13/11)
 - [ ] **P1.** Abrir sem esperar a internet (`app.js` → `N.saudeDaNuvem`; `sw.js` sem tempo limite).

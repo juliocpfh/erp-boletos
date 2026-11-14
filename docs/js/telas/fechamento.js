@@ -85,7 +85,7 @@ export function telaPendencias() {
       <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta). "Desligar" deixa de avisar aquele inquilino ou imóvel até alguém religar.</p></div>
     <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
       ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ''}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ''}</div>`).join('') || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>
-    <h2>Cadastros incompletos <span class="suave">(${lista.length})</span></h2>
+    <h2 id="cadastros">Cadastros incompletos <span class="suave">(${lista.length})</span></h2>
     <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
     ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === 'Imóvel' ? 'Imóveis' : t === 'Empresa' ? 'Empresas' : 'Inquilinos'} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
       ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ''}</td><td>${x.falta.map((f) => (typeof f === 'string' ? etiqueta(f, 'aviso') : etiqueta(f.texto, f.nivel))).join(' ')}</td>

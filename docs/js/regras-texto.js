@@ -1,5 +1,6 @@
 // Texto das regras de negócio do sistema, para o botão "Baixar regras do sistema (TXT)" em Dados e backup.
-// Ao mudar uma regra de negócio, atualize aqui também (e em documentacao/DECISOES.md).
+// Ao mudar uma regra de negócio, atualize aqui também (e em documentacao/DECISOES.md). Este texto descreve o PADRÃO do sistema;
+// o botão acrescenta no fim as regras em uso hoje (textoDasRegrasEmUso, telas/regras-sistema.js), com o que o administrador mudou.
 export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 1. FORMATOS
