@@ -22,7 +22,8 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A } = {}) {
   const pedidos = []; // o que foi ao site
   const fundo = []; // o que o service worker deixou rodando em segundo plano (ev.waitUntil)
   // erro: o site responde com página de erro (ex.: 502 do Cloudflare)
-  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), semInternetNoFundo: false };
+  // lento: o site não responde (sinal fraco) até `site.soltar()`; os prazos do service worker vencem antes
+  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {} };
   const chave = (k) => (k instanceof Request ? k.url : new URL(k, `${origem}/`).href);
   const cacheFalso = (nome) => {
     if (!armazem.has(nome)) armazem.set(nome, new Map());
@@ -51,6 +52,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A } = {}) {
     const url = new URL(req instanceof Request ? req.url : chave(req));
     const metodo = init.method || (req instanceof Request ? req.method : 'GET');
     pedidos.push(`${metodo} ${url.pathname}${url.search}${init.cache ? ` (${init.cache})` : ''}`);
+    if (site.lento) await new Promise((ok) => { const antes = site.soltar; site.soltar = () => { antes(); ok(); }; });
     if (!site.internet || (site.semInternetNoFundo && url.searchParams.has('v'))) throw new TypeError('Failed to fetch');
     const data = site.noCaminho.get(url.pathname + url.search) || site.naOrigem.get(url.pathname) || site.publicada;
     const r = site.erro ? new Response('Bad gateway', { status: site.erro })
@@ -61,7 +63,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A } = {}) {
     return r;
   };
   // o segundo plano espera ESPERA_SEGUNDO_PLANO; aqui, o próximo instante (depois dos pedidos da abertura)
-  const ctx = { self, caches, fetch, Request, Response, URL, console, setTimeout: (fn) => setTimeout(fn, 0) };
+  const ctx = { self, caches, fetch, Request, Response, URL, console, setTimeout: (fn) => setTimeout(fn, 0), clearTimeout };
   vm.runInNewContext(CODIGO, ctx, { filename: 'sw.js' });
   /** Simula um pedido da página: devolve o texto da resposta. */
   const pedir = async (caminho, modo = 'no-cors') => {
@@ -135,6 +137,28 @@ test('sem internet: a página e os arquivos vêm da cópia', async () => {
   const textos = await m.abrir();
   assert.match(textos[2], /css\/estilo\.css/);
   assert.match(await m.pedir('', 'navigate'), /conteudo de \//);
+});
+
+test('sinal fraco (o site demora a responder): a página e os arquivos abrem da cópia sem esperar; o que chegar depois fica guardado', async () => {
+  const m = mundo();
+  await m.abrir();
+  m.site.lento = true;
+  m.site.publicada = B; // há versão nova no site, mas ele não responde a tempo
+  const pagina = await m.pedir('', 'navigate');
+  assert.match(pagina, /conteudo de \/ @ Sat, 07/, 'a página da cópia (versão A), sem esperar o site');
+  const textos = await Promise.all(['js/app.js', 'css/estilo.css'].map((a) => m.pedir(a)));
+  assert.match(textos[0], /js\/app\.js @ Sat, 07/, 'arquivos da cópia');
+  // o site responde depois: a página nova fica guardada para a próxima abertura
+  m.site.lento = false;
+  m.site.soltar();
+  await m.terminarFundo();
+  assert.match(await (await m.armazem.get('imoveis-telas-v3').get('https://erp.exemplo.com.br/')).clone().text(), /@ Sun, 08/);
+  // sem cópia guardada (primeira vez), espera o site
+  const novo = mundo(); novo.site.lento = true;
+  const primeira = novo.pedir('', 'navigate');
+  await new Promise((ok) => setTimeout(ok, 5));
+  novo.site.lento = false; novo.site.soltar();
+  assert.match(await primeira, /conteudo de \//);
 });
 
 test('site fora do ar respondendo com página de erro (502): abre a cópia guardada, como sem internet', async () => {

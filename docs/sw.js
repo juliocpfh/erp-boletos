@@ -14,6 +14,10 @@ const SEMPRE_CONFERIR = ['localhost', '127.0.0.1'].includes(self.location.hostna
 const MANTER_ATE_O_NOVO = /\/(vendor|modelos)\//; // só são pedidos quando usados: o antigo serve sem internet até o novo chegar
 const FOLGA_DATA = 60 * 1000; // o GitHub grava os arquivos de uma publicação um a um: a data de cada um varia alguns segundos
 const ESPERA_SEGUNDO_PLANO = 3000; // ms: o que fica em segundo plano começa depois da abertura, sem disputar a internet com ela
+// Sinal fraco (celular): a conferência da versão e a página não seguram a abertura além destes limites; passou disso, abre a cópia
+// guardada (como sem internet) e o que o site responder depois fica para a próxima abertura
+const LIMITE_CONFERENCIA = 3000; // ms
+const LIMITE_PAGINA = 5000; // ms
 const MAX_TENTATIVAS = 3; // arquivo que nem passando por cima dos caches vem com a data da versão: aceito como veio depois disso
 // Partes do programa que a página só carrega quando usadas (import() em telas/acoes.js e telas/nuvem.js): ficam guardadas
 // desde a primeira abertura com internet, para funcionarem sem internet mesmo sem terem sido usadas antes
@@ -25,11 +29,20 @@ self.addEventListener('activate', (ev) => {
   ev.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
-/** Data de publicação do site agora (cabeçalho Last-Modified do index.html), ou null sem internet / sem resposta normal. */
+/** A resposta da promessa, ou null se ela não chegar em `ms` (continua por fora; erro depois do prazo é ignorado). */
+function comPrazo(promessa, ms) {
+  let t;
+  const prazo = new Promise((ok) => { t = setTimeout(() => ok(null), ms); });
+  const p = promessa.finally(() => clearTimeout(t));
+  p.catch(() => {});
+  return Promise.race([p, prazo]);
+}
+
+/** Data de publicação do site agora (cabeçalho Last-Modified do index.html), ou null sem internet / sem resposta normal (ou no prazo). */
 async function versaoPublicada() {
   try {
-    const r = await fetch('index.html', { method: 'HEAD', cache: 'no-cache', credentials: 'same-origin' });
-    if (!r.ok || r.redirected || r.type !== 'basic') return null; // login do Cloudflare ou erro: não dá para saber
+    const r = await comPrazo(fetch('index.html', { method: 'HEAD', cache: 'no-cache', credentials: 'same-origin' }), LIMITE_CONFERENCIA);
+    if (!r || !r.ok || r.redirected || r.type !== 'basic') return null; // sinal fraco, login do Cloudflare ou erro: não dá para saber
     return r.headers.get('last-modified') || null;
   } catch { return null; }
 }
@@ -170,19 +183,32 @@ self.addEventListener('fetch', (ev) => {
 });
 
 /**
- * A página em si: sempre tenta o site (o login do Cloudflare precisa passar por ela); sem internet, a guardada.
+ * A página em si: sempre tenta o site (o login do Cloudflare precisa passar por ela); sem internet, ou sem resposta em LIMITE_PAGINA, a guardada.
  * Site fora do ar respondendo com página de erro (5xx: Cloudflare ou GitHub Pages com problema) também abre a guardada:
  * para o sistema, "o site caiu" é o mesmo que "sem internet" (edita aqui e envia sozinho quando voltar).
  */
 async function abrirPagina(req) {
+  const guardada = () => caches.match('./', { ignoreSearch: true });
+  // a página do site fica guardada quando chegar, mesmo depois do prazo (depois da limpeza da conferência, se houver)
+  const doSite = fetch(req).then((r) => { if (normal(r)) { const copia = r.clone(); conferencia.then(() => guardar('./', copia)); } return r; });
   try {
-    const r = await fetch(req);
-    if (normal(r)) { const copia = r.clone(); conferencia.then(() => guardar('./', copia)); } // depois da limpeza, se houver
-    if (r.status >= 500) return (await caches.match('./', { ignoreSearch: true })) || r;
+    let r = await comPrazo(doSite, LIMITE_PAGINA);
+    if (!r) {
+      // sinal fraco: abre a cópia guardada (o sistema trabalha com os dados do aparelho e envia depois); sem cópia (1ª vez), espera o site
+      const g = await guardada();
+      if (g) {
+        // a conferência pode ter tirado a página da cópia (versão nova): se a do site não chegar, a que abriu volta para lá
+        const reserva = g.clone();
+        conferencia.then(async () => { if (!(await guardada())) guardar('./', reserva); });
+        return g;
+      }
+      r = await doSite;
+    }
+    if (r.status >= 500) return (await guardada()) || r;
     return r;
   } catch (e) {
-    const guardada = await caches.match('./', { ignoreSearch: true });
-    if (guardada) return guardada;
+    const g = await guardada();
+    if (g) return g;
     throw e;
   }
 }
