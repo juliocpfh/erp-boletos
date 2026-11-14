@@ -103,12 +103,47 @@ export function pedidoDoLink(d, f, pessoa, nomePasta) {
   return { ficha_id: f.id, pessoa, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d, f, pessoa) };
 }
 
-/** Texto do WhatsApp com o link. Ex.: "Olá, Maria! Segue o link da sua ficha cadastral (vale até 21/11/2026): …". */
-export function textoWhatsapp(f, pessoa, link) {
+/**
+ * Texto do WhatsApp com o link. Ex.: "Olá, Maria! Segue o link da sua ficha cadastral (vale até 21/11/2026): …".
+ * ``lembrete``: lembrar quem ainda não terminou; ``faltando``: o que falta (aparece no texto).
+ */
+export function textoWhatsapp(f, pessoa, link, { lembrete = false, faltando = [] } = {}) {
   const nome = String(nomeDaPessoa(f, pessoa) || '').trim().split(/\s+/)[0];
   const fiador = pessoa !== 'interessado';
-  return `Olá${nome ? `, ${nome}` : ''}! Segue o link ${fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ''}` : 'da sua ficha cadastral'}, que vale até ${C.dataBr(String(link.vence_em).slice(0, 10))}: ${link.url}
+  const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ''}` : 'da sua ficha cadastral';
+  const validade = C.dataBr(String(link.vence_em).slice(0, 10));
+  if (lembrete) {
+    return `Olá${nome ? `, ${nome}` : ''}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join('; ')}` : ''}. O link vale até ${validade}: ${link.url}
+Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ': a reserva é devolvida por inteiro' : ''}.`;
+  }
+  return `Olá${nome ? `, ${nome}` : ''}! Segue o link ${qual}, que vale até ${validade}: ${link.url}
 Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
+}
+
+/** Documentos do link (a lista da pessoa como ela está agora na ficha; com as partes, conforme a renda e o estado civil). */
+export function documentosDoLink(f, l) {
+  if (l.pessoa !== 'interessado') return R.documentosDoFiador(R.fiadorDaFicha(f, l.pessoa.slice(6)));
+  return R.documentosDaFicha(f);
+}
+
+/**
+ * O que entra na ficha ao "Trazer": os valores preenchidos do último envio (os vazios não apagam o que a ficha tem) e as
+ * marcas de documento recebido, pelos documentos que chegaram (ex.: holerite → comprovante de renda; ficha assinada).
+ */
+export function dadosParaFicha(f, l) {
+  const ultimo = (l.respostas || []).at(-1);
+  const campos = new Set((l.formulario || []).filter((c) => c.nome).map((c) => c.nome));
+  const out = {};
+  if (ultimo) for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== undefined && v !== '') out[k] = v;
+  if (l.pessoa === 'interessado') {
+    const docs = (l.arquivos || []).map((a) => a.documento);
+    const renda = new Set([...Object.values(R.DOCUMENTOS_RENDA).flat(), ...R.PARTES_DOCUMENTOS_PF.renda_padrao, 'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)']);
+    if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
+    if (docs.some((x) => renda.has(x))) out.doc_renda = true;
+    if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
+    if (docs.some((x) => /assinada/.test(x))) out.doc_ficha = true;
+  }
+  return out;
 }
 
 /** Telefone para o WhatsApp (só números, com o 55). */
@@ -140,3 +175,51 @@ export const criarLinkNaNuvem = (corpo) => pedir('link', { method: 'POST', heade
 export const guardarPdfNaNuvem = (fichaId, pessoa, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob });
 export const linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ''}`).then((r) => r.links || []);
 export const atualizarLinkNaNuvem = (corpo) => pedir('atualizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+
+// ---------------------------------------------------------------------------
+// Aviso no celular (Web Push): cada aparelho da equipe liga o seu (o navegador pergunta a permissão)
+// ---------------------------------------------------------------------------
+const chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(t).length / 4) * 4, '=')), (c) => c.charCodeAt(0));
+const temPush = () => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof PushManager !== 'undefined' && typeof Notification !== 'undefined';
+
+/** { possivel, ligadoNaNuvem, ligadoAqui, negado }: o aparelho aceita aviso? a nuvem tem as chaves? este aparelho já ligou? */
+export async function estadoDoAviso() {
+  if (!temPush()) return { possivel: false };
+  const nuvem = await pedir('push').catch(() => ({ ligado: false }));
+  const reg = await navigator.serviceWorker.getRegistration();
+  const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+  // inscrição feita com chaves antigas (trocadas na nuvem) não recebe mais: mostra como desligado, para ligar de novo
+  return { possivel: true, ligadoNaNuvem: !!nuvem.ligado, ligadoAqui: !!inscricao && mesmaChave(inscricao, nuvem.chave), negado: Notification.permission === 'denied', chave: nuvem.chave };
+}
+
+/** A inscrição do aparelho foi feita com esta chave do servidor? (trocar as chaves VAPID exige inscrever de novo) */
+const mesmaChave = (inscricao, chave) => {
+  const k = inscricao && inscricao.options && inscricao.options.applicationServerKey;
+  if (!k || !chave) return true;
+  const a = new Uint8Array(k); const b = chaveDoServidor(chave);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+};
+
+/** Liga o aviso neste aparelho: pede a permissão, inscreve no serviço do navegador e guarda na nuvem. */
+export async function ligarAviso() {
+  if (!temPush()) throw new C.ErroUsuario('Este navegador não recebe avisos. No iPhone: instale o aplicativo (Compartilhar → Adicionar à Tela de Início) e abra por ele.');
+  // a permissão logo no toque do botão (o Safari do iPhone recusa sem perguntar se vier depois de uma ida à internet)
+  const permissao = await Notification.requestPermission();
+  const e = await estadoDoAviso();
+  if (!e.ligadoNaNuvem) throw new C.ErroUsuario('O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).');
+  if (permissao !== 'granted') throw new C.ErroUsuario('Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.');
+  const reg = await navigator.serviceWorker.ready;
+  let inscricao = await reg.pushManager.getSubscription();
+  if (inscricao && !mesmaChave(inscricao, e.chave)) { await inscricao.unsubscribe().catch(() => {}); inscricao = null; }
+  inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
+  await pedir('push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inscricao.toJSON()) });
+}
+
+/** Desliga o aviso neste aparelho. */
+export async function desligarAviso() {
+  const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+  const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+  if (!inscricao) return;
+  await pedir('push-sair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: inscricao.endpoint }) }).catch(() => {});
+  await inscricao.unsubscribe();
+}

@@ -8,6 +8,7 @@
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
+import { avisar } from './avisos-ficha.mjs';
 import { atenderEquipe, atenderFicha } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
@@ -336,7 +337,17 @@ async function rotaEnviarEmail(request, env, email, url, buscar) {
 }
 
 // ---------------------------------------------------------------------------
-export async function atender(request, env, buscar = fetch) {
+/**
+ * Avisos da ficha pela internet sem segurar a resposta: no Cloudflare continuam depois dela (waitUntil); nos testes e no
+ * computador, a resposta espera o aviso. Erro no aviso só vai para o registro.
+ */
+export const avisador = (ctx = null, buscar = fetch) => (env, registro, evento, detalhe) => {
+  const p = avisar(env, registro, evento, detalhe, { buscar }).catch((e) => console.error('aviso da ficha', e));
+  if (ctx && ctx.waitUntil) { ctx.waitUntil(p); return undefined; }
+  return p;
+};
+
+export async function atender(request, env, buscar = fetch, ctx = null) {
   const url = new URL(request.url);
   const rota = url.pathname.replace(/^\/api\/?/, '');
   if (!url.pathname.startsWith('/api/') && url.pathname !== '/api') return json(404, { erro: 'Não encontrado.' });
@@ -357,7 +368,7 @@ export async function atender(request, env, buscar = fetch) {
     if (rota.startsWith('ficha-online/')) {
       if (m !== 'GET') conferirGravacao(request, env);
       await exigirPapel(env, email, 'operador');
-      return await atenderEquipe(request, env, rota.slice(13), email);
+      return await atenderEquipe(request, env, rota.slice(13), email, { avisar: avisador(ctx, buscar) });
     }
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
@@ -387,4 +398,6 @@ export async function atender(request, env, buscar = fetch) {
 /** O endereço da ficha (ficha.ankjck.com.br) é outro aplicativo: sem login, só a ficha. */
 export const ehEnderecoDaFicha = (request, env) => new URL(request.url).hostname === String(env.HOST_FICHA || 'ficha.ankjck.com.br');
 
-export default { fetch: (request, env) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env) : atender(request, env)) };
+export default {
+  fetch: (request, env, ctx) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env, { avisar: avisador(ctx) }) : atender(request, env, fetch, ctx)),
+};

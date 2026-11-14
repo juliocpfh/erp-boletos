@@ -68,6 +68,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 |---|---|---|---|---|---|
 | D1 | Régua de cobrança | 1 dia: e-mail; 10 dias: ligar; 30 dias: avaliar negativação (só aviso) | [C] dias e texto de cada passo; incluir/tirar passos | Hoje. Cobrar sem constranger ou ameaçar (CDC art. 42). Negativar: o órgão avisa o devedor antes (CDC art. 43, §2º; Súmula 359 do STJ) e a LGPD permite usar os dados para proteger o crédito (art. 7º, X) | |
 | D2 | Documentos da ficha reprovada | Apagados 3 meses depois | [C] meses (1 a 12) | 3 meses (hoje). LGPD art. 6º, III e arts. 15/16: guardar só o tempo necessário | |
+| D2b | Link da ficha pela internet sem resposta vira alerta (14/11/2026, `dias_ficha_parada`) | Depois de 2 dias, com o botão "Lembrar" | [C] dias (1 a 7; o link vale 7) | 2 (pedido do dono). Rotina: só muda o alerta | Sim |
 | D3 | Pagamento adiantado na conciliação do banco | Liga entrada a boleto que vence até 45 dias depois | [C] dias | 45 (hoje). Rotina | |
 | D3b | Tolerância para casar a entrada com o boleto (13/11/2026; antes ficava em Dados e backup → Banco) | Entrada com o valor em dia até 3 dias depois do vencimento ainda casa (vence dia 10, entrou dia 13) | [C] `tolerancia_boleto_dias`: 0 a 30 dias | 3 (hoje). Rotina | Feito (dono: "corrija") |
 | D4 | Movimentação do banco sem destino vira alerta | Depois de 7 dias | [C] dias | 7 (hoje). Rotina | |

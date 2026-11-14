@@ -12,6 +12,8 @@
 //   para o registro; a chave em si não fica guardada), publico/fichas/<ficha>/<pessoa>.pdf; os documentos vão direto para a
 //   pasta da ficha (arquivos/Fichas em analise/<pasta>/), com nome dado aqui, e aparecem na caixa de arquivos da ficha.
 // - Os dados enviados nunca entram sozinhos na ficha: a equipe confere e traz (telas/fichas.js).
+// - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
+import { desinscrever, inscrever, pushLigado } from './push.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
@@ -226,7 +228,7 @@ export async function listarLinks(env, url) {
       }
       lista.push(ficha ? paraEquipe(reg) : {
         ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-        vence_em: reg.vence_em, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
+        vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
         nome: reg.contexto.nome,
       });
     }
@@ -235,22 +237,30 @@ export async function listarLinks(env, url) {
   return json(200, { links: lista });
 }
 
-/** Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true }. */
-export async function atualizarLink(request, env, email) {
+/** Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true }. Falta documento e Assinar avisam a pessoa. */
+export async function atualizarLink(request, env, email, avisar = null) {
   const p = await lerJson(request);
   const fichaId = fichaIdValido(p.ficha_id);
   const pessoa = pessoaValida(p.pessoa);
+  let mudou = false;
   const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
+    const antes = JSON.stringify([r.situacao, r.faltando]);
     if (p.situacao !== undefined) {
       if (!SITUACOES_EQUIPE.includes(p.situacao)) throw new ErroFicha(400, 'Situação inválida.');
       r.eventos.push({ em: new Date().toISOString(), texto: `situação "${p.situacao}" por ${email}` });
+      if (r.situacao !== p.situacao) r.mudou_em = new Date().toISOString();
       r.situacao = p.situacao;
     }
     if (p.faltando !== undefined) r.faltando = (Array.isArray(p.faltando) ? p.faltando : []).slice(0, 15).map((x) => texto(x, 300)).filter(Boolean);
     if (p.visto) r.visto_em = new Date().toISOString();
     r.eventos = r.eventos.slice(-50);
+    mudou = antes !== JSON.stringify([r.situacao, r.faltando]);
   });
   if (novo.situacao === 'Encerrado' && novo.hash) await env.DADOS.delete(chaveToken(novo.hash));
+  // avisa a pessoa só quando muda de verdade (clicar duas vezes não repete) e com o link ainda no prazo
+  const noPrazo = novo.vence_em > new Date().toISOString();
+  if (avisar && mudou && noPrazo && p.situacao === 'Falta documento') await avisar(env, novo, 'falta');
+  if (avisar && mudou && noPrazo && p.situacao === 'Assinar') await avisar(env, novo, 'assinar');
   return json(200, { ok: true, link: paraEquipe(novo) });
 }
 
@@ -393,14 +403,22 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
 }
 
 /** Rotas da equipe (/api/ficha-online/…), chamadas pelo Worker depois do login e do papel conferidos. */
-export async function atenderEquipe(request, env, rota, email) {
+export async function atenderEquipe(request, env, rota, email, { avisar = null } = {}) {
   const url = new URL(request.url);
   const m = request.method;
   try {
+    // aviso no celular: a chave pública para o aparelho se inscrever, inscrever e sair
+    if (rota === 'push' && m === 'GET') return json(200, { ligado: pushLigado(env), chave: pushLigado(env) ? env.VAPID_PUBLICA : null });
+    if (rota === 'push' && m === 'POST') {
+      if (!pushLigado(env)) throw new ErroFicha(503, 'O aviso no celular ainda não foi ligado na nuvem.');
+      try { await inscrever(env, await lerJson(request, 8 * 1024), email); } catch (e) { throw e instanceof ErroFicha ? e : new ErroFicha(400, e.message); }
+      return json(200, { ok: true });
+    }
+    if (rota === 'push-sair' && m === 'POST') { await desinscrever(env, (await lerJson(request, 8 * 1024)).endpoint); return json(200, { ok: true }); }
     if (rota === 'link' && m === 'POST') return await criarLink(request, env, email);
     if (rota === 'pdf' && m === 'PUT') return await guardarPdf(request, env, url);
     if (rota === 'lista' && m === 'GET') return await listarLinks(env, url);
-    if (rota === 'atualizar' && m === 'POST') return await atualizarLink(request, env, email);
+    if (rota === 'atualizar' && m === 'POST') return await atualizarLink(request, env, email, avisar);
     return json(404, { erro: 'Não encontrado.' });
   } catch (e) {
     if (e instanceof ErroFicha) return json(e.status, { erro: e.message });

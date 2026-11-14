@@ -264,3 +264,24 @@ async function arquivo(req) {
 function guardar(chave, resposta) {
   caches.open(CACHE).then((c) => c.put(chave, resposta)).catch(() => {});
 }
+
+// Aviso no celular (ficha pela internet: dados, ficha assinada, desistência), mandado pela nuvem (nuvem/push.mjs).
+// Tocar no aviso abre o sistema na ficha (ou traz para a frente a janela já aberta).
+self.addEventListener('push', (ev) => {
+  let d = {};
+  try { d = ev.data ? ev.data.json() : {}; } catch { d = {}; }
+  ev.waitUntil(self.registration.showNotification(d.titulo || 'Administração de Imóveis', {
+    body: d.texto || 'Novidade na ficha pela internet.', icon: 'icones/erp-192.png', badge: 'icones/erp-192.png', tag: d.tag || 'ficha', renotify: true, data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (ev) => {
+  ev.notification.close();
+  const url = new URL((ev.notification.data && ev.notification.data.url) || './', self.location.href).href;
+  ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
+    const aberta = janelas.find((j) => j.url.startsWith(self.registration.scope));
+    if (!aberta) return self.clients.openWindow(url);
+    // primeiro traz a janela; depois vai para a ficha (janela não controlada recusa navigate: abre outra)
+    return aberta.focus().then((j) => (j || aberta).navigate(url)).catch(() => self.clients.openWindow(url));
+  }));
+});
