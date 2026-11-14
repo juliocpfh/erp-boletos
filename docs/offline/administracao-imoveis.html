@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-2We6EDZcNgMQA0t1qMy8s/ozB+nAdgreYDwDg2ui2VE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-XVzcALIe1msNIB0S2/EPb8J+KbIg/jioM/hsYIZyRSs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7fcc3cd5163f2ece">
+<meta name="fontes" content="60038c09ee6f4bc2">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1172,8 +1172,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         return valor;
     }
   }
-  function escolhasDe(d2) {
+  function regrasAntigasDe(d2) {
     const out = {};
+    if (d2 && d2.ressarcimento_abate_nf === true) out.ressarcimento_na_nf = true;
+    const tol = d2 && d2.config_banco && d2.config_banco.tolerancia_dias;
+    if (Number.isInteger(tol) && tol >= 0 && tol <= 30 && tol !== POR_CHAVE.get("tolerancia_boleto_dias").padrao) out.tolerancia_boleto_dias = tol;
+    return out;
+  }
+  function escolhasDe(d2) {
+    const out = regrasAntigasDe(d2);
     for (const r of d2 && Array.isArray(d2.config_regras) ? d2.config_regras : []) {
       if (!r || !POR_CHAVE.has(r.chave)) continue;
       try {
@@ -1264,6 +1271,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           explica: "Como se calcula o aluguel dos dias ocupados no mês de entrada e no de saída.",
           consequencia: "Vale para os boletos gerados ou recalculados daqui em diante. O IPTU e o FCI do mês continuam pelos dias reais.",
           lei: "Sem lei específica: vale o combinado no contrato (" + LI + ", art. 17)."
+        },
+        {
+          chave: "ressarcimento_na_nf",
+          grupo: "aluguel",
+          rotulo: "Ressarcimento de condomínio sai do valor da NF",
+          tipo: "simnao",
+          padrao: false,
+          explica: "Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. Não (padrão): a NF sai com o aluguel cheio e o ressarcimento conta como gasto do imóvel nos Resultados. Sim: a NF fica com o aluguel menos a taxa e ela não conta de novo como gasto. Ex.: aluguel R$ 1.215,00 e fundo de obras R$ 150,00 → NF de R$ 1.215,00 (não) ou de R$ 1.065,00 (sim).",
+          consequencia: "Vale para os boletos em aberto que têm ressarcimento e para os gerados daqui em diante; os pagos não mudam. Confirme com o contador qual forma usar.",
+          lei: "Sem lei específica: é a forma de escriturar o ressarcimento (" + LI + ", art. 22, parágrafo único: despesas extraordinárias do condomínio são do locador)."
         },
         {
           chave: "dia_gerar_boletos",
@@ -1524,6 +1541,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           max: 120,
           explica: "Ex.: entrada de 10/08 → procura boletos com vencimento até 24/09 (pagamento adiantado).",
           consequencia: "Mais dias: acha mais pagamentos adiantados, com mais sugestões erradas.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "tolerancia_boleto_dias",
+          grupo: "rotina",
+          rotulo: "Extrato: entrada casa com o boleto até quantos dias depois do vencimento",
+          tipo: "inteiro",
+          padrao: 3,
+          min: 0,
+          max: 30,
+          explica: "Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto. Ex.: 3 → vence dia 10, entrou dia 13.",
+          consequencia: "Mais dias: casa mais pagamentos atrasados pelo valor em dia, com mais sugestões erradas. Só muda as sugestões: nada é registrado sem a sua confirmação.",
           lei: "Sem lei: rotina."
         },
         {
@@ -5234,7 +5263,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       carencia,
       ressarcimento: ressarc.valor,
       ressarcimento_descricao: ressarc.descricao,
-      ressarcimento_na_nf: !!d2.ressarcimento_abate_nf && ressarc.valor > 0,
+      ressarcimento_na_nf: regra("ressarcimento_na_nf") && ressarc.valor > 0,
       multa_percentual: contrato.multa_percentual || 0,
       juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
       // carência sem nada a cobrar (a reserva não conta: ela nunca entra no boleto da carência)
@@ -8043,7 +8072,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       d2,
       "cobrancas",
       cb.id,
-      { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: !!d2.ressarcimento_abate_nf && r.valor > 0 },
+      { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: regra("ressarcimento_na_nf") && r.valor > 0 },
       usuario,
       `Boleto ${compBr(comp)}: ressarcimento de condomínio ${r.valor ? reais(r.valor) : "retirado"}`
     );
@@ -9089,6 +9118,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const limpos = {};
     for (const [k, v] of Object.entries(valores || {})) if (definicaoRegra(k)) limpos[k] = limparValorRegra(k, v);
     let mudou = 0;
+    const naNfAntes = regrasDe(d2).ressarcimento_na_nf;
     for (const def of DEFINICOES_REGRAS) {
       const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
       const linha = d2.config_regras.find((r) => r.chave === def.chave);
@@ -9104,7 +9134,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         mudou += 1;
       }
     }
+    if (d2.ressarcimento_abate_nf) {
+      d2.ressarcimento_abate_nf = false;
+      mudou += 1;
+    }
+    if (d2.config_banco && "tolerancia_dias" in d2.config_banco) {
+      const { tolerancia_dias: antiga, ...resto } = d2.config_banco;
+      d2.config_banco = resto;
+    }
     usarRegras(d2);
+    const naNf = regra("ressarcimento_na_nf");
+    if (naNf !== naNfAntes) for (const cb of d2.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0 && !!x.ressarcimento_na_nf !== naNf)) atualizar(d2, "cobrancas", cb.id, { ressarcimento_na_nf: naNf }, usuario, "Ressarcimento na NF (regra do sistema)");
     return mudou;
   }
   function salvarVersaoRegras(d2, nome, usuario) {
@@ -9653,7 +9693,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       CONFIG_BANCO_FASE2 = {
         pasta_contador: "_Contador",
         modelo_nome_comprovante: "{data} {empresa} {imovel} {tipo} {valor}",
-        tolerancia_dias: 3,
         permitir_pagamentos: false,
         limite_pagamento: 0,
         ultima_importacao: {},
@@ -13211,23 +13250,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
     return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar/cancelar`, {}, opcoes2);
   }
-  function listarBoletos(d2, contaId, filtros, opcoes2 = {}) {
-    if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
-    return chamarPonte(contaId, "GET", `/boletos?${new URLSearchParams(filtros)}`, null, opcoes2);
-  }
-  var MAX_PAGINAS_LISTA = 10;
-  async function listarTodosBoletos(d2, contaId, filtros, opcoes2 = {}) {
-    const itens = [];
-    let r = null;
-    for (let pagina = 0; pagina < MAX_PAGINAS_LISTA; pagina += 1) {
-      r = await listarBoletos(d2, contaId, { ...filtros, page: pagina, size: 100 }, opcoes2);
-      itens.push(...Array.isArray(r.content) ? r.content : Array.isArray(r.bank_slips) ? r.bank_slips : []);
-      if (!(Number(r.total_pages) > pagina + 1)) return itens;
-    }
-    itens.incompleto = true;
-    itens.total = Number(r && r.total_elements) || null;
-    return itens;
-  }
   var imagemQrPix = (cb) => cb.banco && cb.banco.pix_qr_base64 ? `data:${cb.banco.pix_qr_mime || "image/png"};base64,${cb.banco.pix_qr_base64}` : "";
 
   // docs/js/backup-seguro.js
@@ -14872,9 +14894,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const n = boletosParaEmitir(d(), comp).length;
     const texto3 = `Emitir no C6 todos em aberto do mês${n ? ` (${n})` : ""}`;
     const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && emitidoNoBanco(cb));
-    if (!pontePronta(d())) return `${botaoInativo(texto3, motivoIndisponivel(d()), "secundario")} ${botaoInativo("Conferir pagamentos no banco", motivoIndisponivel(d()), "secundario")}`;
+    const conferir2 = link("#/banco?ir=conferir-boletos", "Conferir pagamentos no banco (tela Banco)", "botao secundario");
+    if (!pontePronta(d())) return `${botaoInativo(texto3, motivoIndisponivel(d()), "secundario")} ${conferir2}`;
     return `${n ? botao("emitirBoletosMesC6", texto3, { comp }, "secundario", `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto3, "Nenhum boleto em aberto sem emissão neste mês", "secundario")}
-    ${emitidos ? botao("conferirPagamentosC6", "Conferir pagamentos no banco", { comp }, "secundario") : botaoInativo("Conferir pagamentos no banco", "Nenhum boleto deste mês foi emitido no C6", "secundario")}`;
+    ${emitidos ? conferir2 : botaoInativo("Conferir pagamentos no banco (tela Banco)", "Nenhum boleto deste mês foi emitido no C6", "secundario")}`;
   }
   var ROTULO = { emitido: ["emitido no C6", "info"], pago: ["pago no C6", "ok"], cancelado: ["cancelado no C6", "neutra"], erro: ["erro na emissão", "perigo"] };
   function etiquetaBanco(cb) {
@@ -15555,7 +15578,7 @@ ${xref}
     return lista3;
   };
   function conciliarBoletos(d2, contaId, pagamentosC6, { dias = null } = {}) {
-    const tol = dias ?? cfg(d2).tolerancia_dias ?? CONFIG_BANCO_FASE2.tolerancia_dias;
+    const tol = dias ?? regra("tolerancia_boleto_dias");
     const planos = [];
     for (const x of pagamentosC6 || []) {
       if (Array.isArray(x.payments)) for (const p2 of x.payments) planos.push({ ...p2, external_reference_id: x.external_reference_id || null, status: x.status || null });
@@ -15621,7 +15644,7 @@ ${xref}
     return confirmarPagamentoPeloBanco(d2, cb.id, origem, usuario, { pagouEmDia: pagouEmDia !== void 0 ? pagouEmDia : p2.pagouEmDia || null, pagou: p2.data_pagamento || null, valorNf, justificativa });
   }
   function conciliarMovimentacoes(d2, movs2, { dias = null } = {}) {
-    const tol = dias ?? cfg(d2).tolerancia_dias ?? CONFIG_BANCO_FASE2.tolerancia_dias;
+    const tol = dias ?? regra("tolerancia_boleto_dias");
     const out = [];
     for (const m of movs2 || []) {
       if (m.tipo !== "entrada" || m.classificacao) continue;
@@ -16249,7 +16272,6 @@ ${xref}
     const permitidos = Object.keys(CONFIG_BANCO_FASE2).filter((k) => k !== "ultima_importacao");
     const novos = {};
     for (const k of permitidos) if (campos[k] !== void 0) novos[k] = campos[k];
-    if (novos.tolerancia_dias !== void 0) novos.tolerancia_dias = Math.max(0, Number(novos.tolerancia_dias) || 0);
     if (novos.limite_pagamento !== void 0) novos.limite_pagamento = Math.max(0, Number(novos.limite_pagamento) || 0);
     if (novos.pasta_contador !== void 0) novos.pasta_contador = nomeSemAcento(novos.pasta_contador) || "_Contador";
     if (novos.modelo_nome_comprovante !== void 0 && !String(novos.modelo_nome_comprovante).includes("{")) throw new Error("O modelo do nome precisa de pelo menos um campo entre chaves, ex.: {data} {empresa} {imovel} {tipo} {valor}.");
@@ -16676,11 +16698,10 @@ ${xref}
     if (!podeUsuario("admin")) return "";
     const cfg3 = { ...CONFIG_BANCO_FASE2, ...config() };
     return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
-    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)".</p>
+    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link("#/regras", "Regras do sistema", "")}.</p>
     <form data-form="configBanco2" class="formulario">
       <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg3.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
       <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg3.limite_pagamento ? esc(reais(cfg3.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
-      <div><label>Tolerância para casar o boleto (dias)</label><input type="number" name="tolerancia_dias" min="0" max="30" value="${Number(cfg3.tolerancia_dias) || 0}"><div class="ajuda">Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto (ex.: 3 → vence dia 10, entrou dia 13).</div></div>
       <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg3.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg3.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
       <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg3.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
       <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg3.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
@@ -17263,7 +17284,6 @@ ${xref}
         permitir_pagamentos: f.permitir_pagamentos === "1",
         copiar_para_contador: f.copiar_para_contador === "1",
         limite_pagamento: String(f.limite_pagamento || "").trim() ? centavos(f.limite_pagamento) : 0,
-        tolerancia_dias: Number(f.tolerancia_dias) || 0,
         pasta_contador: String(f.pasta_contador || "").trim() || PASTA_CONTADOR,
         modelo_nome_comprovante: String(f.modelo_nome_comprovante || "").trim() || CONFIG_BANCO_FASE2.modelo_nome_comprovante
       };
@@ -22710,10 +22730,6 @@ ${m.texto}
       ${podeUsuario("admin") ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? "Trocar logo" : "Enviar logo"}</button>
         ${d().logo ? botao("removerLogo", "Remover logo", {}, "perigo pequeno", "Remover a logo?") : ""}</form>` : ""}</div>
     ${caixaIcone()}
-    <div class="cartao"><h2>Ressarcimento de taxas do condomínio</h2>
-      <p>Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. ${d().ressarcimento_abate_nf ? "<b>Hoje: o ressarcimento sai do valor da NF</b> (a NF fica com o aluguel menos a taxa) e não conta de novo como gasto." : "<b>Hoje: a NF sai com o aluguel cheio</b> e o ressarcimento conta como gasto do imóvel nos Resultados."}</p>
-      <p class="suave">Confirme com o contador qual forma usar. A mudança vale para os boletos gerados ou recalculados daqui em diante.</p>
-      ${podeUsuario("admin") ? botao("ressarcimentoNaNf", d().ressarcimento_abate_nf ? "Passar a emitir a NF com o aluguel cheio" : "Passar a abater o ressarcimento da NF", { valor: d().ressarcimento_abate_nf ? "" : "1" }, "secundario pequeno", "Mudar a forma da NF nos ressarcimentos de condomínio?") : ""}</div>
     ${caixaContaDosBoletos()}`;
   }
   async function desfazerItens(itens) {
@@ -24640,15 +24656,6 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso(`Registro excluído: a reserva volta a abater os boletos em aberto${n ? ` (${n} boleto(s) ajustado(s))` : ""}.`);
       await mostrar();
     },
-    async ressarcimentoNaNf({ valor }) {
-      if (!podeUsuario("admin")) throw new Error("Só administradores mudam esta opção.");
-      await alterar((db) => {
-        db.ressarcimento_abate_nf = valor === "1";
-        registrar(db, login(), "Alteração", "banco", null, `Ressarcimento de condomínio ${valor === "1" ? "abate o valor da NF" : "não abate a NF (conta como gasto)"}`, null, {}, false);
-        for (const cb of db.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0)) atualizar(db, "cobrancas", cb.id, { ressarcimento_na_nf: valor === "1" }, login(), "Ressarcimento na NF");
-      });
-      await mostrar();
-    },
     async condominioConferido({ id, mes }) {
       await alterar((db) => marcarCondominioConferido(db, Number(id), mes, login()));
       await mostrar();
@@ -26096,45 +26103,6 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         if (resposta && resposta.external_reference_id) registrarBoletoBancario(db, cb.id, resposta, login());
       });
       aviso("Cancelamento da negativação pedido ao C6.");
-      await mostrar();
-    },
-    /**
-     * Conferência dos pagamentos do mês no banco: lista na conta emissora os boletos pagos (ou aguardando crédito) por data de pagamento,
-     * atualiza a situação de cada um aqui e, para os pagos ainda não registrados, propõe registrar um a um (sempre com confirmação).
-     * Quais propor: a mesma regra da tela Banco (Z.conciliarBoletos + Z.prontoParaRegistrar): pela referência do boleto e, sem ela, pelo
-     * valor e pela data; um pagamento que casa com mais de um boleto não é proposto (escolha na tela Banco).
-     */
-    async conferirPagamentosC6({ comp }) {
-      if (!opera()) throw new Error("Seu usuário não pode alterar boletos.");
-      const { de, ate } = periodoConferenciaC6(d(), comp);
-      const contas2 = [...new Set(d().cobrancas.filter((cb) => cb.competencia === comp && cb.banco && cb.banco.conta_id).map((cb) => cb.banco.conta_id))];
-      if (!contas2.length) throw new Error("Nenhum boleto deste mês foi emitido no C6.");
-      aviso(`Conferindo no banco os pagamentos de ${dataBr(de)} a ${dataBr(ate)}…`, "info");
-      let atualizados = 0;
-      let ambiguos = 0;
-      const propostas = [];
-      const incompletos = [];
-      for (const contaId of contas2) {
-        const itens = await listarTodosBoletos(d(), contaId, { payment_date_from: de, payment_date_to: ate });
-        if (itens.incompleto) incompletos.push(`${contaId.toUpperCase()}: ${itens.length}${itens.total ? ` de ${itens.total}` : ""}`);
-        const { casados } = casarListagemC6(d(), itens, contaId);
-        for (const { cb, item: item3 } of casados) {
-          await alterar((db) => registrarBoletoBancario(db, cb.id, item3, login()));
-          atualizados += 1;
-        }
-        for (const s of conciliarBoletos(d(), contaId, itens)) {
-          if (prontoParaRegistrar(d(), s)) propostas.push(s);
-          else if (s.alternativas > 1 && !s.jaPago && !s.aguardandoCredito) ambiguos += 1;
-        }
-      }
-      const propostos = /* @__PURE__ */ new Set();
-      for (const s of propostas) {
-        const cb = buscar2("cobrancas", s.cobranca_id);
-        if (!cb || cb.data_pagamento || propostos.has(cb.id)) continue;
-        propostos.add(cb.id);
-        await proporPagamentoDoBanco(cb, s);
-      }
-      aviso(`${atualizados} boleto(s) conferido(s) no banco${propostos.size ? `; ${propostos.size} pago(s) no banco foram propostos para registro` : "; nenhum pagamento novo"}${ambiguos ? `; ${ambiguos} pagamento(s) com o valor de mais de um boleto: escolha qual na tela Banco ("Conferir boletos pagos no banco")` : ""}${incompletos.length ? `. Atenção: o banco tem mais boletos do que o sistema leu (${incompletos.join("; ")}); confira um período menor` : ""}.`, ambiguos || incompletos.length ? "aviso" : "ok");
       await mostrar();
     },
     /** Boleto mudou depois de emitido: manda ao banco o valor, o vencimento e a descrição atuais (PATCH). Se recusar, cancelar e emitir outro. */
