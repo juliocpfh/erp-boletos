@@ -97,8 +97,9 @@ export function telaReajustes(q) {
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
       ${lista.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
-    const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novoBonificado !== null
-      ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * k.novoBonificado)}</b>` : '<span class="suave">-</span>';
+    // prévia da caução: segue as Regras do sistema (acompanha o reajuste? pelo aluguel com bonificação ou pelo cheio?), como o boleto do complemento
+    const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.regra('caucao_acompanha') && R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null
+      ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * R.aluguelDaCaucao(k.novo, c))}</b>` : '<span class="suave">-</span>';
     return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
         <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
           <div class="suave">${r.anos} ano(s) · ${esc(k.indiceContrato || 'índice não informado')}${k.escolhido ? ` ${pct(k.percentual)} até ${compBr(k.escolhido.registro.mes_ref)}` : ''} ${!k.escolhido && k.faltando.length ? etiqueta(`falta ${k.faltando.join(' e ')}`, 'perigo') : ''}</div></div>
@@ -143,7 +144,8 @@ export function cartaReajuste(c, comp) {
     escolhido: { indice: x.indice }, doIndice: x.percentual_indice ?? null } : calc;
   const empresa = K.locadorasDoContrato(d(), c)[0] || { nome: '' };
   const anterior = C.somarMeses(comp, -1);
-  const vencNovo = C.vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+  // vencimento do boleto corrigido: o do boleto já gerado ou o do contrato naquele mês (vale o termo de troca do dia), o mesmo da tela Reajustes
+  const vencNovo = R.vencimentoDoReajuste(d(), c, comp);
   if (k.percentual === null) {
     return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>`;
   }
@@ -151,8 +153,9 @@ export function cartaReajuste(c, comp) {
   const indiceTexto = x && x.digitado
     ? `o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ''}`
     : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
-  // caução: acompanha o aluguel corrigido (aluguéis × aluguel com bonificação); só aparece quando falta depositar
-  let caucao = R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: R.valorGarantia(d(), c) } : null;
+  // caução: acompanha o aluguel corrigido (aluguéis × aluguel com bonificação, ou cheio: regras `caucao_acompanha` e `caucao_base`); só aparece quando falta depositar
+  const baseCaucao = R.aluguelDaCaucao(k.novo, c);
+  let caucao = R.regra('caucao_acompanha') && R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: baseCaucao, nova: c.caucao_meses * baseCaucao, atual: R.valorGarantia(d(), c) } : null;
   if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
   return `${x ? '' : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}

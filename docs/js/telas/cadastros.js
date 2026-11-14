@@ -872,12 +872,13 @@ export const CADASTROS = {
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
   },
   avulsas: {
-    titulo: (r, q) => (r ? 'Editar NF avulsa' : q.modelo === 'airbnb' ? 'Nova NF avulsa do Airbnb' : 'Nova NF avulsa'),
+    titulo: (r) => (r ? (r.airbnb_competencia ? `Editar a NF do Airbnb de ${compBr(r.airbnb_competencia)}` : 'Editar NF avulsa') : 'Nova NF avulsa'),
     campos: () => F.AVULSA.map((c) => (c.nome === 'imovel_id' ? { ...c, opcoes: ordenar(d().imoveis, 'nome').map((i) => [String(i.id), i.nome]) } : c)),
-    // Airbnb: vem preenchida com os dados padrão (todos podem ser mudados aqui)
-    padrao: (q) => ({ data_pagamento: C.hojeIso(), ...(q.modelo === 'airbnb' ? R.modeloAirbnb(d()) : {}) }),
-    aviso: (r, q) => (!r && q.modelo === 'airbnb' ? 'Dados do Airbnb já preenchidos: confira, informe a data em que o dinheiro entrou e o valor. Pode mudar qualquer campo.' : ''),
-    extraHtml: (r, q) => (!r && q.modelo === 'airbnb' ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : ''),
+    // A NF do Airbnb nasce em "Gerar a NF do Airbnb" (R.gerarNfAirbnb, uma por mês, com os dados padrão); aqui só se edita,
+    // e os dados do cliente podem ficar como padrão das próximas. (O botão "Nova NF avulsa do Airbnb" saiu em 2026-11-13: criava uma NF em dobro.)
+    padrao: () => ({ data_pagamento: C.hojeIso() }),
+    aviso: (r) => (r && r.airbnb_competencia ? 'NF do Airbnb gerada pela soma dos ganhos lançados nos imóveis: o valor e as datas acompanham os ganhos ("Acertar a NF do Airbnb"). Aqui você muda os dados do cliente e as observações.' : ''),
+    extraHtml: (r) => (r && r.airbnb_competencia ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : ''),
     voltar: () => '#/faturas',
     descricao: (dados) => `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
     conferir: conferirAvulsa,
