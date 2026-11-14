@@ -53,7 +53,7 @@ async function arquivosProntos(dlg, prontos, objeto) {
   const out = [];
   for (const el of dlg.querySelectorAll('[name=pronto]:checked')) {
     const a = prontos[Number(el.value)];
-    if (a.tipo === 'recibo') { const r = await pdfDoRecibo(a.recibo, objeto); out.push({ nome: r.nome, blob: r.blob }); }
+    if (a.tipo === 'recibo') { const r = await pdfDoRecibo(a.recibo, a.alvo || objeto); out.push({ nome: r.nome, blob: r.blob }); }
     else out.push({ nome: a.nome, blob: await S.abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome) });
   }
   return out;

@@ -22,6 +22,8 @@ export const TIPOS_RECIBO = {
   devolucao_reserva: 'Termo de devolução da reserva',
   garantia: 'Recibo da garantia',
   quitacao: 'Termo de quitação',
+  ficha: 'Ficha cadastral',
+  ficha_fiador: 'Ficha cadastral do fiador',
 };
 
 const documentoDe = (p, campo = 'inquilino_cpf', tipo = p.inquilino_tipo) => (p[campo] ? `${tipo === PJ ? 'CNPJ' : 'CPF'} ${p[campo]}` : '');
@@ -84,6 +86,11 @@ export function reciboDisponivel(d, tipo, alvo) {
   const c = alvo.contrato || null;
   const p = f || c;
   if (!p) return { ok: false, motivo: 'Ficha ou inquilino não encontrado.' };
+  if (tipo === 'ficha' || tipo === 'ficha_fiador') {
+    if (!f) return { ok: false, motivo: 'A ficha cadastral é da ficha em análise.' };
+    if (tipo === 'ficha_fiador' && !R.temFiador(f) && !R.fiadoresDaFicha(f).length) return { ok: false, motivo: 'A garantia da proposta não é fiador.' };
+    return { ok: true };
+  }
   if (tipo === 'reserva') return p.reserva_valor > 0 && p.reserva_data ? { ok: true } : { ok: false, motivo: 'Informe o valor e a data da reserva.' };
   if (tipo === 'devolucao_reserva') {
     if (!f) return { ok: false, motivo: 'O termo de devolução da reserva é da ficha em análise.' };
@@ -125,6 +132,9 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   const assinaPessoa = (papel) => ({ nome: p.inquilino_nome, linha: [documentoDe(p), papel].filter(Boolean).join(' · ') });
   const nomeArq = (doc, data) => `${doc} ${i ? i.nome : 'sem imovel'} - ${p.inquilino_nome} - ${data || hoje}`;
   const base = { emitente: e, cidade: (i && i.cidade) || e.municipio || 'Curitiba', data: hoje, tabela: [], depois: [] };
+
+  if (tipo === 'ficha') return fichaCadastral(d, f, base, nomeArq);
+  if (tipo === 'ficha_fiador') return fichaDoFiador(f, Number(alvo.fiador) || 1, i, base, nomeArq);
 
   if (tipo === 'reserva') {
     const proposta = f ? itensDaProposta(f) : [];
@@ -214,5 +224,107 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     ],
     assinaturas: [assinaEmpresa, assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
     arquivo: nomeArq('Termo quitacao', enc.garantia_devolvida_em || enc.data_saida),
+  };
+}
+
+// --------------------------------------------------------------------------
+// Ficha cadastral em PDF (pedido do dono em 2026-11-14, depois de várias fichas com documentos, extratos e assinaturas
+// falsos): os dados que já temos, linhas em branco para o resto, os documentos conforme o tipo de renda e, antes da
+// assinatura, a declaração de veracidade (tom informativo: o crime e a conferência, sem ameaça) e a saída fácil, a
+// desistência com a reserva devolvida por inteiro (já é a regra, decisão de 2026-11-12). Assina pelo gov.br ou à mão.
+// --------------------------------------------------------------------------
+/** Linha em branco para preencher à mão. */
+export const EM_BRANCO = '______________________________';
+const ou = (v) => (v === undefined || v === null || v === '' ? EM_BRANCO : String(v));
+const dataOu = (v) => (v ? C.dataBr(v) : EM_BRANCO);
+const reaisOu = (v) => (v > 0 ? C.reais(v) : EM_BRANCO);
+const mesOu = (v) => (v ? C.compBr(v) : EM_BRANCO);
+const casadoOuUniao = (estado) => ['Casado(a)', 'União estável'].includes(estado);
+
+/** Qualificação da pessoa física (prefixo do campo: 'inquilino_', 'representante_' ou '' no fiador). */
+const qualificacaoDe = (p, pre) => [
+  ['Nacionalidade', ou(p[`${pre}nacionalidade`])], ['Estado civil', ou(p[`${pre}estado_civil`])],
+  ['Profissão', ou(p[`${pre}profissao`])], ['Data de nascimento', dataOu(p[`${pre}nascimento`])],
+];
+
+/** Lista numerada de documentos, com o aviso de mandar o arquivo original. */
+const listaDocumentos = (itens) => [['DOCUMENTOS PARA ENVIAR JUNTO', null], ...itens.map((t, k) => [`${k + 1}.`, t]), ['Atenção', R.DICA_DOCUMENTOS]];
+
+/** Declaração antes da assinatura: verdade dos dados, conferência com a fonte, o crime (CP 171, 298, 299 e 304) e a LGPD. */
+const declaracao = (quem) => [
+  `DECLARAÇÃO. ${quem} que as informações desta ficha e os documentos entregues com ela são verdadeiros. Os documentos são conferidos diretamente com bancos, empregadores e cartórios, e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 298, 299 e 304), que pode ser comunicado à autoridade policial.`,
+  'Autorizo a consulta do nome e do CPF em cadastros de crédito (como Serasa e SPC) e o uso destes dados só para a análise desta locação (Lei 13.709/2018).',
+];
+const COMO_ASSINAR = 'Assinatura: pelo gov.br (gratuito, em assinador.iti.br, com conta prata ou ouro) ou à mão, mandando a foto ou o PDF da ficha assinada.';
+
+/** Ficha cadastral do interessado (pessoa física ou empresa). */
+function fichaCadastral(d, f, base, nomeArq) {
+  const pj = f.inquilino_tipo === PJ;
+  const proposta = itensDaProposta(f);
+  const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean);
+  const tabela = [['IMÓVEL DE INTERESSE', null], ...(imoveis.length ? imoveis.map((x) => ['Endereço', enderecoDe(x)]) : [['Endereço', EM_BRANCO]])];
+  if (proposta.length) tabela.push(['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta);
+  if (pj) {
+    tabela.push(['DADOS DA EMPRESA', null], ['Razão social', ou(f.inquilino_nome)], ['Nome fantasia', ou(f.inquilino_apelido)], ['CNPJ', ou(f.inquilino_cpf)],
+      ['Inscrição estadual', ou(f.inquilino_rg)], ['Endereço da sede', ou(f.inquilino_endereco)], ['Telefone', ou(f.inquilino_telefone)], ['E-mail', ou(f.inquilino_email)],
+      ['Faturamento mensal médio', reaisOu(f.renda_mensal)],
+      ['REPRESENTANTE (quem assina pela empresa)', null], ['Nome', ou(f.representante_nome)], ['CPF', ou(f.representante_cpf)], ['RG', ou(f.representante_rg)],
+      ['Cargo', ou(f.representante_cargo)], ...qualificacaoDe(f, 'representante_'), ['Endereço', ou(f.representante_endereco)],
+      ['Telefone', ou(f.representante_telefone)], ['E-mail', ou(f.representante_email)]);
+  } else {
+    tabela.push(['DADOS DO INTERESSADO (quem vai assinar o contrato)', null], ['Nome completo', ou(f.inquilino_nome)], ['CPF', ou(f.inquilino_cpf)], ['RG', ou(f.inquilino_rg)],
+      ...qualificacaoDe(f, 'inquilino_'), ['Endereço atual', ou(f.inquilino_endereco)],
+      ['Telefone', `${ou(f.inquilino_telefone)}${f.inquilino_telefone && f.inquilino_whatsapp ? ' (WhatsApp)' : ''}`], ['E-mail', ou(f.inquilino_email)],
+      ['RENDA', null], ['Tipo de renda', ou(f.renda_tipo)], ['Renda mensal (bruta)', reaisOu(f.renda_mensal)], ['Empresa onde trabalha / fonte', ou(f.renda_fonte)],
+      ['Telefone da empresa', ou(f.renda_fonte_telefone)], ['Trabalha lá desde', mesOu(f.renda_desde)]);
+    // cônjuge: de quem é casado ou vive em união estável (estado civil em branco: as linhas vão para preencher, se for o caso)
+    if (R.fichaComConjuge(f) || !f.inquilino_estado_civil) {
+      tabela.push([`CÔNJUGE OU COMPANHEIRO(A)${f.inquilino_estado_civil ? '' : ' (se for casado ou viver em união estável)'}`, null], ['Nome', ou(f.conjuge_nome)],
+        ['CPF', ou(f.conjuge_cpf)], ['Profissão', ou(f.conjuge_profissao)], ['Renda mensal (bruta)', reaisOu(f.conjuge_renda)], ['Telefone', ou(f.conjuge_telefone)]);
+    }
+  }
+  if (f.solidario_nome) tabela.push(['INQUILINO SOLIDÁRIO (assina o contrato junto)', null], ['Nome', f.solidario_nome], ['CPF / CNPJ', ou(f.solidario_cpf)], ['Telefone', ou(f.solidario_telefone)]);
+  tabela.push([pj ? 'QUEM VAI USAR O IMÓVEL' : 'QUEM VAI MORAR NO IMÓVEL', null],
+    ['Pessoas (nome, parentesco e idade)', f.moradores ? String(f.moradores).split(/\n+/).map((x) => x.trim()).filter(Boolean).join('; ') : EM_BRANCO],
+    ['Animais de estimação', ou(f.animais)]);
+  const fiadores = R.fiadoresDaFicha(f);
+  if (fiadores.length || R.temFiador(f)) {
+    tabela.push(['FIADOR', null], ...(fiadores.length ? fiadores.map((x) => [`Fiador ${x.n}`, `${x.nome}${x.cpf ? `, CPF ${x.cpf}` : ''} (preenche e assina a ficha do fiador)`]) : [['Fiador', 'preenche e assina a ficha do fiador']]));
+  }
+  tabela.push(...listaDocumentos(R.documentosDaFicha(f)));
+  const reserva = f.reserva_valor > 0 ? `A reserva de ${C.reais(f.reserva_valor)} é devolvida por inteiro, sem descontos.` : 'Nada é cobrado.';
+  return {
+    ...base, titulo: 'FICHA CADASTRAL',
+    paragrafos: [`Ficha para a análise da locação. Confira os dados já preenchidos, complete o que faltar e assine no fim.${f.data_recebida ? ` Ficha aberta em ${C.dataBr(f.data_recebida)}.` : ''}`],
+    tabela,
+    depois: [
+      ...declaracao(pj ? 'A empresa declara, por meio do representante,' : 'Declaro'),
+      `Se faltar algum documento ou você preferir não seguir com a análise, sem problema: marque abaixo e devolva esta ficha. ${reserva}`,
+      `(   ) Não vou seguir com a análise${f.reserva_valor > 0 ? ' e peço a devolução integral da reserva' : ''}.`,
+      COMO_ASSINAR,
+    ],
+    assinaturas: [pj ? { nome: f.representante_nome || EM_BRANCO, linha: `representante de ${f.inquilino_nome || 'EMPRESA'}` } : { nome: f.inquilino_nome || EM_BRANCO, linha: f.inquilino_cpf ? `CPF ${f.inquilino_cpf} · INTERESSADO` : 'INTERESSADO' }],
+    arquivo: nomeArq('Ficha cadastral', base.data),
+  };
+}
+
+/** Ficha cadastral do fiador ``n`` da ficha (dados da ficha: fiadorN_…). */
+function fichaDoFiador(f, n, i, base, nomeArq) {
+  const x = R.fiadorDaFicha(f, n);
+  const conjuge = casadoOuUniao(x.estado_civil) || !x.estado_civil;
+  const tabela = [['FIADOR DA LOCAÇÃO', null], ['Interessado (locatário)', ou(f.inquilino_nome)], ['Imóvel', ou(enderecoDe(i))],
+    ['DADOS DO FIADOR', null], ['Nome completo', ou(x.nome)], ['CPF', ou(x.cpf)], ['RG', ou(x.rg)], ...qualificacaoDe(x, ''), ['Regime de bens (se casado)', ou(x.regime_bens)],
+    ['Endereço', ou(x.endereco)], ['Telefone', ou(x.telefone)], ['E-mail', ou(x.email)]];
+  if (conjuge) tabela.push([`CÔNJUGE OU COMPANHEIRO(A)${x.estado_civil ? ' (também assina a fiança)' : ' (se for casado ou viver em união estável)'}`, null], ['Nome', ou(x.nome_conjuge)], ['CPF', ou(x.cpf_conjuge)], ['RG', ou(x.rg_conjuge)]);
+  tabela.push(['IMÓVEL DO FIADOR', null], ['Endereço, matrícula e cartório', ou(x.imovel_garantia)], ...listaDocumentos(R.documentosDoFiador(x)));
+  return {
+    ...base, titulo: 'FICHA CADASTRAL DO FIADOR',
+    paragrafos: ['Ficha para a análise do fiador. Confira os dados já preenchidos, complete o que faltar e assine no fim.',
+      'O fiador responde pelas dívidas do contrato de locação se o locatário não pagar (Código Civil, artigo 818). Sendo casado, o cônjuge também assina a fiança, salvo separação total de bens (Código Civil, artigo 1.647, III).'],
+    tabela,
+    depois: [...declaracao('Declaro'), COMO_ASSINAR],
+    assinaturas: [{ nome: x.nome || EM_BRANCO, linha: x.cpf ? `CPF ${x.cpf} · FIADOR` : 'FIADOR' },
+      ...(conjuge ? [{ nome: x.nome_conjuge || EM_BRANCO, linha: 'CÔNJUGE OU COMPANHEIRO(A) DO FIADOR' }] : [])],
+    arquivo: `${nomeArq('Ficha cadastral do fiador', base.data)}${x.nome ? ` - ${x.nome}` : ''}`,
   };
 }

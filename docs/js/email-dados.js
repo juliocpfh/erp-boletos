@@ -69,6 +69,13 @@ function primeiroBoleto(d, c) {
   return `aluguel de ${C.compBr(comp)}, vence em ${C.dataBr(venc)}`;
 }
 
+/** Documentos da ficha para o e-mail, numerados (os do tipo de renda e, com fiador, os do fiador), com o aviso do arquivo original. */
+function documentosDoEmail(f) {
+  const num = (l) => l.map((t, k) => `${k + 1}. ${t}`).join('\n');
+  const fiadores = R.temFiador(f) || R.fiadoresDaFicha(f).length;
+  return [num(R.documentosDaFicha(f)), fiadores ? `\nDO FIADOR\n${num(R.documentosDoFiador(R.fiadoresDaFicha(f)[0] || {}))}` : '', `\n${R.DICA_DOCUMENTOS}`].filter(Boolean).join('\n');
+}
+
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */
 function respostasPadrao(d, c, hoje) {
   const pend = c ? K.resultadoVistoriaSaida(d, c).pendencias : [];
@@ -133,6 +140,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     pendencias: r.pendencias, ano: String(ano),
     inclusos: juntar(inclusos), iptu_valor: f && f.iptu_estimado > 0 ? C.reais(f.iptu_estimado) : '', seguro_valor: f && f.seguro_estimado > 0 ? C.reais(f.seguro_estimado) : '',
     devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
+    documentos_ficha: f ? documentosDoEmail(f) : '',
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
@@ -184,7 +192,12 @@ export function anexosProntos(d, modelo, alvo) {
       }
       continue;
     }
-    if (tipo === 'recibo') {
+    if (tipo === 'recibo' && qual === 'ficha_fiador') {
+      // uma ficha para cada fiador preenchido (fiador na garantia sem nome ainda: uma em branco)
+      if (!f || !REC.reciboDisponivel(d, qual, alvo).ok) continue;
+      const fiadores = R.fiadoresDaFicha(f);
+      for (const x of fiadores.length ? fiadores : [{ n: 1 }]) out.push({ tipo: 'recibo', recibo: qual, rotulo: `${REC.TIPOS_RECIBO[qual]}${x.nome ? ` (${x.nome})` : ''}`, ok: true, motivo: '', alvo: { ...alvo, fiador: x.n } });
+    } else if (tipo === 'recibo') {
       const disp = REC.reciboDisponivel(d, qual, alvo);
       out.push({ tipo: 'recibo', recibo: qual, rotulo: REC.TIPOS_RECIBO[qual], ok: disp.ok, motivo: disp.motivo || '' });
     } else if (qual === 'reserva') {
