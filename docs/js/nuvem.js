@@ -71,26 +71,35 @@ export function diferencas(antes, depois) {
     }
     if (RAIZ_DO_SERVIDOR.includes(k)) continue;
     const va = antes?.[k]; const vb = depois?.[k];
-    if (igual(va, vb)) continue; // tabela (ou campo) que não mudou: uma comparação só, sem olhar registro a registro
+    // tabela (ou campo) que não mudou: uma comparação só (JSON nativo), sem olhar registro a registro
+    if (va === vb || JSON.stringify(va) === JSON.stringify(vb)) continue;
     if (ehTabela(va ?? []) && ehTabela(vb ?? []) && (Array.isArray(va) || Array.isArray(vb))) {
+      // tabela mexida: direto ao registro a registro. (Antes, a tabela inteira ainda passava pelo `canon` das duas cópias, que só
+      // serve para dizer "igual a não ser pela ordem das chaves": com 2.300 boletos eram ~70 ms a mais em cada gravação.)
+      const daTabela = [];
+      let repetido = null;
       const porId = new Map((va || []).map((r) => [r.id, r]));
       const novos = new Set();
       for (const r of vb || []) {
-        if (novos.has(r.id)) throw new ErroNuvem(`Dois registros com o mesmo código (${r.id}) em ${k}: nada foi gravado. Recarregue a página e faça de novo.`);
+        if (novos.has(r.id)) { repetido ??= r.id; continue; }
         novos.add(r.id);
         const velho = porId.get(r.id);
-        if (!velho) { ops.push({ op: 'inserir', tabela: k, id: r.id, dados: r }); continue; }
+        if (!velho) { daTabela.push({ op: 'inserir', tabela: k, id: r.id, dados: r }); continue; }
         if (igual(velho, r)) continue;
         const campos = {};
         for (const c of new Set([...Object.keys(velho), ...Object.keys(r)])) {
           if (igual(velho[c], r[c])) continue;
           campos[c] = c in r && r[c] !== undefined ? { antes: velho[c], depois: r[c] } : { antes: velho[c] }; // sem "depois" = campo apagado
         }
-        ops.push({ op: 'alterar', tabela: k, id: r.id, campos });
+        daTabela.push({ op: 'alterar', tabela: k, id: r.id, campos });
       }
-      for (const r of va || []) if (!novos.has(r.id)) ops.push({ op: 'excluir', tabela: k, id: r.id, base: r });
+      for (const r of va || []) if (!novos.has(r.id)) daTabela.push({ op: 'excluir', tabela: k, id: r.id, base: r });
+      // só a ordem das chaves mudou (nenhuma mudança de verdade): nada a mandar, como antes
+      if (repetido !== null && (daTabela.length || canon(va) !== canon(vb))) throw new ErroNuvem(`Dois registros com o mesmo código (${repetido}) em ${k}: nada foi gravado. Recarregue a página e faça de novo.`);
+      ops.push(...daTabela);
       continue;
     }
+    if (canon(va) === canon(vb)) continue; // fora das tabelas: igual a não ser pela ordem das chaves
     ops.push({ op: 'raiz', campo: k, antes: va, depois: vb });
   }
   return ops;

@@ -345,3 +345,24 @@ test('item 8: conferência de 30 em 30 s sem novidade não remonta nem normaliza
   for (let i = 0; i < 10; i += 1) await s.sincronizar();
   assert.equal(normalizacoes, 0);
 });
+
+test('diferencas: tabela mexida vai direto ao registro a registro, e só a ordem das chaves nunca vira mudança', () => {
+  const antes = { imoveis: [{ id: 1, nome: 'Loja 1', cidade: 'Curitiba' }, { id: 2, nome: 'Loja 2', cidade: 'Curitiba' }], config_banco: { ativo: true, contas: [{ id: 'ank', apelido: 'ANK' }] }, historico: [] };
+  // as mesmas informações com as chaves em outra ordem (tabela e campo da raiz): nada a mandar
+  const outraOrdem = { imoveis: [{ nome: 'Loja 1', id: 1, cidade: 'Curitiba' }, { cidade: 'Curitiba', id: 2, nome: 'Loja 2' }], config_banco: { contas: [{ apelido: 'ANK', id: 'ank' }], ativo: true }, historico: [] };
+  assert.deepEqual(N.diferencas(antes, outraOrdem), []);
+  // um campo mudado + chaves em outra ordem nos outros registros: só o campo mudado
+  const mudou = structuredClone(outraOrdem);
+  mudou.imoveis[1].nome = 'Loja 2B';
+  assert.deepEqual(N.diferencas(antes, mudou), [{ op: 'alterar', tabela: 'imoveis', id: 2, campos: { nome: { antes: 'Loja 2', depois: 'Loja 2B' } } }]);
+  // incluir, excluir e campo apagado, na ordem em que aparecem
+  const depois = { ...antes, imoveis: [{ id: 2, nome: 'Loja 2' }, { id: 3, nome: 'Loja 3' }] };
+  assert.deepEqual(N.diferencas(antes, depois), [
+    { op: 'alterar', tabela: 'imoveis', id: 2, campos: { cidade: { antes: 'Curitiba' } } },
+    { op: 'inserir', tabela: 'imoveis', id: 3, dados: { id: 3, nome: 'Loja 3' } },
+    { op: 'excluir', tabela: 'imoveis', id: 1, base: antes.imoveis[0] },
+  ]);
+  // código repetido numa tabela mexida: recusa (mesmo quando o repetido é a única diferença)
+  assert.throws(() => N.diferencas(antes, { ...antes, imoveis: [...antes.imoveis, { ...antes.imoveis[0] }] }), /mesmo código \(1\) em imoveis/);
+  assert.throws(() => N.diferencas(antes, { ...antes, imoveis: [...antes.imoveis, { id: 2, nome: 'Outra' }] }), /mesmo código \(2\) em imoveis/);
+});
