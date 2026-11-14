@@ -3,11 +3,16 @@
 // de um cache no caminho não fica guardado como novo; sem internet → cópia; localhost → confere arquivo a arquivo.
 // Também carregarScript (docs/js/app.js), que carrega essas bibliotecas na página.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
 const CODIGO = fs.readFileSync(new URL('../docs/sw.js', import.meta.url), 'utf8');
+/** O sw.js com outra VERSAO_VENDOR (as bibliotecas de docs/vendor foram trocadas naquela publicação). */
+const comVendor = (v) => { const [antes, resto] = CODIGO.split("const VERSAO_VENDOR = '"); return `${antes}const VERSAO_VENDOR = '${v}${resto.slice(resto.indexOf("'"))}`; };
+const VERSAO_VENDOR_NO_SW = CODIGO.split("const VERSAO_VENDOR = '")[1].split("'")[0];
+const VENDOR_CONFERIDO = '2026-11-13 86b72bfa5974b8e7'; // "VERSAO_VENDOR resumo de docs/vendor": os dois mudam juntos
 const A = 'Sat, 07 Nov 2026 12:41:50 GMT'; const B = 'Sun, 08 Nov 2026 10:00:00 GMT'; const C = 'Mon, 09 Nov 2026 14:00:00 GMT';
 
 /**
@@ -16,9 +21,9 @@ const A = 'Sat, 07 Nov 2026 12:41:50 GMT'; const B = 'Sun, 08 Nov 2026 10:00:00 
  * endereço (?v=…) não pega; `naOrigem` (caminho → data): velho até no site; `fora`: caminhos que saíram do site (404);
  * `semInternetNoFundo`: a internet cai logo depois da abertura (o que é baixado em segundo plano, ?v=…, falha).
  */
-function mundo({ hostname = 'erp.exemplo.com.br', publicada = A } = {}) {
+function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new Map(), codigo = CODIGO } = {}) {
   const origem = `https://${hostname}`;
-  const armazem = new Map(); // nome do cache → Map(url → Response)
+  // armazem: nome do cache → Map(url → Response); passado de um mundo a outro = o mesmo aparelho com outro service worker (`codigo`)
   const pedidos = []; // o que foi ao site
   const fundo = []; // o que o service worker deixou rodando em segundo plano (ev.waitUntil)
   // erro: o site responde com página de erro (ex.: 502 do Cloudflare)
@@ -64,7 +69,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A } = {}) {
   };
   // o segundo plano espera ESPERA_SEGUNDO_PLANO; aqui, o próximo instante (depois dos pedidos da abertura)
   const ctx = { self, caches, fetch, Request, Response, URL, console, setTimeout: (fn) => setTimeout(fn, 0), clearTimeout };
-  vm.runInNewContext(CODIGO, ctx, { filename: 'sw.js' });
+  vm.runInNewContext(codigo, ctx, { filename: 'sw.js' });
   /** Simula um pedido da página: devolve o texto da resposta. */
   const pedir = async (caminho, modo = 'no-cors') => {
     const req = new Request(`${origem}/${caminho}`);
@@ -185,7 +190,7 @@ test('em localhost (desenvolvimento) cada arquivo é conferido com o servidor, c
   assert.ok(!m.pedidos.some((p) => p.includes('?v=')));
 });
 
-test('versão nova: bibliotecas (vendor/) e modelos usados na versão anterior voltam em segundo plano; sem internet depois, PDF e Excel funcionam', async () => {
+test('versão nova com as mesmas bibliotecas: os modelos voltam em segundo plano e as bibliotecas (vendor/) não são baixadas de novo; sem internet depois, PDF e Excel funcionam', async () => {
   const m = mundo();
   await m.abrir();
   for (const a of ['vendor/jspdf.umd.min.js', 'vendor/exceljs.min.js', 'modelos/fatura-modelo.xlsx', 'vendor/antiga.min.js']) await m.pedir(a); // usados na versão A
@@ -193,27 +198,63 @@ test('versão nova: bibliotecas (vendor/) e modelos usados na versão anterior v
   m.site.publicada = B; m.site.fora.add('/vendor/antiga.min.js'); // 08/11: PR publicada (uma biblioteca saiu)
   m.pedidos.length = 0;
   await m.abrir(); // abre com internet e não gera PDF nem Excel
-  for (const a of ['/vendor/jspdf.umd.min.js', '/vendor/exceljs.min.js', '/modelos/fatura-modelo.xlsx']) {
-    assert.ok(m.pedidos.some((p) => p.startsWith(`GET ${a}?v=`) && p.endsWith('(reload)')), `baixou de novo ${a}`);
-  }
+  assert.ok(m.pedidos.some((p) => p.startsWith('GET /modelos/fatura-modelo.xlsx?v=') && p.endsWith('(reload)')), 'baixou de novo o modelo');
+  assert.ok(!m.pedidos.some((p) => p.includes('/vendor/')), 'as bibliotecas não mudaram (VERSAO_VENDOR): nada delas foi ao site');
   assert.ok(!m.pedidos.some((p) => p.startsWith('GET /js/app.js?v=')), 'o que a página já pediu nesta abertura não é baixado de novo');
-  assert.ok(!m.guardados().includes('/vendor/antiga.min.js'), 'o que saiu do site sai da cópia');
   m.site.internet = false; // depois, sem internet (ou site fora do ar)
   await m.abrir();
-  assert.match(await m.pedir('vendor/jspdf.umd.min.js'), /jspdf.+08 Nov 2026/);
+  assert.match(await m.pedir('vendor/jspdf.umd.min.js'), /jspdf.+07 Nov 2026/, 'a biblioteca guardada continua servindo');
   assert.match(await m.pedir('modelos/fatura-modelo.xlsx'), /fatura-modelo.+08 Nov 2026/);
   // com internet de novo: tudo da cópia, nada baixado outra vez
   m.site.internet = true; m.pedidos.length = 0;
   await m.abrir();
-  assert.match(await m.pedir('vendor/exceljs.min.js'), /08 Nov 2026/);
+  assert.match(await m.pedir('vendor/exceljs.min.js'), /07 Nov 2026/);
   assert.deepEqual(m.pedidos.sort(), ['GET /', 'HEAD /index.html (no-cache)']);
 });
 
-test('versão nova e a internet cai logo depois de abrir: a biblioteca antiga fica até a nova chegar', async () => {
+test('bibliotecas trocadas (VERSAO_VENDOR mudou): voltam em segundo plano, a que saiu do site sai da cópia, e isso vale mesmo se a versão do site já estava conferida', async () => {
   const m = mundo();
   await m.abrir();
-  await m.pedir('vendor/exceljs.min.js'); await m.terminarFundo();
-  m.site.publicada = B; m.site.semInternetNoFundo = true;
+  for (const a of ['vendor/jspdf.umd.min.js', 'vendor/exceljs.min.js', 'vendor/antiga.min.js']) await m.pedir(a); // usadas na versão A
+  await m.terminarFundo();
+  // publicação B troca as bibliotecas: o service worker novo chega com outra VERSAO_VENDOR
+  const m2 = mundo({ armazem: m.armazem, publicada: B, codigo: comVendor('2099-01-01') });
+  m2.site.fora.add('/vendor/antiga.min.js');
+  await m2.abrir();
+  for (const a of ['/vendor/jspdf.umd.min.js', '/vendor/exceljs.min.js']) assert.ok(m2.pedidos.some((p) => p.startsWith(`GET ${a}?v=`) && p.endsWith('(reload)')), `baixou de novo ${a}`);
+  assert.ok(!m2.guardados().includes('/vendor/antiga.min.js'), 'o que saiu do site sai da cópia');
+  m2.site.internet = false;
+  await m2.abrir();
+  assert.match(await m2.pedir('vendor/jspdf.umd.min.js'), /jspdf.+08 Nov 2026/);
+  // outro aparelho: o service worker antigo já tinha conferido a versão B; o novo (outras bibliotecas) assume depois, sem publicação nova
+  const n = mundo();
+  await n.abrir();
+  await n.pedir('vendor/exceljs.min.js'); await n.terminarFundo();
+  n.site.publicada = B; n.pedidos.length = 0;
+  await n.abrir(); // versão B conferida pelo service worker antigo: as bibliotecas ficaram como estavam
+  assert.ok(!n.pedidos.some((p) => p.includes('/vendor/')));
+  const n2 = mundo({ armazem: n.armazem, publicada: B, codigo: comVendor('2099-01-01') });
+  await n2.abrir();
+  assert.ok(n2.pedidos.some((p) => p.startsWith('GET /vendor/exceljs.min.js?v=')), 'mesma versão do site, bibliotecas novas: baixou de novo');
+  n2.site.internet = false;
+  assert.match(await n2.pedir('vendor/exceljs.min.js'), /08 Nov 2026/);
+});
+
+test('VERSAO_VENDOR (sw.js) acompanha docs/vendor: mudou uma biblioteca, troque a data lá e o resumo aqui', () => {
+  const dir = new URL('../docs/vendor/', import.meta.url);
+  const h = createHash('sha256');
+  // fim de linha igual no Windows e no GitHub (o git troca LF por CRLF na pasta de trabalho)
+  for (const f of fs.readdirSync(dir).sort()) { h.update(f); h.update(fs.readFileSync(new URL(f, dir), 'latin1').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)), 'latin1'); }
+  assert.equal(`${VERSAO_VENDOR_NO_SW} ${h.digest('hex').slice(0, 16)}`, VENDOR_CONFERIDO,
+    'docs/vendor mudou: troque VERSAO_VENDOR em docs/sw.js (senão os aparelhos não baixam a biblioteca nova) e atualize VENDOR_CONFERIDO neste teste');
+});
+
+test('bibliotecas trocadas e a internet cai logo depois de abrir: a biblioteca antiga fica até a nova chegar', async () => {
+  const antes = mundo();
+  await antes.abrir();
+  await antes.pedir('vendor/exceljs.min.js'); await antes.terminarFundo();
+  const m = mundo({ armazem: antes.armazem, publicada: B, codigo: comVendor('2099-01-01') });
+  m.site.semInternetNoFundo = true;
   await m.abrir();
   m.site.internet = false;
   await m.abrir();
