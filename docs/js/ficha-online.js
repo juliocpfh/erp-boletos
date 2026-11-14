@@ -175,3 +175,51 @@ export const criarLinkNaNuvem = (corpo) => pedir('link', { method: 'POST', heade
 export const guardarPdfNaNuvem = (fichaId, pessoa, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob });
 export const linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ''}`).then((r) => r.links || []);
 export const atualizarLinkNaNuvem = (corpo) => pedir('atualizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+
+// ---------------------------------------------------------------------------
+// Aviso no celular (Web Push): cada aparelho da equipe liga o seu (o navegador pergunta a permissão)
+// ---------------------------------------------------------------------------
+const chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(t).length / 4) * 4, '=')), (c) => c.charCodeAt(0));
+const temPush = () => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof PushManager !== 'undefined' && typeof Notification !== 'undefined';
+
+/** { possivel, ligadoNaNuvem, ligadoAqui, negado }: o aparelho aceita aviso? a nuvem tem as chaves? este aparelho já ligou? */
+export async function estadoDoAviso() {
+  if (!temPush()) return { possivel: false };
+  const nuvem = await pedir('push').catch(() => ({ ligado: false }));
+  const reg = await navigator.serviceWorker.getRegistration();
+  const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+  // inscrição feita com chaves antigas (trocadas na nuvem) não recebe mais: mostra como desligado, para ligar de novo
+  return { possivel: true, ligadoNaNuvem: !!nuvem.ligado, ligadoAqui: !!inscricao && mesmaChave(inscricao, nuvem.chave), negado: Notification.permission === 'denied', chave: nuvem.chave };
+}
+
+/** A inscrição do aparelho foi feita com esta chave do servidor? (trocar as chaves VAPID exige inscrever de novo) */
+const mesmaChave = (inscricao, chave) => {
+  const k = inscricao && inscricao.options && inscricao.options.applicationServerKey;
+  if (!k || !chave) return true;
+  const a = new Uint8Array(k); const b = chaveDoServidor(chave);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+};
+
+/** Liga o aviso neste aparelho: pede a permissão, inscreve no serviço do navegador e guarda na nuvem. */
+export async function ligarAviso() {
+  if (!temPush()) throw new C.ErroUsuario('Este navegador não recebe avisos. No iPhone: instale o aplicativo (Compartilhar → Adicionar à Tela de Início) e abra por ele.');
+  // a permissão logo no toque do botão (o Safari do iPhone recusa sem perguntar se vier depois de uma ida à internet)
+  const permissao = await Notification.requestPermission();
+  const e = await estadoDoAviso();
+  if (!e.ligadoNaNuvem) throw new C.ErroUsuario('O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).');
+  if (permissao !== 'granted') throw new C.ErroUsuario('Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.');
+  const reg = await navigator.serviceWorker.ready;
+  let inscricao = await reg.pushManager.getSubscription();
+  if (inscricao && !mesmaChave(inscricao, e.chave)) { await inscricao.unsubscribe().catch(() => {}); inscricao = null; }
+  inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
+  await pedir('push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inscricao.toJSON()) });
+}
+
+/** Desliga o aviso neste aparelho. */
+export async function desligarAviso() {
+  const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+  const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+  if (!inscricao) return;
+  await pedir('push-sair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: inscricao.endpoint }) }).catch(() => {});
+  await inscricao.unsubscribe();
+}
