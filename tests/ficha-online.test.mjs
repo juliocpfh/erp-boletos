@@ -54,3 +54,18 @@ test('formulário do fiador, valores já sabidos e contexto do link', () => {
   assert.equal(FO.telefoneWhatsapp(f, 'interessado'), '5541999990000');
   assert.match(FO.textoWhatsapp(f, 'interessado', { url: 'https://ficha.ankjck.com.br/#x', vence_em: '2026-11-21T10:00:00.000Z' }), /^Olá, Maria! Segue o link da sua ficha cadastral, que vale até 21\/11\/2026: https:\/\/ficha/);
 });
+
+test('trazer para a ficha: só os valores preenchidos, e as marcas dos documentos que chegaram', () => {
+  const { f } = base();
+  const l = {
+    pessoa: 'interessado',
+    formulario: [{ nome: 'inquilino_profissao', tipo: 'texto' }, { nome: 'renda_mensal', tipo: 'dinheiro' }, { nome: 'inquilino_rg', tipo: 'texto' }],
+    respostas: [{ em: '2026-11-14T10:00:00Z', valores: { inquilino_profissao: 'Gerente', renda_mensal: 1500000, inquilino_rg: null, fora: 'x' } }],
+    arquivos: [{ documento: '3 últimos holerites' }, { documento: 'Comprovante de residência atual (conta de água, energia ou telefone)' }, { documento: 'Ficha cadastral assinada' }],
+  };
+  assert.deepEqual(FO.dadosParaFicha(f, l), { inquilino_profissao: 'Gerente', renda_mensal: 1500000, doc_renda: true, doc_residencia: true, doc_ficha: true });
+  // lembrete com o que falta
+  const t = FO.textoWhatsapp(f, 'interessado', { url: 'https://ficha.ankjck.com.br/#x', vence_em: '2026-11-21T10:00:00Z' }, { lembrete: true, faltando: ['Comprovante de residência'] });
+  assert.match(t, /^Olá, Maria! Passando para lembrar da sua ficha cadastral\. Falta: Comprovante de residência\. O link vale até 21\/11\/2026/);
+  assert.match(t, /a reserva é devolvida por inteiro/);
+});
