@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-vHTQwNDbbeXwYXXGVXmUQfHMXM2Efe4elBf8oLYNuuU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-KZD44dbT1LEi/fwTZr2vs6uVSMzm6JThaAYTg485wJs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="5b30329fc09c423e">
+<meta name="fontes" content="a170a08f1b2b7407">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3767,6 +3767,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     MOMENTOS_NOTIFICACAO: () => MOMENTOS_NOTIFICACAO,
     NOTIFICACAO_CONTRATO: () => NOTIFICACAO_CONTRATO,
     PADRAO_SISTEMA: () => PADRAO_SISTEMA,
+    PARTES_DOCUMENTOS_PF: () => PARTES_DOCUMENTOS_PF,
     PRESUNCAO: () => PRESUNCAO,
     REGUA_COBRANCA: () => REGUA_COBRANCA,
     SITUACOES: () => SITUACOES,
@@ -4148,6 +4149,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     seguroVigente: () => seguroVigente,
     segurosDoContrato: () => segurosDoContrato,
     segurosPassadosAoHerdeiro: () => segurosPassadosAoHerdeiro,
+    separacaoTotal: () => separacaoTotal,
     separarLeitura: () => separarLeitura,
     sincronizarGarantiaHerdeiro: () => sincronizarGarantiaHerdeiro,
     situacaoAplicacao: () => situacaoAplicacao,
@@ -5880,12 +5882,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Comprovante de endereço da empresa"
       ];
     }
-    return [
-      "Documento com foto e CPF (RG ou CNH)",
-      ...fichaComConjuge(f) ? ["Certidão de casamento ou declaração de união estável", "Documento com foto e CPF do cônjuge ou companheiro(a)"] : [],
-      ...DOCUMENTOS_RENDA[f.renda_tipo] || ["Comprovante de renda dos 3 últimos meses"],
-      "Comprovante de residência atual (conta de água, energia ou telefone)"
-    ];
+    const p2 = PARTES_DOCUMENTOS_PF;
+    return [...p2.inicio, ...fichaComConjuge(f) ? p2.conjuge : [], ...DOCUMENTOS_RENDA[f.renda_tipo] || p2.renda_padrao, ...p2.fim];
   }
   function fiadorDaFicha(f, n) {
     const p2 = `fiador${n}_`;
@@ -7479,13 +7477,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   function bancoAtivo(d2) {
-    const cfg3 = configBanco(d2);
-    return !!(cfg3.ativo && cfg3.contas.length);
+    const cfg4 = configBanco(d2);
+    return !!(cfg4.ativo && cfg4.contas.length);
   }
   function motivoBancoInativo(d2) {
-    const cfg3 = configBanco(d2);
-    if (!cfg3.contas.length) return "Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)";
-    if (!cfg3.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
+    const cfg4 = configBanco(d2);
+    if (!cfg4.contas.length) return "Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)";
+    if (!cfg4.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
     return "";
   }
   function salvarConfigBanco(d2, dados, usuario) {
@@ -7504,14 +7502,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return novo;
   }
   function salvarContaBanco(d2, dados, usuario) {
-    const cfg3 = configBanco(d2);
+    const cfg4 = configBanco(d2);
     const id = limparId(dados.id);
     if (!id) throw new Error("Informe o identificador da conta na ponte (só letras e números, ex.: ank).");
     const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
     if (!emitenteId || !buscar(d2, "emitentes", emitenteId)) throw new Error("Escolha a empresa dona da conta.");
-    const outra = cfg3.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
+    const outra = cfg4.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
     if (outra) throw new Error(`A empresa já está ligada à conta "${outra.id}".`);
-    const antes = cfg3.contas.find((x) => x.id === id) || null;
+    const antes = cfg4.contas.find((x) => x.id === id) || null;
     const ou2 = (k, conv) => dados[k] === void 0 && antes ? antes[k] : conv(dados[k]);
     const ambiente = ou2("ambiente", (v) => v === "producao" ? "producao" : "sandbox");
     const tipo = "EVP";
@@ -7543,26 +7541,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       notificar,
       negativacao: { ativa: dados.negativacao_ativa === void 0 ? antes ? !!antes.negativacao.ativa : false : marcado2(dados.negativacao_ativa), dias_atraso: diasNeg }
     };
-    cfg3.contas = antes ? cfg3.contas.map((x) => x.id === id ? conta : x) : [...cfg3.contas, conta];
-    if (!cfg3.conta_padrao_id || id === "ank" && !cfg3.contas.some((x) => x.id === cfg3.conta_padrao_id && x.id !== "ank" && antes)) cfg3.conta_padrao_id = id;
-    d2.config_banco = cfg3;
+    cfg4.contas = antes ? cfg4.contas.map((x) => x.id === id ? conta : x) : [...cfg4.contas, conta];
+    if (!cfg4.conta_padrao_id || id === "ank" && !cfg4.contas.some((x) => x.id === cfg4.conta_padrao_id && x.id !== "ank" && antes)) cfg4.conta_padrao_id = id;
+    d2.config_banco = cfg4;
     registrar(d2, usuario, antes ? "Alteração" : "Inclusão", "banco", null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? "alterada" : "incluída"} na integração C6`, { conta: { de: antes, para: conta } });
     return conta;
   }
   function excluirContaBanco(d2, contaId, usuario) {
-    const cfg3 = configBanco(d2);
-    const conta = cfg3.contas.find((x) => x.id === contaId);
+    const cfg4 = configBanco(d2);
+    const conta = cfg4.contas.find((x) => x.id === contaId);
     if (!conta) throw new Error("Conta não encontrada.");
     if (d2.cobrancas.some((cb) => cb.banco && cb.banco.conta_id === contaId && cb.banco.situacao === "emitido")) throw new Error("Há boletos emitidos nesta conta ainda em aberto no banco. Cancele-os ou aguarde o pagamento antes de tirar a conta.");
-    cfg3.contas = cfg3.contas.filter((x) => x.id !== contaId);
-    if (cfg3.conta_padrao_id === contaId) cfg3.conta_padrao_id = cfg3.contas.length ? cfg3.contas[0].id : "";
-    if (!cfg3.contas.length) cfg3.ativo = false;
-    d2.config_banco = cfg3;
+    cfg4.contas = cfg4.contas.filter((x) => x.id !== contaId);
+    if (cfg4.conta_padrao_id === contaId) cfg4.conta_padrao_id = cfg4.contas.length ? cfg4.contas[0].id : "";
+    if (!cfg4.contas.length) cfg4.ativo = false;
+    d2.config_banco = cfg4;
     registrar(d2, usuario, "Exclusão", "banco", null, `Conta bancária "${conta.apelido}" (${contaId}) tirada da integração C6`, { conta: { de: conta, para: null } });
   }
   function contaEmissora(d2) {
-    const cfg3 = configBanco(d2);
-    return cfg3.contas.find((x) => x.id === cfg3.conta_padrao_id) || cfg3.contas.find((x) => x.id === "ank") || cfg3.contas[0] || null;
+    const cfg4 = configBanco(d2);
+    return cfg4.contas.find((x) => x.id === cfg4.conta_padrao_id) || cfg4.contas.find((x) => x.id === "ank") || cfg4.contas[0] || null;
   }
   function contasDoImovel(d2, cb) {
     const c = buscar(d2, "contratos", cb.contrato_id);
@@ -7610,13 +7608,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return conta.notificar || CONTA_BANCO_PADRAO.notificar;
   }
   function notificacoesDoPagador(conta, c) {
-    const cfg3 = notificacaoDoContrato(conta, c);
-    if (!cfg3) return [];
-    const destinos = { email: cfg3.email ? String(c.inquilino_email || "").trim() : "", sms: cfg3.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
+    const cfg4 = notificacaoDoContrato(conta, c);
+    if (!cfg4) return [];
+    const destinos = { email: cfg4.email ? String(c.inquilino_email || "").trim() : "", sms: cfg4.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
     const r = [];
     for (const [canal, destino] of Object.entries(destinos)) {
       if (!destino) continue;
-      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg3[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
+      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg4[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
     }
     return r;
   }
@@ -8879,8 +8877,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return `comprovante do banco ${conta}: ${oque} (${data2 ? `${dataBr(data2)}, ` : ""}${valor})`;
   }
   function pendenciasBancoDoMes(d2, mes, hoje3 = hojeIso()) {
-    const cfg3 = d2.config_banco || {};
-    const contas2 = cfg3.contas || [];
+    const cfg4 = d2.config_banco || {};
+    const contas2 = cfg4.contas || [];
     const fim = limitesCompetencia(mes)[1];
     const mesFechado2 = fim < hoje3;
     const ate = mesFechado2 ? fim : somarDias(hoje3, -regra("dias_extrato_recente"));
@@ -8895,8 +8893,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado: mesFechado2 };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
-    const cfg3 = d2.config_banco || {};
-    if (!cfg3.ativo) return null;
+    const cfg4 = d2.config_banco || {};
+    if (!cfg4.ativo) return null;
     const limite = somarDias(hoje3, -regra("dias_alerta_banco"));
     const semDestino = (d2.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
     const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador && m.data <= limite);
@@ -9240,7 +9238,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -9512,16 +9510,23 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Aposentado / pensionista": ["Extrato do benefício dos 3 últimos meses, baixado do Meu INSS (ou do órgão que paga)"],
         Outra: ["Comprovante da renda dos 3 últimos meses (explique a origem da renda)"]
       };
-      DICA_DOCUMENTOS = "Mande os arquivos em PDF como saem do aplicativo do banco, do empregador ou do site do governo (não foto de tela nem arquivo editado): os documentos são conferidos diretamente com a fonte.";
+      DICA_DOCUMENTOS = "Mande os arquivos em PDF como saem do aplicativo do banco, do empregador ou do site do governo (não foto de tela nem arquivo editado): os documentos podem ser conferidos diretamente com a fonte.";
       PJ = "Pessoa jurídica (empresa)";
       casadoOuUniao = (estado2) => ["Casado(a)", "União estável"].includes(estado2);
       fichaComConjuge = (f) => f.inquilino_tipo !== PJ && casadoOuUniao(f.inquilino_estado_civil);
+      PARTES_DOCUMENTOS_PF = {
+        inicio: ["Documento com foto e CPF (RG ou CNH)"],
+        conjuge: ["Certidão de casamento ou declaração de união estável", "Documento com foto e CPF do cônjuge ou companheiro(a)"],
+        renda_padrao: ["Comprovante de renda dos 3 últimos meses"],
+        fim: ["Comprovante de residência atual (conta de água, energia ou telefone)"]
+      };
+      separacaoTotal = (x = {}) => /^Separação total/.test(x.regime_bens || "");
       documentosDoFiador = (x = {}) => [
         "Documento com foto e CPF",
         "Comprovante de renda dos 3 últimos meses",
         "Comprovante de residência atual",
         "Matrícula atualizada (de até 30 dias) de um imóvel em nome dele",
-        ...casadoOuUniao(x.estado_civil) ? ["Certidão de casamento ou declaração de união estável", "Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança"] : !x.estado_civil ? ["Se for casado ou viver em união estável: a certidão e o documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança"] : []
+        ...casadoOuUniao(x.estado_civil) && separacaoTotal(x) ? ["Certidão de casamento com a anotação do pacto antenupcial (separação total de bens)"] : casadoOuUniao(x.estado_civil) ? ["Certidão de casamento ou declaração de união estável", "Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança"] : !x.estado_civil ? ["Se for casado ou viver em união estável: a certidão e o documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança"] : []
       ];
       VAGAS_FIADOR_FICHA = 2;
       fiadoresDaFicha = (f) => Array.from({ length: VAGAS_FIADOR_FICHA }, (_, k) => ({ n: k + 1, ...fiadorDaFicha(f, k + 1) })).filter((x) => x.nome);
@@ -9845,11 +9850,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     await lembrarPasta(handle);
     return handle;
   }
-  async function temPermissao(handle, pedir = false) {
+  async function temPermissao(handle, pedir2 = false) {
     const opcoes2 = { mode: "readwrite" };
     if (!handle.queryPermission) return true;
     if (await handle.queryPermission(opcoes2) === "granted") return true;
-    return pedir && await handle.requestPermission(opcoes2) === "granted";
+    return pedir2 && await handle.requestPermission(opcoes2) === "granted";
   }
   async function arquivoExiste(dir, nome) {
     try {
@@ -13250,8 +13255,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var configuracaoBanco = (d2) => ({ ...configBanco(d2), ...local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: "", senha_ponte: "" } });
   var pontePronta = (d2) => bancoAtivo(d2) && !!local.ponte_url;
   var motivoIndisponivel = (d2) => motivoBancoInativo(d2) || (!local.ponte_url ? "Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6)" : "");
-  function urlDaPonte(cfg3, caminho) {
-    const base = String(cfg3.ponte_url || "").trim().replace(/\/+$/, "");
+  function urlDaPonte(cfg4, caminho) {
+    const base = String(cfg4.ponte_url || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).");
     return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
   }
@@ -13264,8 +13269,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
   };
   async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes2 = {}) {
-    const cfg3 = ponteLocal();
-    const url = urlDaPonte(cfg3, caminho);
+    const cfg4 = ponteLocal();
+    const url = urlDaPonte(cfg4, caminho);
     const f = opcoes2.fetch || fetch;
     const controlador = typeof AbortController === "function" ? new AbortController() : null;
     const timer = controlador ? setTimeout(() => controlador.abort(), opcoes2.tempoLimite || TEMPO_LIMITE_MS) : null;
@@ -13275,12 +13280,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         method: metodo,
         mode: "cors",
         signal: controlador ? controlador.signal : void 0,
-        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg3.senha_ponte ? { [CABECALHO_SENHA]: cfg3.senha_ponte } : {} },
+        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg4.senha_ponte ? { [CABECALHO_SENHA]: cfg4.senha_ponte } : {} },
         body: corpo !== null ? JSON.stringify(corpo) : void 0
       });
     } catch (e) {
-      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg3.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
-      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg3.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
+      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg4.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
+      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg4.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -15079,24 +15084,24 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var marcado = (v) => v ? "checked" : "";
   function caixaContaDosBoletos() {
     if (!podeUsuario("admin")) return "";
-    const cfg3 = configBanco(d());
+    const cfg4 = configBanco(d());
     const emissora = contaEmissora(d());
     const nomeEmp = (x) => esc((buscar2("emitentes", x.emitente_id) || {}).nome || x.apelido);
     return `<div class="cartao" id="conta-boletos"><h2>Emissão de boletos no banco (C6)</h2>
-    ${cfg3.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg3.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
-        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg3.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg3.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
+    ${cfg4.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg4.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
+        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg4.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg4.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
   }
   function caixaConfigBanco() {
     if (!podeUsuario("admin")) return "";
-    const cfg3 = configuracaoBanco(d());
+    const cfg4 = configuracaoBanco(d());
     const emitentes = ordenar(d().emitentes.filter((e) => e.ativo !== false), "nome");
     const nomeEmp = (id) => esc((buscar2("emitentes", id) || {}).nome || "(empresa excluída)");
-    const situacao2 = cfg3.contas.length ? cfg3.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves da API do C6", "aviso");
+    const situacao2 = cfg4.contas.length ? cfg4.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves da API do C6", "aviso");
     const padrao = CONTA_BANCO_PADRAO;
     const emissora = contaEmissora(d());
     const resumoNotif = (x) => {
@@ -15111,12 +15116,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
       <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
-      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg3.ativo)} ${cfg3.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
+      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg4.ativo)} ${cfg4.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}${ponteLocal().configurada ? ` ${botao("esquecerPonteC6", "Esquecer a ponte neste computador", {}, "perigo", "Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.")}` : ""}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
-      ${cfg3.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span></td>
+      ${cfg4.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span></td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa (ex.: ANK e JCK), com o mesmo identificador usado no .env da ponte (CONTAS=ank,jck).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
@@ -15146,8 +15151,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const certificado = (c) => c.certificado_valido_ate ? ` · certificado válido até ${dataBr(c.certificado_valido_ate)}${c.certificado_dias !== null && c.certificado_dias <= 30 ? ` ${etiqueta(c.certificado_dias < 0 ? "vencido" : `vence em ${c.certificado_dias} dia(s)`, "perigo")}` : ""}` : "";
     const escopos = (c) => c.escopos && c.escopos.length ? ` · escopos: ${esc(c.escopos.join(" "))}` : "";
     const linhaConta = (c) => `<li><b>${esc(c.id)}</b> (${c.ambiente === "producao" ? "produção" : "sandbox"}): ${c.simulado ? etiqueta("modo simulado", "aviso") : c.configurado ? `${etiqueta("chaves ok", "ok")} · token ${c.token === "ok" ? etiqueta("ok", "ok") : c.token === "falhou" ? `${etiqueta("falhou", "perigo")} ${esc(c.erro_token || "")}` : etiqueta("não testado", "neutra")}${escopos(c)}` : `${etiqueta("faltam as chaves", "aviso")} ${esc((c.faltam || []).join(", "))}`}${certificado(c)}${(c.avisos || []).map((a) => ` <span class="suave">${esc(a)}</span>`).join("")}</li>`;
-    const cfg3 = configuracaoBanco(d());
-    const semNaPonte = contaId ? [] : cfg3.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
+    const cfg4 = configuracaoBanco(d());
+    const semNaPonte = contaId ? [] : cfg4.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
     return `<div class="alerta ${s.simulado ? "aviso" : s.configurado ? "ok" : "info"}"><b>Ponte respondeu</b>${s.versao ? ` (versão ${esc(s.versao)})` : ""}${s.simulado ? ": <b>modo simulado</b>, os boletos emitidos são fictícios" : s.configurado ? ": pronta para falar com o banco" : ": ainda falta configurar"}${s.senha_exigida === false ? " · <b>sem senha na ponte</b> (defina PONTE_SENHA no .env)" : ""}.
     <ul style="margin:6px 0 0">${Object.values(contas2).map(linhaConta).join("") || "<li>Nenhuma conta na ponte: defina CONTAS=ank,jck no .env dela.</li>"}</ul>
     ${semNaPonte.length ? `<p style="margin:6px 0 0">Contas cadastradas aqui mas não na ponte: <b>${semNaPonte.map(esc).join(", ")}</b>.</p>` : ""}</div>`;
@@ -16807,15 +16812,15 @@ ${xref}
   }
   function caixaConfigBanco2() {
     if (!podeUsuario("admin")) return "";
-    const cfg3 = { ...CONFIG_BANCO_FASE2, ...config() };
+    const cfg4 = { ...CONFIG_BANCO_FASE2, ...config() };
     return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
     <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link("#/regras", "Regras do sistema", "")}.</p>
     <form data-form="configBanco2" class="formulario">
-      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg3.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
-      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg3.limite_pagamento ? esc(reais(cfg3.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
-      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg3.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg3.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
-      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg3.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
-      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg3.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
+      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg4.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
+      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg4.limite_pagamento ? esc(reais(cfg4.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
+      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg4.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg4.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
+      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg4.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
+      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg4.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
       <div class="check"><button>Salvar</button></div></form></div>`;
   }
   var opcoes = (lista3, atual, vazio = "") => `${vazio ? `<option value="">${esc(vazio)}</option>` : ""}${lista3.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(atual ?? "") ? "selected" : ""}>${esc(t)}</option>`).join("")}`;
@@ -17666,31 +17671,31 @@ Salvar assim mesmo?`)) {
     }
     return feitos;
   }
-  async function consultarCep(el, cfg3) {
+  async function consultarCep(el, cfg4) {
     const n = soDigitos(el.value);
     if (n.length !== 8) return;
     mensagemAuto(el, "Consultando o CEP…");
     try {
       const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
       if (r.erro) return mensagemAuto(el, "CEP não encontrado.");
-      if (cfg3.linha) return enderecoNaLinha(el, cfg3, r);
-      const feitos = preencherVazios(el.form, { [cfg3.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg3.bairro]: r.bairro, [cfg3.cidade]: r.localidade });
-      const uf = cfg3.uf && el.form.querySelector(`[name="${cfg3.uf}"]`);
+      if (cfg4.linha) return enderecoNaLinha(el, cfg4, r);
+      const feitos = preencherVazios(el.form, { [cfg4.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg4.bairro]: r.bairro, [cfg4.cidade]: r.localidade });
+      const uf = cfg4.uf && el.form.querySelector(`[name="${cfg4.uf}"]`);
       if (uf && r.uf && uf.value !== r.uf) {
         uf.value = r.uf;
         feitos.push("Estado");
       }
       mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(", "))}. Complete o número.` : "CEP conferido.");
-      const end = el.form.querySelector(`[name="${cfg3.endereco}"]`);
+      const end = el.form.querySelector(`[name="${cfg4.endereco}"]`);
       if (feitos.length && end) end.focus();
     } catch {
-      const uf = cfg3.uf && el.form.querySelector(`[name="${cfg3.uf}"]`);
+      const uf = cfg4.uf && el.form.querySelector(`[name="${cfg4.uf}"]`);
       if (uf && ufDoCep(n)) uf.value = ufDoCep(n);
       mensagemAuto(el, "Não deu para consultar o CEP agora (sem internet?). Preencha à mão.");
     }
   }
-  function enderecoNaLinha(el, cfg3, r) {
-    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg3.linha}"]`);
+  function enderecoNaLinha(el, cfg4, r) {
+    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg4.linha}"]`);
     if (!campo2) return;
     if (campo2.value.trim()) return mensagemAuto(el, "O endereço já está preenchido e ficou como estava. Para usar o do CEP, apague o endereço e digite o CEP de novo.");
     const rua = r.logradouro ? `${r.logradouro}, ` : "";
@@ -17700,7 +17705,7 @@ Salvar assim mesmo?`)) {
     campo2.focus();
     campo2.setSelectionRange(rua.length, rua.length);
   }
-  async function consultarCnpj(el, cfg3) {
+  async function consultarCnpj(el, cfg4) {
     const n = soDigitos(el.value);
     if (n.length !== 14 || !cnpjValido(n)) return;
     mensagemAuto(el, "Consultando o CNPJ…");
@@ -17714,14 +17719,14 @@ Salvar assim mesmo?`)) {
       const unico = admins.length === 1 ? admins[0] : socios.length === 1 ? socios[0] : null;
       const tel = soDigitos(r.ddd_telefone_1 || "");
       const feitos = preencherVazios(el.form, {
-        [cfg3.razao]: r.razao_social,
-        [cfg3.nome]: cfg3.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
-        [cfg3.fantasia]: r.nome_fantasia,
-        [cfg3.endereco]: endereco2,
-        [cfg3.sede]: endereco2,
-        [cfg3.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
-        [cfg3.email]: String(r.email || "").toLowerCase(),
-        [cfg3.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
+        [cfg4.razao]: r.razao_social,
+        [cfg4.nome]: cfg4.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
+        [cfg4.fantasia]: r.nome_fantasia,
+        [cfg4.endereco]: endereco2,
+        [cfg4.sede]: endereco2,
+        [cfg4.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
+        [cfg4.email]: String(r.email || "").toLowerCase(),
+        [cfg4.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
       });
       mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}`);
     } catch {
@@ -18248,9 +18253,9 @@ Salvar assim mesmo?`)) {
         const n = soDigitos(el.value);
         mensagemAuto(el, tipo !== "cep" && tipo !== "tel" && n ? `<span class="etiqueta ok">✓ ${n.length === 11 ? "CPF" : "CNPJ"} válido</span>` : "");
         if (el.dataset.preencher) {
-          const cfg3 = JSON.parse(el.dataset.preencher);
-          if (cfg3.fonte === "cep") consultarCep(el, cfg3);
-          else consultarCnpj(el, cfg3);
+          const cfg4 = JSON.parse(el.dataset.preencher);
+          if (cfg4.fonte === "cep") consultarCep(el, cfg4);
+          else consultarCnpj(el, cfg4);
         }
         if (el.hasAttribute("data-buscar-pessoa")) procurarPessoa(el);
       });
@@ -18275,9 +18280,9 @@ administracao@ankjck.com.br`;
   var CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
 Pix (CNPJ): 58.492.818/0001-59`;
   var CONDICOES = `CONDIÇÕES DA LOCAÇÃO
-- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
-- Vencimento: todo dia {vencimento}
-[se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
+[se aluguel]- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
+[fim][se vencimento]- Vencimento: todo dia {vencimento}
+[fim][se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
 [fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel[se seguro_valor] (cerca de {seguro_valor} por ano)[fim]
 [fim][se contas]- Contas de {contas_texto}: por conta do locatário
 [fim][se inclusos]- Incluso no aluguel: {inclusos}
@@ -18301,7 +18306,7 @@ ${CONDICOES}
 Estas condições dependem da aprovação da ficha. A locação só se forma com a assinatura do contrato por todas as partes.
 
 FICHA CADASTRAL
-Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha do fiador[fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
+Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
 
 DOCUMENTOS
 {documentos_ficha}[se seguro_fianca]
@@ -18309,7 +18314,13 @@ DOCUMENTOS
 SEGURO FIANÇA
 A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]
 
-Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
+[se link]PELA INTERNET
+Se preferir, preencha a ficha, mande os documentos e, depois, a ficha assinada por este link, que é só seu e vale até {link_validade}:
+{link}[se link_fiador]
+
+Link para o fiador (encaminhe para ele): {link_fiador}[fim]
+
+[fim]Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
 
 COMO FUNCIONA
 1. Análise da ficha em até 2 dias úteis
@@ -18743,7 +18754,7 @@ ${FECHO}` };
     const nomeArq = (doc, data2) => `${doc} ${i ? i.nome : "sem imovel"} - ${p2.inquilino_nome} - ${data2 || hoje3}`;
     const base = { emitente: e, cidade: i && i.cidade || e.municipio || "Curitiba", data: hoje3, tabela: [], depois: [] };
     if (tipo === "ficha") return fichaCadastral(d2, f, base, nomeArq);
-    if (tipo === "ficha_fiador") return fichaDoFiador(f, Number(alvo.fiador) || 1, i, base, nomeArq);
+    if (tipo === "ficha_fiador") return fichaDoFiador(d2, f, Number(alvo.fiador) || 1, i, base, nomeArq);
     if (tipo === "reserva") {
       const proposta = f ? itensDaProposta(f) : [];
       return {
@@ -18841,9 +18852,9 @@ ${FECHO}` };
     ["Data de nascimento", dataOu(p2[`${pre}nascimento`])]
   ];
   var listaDocumentos = (itens) => [["DOCUMENTOS PARA ENVIAR JUNTO", null], ...itens.map((t, k) => [`${k + 1}.`, t]), ["Atenção", DICA_DOCUMENTOS]];
-  var declaracao = (quem) => [
-    `DECLARAÇÃO. ${quem} que as informações desta ficha e os documentos entregues com ela são verdadeiros. Os documentos são conferidos diretamente com bancos, empregadores e cartórios, e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 298, 299 e 304), que pode ser comunicado à autoridade policial.`,
-    "Autorizo a consulta do nome e do CPF em cadastros de crédito (como Serasa e SPC) e o uso destes dados só para a análise desta locação (Lei 13.709/2018)."
+  var declaracao = (quem, pj = false) => [
+    `DECLARAÇÃO. ${quem} que as informações desta ficha e os documentos entregues com ela são verdadeiros. Os documentos podem ser conferidos diretamente com a fonte (empregadores, cartórios, bancos e validadores oficiais), e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 297, 298, 299 e 304), que pode ser comunicado à autoridade policial.`,
+    `Autorizo a consulta ${pj ? "do CNPJ da empresa e do CPF do representante" : "do nome e do CPF"} em cadastros de crédito (como Serasa e SPC) e o uso destes dados para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).`
   ];
   var COMO_ASSINAR = "Assinatura: pelo gov.br (gratuito, em assinador.iti.br, com conta prata ou ouro) ou à mão, mandando a foto ou o PDF da ficha assinada.";
   function fichaCadastral(d2, f, base, nomeArq) {
@@ -18919,7 +18930,7 @@ ${FECHO}` };
       paragrafos: [`Ficha para a análise da locação. Confira os dados já preenchidos, complete o que faltar e assine no fim.${f.data_recebida ? ` Ficha aberta em ${dataBr(f.data_recebida)}.` : ""}`],
       tabela,
       depois: [
-        ...declaracao(pj ? "A empresa declara, por meio do representante," : "Declaro"),
+        ...declaracao(pj ? "A empresa declara, por meio do representante," : "Declaro", pj),
         `Se faltar algum documento ou você preferir não seguir com a análise, sem problema: marque abaixo e devolva esta ficha. ${reserva}`,
         `(   ) Não vou seguir com a análise${f.reserva_valor > 0 ? " e peço a devolução integral da reserva" : ""}.`,
         COMO_ASSINAR
@@ -18928,13 +18939,14 @@ ${FECHO}` };
       arquivo: nomeArq("Ficha cadastral", base.data)
     };
   }
-  function fichaDoFiador(f, n, i, base, nomeArq) {
+  function fichaDoFiador(d2, f, n, i, base, nomeArq) {
     const x = fiadorDaFicha(f, n);
-    const conjuge = casadoOuUniao2(x.estado_civil) || !x.estado_civil;
+    const conjuge = casadoOuUniao2(x.estado_civil) && !separacaoTotal(x) || !x.estado_civil;
+    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map(enderecoDe).join(" ou ") || enderecoDe(i);
     const tabela = [
       ["FIADOR DA LOCAÇÃO", null],
       ["Interessado (locatário)", ou(f.inquilino_nome)],
-      ["Imóvel", ou(enderecoDe(i))],
+      ["Imóvel", ou(imoveis)],
       ["DADOS DO FIADOR", null],
       ["Nome completo", ou(x.nome)],
       ["CPF", ou(x.cpf)],
@@ -19027,11 +19039,17 @@ ${FECHO}` };
   }
   function documentosDoEmail(f) {
     const num = (l) => l.map((t, k) => `${k + 1}. ${t}`).join("\n");
-    const fiadores = temFiador(f) || fiadoresDaFicha(f).length;
-    return [num(documentosDaFicha(f)), fiadores ? `
-DO FIADOR
-${num(documentosDoFiador(fiadoresDaFicha(f)[0] || {}))}` : "", `
-${DICA_DOCUMENTOS}`].filter(Boolean).join("\n");
+    const lista3 = fiadoresDaFicha(f);
+    const fiadores = lista3.length ? lista3 : temFiador(f) ? [{}] : [];
+    const blocos = fiadores.map((x) => `
+DO FIADOR${x.nome && fiadores.length > 1 ? ` (${x.nome})` : ""}
+${num(documentosDoFiador(x))}`);
+    return [num(documentosDaFicha(f)), ...blocos, `
+${DICA_DOCUMENTOS}`].join("\n");
+  }
+  function linkDaFicha(f, pessoa2, hoje3) {
+    const l = f && f.links_ficha && f.links_ficha[pessoa2];
+    return l && l.url && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: l.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
   }
   function respostasPadrao(d2, c, hoje3) {
     const pend = c ? resultadoVistoriaSaida(d2, c).pendencias : [];
@@ -19110,7 +19128,10 @@ ${DICA_DOCUMENTOS}`].filter(Boolean).join("\n");
       seguro_valor: f && f.seguro_estimado > 0 ? reais(f.seguro_estimado) : "",
       devolucao: f && f.devolucao_data ? reais(f.devolucao_valor || f.reserva_valor) : "",
       devolucao_data: f && f.devolucao_data ? dataBr(f.devolucao_data) : "",
-      documentos_ficha: f ? documentosDoEmail(f) : ""
+      documentos_ficha: f ? documentosDoEmail(f) : "",
+      link: linkDaFicha(f, "interessado", hoje3).url,
+      link_validade: linkDaFicha(f, "interessado", hoje3).validade,
+      link_fiador: linkDaFicha(f, "fiador1", hoje3).url
     };
     const condicoes = {
       ...g,
@@ -19125,7 +19146,10 @@ ${DICA_DOCUMENTOS}`].filter(Boolean).join("\n");
       seguro_valor: !!(f && f.seguro_estimado > 0),
       saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== "Indeterminado" && fim && c.data_saida < fim),
       devolver: !!(e && e.saldo > 0),
-      cobrar: !!(e && e.saldo < 0)
+      cobrar: !!(e && e.saldo < 0),
+      link: !!linkDaFicha(f, "interessado", hoje3).url,
+      link_fiador: !!linkDaFicha(f, "fiador1", hoje3).url,
+      varios_fiadores: !!f && fiadoresDaFicha(f).length > 1
     };
     const a = alvo.aditivo || null;
     if (a) Object.assign(campos, { aditivo_data: dataBr(a.data), aditivo_assunto: a.assunto || "alteração do contrato" });
@@ -20777,6 +20801,119 @@ ${m.texto}
     ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
   }
 
+  // docs/js/ficha-online.js
+  init_calculos();
+  init_formularios();
+  init_regras();
+  var PJ5 = "Pessoa jurídica (empresa)";
+  var nomeDaPessoa = (f, pessoa2) => pessoa2 === "interessado" ? f.inquilino_nome : fiadorDaFicha(f, pessoa2.slice(6)).nome || `fiador ${pessoa2.slice(6)}`;
+  function pessoasDaFicha(f) {
+    const fiadores = fiadoresDaFicha(f).map((x) => `fiador${x.n}`);
+    return ["interessado", ...fiadores.length ? fiadores : temFiador(f) ? ["fiador1"] : []];
+  }
+  var FORA_DO_LINK = /^(inquilino_tipo|inquilino_whatsapp|responsavel_|solidario_|usar_endereco|representante_usar_endereco|.*cep_busca$)/;
+  var PARTES_DO_LINK = { "Interessado (quem vai assinar o contrato)": "Seus dados", "Representante da empresa (pessoa física)": "Representante (quem assina pela empresa)" };
+  var SEMPRE_OBRIGATORIOS = ["inquilino_nome", "inquilino_cpf"];
+  function resolverTipo(c, tipo) {
+    const m = c.mostrarSe;
+    if (m && m.campo === "inquilino_tipo") {
+      if (!m.valores.includes(tipo)) return null;
+      const { mostrarSe, ...resto } = c;
+      c = resto;
+    }
+    if (c.rotuloSe && c.rotuloSe.campo === "inquilino_tipo") {
+      const { rotuloSe, ...resto } = c;
+      c = rotuloSe.valor === tipo ? { ...resto, rotulo: rotuloSe.rotulo } : resto;
+    }
+    return c;
+  }
+  var paraLink = (c, obrig = false) => c.secao ? { secao: c.secao, ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {} } : {
+    nome: c.nome,
+    rotulo: c.rotulo,
+    tipo: c.tipo === "cpfcnpj" ? "cpfcnpj" : c.tipo,
+    ajuda: c.ajuda || "",
+    obrig: obrig || !!c.obrig,
+    largo: !!c.largo,
+    ...c.opcoes ? { opcoes: c.opcoes } : {},
+    ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {}
+  };
+  function formularioDaFicha(f, pessoa2) {
+    const tipo = f.inquilino_tipo || "Pessoa física";
+    if (pessoa2 === "interessado") {
+      const pessoaCampos = camposDaPessoa(CAMPOS_PESSOA).map((c) => resolverTipo(c, tipo)).filter(Boolean).filter((c) => c.secao ? c.secao !== "Inquilino solidário" : !c.quebra && !FORA_DO_LINK.test(c.nome));
+      const renda = FICHA_RENDA.map((c) => resolverTipo(c, tipo)).filter(Boolean);
+      const titulo2 = (s) => s === "Interessado (quem vai assinar o contrato)" && tipo === PJ5 ? "Dados da empresa" : PARTES_DO_LINK[s] || s;
+      const nome = pessoaCampos.find((c) => c.nome === "inquilino_nome");
+      const ordenados = [pessoaCampos[0], nome, ...pessoaCampos.slice(1).filter((c) => c !== nome)].map((c) => c.secao ? c : { ...c, ajuda: "" });
+      return [...ordenados, ...renda].map((c) => c.secao ? { ...c, secao: titulo2(c.secao) } : c).map((c) => paraLink(c, SEMPRE_OBRIGATORIOS.includes(c.nome)));
+    }
+    const n = Number(String(pessoa2).replace("fiador", ""));
+    const p2 = `fiador${n}_`;
+    const campos = FICHA_FIADORES.filter((c) => c.secao ? false : c.nome.startsWith(p2) && !/cep_busca$/.test(c.nome)).map(({ mostrarSe, ...c }) => /_imovel_garantia$/.test(c.nome) ? c : { ...c, ajuda: "" });
+    const conjuge = campos.filter((c) => /_(nome_conjuge|cpf_conjuge|rg_conjuge)$/.test(c.nome));
+    const casado = { campo: `${p2}estado_civil`, valores: ["Casado(a)", "União estável"] };
+    return [
+      { secao: "Seus dados" },
+      ...campos.filter((c) => !conjuge.includes(c) && !/_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c, [`${p2}nome`, `${p2}cpf`].includes(c.nome))),
+      { secao: "Cônjuge ou companheiro(a) (também assina a fiança)", mostrarSe: casado },
+      ...conjuge.map((c) => paraLink({ ...c, mostrarSe: casado })),
+      { secao: "Imóvel do fiador" },
+      ...campos.filter((c) => /_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c))
+    ];
+  }
+  var valoresDaFicha = (f, formulario) => Object.fromEntries(formulario.filter((c) => c.nome && f[c.nome] !== void 0 && f[c.nome] !== null && f[c.nome] !== "").map((c) => [c.nome, f[c.nome]]));
+  function contextoDaFicha(d2, f, pessoa2) {
+    const r = montarRecibo(d2, "ficha", { ficha: f });
+    const e = r.emitente || {};
+    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((i) => [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", "));
+    const fiador = pessoa2 !== "interessado";
+    return {
+      empresa: e.razao_social || e.nome || "",
+      nome: nomeDaPessoa(f, pessoa2),
+      imovel: imoveis.join(" ou "),
+      tipo: f.inquilino_tipo || "Pessoa física",
+      reserva: !fiador && f.reserva_valor > 0 ? reais(f.reserva_valor) : "",
+      de: fiador ? f.inquilino_nome : "",
+      proposta: fiador ? [] : itensDaProposta(f),
+      documentos: fiador ? documentosDoFiador(fiadorDaFicha(f, pessoa2.slice(6))) : documentosDaFicha(f),
+      // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
+      ...!fiador && f.inquilino_tipo !== PJ5 ? { listas: { ...PARTES_DOCUMENTOS_PF, renda: DOCUMENTOS_RENDA } } : {},
+      dica: DICA_DOCUMENTOS
+    };
+  }
+  var pastaNaNuvem = (f, nomePasta) => `arquivos/Fichas em analise/${nomePasta}`;
+  function pedidoDoLink(d2, f, pessoa2, nomePasta) {
+    const formulario = formularioDaFicha(f, pessoa2);
+    return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
+  }
+  function textoWhatsapp(f, pessoa2, link2) {
+    const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
+    const fiador = pessoa2 !== "interessado";
+    return `Olá${nome ? `, ${nome}` : ""}! Segue o link ${fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral"}, que vale até ${dataBr(String(link2.vence_em).slice(0, 10))}: ${link2.url}
+Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
+  }
+  function telefoneWhatsapp(f, pessoa2) {
+    const t = String((pessoa2 === "interessado" ? f.inquilino_telefone : fiadorDaFicha(f, pessoa2.slice(6)).telefone) || "").replace(/\D/g, "");
+    return t.length >= 10 ? t.length <= 11 ? `55${t}` : t : "";
+  }
+  var cfg3 = { base: "api/ficha-online/", buscar: (...a) => fetch(...a) };
+  async function pedir(caminho, op = {}) {
+    let r;
+    try {
+      r = await cfg3.buscar(`${cfg3.base}${caminho}`, { cache: "no-store", credentials: "same-origin", ...op, headers: { ...op.method && op.method !== "GET" ? { "X-Sistema": "imoveis" } : {}, ...op.headers || {} } });
+    } catch {
+      throw new ErroUsuario("Sem internet: a ficha pela internet precisa de conexão.");
+    }
+    const tipo = r.headers.get("content-type") || "";
+    if (r.redirected || !tipo.includes("json")) throw new ErroUsuario("A nuvem não respondeu (entre de novo no sistema e tente outra vez).");
+    const dados = await r.json();
+    if (!r.ok) throw new ErroUsuario(dados.erro || "A nuvem recusou o pedido.");
+    return dados;
+  }
+  var criarLinkNaNuvem = (corpo) => pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob });
+  var linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => r.links || []);
+
   // docs/js/telas/fichas.js
   init_calculos();
   init_calculos();
@@ -20843,7 +20980,7 @@ ${m.texto}
     const fichaPdf = (tipo, extra, texto3) => reciboDisponivel(d(), tipo, { ficha: f }).ok ? link(`#/imprimir/recibo?tipo=${tipo}&ficha=${f.id}${extra}`, `🧾 ${texto3}`, "") : "";
     const fichasPdf = [
       fichaPdf("ficha", "", "Ficha cadastral para assinar"),
-      ...fiadores.length ? fiadores.map((x) => fichaPdf("ficha_fiador", `&fiador=${x.n}`, `Ficha do fiador ${x.nome}`)) : [fichaPdf("ficha_fiador", "&fiador=1", "Ficha do fiador (em branco)")]
+      ...fiadores.length ? fiadores.map((x) => fichaPdf("ficha_fiador", `&fiador=${x.n}`, `Ficha do fiador ${esc(x.nome)}`)) : [fichaPdf("ficha_fiador", "&fiador=1", "Ficha do fiador (em branco)")]
     ].filter(Boolean).join(" · ");
     const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
     const incluso = itensDaProposta(f).filter(([rot]) => ["Prazo do contrato", "IPTU", "Seguro contra incêndio", "Contas"].includes(rot));
@@ -20881,6 +21018,7 @@ ${m.texto}
       ${botaoDesistencia(f)}
       ${devolucao}
       ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${regra("meses_documentos_ficha")} meses depois da decisão).</p>` : ""}</div>
+    ${caixaFichaOnline(f)}
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === "Todos juntos" ? "todos juntos" : "apenas um dos imóveis")}</b>.` : ""}</p>
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
@@ -20914,7 +21052,124 @@ ${m.texto}
     if (f && fichaSemContrato(f)) return "";
     return botao("desistirAntesDeAssinar", "Desistiu antes de assinar", { contrato: c.id }, "secundario");
   }
+  var TEXTO_SITUACAO_LINK = {
+    Aguardando: "link enviado, sem resposta ainda",
+    Respondida: "respondeu",
+    "Falta documento": "falta documento",
+    Assinar: "falta assinar",
+    Assinada: "ficha assinada recebida",
+    Desistiu: "avisou que não vai seguir",
+    Encerrado: "link encerrado"
+  };
+  var COR_LINK = { Respondida: "info", Assinada: "ok", Desistiu: "perigo", "Falta documento": "aviso", Assinar: "aviso" };
+  var linkValido = (f, pessoa2) => {
+    const l = (f.links_ficha || {})[pessoa2];
+    return l && l.url && String(l.vence_em) > (/* @__PURE__ */ new Date()).toISOString() ? l : null;
+  };
+  function caixaFichaOnline(f) {
+    if (!opera() || fichaSemContrato(f) || f.documentos_no_contrato) return "";
+    const titulo2 = "<h2>Ficha pela internet</h2>";
+    if (!E.nuvem) return `<div class="cartao">${titulo2}<p class="suave">Só no sistema na nuvem (erp.ankjck.com.br): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
+    const linhas2 = pessoasDaFicha(f).map((p2) => {
+      const l = (f.links_ficha || {})[p2];
+      const valido = linkValido(f, p2);
+      return `<li style="margin:6px 0"><b>${esc(nomeDaPessoa(f, p2))}</b>${p2 === "interessado" ? "" : ' <span class="suave">(fiador)</span>'}
+      <span data-situacao-link="${p2}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta("link vencido", "aviso") : '<span class="suave">sem link</span>'}</span><br>
+      ${botao("gerarLinkFicha", valido ? "Gerar novo link" : "Gerar link", { id: f.id, pessoa: p2 }, valido ? "secundario pequeno" : "pequeno", valido ? "Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado)." : "")}
+      ${valido ? botao("compartilharLinkFicha", "Copiar / WhatsApp", { id: f.id, pessoa: p2 }, "secundario pequeno") : ""}</li>`;
+    }).join("");
+    return `<div class="cartao" data-ficha-online="${f.id}">${titulo2}
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
+    <ul style="padding-left:18px">${linhas2}</ul><div data-respostas-link></div></div>`;
+  }
+  async function ligarFichaOnline(raiz) {
+    const caixa = raiz.querySelector("[data-ficha-online]");
+    if (!caixa || !E.nuvem) return;
+    let links;
+    try {
+      links = await linksNaNuvem(Number(caixa.dataset.fichaOnline));
+    } catch (e) {
+      const r = caixa.querySelector("[data-respostas-link]");
+      if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`;
+      return;
+    }
+    for (const l of links) {
+      const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
+      if (!el) continue;
+      const ultimo = (l.respostas || []).at(-1);
+      el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || "neutra")}
+      <span class="suave">${ultimo ? ` · dados enviados em ${dataHoraBr(ultimo.em)}` : ""}${(l.arquivos || []).length ? ` · ${l.arquivos.length} arquivo(s)` : ""} · link até ${new Date(l.vence_em).toLocaleDateString("pt-BR")}</span>`;
+    }
+    caixa._links = links;
+    const id = Number(caixa.dataset.fichaOnline);
+    const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
+    if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
+    const antes = arquivosDoLinkVistos.get(id);
+    arquivosDoLinkVistos.set(id, total);
+    const f = buscar2("fichas", id);
+    if (total && f && E.anexos?.esquecerLista) {
+      E.anexos.esquecerLista(["arquivos", PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+      if (antes !== void 0 || total) await mostrar();
+    }
+  }
+  var arquivosDoLinkVistos = /* @__PURE__ */ new Map();
+  async function janelaDoLink(f, pessoa2, link2) {
+    const tel = telefoneWhatsapp(f, pessoa2);
+    const texto3 = textoWhatsapp(f, pessoa2, link2);
+    await janela({
+      titulo: `Link da ficha: ${nomeDaPessoa(f, pessoa2)}`,
+      sim: "Fechar",
+      nao: "Voltar",
+      html: `<p>Vale até <b>${dataBr(String(link2.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto3)}</textarea></p>
+      <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
+      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(texto3)}">Abrir no WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
+      ${pessoa2 === "interessado" ? '<p class="suave">O e-mail "Envio de ficha cadastral" já leva este link (e o do fiador, se houver).</p>' : ""}`,
+      ligar: (dlg) => {
+        dlg.querySelector("[data-copiar-link]").addEventListener("click", async (ev) => {
+          try {
+            await navigator.clipboard.writeText(dlg.querySelector("[data-texto-link]").value);
+            ev.target.textContent = "Copiado ✓";
+          } catch {
+            dlg.querySelector("[data-texto-link]").select();
+          }
+        });
+      }
+    });
+  }
   var ACOES_FICHAS = {
+    /** Cria o link da pessoa na nuvem (com a ficha em PDF para baixar), guarda na ficha e mostra para copiar ou mandar. */
+    async gerarLinkFicha({ id, pessoa: pessoa2 }) {
+      if (!opera()) throw new ErroUsuario("Seu usuário não pode gerar o link da ficha.");
+      if (!E.nuvem) throw new ErroUsuario("A ficha pela internet só funciona no sistema na nuvem.");
+      const f = buscar2("fichas", id);
+      if (!f || !pessoasDaFicha(f).includes(pessoa2)) throw new ErroUsuario("Ficha ou pessoa não encontrada.");
+      const link2 = await criarLinkNaNuvem(pedidoDoLink(d(), f, pessoa2, f.pasta || nomePastaFicha(f)));
+      try {
+        const tipo = pessoa2 === "interessado" ? "ficha" : "ficha_fiador";
+        const pdf = await pdfDoRecibo(tipo, { ficha: f, ...tipo === "ficha_fiador" ? { fiador: Number(pessoa2.slice(6)) } : {} });
+        await guardarPdfNaNuvem(f.id, pessoa2, pdf.blob);
+      } catch (e) {
+        console.warn("ficha em PDF do link", e);
+      }
+      const guardado = { url: link2.url, vence_em: link2.vence_em, criado_em: (/* @__PURE__ */ new Date()).toISOString(), por: login() };
+      await alterar((db) => atualizar(
+        db,
+        "fichas",
+        f.id,
+        { links_ficha: { ...buscar(db, "fichas", f.id).links_ficha || {}, [pessoa2]: guardado } },
+        login(),
+        `Link da ficha de ${nomeDaPessoa(f, pessoa2)} gerado (vale até ${dataBr(link2.vence_em.slice(0, 10))})`
+      ));
+      await mostrar();
+      await janelaDoLink(buscar2("fichas", id), pessoa2, guardado);
+    },
+    async compartilharLinkFicha({ id, pessoa: pessoa2 }) {
+      const f = buscar2("fichas", id);
+      const l = f && linkValido(f, pessoa2);
+      if (!l) throw new ErroUsuario("O link venceu: gere um novo.");
+      await janelaDoLink(f, pessoa2, l);
+    },
     /**
      * Desistência antes de assinar: pergunta a data e o motivo, leva os arquivos do contrato não assinado para a pasta da
      * ficha, grava (ficha "Desistiu", contrato cancelado) e só então apaga os originais.
@@ -21808,8 +22063,8 @@ ${m.texto}
   }
   function avisoDaFicha(f) {
     const dados = dadosDaFicha(d(), f);
-    const veio = ["os dados da pessoa", dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? "a proposta (aluguel, vencimento, bonificação e garantia)" : "", dados.fiador1_nome ? "os fiadores" : "", dados.reserva_valor ? "a reserva" : ""].filter(Boolean);
-    return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(", ").replace(/, ([^,]*)$/, " e $1")} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome ? "" : "fiador, "}o que está incluso, datas).${f.documentos_no_contrato ? "" : " Ao salvar, os documentos da ficha vão para a pasta do inquilino."}`;
+    const veio = ["os dados da pessoa", dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? "a proposta (aluguel, vencimento, bonificação e garantia)" : "", dados.fiador1_nome || dados.fiador2_nome ? "os fiadores" : "", dados.reserva_valor ? "a reserva" : ""].filter(Boolean);
+    return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(", ").replace(/, ([^,]*)$/, " e $1")} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome || dados.fiador2_nome ? "" : "fiador, "}o que está incluso, datas).${f.documentos_no_contrato ? "" : " Ao salvar, os documentos da ficha vão para a pasta do inquilino."}`;
   }
   var CADASTROS = {
     imoveis: {
@@ -22665,21 +22920,21 @@ ${m.texto}
     }
   };
   function telaFormulario(tabela, registro, q, estado2) {
-    const cfg3 = CADASTROS[tabela];
-    if (!cfg3) return naoEncontrado("Página não encontrada");
-    if (!opera() || cfg3.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
-    const campos = cfg3.campos(registro, q);
-    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg3.valores ? cfg3.valores(registro) : registro);
+    const cfg4 = CADASTROS[tabela];
+    if (!cfg4) return naoEncontrado("Página não encontrada");
+    if (!opera() || cfg4.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
+    const campos = cfg4.campos(registro, q);
+    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg4.valores ? cfg4.valores(registro) : registro);
     if (!registro && !estado2) {
       const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== void 0).map((c) => [c.nome, c.padrao]));
-      valores = paraFormulario(campos, { ...padroes, ...cfg3.padrao ? cfg3.padrao(q) : {} });
+      valores = paraFormulario(campos, { ...padroes, ...cfg4.padrao ? cfg4.padrao(q) : {} });
     }
-    const base = cfg3.base ? cfg3.base(registro) : null;
-    const avisoTexto = cfg3.aviso ? cfg3.aviso(registro, q) : "";
-    return `<h1>${esc(cfg3.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
+    const base = cfg4.base ? cfg4.base(registro) : null;
+    const avisoTexto = cfg4.aviso ? cfg4.aviso(registro, q) : "";
+    return `<h1>${esc(cfg4.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== void 0 ? `data-base="${base}"` : ""}>
-      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg3.compacto })}${cfg3.extraHtml ? cfg3.extraHtml(registro, q) : ""}
-      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg3.voltar(registro, q))}">Voltar</a></p></form>`;
+      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg4.compacto })}${cfg4.extraHtml ? cfg4.extraHtml(registro, q) : ""}
+      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg4.voltar(registro, q))}">Voltar</a></p></form>`;
   }
 
   // docs/js/telas/icone.js
@@ -23034,8 +23289,8 @@ ${m.texto}
     let recalculados = 0;
     await alterar((db) => {
       for (const { tabela, id } of desfazerAlteracoes(db, itens, login())) {
-        const cfg3 = CADASTROS[tabela];
-        if (cfg3 && cfg3.recalcular) recalculados += recalcularCobrancas(db, cfg3.recalcular(buscar(db, tabela, id), db), login());
+        const cfg4 = CADASTROS[tabela];
+        if (cfg4 && cfg4.recalcular) recalculados += recalcularCobrancas(db, cfg4.recalcular(buscar(db, tabela, id), db), login());
       }
     });
     aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : "Desfeito.");
@@ -25193,22 +25448,22 @@ ${MODELO_COMODOS[comodo].join("\n")}
     },
     voltar: () => history.back(),
     async excluir({ tabela, id }) {
-      const cfg3 = TABELAS_EXCLUSAO[tabela] || {};
-      if (cfg3.admin && !podeUsuario("admin")) throw new Error("Só administradores podem excluir.");
+      const cfg4 = TABELAS_EXCLUSAO[tabela] || {};
+      if (cfg4.admin && !podeUsuario("admin")) throw new Error("Só administradores podem excluir.");
       const r = buscar2(tabela, id);
-      const destino = cfg3.voltar ? cfg3.voltar(r) : null;
+      const destino = cfg4.voltar ? cfg4.voltar(r) : null;
       const pastaFicha = tabela === "fichas" && r ? r.pasta || nomePastaFicha(r) : null;
       await (["imoveis", "fichas"].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
         const reg = buscar(db, tabela, id);
-        const problema = cfg3.checar ? cfg3.checar(db, reg) : null;
+        const problema = cfg4.checar ? cfg4.checar(db, reg) : null;
         if (problema) throw new Error(problema);
         if (tabela === "imoveis") {
           for (const t of ["participacoes", "seguros", "leituras", "reformas", "iptus", "titularidades", "despesas", "vistorias"]) db[t].filter((p2) => p2.imovel_id === reg.id).forEach((p2) => excluir(db, t, p2.id, login()));
         }
         if (tabela === "contratos") excluirContrato(db, reg.id, login());
         else excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === "fichas" ? `Ficha de ${reg.inquilino_nome}` : null));
-        if (cfg3.recalcular) recalcularCobrancas(db, cfg3.recalcular(db, reg), login());
-        if (cfg3.depois) cfg3.depois(db, reg);
+        if (cfg4.recalcular) recalcularCobrancas(db, cfg4.recalcular(db, reg), login());
+        if (cfg4.depois) cfg4.depois(db, reg);
       });
       if (pastaFicha) await apagarPastaDaFicha(pastaFicha);
       if (tabela === "contratos") {
@@ -26861,36 +27116,36 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     async cadastro(form, rota) {
       const tabela = rota.partes[1];
-      const cfg3 = CADASTROS[tabela];
+      const cfg4 = CADASTROS[tabela];
       const registro = rota.partes[0] === "editar" ? buscar2(tabela, rota.partes[2]) : null;
       if (rota.partes[0] === "editar" && !registro) throw new ErroUsuario(REGISTRO_EXCLUIDO);
       const antigo = registro ? { ...registro } : null;
-      const campos = cfg3.campos(registro, rota.q);
-      const { dados, erros } = ler(campos, form, registro && cfg3.valores ? cfg3.valores(registro) : registro);
-      if (cfg3.ajustar && !Object.keys(erros).length) cfg3.ajustar(dados, erros, registro, form, rota.q);
-      if (cfg3.confirmar && !Object.keys(erros).length && !await cfg3.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
-      if (cfg3.ajustarAsync && !Object.keys(erros).length) await cfg3.ajustarAsync(dados, erros, registro, form, rota.q);
+      const campos = cfg4.campos(registro, rota.q);
+      const { dados, erros } = ler(campos, form, registro && cfg4.valores ? cfg4.valores(registro) : registro);
+      if (cfg4.ajustar && !Object.keys(erros).length) cfg4.ajustar(dados, erros, registro, form, rota.q);
+      if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
+      if (cfg4.ajustarAsync && !Object.keys(erros).length) await cfg4.ajustarAsync(dados, erros, registro, form, rota.q);
       if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
-      confirmarAvisos(cfg3.conferir ? cfg3.conferir(dados, registro, rota.q) : []);
-      Object.assign(dados, cfg3.fixos ? cfg3.fixos(registro, rota.q) : {});
-      const descricao = cfg3.descricao ? cfg3.descricao(dados, registro, rota.q) : null;
+      confirmarAvisos(cfg4.conferir ? cfg4.conferir(dados, registro, rota.q) : []);
+      Object.assign(dados, cfg4.fixos ? cfg4.fixos(registro, rota.q) : {});
+      const descricao = cfg4.descricao ? cfg4.descricao(dados, registro, rota.q) : null;
       let recalculados = 0;
       const salvo = await alterar((db) => {
         if (registro && !buscar(db, tabela, registro.id)) throw new ErroUsuario(REGISTRO_EXCLUIDO);
         let r;
-        if (cfg3.salvar) r = cfg3.salvar(db, dados, rota.q, registro);
+        if (cfg4.salvar) r = cfg4.salvar(db, dados, rota.q, registro);
         else if (registro) {
           atualizar(db, tabela, registro.id, dados, login(), descricao);
           r = buscar(db, tabela, registro.id);
         } else r = inserir(db, tabela, dados, login(), descricao);
-        if (cfg3.recalcular) recalculados = recalcularCobrancas(db, cfg3.recalcular(r, db), login());
+        if (cfg4.recalcular) recalculados = recalcularCobrancas(db, cfg4.recalcular(r, db), login());
         return r;
       });
-      if (cfg3.depois) await cfg3.depois(salvo, antigo);
+      if (cfg4.depois) await cfg4.depois(salvo, antigo);
       if (["contratos", "depositos_garantia", "correcoes_garantia", "aplicacoes", "devolucoes_garantia"].includes(tabela)) await acertarNomesDosComprovantes(tabela === "contratos" ? salvo.id : salvo.contrato_id);
       if (tabela === "usuarios") renovarUsuario();
       aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : "Salvo.");
-      const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg3.destino ? cfg3.destino(salvo, rota.q) : cfg3.voltar(salvo, rota.q);
+      const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg4.destino ? cfg4.destino(salvo, rota.q) : cfg4.voltar(salvo, rota.q);
       ir(destino);
       return null;
     },
@@ -27154,6 +27409,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ligarCamposAutomaticos(raiz);
       ligarEditorIcone(raiz);
       ligarGarantiasCorrigidas(raiz);
+      ligarFichaOnline(raiz);
       ligarIndiceBancoCentral(raiz);
       const regras = [...raiz.querySelectorAll("[data-mostrar-se]")];
       const valorDe = (form2, nome) => {
@@ -27677,13 +27933,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   var chaveTentadaEm = 0;
   var ESPERA_CHAVE = 6e4;
   var AVISAR_DEPOIS_DE = 3;
-  async function conectarSeguro(pedir = false) {
+  async function conectarSeguro(pedir2 = false) {
     const h = await pastaSeguraLembrada();
     if (!h) {
       E.seguro = null;
       return false;
     }
-    if (!await temPermissao(h, pedir)) {
+    if (!await temPermissao(h, pedir2)) {
       E.seguro = { dir: h, desconectado: true };
       return false;
     }
