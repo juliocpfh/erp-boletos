@@ -2526,6 +2526,52 @@ test('D3: texto do lembrete muda com a fase do boleto e traz Pix quando emitido 
   assert.match(R.textoLembrete(d, cb, '2026-08-01').texto, /Pix copia e cola:\n00020126pixteste/);
 });
 
+test('alerta desligado para um inquilino: some só para ele até religar, fica na lista de desligados e sai quando o inquilino é excluído', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08/2026
+  const hoje = '2026-09-01';
+  const inad = () => R.alertasComAdiamento(d, hoje).find((a) => a.tipo === 'Inadimplência');
+  assert.ok(inad() && !inad().desligado);
+  const c = R.buscar(d, 'contratos', inad().contrato_id);
+  // alerta geral (sem inquilino nem imóvel) não se desliga; tipo desconhecido também não
+  assert.throws(() => R.desligarAlerta(d, 'Banco', {}, 'julio', { hoje }), /não dá para desligar/);
+  assert.throws(() => R.desligarAlerta(d, 'Inventado', { contrato_id: c.id }, 'julio', { hoje }), /desconhecido/);
+  const r = R.desligarAlerta(d, 'Inadimplência', { contrato_id: String(c.id) }, 'julio', { hoje, quem: 'Ana' });
+  assert.equal(R.desligarAlerta(d, 'Inadimplência', { contrato_id: c.id }, 'julio', { hoje }).id, r.id, 'desligar de novo não duplica');
+  assert.equal(d.alertas_desligados.length, 1);
+  assert.equal(inad().desligado.quem, 'Ana');
+  assert.ok(R.alertasComAdiamento(d, '2027-09-01').find((a) => a.tipo === 'Inadimplência').desligado, 'não vence: continua desligado um ano depois');
+  // só aquele tipo, só aquele inquilino
+  assert.equal(R.desligamentoDe(d, { tipo: 'Seguro obrigatório', contrato_id: c.id }), null);
+  assert.equal(R.desligamentoDe(d, { tipo: 'Inadimplência', contrato_id: c.id + 1000 }), null);
+  const lista = R.alertasDesligados(d, hoje);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].pendentes, 1, 'está escondendo um alerta hoje');
+  assert.ok(lista[0].nome.includes(c.inquilino_nome));
+  assert.equal(R.alertasDesligados(d, hoje, { contrato_id: c.id }, []).length, 1);
+  assert.equal(R.alertasDesligados(d, hoje, { contrato_id: c.id + 1000 }, []).length, 0);
+  assert.match(d.historico[d.historico.length - 1].descricao, /Alerta "Inadimplência" desligado para/);
+  // a rotina de abertura não apaga o desligamento enquanto o inquilino existe
+  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-09-02' });
+  assert.equal(d.alertas_desligados.length, 1);
+  assert.equal(R.religarAlerta(d, r.id, 'julio'), true);
+  assert.ok(!inad().desligado, 'religado: volta a aparecer');
+  assert.equal(R.religarAlerta(d, r.id, 'julio'), false);
+  // imóvel: o alerta que é do imóvel (sem inquilino) desliga pelo imóvel; imóvel que não existe mais sai na abertura
+  const i = d.imoveis[0];
+  R.desligarAlerta(d, 'IPTU do proprietário', { imovel_id: i.id }, 'julio', { hoje });
+  assert.ok(R.desligamentoDe(d, { tipo: 'IPTU do proprietário', imovel_id: i.id }));
+  assert.equal(R.desligamentoDe(d, { tipo: 'IPTU do proprietário', imovel_id: i.id, contrato_id: c.id }), null, 'o do imóvel não esconde o do inquilino');
+  d.alertas_desligados[0].imovel_id = 99999;
+  assert.equal(R.desligamentosOrfaos(d).length, 1);
+  R.rotinaDeAbertura(d, 'julio', { hoje: '2026-09-02' });
+  assert.equal(d.alertas_desligados.length, 0);
+  // excluir o inquilino leva junto o que estava desligado para ele
+  R.desligarAlerta(d, 'Inadimplência', { contrato_id: c.id }, 'julio', { hoje });
+  R.excluirContrato(d, c.id, 'julio');
+  assert.equal(d.alertas_desligados.length, 0);
+});
+
 test('D14: alerta adiado some até a data, "cuidando" vale só o dia (volta amanhã), voltar reaparece e o vencido é limpo na abertura', () => {
   const { d } = base();
   R.gerarCobrancas(d, '2026-07', 'julio'); // vence 10/08/2026

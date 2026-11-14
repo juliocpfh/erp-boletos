@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { caixaReservaAbatida, linkComprovante, xAnexo } from './cadastros.js';
-import { alertaArquivosFaltando, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
+import { alertaArquivosFaltando, alertaDesligado, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Contrato / inquilino
@@ -455,11 +455,13 @@ export function caixaSeguros(c) {
       ${passados.map((s) => { const novo = buscar('contratos', s.contrato_id); return `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.arquivo_apolice && novo ? `<br><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${novo.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>` : ''}</td><td>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</td><td class="n">${reais(s.valor_total)}</td><td>${novo ? link(`#/contrato/${novo.id}?ir=seguros`, esc(novo.inquilino_nome), '') : '-'}</td></tr>`; }).join('')}</table></div>
     <p class="suave">Histórico: a apólice continuou valendo para a locação e passou ao novo titular (as parcelas seguem nos boletos dele). Para mudar, abra a página dele.</p>`;
   if (!i || (c.conta_seguro === R.SITUACOES[2] && !seguros.length && !passados.length)) return '';
-  const alerta = [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
+  const seguroDesligado = R.alertasDesligados(d(), C.hojeIso(), { contrato_id: c.id }, []).find((x) => x.tipo === 'Seguro obrigatório');
+  const alerta = seguroDesligado ? null : [R.alertaSeguroImovel(d(), i)].find((a) => a && a.contrato_id === c.id);
   const vigente = R.seguroVigente(d(), c.id); // o × da apólice vigente apaga direto; o das anteriores pede para conferir o arquivo
   const agendada = R.herancaAgendada(d(), c);
   return `<div class="cartao" id="seguros"><div class="cabecalho"><h2>Seguro obrigatório</h2>${opera() ? link(`#/novo/seguros?contrato=${c.id}`, 'Cadastrar apólice') : ''}</div>
     ${alerta ? `<div class="alerta ${alerta.nivel}">${esc(alerta.texto)}</div>` : ''}
+    ${seguroDesligado ? alertaDesligado(seguroDesligado, false) : ''}
     ${agendada ? `<div class="alerta info">Troca de titular em ${dataBr(agendada)}: a apólice em vigência de ${esc(R.contratoHerdado(d(), c).inquilino_nome)} passa para cá ${R.trocaAguardaAditivo(d(), c) ? 'com o termo aditivo assinado' : 'nesse dia'}.</div>` : ''}
     <div class="rolagem"><table><tr><th>Seguradora / apólice</th><th>Contratado em</th><th>Vigência</th><th class="n">Valor</th><th>Parcelas</th><th></th></tr>
       ${seguros.map((s) => `<tr><td>${esc(s.seguradora || '-')}<br><span class="suave">${esc(s.apolice || '')}</span>${s.telefone_assistencia ? ` <span class="nw">· 📞 Assistência: <b>${esc(s.telefone_assistencia)}</b></span>` : ''}${s.arquivo_apolice ? `<br><span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="seguro" data-id="${c.id}" data-nome="${esc(s.arquivo_apolice)}">📎 apólice</a>${!opera() ? '' : vigente && vigente.id === s.id ? ` ${botao('excluirArquivoSeguro', '×', { contrato: c.id, seguro: s.id, nome: s.arquivo_apolice }, 'x-excluir', `Apagar o arquivo da apólice "${s.arquivo_apolice}"? O seguro continua e fica o alerta para anexar de novo.`)}`
@@ -712,6 +714,22 @@ function caixaAditivos(c) {
       <p class="suave">Termo assinado cujo papel se perdeu: "Perdido" (nos que aguardam assinatura) ou "Registrar como perdido" (termo antigo, sem o arquivo) vale como assinado. O termo da troca de titular não pode ser dado como perdido.</p>` : ''}`;
 }
 
+/**
+ * "Alertas deste inquilino": os tipos de alerta desligados para ele (com "Religar") e, para quem opera, a escolha de mais um
+ * tipo para desligar (ex.: não cobrar mais o seguro obrigatório dele). Recolhida quando não há nenhum desligado.
+ */
+function caixaAlertasDesligados(c, hoje, alertasDoContrato) {
+  const lista = R.alertasDesligados(d(), hoje, { contrato_id: c.id }, alertasDoContrato);
+  const podeDesligar = opera() && R.contratoAtivo(c, hoje);
+  if (!lista.length && !podeDesligar) return '';
+  const tipos = R.TIPOS_ALERTA.filter((t) => !R.TIPOS_ALERTA_DO_IMOVEL.includes(t) && !lista.some((x) => x.tipo === t));
+  return `<details class="alertas-do-inquilino" id="alertas-desligados"${lista.length ? ' open' : ''}><summary class="suave">Alertas deste inquilino: ${lista.length ? `${lista.length} desligado(s)` : 'desligar algum'}</summary>
+    ${lista.map((x) => alertaDesligado(x, false)).join('')}
+    ${podeDesligar ? `<form data-form="desligarAlerta" data-contrato="${c.id}" class="acoes"><label class="suave" for="tipo-alerta-desligar">Não avisar mais sobre</label>
+      <select name="tipo" id="tipo-alerta-desligar" style="width:auto">${tipos.map((t) => `<option>${esc(t)}</option>`).join('')}</select><button class="secundario pequeno">Desligar para este inquilino</button></form>
+      <p class="suave">O alerta escolhido deixa de aparecer para este inquilino (no Painel, nas Pendências e aqui) até alguém clicar em "Religar". Os outros inquilinos continuam com o alerta.</p>` : ''}</details>`;
+}
+
 export function telaContrato(c) {
   const i = buscar('imoveis', c.imovel_id);
   const hoje = C.hojeIso();
@@ -720,7 +738,9 @@ export function telaContrato(c) {
   const desconto = C.descontoPorPercentual(aluguel, pctBonif);
   // documentos de entrada e contas a transferir aparecem na rotina de entrada (recolhida: também na faixa dos documentos)
   // alertas adiados no Painel ("adiar 7 dias" / "já estou cuidando") ficam de fora aqui também
-  const alertas = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo) && !R.adiamentoDe(d(), R.chaveAlerta({ ...a, contrato_id: c.id }), hoje)) : [];
+  // os desligados para este inquilino também (lista e "Religar" na caixa "Alertas deste inquilino", logo abaixo dos alertas)
+  const alertasDoContrato = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).map((a) => ({ ...a, contrato_id: c.id })) : [];
+  const alertas = alertasDoContrato.filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo) && !R.adiamentoDe(d(), R.chaveAlerta(a), hoje) && !R.desligamentoDe(d(), a));
   const rotina = caixaRotinaEntrada(c, hoje);
   const agendada = R.herancaAgendada(d(), c, hoje);
   const anteriorAgendado = agendada && R.contratoHerdado(d(), c);
@@ -769,6 +789,7 @@ export function telaContrato(c) {
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}
     ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
+    ${caixaAlertasDesligados(c, hoje, alertasDoContrato)}
     <div class="cartao"><h2>Identificação e contato</h2><div class="grade">
       ${item('Telefone', `${esc(c.inquilino_telefone || '-')}${c.inquilino_whatsapp && tel ? ` <a class="etiqueta ok" target="_blank" rel="noopener" href="https://wa.me/${tel.length <= 11 ? `55${tel}` : tel}">WhatsApp</a>` : ''}`)}
       ${item('E-mail', c.inquilino_email ? `<a href="mailto:${esc(c.inquilino_email)}">${esc(c.inquilino_email)}</a>` : '-')}

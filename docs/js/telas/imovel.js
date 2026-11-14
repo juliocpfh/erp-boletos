@@ -89,7 +89,8 @@ export function telaImovel(i) {
   const hoje = C.hojeIso();
   const contratos = d().contratos.filter((c) => c.imovel_id === i.id).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
   const tits = d().titularidades.filter((t) => t.imovel_id === i.id).sort((a, b) => String(b.data).localeCompare(String(a.data)));
-  const lembretes = contratos.map((c) => R.alertaTitularidade(d(), c, hoje)).filter(Boolean);
+  // lembrete da titularidade desligado para este imóvel (Painel → "Desligar") não aparece aqui também
+  const lembretes = R.desligamentoDe(d(), { tipo: 'Titularidade', imovel_id: i.id }) ? [] : contratos.map((c) => R.alertaTitularidade(d(), c, hoje)).filter(Boolean);
   return `<div class="cabecalho"><h1>${esc(i.nome)}${i.sublote ? ` <span class="suave">· ${esc(i.sublote)}</span>` : ''}</h1><div class="acoes">
       ${opera() ? `${link(`#/novo/contratos?imovel=${i.id}`, 'Novo contrato', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo', 'Excluir este imóvel? Os arquivos da pasta são mantidos.') : ''}</div></div>

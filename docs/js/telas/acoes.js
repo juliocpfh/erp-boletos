@@ -1079,6 +1079,19 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Desliga um tipo de alerta para um inquilino ou imóvel: não aparece mais até alguém religar (lista "Alertas desligados" do Painel). */
+  async desligarAlerta({ tipo, contrato, imovel }) {
+    await alterar((db) => R.desligarAlerta(db, tipo, { contrato_id: contrato || null, imovel_id: imovel || null }, login(), { quem: E.usuario.nome }));
+    aviso(`Alerta "${tipo}" desligado. Para voltar a avisar, use "Religar" em "Alertas desligados", no fim dos alertas do Painel.`);
+    await mostrar();
+  },
+
+  async religarAlerta({ id }) {
+    await alterar((db) => R.religarAlerta(db, id, login()));
+    aviso('Alerta religado: volta a aparecer se ainda estiver pendente.');
+    await mostrar();
+  },
+
   /**
    * Acordo de dívida (D8): janela com os boletos vencidos do inquilino (marcados), o total combinado (vem com o valor de
    * hoje, com multa e juros), o número de boletos e o 1º vencimento; a prévia mostra os boletos novos e quanto vai na NF.

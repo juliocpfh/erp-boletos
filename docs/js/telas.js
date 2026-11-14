@@ -16,7 +16,7 @@ import { telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, botao, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
@@ -228,9 +228,11 @@ export const TELAS = {
     const hoje = C.hojeIso();
     // alertas adiados ("adiar 7 dias" / "já estou cuidando") ficam recolhidos no fim da caixa, com quem marcou
     const todosOsAlertas = R.alertasComAdiamento(d(), hoje);
-    const alertas = todosOsAlertas.filter((a) => !a.adiamento);
-    const adiados = todosOsAlertas.filter((a) => a.adiamento);
-    const adiar = (a) => (opera() ? `<span class="adiar-alerta nw">${botao('adiarAlerta', `Adiar ${R.DIAS_ADIAR_ALERTA} dias`, { chave: a.chave, modo: 'adiado', tipo: a.tipo }, 'secundario mini')} ${botao('adiarAlerta', 'Já estou cuidando', { chave: a.chave, modo: 'cuidando', tipo: a.tipo }, 'secundario mini')}</span>` : '');
+    const alertas = todosOsAlertas.filter((a) => !a.adiamento && !a.desligado);
+    const adiados = todosOsAlertas.filter((a) => a.adiamento && !a.desligado);
+    // alertas desligados para um inquilino ou imóvel (não aparecem até religar): lista recolhida no fim, de onde se religa
+    const desligados = R.alertasDesligados(d(), hoje, null, todosOsAlertas);
+    const adiar = (a) => (opera() ? `<span class="adiar-alerta nw">${botao('adiarAlerta', `Adiar ${R.DIAS_ADIAR_ALERTA} dias`, { chave: a.chave, modo: 'adiado', tipo: a.tipo }, 'secundario mini')} ${botao('adiarAlerta', 'Já estou cuidando', { chave: a.chave, modo: 'cuidando', tipo: a.tipo }, 'secundario mini')} ${botaoDesligarAlerta(a)}</span>` : '');
     const pend = R.pendentesDeFatura(d());
     const n = (v, t, h) => `<a class="cartao" href="${h}"><div class="grande">${v}</div>${t}</a>`;
     const mesAtual = C.competenciaDe(hoje);
@@ -250,7 +252,7 @@ export const TELAS = {
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/inquilinos')}
         ${n(pend.length, 'pagamentos aguardando NF', '#/faturas')}
-        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total${adiados.length ? `, ${adiados.length} adiado(s)` : ''})</span>` : `<div class="grande">0</div>alertas ativos${adiados.length ? `<br><span class="suave">${adiados.length} adiado(s)</span>` : ''}`}</a>
+        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total${adiados.length ? `, ${adiados.length} adiado(s)` : ''}${desligados.length ? `, ${desligados.length} desligado(s)` : ''})</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(', ')}</span>` : ''}`}</a>
         ${(() => { const r = R.resumoSolicitacoes(d()); return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
           <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos</a>`; })()}
       </div>
@@ -274,6 +276,8 @@ export const TELAS = {
           ${lista.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
         ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
           ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}</details>` : ''}
+        ${desligados.length ? `<details id="alertas-desligados"><summary class="suave">${desligados.length} alerta(s) desligado(s) (clique para ver ou religar)</summary>
+          ${desligados.map((x) => alertaDesligado(x)).join('')}</details>` : ''}
         <p class="suave" style="margin:10px 0 0">${link('#/pendencias', 'Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só', '')}</p>
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
