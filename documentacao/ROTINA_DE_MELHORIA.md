@@ -152,6 +152,6 @@ Três varreduras só de leitura (desempenho, dados e fluxo, conflitos). Medido n
 **Desempenho** (5 propostas apresentadas em 13/11)
 - [ ] **P1.** Abrir sem esperar a internet (`app.js` → `N.saudeDaNuvem`; `sw.js` sem tempo limite).
 - [ ] **P2.** Gravação na nuvem mais leve (`nuvem.js` → `diferencas`; cópia cifrada e backup seguro juntados).
-- [ ] **P3.** Banco e Financeiro: sugestão de destino com índice por desenho (`conciliacao.js` → `sugerirDestino`).
+- [x] **P3.** Banco e Financeiro: a memória da sugestão de destino vem de um índice montado uma vez (`Z.indiceDeSugestoes`, guardado por tela em `Z.indiceDaTela`): com 6.000 linhas de extrato e 100 sem destino, 246 → 8 ms por desenho (Node, computador), com as mesmas sugestões.
 - [ ] **P4.** Histórico mais magro (QR Pix e itens de vistoria fora do "de/para"; uma entrada por importação de extrato).
 - [ ] **P5.** Atualização do app sem baixar de novo `vendor/` que não mudou (`sw.js`).

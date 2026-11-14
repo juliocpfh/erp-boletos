@@ -524,12 +524,41 @@ function imovelNoTexto(d, texto) {
 }
 
 /**
+ * Memória das movimentações já classificadas, para o passo 5 de `sugerirDestino`: por descrição sem números e por documento da
+ * contrapartida (boleto, ignorar e transferência não servem de memória). Antes cada sugestão relia o extrato inteiro: com 6.000
+ * linhas e 100 sem destino, a tela Banco levava 246 ms por desenho; com o índice, uma leitura só.
+ */
+export function indiceDeSugestoes(d) {
+  const porDescricao = new Map();
+  const porDocumento = new Map();
+  const guardar = (mapa, k, m) => { const l = mapa.get(k); if (l) l.push(m); else mapa.set(k, [m]); };
+  for (const m of d.movimentacoes_banco || []) {
+    if (!m.classificacao || ['boleto', 'ignorar', 'transferencia'].includes(m.classificacao)) continue;
+    const chave = semDigitos(m.descricao);
+    if (chave) guardar(porDescricao, `${m.tipo}|${chave}`, m);
+    const doc = m.contrapartida ? String(m.contrapartida.documento || '').replace(/\D/g, '') : '';
+    if (doc) guardar(porDocumento, `${m.tipo}|${doc}`, m);
+  }
+  return { porDescricao, porDocumento };
+}
+
+let indiceGuardado = { d: null, indice: null };
+/**
+ * O índice de sugestões do banco que a tela está mostrando: guardado enquanto for o mesmo objeto (cada gravação e cada novidade da
+ * nuvem trocam `E.d` por outro). Só para as telas: dentro de `alterar` o banco está mudando, use `indiceDeSugestoes`.
+ */
+export function indiceDaTela(d) {
+  if (indiceGuardado.d !== d) indiceGuardado = { d, indice: indiceDeSugestoes(d) };
+  return indiceGuardado.indice;
+}
+
+/**
  * Sugestão de destino para uma movimentação (nada é gravado): { classificacao, imovel_id, tipo_despesa, cobranca_id, iptu, motivo, confianca }
  * ou null. Ordem: pagamento pelo banco pendente de mesma conta/valor/data; transferência entre as nossas contas; liquidação de boleto
  * (valor + data); palavras da descrição (Sanepar, Copel, IPTU, DARF, tarifa…) com o imóvel pela matrícula/UC/nome; memória da última
  * movimentação com a mesma descrição (sem números).
  */
-export function sugerirDestino(d, mov) {
+export function sugerirDestino(d, mov, indice = null) {
   const texto = textoDaMov(mov);
   // 1) saída que é um pagamento feito pelo sistema
   if (mov.tipo === 'saida') {
@@ -588,9 +617,10 @@ export function sugerirDestino(d, mov) {
   // 5) memória: última movimentação já classificada com a mesma descrição (sem números) ou a mesma contrapartida (vale mais que a palavra sem imóvel)
   const chave = semDigitos(mov.descricao);
   const doc = mov.contrapartida && mov.contrapartida.documento ? String(mov.contrapartida.documento).replace(/\D/g, '') : '';
-  const antiga = (d.movimentacoes_banco || []).filter((m) => m.id !== mov.id && m.classificacao && !['boleto', 'ignorar', 'transferencia'].includes(m.classificacao) && m.tipo === mov.tipo
-    && ((chave && semDigitos(m.descricao) === chave) || (doc && m.contrapartida && String(m.contrapartida.documento || '').replace(/\D/g, '') === doc)))
-    .sort(C.maisRecentePrimeiro)[0];
+  // a memória vem do índice (montado uma vez por desenho da tela: indiceDaTela); sem ele, monta-se aqui
+  const ind = indice || indiceDeSugestoes(d);
+  const antiga = [...(chave ? ind.porDescricao.get(`${mov.tipo}|${chave}`) || [] : []), ...(doc ? ind.porDocumento.get(`${mov.tipo}|${doc}`) || [] : [])]
+    .filter((m) => m.id !== mov.id).sort(C.maisRecentePrimeiro)[0];
   if (antiga) {
     const de = antiga.despesa_id ? buscar(d, 'despesas', antiga.despesa_id) : null;
     return comContaLancada(d, mov, { classificacao: antiga.classificacao, imovel_id: antiga.imovel_id, tipo_despesa: de ? de.tipo : null, iptu: antiga.iptu_id ? { id: antiga.iptu_id, n: null } : null,
