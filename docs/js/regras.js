@@ -2164,6 +2164,53 @@ export const COMPROVANTES_DINHEIRO_FICHA = ['comprovante_reserva', 'comprovante_
 export const CAMPOS_PROPOSTA_FICHA = ['aluguel_inicial', 'dia_vencimento', 'bonificacao', 'desconto_pontualidade_percentual', 'garantia_tipo', 'prazo_meses',
   'conta_iptu', 'conta_seguro', 'conta_agua', 'conta_energia', 'conta_gas', 'conta_internet', 'conta_condominio'];
 
+/**
+ * Documentos de renda conforme o tipo de renda da ficha (pedido do dono, 2026-11-14: cada interessado vê só a lista dele).
+ * As chaves são as opções de "Tipo de renda" (RENDAS_FICHA, formularios.js; tests/fichas.test.mjs confere as duas listas).
+ */
+export const DOCUMENTOS_RENDA = {
+  'Empregado (CLT)': ['3 últimos holerites', 'Carteira de trabalho digital (a página do contrato atual), baixada do aplicativo do governo'],
+  'Servidor público': ['3 últimos contracheques, baixados do portal do órgão'],
+  'Autônomo / profissional liberal': ['Extratos bancários dos 3 últimos meses, baixados em PDF do aplicativo do banco', 'Declaração do Imposto de Renda completa, com o recibo de entrega'],
+  'Empresário / sócio': ['Pró-labore dos 3 últimos meses ou declaração do Imposto de Renda completa, com o recibo de entrega', 'Contrato social da empresa'],
+  'Aposentado / pensionista': ['Extrato do benefício dos 3 últimos meses, baixado do Meu INSS (ou do órgão que paga)'],
+  Outra: ['Comprovante da renda dos 3 últimos meses (explique a origem da renda)'],
+};
+/** Aviso junto da lista de documentos: arquivo original da fonte, conferido com ela (pedido do dono, 2026-11-14). */
+export const DICA_DOCUMENTOS = 'Mande os arquivos em PDF como saem do aplicativo do banco, do empregador ou do site do governo (não foto de tela nem arquivo editado): os documentos são conferidos diretamente com a fonte.';
+const PJ = 'Pessoa jurídica (empresa)';
+const casadoOuUniao = (estado) => ['Casado(a)', 'União estável'].includes(estado);
+/** Interessado (pessoa física) casado ou em união estável: a ficha pede os dados e os documentos do cônjuge. */
+export const fichaComConjuge = (f) => f.inquilino_tipo !== PJ && casadoOuUniao(f.inquilino_estado_civil);
+
+/** Documentos que o interessado manda com a ficha. Ex.: CLT solteiro → documento com foto, 3 holerites, carteira digital, residência. */
+export function documentosDaFicha(f) {
+  if (f.inquilino_tipo === PJ) {
+    return ['Contrato social e a última alteração', 'Cartão do CNPJ', 'Documento com foto e CPF do representante',
+      'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)', 'Comprovante de endereço da empresa'];
+  }
+  return ['Documento com foto e CPF (RG ou CNH)',
+    ...(fichaComConjuge(f) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a)'] : []),
+    ...(DOCUMENTOS_RENDA[f.renda_tipo] || ['Comprovante de renda dos 3 últimos meses']),
+    'Comprovante de residência atual (conta de água, energia ou telefone)'];
+}
+
+/** Documentos do fiador (``x``: os dados dele, sem o prefixo fiadorN_). Casado: também os do cônjuge, que assina a fiança. */
+export const documentosDoFiador = (x = {}) => ['Documento com foto e CPF', 'Comprovante de renda dos 3 últimos meses', 'Comprovante de residência atual',
+  'Matrícula atualizada (de até 30 dias) de um imóvel em nome dele',
+  ...(casadoOuUniao(x.estado_civil) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança']
+    : !x.estado_civil ? ['Se for casado ou viver em união estável: a certidão e o documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança'] : [])];
+
+/** Quantos fiadores a ficha comporta (campos fiador1_…, fiador2_…, os mesmos nomes do Novo contrato). */
+export const VAGAS_FIADOR_FICHA = 2;
+/** Dados do fiador ``n`` da ficha, sem o prefixo (ex.: { nome, cpf, estado_civil, ... }). */
+export function fiadorDaFicha(f, n) {
+  const p = `fiador${n}_`;
+  return Object.fromEntries(Object.entries(f).filter(([k]) => k.startsWith(p)).map(([k, v]) => [k.slice(p.length), v]));
+}
+/** Fiadores preenchidos na ficha: [{ n, ...dados }] (só os que têm nome). */
+export const fiadoresDaFicha = (f) => Array.from({ length: VAGAS_FIADOR_FICHA }, (_, k) => ({ n: k + 1, ...fiadorDaFicha(f, k + 1) })).filter((x) => x.nome);
+
 /** Imóveis da ficha que já têm contrato feito a partir dela: { imovel_id: contrato_id }. */
 export function contratosDaFicha(d, f) {
   const out = {};
@@ -2224,7 +2271,9 @@ export function dadosDaFicha(d, f) {
   const proposta = Object.fromEntries(CAMPOS_PROPOSTA_FICHA.filter((k) => f[k] !== undefined && f[k] !== null && f[k] !== '').map((k) => [k, f[k]]));
   if (proposta.aluguel_inicial > 0 && f.bonificacao !== false) proposta.aluguel_bonificado = proposta.aluguel_inicial - C.descontoPorPercentual(proposta.aluguel_inicial, f.desconto_pontualidade_percentual || 0);
   const reserva = primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data, ...(f.comprovante_reserva && !f.documentos_no_contrato ? { comprovante_reserva: f.comprovante_reserva } : {}) } : {};
-  return { ...dadosDaPessoa(f), ...proposta, ...reserva };
+  // fiadores da ficha: os mesmos campos do Novo contrato (fiador1_nome...)
+  const fiadores = Object.fromEntries(Object.entries(f).filter(([k, v]) => /^fiador\d+_/.test(k) && v !== undefined && v !== null && v !== ''));
+  return { ...dadosDaPessoa(f), ...proposta, ...fiadores, ...reserva };
 }
 
 /** Ficha aprovada que ainda espera o contrato deste imóvel (o Novo contrato aberto pelo imóvel também a usa), ou null. */

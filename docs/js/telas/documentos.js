@@ -284,7 +284,7 @@ function declaracaoHtml(r, g) {
 
 /** Ficha ou contrato do recibo pelo endereço (?ficha=ID ou ?contrato=ID): { ficha } ou { contrato }, ou null. */
 export function alvoDoRecibo(q) {
-  if (q.ficha) { const f = buscar('fichas', q.ficha); return f ? { ficha: f } : null; }
+  if (q.ficha) { const f = buscar('fichas', q.ficha); return f ? { ficha: f, ...(q.fiador ? { fiador: Number(q.fiador) } : {}) } : null; }
   const c = buscar('contratos', q.contrato);
   return c ? { contrato: c } : null;
 }

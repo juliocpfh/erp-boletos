@@ -356,6 +356,36 @@ export const FICHA_INICIO = [
   campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu') }),
 ];
 
+/** Tipos de renda da ficha: cada um tem a sua lista de documentos (R.DOCUMENTOS_RENDA, regras.js). */
+export const RENDAS_FICHA = ['Empregado (CLT)', 'Servidor público', 'Autônomo / profissional liberal', 'Empresário / sócio', 'Aposentado / pensionista', 'Outra'];
+const PF = quando('inquilino_tipo', 'Pessoa física');
+const CASADO = quando('inquilino_estado_civil', 'Casado(a)', 'União estável');
+/** Renda, cônjuge e quem vai morar (pedido do dono, 2026-11-14): vão na ficha cadastral em PDF; não passam para o contrato. */
+export const FICHA_RENDA = [
+  secao('Renda'),
+  campo('renda_tipo', 'Tipo de renda', 'opcao', { opcoes: RENDAS_FICHA, ...PF, ajuda: 'Escolhe os documentos de renda pedidos na ficha (ex.: CLT: 3 últimos holerites e a carteira de trabalho digital)' }),
+  campo('renda_mensal', 'Renda mensal (bruta)', 'dinheiro', rotuloPJ('Faturamento mensal médio')),
+  campo('renda_fonte', 'Empresa onde trabalha / fonte da renda', 'texto', { largo: true, ...PF }),
+  campo('renda_fonte_telefone', 'Telefone da empresa (para a conferência)', 'tel', PF),
+  campo('renda_desde', 'Trabalha lá desde', 'mes', PF),
+  { secao: 'Cônjuge ou companheiro(a)', ...CASADO },
+  campo('conjuge_nome', 'Nome do cônjuge ou companheiro(a)', 'texto', { largo: true, ...CASADO }),
+  campo('conjuge_cpf', 'CPF', 'cpf', CASADO),
+  campo('conjuge_profissao', 'Profissão', 'texto', CASADO),
+  campo('conjuge_renda', 'Renda mensal (bruta)', 'dinheiro', CASADO),
+  campo('conjuge_telefone', 'Telefone', 'tel', CASADO),
+  secao('Quem vai morar ou usar o imóvel'),
+  campo('moradores', 'Pessoas', 'area', { largo: true, linha: true, ajuda: 'Nome, parentesco e idade, uma por linha. Ex.: Ana Souza, filha, 8 anos' }),
+  campo('animais', 'Animais de estimação', 'texto', { ajuda: 'Ex.: 1 cachorro de porte pequeno. Em branco: nenhum' }),
+];
+/** Fiadores da ficha: os mesmos campos do Novo contrato (fiador1_nome…), sem as datas do vínculo; vão preenchidos para o contrato. */
+const SO_NO_CONTRATO = ['data_entrada', 'data_saida'];
+export const CAMPOS_FIADOR_FICHA = CAMPOS_FIADOR.filter((c) => !SO_NO_CONTRATO.includes(c.nome)).map((c) => c.nome);
+export const FICHA_FIADORES = [1, 2].flatMap((n) => [
+  { secao: n === 1 ? 'Fiador' : 'Segundo fiador (se houver)', ...GARANTIA_FIADOR, ...(n === 1 ? {} : { recolher: EXPANDIR_PARTE }) },
+  ...FORM_FIADOR.filter((c) => !SO_NO_CONTRATO.includes(c.nome)).map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),
+]);
+
 export const FICHA_FIM = [
   secao('Documentos recebidos'),
   campo('doc_ficha', 'Ficha cadastral', 'simnao'),

@@ -93,8 +93,9 @@ test('termo de quitação: depois do cálculo final e do saldo acertado; valores
 test('e-mails: anexos do sistema (recibo e comprovante) e proposta com IPTU, seguro e o que está incluso', () => {
   const { d, f, c } = base();
   const prontos = anexosProntos(d, modeloEmail(d, 'ficha_envio'), { ficha: f });
-  assert.deepEqual(prontos.map((a) => [a.tipo, a.rotulo, a.ok ?? true]), [['recibo', 'Recibo da reserva', true], ['arquivo', 'comprovante da reserva (comprovante-reserva-2026-11-10.pdf)', true]]);
-  assert.equal(prontos[1].escopo, 'ficha');
+  // a ficha cadastral vai junto (sem fiador na garantia: sem a ficha do fiador)
+  assert.deepEqual(prontos.map((a) => [a.tipo, a.rotulo, a.ok ?? true]), [['recibo', 'Ficha cadastral', true], ['recibo', 'Recibo da reserva', true], ['arquivo', 'comprovante da reserva (comprovante-reserva-2026-11-10.pdf)', true]]);
+  assert.equal(prontos[2].escopo, 'ficha');
   const e = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-13')).texto;
   assert.match(e, /IPTU: cobrado junto com o aluguel \(cerca de R\$ 153,00 por mês\)/);
   assert.match(e, /Seguro contra incêndio: cobrado junto com o aluguel \(cerca de R\$ 250,00 por ano\)/);
@@ -132,4 +133,60 @@ test('proposta da ficha vai para o contrato com o que está incluso', () => {
   assert.equal(dados.prazo_meses, 30);
   assert.ok(!('iptu_estimado' in dados), 'estimativa não vai para o contrato');
   assert.ok(itensDaProposta({}).length === 0);
+});
+
+test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pela renda e a declaração antes da assinatura', () => {
+  const { d, f } = base();
+  Object.assign(f, { inquilino_estado_civil: 'Solteiro(a)', renda_tipo: 'Empregado (CLT)', renda_mensal: 1500000, renda_fonte: 'Mercado Bom', data_recebida: '2026-11-14' });
+  const r = montarRecibo(d, 'ficha', { ficha: f }, '2026-11-14');
+  assert.equal(r.titulo, 'FICHA CADASTRAL');
+  const tab = Object.fromEntries(r.tabela.filter((x) => x[1] !== null));
+  assert.equal(tab['Nome completo'], 'Maria Souza');
+  assert.equal(tab['Renda mensal (bruta)'], 'R$ 15.000,00');
+  assert.equal(tab.RG, '______________________________', 'o que falta vai em branco para preencher');
+  assert.ok(!r.tabela.some((x) => /CÔNJUGE/.test(x[0])), 'solteira: sem cônjuge');
+  const docs = r.tabela.filter((x) => /^\d+\.$/.test(x[0])).map((x) => x[1]);
+  assert.deepEqual(docs, ['Documento com foto e CPF (RG ou CNH)', '3 últimos holerites', 'Carteira de trabalho digital (a página do contrato atual), baixada do aplicativo do governo', 'Comprovante de residência atual (conta de água, energia ou telefone)']);
+  assert.match(r.depois[0], /^DECLARAÇÃO\. Declaro .*conferidos diretamente com bancos, empregadores e cartórios.*artigos 171, 298, 299 e 304/);
+  assert.match(r.depois[1], /Serasa e SPC.*13\.709\/2018/);
+  assert.match(r.depois[2], /reserva de R\$ 4\.150,00 é devolvida por inteiro/);
+  assert.match(r.depois[3], /^\( {3}\) Não vou seguir com a análise e peço a devolução integral da reserva\.$/);
+  assert.match(r.depois[4], /gov\.br/);
+  assert.deepEqual(r.assinaturas.map((a) => a.nome), ['Maria Souza']);
+  // casada: cônjuge e certidão; fiador na garantia: a ficha do fiador sai, com o cônjuge dele assinando
+  Object.assign(f, { inquilino_estado_civil: 'Casado(a)', conjuge_nome: 'Pedro Souza', garantia_tipo: 'Fiador', fiador1_nome: 'Ana Lima', fiador1_estado_civil: 'Casado(a)', fiador1_nome_conjuge: 'Rui Lima' });
+  const casada = montarRecibo(d, 'ficha', { ficha: f });
+  assert.ok(casada.tabela.some((x) => x[0] === 'Nome' && x[1] === 'Pedro Souza'));
+  assert.ok(casada.tabela.some((x) => x[1] === 'Certidão de casamento ou declaração de união estável'));
+  assert.ok(casada.tabela.some((x) => x[0] === 'Fiador 1' && /^Ana Lima/.test(x[1])));
+  const fia = montarRecibo(d, 'ficha_fiador', { ficha: f, fiador: 1 });
+  assert.equal(fia.titulo, 'FICHA CADASTRAL DO FIADOR');
+  assert.deepEqual(fia.assinaturas.map((a) => a.nome), ['Ana Lima', 'Rui Lima']);
+  assert.ok(fia.tabela.some((x) => /^Matrícula atualizada/.test(x[1])));
+  assert.match(fia.paragrafos[1], /artigo 818/);
+  const prontos = anexosProntos(d, modeloEmail(d, 'ficha_envio'), { ficha: f });
+  assert.deepEqual(prontos.filter((a) => a.recibo === 'ficha_fiador').map((a) => [a.rotulo, a.alvo.fiador]), [['Ficha cadastral do fiador (Ana Lima)', 1]]);
+  const e = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-14')).texto;
+  assert.match(e, /e a ficha do fiador/);
+  assert.match(e, /1\. Documento com foto e CPF \(RG ou CNH\)\n2\. Certidão de casamento/);
+  assert.match(e, /DO FIADOR\n1\. Documento com foto e CPF/);
+  assert.doesNotMatch(e, /\[preencher/);
+  // empresa: dados da empresa e do representante, documentos da empresa; assina o representante
+  Object.assign(f, { inquilino_tipo: 'Pessoa jurídica (empresa)', inquilino_cpf: '11.222.333/0001-81', representante_nome: 'Carla Dias', garantia_tipo: 'Caução' });
+  const pj = montarRecibo(d, 'ficha', { ficha: f });
+  assert.ok(pj.tabela.some((x) => x[0] === 'DADOS DA EMPRESA'));
+  assert.ok(pj.tabela.some((x) => x[1] === 'Cartão do CNPJ'));
+  assert.deepEqual(pj.assinaturas.map((a) => a.nome), ['Carla Dias']);
+  assert.match(pj.depois[0], /A empresa declara, por meio do representante,/);
+});
+
+test('tipos de renda: cada opção do formulário tem a sua lista de documentos', async () => {
+  const F = await import('../docs/js/formularios.js');
+  assert.deepEqual(F.RENDAS_FICHA, Object.keys(R.DOCUMENTOS_RENDA));
+  // os fiadores da ficha usam os mesmos campos do Novo contrato e vão preenchidos para ele
+  const { d, f } = base();
+  Object.assign(f, { garantia_tipo: 'Fiador', fiador1_nome: 'Ana Lima', fiador1_cpf: '529.982.247-25' });
+  const dados = R.dadosDaFicha(d, f);
+  assert.equal(dados.fiador1_nome, 'Ana Lima');
+  assert.ok(F.CAMPOS_FIADOR_FICHA.every((k) => F.CAMPOS_FIADOR.some((c) => c.nome === k)));
 });

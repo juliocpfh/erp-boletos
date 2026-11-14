@@ -152,11 +152,31 @@ function fichaDoNovoContrato(q = {}) {
   return q.imovel && !q.pessoa ? R.fichaAprovadaDoImovel(d(), q.imovel) : null;
 }
 
+/** Fim do formulário da ficha: documentos e proposta, os fiadores (com fiador na garantia), a reserva e as observações. */
+function fimDaFicha() {
+  const k = F.FICHA_FIM.findIndex((c) => c.secao === 'Reserva');
+  return [...F.FICHA_FIM.slice(0, k), ...F.FICHA_FIADORES, ...F.FICHA_FIM.slice(k)];
+}
+
+/**
+ * O que não vale mais na ficha sai em branco: renda de pessoa física na empresa, cônjuge de quem não é casado nem vive em
+ * união estável e fiadores sem nome ou sem fiador na garantia.
+ */
+function limparFicha(dados) {
+  const pj = dados.inquilino_tipo === 'Pessoa jurídica (empresa)';
+  if (pj) for (const k of ['renda_tipo', 'renda_fonte', 'renda_fonte_telefone', 'renda_desde']) dados[k] = null;
+  if (!R.fichaComConjuge(dados)) for (const k of Object.keys(dados)) if (k.startsWith('conjuge_')) dados[k] = null;
+  for (let n = 1; n <= R.VAGAS_FIADOR_FICHA; n += 1) {
+    if (R.temFiador(dados) && dados[`fiador${n}_nome`]) continue;
+    for (const k of Object.keys(dados)) if (k.startsWith(`fiador${n}_`)) dados[k] = null;
+  }
+}
+
 /** Aviso do Novo contrato feito da ficha: o que já veio preenchido e o que falta. */
 function avisoDaFicha(f) {
   const dados = R.dadosDaFicha(d(), f);
-  const veio = ['os dados da pessoa', dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? 'a proposta (aluguel, vencimento, bonificação e garantia)' : '', dados.reserva_valor ? 'a reserva' : ''].filter(Boolean);
-  return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (fiador, o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
+  const veio = ['os dados da pessoa', dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? 'a proposta (aluguel, vencimento, bonificação e garantia)' : '', dados.fiador1_nome ? 'os fiadores' : '', dados.reserva_valor ? 'a reserva' : ''].filter(Boolean);
+  return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome ? '' : 'fiador, '}o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
 }
 
 export const CADASTROS = {
@@ -458,7 +478,7 @@ export const CADASTROS = {
         // "Usar o endereço do imóvel": o de interesse (com um só marcado)
         ...F.camposDaPessoa([...R.CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)])
           .map((c) => (ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: 'Usar o endereço do imóvel de interesse', ajuda: 'Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)' } : c)),
-        ...F.FICHA_FIM];
+        ...F.FICHA_RENDA, ...fimDaFicha()];
     },
     padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
     valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', bonificacao: r.bonificacao !== false,
@@ -499,6 +519,7 @@ export const CADASTROS = {
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
       }
       if (!dados.solidario_nome) for (const k of Object.keys(dados)) if (k.startsWith('solidario_')) dados[k] = null;
+      limparFicha(dados);
       // "Usar o endereço do imóvel de interesse": precisa de um só imóvel marcado
       for (const [caixa, campoEnd] of ENDERECO_DO_IMOVEL) {
         if (new FormData(form).get(caixa) !== '1' || (caixa.startsWith('solidario') && !dados.solidario_nome) || (caixa.startsWith('representante') && dados.inquilino_tipo !== 'Pessoa jurídica (empresa)')) continue;
