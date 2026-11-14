@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-9pNdWGf30fePo2YI2aqmMuiq4kjy/CZ8Us5ndkaDYXo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-2We6EDZcNgMQA0t1qMy8s/ozB+nAdgreYDwDg2ui2VE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="71230ced31c81fc3">
+<meta name="fontes" content="7fcc3cd5163f2ece">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -14111,7 +14111,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var ehMatricula = (nome) => /^matr[ií]cula/i.test(nome);
   var SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO, iptu: "IPTU (guias)", reformas: "Reformas", contas: "Contas pagas" };
   var PASTA_CONTADOR = "_Contador";
-  var decodificarIdContador2 = (id) => ({ emitenteId: Math.floor(id / 1e6), comp: `${String(id % 1e6).slice(0, 4)}-${String(id % 1e6).slice(4)}` });
+  var decodificarIdContador2 = decodificarIdContador;
   var pastaContador2 = () => d().config_banco && d().config_banco.pasta_contador || PASTA_CONTADOR;
   var SUB_SEGURO = "Seguro (apólices)";
   var PASTA_SEM_IMOVEL = "Sem imóvel";
@@ -14954,7 +14954,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     ${qr ? `<div class="qr-pix"><img src="${qr}" alt="QR Code do Pix" width="180" height="180"><div class="suave">QR Code do Pix: o inquilino lê com o app do banco.</div></div>` : ""}
     ${tabelaNotificacoes(b)}
     ${blocoNegativacao(cb, conta)}
-    ${opera() ? `<div class="acoes">${botao("consultarBoletoC6", "Consultar situação no banco", { id: cb.id })}
+    ${opera() ? `<div class="acoes">${b.situacao === "pago" && !cb.data_pagamento ? "" : botao("consultarBoletoC6", "Consultar situação no banco", { id: cb.id })}
       ${b.situacao === "emitido" ? botao("cancelarBoletoC6", "Cancelar no banco", { id: cb.id }, "perigo pequeno", "Cancelar este boleto no C6? O inquilino não conseguirá mais pagar por ele; depois dá para emitir outro.") : ""}
       ${b.situacao === "emitido" && b.simulado ? botao("pagarSimuladoC6", "Simular pagamento (teste)", { id: cb.id }, "secundario pequeno") : ""}
       ${b.situacao !== "cancelado" && !b.simulado ? botao("abrirPdfC6", "Abrir PDF do boleto", { id: cb.id }) : ""}</div>` : ""}</div>`;
@@ -16382,7 +16382,7 @@ ${xref}
   function caixaPastaContador(e, mes) {
     return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador3())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
     <p class="acoes">${botao("zipContador", `Baixar ZIP de ${compBr(mes)} para o contador`, { emitente: e.id, mes }, "botao")}<span class="suave">NFs do mês em Excel, planilha das entradas e saídas com o destino de cada uma e os comprovantes desta pasta.</span></p>
-    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
+    ${caixaArquivos("contador", idContador(e.id, mes), "Comprovantes do mês para o contador", "arquivos-contador", `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, use o botão "Baixar ZIP … para o contador", logo acima.' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
   }
   function descreverSugestao(s) {
     const i = s.imovel_id ? buscar2("imoveis", s.imovel_id) : null;
@@ -19114,7 +19114,7 @@ ${FECHO}` };
   function caixaRenumerar() {
     const ciclo = ultimoCicloDeNumeracao(d());
     return `<div class="cartao"><h2>Corrigir e numerar de novo</h2>
-    <p class="suave">Emitiu NFs com algo errado, ou passou despercebido um pagamento de data intermediária? Volte a última numeração: as NFs daquele ciclo saem da lista, os pagamentos voltam para a fila acima com o que já foi preenchido, você corrige (botão "Corrigir"), inclui o que faltou e clica de novo em "Numerar estas NFs". Os números são reaproveitados, na ordem das datas. Dá para repetir e voltar ciclos anteriores.</p>
+    <p class="suave">Emitiu NFs com algo errado, ou passou despercebido um pagamento de data intermediária? Volte a última numeração: as NFs daquele ciclo saem da lista, os pagamentos voltam para a fila acima com o que já foi preenchido, você corrige (botão "Corrigir"), inclui o que faltou e clica de novo em "Numerar as NFs marcadas". Os números são reaproveitados, na ordem das datas. Dá para repetir e voltar ciclos anteriores.</p>
     ${ciclo ? `<p>${botao(
       "desfazerUltimaNumeracao",
       `Voltar a última numeração: nº ${numeroFatura(ciclo.de)}${ciclo.ate !== ciclo.de ? ` a ${numeroFatura(ciclo.ate)}` : ""} (${ciclo.qtd} NF${ciclo.qtd > 1 ? "s" : ""}, pagamentos de ${dataBr(ciclo.emissoes[0])}${ciclo.emissoes[1] !== ciclo.emissoes[0] ? ` a ${dataBr(ciclo.emissoes[1])}` : ""})`,
@@ -19213,6 +19213,7 @@ ${FECHO}` };
       return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
         <div class="acoes">${link(url({ filtro: "todos" }), `← Boletos de ${compBr(comp)}`, "botao secundario")}</div></div>
       ${filtros}
+      ${filtro === "vencidos" ? `<p class="suave">Aqui entram todos os boletos vencidos e não pagos, também os de inquilinos que já saíram (com o cálculo final feito). A tela ${link("#/inadimplencia", "Inadimplência", "")} mostra só os inquilinos em cobrança, por isso os números podem ser diferentes.</p>` : ""}
       ${filtro === "semnf" && lista3.length && opera() ? `<div class="alerta info">${lista3.length} pagamento(s) aguardando número de NF. ${link("#/faturas", "Numerar na tela NF", "botao pequeno")}</div>` : ""}
       ${opera() && ["abertos", "vencidos"].includes(filtro) ? caixaBaixaLote(lista3, hoje3) : ""}
       ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: true, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma2((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma2((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
@@ -19247,7 +19248,7 @@ ${FECHO}` };
     const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
       ${opcoes2.comp ? "" : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
       ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
-    return `${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
+    return `${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: "" }).replace(/&ordem=&?/, "&").replace(/[?&]$/, ""))}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${ordem === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
@@ -19467,7 +19468,7 @@ ${FECHO}` };
     };
     const nomesIndices = [...new Set(lista2(d(), "indices").flatMap((n) => n.replace(/\(.*\)/, "").split("/").map((x) => x.trim())).filter(Boolean))];
     return `<h1>Reajustes do aluguel</h1>
-    <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou. O índice acumulado até o mês anterior sai no começo do mês do reajuste: aí aplique a correção e mande a carta junto com o boleto do próprio aluguel corrigido (ex.: aluguel de 11/2026, índice até 10/2026, boleto emitido no fim de novembro com vencimento em dezembro).</p>
+    <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. ${regra("reajuste_inicio") === "mes_seguinte" ? "O 1º mês é o de entrada só para quem entrou no dia 1º; entrando depois, o 1º mês é o seguinte (regra escolhida em Regras do sistema)." : "O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou."} O índice acumulado até o mês anterior sai no começo do mês do reajuste: aí aplique a correção e mande a carta junto com o boleto do próprio aluguel corrigido (ex.: aluguel de 11/2026, índice até 10/2026, boleto emitido no fim de novembro com vencimento em dezembro).</p>
     <div class="cartao"><h2>Índices acumulados em 12 meses</h2>
       <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
       ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join("")}</select>
@@ -19581,7 +19582,7 @@ ${FECHO}` };
       const falta = pendenciasDoContrato(d(), m.c);
       const volta = tipo === "contrato" ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === "aditivo" ? "aditivos" : "documentos"}`;
       return `<div class="impressao">
-      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir / salvar em PDF</button>${botao("documentoPdf", "Baixar PDF", {}, "secundario")}${botao("documentoWord", "Baixar Word", {}, "secundario")}
+      <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${botao("documentoPdf", "Baixar PDF", {}, "secundario")}${botao("documentoWord", "Baixar Word", {}, "secundario")}
         ${tipo === "vistoria" && opera() ? link(`#/vistoria/${m.v.id}`, "Editar a vistoria", "botao secundario") : ""}
         ${tipo === "aditivo" && opera() && !m.a.arquivo && m.a.tipo !== TIPO_ADITIVO_VALOR ? link(`#/aditivo/${m.a.id}`, "Editar o aditivo", "botao secundario") : ""}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
@@ -21379,7 +21380,7 @@ ${m.texto}
       const abertos = reajustesAbertos(d()).filter((r) => r.contrato.id === c.id);
       if (!abertos.length) {
         const p2 = mesDeAniversario(c);
-        return p2 ? `<p class="suave">Reajuste no 13º mês (o mês de entrada conta como o 1º): aluguel de ${compBr(competenciaDoReajuste(c, Math.max(1, Math.floor(mesesEntre(p2, competenciaDe(hojeIso())) / 12) + 1)))}.</p>` : "";
+        return p2 ? `<p class="suave">Reajuste no 13º mês (${regra("reajuste_inicio") === "mes_seguinte" ? "entrada depois do dia 1º: o 1º mês é o seguinte" : "o mês de entrada conta como o 1º"}): aluguel de ${compBr(competenciaDoReajuste(c, Math.max(1, Math.floor(mesesEntre(p2, competenciaDe(hojeIso())) / 12) + 1)))}.</p>` : "";
       }
       return `<div class="alerta aviso"><b>Reajuste do aluguel em aberto:</b> ${abertos.map((r) => `${compBr(r.competencia)} (${r.anos} ano(s)${r.corrigido ? ", falta a carta" : ""})`).join(", ")} ${link(`#/reajustes?contrato=${c.id}`, "Ir para Reajustes", "botao pequeno")}</div>`;
     })()}
@@ -22811,8 +22812,8 @@ ${m.texto}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao("exportar", "Baixar ZIP com todos os dados", {}, "") : ""}
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao("exportarPlanilhaPdf", "Baixar todos os dados em planilha e PDF", {}, "secundario") : ""}
-      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link("#/regras", "Regras do sistema")}.</p>
-      ${botao("baixarRegras", "Baixar regras do sistema (TXT)", {}, "secundario")}</div>
+      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto para ler, com a lista das regras em uso hoje no fim. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link("#/regras", "Regras do sistema")}.</p>
+      ${botao("baixarRegras", "Baixar as regras para ler (TXT)", {}, "secundario")}</div>
     ${podeUsuario("admin") && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
       <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ""}
@@ -23187,7 +23188,7 @@ ${m.texto}
       <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta). "Desligar" deixa de avisar aquele inquilino ou imóvel até alguém religar.</p></div>
     <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
       ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ""}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ""}</div>`).join("") || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>
-    <h2>Cadastros incompletos <span class="suave">(${lista3.length})</span></h2>
+    <h2 id="cadastros">Cadastros incompletos <span class="suave">(${lista3.length})</span></h2>
     <p class="suave">O que falta para o contrato, a vistoria, os resultados e a NF saírem completos. Inquilinos: só os ativos.</p>
     ${grupos.map(([t, l]) => `<div class="cartao"><h2>${t === "Imóvel" ? "Imóveis" : t === "Empresa" ? "Empresas" : "Inquilinos"} (${l.length})</h2><div class="rolagem"><table><tr><th>${t}</th><th>Falta</th><th></th></tr>
       ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ""}</td><td>${x.falta.map((f) => typeof f === "string" ? etiqueta(f, "aviso") : etiqueta(f.texto, f.nivel)).join(" ")}</td>
@@ -23915,6 +23916,26 @@ ${m.texto}
         return String(v ?? "");
     }
   }
+  function textoDasRegrasEmUso(hoje3 = hojeIso()) {
+    const regras = regrasDe(d());
+    const linhas2 = [
+      "",
+      "",
+      `REGRAS EM USO EM ${dataBr(hoje3)} (Dados e backup → Regras do sistema)`,
+      "O texto acima descreve o padrão do sistema (ex.: boletos a partir do dia 20, reajuste no 13º mês). Onde o administrador mudou, vale o que está aqui."
+    ];
+    let mudadas = 0;
+    for (const [g, titulo2] of GRUPOS_REGRAS) {
+      linhas2.push("", titulo2.toLocaleUpperCase("pt-BR"));
+      for (const def of DEFINICOES_REGRAS.filter((x) => x.grupo === g)) {
+        const mudou = !mesmoValor(regras[def.chave], def.padrao);
+        if (mudou) mudadas += 1;
+        linhas2.push(`- ${def.rotulo}: ${valorRegraTexto(def, regras[def.chave])}${mudou ? `  << MUDADA (padrão do sistema: ${valorRegraTexto(def, def.padrao)})` : ""}`);
+      }
+    }
+    linhas2.push("", mudadas ? `${mudadas} regra(s) diferente(s) do padrão do sistema.` : "Todas as regras estão no padrão do sistema.");
+    return linhas2.join("\n");
+  }
   function campoRegra(def, v, admin) {
     const nome = `r_${def.chave}`;
     const des = admin ? "" : " disabled";
@@ -23968,7 +23989,7 @@ ${m.texto}
       ${versoes.length ? `<table><tr><th>Versão</th><th>Salva em</th><th>Por</th><th></th></tr>${versoes.map((v) => `<tr><td><b>${esc(v.nome)}</b></td><td>${dataHoraBr(v.salvo_em)}</td><td>${esc(v.salvo_por || "-")}</td>
         <td class="n">${admin ? `${botao("restaurarVersaoRegras", "Voltar a esta versão", { id: v.id }, "secundario pequeno", `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}
         ${botao("excluirVersaoRegras", "Excluir", { id: v.id }, "perigo pequeno", `Excluir a versão "${v.nome}"? As regras em uso não mudam.`)}` : ""}</td></tr>`).join("")}</table>` : '<p class="suave">Nenhuma versão salva.</p>'}
-      <p class="acoes">${botao("baixarArquivoRegras", "Baixar arquivo das regras", {}, "secundario pequeno")}
+      <p class="acoes">${botao("baixarArquivoRegras", "Baixar cópia das regras (para carregar depois)", {}, "secundario pequeno")}
         ${admin ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
         ${botao("voltarRegrasPadrao", "Voltar tudo ao padrão do sistema", {}, "perigo pequeno", "Voltar todas as regras ao padrão do sistema? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).")}` : ""}</p></div>
     <form data-form="regrasSistema">
@@ -25846,7 +25867,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     async baixarRegras() {
       const { REGRAS_TEXTO: REGRAS_TEXTO2 } = await carregarParte(() => Promise.resolve().then(() => (init_regras_texto(), regras_texto_exports)));
-      baixar(new Blob(["\uFEFF", REGRAS_TEXTO2], { type: "text/plain;charset=utf-8" }), "Regras do sistema.txt");
+      baixar(new Blob(["\uFEFF", REGRAS_TEXTO2, textoDasRegrasEmUso()], { type: "text/plain;charset=utf-8" }), "Regras do sistema.txt");
     },
     async removerModelo() {
       const dir = await E.pasta.getDirectoryHandle(PASTA_MODELOS, { create: true });
@@ -27085,7 +27106,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join("")}</div>Solicitações de inquilinos</a>`;
       })()}
       </div>
-      ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link("#/pendencias", "Ver o que falta", "botao pequeno")}</div>` : ""}
+      ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link("#/pendencias?ir=cadastros", "Ver os cadastros incompletos", "botao pequeno")}</div>` : ""}
       ${d().contratos.filter((c) => dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join("")}
       ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(", "))}. Confira e apague à mão se não precisar mais.</div>` : ""}
@@ -27776,7 +27797,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     ["#/banco", "Banco", "^banco"],
     ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
     ["#/financeiro", "Financeiro", "^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias"],
-    ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^backup|^empresas"]
+    ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas"]
   ];
   var versaoIcone = 0;
   function trocarIconeDaAba(nova = true) {
