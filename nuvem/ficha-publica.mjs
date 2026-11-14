@@ -17,6 +17,10 @@ export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
 const SITUACOES_EQUIPE = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Encerrado'];
 export const DIAS_LINK = 7;
+/** Depois do prazo, a página ainda mostra o que foi mandado por DIAS_LEITURA dias; passados DIAS_GUARDA, o registro do link sai (LGPD). */
+export const DIAS_LEITURA = 30;
+export const DIAS_GUARDA = 90;
+const passou = (iso, dias) => Date.parse(iso) + dias * 86400000 < Date.now();
 export const MAX_DOCUMENTO = 10 * 1024 * 1024;
 export const MAX_ARQUIVOS = 40;
 export const MAX_ENVIOS = 20;
@@ -215,6 +219,11 @@ export async function listarLinks(env, url) {
       const obj = await env.DADOS.get(o.key);
       if (!obj) continue;
       const reg = JSON.parse(await obj.text());
+      // guarda: 90 dias depois do prazo o link sai inteiro (registro, ponteiro e PDF); os documentos ficam na pasta da ficha
+      if (passou(reg.vence_em, DIAS_GUARDA)) {
+        await env.DADOS.delete([o.key, o.key.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
+        continue;
+      }
       lista.push(ficha ? paraEquipe(reg) : {
         ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
         vence_em: reg.vence_em, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
@@ -259,6 +268,7 @@ async function registroDaChave(request, env, { gravar = false } = {}) {
   if (!atual || atual.registro.hash !== hash) throw new ErroFicha(404, 'Este link não vale mais. Peça um novo para quem enviou.');
   const r = atual.registro;
   if (r.situacao === 'Encerrado') throw new ErroFicha(410, 'Esta ficha foi encerrada. Qualquer dúvida, fale com quem enviou o link.');
+  if (passou(r.vence_em, DIAS_LEITURA)) throw new ErroFicha(410, 'Este link não vale mais. Peça um novo para quem enviou.');
   if (gravar && r.vence_em < new Date().toISOString()) throw new ErroFicha(410, 'O prazo deste link acabou. Peça um novo para quem enviou: o que você já mandou continua guardado.');
   if (gravar && r.situacao === 'Desistiu') throw new ErroFicha(409, 'Você já avisou que não vai seguir com a análise.');
   return { fichaId, pessoa, registro: r };
@@ -315,7 +325,8 @@ export async function receberArquivoPublico(request, env, url, avisar) {
   if (!ext) throw new ErroFicha(415, 'Mande o documento em PDF ou foto (JPG ou PNG).');
   const dia = new Date().toISOString().slice(0, 10);
   const quem = pessoa === 'interessado' ? '' : `${pessoa.replace('fiador', 'fiador-')}-`;
-  const base = `${registro.pasta}/link-${quem}${nomeSimples(documento)}-${dia}`;
+  const sufixo = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const base = `${registro.pasta}/link-${quem}${nomeSimples(documento)}-${dia}-${sufixo}`;
   let nome = `${base}.${ext}`;
   for (let n = 2; await env.DADOS.head(nome); n += 1) nome = `${base}-${n}.${ext}`;
   await env.DADOS.put(nome, corpo, { customMetadata: { por: `link da ficha (${pessoa})` } });
@@ -521,9 +532,9 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
   function documentosHtml() {
     const enviados = (doc) => F.arquivos.filter((a) => a.documento === doc).map((a) => '✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')').join('<br>');
     const linha = (doc, qual) => '<div class="doc"><div><b>' + esc(doc) + '</b></div><div class="enviados">' + enviados(doc) + '</div>'
-      + '<input type="file" accept="application/pdf,image/jpeg,image/png" multiple data-documento="' + qual + '" aria-label="' + esc(doc) + '"><div class="suave" data-estado="' + qual + '"></div></div>';
+      + '<input type="file" accept="application/pdf,image/jpeg,image/png" multiple data-documento="' + esc(qual) + '" aria-label="' + esc(doc) + '"><div class="suave" data-estado="' + esc(qual) + '"></div></div>';
     return '<div class="cartao"><h2>Documentos</h2><p class="suave">' + esc(F.contexto.dica) + ' PDF ou foto (JPG, PNG), até 10 MB cada. Pode mandar mais de um arquivo em cada item.</p>'
-      + '<div id="lista-documentos">' + documentosAgora().map((d) => linha(d, d)).join('') + '</div>' + linha('Outro documento', 'outro') + '</div>';
+      + '<div id="lista-documentos">' + documentosAgora().map((d, k) => linha(d, 'd' + k)).join('') + '</div>' + linha('Outro documento', 'outro') + '</div>';
   }
 
   function desenhar(mensagem = '') {
@@ -538,7 +549,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
       + '<div class="cartao"><h2>Imóvel</h2><p>' + esc(ctx.imovel) + '</p>' + (ctx.proposta.length ? '<table>' + ctx.proposta.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table><p class="suave">Condições que dependem da aprovação da ficha.</p>' : '') + '</div>'
       + (F.pdf ? '<div class="cartao"><h2>Prefere imprimir?</h2><p class="suave">Baixe a ficha em PDF, preencha, assine (pelo gov.br ou à mão) e mande em "Ficha assinada", no fim da página.</p><button type="button" class="sec" id="baixar">Baixar a ficha em PDF</button></div>' : '')
       + (bloqueado ? '' : '<form id="form" novalidate>' + formularioHtml() + documentosHtml()
-      + '<div class="cartao"><h2>Declaração</h2><label class="caixa"><input type="checkbox" id="declaracao"> Declaro que as informações e os documentos enviados são verdadeiros. Os documentos são conferidos diretamente com bancos, empregadores e cartórios, e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 298, 299 e 304), que pode ser comunicado à autoridade policial. Autorizo a consulta do nome e do CPF em cadastros de crédito (como Serasa e SPC) e o uso destes dados só para a análise desta locação (Lei 13.709/2018).</label>'
+      + '<div class="cartao"><h2>Declaração</h2><label class="caixa"><input type="checkbox" id="declaracao"> Declaro que as informações e os documentos enviados são verdadeiros. Os documentos podem ser conferidos diretamente com a fonte (empregadores, cartórios, bancos e validadores oficiais), e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 297, 298, 299 e 304), que pode ser comunicado à autoridade policial. Autorizo a consulta ' + (F.contexto.tipo === 'Pessoa jurídica (empresa)' ? 'do CNPJ da empresa e do CPF do representante' : 'do nome e do CPF') + ' em cadastros de crédito (como Serasa e SPC) e o uso destes dados para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).</label>'
       + '<p class="erro" id="erro" hidden></p><button type="submit" id="enviar">Enviar meus dados</button></div>'
       + '<div class="cartao"><h2>Ficha assinada</h2><p class="suave">Depois de conferirmos os dados, mande aqui a ficha assinada (pelo gov.br, em assinador.iti.br, ou à mão: foto ou PDF).</p>' + '<div class="enviados">' + F.arquivos.filter((a) => /assinada/.test(a.documento)).map((a) => '✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')').join('<br>') + '</div><input type="file" accept="application/pdf,image/jpeg,image/png" data-documento="assinada" aria-label="Ficha assinada"><div class="suave" data-estado="assinada"></div></div>'
       + (fiador ? '' : '<div class="cartao"><h2>Não vai seguir?</h2><p class="suave">Se faltar algum documento ou você preferir não seguir com a análise, sem problema: é só avisar' + (ctx.reserva ? ' e a reserva de ' + esc(ctx.reserva) + ' é devolvida por inteiro, sem descontos' : '') + '.</p><button type="button" class="perigo" id="desistir">Não vou seguir com a análise</button></div>')
@@ -588,12 +599,14 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
     for (const input of form.querySelectorAll('input[type=file]')) {
       input.addEventListener('change', async () => {
         const qual = input.dataset.documento;
-        const estado = form.querySelector('[data-estado="' + qual + '"]');
+        const estado = input.parentElement.querySelector('[data-estado]');
+        // o servidor recebe o nome do documento (da lista de agora), "assinada" ou "outro"
+        const documento = /^d\d+$/.test(qual) ? documentosAgora()[Number(qual.slice(1))] : qual;
         for (const arq of input.files) {
           if (arq.size > 10 * 1024 * 1024) { estado.innerHTML = '<span class="erro">' + esc(arq.name) + ': passa de 10 MB.</span>'; continue; }
           estado.textContent = 'Enviando ' + arq.name + '…';
           try {
-            const r = await api('ficha/arquivo?documento=' + encodeURIComponent(qual) + '&nome=' + encodeURIComponent(arq.name), { method: 'PUT', body: arq });
+            const r = await api('ficha/arquivo?documento=' + encodeURIComponent(documento) + '&nome=' + encodeURIComponent(arq.name), { method: 'PUT', body: arq });
             F.arquivos.push({ documento: r.documento, nome_original: arq.name, em: new Date().toISOString() });
             if (qual === 'assinada') F.situacao = 'Assinada';
             estado.textContent = '';

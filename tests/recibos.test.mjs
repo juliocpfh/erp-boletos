@@ -147,8 +147,8 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   assert.ok(!r.tabela.some((x) => /CÔNJUGE/.test(x[0])), 'solteira: sem cônjuge');
   const docs = r.tabela.filter((x) => /^\d+\.$/.test(x[0])).map((x) => x[1]);
   assert.deepEqual(docs, ['Documento com foto e CPF (RG ou CNH)', '3 últimos holerites', 'Carteira de trabalho digital (a página do contrato atual), baixada do aplicativo do governo', 'Comprovante de residência atual (conta de água, energia ou telefone)']);
-  assert.match(r.depois[0], /^DECLARAÇÃO\. Declaro .*conferidos diretamente com bancos, empregadores e cartórios.*artigos 171, 298, 299 e 304/);
-  assert.match(r.depois[1], /Serasa e SPC.*13\.709\/2018/);
+  assert.match(r.depois[0], /^DECLARAÇÃO\. Declaro .*podem ser conferidos diretamente com a fonte.*artigos 171, 297, 298, 299 e 304/);
+  assert.match(r.depois[1], /do nome e do CPF em cadastros de crédito \(como Serasa e SPC\).*se aprovada, para o contrato \(Lei 13\.709\/2018\)/);
   assert.match(r.depois[2], /reserva de R\$ 4\.150,00 é devolvida por inteiro/);
   assert.match(r.depois[3], /^\( {3}\) Não vou seguir com a análise e peço a devolução integral da reserva\.$/);
   assert.match(r.depois[4], /gov\.br/);
@@ -178,6 +178,17 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   assert.ok(pj.tabela.some((x) => x[1] === 'Cartão do CNPJ'));
   assert.deepEqual(pj.assinaturas.map((a) => a.nome), ['Carla Dias']);
   assert.match(pj.depois[0], /A empresa declara, por meio do representante,/);
+  assert.match(pj.depois[1], /do CNPJ da empresa e do CPF do representante/);
+  // fiador casado com separação total: sem o cônjuge na ficha dele
+  Object.assign(f, { inquilino_tipo: 'Pessoa física', garantia_tipo: 'Fiador', fiador1_regime_bens: 'Separação total (pacto antenupcial)' });
+  const sep = montarRecibo(d, 'ficha_fiador', { ficha: f, fiador: 1 });
+  assert.deepEqual(sep.assinaturas.map((a) => a.nome), ['Ana Lima']);
+  assert.ok(sep.tabela.some((x) => /pacto antenupcial/.test(x[1])));
+  // dois fiadores: uma lista de documentos para cada um no e-mail
+  Object.assign(f, { fiador2_nome: 'Rui Prado', fiador2_estado_civil: 'Solteiro(a)' });
+  const dois = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-14')).texto;
+  assert.match(dois, /DO FIADOR \(Ana Lima\)[\s\S]*DO FIADOR \(Rui Prado\)/);
+  assert.match(dois, /e a ficha de cada fiador/);
 });
 
 test('tipos de renda: cada opção do formulário tem a sua lista de documentos', async () => {
