@@ -493,7 +493,10 @@ export async function abrirNuvem() {
   E.anexos = new AnexosNuvem({ guardar });
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
-  E.emailNuvem = (await N.saudeDaNuvem())?.email || null; // quem passou pelo login da internet (null sem internet)
+  // quem passou pelo login da internet (null sem internet). Não segura a abertura (com sinal fraco eram até 10 s de tela em branco,
+  // com os dados já no aparelho): a resposta chega por trás e só o login com senha espera por ela (`entrar`)
+  E.emailNuvem = null;
+  E.saudeNuvem = N.saudeDaNuvem().then((s) => { E.emailNuvem = s?.email || null; return s; }).catch(() => null);
   try { localStorage.setItem(MODO_NUVEM, '1'); } catch { /* sem armazenamento */ }
   try {
     E.d = await E.nuvem.iniciar();
@@ -558,6 +561,7 @@ export async function entrar(loginTexto, senha) {
   E.d = disco;
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
   // nuvem: o usuário do sistema tem de ser o mesmo do login da internet (a nuvem decide o que ele pode pelo e-mail)
+  if (E.nuvem && E.saudeNuvem) await E.saudeNuvem; // a resposta do site sobre quem está no login da internet (pedida na abertura)
   if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new C.ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
   if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
