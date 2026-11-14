@@ -189,7 +189,7 @@ function caixaFichaOnline(f) {
   }).join('');
   return `<div class="cartao" data-ficha-online="${f.id}">${titulo}
     <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
-    <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div></div>`;
+    <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
 }
 
 /** Depois de desenhar a página da ficha: busca na nuvem a situação de cada link (e o que foi mandado). */
@@ -198,6 +198,7 @@ export async function ligarFichaOnline(raiz) {
   if (painel && E.nuvem) await avisosDoPainel(painel).catch(() => {});
   const caixa = raiz.querySelector('[data-ficha-online]');
   if (!caixa || !E.nuvem) return;
+  linhaDoAvisoNoAparelho(caixa.querySelector('[data-aviso-aparelho]')).catch(() => {});
   let links;
   try { links = await FO.linksNaNuvem(Number(caixa.dataset.fichaOnline)); } catch (e) { const r = caixa.querySelector('[data-respostas-link]'); if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`; return; }
   for (const l of links) {
@@ -230,6 +231,17 @@ export async function ligarFichaOnline(raiz) {
 }
 /** Quantos arquivos dos links de cada ficha já foram vistos nesta abertura (ficha → quantidade). */
 const arquivosDoLinkVistos = new Map();
+
+/** Linha "Avisos neste aparelho" (celular ou computador): ligar ou desligar o aviso quando chega algo pelos links. */
+async function linhaDoAvisoNoAparelho(el) {
+  if (!el) return;
+  const e = await FO.estadoDoAviso();
+  if (!e.possivel) { el.innerHTML = '🔔 Aviso no celular: abra pelo aplicativo instalado (no iPhone: Compartilhar → Adicionar à Tela de Início).'; return; }
+  if (!e.ligadoNaNuvem) { el.innerHTML = '🔔 Aviso no celular: ainda não ligado na nuvem (o administrador cadastra as chaves; o Painel e o e-mail continuam avisando).'; return; }
+  el.innerHTML = e.ligadoAqui
+    ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao('desligarAvisoFicha', 'Desligar neste aparelho', {}, 'secundario mini')}`
+    : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao('ligarAvisoFicha', 'Ligar', {}, 'mini')}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ''}`;
+}
 
 /** Valor de um campo do link para mostrar (dinheiro em reais, datas, sim/não). */
 function valorDoCampo(c, v) {
@@ -450,6 +462,16 @@ export const ACOES_FICHAS = {
       R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} encerrado`);
     });
     aviso('Link encerrado.');
+    await mostrar();
+  },
+  async ligarAvisoFicha() {
+    await FO.ligarAviso();
+    aviso('Pronto: este aparelho avisa quando chegar algo pelos links da ficha.');
+    await mostrar();
+  },
+  async desligarAvisoFicha() {
+    await FO.desligarAviso();
+    aviso('Aviso desligado neste aparelho.');
     await mostrar();
   },
   async compartilharLinkFicha({ id, pessoa }) {

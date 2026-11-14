@@ -12,6 +12,8 @@
 //   para o registro; a chave em si não fica guardada), publico/fichas/<ficha>/<pessoa>.pdf; os documentos vão direto para a
 //   pasta da ficha (arquivos/Fichas em analise/<pasta>/), com nome dado aqui, e aparecem na caixa de arquivos da ficha.
 // - Os dados enviados nunca entram sozinhos na ficha: a equipe confere e traz (telas/fichas.js).
+// - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
+import { desinscrever, inscrever, pushLigado } from './push.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
@@ -226,8 +228,8 @@ export async function listarLinks(env, url) {
   return json(200, { links: lista });
 }
 
-/** Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true }. */
-export async function atualizarLink(request, env, email) {
+/** Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true }. Falta documento e Assinar avisam a pessoa. */
+export async function atualizarLink(request, env, email, avisar = null) {
   const p = await lerJson(request);
   const fichaId = fichaIdValido(p.ficha_id);
   const pessoa = pessoaValida(p.pessoa);
@@ -242,6 +244,8 @@ export async function atualizarLink(request, env, email) {
     r.eventos = r.eventos.slice(-50);
   });
   if (novo.situacao === 'Encerrado' && novo.hash) await env.DADOS.delete(chaveToken(novo.hash));
+  if (avisar && p.situacao === 'Falta documento') await avisar(env, novo, 'falta');
+  if (avisar && p.situacao === 'Assinar') await avisar(env, novo, 'assinar');
   return json(200, { ok: true, link: paraEquipe(novo) });
 }
 
@@ -382,14 +386,22 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
 }
 
 /** Rotas da equipe (/api/ficha-online/…), chamadas pelo Worker depois do login e do papel conferidos. */
-export async function atenderEquipe(request, env, rota, email) {
+export async function atenderEquipe(request, env, rota, email, { avisar = null } = {}) {
   const url = new URL(request.url);
   const m = request.method;
   try {
+    // aviso no celular: a chave pública para o aparelho se inscrever, inscrever e sair
+    if (rota === 'push' && m === 'GET') return json(200, { ligado: pushLigado(env), chave: pushLigado(env) ? env.VAPID_PUBLICA : null });
+    if (rota === 'push' && m === 'POST') {
+      if (!pushLigado(env)) throw new ErroFicha(503, 'O aviso no celular ainda não foi ligado na nuvem.');
+      try { await inscrever(env, await lerJson(request, 8 * 1024), email); } catch (e) { throw e instanceof ErroFicha ? e : new ErroFicha(400, e.message); }
+      return json(200, { ok: true });
+    }
+    if (rota === 'push-sair' && m === 'POST') { await desinscrever(env, (await lerJson(request, 8 * 1024)).endpoint); return json(200, { ok: true }); }
     if (rota === 'link' && m === 'POST') return await criarLink(request, env, email);
     if (rota === 'pdf' && m === 'PUT') return await guardarPdf(request, env, url);
     if (rota === 'lista' && m === 'GET') return await listarLinks(env, url);
-    if (rota === 'atualizar' && m === 'POST') return await atualizarLink(request, env, email);
+    if (rota === 'atualizar' && m === 'POST') return await atualizarLink(request, env, email, avisar);
     return json(404, { erro: 'Não encontrado.' });
   } catch (e) {
     if (e instanceof ErroFicha) return json(e.status, { erro: e.message });
