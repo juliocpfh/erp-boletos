@@ -175,8 +175,8 @@ function limparFicha(dados) {
 /** Aviso do Novo contrato feito da ficha: o que já veio preenchido e o que falta. */
 function avisoDaFicha(f) {
   const dados = R.dadosDaFicha(d(), f);
-  const veio = ['os dados da pessoa', dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? 'a proposta (aluguel, vencimento, bonificação e garantia)' : '', dados.fiador1_nome ? 'os fiadores' : '', dados.reserva_valor ? 'a reserva' : ''].filter(Boolean);
-  return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome ? '' : 'fiador, '}o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
+  const veio = ['os dados da pessoa', dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? 'a proposta (aluguel, vencimento, bonificação e garantia)' : '', dados.fiador1_nome || dados.fiador2_nome ? 'os fiadores' : '', dados.reserva_valor ? 'a reserva' : ''].filter(Boolean);
+  return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome || dados.fiador2_nome ? '' : 'fiador, '}o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
 }
 
 export const CADASTROS = {

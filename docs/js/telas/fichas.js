@@ -77,7 +77,7 @@ export function telaFicha(id) {
   const fiadores = R.fiadoresDaFicha(f);
   const fichaPdf = (tipo, extra, texto) => (REC.reciboDisponivel(d(), tipo, { ficha: f }).ok ? link(`#/imprimir/recibo?tipo=${tipo}&ficha=${f.id}${extra}`, `🧾 ${texto}`, '') : '');
   const fichasPdf = [fichaPdf('ficha', '', 'Ficha cadastral para assinar'),
-    ...(fiadores.length ? fiadores.map((x) => fichaPdf('ficha_fiador', `&fiador=${x.n}`, `Ficha do fiador ${x.nome}`)) : [fichaPdf('ficha_fiador', '&fiador=1', 'Ficha do fiador (em branco)')])].filter(Boolean).join(' · ');
+    ...(fiadores.length ? fiadores.map((x) => fichaPdf('ficha_fiador', `&fiador=${x.n}`, `Ficha do fiador ${esc(x.nome)}`)) : [fichaPdf('ficha_fiador', '&fiador=1', 'Ficha do fiador (em branco)')])].filter(Boolean).join(' · ');
   // proposta combinada (vai preenchida para o contrato)
   const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - C.descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
   const incluso = REC.itensDaProposta(f).filter(([rot]) => ['Prazo do contrato', 'IPTU', 'Seguro contra incêndio', 'Contas'].includes(rot));

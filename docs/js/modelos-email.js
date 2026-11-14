@@ -15,9 +15,9 @@ const CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0
 Pix (CNPJ): 58.492.818/0001-59`;
 
 const CONDICOES = `CONDIÇÕES DA LOCAÇÃO
-- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
-- Vencimento: todo dia {vencimento}
-[se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
+[se aluguel]- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
+[fim][se vencimento]- Vencimento: todo dia {vencimento}
+[fim][se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
 [fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel[se seguro_valor] (cerca de {seguro_valor} por ano)[fim]
 [fim][se contas]- Contas de {contas_texto}: por conta do locatário
 [fim][se inclusos]- Incluso no aluguel: {inclusos}
@@ -45,7 +45,7 @@ ${CONDICOES}
 Estas condições dependem da aprovação da ficha. A locação só se forma com a assinatura do contrato por todas as partes.
 
 FICHA CADASTRAL
-Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha do fiador[fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
+Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
 
 DOCUMENTOS
 {documentos_ficha}[se seguro_fianca]
