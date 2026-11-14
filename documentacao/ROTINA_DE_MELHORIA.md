@@ -130,3 +130,28 @@ Seis análises em paralelo (boletos e NFs, telas, nuvem, banco C6, contratos e d
 - [x] **M10.** Limpeza: formulários "ir" num só (`data-form="ir"`), arquivo → ação num só (`data-acao-arquivo`), Banco Central guardado na sessão, formatadores de dinheiro criados uma vez, 5 partes carregadas só quando usadas (47 → 42 módulos ao abrir), apelidos e exports mortos fora, funções repetidas juntadas.
 
 **Fica para o dono:** confirmar Carnaval e Corpus Christi como dia não útil e os prazos de 45 e 7 dias (`DECISOES.md`, NÃO CONFIRMADO); descrição e instruções do boleto no C6 continuam cortadas em 100 e 4 × 80 letras (texto gerado pelo sistema); `restaurarGarantiaHerdada` existe sem botão (vira botão ou sai). Depois de publicar: conferir no Chrome/celular o aplicativo sem internet (abrir com internet, esperar alguns segundos, desligar, gerar um PDF) e copiar a ponte de novo para o computador (arquivos `c6-*`, `rotas-fase2`, `servidor`).
+
+## Revisão de 2026-11-13 (desempenho, dados, conflitos e botões repetidos)
+Três varreduras só de leitura (desempenho, dados e fluxo, conflitos). Medido no computador com dados fictícios de 5 anos: as telas desenham em menos de 35 ms; o desenho geral (um JSON em memória + nuvem por diferenças) está adequado ao tamanho do negócio e não se troca. No banco real de 06/11 (1,82 MB): 67% histórico, 15% logo, 18% dados. O cruzamento de ACOES, FORMULARIOS, TELAS e links veio limpo.
+
+**Conflitos e botões** (o dono respondeu item a item em 13/11)
+- [x] **R1.** "Nova NF avulsa do Airbnb" abria o formulário em branco (`modelo=airbnb` barrado por `sanearParametros`) e, se funcionasse, criava uma NF em dobro: botão retirado; a NF do Airbnb nasce só em "Gerar a NF do Airbnb" e o padrão do cliente se guarda ao editá-la.
+- [x] **R2.** Carta de reajuste com o vencimento do boleto de verdade (`R.vencimentoDoReajuste`), como a tela Reajustes.
+- [x] **R3.** Caução na carta e na prévia de Reajustes pelas regras `caucao_acompanha` e `caucao_base` (`R.aluguelDaCaucao`), como o boleto do complemento.
+- [ ] **R4.** "Baixar regras do sistema (TXT)" com as regras em uso; nome diferente de "Baixar arquivo das regras".
+- [ ] **R5.** Texto da pasta do contador (Banco) na nuvem.
+- [ ] **R6.** Tela NF: nome do botão citado no texto.
+- [ ] **R7.** Filtro "Vencidos e não pagos" (Boletos) avisa que conta inquilinos encerrados (Inadimplência não conta).
+- [ ] **R8.** Conferência de pagamentos no banco: fica a da tela Banco; o botão de Boletos leva até ela (dono: "sim").
+- [ ] **R9.** Ressarcimento na NF e tolerância de dias do boleto passam para Regras do sistema (dono: "corrija").
+- [x] **R10.** "Emite NF" continua mudando em três lugares (dono: "mantenha e coloque justificativa na documentação"): ver `DECISOES.md`, 2026-11-13.
+- [ ] **R11.** "Movimentações sem destino" em Financeiro e Banco: fica como está até o C6 entrar em uso (o dono ainda não conhece o módulo).
+- [ ] **R12-R15.** Botões com nomes diferentes para o mesmo lugar (Boletos, Painel, página do boleto, impressões).
+- [ ] **R16.** Limpeza interna (código sem uso, listas repetidas).
+
+**Desempenho** (5 propostas apresentadas em 13/11)
+- [ ] **P1.** Abrir sem esperar a internet (`app.js` → `N.saudeDaNuvem`; `sw.js` sem tempo limite).
+- [ ] **P2.** Gravação na nuvem mais leve (`nuvem.js` → `diferencas`; cópia cifrada e backup seguro juntados).
+- [ ] **P3.** Banco e Financeiro: sugestão de destino com índice por desenho (`conciliacao.js` → `sugerirDestino`).
+- [ ] **P4.** Histórico mais magro (QR Pix e itens de vistoria fora do "de/para"; uma entrada por importação de extrato).
+- [ ] **P5.** Atualização do app sem baixar de novo `vendor/` que não mudou (`sw.js`).

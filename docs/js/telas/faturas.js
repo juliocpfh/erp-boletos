@@ -128,8 +128,8 @@ function caixaRenumerar() {
 
 function caixaAvulsas() {
   const pend = d().avulsas.filter((a) => !R.faturasDe(d(), 'avulsa', a.id).length);
-  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link('#/novo/avulsas?modelo=airbnb', 'Nova NF avulsa do Airbnb', 'botao')} ${link('#/novo/avulsas', 'Nova NF avulsa', 'botao secundario')}</div>` : ''}</div>
-    <p class="suave">Para recebimentos fora do boleto, como o faturamento do Airbnb (lançamento esporádico com a data em que o dinheiro entrou) ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
+  return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link('#/novo/avulsas', 'Nova NF avulsa', 'botao')}</div>` : ''}</div>
+    <p class="suave">Para recebimentos fora do boleto: uma nota com cliente e imóvel que você escolher. A do Airbnb não se cria aqui: lance os ganhos em cada imóvel (Financeiro) e use "Gerar a NF do Airbnb", que soma o mês numa NF só; depois de gerada, ela aparece nesta lista e pode ser editada (os dados do cliente ficam guardados como padrão se você marcar). Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
       ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || '')}</td><td class="n">${reais(a.valor)}</td>
         <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'avulsas', id: a.id }, 'x-excluir', 'Excluir esta NF avulsa?')}` : ''}</td></tr>`).join('')}</table>` : ''}</div>`;
