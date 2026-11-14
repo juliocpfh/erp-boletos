@@ -353,11 +353,24 @@ const OCULTOS = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes'
 const visivel = (obj) => Object.fromEntries(Object.entries(obj)
   .filter(([k, v]) => !OCULTOS.has(k) && v !== null && v !== '' && v !== undefined));
 
-export function inserir(d, tabela, dados, usuario, descricao) {
+/**
+ * Conteúdo pesado que não precisa ir duas vezes ("de" e "para") a cada linha do histórico: a imagem do QR Code do Pix dentro de
+ * `cobrancas.banco` (alguns KB por boleto, repetidos a cada consulta ao banco). No histórico fica a marca; a imagem continua no
+ * boleto. Só em tabela que não se desfaz pelo Histórico (boleto está em SEM_DESFAZER): o "Desfazer" precisa do valor inteiro.
+ */
+const IMAGEM_FORA_DO_HISTORICO = '(imagem guardada só no boleto)';
+const semPeso = (tabela, k, v) => (tabela === 'cobrancas' && k === 'banco' && v && typeof v === 'object' && v.pix_qr_base64
+  ? { ...v, pix_qr_base64: IMAGEM_FORA_DO_HISTORICO } : v);
+
+/**
+ * Inclui um registro, com a linha no histórico. ``historico: false`` só para carga em lote que registra UMA linha por conta
+ * própria (importação do extrato: 1.100 lançamentos davam 1.100 linhas de histórico, cada uma com a cópia do lançamento).
+ */
+export function inserir(d, tabela, dados, usuario, descricao, { historico = true } = {}) {
   d.seq[tabela] = (d.seq[tabela] || Math.max(0, ...d[tabela].map((r) => r.id))) + 1;
   const r = { id: d.seq[tabela], ...dados };
   d[tabela].push(r);
-  registrar(d, usuario, 'Inclusão', tabela, r.id, descricao, visivel(dados), vinculos(d, tabela, r));
+  if (historico) registrar(d, usuario, 'Inclusão', tabela, r.id, descricao, visivel(dados), vinculos(d, tabela, r));
   return r;
 }
 
@@ -372,7 +385,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
   }
   if (Object.keys(mudancas).length) {
     Object.assign(r, dados);
-    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)));
+    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
     if (mudancas.senha_hash) det.senha = 'alterada';
     registrar(d, usuario, 'Alteração', tabela, r.id, descricao, det, vinculos(d, tabela, r));
   }

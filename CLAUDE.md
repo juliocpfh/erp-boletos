@@ -20,7 +20,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 
 ## Regras que não podem quebrar
 1. Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`.
-2. Toda gravação: na tela, `alterar((db) => …)` (`docs/js/app.js`; é uma fila, uma gravação por vez, `alterarAgora` grava de verdade); nas regras, só `inserir`/`atualizar`/`excluir` (`docs/js/regras.js`), que registram o histórico.
+2. Toda gravação: na tela, `alterar((db) => …)` (`docs/js/app.js`; é uma fila, uma gravação por vez, `alterarAgora` grava de verdade); nas regras, só `inserir`/`atualizar`/`excluir` (`docs/js/regras.js`), que registram o histórico (`inserir(..., { historico: false })` só em carga em lote que grava uma linha própria, como a importação do extrato).
 3. Campo ou tabela nova no banco: `TABELAS` em `regras.js`; dados antigos se ajustam em `normalizar()` (nunca remova passos de migração).
 4. HTML com texto do usuário sempre passa por `esc()`. Parâmetros do endereço (`rota.q`) passam por `sanearParametros` (`calculos.js`): parâmetro novo = entrada em `FORMATOS_PARAMETRO`; mês e data nas telas por `competenciaValida`/`dataValida`.
 5. Site fora do ar = sem internet: abre-se o **aplicativo instalado** (`sw.js` usa a cópia do aparelho também quando o site responde erro 5xx) e as mudanças sobem sozinhas depois (decisão de 2026-11-09). A versão PC (`docs/offline/administracao-imoveis.html`, o programa inteiro num arquivo) ficou só como reserva para desastre, fora das telas: fica na pasta do backup seguro (`backup-seguro.js`, `atualizarProgramaSeguro` em `app.js`; `atualizador-pc/` no Windows). O GitHub a gera sozinho; `gerar-offline.mjs` precisa continuar funcionando (CSP por hash, `window.VERSAO_OFFLINE`).

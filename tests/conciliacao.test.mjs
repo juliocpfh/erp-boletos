@@ -45,8 +45,11 @@ test('importação do extrato: converte "1500.00" em centavos, nunca repete o re
   assert.deepEqual(r.novas.map((m) => [m.valor, m.tipo, m.categoria_banco]), [[12345, 'saida', 'PAYMENT'], [131850, 'entrada', 'CREDIT_PIX_PAYMENT_RECEIVED'], [150000, 'saida', 'PAYMENT']]);
   assert.equal(r.novas[0].id_externo, 'r1');
   assert.equal(r.novas[0].classificacao, null);
-  assert.equal(d.historico.filter((h) => h.acao === 'Inclusão' && h.tabela === 'movimentacoes_banco').length - 0, 3);
-  assert.ok(d.historico.length >= antes + 4);
+  // uma linha de histórico por importação (não uma por lançamento), com quem importou no próprio lançamento
+  assert.equal(d.historico.filter((h) => h.acao === 'Inclusão' && h.tabela === 'movimentacoes_banco').length, 0);
+  assert.equal(d.historico.length, antes + 1);
+  assert.deepEqual([d.historico.at(-1).detalhes.novas, d.historico.at(-1).detalhes.entradas, d.historico.at(-1).detalhes.saidas], [3, 131850, 12345 + 150000]);
+  assert.ok(r.novas.every((m) => m.importada_por === d.historico.at(-1).usuario));
   assert.equal(R.extratoImportadoAte(d, 'ank'), '2026-11-05');
   const r2 = importar(d, 'ank', lancs);
   assert.deepEqual([r2.novas.length, r2.repetidas], [0, 3]);

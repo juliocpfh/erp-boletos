@@ -153,5 +153,5 @@ Três varreduras só de leitura (desempenho, dados e fluxo, conflitos). Medido n
 - [ ] **P1.** Abrir sem esperar a internet (`app.js` → `N.saudeDaNuvem`; `sw.js` sem tempo limite).
 - [ ] **P2.** Gravação na nuvem mais leve (`nuvem.js` → `diferencas`; cópia cifrada e backup seguro juntados).
 - [x] **P3.** Banco e Financeiro: a memória da sugestão de destino vem de um índice montado uma vez (`Z.indiceDeSugestoes`, guardado por tela em `Z.indiceDaTela`): com 6.000 linhas de extrato e 100 sem destino, 246 → 8 ms por desenho (Node, computador), com as mesmas sugestões.
-- [ ] **P4.** Histórico mais magro (QR Pix e itens de vistoria fora do "de/para"; uma entrada por importação de extrato).
+- [x] **P4.** Histórico mais magro: a imagem do QR Pix não vai mais ao "de/para" do boleto (`semPeso`, `regras.js`; fica a marca) e a importação do extrato grava uma linha de histórico por importação, com quem importou no lançamento (`importada_por`; `inserir(..., { historico: false })`). Ficou de fora, de propósito: `vistorias.itens` (o "Desfazer" precisa do valor inteiro), a logo dentro do banco (272 KB) e arquivar o histórico antigo (só quando o banco passar de ~5 MB; o Desfazer usa a posição na lista).
 - [ ] **P5.** Atualização do app sem baixar de novo `vendor/` que não mudou (`sw.js`).

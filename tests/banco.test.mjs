@@ -245,6 +245,13 @@ test('registrarBoletoBancario grava linha digitável, código de barras, Pix e Q
   assert.equal(h.tabela, 'cobrancas');
   assert.match(h.descricao, /emitido no C6 .*sandbox/);
   R.registrarBoletoBancario(d, cb.id, CONSULTA, 'teste');
+  // a imagem do QR Code fica só no boleto: no histórico (emissão e cada consulta) vai a marca, não a imagem repetida
+  assert.equal(cb.banco.pix_qr_base64, 'iVBORw0KGgo=');
+  const doBoleto = d.historico.filter((x) => x.tabela === 'cobrancas' && x.registro_id === cb.id && x.detalhes && x.detalhes.banco);
+  assert.ok(doBoleto.length >= 2);
+  assert.equal(JSON.stringify(doBoleto).includes('iVBORw0KGgo='), false);
+  assert.equal(doBoleto.at(-1).detalhes.banco.para.pix_qr_base64, '(imagem guardada só no boleto)');
+  assert.equal(doBoleto.at(-1).detalhes.banco.para.linha_digitavel, cb.banco.linha_digitavel); // o resto continua no histórico
   assert.deepEqual(cb.banco.notificacoes, [{ canal: 'EMAIL', destino: 'maria@exemplo.com.br', momento: 'ISSUE_DATE', situacao: 'SENT', enviada_em: '2026-02-20T10:00:00Z' }]);
   assert.ok(cb.banco.consultado_em);
 });
