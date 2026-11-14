@@ -112,7 +112,7 @@ const AJUDA_BANCO = 'Busque o extrato uma vez por mês (ou quando quiser). Cada 
 function caixaPastaContador(e, mes) {
   return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
     <p class="acoes">${botao('zipContador', `Baixar ZIP de ${compBr(mes)} para o contador`, { emitente: e.id, mes }, 'botao')}<span class="suave">NFs do mês em Excel, planilha das entradas e saídas com o destino de cada uma e os comprovantes desta pasta.</span></p>
-    ${caixaArquivos('contador', R.idContador(e.id, mes), 'Comprovantes do mês para o contador', 'arquivos-contador', `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, baixe o ZIP com todos os dados (Dados e backup): a pasta do contador vem dentro de "arquivos".' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
+    ${caixaArquivos('contador', R.idContador(e.id, mes), 'Comprovantes do mês para o contador', 'arquivos-contador', `Cópias dos comprovantes guardados pela tela Banco. ${E.nuvem ? 'Na nuvem, abra cada arquivo daqui para baixar; para mandar o mês inteiro ao contador, use o botão "Baixar ZIP … para o contador", logo acima.' : 'O contador pode receber esta pasta inteira (está dentro de "arquivos", na pasta dos dados).'}`, true, false)}</details>`;
 }
 
 function descreverSugestao(s) {

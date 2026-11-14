@@ -112,7 +112,7 @@ const SUBPASTAS = { imovel: SUB_DOCS, matricula: SUB_DOCS, anuncio: SUB_ANUNCIO,
 
 /** Cópia para o contador: "_Contador/<Empresa>/<AAAA-MM>" (escopo `contador`); o id junta a empresa e o mês (empresa 1, 2026-11 → 1202611). */
 export const PASTA_CONTADOR = '_Contador';
-export const decodificarIdContador = (id) => ({ emitenteId: Math.floor(id / 1000000), comp: `${String(id % 1000000).slice(0, 4)}-${String(id % 1000000).slice(4)}` });
+export const decodificarIdContador = R.decodificarIdContador; // uma conta só (regras.js)
 const pastaContador = () => (d().config_banco && d().config_banco.pasta_contador) || PASTA_CONTADOR;
 
 /** Apólices do seguro obrigatório: subpasta dentro da pasta do inquilino (antes ficava na pasta do imóvel). */

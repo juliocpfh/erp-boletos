@@ -28,6 +28,27 @@ export function valorRegraTexto(def, v) {
   }
 }
 
+/**
+ * Fim do TXT "regras para ler": as regras de "Regras do sistema" como estão hoje, grupo a grupo, com "MUDADA" nas que
+ * diferem do padrão. O texto de cima do arquivo descreve o padrão; onde houver diferença, vale esta lista.
+ */
+export function textoDasRegrasEmUso(hoje = C.hojeIso()) {
+  const regras = CR.regrasDe(d());
+  const linhas = ['', '', `REGRAS EM USO EM ${C.dataBr(hoje)} (Dados e backup → Regras do sistema)`,
+    'O texto acima descreve o padrão do sistema (ex.: boletos a partir do dia 20, reajuste no 13º mês). Onde o administrador mudou, vale o que está aqui.'];
+  let mudadas = 0;
+  for (const [g, titulo] of CR.GRUPOS_REGRAS) {
+    linhas.push('', titulo.toLocaleUpperCase('pt-BR'));
+    for (const def of CR.DEFINICOES_REGRAS.filter((x) => x.grupo === g)) {
+      const mudou = !CR.mesmoValor(regras[def.chave], def.padrao);
+      if (mudou) mudadas += 1;
+      linhas.push(`- ${def.rotulo}: ${valorRegraTexto(def, regras[def.chave])}${mudou ? `  << MUDADA (padrão do sistema: ${valorRegraTexto(def, def.padrao)})` : ''}`);
+    }
+  }
+  linhas.push('', mudadas ? `${mudadas} regra(s) diferente(s) do padrão do sistema.` : 'Todas as regras estão no padrão do sistema.');
+  return linhas.join('\n');
+}
+
 function campoRegra(def, v, admin) {
   const nome = `r_${def.chave}`;
   const des = admin ? '' : ' disabled';
@@ -75,7 +96,7 @@ export function telaRegras() {
       ${versoes.length ? `<table><tr><th>Versão</th><th>Salva em</th><th>Por</th><th></th></tr>${versoes.map((v) => `<tr><td><b>${esc(v.nome)}</b></td><td>${dataHoraBr(v.salvo_em)}</td><td>${esc(v.salvo_por || '-')}</td>
         <td class="n">${admin ? `${botao('restaurarVersaoRegras', 'Voltar a esta versão', { id: v.id }, 'secundario pequeno', `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}
         ${botao('excluirVersaoRegras', 'Excluir', { id: v.id }, 'perigo pequeno', `Excluir a versão "${v.nome}"? As regras em uso não mudam.`)}` : ''}</td></tr>`).join('')}</table>` : '<p class="suave">Nenhuma versão salva.</p>'}
-      <p class="acoes">${botao('baixarArquivoRegras', 'Baixar arquivo das regras', {}, 'secundario pequeno')}
+      <p class="acoes">${botao('baixarArquivoRegras', 'Baixar cópia das regras (para carregar depois)', {}, 'secundario pequeno')}
         ${admin ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
         ${botao('voltarRegrasPadrao', 'Voltar tudo ao padrão do sistema', {}, 'perigo pequeno', 'Voltar todas as regras ao padrão do sistema? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).')}` : ''}</p></div>
     <form data-form="regrasSistema">

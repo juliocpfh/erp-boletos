@@ -111,6 +111,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
         <div class="acoes">${link(url({ filtro: 'todos' }), `← Boletos de ${compBr(comp)}`, 'botao secundario')}</div></div>
       ${filtros}
+      ${filtro === 'vencidos' ? `<p class="suave">Aqui entram todos os boletos vencidos e não pagos, também os de inquilinos que já saíram (com o cálculo final feito). A tela ${link('#/inadimplencia', 'Inadimplência', '')} mostra só os inquilinos em cobrança, por isso os números podem ser diferentes.</p>` : ''}
       ${filtro === 'semnf' && lista.length && opera() ? `<div class="alerta info">${lista.length} pagamento(s) aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
       ${opera() && ['abertos', 'vencidos'].includes(filtro) ? caixaBaixaLote(lista, hoje) : ''}
       ${tabelaBoletos(lista, hoje, ordem, url, { comp: true, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
@@ -153,7 +154,7 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
       ${opcoes.comp ? '' : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
       ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
-  return `${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Ver NFs</a></div>
+  return `${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: '' }).replace(/&ordem=&?/, '&').replace(/[?&]$/, ''))}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas responsiva">

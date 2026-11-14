@@ -85,7 +85,7 @@ export function telaReajustes(q) {
   };
   const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
   return `<h1>Reajustes do aluguel</h1>
-    <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou. O índice acumulado até o mês anterior sai no começo do mês do reajuste: aí aplique a correção e mande a carta junto com o boleto do próprio aluguel corrigido (ex.: aluguel de 11/2026, índice até 10/2026, boleto emitido no fim de novembro com vencimento em dezembro).</p>
+    <p class="suave">O aluguel é corrigido no 13º mês do contrato e a cada 12 meses depois. ${R.regra('reajuste_inicio') === 'mes_seguinte' ? 'O 1º mês é o de entrada só para quem entrou no dia 1º; entrando depois, o 1º mês é o seguinte (regra escolhida em Regras do sistema).' : 'O mês de entrada conta como o 1º mês, seja qual for o dia em que o inquilino entrou.'} O índice acumulado até o mês anterior sai no começo do mês do reajuste: aí aplique a correção e mande a carta junto com o boleto do próprio aluguel corrigido (ex.: aluguel de 11/2026, índice até 10/2026, boleto emitido no fim de novembro com vencimento em dezembro).</p>
     <div class="cartao"><h2>Índices acumulados em 12 meses</h2>
       <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
       ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join('')}</select>

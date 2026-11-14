@@ -14,7 +14,7 @@ import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
-import { ACOES_REGRAS } from './regras-sistema.js';
+import { ACOES_REGRAS, textoDasRegrasEmUso } from './regras-sistema.js';
 import { ACOES_NUVEM } from './nuvem.js';
 import { ACOES_FICHAS } from './fichas.js';
 import { ACOES_EMAILS } from './emails.js';
@@ -1723,7 +1723,7 @@ export const ACOES = {
 
   async baixarRegras() {
     const { REGRAS_TEXTO } = await carregarParte(() => import('../regras-texto.js'));
-    baixar(new Blob(['﻿', REGRAS_TEXTO], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
+    baixar(new Blob(['﻿', REGRAS_TEXTO, textoDasRegrasEmUso()], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
   },
 
   async removerModelo() {
