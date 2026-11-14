@@ -103,12 +103,47 @@ export function pedidoDoLink(d, f, pessoa, nomePasta) {
   return { ficha_id: f.id, pessoa, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d, f, pessoa) };
 }
 
-/** Texto do WhatsApp com o link. Ex.: "Olá, Maria! Segue o link da sua ficha cadastral (vale até 21/11/2026): …". */
-export function textoWhatsapp(f, pessoa, link) {
+/**
+ * Texto do WhatsApp com o link. Ex.: "Olá, Maria! Segue o link da sua ficha cadastral (vale até 21/11/2026): …".
+ * ``lembrete``: lembrar quem ainda não terminou; ``faltando``: o que falta (aparece no texto).
+ */
+export function textoWhatsapp(f, pessoa, link, { lembrete = false, faltando = [] } = {}) {
   const nome = String(nomeDaPessoa(f, pessoa) || '').trim().split(/\s+/)[0];
   const fiador = pessoa !== 'interessado';
-  return `Olá${nome ? `, ${nome}` : ''}! Segue o link ${fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ''}` : 'da sua ficha cadastral'}, que vale até ${C.dataBr(String(link.vence_em).slice(0, 10))}: ${link.url}
+  const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ''}` : 'da sua ficha cadastral';
+  const validade = C.dataBr(String(link.vence_em).slice(0, 10));
+  if (lembrete) {
+    return `Olá${nome ? `, ${nome}` : ''}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join('; ')}` : ''}. O link vale até ${validade}: ${link.url}
+Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ': a reserva é devolvida por inteiro' : ''}.`;
+  }
+  return `Olá${nome ? `, ${nome}` : ''}! Segue o link ${qual}, que vale até ${validade}: ${link.url}
 Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
+}
+
+/** Documentos do link (a lista da pessoa como ela está agora na ficha; com as partes, conforme a renda e o estado civil). */
+export function documentosDoLink(f, l) {
+  if (l.pessoa !== 'interessado') return R.documentosDoFiador(R.fiadorDaFicha(f, l.pessoa.slice(6)));
+  return R.documentosDaFicha(f);
+}
+
+/**
+ * O que entra na ficha ao "Trazer": os valores preenchidos do último envio (os vazios não apagam o que a ficha tem) e as
+ * marcas de documento recebido, pelos documentos que chegaram (ex.: holerite → comprovante de renda; ficha assinada).
+ */
+export function dadosParaFicha(f, l) {
+  const ultimo = (l.respostas || []).at(-1);
+  const campos = new Set((l.formulario || []).filter((c) => c.nome).map((c) => c.nome));
+  const out = {};
+  if (ultimo) for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== undefined && v !== '') out[k] = v;
+  if (l.pessoa === 'interessado') {
+    const docs = (l.arquivos || []).map((a) => a.documento);
+    const renda = new Set([...Object.values(R.DOCUMENTOS_RENDA).flat(), ...R.PARTES_DOCUMENTOS_PF.renda_padrao, 'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)']);
+    if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
+    if (docs.some((x) => renda.has(x))) out.doc_renda = true;
+    if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
+    if (docs.some((x) => /assinada/.test(x))) out.doc_ficha = true;
+  }
+  return out;
 }
 
 /** Telefone para o WhatsApp (só números, com o 55). */

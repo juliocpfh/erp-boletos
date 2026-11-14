@@ -217,7 +217,7 @@ export async function listarLinks(env, url) {
       const reg = JSON.parse(await obj.text());
       lista.push(ficha ? paraEquipe(reg) : {
         ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-        vence_em: reg.vence_em, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
+        vence_em: reg.vence_em, criado_em: reg.criado_em, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
         nome: reg.contexto.nome,
       });
     }
