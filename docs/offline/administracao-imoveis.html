@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-dQ5E9JnDXcC8dkd8xjkO9O53Aa8xt2fzsRs0gEb9s7Y='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-kSxCeMey4fRENk6lCpRvKCQrrSNrexGOSUw+b+tSlOg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b2d832df56684c16">
+<meta name="fontes" content="6a03a19de45cd2fb">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -10915,16 +10915,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (RAIZ_DO_SERVIDOR.includes(k)) continue;
       const va = antes?.[k];
       const vb = depois?.[k];
-      if (igual(va, vb)) continue;
+      if (va === vb || JSON.stringify(va) === JSON.stringify(vb)) continue;
       if (ehTabela(va ?? []) && ehTabela(vb ?? []) && (Array.isArray(va) || Array.isArray(vb))) {
+        const daTabela = [];
+        let repetido = null;
         const porId = new Map((va || []).map((r) => [r.id, r]));
         const novos = /* @__PURE__ */ new Set();
         for (const r of vb || []) {
-          if (novos.has(r.id)) throw new ErroNuvem(`Dois registros com o mesmo código (${r.id}) em ${k}: nada foi gravado. Recarregue a página e faça de novo.`);
+          if (novos.has(r.id)) {
+            repetido ??= r.id;
+            continue;
+          }
           novos.add(r.id);
           const velho = porId.get(r.id);
           if (!velho) {
-            ops.push({ op: "inserir", tabela: k, id: r.id, dados: r });
+            daTabela.push({ op: "inserir", tabela: k, id: r.id, dados: r });
             continue;
           }
           if (igual(velho, r)) continue;
@@ -10933,11 +10938,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
             if (igual(velho[c], r[c])) continue;
             campos[c] = c in r && r[c] !== void 0 ? { antes: velho[c], depois: r[c] } : { antes: velho[c] };
           }
-          ops.push({ op: "alterar", tabela: k, id: r.id, campos });
+          daTabela.push({ op: "alterar", tabela: k, id: r.id, campos });
         }
-        for (const r of va || []) if (!novos.has(r.id)) ops.push({ op: "excluir", tabela: k, id: r.id, base: r });
+        for (const r of va || []) if (!novos.has(r.id)) daTabela.push({ op: "excluir", tabela: k, id: r.id, base: r });
+        if (repetido !== null && (daTabela.length || canon(va) !== canon(vb))) throw new ErroNuvem(`Dois registros com o mesmo código (${repetido}) em ${k}: nada foi gravado. Recarregue a página e faça de novo.`);
+        ops.push(...daTabela);
         continue;
       }
+      if (canon(va) === canon(vb)) continue;
       ops.push({ op: "raiz", campo: k, antes: va, depois: vb });
     }
     return ops;
