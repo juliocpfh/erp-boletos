@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-gCy78DgPePS5yGdCw1LB6xYuNwLxU/Xow76XSMohuBg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-dQ5E9JnDXcC8dkd8xjkO9O53Aa8xt2fzsRs0gEb9s7Y='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3f46beb5719070d0">
+<meta name="fontes" content="b2d832df56684c16">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -27648,7 +27648,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.anexos = new AnexosNuvem({ guardar });
     E.pasta = E.anexos.raiz();
     await E.anexos.carregarFila();
-    E.emailNuvem = (await saudeDaNuvem())?.email || null;
+    E.emailNuvem = null;
+    E.saudeNuvem = saudeDaNuvem().then((s) => {
+      E.emailNuvem = s?.email || null;
+      return s;
+    }).catch(() => null);
     try {
       localStorage.setItem(MODO_NUVEM, "1");
     } catch {
@@ -27713,6 +27717,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
     E.d = disco;
     const u = E.d.usuarios.find((x) => x.login === loginTexto);
+    if (E.nuvem && E.saudeNuvem) await E.saudeNuvem;
     if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
     if (!await conferirSenha(u, senha)) throw new ErroUsuario("Login ou senha incorretos.");
     if (u.pendente) throw new Error("Seu pedido de acesso ainda não foi aprovado pelo administrador.");
