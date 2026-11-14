@@ -305,7 +305,7 @@ export function telaFinanceiro(q) {
   const air = R.airbnbDoMes(d(), mesAir);
   const impostos = R.impostosDoMes(d(), mes);
   const nomeConta = (id) => { const c = ((d().config_banco || {}).contas || []).find((x) => x.id === id); return c ? (c.apelido || c.id) : id; };
-  const sugestao = (m) => { try { return Z.sugerirDestino(d(), m); } catch { return null; } };
+  const sugestao = (m) => { try { return Z.sugerirDestino(d(), m, Z.indiceDaTela(d())); } catch { return null; } };
   return `<h1>Financeiro</h1>${abasFinanceiro('financeiro')}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>

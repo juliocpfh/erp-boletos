@@ -38,7 +38,7 @@ const registroDe = (tabela, id) => (tabela === 'pagamentos_banco' ? pag(id) : mo
 const valorHtml = (m) => `<span class="mov-${m.tipo}">${m.tipo === 'entrada' ? '+' : '−'} ${reais(m.valor)}</span>`;
 const precisaComprovante = (m) => !!m.classificacao && !SEM_COMPROVANTE.includes(m.classificacao);
 const temComprovante = (x) => !!(x.comprovante || x.comprovante_contador);
-const sugestaoDe = (m) => (m.classificacao ? null : Z.sugerirDestino(d(), m));
+const sugestaoDe = (m) => (m.classificacao ? null : Z.sugerirDestino(d(), m, Z.indiceDaTela(d())));
 const centavosDoBanco = (x) => { try { return Z.centavosDoC6(x); } catch { return 0; } };
 
 /** Botão que fala com a ponte: desligado (com o motivo) enquanto o banco não está configurado em Dados e backup. */

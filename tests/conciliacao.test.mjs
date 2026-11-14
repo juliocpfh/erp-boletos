@@ -732,3 +732,32 @@ test('D10: descreverDestino descreve o destino em texto puro para a planilha do 
   assert.equal(Z.descreverDestino(d, { classificacao: 'tarifa', observacoes: 'pacote mensal' }), 'Tarifa do banco · pacote mensal');
   assert.equal(Z.descreverDestino(d, { classificacao: 'conta_imovel', imovel_id: loja.id }), 'Conta do imóvel · Loja 1');
 });
+
+test('sugestão pela memória: o índice montado uma vez dá a mesma sugestão que reler o extrato, e a tela troca de índice quando o banco muda', () => {
+  const d = R.normalizar(R.bancoVazio());
+  d.config_banco.contas = [{ id: 'ank', apelido: 'ANK', emitente_id: 1 }];
+  const mov = (id, data, descricao, extra = {}) => ({ id, conta_id: 'ank', id_externo: `m${id}`, data, valor: 5000 + id, tipo: 'saida', descricao, classificacao: null, contrapartida: null, ...extra });
+  d.movimentacoes_banco.push(
+    mov(1, '2026-09-05', 'PIX ENVIADO JARDINEIRO 111', { classificacao: 'outro' }),
+    mov(2, '2026-10-05', 'PIX ENVIADO JARDINEIRO 222', { classificacao: 'retirada' }), // a mais recente com a mesma descrição (sem números)
+    mov(3, '2026-10-20', 'COMPRA 999', { classificacao: 'outro', contrapartida: { documento: '529.982.247-25' } }),
+    mov(4, '2026-10-21', 'PIX ENVIADO JARDINEIRO 333', { classificacao: 'boleto' }), // boleto, ignorar e transferência não servem de memória
+    mov(5, '2026-11-05', 'PIX ENVIADO JARDINEIRO 444'),
+    mov(6, '2026-11-06', 'OUTRA COISA', { contrapartida: { documento: '52998224725' } }),
+    mov(7, '2026-11-07', 'NUNCA VISTA'),
+  );
+  const [novaDescricao, novaDocumento, semMemoria] = [5, 6, 7].map((id) => d.movimentacoes_banco.find((m) => m.id === id));
+  const ind = Z.indiceDeSugestoes(d);
+  for (const m of [novaDescricao, novaDocumento, semMemoria]) assert.deepEqual(Z.sugerirDestino(d, m, ind), Z.sugerirDestino(d, m));
+  assert.equal(Z.sugerirDestino(d, novaDescricao, ind).classificacao, 'retirada');
+  assert.match(Z.sugerirDestino(d, novaDescricao, ind).motivo, /05\/10\/2026/);
+  assert.equal(Z.sugerirDestino(d, novaDocumento, ind).classificacao, 'outro'); // pelo documento da contrapartida
+  assert.equal(Z.sugerirDestino(d, semMemoria, ind), null);
+  // a própria movimentação nunca é a memória dela
+  assert.equal(Z.sugerirDestino(d, d.movimentacoes_banco[2], ind), null);
+  // a tela guarda o índice enquanto o banco é o mesmo objeto; outro objeto (depois de gravar), outro índice
+  assert.equal(Z.indiceDaTela(d), Z.indiceDaTela(d));
+  const depois = { ...d, movimentacoes_banco: [...d.movimentacoes_banco.map((m) => (m.id === 2 ? { ...m, classificacao: 'boleto' } : m))] };
+  assert.notEqual(Z.indiceDaTela(depois), ind);
+  assert.equal(Z.sugerirDestino(depois, novaDescricao, Z.indiceDaTela(depois)).classificacao, 'outro'); // agora a de 05/09
+});
