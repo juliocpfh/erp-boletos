@@ -12,6 +12,11 @@ const MARCA = './__versao-publicada'; // entrada do cache com a data de publica�
 const PENDENTES = './__para-baixar'; // entrada do cache com os arquivos ainda por baixar na versão guardada (lista em JSON)
 const SEMPRE_CONFERIR = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 const MANTER_ATE_O_NOVO = /\/(vendor|modelos)\//; // só são pedidos quando usados: o antigo serve sem internet até o novo chegar
+// Bibliotecas (vendor/, 3 MB): não mudam a cada publicação, então só são baixadas de novo quando esta versão muda (antes, cada
+// publicação fazia o aparelho baixar tudo outra vez). MUDOU UM ARQUIVO DE docs/vendor? Troque esta data (tests/sw.test.mjs confere).
+const VERSAO_VENDOR = '2026-11-13';
+const VENDOR = './__versao-vendor'; // entrada do cache com a VERSAO_VENDOR das bibliotecas guardadas
+const EH_VENDOR = /\/vendor\//;
 const FOLGA_DATA = 60 * 1000; // o GitHub grava os arquivos de uma publicação um a um: a data de cada um varia alguns segundos
 const ESPERA_SEGUNDO_PLANO = 3000; // ms: o que fica em segundo plano começa depois da abertura, sem disputar a internet com ela
 // Sinal fraco (celular): a conferência da versão e a página não seguram a abertura além destes limites; passou disso, abre a cópia
@@ -55,7 +60,7 @@ let gravandoPendentes = Promise.resolve();
 let baixando = false;
 
 const PAGINA = new URL('./', self.location.href).href;
-const INTERNOS = [MARCA, PENDENTES].map((k) => new URL(k, self.location.href).href);
+const INTERNOS = [MARCA, PENDENTES, VENDOR].map((k) => new URL(k, self.location.href).href);
 const normal = (r) => !!r && r.ok && r.type === 'basic' && !r.redirected; // não o login do Cloudflare (redirecionamento) nem erro
 const esperar = (ms) => new Promise((ok) => { setTimeout(ok, ms); });
 
@@ -107,15 +112,27 @@ async function conferirVersao() {
   comInternet = !!publicada;
   if (!publicada) { marca = guardada || null; return guardada ? 'copia' : 'rede'; }
   marca = publicada;
-  if (guardada === publicada) return 'copia';
+  // bibliotecas: só voltam para a lista de baixar quando VERSAO_VENDOR muda (ou na 1ª vez, sem a marca)
+  const vendorMudou = (await (await c.match(VENDOR))?.text()) !== VERSAO_VENDOR;
+  if (guardada === publicada) {
+    // mesma versão do site, mas este service worker chegou depois com outras bibliotecas: as guardadas entram na lista
+    if (vendorMudou) {
+      for (const k of await c.keys()) if (EH_VENDOR.test(new URL(k.url).pathname)) pendentes.set(k.url, 0);
+      await c.put(VENDOR, new Response(VERSAO_VENDOR));
+      await gravarPendentes();
+    }
+    return 'copia';
+  }
   // versão nova: sai da cópia o que é da versão anterior (os arquivos entram de novo conforme a página os pede); tudo o que
   // estava guardado fica na lista para baixar em segundo plano, e as bibliotecas e modelos antigos ficam até o novo chegar
   for (const k of await c.keys()) {
     if (INTERNOS.includes(k.url)) continue;
+    if (!vendorMudou && EH_VENDOR.test(new URL(k.url).pathname)) continue; // biblioteca igual: fica como está, sem baixar de novo
     if (k.url !== PAGINA) pendentes.set(k.url, 0);
     if (k.url === PAGINA || !MANTER_ATE_O_NOVO.test(new URL(k.url).pathname)) await c.delete(k);
   }
   await c.put(MARCA, new Response(publicada));
+  if (vendorMudou) await c.put(VENDOR, new Response(VERSAO_VENDOR));
   await gravarPendentes();
   return 'rede';
 }
