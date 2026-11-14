@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-ETTWF/QgvMpy5fBjburx7pYtDuAEZ7TGSk5iKUPkeHg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-AInunmDnoihwgEgSleq7GHiCtFLVU7ru5B1/ZLzUS1Y=' 'sha256-9pNdWGf30fePo2YI2aqmMuiq4kjy/CZ8Us5ndkaDYXo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="6aa5e40a072096ea">
+<meta name="fontes" content="71230ced31c81fc3">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -19128,8 +19128,8 @@ ${FECHO}` };
   }
   function caixaAvulsas() {
     const pend = d().avulsas.filter((a) => !faturasDe(d(), "avulsa", a.id).length);
-    return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link("#/novo/avulsas?modelo=airbnb", "Nova NF avulsa do Airbnb", "botao")} ${link("#/novo/avulsas", "Nova NF avulsa", "botao secundario")}</div>` : ""}</div>
-    <p class="suave">Para recebimentos fora do boleto, como o faturamento do Airbnb (lançamento esporádico com a data em que o dinheiro entrou) ou uma nota com cliente e imóvel que você escolher. Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
+    return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link("#/novo/avulsas", "Nova NF avulsa", "botao")}</div>` : ""}</div>
+    <p class="suave">Para recebimentos fora do boleto: uma nota com cliente e imóvel que você escolher. A do Airbnb não se cria aqui: lance os ganhos em cada imóvel (Financeiro) e use "Gerar a NF do Airbnb", que soma o mês numa NF só; depois de gerada, ela aparece nesta lista e pode ser editada (os dados do cliente ficam guardados como padrão se você marcar). Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
       ${pend.map((a) => `<tr><td>${dataBr(a.data_pagamento)}</td><td>${esc(a.tomador_nome)}</td><td>${esc(a.descricao || "")}</td><td class="n">${reais(a.valor)}</td>
         <td class="n">${opera() ? `${link(`#/editar/avulsas/${a.id}`, "Editar")} ${botao("excluir", "×", { tabela: "avulsas", id: a.id }, "x-excluir", "Excluir esta NF avulsa?")}` : ""}</td></tr>`).join("")}</table>` : ""}</div>`;
@@ -19483,7 +19483,7 @@ ${FECHO}` };
       const c = r.contrato;
       const i = buscar2("imoveis", c.imovel_id);
       const p2 = partesReajuste(c, r);
-      const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : temCaucao(c) && garantiaDepositada(c) && c.caucao_meses > 0 && k.novoBonificado !== null ? `${reais(valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * k.novoBonificado)}</b>` : '<span class="suave">-</span>';
+      const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : regra("caucao_acompanha") && temCaucao(c) && garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null ? `${reais(valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * aluguelDaCaucao(k.novo, c))}</b>` : '<span class="suave">-</span>';
       return `<div class="reajuste-card ${String(c.id) === q.contrato ? "amarelo" : ""}"><div class="reajuste-topo">
         <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : "")} – ${esc(c.inquilino_nome)}</b></a>
           <div class="suave">${r.anos} ano(s) · ${esc(k.indiceContrato || "índice não informado")}${k.escolhido ? ` ${pct(k.percentual)} até ${compBr(k.escolhido.registro.mes_ref)}` : ""} ${!k.escolhido && k.faltando.length ? etiqueta(`falta ${k.faltando.join(" e ")}`, "perigo") : ""}</div></div>
@@ -19535,12 +19535,13 @@ ${FECHO}` };
     } : calc;
     const empresa = locadorasDoContrato(d(), c)[0] || { nome: "" };
     const anterior = somarMeses(comp, -1);
-    const vencNovo = vencimentoDaCompetencia(comp, c.dia_vencimento || 10, c.cobranca_mes_seguinte !== false);
+    const vencNovo = vencimentoDoReajuste(d(), c, comp);
     if (k.percentual === null) {
       return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(" e ") || "o índice do contrato")} até ${compBr(anterior)}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, "Ir para Reajustes")}</div>`;
     }
     const indiceTexto = x && x.digitado ? `o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ""}` : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
-    let caucao = temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: k.novoBonificado, nova: c.caucao_meses * k.novoBonificado, atual: valorGarantia(d(), c) } : null;
+    const baseCaucao = aluguelDaCaucao(k.novo, c);
+    let caucao = regra("caucao_acompanha") && temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: baseCaucao, nova: c.caucao_meses * baseCaucao, atual: valorGarantia(d(), c) } : null;
     if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
     return `${x ? "" : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
@@ -22270,12 +22271,13 @@ ${m.texto}
       salvar: (db, dados, q) => encerrarContrato(db, Number(q.contrato), dados, login())
     },
     avulsas: {
-      titulo: (r, q) => r ? "Editar NF avulsa" : q.modelo === "airbnb" ? "Nova NF avulsa do Airbnb" : "Nova NF avulsa",
+      titulo: (r) => r ? r.airbnb_competencia ? `Editar a NF do Airbnb de ${compBr(r.airbnb_competencia)}` : "Editar NF avulsa" : "Nova NF avulsa",
       campos: () => AVULSA.map((c) => c.nome === "imovel_id" ? { ...c, opcoes: ordenar(d().imoveis, "nome").map((i) => [String(i.id), i.nome]) } : c),
-      // Airbnb: vem preenchida com os dados padrão (todos podem ser mudados aqui)
-      padrao: (q) => ({ data_pagamento: hojeIso(), ...q.modelo === "airbnb" ? modeloAirbnb(d()) : {} }),
-      aviso: (r, q) => !r && q.modelo === "airbnb" ? "Dados do Airbnb já preenchidos: confira, informe a data em que o dinheiro entrou e o valor. Pode mudar qualquer campo." : "",
-      extraHtml: (r, q) => !r && q.modelo === "airbnb" ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : "",
+      // A NF do Airbnb nasce em "Gerar a NF do Airbnb" (R.gerarNfAirbnb, uma por mês, com os dados padrão); aqui só se edita,
+      // e os dados do cliente podem ficar como padrão das próximas. (O botão "Nova NF avulsa do Airbnb" saiu em 2026-11-13: criava uma NF em dobro.)
+      padrao: () => ({ data_pagamento: hojeIso() }),
+      aviso: (r) => r && r.airbnb_competencia ? 'NF do Airbnb gerada pela soma dos ganhos lançados nos imóveis: o valor e as datas acompanham os ganhos ("Acertar a NF do Airbnb"). Aqui você muda os dados do cliente e as observações.' : "",
+      extraHtml: (r) => r && r.airbnb_competencia ? '<p style="margin-top:12px"><label class="check" style="padding:0"><input type="checkbox" name="salvar_modelo" value="1"> Guardar a descrição, o cliente, o imóvel, o município e as observações como padrão das próximas NFs do Airbnb</label></p>' : "",
       voltar: () => "#/faturas",
       descricao: (dados) => `NF avulsa: ${dados.tomador_nome} ${reais(dados.valor)}`,
       conferir: conferirAvulsa,
