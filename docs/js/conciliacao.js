@@ -177,8 +177,8 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
     const igual = mesmoLancamento(daConta, m, usadas);
     if (igual) { usadas.add(igual.id); juntarIdentificadores(d, igual, m, usuario); repetidas += 1; continue; }
     if (!maior || m.data > maior) maior = m.data;
-    novas.push(inserir(d, 'movimentacoes_banco', { ...m, importada_em: new Date().toISOString(), ...CAMPOS_DESTINO }, usuario,
-      `Extrato ${apelidoDaConta(d, contaId)}: ${C.dataBr(m.data)} · ${m.tipo} ${C.reais(m.valor)} · ${m.descricao}`.slice(0, 200)));
+    // sem linha de histórico por lançamento (o lançamento É o registro do banco): fica uma linha só da importação, abaixo, e quem importou no registro
+    novas.push(inserir(d, 'movimentacoes_banco', { ...m, importada_em: new Date().toISOString(), importada_por: usuario || '', ...CAMPOS_DESTINO }, usuario, '', { historico: false }));
   }
   const ultimo = ate || maior;
   let fim = ultimo && ultimo >= dia ? C.somarDias(dia, -1) : ultimo;
@@ -188,7 +188,7 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
     if (!anterior || fim > anterior) d.extrato_importado_ate = { ...(d.extrato_importado_ate || {}), [contaId]: fim };
   }
   registrar(d, usuario, 'Alteração', 'banco', null, `Extrato ${apelidoDaConta(d, contaId)} importado${de ? ` de ${C.dataBr(de)}` : ''}${fim ? ` até ${C.dataBr(fim)}` : ''}: ${novas.length} nova(s), ${repetidas} já estava(m)`,
-    { conta_id: contaId, novas: novas.length, repetidas, de, ate: fim });
+    { conta_id: contaId, novas: novas.length, repetidas, de, ate: fim, entradas: novas.filter((x) => x.tipo === 'entrada').reduce((s, x) => s + x.valor, 0), saidas: novas.filter((x) => x.tipo !== 'entrada').reduce((s, x) => s + x.valor, 0) });
   return { novas, repetidas, conta };
 }
 
