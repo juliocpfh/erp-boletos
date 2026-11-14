@@ -2183,16 +2183,22 @@ const casadoOuUniao = (estado) => ['Casado(a)', 'União estável'].includes(esta
 /** Interessado (pessoa física) casado ou em união estável: a ficha pede os dados e os documentos do cônjuge. */
 export const fichaComConjuge = (f) => f.inquilino_tipo !== PJ && casadoOuUniao(f.inquilino_estado_civil);
 
+/** Partes da lista de documentos da pessoa física (a página da ficha pela internet monta a lista com elas, conforme o que a pessoa escolhe). */
+export const PARTES_DOCUMENTOS_PF = {
+  inicio: ['Documento com foto e CPF (RG ou CNH)'],
+  conjuge: ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a)'],
+  renda_padrao: ['Comprovante de renda dos 3 últimos meses'],
+  fim: ['Comprovante de residência atual (conta de água, energia ou telefone)'],
+};
+
 /** Documentos que o interessado manda com a ficha. Ex.: CLT solteiro → documento com foto, 3 holerites, carteira digital, residência. */
 export function documentosDaFicha(f) {
   if (f.inquilino_tipo === PJ) {
     return ['Contrato social e a última alteração', 'Cartão do CNPJ', 'Documento com foto e CPF do representante',
       'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)', 'Comprovante de endereço da empresa'];
   }
-  return ['Documento com foto e CPF (RG ou CNH)',
-    ...(fichaComConjuge(f) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a)'] : []),
-    ...(DOCUMENTOS_RENDA[f.renda_tipo] || ['Comprovante de renda dos 3 últimos meses']),
-    'Comprovante de residência atual (conta de água, energia ou telefone)'];
+  const p = PARTES_DOCUMENTOS_PF;
+  return [...p.inicio, ...(fichaComConjuge(f) ? p.conjuge : []), ...(DOCUMENTOS_RENDA[f.renda_tipo] || p.renda_padrao), ...p.fim];
 }
 
 /** Documentos do fiador (``x``: os dados dele, sem o prefixo fiadorN_). Casado: também os do cônjuge, que assina a fiança. */

@@ -11,6 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { r2Falso } from '../tests/r2-falso.mjs';
 import { CofreDO } from './cofre.mjs';
+import { atenderFicha } from './ficha-publica.mjs';
 import { atender } from './worker.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +27,7 @@ const R2 = r2Falso();
 const cofre = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: R2 });
 const env = {
   MODO_TESTE: '1', EMAIL_TESTE: process.env.EMAIL_TESTE || 'teste@exemplo.com.br', ORIGEM: `http://localhost:${PORTA}`,
+  URL_FICHA: `http://localhost:${PORTA}/ficha`, // aqui a página da ficha fica em /ficha (lá, em ficha.ankjck.com.br)
   SIMULAR_GMAIL: process.env.SIMULAR_GMAIL === '1' ? '1' : '',
   ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^GMAIL_[A-Z_]+$/.test(k))),
   DADOS: R2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => cofre.fetch(req) }) },
@@ -38,6 +40,15 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORTA}`);
   try {
     if (url.pathname === '/__internet') { semInternet = url.searchParams.get('ligar') === '0'; res.end(semInternet ? 'sem internet' : 'com internet'); return; }
+    // ficha pela internet: a página (/ficha) e as rotas públicas, como no endereço da ficha
+    if (url.pathname === '/ficha' || url.pathname.startsWith('/api/publico/')) {
+      if (semInternet) { req.socket.destroy(); return; }
+      const corpo = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(await Array.fromAsync(req));
+      const r = await atenderFicha(new Request(url, { method: req.method, headers: req.headers, body: corpo }), env);
+      res.writeHead(r.status, Object.fromEntries(r.headers));
+      res.end(Buffer.from(await r.arrayBuffer()));
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       if (semInternet) { req.socket.destroy(); return; }
       const corpo = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(await Array.fromAsync(req));

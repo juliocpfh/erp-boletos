@@ -53,7 +53,13 @@ DOCUMENTOS
 SEGURO FIANÇA
 A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]
 
-Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
+[se link]PELA INTERNET
+Se preferir, preencha a ficha, mande os documentos e, depois, a ficha assinada por este link, que é só seu e vale até {link_validade}:
+{link}[se link_fiador]
+
+Link para o fiador (encaminhe para ele): {link_fiador}[fim]
+
+[fim]Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
 
 COMO FUNCIONA
 1. Análise da ficha em até 2 dias úteis
