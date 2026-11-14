@@ -242,7 +242,9 @@ export async function atualizarLink(request, env, email, avisar = null) {
   const p = await lerJson(request);
   const fichaId = fichaIdValido(p.ficha_id);
   const pessoa = pessoaValida(p.pessoa);
+  let mudou = false;
   const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
+    const antes = JSON.stringify([r.situacao, r.faltando]);
     if (p.situacao !== undefined) {
       if (!SITUACOES_EQUIPE.includes(p.situacao)) throw new ErroFicha(400, 'Situação inválida.');
       r.eventos.push({ em: new Date().toISOString(), texto: `situação "${p.situacao}" por ${email}` });
@@ -252,10 +254,13 @@ export async function atualizarLink(request, env, email, avisar = null) {
     if (p.faltando !== undefined) r.faltando = (Array.isArray(p.faltando) ? p.faltando : []).slice(0, 15).map((x) => texto(x, 300)).filter(Boolean);
     if (p.visto) r.visto_em = new Date().toISOString();
     r.eventos = r.eventos.slice(-50);
+    mudou = antes !== JSON.stringify([r.situacao, r.faltando]);
   });
   if (novo.situacao === 'Encerrado' && novo.hash) await env.DADOS.delete(chaveToken(novo.hash));
-  if (avisar && p.situacao === 'Falta documento') await avisar(env, novo, 'falta');
-  if (avisar && p.situacao === 'Assinar') await avisar(env, novo, 'assinar');
+  // avisa a pessoa só quando muda de verdade (clicar duas vezes não repete) e com o link ainda no prazo
+  const noPrazo = novo.vence_em > new Date().toISOString();
+  if (avisar && mudou && noPrazo && p.situacao === 'Falta documento') await avisar(env, novo, 'falta');
+  if (avisar && mudou && noPrazo && p.situacao === 'Assinar') await avisar(env, novo, 'assinar');
   return json(200, { ok: true, link: paraEquipe(novo) });
 }
 

@@ -271,7 +271,7 @@ self.addEventListener('push', (ev) => {
   let d = {};
   try { d = ev.data ? ev.data.json() : {}; } catch { d = {}; }
   ev.waitUntil(self.registration.showNotification(d.titulo || 'Administração de Imóveis', {
-    body: d.texto || 'Novidade na ficha pela internet.', icon: 'icones/erp-192.png', badge: 'icones/erp-192.png', tag: d.tag || 'ficha', data: { url: d.url || './' },
+    body: d.texto || 'Novidade na ficha pela internet.', icon: 'icones/erp-192.png', badge: 'icones/erp-192.png', tag: d.tag || 'ficha', renotify: true, data: { url: d.url || './' },
   }));
 });
 
@@ -280,7 +280,8 @@ self.addEventListener('notificationclick', (ev) => {
   const url = new URL((ev.notification.data && ev.notification.data.url) || './', self.location.href).href;
   ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
     const aberta = janelas.find((j) => j.url.startsWith(self.registration.scope));
-    if (aberta) return aberta.navigate(url).then((j) => (j || aberta).focus()).catch(() => aberta.focus());
-    return self.clients.openWindow(url);
+    if (!aberta) return self.clients.openWindow(url);
+    // primeiro traz a janela; depois vai para a ficha (janela não controlada recusa navigate: abre outra)
+    return aberta.focus().then((j) => (j || aberta).navigate(url)).catch(() => self.clients.openWindow(url));
   }));
 });

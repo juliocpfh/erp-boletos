@@ -15,6 +15,8 @@ const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart
 const SERVICOS = /^https:\/\/([a-z0-9-]+\.)*(fcm\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.apple\.com)\//i;
 
 export const pushLigado = (env) => !!(env.VAPID_PUBLICA && env.VAPID_PRIVADA);
+/** Contato do VAPID: "mailto:" + e-mail (a Apple recusa outro formato); fora disso, o padrão. */
+const contato = (env) => (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(env.VAPID_CONTATO || '').trim()) ? String(env.VAPID_CONTATO).trim() : 'mailto:administracao@ankjck.com.br');
 
 /** Chave privada VAPID (d) com a pública (x, y) como JWK, para assinar com ES256. */
 async function chaveVapid(env) {
@@ -27,7 +29,7 @@ async function chaveVapid(env) {
 export async function autorizacaoVapid(env, endpoint, agora = Date.now()) {
   const aud = new URL(endpoint).origin;
   const cab = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
-  const corpo = b64url(enc.encode(JSON.stringify({ aud, exp: Math.floor(agora / 1000) + 12 * 3600, sub: env.VAPID_CONTATO || 'mailto:administracao@ankjck.com.br' })));
+  const corpo = b64url(enc.encode(JSON.stringify({ aud, exp: Math.floor(agora / 1000) + 12 * 3600, sub: contato(env) })));
   const assinatura = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, await chaveVapid(env), enc.encode(`${cab}.${corpo}`));
   return `vapid t=${cab}.${corpo}.${b64url(assinatura)}, k=${env.VAPID_PUBLICA}`;
 }
@@ -74,15 +76,32 @@ export async function desinscrever(env, endpoint) {
  * Manda { titulo, texto, url, tag } para todos os aparelhos inscritos. Inscrição que o serviço diz que acabou (404/410) é
  * apagada. Devolve quantos aceitaram. Sem as chaves VAPID: não manda nada.
  */
+/** Quem ligou o aviso ainda é da equipe (usuário ativo, operador ou administrador)? Sem cofre (testes): sim. */
+async function aindaNaEquipe(env, email) {
+  if (!env.COFRE || !email) return true;
+  try {
+    const r = await env.COFRE.get(env.COFRE.idFromName('principal')).fetch(new Request('https://cofre/papel?nivel=operador', { headers: { 'X-Email-Conferido': email } }));
+    return r.ok || r.status >= 500; // erro do cofre: não apaga a inscrição por engano
+  } catch { return true; }
+}
+
 export async function avisarAparelhos(env, mensagem, { buscar = fetch } = {}) {
   if (!pushLigado(env)) return 0;
-  const lista = await env.DADOS.list({ prefix: 'publico/push/', limit: 100 });
+  const objetos = [];
+  let cursor;
+  do {
+    const r = await env.DADOS.list({ prefix: 'publico/push/', limit: 1000, cursor });
+    objetos.push(...r.objects);
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
   let ok = 0;
-  for (const o of lista.objects) {
-    const obj = await env.DADOS.get(o.key);
-    if (!obj) continue;
-    const s = JSON.parse(await obj.text());
+  for (const o of objetos) {
     try {
+      const obj = await env.DADOS.get(o.key);
+      if (!obj) continue;
+      const s = JSON.parse(await obj.text());
+      // quem saiu da equipe deixa de receber (os avisos têm nome e imóvel do interessado)
+      if (!(await aindaNaEquipe(env, s.email))) { await env.DADOS.delete(o.key); continue; }
       const corpo = await cifrar(JSON.stringify(mensagem), s.p256dh, s.auth);
       const r = await buscar(s.endpoint, {
         method: 'POST', body: corpo,

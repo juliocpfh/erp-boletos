@@ -10,11 +10,14 @@ import { avisarAparelhos } from './push.mjs';
 
 const primeiro = (n) => String(n || '').trim().split(/\s+/)[0] || '';
 
-/** E-mail da pessoa do link: o que ela mandou por último ou o que já estava na ficha. */
+/**
+ * E-mail da pessoa do link: o que a equipe pôs na ficha; o digitado no link só quando a ficha não tem (assim quem tem o
+ * link não faz o Gmail da empresa escrever para um endereço qualquer).
+ */
 export function emailDaPessoa(registro) {
   const campo = registro.pessoa === 'interessado' ? 'inquilino_email' : `${registro.pessoa}_email`;
   const ultimo = (registro.respostas || []).at(-1);
-  const e = String((ultimo && ultimo.valores[campo]) || (registro.valores_iniciais || {})[campo] || '').trim();
+  const e = String((registro.valores_iniciais || {})[campo] || (ultimo && ultimo.valores[campo]) || '').trim();
   return emailValido(e) ? e : '';
 }
 
@@ -38,6 +41,8 @@ export function textosDoAviso(registro, evento, detalhe = '') {
   } else if (evento === 'documento') {
     if ((registro.arquivos || []).length === 1) out.equipe = { titulo: `${quem} começou a mandar documentos`, texto: `Primeiro documento pelo link: ${detalhe}.` };
   } else if (evento === 'assinou') {
+    // só a primeira ficha assinada avisa (mandar de novo não repete os e-mails)
+    if ((registro.arquivos || []).filter((a) => /assinada/.test(a.documento)).length > 1) return out;
     out.pessoa = { assunto: `Recebemos ${qual} assinada${imovel}`, texto: `${ola}\n\nRecebemos a ficha assinada. Avisaremos o resultado da análise.${fecho}` };
     out.equipe = { titulo: `${quem} mandou a ficha assinada`, texto: `A ficha assinada chegou pelo link${imovel}. Confira a assinatura na página da ficha.` };
   } else if (evento === 'desistiu') {

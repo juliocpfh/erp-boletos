@@ -65,8 +65,12 @@ test('textos de cada etapa: pessoa e equipe; o link não vai no e-mail', () => {
   assert.doesNotMatch(falta.pessoa.texto, /https?:/);
   assert.match(textosDoAviso(r, 'desistiu').pessoa.texto, /reserva de R\$ 1\.000,00 é devolvida por inteiro/);
   assert.match(textosDoAviso(r, 'assinar').pessoa.assunto, /^Sua ficha cadastral está pronta para assinar/);
-  // e-mail da pessoa: o que ela mandou por último vale mais que o da ficha; inválido não manda
-  assert.equal(emailDaPessoa(registro({ respostas: [{ valores: { inquilino_email: 'novo@exemplo.com.br' } }] })), 'novo@exemplo.com.br');
+  // e-mail da pessoa: o da ficha (posto pela equipe) vale mais que o digitado no link; sem o da ficha, o digitado; inválido não manda
+  assert.equal(emailDaPessoa(registro({ respostas: [{ valores: { inquilino_email: 'outro@exemplo.com.br' } }] })), 'maria@exemplo.com.br');
+  assert.equal(emailDaPessoa(registro({ valores_iniciais: {}, respostas: [{ valores: { inquilino_email: 'novo@exemplo.com.br' } }] })), 'novo@exemplo.com.br');
+  // a segunda ficha assinada não repete os avisos
+  assert.ok(textosDoAviso(registro({ arquivos: [{ documento: 'Ficha cadastral assinada' }] }), 'assinou').pessoa);
+  assert.equal(textosDoAviso(registro({ arquivos: [{ documento: 'Ficha cadastral assinada' }, { documento: 'Ficha cadastral assinada' }] }), 'assinou').equipe, null);
   assert.equal(emailDaPessoa(registro({ valores_iniciais: { inquilino_email: 'sem arroba' } })), '');
   assert.equal(emailDaPessoa({ pessoa: 'fiador1', respostas: [], valores_iniciais: { fiador1_email: 'ana@exemplo.com.br' } }), 'ana@exemplo.com.br');
 });
@@ -95,6 +99,10 @@ test('aviso no celular: cifrado para o aparelho, assinado com VAPID; inscrição
   assert.equal(fcm.op.headers['Content-Encoding'], 'aes128gcm');
   assert.match(JSON.parse(await decifrar(fcm.op.body, ap)).titulo, /Maria mandou os dados/);
   assert.equal([...env.DADOS.m.keys()].filter((k) => k.startsWith('publico/push/')).length, 1, 'a vencida (410) saiu');
+  // quem saiu da equipe (o cofre não reconhece mais o e-mail) deixa de receber e a inscrição sai
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async () => new Response('{"erro":"sem acesso"}', { status: 403 }) }) };
+  assert.equal(await avisarAparelhos({ ...env, COFRE }, { titulo: 'x' }, { buscar }), 0);
+  assert.equal([...env.DADOS.m.keys()].filter((k) => k.startsWith('publico/push/')).length, 0);
   // sem as chaves VAPID: nada sai
   assert.equal(await avisarAparelhos({ DADOS: env.DADOS }, { titulo: 'x' }, { buscar }), 0);
 });
@@ -115,6 +123,10 @@ test('fluxo: a pessoa manda os dados → e-mail para ela e para a equipe; a equi
     logs.length = 0;
     await equipe('atualizar', { ficha_id: 7, pessoa: 'interessado', situacao: 'Falta documento', faltando: ['Comprovante de residência'] });
     assert.ok(logs.some((l) => /para maria@exemplo\.com\.br.*"Falta um documento: sua ficha cadastral"/.test(l)));
+    // o mesmo pedido de novo (clique duplo) não repete o e-mail
+    logs.length = 0;
+    await equipe('atualizar', { ficha_id: 7, pessoa: 'interessado', situacao: 'Falta documento', faltando: ['Comprovante de residência'] });
+    assert.ok(!logs.some((l) => /Falta um documento/.test(l)));
     // sem Gmail ligado, nada sai e não dá erro
     const feitos = await avisar({ DADOS: r2Falso() }, registro({ respostas: [{ em: 'x', valores: {} }] }), 'enviou');
     assert.deepEqual(feitos, []);
