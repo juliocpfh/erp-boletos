@@ -48,6 +48,10 @@ export const DEFINICOES_REGRAS = [
     explica: 'Como se calcula o aluguel dos dias ocupados no mês de entrada e no de saída.',
     consequencia: 'Vale para os boletos gerados ou recalculados daqui em diante. O IPTU e o FCI do mês continuam pelos dias reais.',
     lei: 'Sem lei específica: vale o combinado no contrato (' + LI + ', art. 17).' },
+  { chave: 'ressarcimento_na_nf', grupo: 'aluguel', rotulo: 'Ressarcimento de condomínio sai do valor da NF', tipo: 'simnao', padrao: false,
+    explica: 'Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. Não (padrão): a NF sai com o aluguel cheio e o ressarcimento conta como gasto do imóvel nos Resultados. Sim: a NF fica com o aluguel menos a taxa e ela não conta de novo como gasto. Ex.: aluguel R$ 1.215,00 e fundo de obras R$ 150,00 → NF de R$ 1.215,00 (não) ou de R$ 1.065,00 (sim).',
+    consequencia: 'Vale para os boletos em aberto que têm ressarcimento e para os gerados daqui em diante; os pagos não mudam. Confirme com o contador qual forma usar.',
+    lei: 'Sem lei específica: é a forma de escriturar o ressarcimento (' + LI + ', art. 22, parágrafo único: despesas extraordinárias do condomínio são do locador).' },
   { chave: 'dia_gerar_boletos', grupo: 'aluguel', rotulo: 'Dia de gerar os boletos do mês', tipo: 'inteiro', padrao: 20, min: 1, max: 28,
     explica: 'A partir deste dia o fechamento do mês pede para gerar os boletos do próprio mês (que vencem no mês seguinte). Ex.: dia 20 → a partir de 20/10, os de 10/2026.',
     consequencia: 'Muda só quando a etapa "Gerar boletos" do fechamento aparece.',
@@ -142,6 +146,8 @@ export const DEFINICOES_REGRAS = [
     lei: 'LGPD (Lei 13.709/2018), art. 6º, III, e arts. 15 e 16.' },
   { chave: 'dias_antecipacao_banco', grupo: 'rotina', rotulo: 'Extrato: ligar a entrada a boletos que vencem até quantos dias depois', tipo: 'inteiro', padrao: 45, min: 1, max: 120,
     explica: 'Ex.: entrada de 10/08 → procura boletos com vencimento até 24/09 (pagamento adiantado).', consequencia: 'Mais dias: acha mais pagamentos adiantados, com mais sugestões erradas.', lei: 'Sem lei: rotina.' },
+  { chave: 'tolerancia_boleto_dias', grupo: 'rotina', rotulo: 'Extrato: entrada casa com o boleto até quantos dias depois do vencimento', tipo: 'inteiro', padrao: 3, min: 0, max: 30,
+    explica: 'Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto. Ex.: 3 → vence dia 10, entrou dia 13.', consequencia: 'Mais dias: casa mais pagamentos atrasados pelo valor em dia, com mais sugestões erradas. Só muda as sugestões: nada é registrado sem a sua confirmação.', lei: 'Sem lei: rotina.' },
   { chave: 'dias_alerta_banco', grupo: 'rotina', rotulo: 'Alerta de movimentação do extrato sem destino depois de (dias)', tipo: 'inteiro', padrao: 7, min: 1, max: 90,
     explica: 'Movimentação sem destino há mais dias que isto vira alerta no Painel.', consequencia: 'Só muda o alerta.', lei: 'Sem lei: rotina.' },
   { chave: 'dias_extrato_recente', grupo: 'rotina', rotulo: 'Fechamento: extrato buscado há até (dias)', tipo: 'inteiro', padrao: 7, min: 0, max: 31,
@@ -231,9 +237,22 @@ export function limparValorRegra(chave, valor) {
   }
 }
 
+/**
+ * Duas regras ficavam fora de "Regras do sistema" até 2026-11-13: o ressarcimento na NF (`d.ressarcimento_abate_nf`, em Empresas)
+ * e a tolerância de dias do boleto (`config_banco.tolerancia_dias`, em Dados e backup). O valor antigo continua valendo enquanto
+ * a regra nova não tem linha própria; ao salvar as regras, `salvarRegrasSistema` grava a linha e apaga o campo antigo.
+ */
+export function regrasAntigasDe(d) {
+  const out = {};
+  if (d && d.ressarcimento_abate_nf === true) out.ressarcimento_na_nf = true;
+  const tol = d && d.config_banco && d.config_banco.tolerancia_dias;
+  if (Number.isInteger(tol) && tol >= 0 && tol <= 30 && tol !== POR_CHAVE.get('tolerancia_boleto_dias').padrao) out.tolerancia_boleto_dias = tol;
+  return out;
+}
+
 /** Valores escolhidos no banco ``d`` (só os diferentes do padrão), já conferidos: o que não passa na conferência vale o padrão. */
 export function escolhasDe(d) {
-  const out = {};
+  const out = regrasAntigasDe(d);
   for (const r of (d && Array.isArray(d.config_regras) ? d.config_regras : [])) {
     if (!r || !POR_CHAVE.has(r.chave)) continue;
     try { out[r.chave] = limparValorRegra(r.chave, r.valor); } catch { /* valor estragado: fica o padrão */ }

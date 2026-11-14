@@ -191,3 +191,49 @@ test('boleto do C6: multa em % sobre o boleto (padrão) ou em reais quando é s�
     assert.equal(b.juros_ao_dia, 66);
   });
 });
+
+test('regras que ficavam fora de "Regras do sistema" (ressarcimento na NF, tolerância do boleto): o valor antigo continua valendo e passa para as regras ao salvar', () => {
+  try {
+    // banco antigo: ressarcimento abatendo a NF (Empresas) e tolerância de 5 dias (Dados e backup → Banco)
+    const d = R.bancoVazio();
+    d.ressarcimento_abate_nf = true;
+    d.config_banco = { tolerancia_dias: 5 };
+    R.normalizar(d);
+    assert.equal(R.regra('ressarcimento_na_nf'), true);
+    assert.equal(R.regra('tolerancia_boleto_dias'), 5);
+    assert.equal(d.config_regras.length, 0, 'abrir o banco não grava nada (o operador não pode gravar regras na nuvem)');
+    assert.deepEqual(CR.regrasAntigasDe(d), { ressarcimento_na_nf: true, tolerancia_boleto_dias: 5 });
+    // mudar OUTRA regra mantém as duas: viram linhas próprias e os campos antigos saem
+    R.mudarRegraSistema(d, 'dia_gerar_boletos', 25, 'admin');
+    assert.deepEqual(d.config_regras.map((r) => [r.chave, r.valor]).sort(), [['dia_gerar_boletos', 25], ['ressarcimento_na_nf', true], ['tolerancia_boleto_dias', 5]]);
+    assert.equal(d.ressarcimento_abate_nf, false);
+    assert.equal('tolerancia_dias' in d.config_banco, false);
+    R.normalizar(d);
+    assert.equal(R.regra('ressarcimento_na_nf'), true);
+    assert.equal(R.regra('tolerancia_boleto_dias'), 5);
+    // voltar ao padrão vale também para elas (o valor antigo não "ressuscita")
+    R.voltarRegrasAoPadrao(d, 'admin');
+    R.normalizar(d);
+    assert.equal(R.regra('ressarcimento_na_nf'), false);
+    assert.equal(R.regra('tolerancia_boleto_dias'), 3);
+    // tolerância antiga igual ao padrão (3) ou estragada não vira escolha
+    const d2 = R.bancoVazio();
+    d2.config_banco = { tolerancia_dias: 3 };
+    assert.deepEqual(CR.regrasAntigasDe(R.normalizar(d2)), {});
+    d2.config_banco.tolerancia_dias = 'x';
+    assert.deepEqual(CR.regrasAntigasDe(d2), {});
+  } finally { CR.usarRegras(null); }
+});
+
+test('ressarcimento na NF: mudar a regra acerta os boletos em aberto com ressarcimento (os pagos não mudam)', () => {
+  try {
+    const d = banco();
+    d.cobrancas.push({ id: 1, contrato_id: 1, competencia: '2026-09', ressarcimento: 15000, ressarcimento_na_nf: false, data_pagamento: null, banco: null },
+      { id: 2, contrato_id: 1, competencia: '2026-08', ressarcimento: 15000, ressarcimento_na_nf: false, data_pagamento: '2026-09-10', banco: null },
+      { id: 3, contrato_id: 1, competencia: '2026-10', ressarcimento: 0, ressarcimento_na_nf: false, data_pagamento: null, banco: null });
+    R.mudarRegraSistema(d, 'ressarcimento_na_nf', true, 'admin');
+    assert.deepEqual(d.cobrancas.map((cb) => cb.ressarcimento_na_nf), [true, false, false]);
+    R.mudarRegraSistema(d, 'ressarcimento_na_nf', false, 'admin');
+    assert.deepEqual(d.cobrancas.map((cb) => cb.ressarcimento_na_nf), [false, false, false]);
+  } finally { CR.usarRegras(null); }
+});

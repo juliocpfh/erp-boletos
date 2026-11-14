@@ -142,8 +142,8 @@ Três varreduras só de leitura (desempenho, dados e fluxo, conflitos). Medido n
 - [x] **R5.** Texto da pasta do contador (Banco) na nuvem aponta para o botão do ZIP do mês.
 - [x] **R6.** Tela NF: o texto cita "Numerar as NFs marcadas".
 - [x] **R7.** Filtro "Vencidos e não pagos" (Boletos) avisa que conta inquilinos encerrados (Inadimplência não conta).
-- [ ] **R8.** Conferência de pagamentos no banco: fica a da tela Banco; o botão de Boletos leva até ela (dono: "sim").
-- [ ] **R9.** Ressarcimento na NF e tolerância de dias do boleto passam para Regras do sistema (dono: "corrija").
+- [x] **R8.** Conferência de pagamentos no banco: fica a da tela Banco; o botão de Boletos virou atalho até ela (`#/banco?ir=conferir-boletos`) e a ação `conferirPagamentosC6` saiu (dono: "sim"). `R.periodoConferenciaC6` e `R.casarListagemC6` ficaram sem uso na tela (só nos testes): entram na limpeza R16.
+- [x] **R9.** Ressarcimento na NF (`ressarcimento_na_nf`) e tolerância de dias do boleto (`tolerancia_boleto_dias`) passaram para Regras do sistema (dono: "corrija"); o valor que estava em uso continua valendo (`regrasAntigasDe`) e passa para as regras na primeira vez em que o administrador as salva.
 - [x] **R10.** "Emite NF" continua mudando em três lugares (dono: "mantenha e coloque justificativa na documentação"): ver `DECISOES.md`, 2026-11-13.
 - [ ] **R11.** "Movimentações sem destino" em Financeiro e Banco: fica como está até o C6 entrar em uso (o dono ainda não conhece o módulo).
 - [x] **R12-R15.** Boletos: "Tela NF" no lugar de "Ver NFs"; Painel: "Ver os cadastros incompletos" abre as Pendências já nessa parte; página do boleto: com o pagamento informado pelo banco fica só "Registrar o pagamento"; contrato, vistoria e aditivo: "Imprimir" ao lado de "Baixar PDF".

@@ -1420,7 +1420,7 @@ export function montarCobranca(d, contrato, comp) {
     aluguel: r.aluguel, desconto: r.desconto, iptu: r.iptu, iptu_parcela: iptuRots.join('; '), seguro: r.seguro,
     seguro_parcela: seguroRot, taxa_boleto: r.taxa_boleto, fci: fciDoMes(contrato, r.aluguel, r.desconto), outros: 0, outros_descricao: '',
     reserva_utilizada: 0, carencia,
-    ressarcimento: ressarc.valor, ressarcimento_descricao: ressarc.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && ressarc.valor > 0,
+    ressarcimento: ressarc.valor, ressarcimento_descricao: ressarc.descricao, ressarcimento_na_nf: CR.regra('ressarcimento_na_nf') && ressarc.valor > 0,
     multa_percentual: contrato.multa_percentual || 0, juros_mensal_percentual: contrato.juros_mensal_percentual || 0,
     // carência sem nada a cobrar (a reserva não conta: ela nunca entra no boleto da carência)
     situacao: carencia && r.total_pontual <= 0 ? 'Carência' : 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null,
@@ -5084,7 +5084,7 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
   const cb = boletoDoMes(d, contrato.id, comp);
   if (!cb || cb.data_pagamento) return cb || null;
   const r = ressarcimentosNoBoleto(d, contrato.id, comp);
-  atualizar(d, 'cobrancas', cb.id, { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: !!d.ressarcimento_abate_nf && r.valor > 0 },
+  atualizar(d, 'cobrancas', cb.id, { ressarcimento: r.valor, ressarcimento_descricao: r.descricao, ressarcimento_na_nf: CR.regra('ressarcimento_na_nf') && r.valor > 0 },
     usuario, `Boleto ${C.compBr(comp)}: ressarcimento de condomínio ${r.valor ? C.reais(r.valor) : 'retirado'}`);
   return cb;
 }
@@ -5914,7 +5914,7 @@ export function salvarGuiaImposto(d, emitenteId, imposto, periodo, valor, usuari
  * ({ conta: 'AAAA-MM-DD' }), porque config_banco só o administrador muda na nuvem e o operador também importa o extrato.
  */
 export const CONFIG_BANCO_FASE2 = {
-  pasta_contador: '_Contador', modelo_nome_comprovante: '{data} {empresa} {imovel} {tipo} {valor}', tolerancia_dias: 3,
+  pasta_contador: '_Contador', modelo_nome_comprovante: '{data} {empresa} {imovel} {tipo} {valor}',
   permitir_pagamentos: false, limite_pagamento: 0, ultima_importacao: {}, copiar_para_contador: true,
 };
 
@@ -6388,6 +6388,7 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   const limpos = {};
   for (const [k, v] of Object.entries(valores || {})) if (CR.definicaoRegra(k)) limpos[k] = CR.limparValorRegra(k, v);
   let mudou = 0;
+  const naNfAntes = CR.regrasDe(d).ressarcimento_na_nf;
   for (const def of CR.DEFINICOES_REGRAS) {
     const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
     const linha = d.config_regras.find((r) => r.chave === def.chave);
@@ -6396,7 +6397,13 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
     else if (linha && !CR.mesmoValor(linha.valor, novo)) { atualizar(d, 'config_regras', linha.id, { valor: novo }, usuario, `${motivo}: ${def.rotulo}`); mudou += 1; }
     else if (!linha && !padrao) { inserir(d, 'config_regras', { chave: def.chave, valor: novo }, usuario, `${motivo}: ${def.rotulo}`); mudou += 1; }
   }
+  // as duas regras que ficavam fora daqui (regrasAntigasDe) já têm a linha própria (ou voltaram ao padrão): o campo antigo sai
+  if (d.ressarcimento_abate_nf) { d.ressarcimento_abate_nf = false; mudou += 1; }
+  if (d.config_banco && 'tolerancia_dias' in d.config_banco) { const { tolerancia_dias: antiga, ...resto } = d.config_banco; d.config_banco = resto; }
   CR.usarRegras(d);
+  // ressarcimento na NF mudou: os boletos em aberto com ressarcimento passam a seguir a regra nova (os pagos não mudam)
+  const naNf = CR.regra('ressarcimento_na_nf');
+  if (naNf !== naNfAntes) for (const cb of d.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0 && !!x.ressarcimento_na_nf !== naNf)) atualizar(d, 'cobrancas', cb.id, { ressarcimento_na_nf: naNf }, usuario, 'Ressarcimento na NF (regra do sistema)');
   return mudou;
 }
 

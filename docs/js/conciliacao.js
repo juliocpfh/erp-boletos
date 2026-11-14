@@ -351,7 +351,7 @@ const marcarProvaveis = (lista) => { if (lista.length > 1) for (const x of lista
  * não aparece. A tela marca sozinha só o que ``prontoParaRegistrar`` aceita.
  */
 export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {}) {
-  const tol = dias ?? cfg(d).tolerancia_dias ?? CONFIG_BANCO_FASE2.tolerancia_dias;
+  const tol = dias ?? regra('tolerancia_boleto_dias'); // regra do sistema (antes, config_banco.tolerancia_dias)
   const planos = [];
   for (const x of pagamentosC6 || []) {
     if (Array.isArray(x.payments)) for (const p of x.payments) planos.push({ ...p, external_reference_id: x.external_reference_id || null, status: x.status || null });
@@ -421,7 +421,7 @@ export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, 
 
 /** Entradas do extrato que parecem boletos (em aberto, ou já pagos à mão: jaPago): [{ movimentacao_id, cobranca_id, certeza, previsto, pagouEmDia, jaPago }] (sem gravar). */
 export function conciliarMovimentacoes(d, movs, { dias = null } = {}) {
-  const tol = dias ?? cfg(d).tolerancia_dias ?? CONFIG_BANCO_FASE2.tolerancia_dias;
+  const tol = dias ?? regra('tolerancia_boleto_dias');
   const out = [];
   for (const m of movs || []) {
     if (m.tipo !== 'entrada' || m.classificacao) continue;
@@ -1099,7 +1099,6 @@ export function salvarConfigBanco2(d, campos, usuario) {
   const permitidos = Object.keys(CONFIG_BANCO_FASE2).filter((k) => k !== 'ultima_importacao');
   const novos = {};
   for (const k of permitidos) if (campos[k] !== undefined) novos[k] = campos[k];
-  if (novos.tolerancia_dias !== undefined) novos.tolerancia_dias = Math.max(0, Number(novos.tolerancia_dias) || 0);
   if (novos.limite_pagamento !== undefined) novos.limite_pagamento = Math.max(0, Number(novos.limite_pagamento) || 0);
   if (novos.pasta_contador !== undefined) novos.pasta_contador = nomeSemAcento(novos.pasta_contador) || '_Contador';
   if (novos.modelo_nome_comprovante !== undefined && !String(novos.modelo_nome_comprovante).includes('{')) throw new Error('O modelo do nome precisa de pelo menos um campo entre chaves, ex.: {data} {empresa} {imovel} {tipo} {valor}.');

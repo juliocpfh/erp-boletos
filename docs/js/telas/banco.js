@@ -450,11 +450,10 @@ export function caixaConfigBanco2() {
   if (!podeUsuario('admin')) return '';
   const cfg = { ...R.CONFIG_BANCO_FASE2, ...config() };
   return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
-    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)".</p>
+    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link('#/regras', 'Regras do sistema', '')}.</p>
     <form data-form="configBanco2" class="formulario">
       <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg.permitir_pagamentos ? 'checked' : ''}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
       <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg.limite_pagamento ? esc(reais(cfg.limite_pagamento, false)) : ''}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
-      <div><label>Tolerância para casar o boleto (dias)</label><input type="number" name="tolerancia_dias" min="0" max="30" value="${Number(cfg.tolerancia_dias) || 0}"><div class="ajuda">Entrada com o valor em dia até tantos dias depois do vencimento ainda casa com o boleto (ex.: 3 → vence dia 10, entrou dia 13).</div></div>
       <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
       <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
       <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg.copiar_para_contador !== false ? 'checked' : ''}> Guardar também uma cópia na pasta do contador</label></div>
@@ -1030,7 +1029,7 @@ export const FORMULARIOS_BANCO = {
     if (!podeUsuario('admin')) throw new Error('Só o administrador altera a configuração do banco.');
     const f = Object.fromEntries(new FormData(form));
     const campos = { permitir_pagamentos: f.permitir_pagamentos === '1', copiar_para_contador: f.copiar_para_contador === '1',
-      limite_pagamento: String(f.limite_pagamento || '').trim() ? C.centavos(f.limite_pagamento) : 0, tolerancia_dias: Number(f.tolerancia_dias) || 0,
+      limite_pagamento: String(f.limite_pagamento || '').trim() ? C.centavos(f.limite_pagamento) : 0,
       pasta_contador: String(f.pasta_contador || '').trim() || PASTA_CONTADOR, modelo_nome_comprovante: String(f.modelo_nome_comprovante || '').trim() || R.CONFIG_BANCO_FASE2.modelo_nome_comprovante };
     await alterar((db) => Z.salvarConfigBanco2(db, campos, login()));
     aviso(`Configuração do banco salva. Pagamentos pelo banco: ${campos.permitir_pagamentos ? 'permitidos' : 'desligados'}.`);

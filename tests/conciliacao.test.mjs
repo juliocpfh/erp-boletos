@@ -567,7 +567,7 @@ test('normalizar em banco antigo cria as tabelas e a configuração da fase 2 se
   assert.equal(R.idPastaAno(3, 2026), 32026);
   // configuração da fase 2 gravada com histórico, sem a senha
   Z.salvarConfigBanco2(d3, { pasta_contador: 'Contador Ébano', tolerancia_dias: '4', permitir_pagamentos: true, limite_pagamento: 500000, senha_ponte: 'nova' }, 'julio');
-  assert.deepEqual([d3.config_banco.pasta_contador, d3.config_banco.tolerancia_dias, d3.config_banco.permitir_pagamentos, d3.config_banco.limite_pagamento, d3.config_banco.senha_ponte], ['Contador Ebano', 4, true, 500000, undefined] /* senha da ponte nunca fica no banco */);
+  assert.deepEqual([d3.config_banco.pasta_contador, d3.config_banco.tolerancia_dias, d3.config_banco.permitir_pagamentos, d3.config_banco.limite_pagamento, d3.config_banco.senha_ponte], ['Contador Ebano', undefined, true, 500000, undefined] /* senha da ponte nunca fica no banco */);
   assert.equal(JSON.stringify(d3.historico.at(-1).detalhes).includes('nova'), false);
   assert.throws(() => Z.salvarConfigBanco2(d3, { modelo_nome_comprovante: 'sem campos' }, 'julio'), /entre chaves/);
 });

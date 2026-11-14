@@ -585,17 +585,6 @@ export const ACOES = {
     await mostrar();
   },
 
-  async ressarcimentoNaNf({ valor }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores mudam esta opção.');
-    await alterar((db) => {
-      db.ressarcimento_abate_nf = valor === '1';
-      R.registrar(db, login(), 'Alteração', 'banco', null, `Ressarcimento de condomínio ${valor === '1' ? 'abate o valor da NF' : 'não abate a NF (conta como gasto)'}`, null, {}, false);
-      // boletos em aberto com ressarcimento passam a seguir a opção nova
-      for (const cb of db.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0)) R.atualizar(db, 'cobrancas', cb.id, { ressarcimento_na_nf: valor === '1' }, login(), 'Ressarcimento na NF');
-    });
-    await mostrar();
-  },
-
   async condominioConferido({ id, mes }) {
     await alterar((db) => R.marcarCondominioConferido(db, Number(id), mes, login()));
     await mostrar();
@@ -1952,46 +1941,6 @@ export const ACOES = {
     const resposta = await BANCO.cancelarNegativacao(d(), cb);
     await alterar((db) => { R.registrarCancelamentoNegativacao(db, cb.id, login()); if (resposta && resposta.external_reference_id) R.registrarBoletoBancario(db, cb.id, resposta, login()); });
     aviso('Cancelamento da negativação pedido ao C6.');
-    await mostrar();
-  },
-
-  /**
-   * Conferência dos pagamentos do mês no banco: lista na conta emissora os boletos pagos (ou aguardando crédito) por data de pagamento,
-   * atualiza a situação de cada um aqui e, para os pagos ainda não registrados, propõe registrar um a um (sempre com confirmação).
-   * Quais propor: a mesma regra da tela Banco (Z.conciliarBoletos + Z.prontoParaRegistrar): pela referência do boleto e, sem ela, pelo
-   * valor e pela data; um pagamento que casa com mais de um boleto não é proposto (escolha na tela Banco).
-   */
-  async conferirPagamentosC6({ comp }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
-    const { de, ate } = R.periodoConferenciaC6(d(), comp);
-    const contas = [...new Set(d().cobrancas.filter((cb) => cb.competencia === comp && cb.banco && cb.banco.conta_id).map((cb) => cb.banco.conta_id))];
-    if (!contas.length) throw new Error('Nenhum boleto deste mês foi emitido no C6.');
-    aviso(`Conferindo no banco os pagamentos de ${dataBr(de)} a ${dataBr(ate)}…`, 'info');
-    let atualizados = 0;
-    let ambiguos = 0;
-    const propostas = [];
-    const incompletos = [];
-    for (const contaId of contas) {
-      const itens = await BANCO.listarTodosBoletos(d(), contaId, { payment_date_from: de, payment_date_to: ate });
-      if (itens.incompleto) incompletos.push(`${contaId.toUpperCase()}: ${itens.length}${itens.total ? ` de ${itens.total}` : ''}`);
-      const { casados } = R.casarListagemC6(d(), itens, contaId);
-      for (const { cb, item } of casados) {
-        await alterar((db) => R.registrarBoletoBancario(db, cb.id, item, login()));
-        atualizados += 1;
-      }
-      for (const s of Z.conciliarBoletos(d(), contaId, itens)) {
-        if (Z.prontoParaRegistrar(d(), s)) propostas.push(s);
-        else if (s.alternativas > 1 && !s.jaPago && !s.aguardandoCredito) ambiguos += 1;
-      }
-    }
-    const propostos = new Set();
-    for (const s of propostas) {
-      const cb = buscar('cobrancas', s.cobranca_id);
-      if (!cb || cb.data_pagamento || propostos.has(cb.id)) continue;
-      propostos.add(cb.id);
-      await proporPagamentoDoBanco(cb, s);
-    }
-    aviso(`${atualizados} boleto(s) conferido(s) no banco${propostos.size ? `; ${propostos.size} pago(s) no banco foram propostos para registro` : '; nenhum pagamento novo'}${ambiguos ? `; ${ambiguos} pagamento(s) com o valor de mais de um boleto: escolha qual na tela Banco ("Conferir boletos pagos no banco")` : ''}${incompletos.length ? `. Atenção: o banco tem mais boletos do que o sistema leu (${incompletos.join('; ')}); confira um período menor` : ''}.`, ambiguos || incompletos.length ? 'aviso' : 'ok');
     await mostrar();
   },
 
