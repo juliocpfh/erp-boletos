@@ -28,7 +28,7 @@
 | `conciliacao.js` | Regras do banco fase 2 (recebem `d`, rodam no Node): `importarExtrato`, destinos `CLASSIFICACOES`/`sugerirDestino`/`vincularMovimentacao`, `conciliarBoletos`, `confirmarPagamentoPeloBanco`, comprovantes (`nomeComprovante`, `registrarComprovante`), pagamentos (`prepararPagamentos`, `aprovarPagamento`, `marcarPagoPeloExtrato`), `configBanco`/`salvarConfigBanco2` |
 | `mapa-c6.js` | Caminhos, nomes dos campos e situações da API Bolepix v2 do C6 (igual a `ponte-c6/mapa-c6.mjs`) |
 | `caixas.js` | Ordem das caixas e setores de cada página (arrastar pelo ícone ☰, só administrador) |
-| `indice.js` | Páginas do inquilino e do imóvel: índice com um link para cada caixa (embaixo do nome) e botão ▾/▸ para recolher cada caixa (lembrado no navegador) |
+| `indice.js` | Páginas do inquilino e do imóvel: botão ▾/▸ para recolher cada caixa (lembrado no navegador); só no imóvel, o índice "Nesta página:" com um link para cada caixa (embaixo do nome; tirado do inquilino em 2026-11-13) |
 | `exportar.js` | Todos os dados numa planilha Excel e num PDF (sem senhas e anexos) |
 | `regras-texto.js` | `REGRAS_TEXTO`: as regras de negócio em texto objetivo, baixado em Dados e backup (TXT) |
 | `auth.js` | Senhas PBKDF2-SHA256 (600 mil iterações, gravadas em `senha_iteracoes`; usuário antigo é reforçado no login: `camposDeSenha`, `reforcarSenha`; mínimo 10 caracteres, `senhaCurta`) e papéis (admin, operador, consulta) |

@@ -1,10 +1,12 @@
-// Índice e caixas recolhíveis nas páginas longas (inquilino e imóvel): embaixo do nome, um link para cada caixa; cada caixa
-// ganha o botão ▾/▸ para recolher. As recolhidas ficam lembradas neste navegador (localStorage, por página), não no banco de dados.
+// Índice e caixas recolhíveis nas páginas longas (inquilino e imóvel): cada caixa ganha o botão ▾/▸ para recolher; no
+// imóvel, embaixo do nome, um link para cada caixa (no inquilino o dono tirou o índice em 13/11/2026: texto demais). As recolhidas ficam lembradas neste navegador (localStorage, por página), não no banco de dados.
 import { paraNomeDeArquivo } from './calculos.js';
 import { esc } from './formularios.js';
 
 /** Páginas com índice (rota → chave da memória local). */
 const PAGINAS = new Set(['contrato', 'imovel']);
+/** Páginas que mostram também a linha "Nesta página:" (o inquilino só recolhe as caixas). */
+const COM_INDICE = new Set(['imovel']);
 const CHAVE = (pagina) => `caixas-recolhidas:${pagina}`;
 
 function lerRecolhidas(pagina) {
@@ -74,6 +76,7 @@ export function montarIndice(raiz, pagina) {
     });
     (cab.tagName === 'H2' ? x.cx : cab).insertBefore(b, cab.tagName === 'H2' ? cab : cab.firstChild);
   }
+  if (!COM_INDICE.has(pagina)) return;
   const nav = document.createElement('nav');
   nav.className = 'indice-caixas nao-imprimir';
   nav.setAttribute('aria-label', 'Partes desta página');
