@@ -1,12 +1,14 @@
 // Fichas em análise: pré-cadastro do interessado (dados, reserva e documentos), aprovar ou reprovar e, aprovada, o contrato (#/ficha/ID, caixa em Inquilinos e alerta no Painel).
-import { alterar, aviso, ir, janela, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, E, ir, janela, login, mostrar, podeUsuario } from '../app.js';
+import * as FO from '../ficha-online.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
 import { esc, pctTexto } from '../formularios.js';
 import * as REC from '../recibos.js';
 import * as R from '../regras.js';
+import { pdfDoRecibo } from './documentos.js';
 import { botaoEmail } from './emails.js';
-import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera } from './comum.js';
+import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera, PASTA_FICHAS } from './comum.js';
 
 const COR_SITUACAO = { 'Em análise': 'aviso', Aprovada: 'ok', Reprovada: 'neutra', Desistiu: 'neutra' };
 
@@ -72,7 +74,7 @@ export function telaFicha(id) {
   const fiadores = R.fiadoresDaFicha(f);
   const fichaPdf = (tipo, extra, texto) => (REC.reciboDisponivel(d(), tipo, { ficha: f }).ok ? link(`#/imprimir/recibo?tipo=${tipo}&ficha=${f.id}${extra}`, `🧾 ${texto}`, '') : '');
   const fichasPdf = [fichaPdf('ficha', '', 'Ficha cadastral para assinar'),
-    ...(fiadores.length ? fiadores.map((x) => fichaPdf('ficha_fiador', `&fiador=${x.n}`, `Ficha do fiador ${x.nome}`)) : [fichaPdf('ficha_fiador', '&fiador=1', 'Ficha do fiador (em branco)')])].filter(Boolean).join(' · ');
+    ...(fiadores.length ? fiadores.map((x) => fichaPdf('ficha_fiador', `&fiador=${x.n}`, `Ficha do fiador ${esc(x.nome)}`)) : [fichaPdf('ficha_fiador', '&fiador=1', 'Ficha do fiador (em branco)')])].filter(Boolean).join(' · ');
   // proposta combinada (vai preenchida para o contrato)
   const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - C.descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
   const incluso = REC.itensDaProposta(f).filter(([rot]) => ['Prazo do contrato', 'IPTU', 'Seguro contra incêndio', 'Contas'].includes(rot));
@@ -113,6 +115,7 @@ export function telaFicha(id) {
       ${botaoDesistencia(f)}
       ${devolucao}
       ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da decisão).</p>` : ''}</div>
+    ${caixaFichaOnline(f)}
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um dos imóveis')}</b>.` : ''}</p>
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
@@ -154,8 +157,113 @@ export function botaoDesistenciaContrato(c) {
   return botao('desistirAntesDeAssinar', 'Desistiu antes de assinar', { contrato: c.id }, 'secundario');
 }
 
+// --------------------------------------------------------------------------
+// Ficha pela internet (pedido do dono em 2026-11-14): um link por pessoa (interessado e fiadores), que vale 7 dias, em
+// ficha.ankjck.com.br (fora do login do sistema). A pessoa preenche, manda os documentos e a ficha assinada; o que ela
+// manda fica como resposta na nuvem e só entra na ficha quando a equipe confere (ficha-online.js, nuvem/ficha-publica.mjs).
+// --------------------------------------------------------------------------
+const TEXTO_SITUACAO_LINK = {
+  Aguardando: 'link enviado, sem resposta ainda', Respondida: 'respondeu', 'Falta documento': 'falta documento', Assinar: 'falta assinar',
+  Assinada: 'ficha assinada recebida', Desistiu: 'avisou que não vai seguir', Encerrado: 'link encerrado',
+};
+const COR_LINK = { Respondida: 'info', Assinada: 'ok', Desistiu: 'perigo', 'Falta documento': 'aviso', Assinar: 'aviso' };
+
+/** Link guardado na ficha ainda no prazo (ou null). */
+const linkValido = (f, pessoa) => { const l = (f.links_ficha || {})[pessoa]; return l && l.url && String(l.vence_em) > new Date().toISOString() ? l : null; };
+
+/** Caixa "Ficha pela internet" da página da ficha: uma linha por pessoa; o que ela mandou aparece depois (ligarFichaOnline). */
+function caixaFichaOnline(f) {
+  if (!opera() || R.fichaSemContrato(f) || f.documentos_no_contrato) return '';
+  const titulo = '<h2>Ficha pela internet</h2>';
+  if (!E.nuvem) return `<div class="cartao">${titulo}<p class="suave">Só no sistema na nuvem (erp.ankjck.com.br): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
+  const linhas = FO.pessoasDaFicha(f).map((p) => {
+    const l = (f.links_ficha || {})[p];
+    const valido = linkValido(f, p);
+    return `<li style="margin:6px 0"><b>${esc(FO.nomeDaPessoa(f, p))}</b>${p === 'interessado' ? '' : ' <span class="suave">(fiador)</span>'}
+      <span data-situacao-link="${p}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta('link vencido', 'aviso') : '<span class="suave">sem link</span>'}</span><br>
+      ${botao('gerarLinkFicha', valido ? 'Gerar novo link' : 'Gerar link', { id: f.id, pessoa: p }, valido ? 'secundario pequeno' : 'pequeno', valido ? 'Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado).' : '')}
+      ${valido ? botao('compartilharLinkFicha', 'Copiar / WhatsApp', { id: f.id, pessoa: p }, 'secundario pequeno') : ''}</li>`;
+  }).join('');
+  return `<div class="cartao" data-ficha-online="${f.id}">${titulo}
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
+    <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div></div>`;
+}
+
+/** Depois de desenhar a página da ficha: busca na nuvem a situação de cada link (e o que foi mandado). */
+export async function ligarFichaOnline(raiz) {
+  const caixa = raiz.querySelector('[data-ficha-online]');
+  if (!caixa || !E.nuvem) return;
+  let links;
+  try { links = await FO.linksNaNuvem(Number(caixa.dataset.fichaOnline)); } catch (e) { const r = caixa.querySelector('[data-respostas-link]'); if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`; return; }
+  for (const l of links) {
+    const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
+    if (!el) continue;
+    const ultimo = (l.respostas || []).at(-1);
+    el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || 'neutra')}
+      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).length ? ` · ${l.arquivos.length} arquivo(s)` : ''} · link até ${new Date(l.vence_em).toLocaleDateString('pt-BR')}</span>`;
+  }
+  caixa._links = links;
+  // documentos que chegaram pelo link desde a última vez: a lista da pasta guardada neste aparelho fica velha; busca de novo
+  const id = Number(caixa.dataset.fichaOnline);
+  const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
+  if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
+  const antes = arquivosDoLinkVistos.get(id);
+  arquivosDoLinkVistos.set(id, total);
+  const f = buscar('fichas', id);
+  if (total && f && E.anexos?.esquecerLista) {
+    E.anexos.esquecerLista(['arquivos', PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+    if (antes !== undefined || total) await mostrar();
+  }
+}
+/** Quantos arquivos dos links de cada ficha já foram vistos nesta abertura (ficha → quantidade). */
+const arquivosDoLinkVistos = new Map();
+
+/** Janela com o link: copiar, WhatsApp (com o texto pronto) e o lembrete do e-mail. */
+async function janelaDoLink(f, pessoa, link) {
+  const tel = FO.telefoneWhatsapp(f, pessoa);
+  const texto = FO.textoWhatsapp(f, pessoa, link);
+  await janela({
+    titulo: `Link da ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Fechar', nao: 'Voltar',
+    html: `<p>Vale até <b>${dataBr(String(link.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto)}</textarea></p>
+      <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
+      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(texto)}">Abrir no WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
+      ${pessoa === 'interessado' ? '<p class="suave">O e-mail "Envio de ficha cadastral" já leva este link (e o do fiador, se houver).</p>' : ''}`,
+    ligar: (dlg) => {
+      dlg.querySelector('[data-copiar-link]').addEventListener('click', async (ev) => {
+        try { await navigator.clipboard.writeText(dlg.querySelector('[data-texto-link]').value); ev.target.textContent = 'Copiado ✓'; } catch { dlg.querySelector('[data-texto-link]').select(); }
+      });
+    },
+  });
+}
+
 /** Botão "Aprovar" da página da ficha (operador ou administrador). */
 export const ACOES_FICHAS = {
+  /** Cria o link da pessoa na nuvem (com a ficha em PDF para baixar), guarda na ficha e mostra para copiar ou mandar. */
+  async gerarLinkFicha({ id, pessoa }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode gerar o link da ficha.');
+    if (!E.nuvem) throw new C.ErroUsuario('A ficha pela internet só funciona no sistema na nuvem.');
+    const f = buscar('fichas', id);
+    if (!f || !FO.pessoasDaFicha(f).includes(pessoa)) throw new C.ErroUsuario('Ficha ou pessoa não encontrada.');
+    const link = await FO.criarLinkNaNuvem(FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)));
+    // a ficha em PDF (com o que já se sabe) para quem prefere imprimir; sem ela, o link funciona do mesmo jeito
+    try {
+      const tipo = pessoa === 'interessado' ? 'ficha' : 'ficha_fiador';
+      const pdf = await pdfDoRecibo(tipo, { ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: Number(pessoa.slice(6)) } : {}) });
+      await FO.guardarPdfNaNuvem(f.id, pessoa, pdf.blob);
+    } catch (e) { console.warn('ficha em PDF do link', e); }
+    const guardado = { url: link.url, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login() };
+    await alterar((db) => R.atualizar(db, 'fichas', f.id, { links_ficha: { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}), [pessoa]: guardado } }, login(),
+      `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} gerado (vale até ${dataBr(link.vence_em.slice(0, 10))})`));
+    await mostrar();
+    await janelaDoLink(buscar('fichas', id), pessoa, guardado);
+  },
+  async compartilharLinkFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    const l = f && linkValido(f, pessoa);
+    if (!l) throw new C.ErroUsuario('O link venceu: gere um novo.');
+    await janelaDoLink(f, pessoa, l);
+  },
   /**
    * Desistência antes de assinar: pergunta a data e o motivo, leva os arquivos do contrato não assinado para a pasta da
    * ficha, grava (ficha "Desistiu", contrato cancelado) e só então apaga os originais.

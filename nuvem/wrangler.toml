@@ -7,7 +7,12 @@ compatibility_date = "2026-10-01"
 workers_dev = false
 
 # Mesmo endereço do site: o navegador chama /api/ sem sair de erp.ankjck.com.br (sem CORS)
-routes = [{ pattern = "erp.ankjck.com.br/api/*", zone_name = "ankjck.com.br" }]
+# A ficha cadastral pela internet (ficha-publica.mjs) tem endereço próprio, fora do login do Access: o Cloudflare cria o
+# DNS e o cadeado de ficha.ankjck.com.br sozinho (custom_domain). O sistema (erp.ankjck.com.br) continua fechado.
+routes = [
+  { pattern = "erp.ankjck.com.br/api/*", zone_name = "ankjck.com.br" },
+  { pattern = "ficha.ankjck.com.br", custom_domain = true },
+]
 
 [[r2_buckets]]
 binding = "DADOS"
@@ -15,6 +20,8 @@ bucket_name = "imoveis-dados"
 
 [vars]
 ORIGEM = "https://erp.ankjck.com.br"
+HOST_FICHA = "ficha.ankjck.com.br"
+URL_FICHA = "https://ficha.ankjck.com.br/"
 # ACCESS_EQUIPE (ex.: ankjck.cloudflareaccess.com), ACCESS_AUD e EMAILS: no painel
 
 # Cofre dos dados (cofre.mjs): um Durable Object com SQLite, grátis até 5 GB

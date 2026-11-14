@@ -4,8 +4,11 @@
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
 // · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE)
 // · email/estado (GET) e email/enviar (POST): e-mail pela conta Gmail da empresa (gmail.mjs; documentacao/LIGAR_GMAIL.md).
+// · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
+//   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
+import { atenderEquipe, atenderFicha } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
@@ -351,6 +354,11 @@ export async function atender(request, env, buscar = fetch) {
     if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
     if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'consulta'); return await rotaEnviarEmail(request, env, email, url, buscar); }
     if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
+    if (rota.startsWith('ficha-online/')) {
+      if (m !== 'GET') conferirGravacao(request, env);
+      await exigirPapel(env, email, 'operador');
+      return await atenderEquipe(request, env, rota.slice(13), email);
+    }
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
     if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
@@ -376,4 +384,7 @@ export async function atender(request, env, buscar = fetch) {
   }
 }
 
-export default { fetch: (request, env) => atender(request, env) };
+/** O endereço da ficha (ficha.ankjck.com.br) é outro aplicativo: sem login, só a ficha. */
+export const ehEnderecoDaFicha = (request, env) => new URL(request.url).hostname === String(env.HOST_FICHA || 'ficha.ankjck.com.br');
+
+export default { fetch: (request, env) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env) : atender(request, env)) };

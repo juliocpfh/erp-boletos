@@ -72,8 +72,16 @@ function primeiroBoleto(d, c) {
 /** Documentos da ficha para o e-mail, numerados (os do tipo de renda e, com fiador, os do fiador), com o aviso do arquivo original. */
 function documentosDoEmail(f) {
   const num = (l) => l.map((t, k) => `${k + 1}. ${t}`).join('\n');
-  const fiadores = R.temFiador(f) || R.fiadoresDaFicha(f).length;
-  return [num(R.documentosDaFicha(f)), fiadores ? `\nDO FIADOR\n${num(R.documentosDoFiador(R.fiadoresDaFicha(f)[0] || {}))}` : '', `\n${R.DICA_DOCUMENTOS}`].filter(Boolean).join('\n');
+  const lista = R.fiadoresDaFicha(f);
+  const fiadores = lista.length ? lista : R.temFiador(f) ? [{}] : [];
+  const blocos = fiadores.map((x) => `\nDO FIADOR${x.nome && fiadores.length > 1 ? ` (${x.nome})` : ''}\n${num(R.documentosDoFiador(x))}`);
+  return [num(R.documentosDaFicha(f)), ...blocos, `\n${R.DICA_DOCUMENTOS}`].join('\n');
+}
+
+/** Link da ficha pela internet ainda no prazo: { url, validade } (vazios sem link). */
+function linkDaFicha(f, pessoa, hoje) {
+  const l = f && f.links_ficha && f.links_ficha[pessoa];
+  return l && l.url && String(l.vence_em).slice(0, 10) >= hoje ? { url: l.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
 }
 
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */
@@ -141,6 +149,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inclusos: juntar(inclusos), iptu_valor: f && f.iptu_estimado > 0 ? C.reais(f.iptu_estimado) : '', seguro_valor: f && f.seguro_estimado > 0 ? C.reais(f.seguro_estimado) : '',
     devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
     documentos_ficha: f ? documentosDoEmail(f) : '',
+    link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
+    link_fiador: linkDaFicha(f, 'fiador1', hoje).url,
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
@@ -149,6 +159,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inclusos: inclusos.length > 0, iptu_valor: !!(f && f.iptu_estimado > 0), seguro_valor: !!(f && f.seguro_estimado > 0),
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
     devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0),
+    link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: !!linkDaFicha(f, 'fiador1', hoje).url,
+    varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
   };
   const a = alvo.aditivo || null;
   if (a) Object.assign(campos, { aditivo_data: C.dataBr(a.data), aditivo_assunto: a.assunto || 'alteração do contrato' });

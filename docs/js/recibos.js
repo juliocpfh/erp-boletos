@@ -134,7 +134,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   const base = { emitente: e, cidade: (i && i.cidade) || e.municipio || 'Curitiba', data: hoje, tabela: [], depois: [] };
 
   if (tipo === 'ficha') return fichaCadastral(d, f, base, nomeArq);
-  if (tipo === 'ficha_fiador') return fichaDoFiador(f, Number(alvo.fiador) || 1, i, base, nomeArq);
+  if (tipo === 'ficha_fiador') return fichaDoFiador(d, f, Number(alvo.fiador) || 1, i, base, nomeArq);
 
   if (tipo === 'reserva') {
     const proposta = f ? itensDaProposta(f) : [];
@@ -251,9 +251,11 @@ const qualificacaoDe = (p, pre) => [
 const listaDocumentos = (itens) => [['DOCUMENTOS PARA ENVIAR JUNTO', null], ...itens.map((t, k) => [`${k + 1}.`, t]), ['Atenção', R.DICA_DOCUMENTOS]];
 
 /** Declaração antes da assinatura: verdade dos dados, conferência com a fonte, o crime (CP 171, 298, 299 e 304) e a LGPD. */
-const declaracao = (quem) => [
-  `DECLARAÇÃO. ${quem} que as informações desta ficha e os documentos entregues com ela são verdadeiros. Os documentos são conferidos diretamente com bancos, empregadores e cartórios, e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 298, 299 e 304), que pode ser comunicado à autoridade policial.`,
-  'Autorizo a consulta do nome e do CPF em cadastros de crédito (como Serasa e SPC) e o uso destes dados só para a análise desta locação (Lei 13.709/2018).',
+// revisão de 14/11: art. 297 (documento público: RG, CNH, certidão, recibo do IR) junto do 298 (particular: holerite, extrato);
+// "podem ser conferidos" (o banco não confirma extrato de cliente a terceiros, LC 105/2001: confere-se com a fonte possível)
+const declaracao = (quem, pj = false) => [
+  `DECLARAÇÃO. ${quem} que as informações desta ficha e os documentos entregues com ela são verdadeiros. Os documentos podem ser conferidos diretamente com a fonte (empregadores, cartórios, bancos e validadores oficiais), e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 297, 298, 299 e 304), que pode ser comunicado à autoridade policial.`,
+  `Autorizo a consulta ${pj ? 'do CNPJ da empresa e do CPF do representante' : 'do nome e do CPF'} em cadastros de crédito (como Serasa e SPC) e o uso destes dados para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).`,
 ];
 const COMO_ASSINAR = 'Assinatura: pelo gov.br (gratuito, em assinador.iti.br, com conta prata ou ouro) ou à mão, mandando a foto ou o PDF da ficha assinada.';
 
@@ -298,7 +300,7 @@ function fichaCadastral(d, f, base, nomeArq) {
     paragrafos: [`Ficha para a análise da locação. Confira os dados já preenchidos, complete o que faltar e assine no fim.${f.data_recebida ? ` Ficha aberta em ${C.dataBr(f.data_recebida)}.` : ''}`],
     tabela,
     depois: [
-      ...declaracao(pj ? 'A empresa declara, por meio do representante,' : 'Declaro'),
+      ...declaracao(pj ? 'A empresa declara, por meio do representante,' : 'Declaro', pj),
       `Se faltar algum documento ou você preferir não seguir com a análise, sem problema: marque abaixo e devolva esta ficha. ${reserva}`,
       `(   ) Não vou seguir com a análise${f.reserva_valor > 0 ? ' e peço a devolução integral da reserva' : ''}.`,
       COMO_ASSINAR,
@@ -309,10 +311,12 @@ function fichaCadastral(d, f, base, nomeArq) {
 }
 
 /** Ficha cadastral do fiador ``n`` da ficha (dados da ficha: fiadorN_…). */
-function fichaDoFiador(f, n, i, base, nomeArq) {
+function fichaDoFiador(d, f, n, i, base, nomeArq) {
   const x = R.fiadorDaFicha(f, n);
-  const conjuge = casadoOuUniao(x.estado_civil) || !x.estado_civil;
-  const tabela = [['FIADOR DA LOCAÇÃO', null], ['Interessado (locatário)', ou(f.inquilino_nome)], ['Imóvel', ou(enderecoDe(i))],
+  // casado com separação total de bens (pacto antenupcial): o cônjuge não assina a fiança (CC art. 1.647)
+  const conjuge = (casadoOuUniao(x.estado_civil) && !R.separacaoTotal(x)) || !x.estado_civil;
+  const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean).map(enderecoDe).join(' ou ') || enderecoDe(i);
+  const tabela = [['FIADOR DA LOCAÇÃO', null], ['Interessado (locatário)', ou(f.inquilino_nome)], ['Imóvel', ou(imoveis)],
     ['DADOS DO FIADOR', null], ['Nome completo', ou(x.nome)], ['CPF', ou(x.cpf)], ['RG', ou(x.rg)], ...qualificacaoDe(x, ''), ['Regime de bens (se casado)', ou(x.regime_bens)],
     ['Endereço', ou(x.endereco)], ['Telefone', ou(x.telefone)], ['E-mail', ou(x.email)]];
   if (conjuge) tabela.push([`CÔNJUGE OU COMPANHEIRO(A)${x.estado_civil ? ' (também assina a fiança)' : ' (se for casado ou viver em união estável)'}`, null], ['Nome', ou(x.nome_conjuge)], ['CPF', ou(x.cpf_conjuge)], ['RG', ou(x.rg_conjuge)]);
