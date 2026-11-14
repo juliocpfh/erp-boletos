@@ -226,7 +226,7 @@ export async function listarLinks(env, url) {
       }
       lista.push(ficha ? paraEquipe(reg) : {
         ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-        vence_em: reg.vence_em, criado_em: reg.criado_em, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
+        vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
         nome: reg.contexto.nome,
       });
     }
@@ -244,6 +244,7 @@ export async function atualizarLink(request, env, email) {
     if (p.situacao !== undefined) {
       if (!SITUACOES_EQUIPE.includes(p.situacao)) throw new ErroFicha(400, 'Situação inválida.');
       r.eventos.push({ em: new Date().toISOString(), texto: `situação "${p.situacao}" por ${email}` });
+      if (r.situacao !== p.situacao) r.mudou_em = new Date().toISOString();
       r.situacao = p.situacao;
     }
     if (p.faltando !== undefined) r.faltando = (Array.isArray(p.faltando) ? p.faltando : []).slice(0, 15).map((x) => texto(x, 300)).filter(Boolean);

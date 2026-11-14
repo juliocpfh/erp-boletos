@@ -264,7 +264,7 @@ function blocoDoLink(f, l) {
     const dif = diferencasDoEnvio(f, l);
     partes.push(`<p><b>Dados enviados em ${C.dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>
       ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join('')}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
-      <p class="acoes">${botao('trazerRespostaFicha', dif.length ? 'Trazer para a ficha' : 'Marcar como conferido', { id: f.id, pessoa: p }, 'pequeno', dif.length ? `Trazer os ${dif.length} dado(s) enviados por ${nome} para a ficha? Os outros campos ficam como estão.` : '')}</p>`);
+      <p class="acoes">${botao('trazerRespostaFicha', dif.length ? 'Trazer para a ficha…' : 'Marcar como conferido…', { id: f.id, pessoa: p }, 'pequeno')}</p>`);
   } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${C.dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
   if ((l.arquivos || []).length) {
     partes.push(`<p><b>Documentos mandados pelo link</b> <span class="suave">(estão na pasta da ficha, abaixo; a conferência olha por dentro de cada arquivo)</span></p>
@@ -314,7 +314,8 @@ function sinaisHtml(r, nomePessoa) {
     const bate = CP.mesmoNome(a.nome, nomePessoa);
     out.push(`${etiqueta(`✓ assinado${a.govbr ? ' pelo gov.br' : a.icp ? ' (ICP-Brasil)' : ''}`, bate ? 'ok' : 'aviso')} <span class="suave">por ${esc(a.nome || 'nome não lido')}${a.data ? ` em ${dataBr(a.data.slice(0, 10))}` : ''}${bate ? '' : ` · o nome não bate com a ficha (${esc(nomePessoa)})`}</span>`);
   }
-  if (!out.length) out.push(`<span class="suave">sem sinal de edição${r.programa ? ` (feito em: ${esc(r.programa)})` : ''}</span>`);
+  if (r.assinaturas.length) out.push('<span class="suave">confirme a assinatura em validar.iti.gov.br</span>');
+  if (!r.sinais.length) out.push(`<span class="suave">nenhum sinal de edição encontrado${r.programa ? ` (feito em: ${esc(r.programa)})` : ''}: isso não prova que é verdadeiro, confira com a fonte</span>`);
   return out.join('<br>');
 }
 
@@ -332,12 +333,17 @@ async function avisosDoPainel(el) {
     if (l.situacao === 'Desistiu' && !R.fichaSemContrato(f)) { linhas.push(`${ir} avisou pelo link que não vai seguir: registre a desistência${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)}` : ''}`); continue; }
     if (R.fichaSemContrato(f)) continue;
     const novo = !l.visto_em && (l.ultimo_envio || l.arquivos);
+    const esperando = (!l.ultimo_envio && !l.arquivos) || ['Falta documento', 'Assinar'].includes(l.situacao);
     if (novo) linhas.push(`${ir} ${l.situacao === 'Assinada' ? 'mandou a ficha assinada' : l.ultimo_envio ? 'mandou dados pelo link' : 'mandou documentos pelo link'}: conferir`);
-    else if (!l.ultimo_envio && !l.arquivos) {
+    else if (esperando) {
       const vencido = Date.parse(l.vence_em) < agora;
-      const parado = Math.floor((agora - Date.parse(l.criado_em)) / 86400000);
-      if (vencido) linhas.push(`${ir}: o link venceu sem resposta (gere um novo na ficha)`);
-      else if (parado >= dias) linhas.push(`${ir}: link sem resposta há ${parado} dia(s) ${botao('lembrarFicha', 'Lembrar', { id: f.id, pessoa: l.pessoa }, 'secundario mini')}`);
+      // conta desde a última coisa feita: o link, o pedido da equipe (falta documento, assinar) ou o lembrete
+      const lembrado = ((f.links_ficha || {})[l.pessoa] || {}).lembrado_em;
+      const desde = Math.max(...[l.criado_em, ['Falta documento', 'Assinar'].includes(l.situacao) ? l.mudou_em : null, lembrado].filter(Boolean).map(Date.parse));
+      const parado = Number.isFinite(desde) ? Math.floor((agora - desde) / 86400000) : 0;
+      const oque = l.situacao === 'Falta documento' ? 'pedido de documento sem resposta' : l.situacao === 'Assinar' ? 'ficha para assinar sem resposta' : 'link sem resposta';
+      if (vencido) linhas.push(`${ir}: o link venceu (${oque}; gere um novo na ficha)`);
+      else if (parado >= dias) linhas.push(`${ir}: ${oque} há ${parado} dia(s) ${botao('lembrarFicha', 'Lembrar', { id: f.id, pessoa: l.pessoa }, 'secundario mini')}`);
     }
   }
   el.innerHTML = linhas.length ? `<div class="alerta info"><b>Ficha pela internet:</b> ${linhas.join('; ')}.</div>` : '';
@@ -390,7 +396,19 @@ export const ACOES_FICHAS = {
     const l = (await FO.linksNaNuvem(id)).find((x) => x.pessoa === pessoa);
     const ultimo = l && (l.respostas || []).at(-1);
     if (!f || !ultimo) throw new C.ErroUsuario('Não há dados enviados por este link.');
-    const dados = FO.dadosParaFicha(f, l);
+    const sugestao = FO.dadosParaFicha(f, l);
+    const dif = diferencasDoEnvio(f, l);
+    const marcas = [['doc_ficha', 'Ficha cadastral assinada'], ['doc_pessoais', 'Documentos pessoais'], ['doc_renda', 'Comprovante de renda'], ['doc_residencia', 'Comprovante de residência']]
+      .filter(([k]) => sugestao[k] && !f[k]);
+    // a equipe escolhe: cada dado que muda (desmarque o que a ficha já tem certo) e as marcas de documento recebido
+    const resp = await janela({
+      titulo: `Trazer para a ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Trazer os marcados',
+      html: `${dif.length ? `<p><b>Dados</b> (desmarque o que a ficha já tem certo):</p>${dif.map((x) => `<p><label class="check"><input type="checkbox" name="campo" value="${esc(x.campo.nome)}" checked> ${esc(x.campo.rotulo)}: ${valorDoCampo(x.campo, x.na_ficha)} → <b>${valorDoCampo(x.campo, x.enviado)}</b></label></p>`).join('')}` : '<p>Os dados enviados já estão na ficha.</p>'}
+        ${marcas.length ? `<p><b>Marcar como recebido</b> (só o que está completo e conferido; veja os avisos de cada documento):</p>${marcas.map(([k, t]) => `<p><label class="check"><input type="checkbox" name="marca" value="${k}"> ${esc(t)}</label></p>`).join('')}` : ''}`,
+    });
+    if (!resp) return;
+    const campos = new Set(resp.campo || []);
+    const dados = Object.fromEntries([...Object.entries(sugestao).filter(([k]) => campos.has(k)), ...(resp.marca || []).map((k) => [k, true])]);
     await alterar((db) => {
       const atual = R.buscar(db, 'fichas', f.id);
       const links = { ...(atual.links_ficha || {}) };
@@ -439,6 +457,13 @@ export const ACOES_FICHAS = {
     const l = f && linkValido(f, pessoa);
     if (!l) throw new C.ErroUsuario('O link venceu: gere um novo na página da ficha.');
     await janelaDoLink(f, pessoa, l, { lembrete: true });
+    // a contagem de "sem resposta" do Painel recomeça do lembrete
+    await alterar((db) => {
+      const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
+      links[pessoa] = { ...links[pessoa], lembrado_em: new Date().toISOString() };
+      R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Lembrete da ficha mandado a ${FO.nomeDaPessoa(f, pessoa)}`);
+    });
+    await mostrar();
   },
   async encerrarLinkFicha({ id, pessoa }) {
     const f = buscar('fichas', id);
