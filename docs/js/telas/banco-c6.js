@@ -7,7 +7,7 @@ import { dataBr, dataHoraBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as M from '../mapa-c6.js';
 import * as R from '../regras.js';
-import { botao, buscar, d, etiqueta, item, opera, ordenar } from './comum.js';
+import { botao, buscar, d, etiqueta, item, link, opera, ordenar } from './comum.js';
 
 /** Botão que não funciona ainda, com a explicação no ``title`` (passe o mouse). */
 export const botaoInativo = (texto, titulo, cls = 'secundario pequeno') => `<button type="button" class="${cls}" disabled title="${esc(titulo)}">${texto}</button>`;
@@ -25,9 +25,11 @@ export function botoesMesC6(comp) {
   const n = R.boletosParaEmitir(d(), comp).length;
   const texto = `Emitir no C6 todos em aberto do mês${n ? ` (${n})` : ''}`;
   const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
-  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${botaoInativo('Conferir pagamentos no banco', B.motivoIndisponivel(d()), 'secundario')}`;
+  // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
+  const conferir = link('#/banco?ir=conferir-boletos', 'Conferir pagamentos no banco (tela Banco)', 'botao secundario');
+  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
-    ${emitidos ? botao('conferirPagamentosC6', 'Conferir pagamentos no banco', { comp }, 'secundario') : botaoInativo('Conferir pagamentos no banco', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}`;
+    ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}`;
 }
 
 const ROTULO = { emitido: ['emitido no C6', 'info'], pago: ['pago no C6', 'ok'], cancelado: ['cancelado no C6', 'neutra'], erro: ['erro na emissão', 'perigo'] };

@@ -33,6 +33,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | A11 | Tarifa do boleto cobrada do inquilino | Em branco (só se digitar no contrato) | [E] valor padrão | R$ 0,00 (hoje). Tribunais divergem sobre repassar a tarifa bancária; só com cláusula expressa no contrato | |
 | A12 | Dia de gerar os boletos | A partir do dia 20, os do próprio mês (que vencem no mês seguinte) | [C] dia 1 a 28 | 20 (hoje). Regra só de rotina, sem lei | |
 | A13 | Boleto no C6: como sai | Valor cheio com desconto da bonificação até o vencimento | [S] cheio com desconto (hoje) / já bonificado | Cheio com desconto (hoje): o próprio boleto mostra que é desconto e não multa, o que ajuda contra a tese da "multa dobrada" (A3) | |
+| A14 | Ressarcimento de condomínio na NF (13/11/2026; antes ficava em Empresas) | NF com o aluguel cheio e o ressarcimento como gasto do imóvel. Aluguel R$ 1.215,00 e fundo de obras R$ 150,00 → NF de R$ 1.215,00 | [S] `ressarcimento_na_nf`: não (hoje) / sim (NF de R$ 1.065,00, sem contar de novo como gasto) | Não (hoje). Forma de escriturar: confirmar com o contador. Ao mudar, os boletos em aberto com ressarcimento seguem a regra nova | Feito (dono: "corrija") |
 
 ## B. Reserva, garantia e FCI
 
@@ -68,6 +69,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | D1 | Régua de cobrança | 1 dia: e-mail; 10 dias: ligar; 30 dias: avaliar negativação (só aviso) | [C] dias e texto de cada passo; incluir/tirar passos | Hoje. Cobrar sem constranger ou ameaçar (CDC art. 42). Negativar: o órgão avisa o devedor antes (CDC art. 43, §2º; Súmula 359 do STJ) e a LGPD permite usar os dados para proteger o crédito (art. 7º, X) | |
 | D2 | Documentos da ficha reprovada | Apagados 3 meses depois | [C] meses (1 a 12) | 3 meses (hoje). LGPD art. 6º, III e arts. 15/16: guardar só o tempo necessário | |
 | D3 | Pagamento adiantado na conciliação do banco | Liga entrada a boleto que vence até 45 dias depois | [C] dias | 45 (hoje). Rotina | |
+| D3b | Tolerância para casar a entrada com o boleto (13/11/2026; antes ficava em Dados e backup → Banco) | Entrada com o valor em dia até 3 dias depois do vencimento ainda casa (vence dia 10, entrou dia 13) | [C] `tolerancia_boleto_dias`: 0 a 30 dias | 3 (hoje). Rotina | Feito (dono: "corrija") |
 | D4 | Movimentação do banco sem destino vira alerta | Depois de 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D5 | Extrato "recente" no fechamento do mês | Buscado há até 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D6 | Antecedência dos alertas de seguro e de fim do contrato | 60 dias | [C] dias (cada um) | 60 (hoje). Contrato comercial com direito a renovação: a ação tem de entrar entre 1 ano e 6 meses antes do fim (LI art. 51, §5º); sugerir 365 dias para esses | |

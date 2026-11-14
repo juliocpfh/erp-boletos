@@ -858,7 +858,7 @@ test('ressarcimento de taxa do condomínio: abate no boleto do mês seguinte ao 
   const res = R.resultadosFinanceiros(d, '2026-09-01', '2026-09-30').find((x) => x.imovel.id === loja.id);
   assert.equal(res.contas, 15000);
   // opção: sai da NF (e não conta de novo como gasto)
-  d.ressarcimento_abate_nf = true;
+  R.mudarRegraSistema(d, 'ressarcimento_na_nf', true, 'julio');
   R.gerarCobrancas(d, '2026-09', 'julio');
   R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-08', descricao: 'Fundo de obras', valor: 15000, data_pagamento: '2026-09-05', competencia_abatimento: '2026-09' }, 'julio');
   const cb2 = R.aplicarRessarcimentos(d, c, '2026-09', 'julio');
@@ -2339,7 +2339,8 @@ test('banco (C6): normalizar cria as tabelas e os campos novos; comprovantes do 
   delete d.pagamentos_banco;
   d.config_banco = { ativo: true, contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id }] };
   R.normalizar(d);
-  assert.deepEqual([d.movimentacoes_banco, d.pagamentos_banco, d.config_banco.pasta_contador, d.config_banco.tolerancia_dias, d.config_banco.permitir_pagamentos, d.config_banco.ativo], [[], [], '_Contador', 3, false, true]);
+  assert.deepEqual([d.movimentacoes_banco, d.pagamentos_banco, d.config_banco.pasta_contador, d.config_banco.tolerancia_dias, d.config_banco.permitir_pagamentos, d.config_banco.ativo], [[], [], '_Contador', undefined, false, true]);
+  assert.equal(R.regra('tolerancia_boleto_dias'), 3); // a tolerância virou regra do sistema (padrão 3 dias)
   const [de] = R.lancarDespesas(d, loja.id, '2026-05', [{ tipo: 'Água', valor: 12345, data_pagamento: '2026-05-20' }], 'julio');
   const m = R.inserir(d, 'movimentacoes_banco', { conta_id: 'ank', id_externo: 'r1', data: '2026-05-20', valor: 12345, tipo: 'saida', descricao: 'SANEPAR', classificacao: 'conta_imovel',
     imovel_id: loja.id, despesa_id: de.id, comprovante: '2026-05-20 ANK Loja 1 Agua 123,45.pdf', comprovante_contador: '2026-05-20 ANK Loja 1 Agua 123,45.pdf' }, 'julio');
