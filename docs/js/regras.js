@@ -2177,7 +2177,7 @@ export const DOCUMENTOS_RENDA = {
   Outra: ['Comprovante da renda dos 3 últimos meses (explique a origem da renda)'],
 };
 /** Aviso junto da lista de documentos: arquivo original da fonte, conferido com ela (pedido do dono, 2026-11-14). */
-export const DICA_DOCUMENTOS = 'Mande os arquivos em PDF como saem do aplicativo do banco, do empregador ou do site do governo (não foto de tela nem arquivo editado): os documentos são conferidos diretamente com a fonte.';
+export const DICA_DOCUMENTOS = 'Mande os arquivos em PDF como saem do aplicativo do banco, do empregador ou do site do governo (não foto de tela nem arquivo editado): os documentos podem ser conferidos diretamente com a fonte.';
 const PJ = 'Pessoa jurídica (empresa)';
 const casadoOuUniao = (estado) => ['Casado(a)', 'União estável'].includes(estado);
 /** Interessado (pessoa física) casado ou em união estável: a ficha pede os dados e os documentos do cônjuge. */
@@ -2201,10 +2201,14 @@ export function documentosDaFicha(f) {
   return [...p.inicio, ...(fichaComConjuge(f) ? p.conjuge : []), ...(DOCUMENTOS_RENDA[f.renda_tipo] || p.renda_padrao), ...p.fim];
 }
 
+/** Fiador casado com separação total de bens por pacto antenupcial: o cônjuge não precisa assinar a fiança (CC art. 1.647). */
+export const separacaoTotal = (x = {}) => /^Separação total/.test(x.regime_bens || '');
+
 /** Documentos do fiador (``x``: os dados dele, sem o prefixo fiadorN_). Casado: também os do cônjuge, que assina a fiança. */
 export const documentosDoFiador = (x = {}) => ['Documento com foto e CPF', 'Comprovante de renda dos 3 últimos meses', 'Comprovante de residência atual',
   'Matrícula atualizada (de até 30 dias) de um imóvel em nome dele',
-  ...(casadoOuUniao(x.estado_civil) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança']
+  ...(casadoOuUniao(x.estado_civil) && separacaoTotal(x) ? ['Certidão de casamento com a anotação do pacto antenupcial (separação total de bens)']
+    : casadoOuUniao(x.estado_civil) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança']
     : !x.estado_civil ? ['Se for casado ou viver em união estável: a certidão e o documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança'] : [])];
 
 /** Quantos fiadores a ficha comporta (campos fiador1_…, fiador2_…, os mesmos nomes do Novo contrato). */

@@ -7,7 +7,7 @@
 // Funções puras (Node e navegador; tests/conferir-pdf.test.mjs). Só avisa: quem decide é a equipe.
 
 /** Programas de edição: o documento foi montado ou mexido por um editor (o banco e o empregador não usam esses). */
-const EDITORES = /canva|ilovepdf|smallpdf|sejda|pdfescape|pdfelement|wondershare|pdf24|pdf-xchange|nitro|foxit (phantom|pdf editor)|photoshop|gimp|inkscape|pixelmator|soda ?pdf|pdffiller|dochub|online2pdf|pdf ?candy|pdfsam|pdf editor|corel|affinity|paint\.net|gerador|fake/i;
+const EDITORES = /canva|ilovepdf|smallpdf|sejda|pdfescape|pdfelement|wondershare|pdf24|pdf-xchange|nitro|foxit (phantom|pdf editor)|photoshop|gimp|inkscape|pixelmator|soda ?pdf|pdffiller|dochub|online2pdf|pdf ?candy|pdfsam|pdf editor|corel|affinity|paint\.net|gerador|fake|acrobat (pro|standard|dc)|pdf expert|xodo|lightpdf|pdfgear|pdf2go|hipdf|sodapdf|libreoffice draw/i;
 /** Programas de escritório: holerite de empresa pequena pode sair daqui; extrato de banco, não. */
 const ESCRITORIO = /microsoft.*(word|excel|powerpoint)|libreoffice|openoffice|google docs|wps office|pages|keynote|numbers/i;
 /** Impressão de página (navegador, "imprimir como PDF"): comum no extrato tirado do site do banco; vale olhar com calma. */
@@ -39,7 +39,10 @@ export function textoDoPdf(bruto) {
 
 /** Data do PDF ("D:20261110143000-03'00'") em ISO, ou null. */
 export function dataDoPdf(t) {
-  const m = String(t || '').match(/(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
+  const x = String(t || '');
+  const iso = x.match(/(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/); // XMP
+  if (iso) { const [, a, me, d, h = '00', mi = '00', s = '00'] = iso; return `${a}-${me}-${d}T${h}:${mi}:${s}`; }
+  const m = x.match(/(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
   if (!m) return null;
   const [, a, me = '01', d = '01', h = '00', mi = '00', s = '00'] = m;
   return `${a}-${me}-${d}T${h}:${mi}:${s}`;
@@ -58,7 +61,7 @@ async function abrirTrechos(bytes, texto, limite = 4 * 1024 * 1024) {
   if (typeof DecompressionStream === 'undefined') return '';
   const out = [];
   let total = 0;
-  const re = /stream\r?\n/g;
+  const re = /(?<!end)stream\r?\n/g;
   for (let m = re.exec(texto); m && total < limite; m = re.exec(texto)) {
     const ini = m.index + m[0].length;
     let fim = texto.indexOf('endstream', ini);
@@ -98,6 +101,8 @@ function nomesDoCertificado(hex) {
   }
   return nomes;
 }
+/** Nome de autoridade certificadora (quem emite), não de pessoa. */
+const ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
 const textoDoHex = (hex) => { const h = String(hex || '').replace(/[^0-9a-f]/gi, ''); let s = ''; for (let i = 0; i + 1 < h.length; i += 2) s += String.fromCharCode(parseInt(h.slice(i, i + 2), 16)); return s; };
 
 /** Assinaturas digitais do PDF: [{ nome, data, govbr, icp, certificados: [CN...] }]. */
@@ -108,7 +113,12 @@ async function assinaturas(texto) {
   for (let m = re.exec(texto); m; m = re.exec(texto)) {
     // o dicionário da assinatura: do "<<" antes até o ">>" que fecha, com o /Contents <hex> (pode ser grande)
     const ini = texto.lastIndexOf('<<', m.index);
-    const contents = texto.indexOf('/Contents', m.index - 2000 > ini ? m.index - 2000 : ini);
+    // o /Contents pode vir antes ou depois do /Type /Sig (cada programa escreve numa ordem): o mais perto dentro do objeto
+    const obj = Math.max(texto.lastIndexOf(' obj', m.index), 0);
+    const fimObj = texto.indexOf('endobj', m.index);
+    const trecho = texto.slice(obj, fimObj < 0 ? m.index + 200000 : fimObj);
+    const rel = trecho.indexOf('/Contents');
+    const contents = rel < 0 ? -1 : obj + rel;
     if (contents < 0) continue;
     const abre = texto.indexOf('<', contents + 9);
     const fecha = texto.indexOf('>', abre + 1);
@@ -117,12 +127,16 @@ async function assinaturas(texto) {
     const hex = texto.slice(abre + 1, fecha);
     const dic = texto.slice(ini, Math.min(texto.length, Math.max(fecha + 400, m.index + 400)));
     const certs = nomesDoCertificado(hex);
-    const bruto = textoDoHex(hex);
-    const govbr = /gov\.?br|governo federal/i.test(bruto) || certs.some((c) => /gov\.?br|governo federal/i.test(c));
-    const icp = govbr || /icp-brasil/i.test(bruto);
-    const pessoa = certs.find((c) => !/\b(AC|autoridade|raiz|root|CA|SERPRO|certisign|valid|soluti|serasa)\b/i.test(c)) || certs[0] || '';
-    const nome = (chaveDoPdf(dic, 'Name')[0] || pessoa.replace(/:\d{11,14}$/, '')).trim();
-    out.push({ nome, data: dataDoPdf(chaveDoPdf(dic, 'M')[0]), govbr, icp, certificados: certs });
+    // gov.br: certificado emitido pela "AC Final do Governo Federal do Brasil" (o texto "gov.br" aparece em qualquer
+    // certificado da ICP-Brasil, nos endereços). ICP-Brasil: emissor com "ICP-Brasil" ou AC conhecida da ICP.
+    // Sem conferir a cadeia de certificados, isto é indício: a confirmação é no validar.iti.gov.br.
+    const emissores = certs.filter(ehAutoridade);
+    const govbr = emissores.some((c) => /governo federal do brasil/i.test(c));
+    const icp = !govbr && emissores.some((c) => /icp-brasil|serasa|certisign|soluti|valid|serpro|safeweb|digitalsign|caixa|receita federal|\brfb\b/i.test(c));
+    const pessoa = certs.find((c) => !ehAutoridade(c)) || '';
+    // o nome vem do certificado; o /Name do PDF é texto livre (qualquer programa escreve): só sem certificado legível
+    const nome = (pessoa.replace(/:\d{11,14}$/, '') || chaveDoPdf(dic, 'Name')[0] || '').trim();
+    out.push({ nome, data: dataDoPdf(chaveDoPdf(dic, 'M')[0]), govbr, icp, certificados: certs, fim: fecha });
   }
   return out;
 }
@@ -144,7 +158,8 @@ export async function conferirArquivo(entrada) {
   }
   if (!(bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)) return { tipo: null, programa: '', criado: null, alterado: null, sinais: [{ nivel: 'atencao', texto: 'Não é PDF nem foto.' }], assinaturas: [] };
   const texto = latin(bytes);
-  const dentro = /\/Producer|\/Creator|CreatorTool/.test(texto) ? '' : await abrirTrechos(bytes, texto);
+  // os trechos comprimidos sempre: um editor que salva por cima (ex.: Acrobat) põe o nome dele lá dentro, e o do banco fica aberto
+  const dentro = await abrirTrechos(bytes, texto);
   const tudo = `${texto}\n${dentro}`;
   const xmp = (re) => (tudo.match(re) || [])[1] || '';
   const produtor = [...chaveDoPdf(tudo, 'Producer'), xmp(/<pdf:Producer>([^<]+)</)].filter(Boolean);
@@ -161,12 +176,17 @@ export async function conferirArquivo(entrada) {
   const sig = await assinaturas(texto + (dentro ? `\n${dentro}` : ''));
   // alterado bem depois de criado (mais de 1 dia): sinal de mexida; documento assinado muda a data na assinatura (normal)
   if (criado && alterado && !sig.length && Date.parse(alterado) - Date.parse(criado) > 86400000) {
-    sinais.push({ nivel: 'atencao', texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
+    sinais.push({ nivel: 'info', texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
   }
   // partes acrescentadas ao arquivo (atualização incremental) sem assinatura: alguém salvou o PDF de novo por cima
-  const fins = (texto.match(/%%EOF/g) || []).length;
-  if (fins > 1 + sig.length && !editor) sinais.push({ nivel: 'atencao', texto: `O arquivo foi salvo de novo ${fins - 1} vez(es) depois de gerado.` });
-  return { tipo: 'pdf', programa: programas.join(' · '), criado, alterado, sinais, assinaturas: sig };
+  // não contam: o arquivo "para a web" (linearizado, nasce com dois %%EOF) e o que vem depois da última assinatura (dados de validação)
+  const posicoes = [...texto.matchAll(/%%EOF/g)].map((x) => x.index);
+  const ultimaAssinatura = sig.length ? Math.max(...sig.map((s) => s.fim)) : -1;
+  const linearizado = /\/Linearized\b/.test(texto.slice(0, 2048)) ? 1 : 0;
+  // assinado: antes do fim da última assinatura há o %%EOF do original e um de cada assinatura anterior (= número de assinaturas)
+  const extras = sig.length ? posicoes.filter((p) => p < ultimaAssinatura).length - linearizado - sig.length : posicoes.length - 1 - linearizado;
+  if (extras > 0 && !editor) sinais.push({ nivel: 'atencao', texto: `O arquivo foi salvo de novo ${extras} vez(es) depois de gerado.` });
+  return { tipo: 'pdf', programa: programas.join(' · '), criado, alterado, sinais, assinaturas: sig.map(({ fim, ...s }) => s) };
 }
 
 /** Nome sem acento, em minúsculas e sem espaços repetidos, para comparar quem assinou com o nome da ficha. */
@@ -177,5 +197,7 @@ export function mesmoNome(a, b) {
   const pal = (t) => nomeComparavel(t).split(' ').filter((p) => p.length > 2 && !['das', 'dos', 'del'].includes(p));
   const x = pal(a); const y = pal(b);
   if (!x.length || !y.length) return false;
-  return x.every((p) => y.includes(p)) || y.every((p) => x.includes(p));
+  const comuns = x.filter((p) => y.includes(p)).length;
+  // pelo menos duas palavras em comum (uma só vale apenas quando os dois nomes têm uma palavra) e todas as do mais curto
+  return comuns >= (x.length === 1 && y.length === 1 ? 1 : 2) && (x.every((p) => y.includes(p)) || y.every((p) => x.includes(p)));
 }

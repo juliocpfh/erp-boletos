@@ -97,9 +97,10 @@ test('documentos: só PDF, JPG ou PNG pelos bytes, até 10 MB, com nome dado pel
   const chave = await criar(ctx);
   const r = await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('3 últimos holerites')}&nome=holerite%20outubro.pdf`, PDF);
   assert.equal(r.status, 200);
-  assert.ok(ctx.env.DADOS.m.has(`${PASTA}/link-3-ultimos-holerites-${new Date().toISOString().slice(0, 10)}.pdf`));
+  const doDia = (k) => k.startsWith(PASTA + '/link-3-ultimos-holerites-' + new Date().toISOString().slice(0, 10) + '-') && /-[0-9a-f]{6}\.pdf$/.test(k);
+  assert.equal([...ctx.env.DADOS.m.keys()].filter(doDia).length, 1);
   assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('3 últimos holerites')}&nome=b.pdf`, PDF)).status, 200);
-  assert.ok(ctx.env.DADOS.m.has(`${PASTA}/link-3-ultimos-holerites-${new Date().toISOString().slice(0, 10)}-2.pdf`), 'não apaga o anterior');
+  assert.equal([...ctx.env.DADOS.m.keys()].filter(doDia).length, 2, 'não apaga o anterior');
   assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('Documento com foto e CPF (RG ou CNH)')}&nome=a.html`, new TextEncoder().encode('<html><script>'))).status, 415);
   assert.equal((await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=Qualquer%20coisa', PDF)).status, 400, 'documento fora da lista');
   assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('Documento com foto e CPF (RG ou CNH)')}`, new Uint8Array(FP.MAX_DOCUMENTO + 1).fill(0x25))).status, 413);
@@ -134,10 +135,21 @@ test('equipe: falta documento, assinar, PDF para baixar, link renovado e encerra
   assert.equal(d.enviado_em !== null, true);
   // prazo vencido: lê, mas não grava
   const reg = JSON.parse(new TextDecoder().decode(ctx.env.DADOS.m.get('publico/fichas/7/interessado.json').dados));
-  reg.vence_em = '2026-01-01T00:00:00.000Z';
+  reg.vence_em = new Date(Date.now() - 86400000).toISOString();
   await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(reg));
   assert.equal((await (await ctx.publico(nova, 'GET', 'ficha')).json()).vencido, true);
   assert.equal((await ctx.publico(nova, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'M' }, declaracao: true })).status, 410);
+  // 30 dias depois do prazo, nem lê; 90 dias depois, o registro sai na próxima lista da equipe
+  reg.vence_em = new Date(Date.now() - 31 * 86400000).toISOString();
+  await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(reg));
+  assert.equal((await ctx.publico(nova, 'GET', 'ficha')).status, 410);
+  reg.vence_em = new Date(Date.now() - 91 * 86400000).toISOString();
+  await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(reg));
+  assert.deepEqual((await (await ctx.equipe('GET', 'lista')).json()).links, []);
+  assert.ok(![...ctx.env.DADOS.m.keys()].some((k) => k.startsWith('publico/fichas/7/') || k.startsWith('publico/tokens/')), 'registro, PDF e ponteiro saíram');
+  // de volta no prazo para o resto do teste
+  reg.vence_em = new Date(Date.now() + 86400000).toISOString();
+  await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(reg));
   // encerrado: nem lê
   await ctx.equipe('POST', 'atualizar', { ficha_id: 7, pessoa: 'interessado', situacao: 'Encerrado' });
   assert.equal((await ctx.publico(nova, 'GET', 'ficha')).status, 404);
