@@ -248,12 +248,17 @@ function tentarSeguroDeNovo() {
   conectarSeguro(false).then((ok) => { if (ok) espelharSeguro(); }).catch(logarErro);
 }
 
-/** Backup completo: o mesmo ZIP do "Exportar tudo", cifrado. */
-export function backupCompletoSeguro() {
+/**
+ * Backup completo: o mesmo ZIP do "Exportar tudo", cifrado. `aoAndar` (opcional, botão "Fazer backup completo agora") recebe
+ * { fase: 'esperando' } (outra cópia segura na fila), o andamento de `S.exportarZip` e, no fim, { fase: 'gravando' }.
+ */
+export function backupCompletoSeguro(aoAndar = () => {}) {
+  aoAndar({ fase: 'esperando' });
   return naFilaSegura(async () => {
     if (!E.seguro || !E.seguro.chave || !E.pasta || !E.d) return;
     const JSZip = await jsZip();
-    const zip = await S.exportarZip(JSZip, E.pasta, E.d);
+    const zip = await S.exportarZip(JSZip, E.pasta, E.d, aoAndar);
+    aoAndar({ fase: 'gravando' });
     await B.gravarCompleto(E.seguro.dir, E.seguro.chave, new Uint8Array(await zip.arrayBuffer()));
   });
 }

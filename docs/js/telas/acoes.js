@@ -43,6 +43,46 @@ async function modeloFatura() {
   }
 }
 
+const megas = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
+
+/**
+ * Barra de progresso do ZIP com tudo (backup completo, "Baixar ZIP"): na nuvem cada anexo é baixado um a um e leva minutos.
+ * Desenha no elemento `id` e, enquanto roda, o navegador pergunta antes de recarregar ou fechar a página. `fim()` limpa.
+ */
+function andamentoZip(id) {
+  const el = document.getElementById(id);
+  const segurar = (ev) => { ev.preventDefault(); ev.returnValue = ''; };
+  window.addEventListener('beforeunload', segurar);
+  let ultimo = 0;
+  let pctAntes = -1;
+  const desenhar = (valor, maximo, texto, detalhe = '') => {
+    if (!el) return;
+    el.innerHTML = `<div class="alerta info"><p><progress ${maximo ? `max="${maximo}" value="${valor}"` : ''} style="width:100%"></progress></p>
+      <p><b>${esc(texto)}</b><br><span class="suave">${esc(detalhe)}</span></p>
+      <p class="suave">Pode levar alguns minutos. <b>Não recarregue nem feche a página</b> até terminar.</p></div>`;
+  };
+  return {
+    aoAndar(p) {
+      const agora = Date.now();
+      if (p.fase === 'arquivos' && p.feitos && agora - ultimo < 150) return; // sem redesenhar a cada arquivo pequeno
+      if (p.fase === 'compactando' && Math.round(p.pct) === pctAntes) return;
+      ultimo = agora;
+      if (p.fase === 'compactando') pctAntes = Math.round(p.pct);
+      if (p.fase === 'esperando') desenhar(0, 0, 'Começando…', 'Esperando a cópia de segurança anterior terminar.');
+      else if (p.fase === 'listando') desenhar(0, 0, 'Procurando os anexos…');
+      else if (p.fase === 'arquivos') {
+        desenhar(p.totalBytes ? p.bytes : p.feitos, p.totalBytes || p.total, `Baixando os anexos: ${p.feitos + 1} de ${p.total}`
+          + (p.totalBytes ? ` (${megas(p.bytes)} de ${megas(p.totalBytes)})` : ''), p.nome);
+      } else if (p.fase === 'compactando') desenhar(Math.round(p.pct), 100, `Compactando: ${Math.round(p.pct)}%`);
+      else if (p.fase === 'gravando') desenhar(0, 0, 'Cifrando e gravando na pasta segura…');
+    },
+    fim() {
+      window.removeEventListener('beforeunload', segurar);
+      if (el) el.innerHTML = '';
+    },
+  };
+}
+
 /**
  * Celular: o anexo abre na própria tela (visualizador.js, que só carrega aqui). Devolve false para abrir como no computador
  * (aba nova), inclusive se o visualizador não carregar (sem internet e ainda não guardado no aparelho).
@@ -497,8 +537,8 @@ export const ACOES = {
   },
 
   async backupCompletoAgora() {
-    aviso('Gravando o backup completo…', 'info');
-    await backupCompletoSeguro();
+    const barra = andamentoZip('progresso-backup');
+    try { await backupCompletoSeguro(barra.aoAndar); } finally { barra.fim(); }
     if (E.seguroErro) throw new Error(E.seguroErro);
     aviso('Backup completo gravado na pasta segura.');
     await mostrar();
@@ -1697,7 +1737,9 @@ export const ACOES = {
 
   async exportar() {
     const JSZip = await jsZip();
-    const blob = await S.exportarZip(JSZip, E.pasta, E.d);
+    const barra = andamentoZip('progresso-exportar');
+    let blob;
+    try { blob = await S.exportarZip(JSZip, E.pasta, E.d, barra.aoAndar); } finally { barra.fim(); }
     baixar(blob, `imoveis-${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}.zip`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Banco e arquivos exportados em ZIP', null, {}, false));
   },
