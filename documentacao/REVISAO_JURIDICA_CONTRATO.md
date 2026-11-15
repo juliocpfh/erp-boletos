@@ -38,7 +38,7 @@ O que já está certo: reajuste anual com índice; IPTU e seguro por conta do in
 | B3 | **Convite para a vistoria de saída** registrado (data, hora, se o inquilino veio) e prazo para ele responder ao relatório | ⬜ 13/11: aprovado (registrar data, hora, se veio e prazo de resposta); depende do meio-termo de A10/C3 |
 | B4 | **Termo de devolução das chaves** na saída, com a ressalva de que receber as chaves não dá quitação (hoje a etapa "Entrega das chaves" fica feita só pela data) | ⬜ 13/11: aprovado (termo gerado no sistema) |
 | B5 | Pendências da vistoria de saída: já existem (lista "Com pendências" e marcação "Contestada"); faltam o orçamento de cada pendência e a escolha do inquilino entre fazer o reparo ou descontar da caução | ⬜ 13/11: aprovado (valor de cada pendência e escolha do inquilino) |
-| B6 | **Reserva**: sempre devolvida (não aprovada ou desistência antes de assinar), com recibo dizendo isso. Decisão do dono em 12/11/2026 | ⬜ 13/11: aprovado (sempre devolvida + recibo gerado no sistema) |
+| B6 | **Reserva**: sempre devolvida (não aprovada ou desistência antes de assinar), com recibo dizendo isso. Decisão do dono em 12/11/2026 | ✅ 13/11: sempre devolvida; recibo "Termo de devolução da reserva e quitação" gerado no sistema (PR #204) |
 | B7 | Barrar caução/depósito acima de 3 aluguéis e a garantia dupla (A1, A2); avisar residencial com menos de 30 meses (A3) | ✅ 12/11: avisar, não proibir |
 | B8 | **Informe anual para o IR**: rotina todo ano para os inquilinos com NF (ver seção D) | ✅ 12/11 |
 
