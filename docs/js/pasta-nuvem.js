@@ -28,6 +28,7 @@ export class AnexosNuvem {
     this.tudo = null; // { raiz, em }: a árvore inteira veio de uma vez (carregarTudo); pasta fora dela = vazia, sem pedir à nuvem
     this.carregandoTudo = null;
     this.fila = null; this.naoEnviados = []; this.avisos = []; this.enviando = null;
+    this.aoMudar = null; // chamado depois de gravar, apagar ou mover na nuvem (a cópia aberta do PC se atualiza: copia-aberta.js)
   }
 
   async pedir(metodo, rota, { corpo, cabecalhos = {} } = {}) {
@@ -140,19 +141,26 @@ export class AnexosNuvem {
     const raiz = partes.join('/');
     const arvore = new Map([[raiz, { pastas: new Set(), arquivos: new Map() }]]);
     const pasta = (chave) => { let l = arvore.get(chave); if (!l) { l = { pastas: new Set(), arquivos: new Map() }; arvore.set(chave, l); } return l; };
+    for (const a of await this.listaCrua(partes)) {
+      const p = a.caminho.split('/');
+      let chave = raiz;
+      for (let i = 0; i < p.length - 1; i += 1) { pasta(chave).pastas.add(p[i]); chave = `${chave}/${p[i]}`; }
+      pasta(chave).arquivos.set(p.at(-1), a.tamanho);
+    }
+    return arvore;
+  }
+
+  /** Todos os arquivos dentro de `partes`, como a nuvem lista: [{ caminho (relativo), tamanho, alterado }]. Falha lança. */
+  async listaCrua(partes) {
+    const todos = [];
     let cursor;
     for (let n = 0; n < 1000; n += 1) {
       const r = await (await this.pedir('GET', `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)).json();
-      for (const a of r.arquivos) {
-        const p = a.caminho.split('/');
-        let chave = raiz;
-        for (let i = 0; i < p.length - 1; i += 1) { pasta(chave).pastas.add(p[i]); chave = `${chave}/${p[i]}`; }
-        pasta(chave).arquivos.set(p.at(-1), a.tamanho);
-      }
+      todos.push(...r.arquivos);
       if (!r.mais) break;
       cursor = r.cursor;
     }
-    return arvore;
+    return todos;
   }
 
   /** A árvore de ``raiz`` (ou acima dela) veio por inteiro há menos de VALIDADE_LISTA? */
@@ -204,6 +212,7 @@ export class AnexosNuvem {
     try {
       await this.pedir('PUT', codificar(partes), { corpo: blob });
       this.anotarNaLista(partes, blob.size);
+      this.aoMudar?.();
     } catch (e) {
       if (!passageiro(e) || !this.guardar) throw e;
       const fila = await this.carregarFila();
@@ -233,6 +242,7 @@ export class AnexosNuvem {
       if (e.status !== 404) throw e;
     }
     this.esquecerLista(pasta ? partes : partes.slice(0, -1));
+    this.aoMudar?.();
   }
 
   async mover(de, para) {
@@ -252,6 +262,7 @@ export class AnexosNuvem {
     if (fila.length) await this.gravarFila();
     for (const c of [...this.criadas]) if (c === k || c.startsWith(`${k}/`)) { this.criadas.delete(c); this.criadas.add(para.join('/') + c.slice(k.length)); }
     this.esquecerLista(de); this.esquecerLista(para);
+    this.aoMudar?.();
   }
 
   /**
@@ -285,6 +296,7 @@ export class AnexosNuvem {
         this.fila = this.fila.filter((x) => x.id !== f.id);
         await this.gravarFila();
         this.esquecerLista(f.partes.slice(0, -1));
+        if (!recusado) this.aoMudar?.();
       }
     })();
     try { await this.enviando; } finally { this.enviando = null; }

@@ -1,5 +1,5 @@
 // ACOES: o que cada botão faz (data-acao="nome"), com os auxiliares de PDF, Excel, exclusão (TABELAS_EXCLUSAO) e reajuste.
-import { alterar, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
+import { alterar, atualizarCopiaAberta, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
 import * as S from '../armazenamento.js';
 import { PAPEIS } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -541,6 +541,15 @@ export const ACOES = {
     try { await backupCompletoSeguro(barra.aoAndar); } finally { barra.fim(); }
     if (E.seguroErro) throw new Error(E.seguroErro);
     aviso('Backup completo gravado na pasta segura.');
+    await mostrar();
+  },
+
+  /** Backup seguro: atualiza agora a cópia aberta dos arquivos (copia-aberta.js). */
+  async atualizarCopiaAberta() {
+    const caixa = document.getElementById('progresso-copia');
+    const r = await atualizarCopiaAberta(({ feitos, total }) => { if (caixa) caixa.textContent = `Atualizando: ${feitos} de ${total}…`; });
+    if (!r) throw new C.ErroUsuario('A cópia aberta precisa dos dados na nuvem e do backup seguro ligado neste computador.');
+    aviso(`Pasta atualizada: ${r.baixados} arquivo(s) baixado(s), ${r.apagados} tirado(s)${r.falhas ? `, ${r.falhas} ficaram para a próxima` : ''}. Total: ${r.total}.`, r.falhas ? 'aviso' : 'ok');
     await mostrar();
   },
 

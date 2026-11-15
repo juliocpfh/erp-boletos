@@ -212,7 +212,7 @@ async function listarPastaInteira(env, chave, cursorInicial) {
   let cursor = cursorInicial || undefined; let truncado = false;
   do {
     const r = await env.DADOS.list({ prefix: prefixo, cursor, limit: 1000 });
-    for (const o of r.objects) arquivos.push({ caminho: o.key.slice(prefixo.length), tamanho: o.size });
+    for (const o of r.objects) arquivos.push({ caminho: o.key.slice(prefixo.length), tamanho: o.size, alterado: o.uploaded ? new Date(o.uploaded).toISOString() : '' }); // alterado: a cópia aberta do PC vê arquivo trocado com o mesmo tamanho
     truncado = !!r.truncated; cursor = truncado ? r.cursor : undefined;
   } while (cursor && arquivos.length < LISTA_TUDO_POR_PEDIDO);
   return json(200, { arquivos, mais: truncado, cursor: truncado ? cursor : undefined });

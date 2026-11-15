@@ -262,6 +262,10 @@ O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lug
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
 - ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 
+SEM CIFRAR (para abrir, imprimir e copiar no Windows):
+- Arquivos dos imoveis/   copia aberta dos arquivos do sistema (imovel -> Inquilinos -> pessoa), atualizada sozinha.
+  E so para consulta: o que for posto ou mudado ali NAO vai para o sistema (anexe sempre pelo sistema).
+
 SE O SITE OU O CLOUDFLARE CAIREM (ou sem internet):
 Abra o sistema pelo icone do aplicativo instalado (ou pelo endereco de sempre no Chrome). Ele abre com os dados da
 ultima vez que este computador esteve conectado; trabalhe normalmente: o que voce fizer sobe sozinho quando o site voltar.

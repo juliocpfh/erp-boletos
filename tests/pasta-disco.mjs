@@ -29,4 +29,12 @@ export class PastaDisco {
     if (!fs.existsSync(c)) { if (!create) throw new DOMException(n, 'NotFoundError'); fs.writeFileSync(c, ''); }
     return new ArquivoDisco(c);
   }
+  async removeEntry(n, { recursive = false } = {}) {
+    const c = path.join(this.caminho, n);
+    if (!fs.existsSync(c)) throw new DOMException(n, 'NotFoundError');
+    if (fs.statSync(c).isDirectory()) {
+      if (!recursive && fs.readdirSync(c).length) throw new DOMException(n, 'InvalidModificationError');
+      fs.rmSync(c, { recursive: true });
+    } else fs.unlinkSync(c);
+  }
 }

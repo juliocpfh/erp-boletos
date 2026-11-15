@@ -18,7 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC e pastas dos inquilinos abertas no Windows (explicado em 15/11; falta você decidir 4 pontos) | você, depois Claude | 5 min |
+| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
 
 ---
 
@@ -161,14 +161,18 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - **Quem atualiza essa pasta:** o próprio sistema, quando está aberto no computador, e o **atualizador do PC** (`atualizador-pc`, Agendador do Windows, às 20h e ao entrar no Windows). Ele traz só os dados, cifrados; **não traz os arquivos dos inquilinos**.
 
 **Proposta (para fazer na sequência):**
-- [ ] **9a. Ícone que abre o sistema** (não precisa programar): no Chrome ou Edge, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria, como programa, e funciona mesmo com o site fora do ar (cópia do aparelho).
-- [ ] **9b. Pasta aberta com os arquivos dos inquilinos** (Claude faz): o atualizador do PC passa a copiar **também os arquivos** da nuvem, **sem cifrar**, para uma pasta comum, por exemplo `C:\Imoveis\Pastas\<Imóvel>\Inquilinos\<Nome>\` (contratos, vistorias, comprovantes, documentos), como era no OneDrive. Ele só baixa o que mudou e apaga da cópia o que foi apagado no sistema. A pasta é **só para consulta**: arquivo posto ou mudado ali não volta para o sistema (anexar continua sendo pelo sistema). Opcional: uma folha com o resumo de cada inquilino (dados, boletos pagos e em aberto) em PDF na pasta dele.
-- **Decisões do dono antes do 9b:**
-  1. Cópia **sem cifrar** no computador: quem usar o computador vê CPFs e documentos. Recomendado: ligar o **BitLocker** no disco C e senha no Windows. Concorda?
-  2. Onde: `C:\Imoveis\Pastas` está bom?
-  3. De quanto em quanto tempo: a cada hora (com o computador ligado), além das 20h e da entrada no Windows?
-  4. Quer a folha-resumo em PDF de cada inquilino na pasta?
-- **Para conferir (dono):** o atualizador do PC está instalado? Na pasta do backup seguro, o arquivo `ultima-atualizacao.txt` deve ter a data de hoje e `ok`. Se não existir, a instalação (`atualizador-pc/README.md`) entra junto com o 9b.
+- [ ] **9a. Ícone que abre o sistema** (aceito em 15/11; você faz, não precisa programar): no Chrome, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria e funciona mesmo com o site, o Cloudflare ou a internet fora do ar, com os dados da última vez que o sistema foi aberto naquele aparelho.
+- [x] **9b. Cópia aberta dos arquivos no computador** (feito em 15/11): subpasta **`Arquivos dos imoveis`** dentro de `C:\Users\Julio\Imoveis` (a pasta do backup seguro), sem cifrar, como no sistema (imóvel → Inquilinos → pessoa). Abrir, imprimir e copiar à vontade; o que for posto ou mudado lá não vai para o sistema. Atualiza sozinha: (A) logo depois de anexar, apagar ou mover neste computador; (B) de hora em hora pelo atualizador do PC; (C) botão **Atualizar a pasta agora** em Dados e backup → Backup seguro. Decisões do dono: sem BitLocker (só ele usa o computador, com senha, e antivírus sempre atualizado); risco de exposição e LGPD aceitos.
+  - **Falta você (depois do merge, 5 min):** copiar os arquivos novos do atualizador para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` (`atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd`, `rodar-escondido.vbs`; o `.env` fica) e rodar `instalar-tarefa.cmd` **como administrador**. Posso fazer a cópia para você. Depois, conferir: aparece a pasta `Arquivos dos imoveis` e o `ultima-atualizacao.txt` termina com `arquivos=…`.
+- [ ] **9c. Rotina "Arquivo impresso" (pasta física do inquilino)** (próxima a fazer; decisões do dono em 15/11):
+  - Liga e desliga em Dados e backup.
+  - **Última etapa da entrada do inquilino: "Montar a pasta física".** Só aparece depois de toda a entrada (contrato assinado, entrega das chaves, troca de titular etc.). Ali se **escolhe** o que imprimir entre tudo o que foi anexado e gerado até então, com um botão para imprimir de uma vez, e uma **capa / folha-resumo** com a lista do que está na pasta (para conferir que tem tudo).
+  - **Na saída** também, e **durante o contrato só documento novo importante** (aditivo, acordo, termo, notificação).
+  - **Entra:** documentos da pessoa e os legais (contratos e aditivos assinados, documentos pessoais, vistorias, recibos, termos, notificações). **Não entra:** NFs, comprovantes de pagamento, boletos (pagos ou em aberto), textos do WhatsApp, itens da ficha cadastral que não precisam (ex.: imposto de renda). E-mails: só quando escolhidos.
+  - **Arquivo trocado** (documento importante): avisa para imprimir a versão nova.
+  - **Começo:** tudo o que já existe (uma pendência por inquilino ativo) e daqui para frente.
+  - **Herança (troca de titular):** ao terminar a entrada de quem herdou, avisa para conferir se os documentos do anterior já estão impressos, pôr a pasta do anterior dentro da pasta do novo ("herdado de fulano") e imprimir os documentos novos da entrada.
+  - Sem folha-resumo de boletos (a parte financeira fica arquivada em outro lugar).
 
 ## Ficou de fora de propósito (não é defeito)
 

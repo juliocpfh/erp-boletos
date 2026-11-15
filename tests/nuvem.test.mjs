@@ -104,7 +104,8 @@ test('lista-tudo: todos os arquivos de uma pasta com as subpastas numa resposta 
   const env = { MODO_TESTE: '1', DADOS: r2Falso() };
   for (const k of ['arquivos/Sala 2/a.pdf', 'arquivos/Sala 2/Inquilinos/Ana/c.pdf', 'arquivos/leia.pdf', 'modelos/x.xlsx']) await env.DADOS.put(k, 'x');
   const tudo = await (await pedir(env, 'GET', '/api/lista-tudo/arquivos/')).json();
-  assert.deepEqual(tudo, { arquivos: [{ caminho: 'Sala 2/Inquilinos/Ana/c.pdf', tamanho: 1 }, { caminho: 'Sala 2/a.pdf', tamanho: 1 }, { caminho: 'leia.pdf', tamanho: 1 }], mais: false });
+  // alterado: data de envio (a cópia aberta do PC vê arquivo trocado com o mesmo tamanho)
+  assert.deepEqual(tudo, { arquivos: [{ caminho: 'Sala 2/Inquilinos/Ana/c.pdf', tamanho: 1, alterado: '2026-11-01T00:00:02.000Z' }, { caminho: 'Sala 2/a.pdf', tamanho: 1, alterado: '2026-11-01T00:00:01.000Z' }, { caminho: 'leia.pdf', tamanho: 1, alterado: '2026-11-01T00:00:03.000Z' }], mais: false });
   const sala = await (await pedir(env, 'GET', '/api/lista-tudo/arquivos/Sala%202/')).json();
   assert.deepEqual(sala.arquivos.map((a) => a.caminho), ['Inquilinos/Ana/c.pdf', 'a.pdf']);
   for (let i = 0; i < 5003; i += 1) await env.DADOS.put(`arquivos/Muitos/f${String(i).padStart(4, '0')}.pdf`, 'x');

@@ -3,6 +3,7 @@ import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
 import { dataBr, dataHoraBr, reais } from '../calculos.js';
+import * as CA from '../copia-aberta.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
@@ -52,6 +53,7 @@ export async function telaBackupSeguro() {
       <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
   }
   const lista = await B.listarBackups(E.seguro.dir);
+  const copia = await CA.situacaoCopia(E.seguro.dir);
   const ultimo = (pasta) => lista.find((x) => x.pasta === pasta);
   const quando = (x) => (x ? dataHoraBr(x.alterado) : 'nenhum ainda');
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
@@ -66,6 +68,15 @@ export async function telaBackupSeguro() {
       <div class="acoes">${botao('backupCompletoAgora', 'Fazer backup completo agora', {}, '')}
         ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div>
       <div id="progresso-backup" aria-live="polite"></div></div>
+    <div class="cartao"><h2>Cópia aberta dos arquivos</h2>
+      <p>Na pasta segura, a subpasta <b>${CA.PASTA_COPIA}</b> tem os arquivos do sistema <b>sem cifrar</b>, como no sistema (imóvel → Inquilinos → pessoa), para abrir, imprimir e copiar direto no Windows. É só para consulta: o que for posto ou mudado lá não vai para o sistema (anexe sempre pelo sistema).</p>
+      ${E.nuvem ? `<div class="grade">
+        ${item('Arquivos na cópia', copia ? String(copia.total) : 'ainda não feita')}
+        ${item('Atualizada em', copia ? `${dataHoraBr(copia.atualizado_em)} (${copia.por === 'atualizador' ? 'pelo atualizador do PC' : 'por este computador'})` : '-')}
+        ${copia && copia.falhas ? item('Ficaram para a próxima', `${copia.falhas} arquivo(s) não baixaram`) : ''}</div>
+      <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
+      <div class="acoes">${botao('atualizarCopiaAberta', 'Atualizar a pasta agora', {}, 'secundario')}</div>
+      <div id="progresso-copia" aria-live="polite"></div>` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
