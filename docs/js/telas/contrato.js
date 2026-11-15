@@ -299,6 +299,9 @@ function roteiroSaidaHtml(c, e) {
       return `${opera() ? link(`#/imprimir/recibo?tipo=devolucao_chaves&contrato=${c.id}`, '🧾 Termo de devolução das chaves', 'botao secundario pequeno') : ''}
         <span class="suave">Assinado:</span> ${linkComprovante(c.id, c.termo_chaves_saida, { tabela: 'contratos', id: c.id, campo: 'termo_chaves_saida', tipo: 'termo-devolucao-chaves', data: c.data_saida }).replace('📎 comprovante', '📎 termo assinado').replace('anexar comprovante', 'anexar o termo assinado')}`;
     }
+    // B5: valor de cada reparo da vistoria de saída (vai para o cálculo final), também com a vistoria já feita
+    const res = x.chave === 'vistoria' && x.feito ? K.resultadoVistoriaSaida(d(), c) : null;
+    if (res && res.pendencias.length && opera() && !e) return botao('valoresReparos', res.semValor ? 'Valores dos reparos' : 'Mudar os valores', { id: res.vistoria.id }, res.semValor ? 'pequeno' : 'secundario pequeno');
     if (!opera() || x.feito) return '';
     if (x.chave === 'vistoria') return `${botao('marcarVistoriaSaida', c.vistoria_saida_data ? 'Mudar a data marcada' : 'Marcar data e hora', { id: c.id }, 'secundario pequeno')} ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'Registrar vistoria de saída', 'botao pequeno')}`;
     if (x.chave === 'contas') return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, 'Registrar protocolo', 'botao pequeno') : ''} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, 'Registrar leitura', 'botao pequeno') : ''}`;
