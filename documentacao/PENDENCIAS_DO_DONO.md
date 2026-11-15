@@ -18,6 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
+| 9 | Para conversar: programa no PC e pastas dos inquilinos sem o sistema | você + Claude | — |
 
 ---
 
@@ -113,7 +114,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 **Situação:** o sistema já está pronto para emitir boleto no C6, puxar o extrato e propor pagamentos. Falta o C6 liberar as chaves da API. A "ponte" (programa que fala com o banco) ainda não está instalada em computador nenhum. Ela só é instalada quando as chaves chegarem.
 
 **O que fazer agora**
-1. Cobrar o C6 **por escrito** (chat do C6 Empresas ou o gerente): "Preciso das credenciais da API de boletos (Bolepix) como Cliente Final, para sistema próprio".
+1. Cobrar o C6 **por escrito** (chat do C6 Empresas ou o gerente): "Preciso das credenciais da API de boletos (Bolepix) como Cliente Final, para sistema próprio". **14/11:** e-mail pronto em `EMAIL_C6_CREDENCIAIS.md` (todos os módulos, as duas empresas), para enviar a `homologacaoapi@c6bank.com` do e-mail de cadastro de cada empresa.
 2. **Não** escolha um "Parceiro" de outra empresa na tela "Integrações via API" do Web Banking: daria acesso a um terceiro.
 3. Quando o C6 mandar o ClientId, o ClientSecret e a pasta do certificado, me chame. A instalação segue `documentacao/LIGAR_C6.md`. **Nunca cole essas chaves no chat.**
 
@@ -125,19 +126,19 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 | Assunto | O que decidir | Quando |
 |---|---|---|
-| **D5, informe do IR** | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. | já |
-| **DIMOB** | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
-| **Feriados sem banco** | Confirmar se Carnaval e Corpus Christi contam como dia sem banco (boleto que vence nesses dias pode ser pago no dia útil seguinte, sem multa). | já |
+| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. | já |
+| **DIMOB** (pendente com o contador em 14/11) | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
+| ~~**Feriados sem banco**~~ | **Decidido em 14/11:** Carnaval e Corpus Christi contam como dia sem banco (o sistema já fazia assim). | feito |
 | **Prazos da conferência do banco** | Confirmar os prazos de 45 dias e de 7 dias usados na conferência do extrato. | quando o C6 entrar |
-| **Pasta do OneDrive** | Aposentar ou não a pasta do OneDrive como reserva (o sistema já está na nuvem desde 06/11). | por volta de **21/11/2026** |
-| **CBS 2027** | O imposto novo substitui o PIS/COFINS em 2027. Exemplo: aluguel residencial de R$ 3.000,00 paga cerca de R$ 81,00 (hoje R$ 109,50). Antes de mudar a aba Impostos: alíquota final do Senado (até 15/12/2026); com o contador, se algum contrato antigo fica nos 3,65%; e se o aluguel passa a ser "valor + CBS". | depois de **15/12/2026** |
+| ~~**Pasta do OneDrive**~~ | **Decidido em 14/11:** aposentada (não é mais usada; backup seguro no disco C, copiado todo dia para o HD externo). Guardar uma última cópia no HD externo e apagar do OneDrive (e da lixeira do OneDrive). | feito |
+| **CBS 2027** (pendente em 14/11) | O imposto novo substitui o PIS/COFINS em 2027. Exemplo: aluguel residencial de R$ 3.000,00 paga cerca de R$ 81,00 (hoje R$ 109,50). Antes de mudar a aba Impostos: alíquota final do Senado (até 15/12/2026); com o contador, se algum contrato antigo fica nos 3,65%; e se o aluguel passa a ser "valor + CBS". | depois de **15/12/2026** |
 | **NF pelo governo (2027)** | Quando o governo definir o sistema da NF, ela passa a sair ao identificar o pagamento no extrato. | quando sair a regra |
 | **Revisão jurídica** | Itens B3 a B6 do fluxo (ver `REVISAO_JURIDICA_CONTRATO.md`). Os recibos e termos de quitação já cobriram parte. Confirme o que ainda quer. | quando puder |
 | **Nome do botão** | "Correção da caução" virou "Complementação de caução". O botão "Corrigir caução" e a regra B7 ficaram com o nome antigo. Quer trocar também? | quando puder |
 
 ---
 
-## 7. Aceitar a PR #231  `[ ]`
+## 7. Aceitar a PR #231  `[x]` (aceita em 14/11)
 
 É só documentação (o aviso de NF dos boletos do mês e esta lista de pendências). O conflito com a `main` foi resolvido em 14/11. Pode aceitar: <https://github.com/juliocpfh/erp-boletos/pull/231>
 
@@ -146,10 +147,14 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 ## 8. Lembretes com data
 
 - **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
-- **21/11/2026**: decisão da pasta do OneDrive (item 6).
 - **15/12/2026**: alíquota da CBS (item 6).
 
 ---
+
+## 9. Para conversar (pedidos do dono em 14/11)  `[ ]`
+
+1. **Programa de verdade no PC.** Hoje a "versão PC" é um arquivo HTML guardado na pasta do backup seguro, só para emergência (site fora do ar). O dono quer **um programa mesmo** (instalado, com ícone, abrindo como aplicativo do Windows). Conversar: o que ele espera do programa (funcionar sem internet o tempo todo? só abrir mais fácil?), se basta o aplicativo instalado pelo Chrome/Edge ("Instalar aplicativo", já existe) ou se precisa de um instalador próprio (ex.: Electron/Tauri), e como ficam os dados (nuvem ou no computador).
+2. **Dados dos inquilinos em pastas, acessíveis sem o sistema.** O dono quer abrir os documentos de cada inquilino direto numa pasta do computador, sem precisar do sistema. Hoje os anexos ficam na nuvem (Cloudflare) e o backup seguro do disco C é **cifrado** (só abre com a senha, pelo sistema). Conversar: uma cópia **não cifrada** dos anexos, organizada por imóvel → inquilino (como era no OneDrive), atualizada sozinha no computador do escritório; com a planilha/PDF dos dados de cada um junto? Cuidado: pasta aberta = quem tiver o computador vê CPFs e documentos (BitLocker e HD externo guardado).
 
 ## Ficou de fora de propósito (não é defeito)
 

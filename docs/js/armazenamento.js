@@ -341,22 +341,40 @@ async function juntarConteudo(origem, destino) {
 // --------------------------------------------------------------------------
 // Exportar / importar tudo em ZIP
 // --------------------------------------------------------------------------
-async function adicionarAoZip(zip, dir, prefixo) {
+/** Junta os arquivos de uma pasta e das subpastas: [{ caminho, h, tamanho }] (tamanho já conhecido na nuvem, senão 0). */
+async function listarParaZip(dir, prefixo, lista = []) {
   for await (const [nome, h] of dir.entries()) {
-    if (h.kind === 'file') zip.file(prefixo + nome, await h.getFile());
-    else await adicionarAoZip(zip, h, `${prefixo}${nome}/`);
+    if (h.kind === 'file') lista.push({ caminho: prefixo + nome, h, tamanho: h.tamanho || 0 });
+    else await listarParaZip(h, `${prefixo}${nome}/`, lista);
   }
+  return lista;
 }
 
-export async function exportarZip(JSZip, pasta, dados) {
+/**
+ * ZIP com o banco e todos os anexos. `aoAndar(p)` (opcional) recebe o andamento para a barra de progresso:
+ * { fase: 'listando' } · { fase: 'arquivos', feitos, total, bytes, totalBytes, nome } · { fase: 'compactando', pct }.
+ * Na nuvem cada anexo é baixado um a um (pode levar minutos), por isso o andamento.
+ */
+export async function exportarZip(JSZip, pasta, dados, aoAndar = () => {}) {
   const zip = new JSZip();
   zip.file(ARQUIVO_BANCO, JSON.stringify(dados, null, 1));
+  aoAndar({ fase: 'listando' });
+  const lista = [];
   for (const sub of [PASTA_ARQUIVOS, PASTA_MODELOS]) {
     try {
-      await adicionarAoZip(zip, await pasta.getDirectoryHandle(sub), `${sub}/`);
+      await listarParaZip(await pasta.getDirectoryHandle(sub), `${sub}/`, lista);
     } catch { /* pasta ainda não existe */ }
   }
-  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const totalBytes = lista.reduce((t, x) => t + x.tamanho, 0);
+  let bytes = 0;
+  for (const [i, x] of lista.entries()) {
+    aoAndar({ fase: 'arquivos', feitos: i, total: lista.length, bytes, totalBytes, nome: x.caminho });
+    const arquivo = await x.h.getFile();
+    zip.file(x.caminho, arquivo);
+    bytes += x.tamanho || arquivo.size || 0;
+  }
+  aoAndar({ fase: 'compactando', pct: 0 });
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }, (m) => aoAndar({ fase: 'compactando', pct: m.percent }));
 }
 
 export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
