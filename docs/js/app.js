@@ -6,6 +6,7 @@ import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import { montarIndice } from './indice.js';
 import * as C from './calculos.js';
+import * as CA from './copia-aberta.js';
 import { encaixarFaturas } from './fatura.js';
 import { esc } from './formularios.js';
 import * as N from './nuvem.js';
@@ -291,6 +292,30 @@ function espelharSeguro() {
   if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
 }
 
+/**
+ * Cópia aberta dos arquivos (copia-aberta.js): na nuvem, com o backup seguro ligado neste computador, os anexos vão sem cifrar
+ * para "Arquivos dos imoveis" na pasta do backup seguro. Uma atualização por vez; `aoAndar` recebe { feitos, total }.
+ */
+let filaCopia = Promise.resolve();
+export function atualizarCopiaAberta(aoAndar = () => {}) {
+  const tarefa = filaCopia.then(async () => {
+    if (!E.anexos || !E.seguro || !E.seguro.chave) return null;
+    return CA.atualizarCopia(E.seguro.dir, {
+      listar: () => E.anexos.listaCrua([S.PASTA_ARQUIVOS]),
+      ler: (caminho) => E.anexos.ler([S.PASTA_ARQUIVOS, ...caminho.split('/')]),
+      aoAndar,
+    });
+  });
+  filaCopia = tarefa.catch(() => {});
+  return tarefa;
+}
+/** Depois de anexar, apagar ou mover neste computador: atualiza a cópia aberta 20 s depois da última mudança. */
+let copiaAgendada = null;
+function agendarCopiaAberta() {
+  clearTimeout(copiaAgendada);
+  copiaAgendada = setTimeout(() => { atualizarCopiaAberta().catch(logarErro); }, 20000);
+}
+
 /** Ao abrir a pasta (ou a nuvem): cópia do banco do dia, a versão PC se houver mais nova e, se já passou uma semana, o backup completo. */
 async function rotinaSegura() {
   if (!(await conectarSeguro(false)) || !E.d) return;
@@ -496,6 +521,7 @@ export async function abrirNuvem() {
   const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
   E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar, tabelas: TABELAS_DO_SISTEMA });
   E.anexos = new AnexosNuvem({ guardar });
+  E.anexos.aoMudar = agendarCopiaAberta; // cópia aberta dos arquivos no computador do administrador
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
   // quem passou pelo login da internet (null sem internet). Não segura a abertura (com sinal fraco eram até 10 s de tela em branco,

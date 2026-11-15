@@ -3,7 +3,7 @@
 export function r2Falso() {
   const m = new Map();
   let n = 0;
-  const objeto = (key, o) => ({ key, size: o.dados.byteLength, etag: o.etag, httpEtag: `"${o.etag}"`, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata });
+  const objeto = (key, o) => ({ key, size: o.dados.byteLength, etag: o.etag, httpEtag: `"${o.etag}"`, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata, uploaded: o.uploaded });
   return {
     m,
     async head(key) { const o = m.get(key); return o ? objeto(key, o) : null; },
@@ -16,7 +16,7 @@ export function r2Falso() {
       if (op.onlyIf?.etagMatches && atual?.etag !== op.onlyIf.etagMatches) return null;
       const dados = typeof valor === 'string' ? new TextEncoder().encode(valor) : new Uint8Array(valor);
       n += 1;
-      const o = { dados, etag: `e${n}`, httpMetadata: op.httpMetadata, customMetadata: op.customMetadata };
+      const o = { dados, etag: `e${n}`, uploaded: new Date(Date.UTC(2026, 10, 1, 0, 0, n)), httpMetadata: op.httpMetadata, customMetadata: op.customMetadata };
       m.set(key, o);
       return objeto(key, o);
     },

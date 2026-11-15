@@ -23,6 +23,16 @@ Tudo que ele grava é cifrado com a mesma chave do backup seguro: sem a senha do
 
 Para rodar na mão a qualquer hora: `node atualizador.mjs`. Para desfazer as tarefas: `desinstalar-tarefa.cmd`.
 
+## Cópia aberta dos arquivos (desde 15/11/2026)
+
+Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subpasta **`Arquivos dos imoveis`**: os arquivos do sistema **sem cifrar**, como estão na nuvem (imóvel → Inquilinos → pessoa), para abrir, imprimir e copiar direto no Windows. Ela é só para consulta: o que for posto ou mudado lá não volta para o sistema. A cada vez ele baixa só o que é novo ou mudou e tira da cópia o que foi apagado no sistema (arquivo apagado à mão na cópia volta). O registro fica em `copia-aberta.json`.
+
+- Todo dia às 20h e ao entrar no Windows: dados, versão PC e arquivos.
+- **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta).
+- O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Dados e backup → Backup seguro).
+
+**Para quem já tinha o atualizador instalado:** copie por cima, na pasta onde ele está, os arquivos novos `atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd` e `rodar-escondido.vbs` (o `.env` continua o mesmo) e rode `instalar-tarefa.cmd` de novo **como administrador** (cria a tarefa de hora em hora). A primeira vez baixa todos os arquivos e pode demorar.
+
 ## Como saber se está funcionando
 
 - Na pasta do backup seguro, `ultima-atualizacao.txt` tem a data e o resultado da última execução (`ok` ou `FALHOU` com o motivo).

@@ -18,7 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Para conversar: programa no PC e pastas dos inquilinos sem o sistema | você + Claude | — |
+| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
 
 ---
 
@@ -126,7 +126,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 | Assunto | O que decidir | Quando |
 |---|---|---|
-| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **14/11:** mensagem de WhatsApp para o contador montada (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
+| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **15/11:** mensagem enviada ao contador (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
 | **DIMOB** (pendente com o contador em 14/11) | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
 | ~~**Feriados sem banco**~~ | **Decidido em 14/11:** Carnaval e Corpus Christi contam como dia sem banco (o sistema já fazia assim). | feito |
 | **Prazos da conferência do banco** | Confirmar os prazos de 45 dias e de 7 dias usados na conferência do extrato. | quando o C6 entrar |
@@ -151,10 +151,28 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ---
 
-## 9. Para conversar (pedidos do dono em 14/11)  `[ ]`
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[ ]`
 
-1. **Programa de verdade no PC.** Hoje a "versão PC" é um arquivo HTML guardado na pasta do backup seguro, só para emergência (site fora do ar). O dono quer **um programa mesmo** (instalado, com ícone, abrindo como aplicativo do Windows). Conversar: o que ele espera do programa (funcionar sem internet o tempo todo? só abrir mais fácil?), se basta o aplicativo instalado pelo Chrome/Edge ("Instalar aplicativo", já existe) ou se precisa de um instalador próprio (ex.: Electron/Tauri), e como ficam os dados (nuvem ou no computador).
-2. **Dados dos inquilinos em pastas, acessíveis sem o sistema.** O dono quer abrir os documentos de cada inquilino direto numa pasta do computador, sem precisar do sistema. Hoje os anexos ficam na nuvem (Cloudflare) e o backup seguro do disco C é **cifrado** (só abre com a senha, pelo sistema). Conversar: uma cópia **não cifrada** dos anexos, organizada por imóvel → inquilino (como era no OneDrive), atualizada sozinha no computador do escritório; com a planilha/PDF dos dados de cada um junto? Cuidado: pasta aberta = quem tiver o computador vê CPFs e documentos (BitLocker e HD externo guardado).
+**Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
+
+**Onde estão as coisas hoje:**
+- **Dados e arquivos:** na nuvem (Cloudflare). Os arquivos já ficam lá organizados por imóvel → Inquilinos → nome da pessoa, como era no OneDrive.
+- **No computador:** só a pasta do **backup seguro** (no disco C, a que foi escolhida em Dados e backup → Backup seguro). Lá dentro: `copias-diarias/` (o banco de cada dia), `semanal/` (banco + anexos, uma vez por semana) e `programa/` (a "versão PC", `administracao-imoveis.html`). **Tudo cifrado**: o Windows não abre, só o sistema com a senha do backup. Por isso a versão PC não parece um programa: ela é só a reserva para o dia em que o site cair.
+- **Quem atualiza essa pasta:** o próprio sistema, quando está aberto no computador, e o **atualizador do PC** (`atualizador-pc`, Agendador do Windows, às 20h e ao entrar no Windows). Ele traz só os dados, cifrados; **não traz os arquivos dos inquilinos**.
+
+**Proposta (para fazer na sequência):**
+- [ ] **9a. Ícone que abre o sistema** (aceito em 15/11; você faz, não precisa programar): no Chrome, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria e funciona mesmo com o site, o Cloudflare ou a internet fora do ar, com os dados da última vez que o sistema foi aberto naquele aparelho.
+- [x] **9b. Cópia aberta dos arquivos no computador** (feito em 15/11): subpasta **`Arquivos dos imoveis`** dentro de `C:\Users\Julio\Imoveis` (a pasta do backup seguro), sem cifrar, como no sistema (imóvel → Inquilinos → pessoa). Abrir, imprimir e copiar à vontade; o que for posto ou mudado lá não vai para o sistema. Atualiza sozinha: (A) logo depois de anexar, apagar ou mover neste computador; (B) de hora em hora pelo atualizador do PC; (C) botão **Atualizar a pasta agora** em Dados e backup → Backup seguro. Decisões do dono: sem BitLocker (só ele usa o computador, com senha, e antivírus sempre atualizado); risco de exposição e LGPD aceitos.
+  - **Falta você (depois do merge, 5 min):** copiar os arquivos novos do atualizador para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` (`atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd`, `rodar-escondido.vbs`; o `.env` fica) e rodar `instalar-tarefa.cmd` **como administrador**. Posso fazer a cópia para você. Depois, conferir: aparece a pasta `Arquivos dos imoveis` e o `ultima-atualizacao.txt` termina com `arquivos=…`.
+- [ ] **9c. Rotina "Arquivo impresso" (pasta física do inquilino)** (próxima a fazer; decisões do dono em 15/11):
+  - Liga e desliga em Dados e backup.
+  - **Última etapa da entrada do inquilino: "Montar a pasta física".** Só aparece depois de toda a entrada (contrato assinado, entrega das chaves, troca de titular etc.). Ali se **escolhe** o que imprimir entre tudo o que foi anexado e gerado até então, com um botão para imprimir de uma vez, e uma **capa / folha-resumo** com a lista do que está na pasta (para conferir que tem tudo).
+  - **Na saída** também, e **durante o contrato só documento novo importante** (aditivo, acordo, termo, notificação).
+  - **Entra:** documentos da pessoa e os legais (contratos e aditivos assinados, documentos pessoais, vistorias, recibos, termos, notificações). **Não entra:** NFs, comprovantes de pagamento, boletos (pagos ou em aberto), textos do WhatsApp, itens da ficha cadastral que não precisam (ex.: imposto de renda). E-mails: só quando escolhidos.
+  - **Arquivo trocado** (documento importante): avisa para imprimir a versão nova.
+  - **Começo:** tudo o que já existe (uma pendência por inquilino ativo) e daqui para frente.
+  - **Herança (troca de titular):** ao terminar a entrada de quem herdou, avisa para conferir se os documentos do anterior já estão impressos, pôr a pasta do anterior dentro da pasta do novo ("herdado de fulano") e imprimir os documentos novos da entrada.
+  - Sem folha-resumo de boletos (a parte financeira fica arquivada em outro lugar).
 
 ## Ficou de fora de propósito (não é defeito)
 
