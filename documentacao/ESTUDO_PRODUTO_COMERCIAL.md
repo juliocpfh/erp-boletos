@@ -133,6 +133,8 @@ Pesquisa feita em 11/11/2026 (bancos e concorrentes pela internet; o resto pela 
 | **2** | Piloto com 2 ou 3 locadores conhecidos: importação, suporte, termos/LGPD, cobrança da assinatura | Não |
 | **3** | Portal do inquilino, assinatura eletrônica, DIMOB/informe, Pix Automático, WhatsApp | Parcial |
 
+**Licença, vários clientes e programa de PC:** proposta de 15/11/2026 em [PROPOSTA_LICENCA_E_PROGRAMA_PC.md](PROPOSTA_LICENCA_E_PROGRAMA_PC.md) (chave com validade de 1 a 3 anos, painel do vendedor, um cofre por cliente, programa de PC ligado por código, sem `.env`).
+
 Referência de preço para o nicho: Alugo cobra R$ 129,90 (30 imóveis) e R$ 199,90 (100) mais taxa por aluguel; Imobzi a partir de R$ 129; Superlógica a partir de R$ 229. Um preço público e sem taxa por aluguel já seria diferencial.
 
 ## 8. Pontos a confirmar
