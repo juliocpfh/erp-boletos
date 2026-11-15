@@ -835,7 +835,7 @@ export function vistoriaDeEntrada(d, c) {
  */
 export function resultadoVistoriaSaida(d, c) {
   const vistoria = (d.vistorias || []).filter((v) => v.contrato_id === c.id && v.tipo === 'Saída').sort(C.maisRecentePrimeiro)[0] || null;
-  if (!vistoria) return { texto: 'Não feita', vistoria: null, pendencias: [] };
+  if (!vistoria) return { texto: 'Não feita', vistoria: null, pendencias: [], reparos: [], totalReparos: 0, semValor: 0 };
   const entrada = vistoriaDeEntrada(d, c);
   const naEntrada = new Map(((entrada && entrada.itens) || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
   let pendencias = (vistoria.itens || []).filter((x) => {
@@ -843,8 +843,16 @@ export function resultadoVistoriaSaida(d, c) {
     return ent ? piorou(ent, x.situacao) : ['Avaria', 'Não funciona'].includes(x.situacao);
   }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ''})`);
   if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ''));
-  return { texto: pendencias.length ? 'Com pendências' : 'Sem pendências', vistoria, pendencias };
+  // B5 (revisão jurídica, 15/11): o valor de cada reparo, com o orçamento; entra no cálculo final (sem a escolha de o
+  // inquilino consertar: depois de devolver as chaves, ele paga o reparo)
+  const guardados = vistoria.reparos || {};
+  const reparos = pendencias.map((p) => ({ pendencia: p, valor: guardados[p] ? guardados[p].valor : null, orcamento: guardados[p] ? guardados[p].orcamento || '' : '' }));
+  const totalReparos = reparos.reduce((s, x) => s + (x.valor || 0), 0);
+  return { texto: pendencias.length ? 'Com pendências' : 'Sem pendências', vistoria, pendencias, reparos, totalReparos, semValor: reparos.filter((x) => x.valor === null).length };
 }
+
+/** Linha do reparo para o cálculo final e o e-mail. Ex.: "Sala – Porta (Avaria: riscada): R$ 350,00 (orçamento Pinturas Silva)". */
+export const textoReparo = (x) => `${x.pendencia}: ${x.valor === null ? 'valor a definir' : C.reais(x.valor)}${x.orcamento ? ` (${x.orcamento})` : ''}`;
 
 /** Texto do "Vistoria de saída" no cálculo final: vale a vistoria registrada; sem ela, o que foi guardado antes (dados antigos). */
 export function textoVistoriaSaida(d, c, encerramento) {

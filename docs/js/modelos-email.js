@@ -262,7 +262,7 @@ Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qual
     chave: 'saida_chaves', nome: 'Devolução das chaves e vistoria de saída', etapa: 'Devolução das chaves',
     assunto: 'Vistoria de saída e devolução das chaves – {imovel}',
     anexos: 'Vistoria de saída e orçamentos (PDF)', prontos: ['assinado:chaves_saida'],
-    perguntas: [['pendencias', 'Pendências da vistoria (uma por linha, com o orçamento)', 'area']],
+    perguntas: [['pendencias', 'Pendências da vistoria (uma por linha, com o valor do orçamento)', 'area']],
     texto: `Olá, {nome},
 
 Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o termo de devolução das chaves.
@@ -270,7 +270,7 @@ Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o term
 PENDÊNCIAS (comparadas com a vistoria de entrada)
 {pendencias}
 
-Se discordar de algum item, responda em até 5 dias úteis, com fotos ou documentos.
+O valor de cada reparo vem do orçamento (ou da nota do serviço) e é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Se discordar de algum item ou valor, responda em até 5 dias úteis, com fotos ou documentos.
 
 O recebimento das chaves não dá quitação: os valores em aberto e as pendências da vistoria entram no acerto final, que enviaremos em seguida.`,
   },

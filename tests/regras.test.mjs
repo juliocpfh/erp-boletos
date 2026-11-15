@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
+import * as K from '../docs/js/contratos.js';
 
 function base() {
   const d = R.bancoVazio();
@@ -2637,7 +2638,7 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.equal(r[2].feito, true);
   assert.ok(R.arquivosReferenciados(d).some((x) => x.nome === 'termo-devolucao-chaves-2026-11-30.pdf'));
   R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [], inquilino_presente: 'Não veio' }, 'julio');
-  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /inquilino: não veio · falta enviar o relatório/);
+  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /inquilino: não veio · sem pendências · falta enviar o relatório/);
   R.inserir(d, 'envios_email', { data: '2026-12-01', chave: 'saida_chaves', contrato_id: c.id, como: 'enviado' }, 'julio');
   assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /relatório enviado em 01\/12\/2026; ele pode contestar até 08\/12\/2026/);
   R.inserir(d, 'leituras', { contrato_id: c.id, imovel_id: c.imovel_id, momento: 'Saída do inquilino', data: '2026-11-30', agua: '100', energia: '200' }, 'julio');
@@ -2732,4 +2733,21 @@ test('aditivo da troca já gravado: a cláusula antiga das contas de consumo vir
   assert.match(t, /O seguro contra incêndio em vigor continua/);
   R.normalizar(d);
   assert.equal(d.modelos_contrato.find((m) => m.id === 7).texto, t, 'não troca duas vezes');
+});
+
+test('B5: valor de cada reparo da vistoria de saída entra no roteiro e só guarda as pendências atuais', () => {
+  const { d, c } = base();
+  R.informarSaida(d, c.id, '2026-11-30', 'julio');
+  const v = R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [], inquilino_presente: 'Acompanhou',
+    descritivo: '- Porta da sala: DIFERENÇA: riscada\n- Parede da sala: DIFERENÇA: furos de quadro' }, 'julio');
+  const pend = K.resultadoVistoriaSaida(d, c).pendencias;
+  assert.equal(pend.length, 2);
+  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /2 reparo\(s\); falta o valor de 2/);
+  R.valoresReparos(d, v.id, [{ pendencia: pend[0], valor: 35000, orcamento: 'Pinturas Silva' }, { pendencia: pend[1], valor: 70000, orcamento: '' }, { pendencia: 'outra', valor: 100, orcamento: '' }], 'julio');
+  const r = K.resultadoVistoriaSaida(d, c);
+  assert.equal(r.totalReparos, 105000);
+  assert.equal(Object.keys(R.buscar(d, 'vistorias', v.id).reparos).length, 2);
+  assert.equal(K.textoReparo(r.reparos[0]), `${pend[0]}: R$ 350,00 (Pinturas Silva)`);
+  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /2 reparo\(s\): R\$ 1\.050,00/);
+  assert.throws(() => R.valoresReparos(d, v.id, [{ pendencia: pend[0], valor: -1, orcamento: '' }], 'julio'), /Valor inválido/);
 });

@@ -132,7 +132,7 @@ test('modelo de vistoria do imóvel e grade de situações (entrada e saída)', 
 test('vistoria de saída registrada é a fonte única do "Vistoria de saída" do cálculo final', () => {
   const { d, c } = base();
   // sem vistoria de saída: "Não feita"; dado antigo guardado no cálculo final continua valendo
-  assert.deepEqual(K.resultadoVistoriaSaida(d, c), { texto: 'Não feita', vistoria: null, pendencias: [] });
+  assert.deepEqual(K.resultadoVistoriaSaida(d, c), { texto: 'Não feita', vistoria: null, pendencias: [], reparos: [], totalReparos: 0, semValor: 0 });
   assert.equal(K.textoVistoriaSaida(d, c, null), 'Não feita');
   assert.equal(K.textoVistoriaSaida(d, c, { vistoria_saida: 'Com pendências' }), 'Com pendências');
   R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Entrada', data: '2026-09-04', itens: [

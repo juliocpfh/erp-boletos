@@ -86,14 +86,15 @@ function linkDaFicha(f, pessoa, hoje) {
 
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */
 function respostasPadrao(d, c, hoje) {
-  const pend = c ? K.resultadoVistoriaSaida(d, c).pendencias : [];
+  const reparos = c ? K.resultadoVistoriaSaida(d, c).reparos : [];
   return {
     prazo_assinatura: C.somarDias(hoje, 7),
     opcoes_entrega: c && c.data_entrada ? `${C.dataBr(c.data_entrada)} às 10h` : '',
     data_aviso: hoje,
     // B3: a data e a hora marcadas no roteiro da saída (sem marcar: o dia da saída, às 10h, para a equipe ajustar)
     data_vistoria: c && c.vistoria_saida_data ? `${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : c && c.data_saida ? `${C.dataBr(c.data_saida)} às 10h` : '',
-    pendencias: pend.length ? pend.map((x) => `- ${x}`).join('\n') : '- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.',
+    // B5: cada pendência com o valor do reparo (orçamento), que entra no acerto final
+    pendencias: reparos.length ? reparos.map((x) => `- ${K.textoReparo(x)}`).join('\n') : '- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.',
     ano: String(Number(hoje.slice(0, 4)) - 1),
     prazo: '30 meses',
   };

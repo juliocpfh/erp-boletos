@@ -1053,6 +1053,29 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Roteiro da saída (B5): valor de cada reparo da vistoria de saída, com o orçamento; entra nos débitos do cálculo final. */
+  async valoresReparos({ id }) {
+    const v = buscar('vistorias', id);
+    const c = v && buscar('contratos', v.contrato_id);
+    if (!c) throw new Error('Vistoria de saída não encontrada.');
+    const res = K.resultadoVistoriaSaida(d(), c);
+    const r = await janela({ titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
+      html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
+        ${res.reparos.map((x) => `<fieldset style="margin:8px 0"><legend>${esc(x.pendencia)}</legend>
+          <label>Valor (R$)</label><input name="valor" inputmode="decimal" value="${x.valor === null ? '' : esc(dinheiroTexto(x.valor))}" placeholder="ex.: 350,00">
+          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join('')}` });
+    if (!r) return;
+    const lista = res.reparos.map((x, k) => {
+      const t = String((r.valor || [])[k] || '').trim();
+      let valor = null;
+      if (t) { try { valor = C.centavos(t); } catch { throw new C.ErroUsuario(`Valor inválido em "${x.pendencia}".`); } }
+      return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || '') };
+    });
+    await alterar((db) => R.valoresReparos(db, v.id, lista, login()));
+    aviso('Valores dos reparos salvos: entram nos débitos do cálculo final.');
+    await mostrar();
+  },
+
   /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
   /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
   async arquivoFisico({ id, desfazer }) {

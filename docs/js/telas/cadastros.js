@@ -5,7 +5,7 @@ import * as S from '../armazenamento.js';
 import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
-import { resultadoVistoriaSaida, TIPO_ADITIVO_TROCA } from '../contratos.js';
+import { resultadoVistoriaSaida, textoReparo, TIPO_ADITIVO_TROCA } from '../contratos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -866,18 +866,23 @@ export const CADASTROS = {
       const c = buscar('contratos', q.contrato);
       const aberto = R.cobrancasEmAberto(d(), c.id);
       const lt = R.leituraDo(d(), c.id, 'Saída do inquilino') || {};
+      // B5: os reparos da vistoria de saída, com o valor de cada um (com FCI, o fundo paga os danos primeiro)
+      const v = resultadoVistoriaSaida(d(), c);
+      const comFci = R.temFci(c) || R.depositosFci(d(), c).length > 0;
+      const reparos = v.reparos.map((x) => `Reparo da vistoria${comFci ? ' (pago pelo FCI)' : ''}: ${textoReparo(x)}`);
       return {
         fci_credito: R.saldoFci(d(), c).corrigido || null,
+        fci_danos: comFci && v.totalReparos ? v.totalReparos : null,
         leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.valorGarantia(d(), c),
-        debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0),
-        debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n'),
+        debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0) + (comFci ? 0 : v.totalReparos),
+        debitos_descricao: [...aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`), ...reparos].join('\n'),
       };
     },
     aviso: (r, q) => {
       const c = buscar('contratos', q.contrato);
       // o "Vistoria de saída" não é digitado: vem da vistoria registrada (fonte única) e é guardado ao salvar
       const v = resultadoVistoriaSaida(d(), c);
-      const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): confira os débitos` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
+      const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
       return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")

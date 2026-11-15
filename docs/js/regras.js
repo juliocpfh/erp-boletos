@@ -3,7 +3,7 @@
 import * as alertas from './alertas.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato, modelosDe, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
+import { locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
@@ -6393,8 +6393,11 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   const convite = ultimoEnvioEmail(d, c.id, 'saida_vistoria');
   const relatorio = ultimoEnvioEmail(d, c.id, 'saida_chaves');
   const comoEnvio = (x) => (x.como === 'enviado' ? 'enviado' : 'aberto no Gmail');
+  const res = vist ? resultadoVistoriaSaida(d, c) : null;
   const vistoriaDetalhe = vist
     ? [`feita em ${C.dataBr(vist.data)}`, vist.inquilino_presente ? `inquilino: ${vist.inquilino_presente.toLocaleLowerCase('pt-BR')}` : null,
+      // B5: o valor de cada reparo, que vai para o cálculo final
+      !res.pendencias.length ? 'sem pendências' : res.semValor ? `${res.pendencias.length} reparo(s); falta o valor de ${res.semValor}` : `${res.pendencias.length} reparo(s): ${C.reais(res.totalReparos)}`,
       relatorio ? `relatório ${comoEnvio(relatorio)} em ${C.dataBr(relatorio.data)}; ele pode contestar até ${C.dataBr(prazoContestarSaida(relatorio.data))}`
         : 'falta enviar o relatório ao inquilino (e-mail da devolução das chaves)']
     : [c.vistoria_saida_data ? `marcada para ${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : saiu ? 'ainda não registrada; data não marcada' : `a partir de ${C.dataBr(c.data_saida)}; data não marcada`,
@@ -6440,6 +6443,26 @@ export function marcarVistoriaSaida(d, contratoId, data, hora, usuario, hoje = C
   if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) throw new C.ErroUsuario('Informe a hora da vistoria (ex.: 14:00).');
   atualizar(d, 'contratos', c.id, { vistoria_saida_data: data || null, vistoria_saida_hora: data ? hora || null : null, vistoria_saida_marcada_em: data ? hoje : null }, usuario,
     data ? `${c.inquilino_nome}: vistoria de saída marcada para ${C.dataBr(data)}${hora ? ` às ${hora}` : ''}` : `${c.inquilino_nome}: data da vistoria de saída desmarcada`);
+}
+
+/**
+ * Valor de cada reparo da vistoria de saída (B5), com o orçamento: ``lista`` [{ pendencia, valor (centavos, null = sem valor), orcamento }].
+ * Só as pendências atuais da vistoria ficam guardadas. Ex.: porta riscada R$ 350,00 + pintura da sala R$ 700,00 = R$ 1.050,00.
+ */
+export function valoresReparos(d, vistoriaId, lista, usuario) {
+  const v = buscar(d, 'vistorias', vistoriaId);
+  if (!v || v.tipo !== 'Saída') throw new Error('Vistoria de saída não encontrada.');
+  const c = buscar(d, 'contratos', v.contrato_id);
+  const atuais = new Set(resultadoVistoriaSaida(d, c).pendencias);
+  const reparos = {};
+  for (const x of lista) {
+    if (!atuais.has(x.pendencia)) continue;
+    if (x.valor !== null && !(Number.isInteger(x.valor) && x.valor >= 0)) throw new C.ErroUsuario(`Valor inválido em "${x.pendencia}".`);
+    if (x.valor === null && !String(x.orcamento || '').trim()) continue;
+    reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || '').trim() };
+  }
+  const total = Object.values(reparos).reduce((s, x) => s + (x.valor || 0), 0);
+  atualizar(d, 'vistorias', v.id, { reparos }, usuario, `${c.inquilino_nome}: valores dos reparos da vistoria de saída (${C.reais(total)})`);
 }
 
 /** Marca o processo do inquilino que saiu como impresso e guardado em papel (``data`` vazia desfaz). */
