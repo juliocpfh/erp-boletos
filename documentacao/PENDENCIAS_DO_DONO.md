@@ -18,7 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Para conversar: programa no PC e pastas dos inquilinos sem o sistema | você + Claude | — |
+| 9 | Programa no PC e pastas dos inquilinos abertas no Windows (explicado em 15/11; falta você decidir 4 pontos) | você, depois Claude | 5 min |
 
 ---
 
@@ -126,7 +126,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 | Assunto | O que decidir | Quando |
 |---|---|---|
-| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **14/11:** mensagem de WhatsApp para o contador montada (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
+| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **15/11:** mensagem enviada ao contador (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
 | **DIMOB** (pendente com o contador em 14/11) | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
 | ~~**Feriados sem banco**~~ | **Decidido em 14/11:** Carnaval e Corpus Christi contam como dia sem banco (o sistema já fazia assim). | feito |
 | **Prazos da conferência do banco** | Confirmar os prazos de 45 dias e de 7 dias usados na conferência do extrato. | quando o C6 entrar |
@@ -151,10 +151,24 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ---
 
-## 9. Para conversar (pedidos do dono em 14/11)  `[ ]`
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[ ]`
 
-1. **Programa de verdade no PC.** Hoje a "versão PC" é um arquivo HTML guardado na pasta do backup seguro, só para emergência (site fora do ar). O dono quer **um programa mesmo** (instalado, com ícone, abrindo como aplicativo do Windows). Conversar: o que ele espera do programa (funcionar sem internet o tempo todo? só abrir mais fácil?), se basta o aplicativo instalado pelo Chrome/Edge ("Instalar aplicativo", já existe) ou se precisa de um instalador próprio (ex.: Electron/Tauri), e como ficam os dados (nuvem ou no computador).
-2. **Dados dos inquilinos em pastas, acessíveis sem o sistema.** O dono quer abrir os documentos de cada inquilino direto numa pasta do computador, sem precisar do sistema. Hoje os anexos ficam na nuvem (Cloudflare) e o backup seguro do disco C é **cifrado** (só abre com a senha, pelo sistema). Conversar: uma cópia **não cifrada** dos anexos, organizada por imóvel → inquilino (como era no OneDrive), atualizada sozinha no computador do escritório; com a planilha/PDF dos dados de cada um junto? Cuidado: pasta aberta = quem tiver o computador vê CPFs e documentos (BitLocker e HD externo guardado).
+**Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
+
+**Onde estão as coisas hoje:**
+- **Dados e arquivos:** na nuvem (Cloudflare). Os arquivos já ficam lá organizados por imóvel → Inquilinos → nome da pessoa, como era no OneDrive.
+- **No computador:** só a pasta do **backup seguro** (no disco C, a que foi escolhida em Dados e backup → Backup seguro). Lá dentro: `copias-diarias/` (o banco de cada dia), `semanal/` (banco + anexos, uma vez por semana) e `programa/` (a "versão PC", `administracao-imoveis.html`). **Tudo cifrado**: o Windows não abre, só o sistema com a senha do backup. Por isso a versão PC não parece um programa: ela é só a reserva para o dia em que o site cair.
+- **Quem atualiza essa pasta:** o próprio sistema, quando está aberto no computador, e o **atualizador do PC** (`atualizador-pc`, Agendador do Windows, às 20h e ao entrar no Windows). Ele traz só os dados, cifrados; **não traz os arquivos dos inquilinos**.
+
+**Proposta (para fazer na sequência):**
+- [ ] **9a. Ícone que abre o sistema** (não precisa programar): no Chrome ou Edge, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria, como programa, e funciona mesmo com o site fora do ar (cópia do aparelho).
+- [ ] **9b. Pasta aberta com os arquivos dos inquilinos** (Claude faz): o atualizador do PC passa a copiar **também os arquivos** da nuvem, **sem cifrar**, para uma pasta comum, por exemplo `C:\Imoveis\Pastas\<Imóvel>\Inquilinos\<Nome>\` (contratos, vistorias, comprovantes, documentos), como era no OneDrive. Ele só baixa o que mudou e apaga da cópia o que foi apagado no sistema. A pasta é **só para consulta**: arquivo posto ou mudado ali não volta para o sistema (anexar continua sendo pelo sistema). Opcional: uma folha com o resumo de cada inquilino (dados, boletos pagos e em aberto) em PDF na pasta dele.
+- **Decisões do dono antes do 9b:**
+  1. Cópia **sem cifrar** no computador: quem usar o computador vê CPFs e documentos. Recomendado: ligar o **BitLocker** no disco C e senha no Windows. Concorda?
+  2. Onde: `C:\Imoveis\Pastas` está bom?
+  3. De quanto em quanto tempo: a cada hora (com o computador ligado), além das 20h e da entrada no Windows?
+  4. Quer a folha-resumo em PDF de cada inquilino na pasta?
+- **Para conferir (dono):** o atualizador do PC está instalado? Na pasta do backup seguro, o arquivo `ultima-atualizacao.txt` deve ter a data de hoje e `ok`. Se não existir, a instalação (`atualizador-pc/README.md`) entra junto com o 9b.
 
 ## Ficou de fora de propósito (não é defeito)
 
