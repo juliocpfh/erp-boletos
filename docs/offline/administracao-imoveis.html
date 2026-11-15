@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-vtQeOp8Ad5kEq/x7aUGir+OKuC3qRW+X5dv66yC+S4c='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-ICPvTNmEG7A52rz8RFYulEzWiR3Zp2lbwb3WqVV9in4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="74cd2b5945cfc420">
+<meta name="fontes" content="19dbb5ab796ecc95">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3486,6 +3486,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     }
     blocos.push({ tipo: "secao", runs: negritos("CONDIÇÕES GERAIS") }, ...linhasDe(v.condicoes).map(it));
     if (!saida) blocos.push(...linhasDe(String(v.texto_final || "").trim() || vistoriaFinal(v.prazo_dias || 3)).map(it));
+    if (saida && v.inquilino_presente) blocos.push(it(v.inquilino_presente === "Não veio" ? "O LOCATÁRIO, convidado por escrito, não compareceu. Este relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar." : `Vistoria acompanhada pelo LOCATÁRIO${v.inquilino_presente === "Mandou representante" ? ", por pessoa autorizada por escrito" : ""}.`));
     blocos.push({ tipo: "direita", runs: negritos(`${dados.campos.cidade}, ${dados.campos.data_assinatura}.`) });
     blocos.push({ tipo: "assinaturas", pessoas: dados.assinaturas.filter((a) => !a.papel.startsWith("TESTEMUNHA")) });
     return { blocos, rodape: dados.rodape };
@@ -3501,7 +3502,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
@@ -3613,6 +3614,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       NAO_SE_APLICA = "Não se aplica";
       GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
       piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+      PRESENCA_VISTORIA_SAIDA = ["Acompanhou", "Mandou representante", "Não veio"];
       FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
     }
   });
@@ -3780,6 +3782,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     NOTIFICACAO_CONTRATO: () => NOTIFICACAO_CONTRATO,
     PADRAO_SISTEMA: () => PADRAO_SISTEMA,
     PARTES_DOCUMENTOS_PF: () => PARTES_DOCUMENTOS_PF,
+    PRAZO_CONTESTAR_SAIDA: () => PRAZO_CONTESTAR_SAIDA,
     PRESUNCAO: () => PRESUNCAO,
     REGUA_COBRANCA: () => REGUA_COBRANCA,
     SITUACOES: () => SITUACOES,
@@ -4046,6 +4049,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     marcarGeradoNaRotina: () => marcarGeradoNaRotina,
     marcarIptuPago: () => marcarIptuPago,
     marcarReservaAbatida: () => marcarReservaAbatida,
+    marcarVistoriaSaida: () => marcarVistoriaSaida,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
     mesDeAniversario: () => mesDeAniversario,
     mesDoDinheiro: () => mesDoDinheiro,
@@ -4093,6 +4097,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     periodoCarencia: () => periodoCarencia,
     periodoConferenciaC6: () => periodoConferenciaC6,
     podeRemoverComprovanteGarantia: () => podeRemoverComprovanteGarantia,
+    prazoContestarSaida: () => prazoContestarSaida,
     prazoDoContrato: () => prazoDoContrato,
     previaAcordo: () => previaAcordo,
     previstoNoPagamento: () => previstoNoPagamento,
@@ -4193,6 +4198,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ultimaFatura: () => ultimaFatura,
     ultimaVistoriaDoImovel: () => ultimaVistoriaDoImovel,
     ultimoCicloDeNumeracao: () => ultimoCicloDeNumeracao,
+    ultimoEnvioEmail: () => ultimoEnvioEmail,
     ultimosValores: () => ultimosValores,
     usoDoItem: () => usoDoItem,
     validarFciPrevios: () => validarFciPrevios,
@@ -6153,7 +6159,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return out;
   }
   function anexarComprovante(d2, tabela, id, campo2, arquivo, usuario) {
-    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"] };
+    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Comprovante desconhecido.");
     if (!arquivo) throw new Error("Escolha o arquivo do comprovante.");
     const r = buscar(d2, tabela, id);
@@ -6220,7 +6226,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     sincronizarGarantiaHerdeiro(d2, c.id, usuario);
   }
   function removerAnexo(d2, tabela, id, campo2, usuario) {
-    const ok = { contratos: ["comprovante_reserva"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"] };
+    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Este arquivo não pode ser apagado por aqui.");
     const r = buscar(d2, tabela, id);
     if (!r || !r[campo2]) throw new Error("Arquivo não encontrado.");
@@ -7089,7 +7095,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       }
     };
     for (const c of d2.contratos) {
-      for (const k of ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva"]) usa("contrato", c[`${k}_contrato`] || c.id, c[k]);
+      for (const k of ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida"]) usa("contrato", c[`${k}_contrato`] || c.id, c[k]);
       for (const [campo2] of DOCUMENTOS_ENTRADA) {
         usa("assinados", c.id, c[campoArquivoDoc(campo2)]);
         usa("assinados", c.id, (c[campoParcialDoc(campo2)] || {}).arquivo);
@@ -9090,10 +9096,27 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (e.saldo < 0) return { feito: false, detalhe: `cobrar ${reais(-e.saldo)} do inquilino (garantia não cobre os débitos)` };
       return { feito: true, detalhe: "nada a devolver nem a cobrar" };
     })();
+    const convite = ultimoEnvioEmail(d2, c.id, "saida_vistoria");
+    const relatorio2 = ultimoEnvioEmail(d2, c.id, "saida_chaves");
+    const comoEnvio = (x) => x.como === "enviado" ? "enviado" : "aberto no Gmail";
+    const vistoriaDetalhe = vist ? [
+      `feita em ${dataBr(vist.data)}`,
+      vist.inquilino_presente ? `inquilino: ${vist.inquilino_presente.toLocaleLowerCase("pt-BR")}` : null,
+      relatorio2 ? `relatório ${comoEnvio(relatorio2)} em ${dataBr(relatorio2.data)}; ele pode contestar até ${dataBr(prazoContestarSaida(relatorio2.data))}` : "falta enviar o relatório ao inquilino (e-mail da devolução das chaves)"
+    ] : [
+      c.vistoria_saida_data ? `marcada para ${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ""}` : saiu ? "ainda não registrada; data não marcada" : `a partir de ${dataBr(c.data_saida)}; data não marcada`,
+      c.vistoria_saida_data ? convite && convite.data >= (c.vistoria_saida_marcada_em || "") ? `convite ${comoEnvio(convite)} em ${dataBr(convite.data)}` : "falta mandar o convite ao inquilino" : null
+    ];
+    const termo = c.termo_chaves_saida;
     return [
       { chave: "aviso", titulo: "Aviso prévio: data de saída informada", feito: true, detalhe: `saída em ${dataBr(c.data_saida)}` },
-      { chave: "vistoria", titulo: "Vistoria de saída (com a leitura dos relógios)", feito: !!vist, detalhe: vist ? `feita em ${dataBr(vist.data)}` : saiu ? "ainda não registrada" : `a partir de ${dataBr(c.data_saida)}` },
-      { chave: "chaves", titulo: "Devolução das chaves", feito: saiu, detalhe: saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}` : `prevista para ${dataBr(c.data_saida)}` },
+      { chave: "vistoria", titulo: "Vistoria de saída (com a leitura dos relógios)", feito: !!vist, detalhe: vistoriaDetalhe.filter(Boolean).join(" · ") },
+      {
+        chave: "chaves",
+        titulo: "Devolução das chaves (termo assinado)",
+        feito: !!termo || saiu && !!e,
+        detalhe: termo ? `chaves devolvidas em ${dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}${e ? "" : "; falta anexar o termo de devolução assinado"}` : `prevista para ${dataBr(c.data_saida)}`
+      },
       {
         chave: "contas",
         titulo: "Contas: titularidade de volta ao proprietário e leitura final",
@@ -9117,6 +9140,24 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         detalhe: c.arquivo_fisico_em ? `arquivado em ${dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${dataBr(somarMesesData(c.data_saida, 120))} (10 anos)`
       }
     ];
+  }
+  function ultimoEnvioEmail(d2, contratoId, chave) {
+    return (d2.envios_email || []).filter((x) => x.contrato_id === contratoId && x.chave === chave).reduce((a, x) => !a || x.data > a.data || x.data === a.data && x.id > a.id ? x : a, null);
+  }
+  function marcarVistoriaSaida(d2, contratoId, data2, hora, usuario, hoje3 = hojeIso()) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new Error("Inquilino não encontrado.");
+    if (!c.data_saida) throw new ErroUsuario("Informe antes a data de saída.");
+    if (data2 && !dataValida(data2)) throw new ErroUsuario("Informe a data da vistoria.");
+    if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) throw new ErroUsuario("Informe a hora da vistoria (ex.: 14:00).");
+    atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { vistoria_saida_data: data2 || null, vistoria_saida_hora: data2 ? hora || null : null, vistoria_saida_marcada_em: data2 ? hoje3 : null },
+      usuario,
+      data2 ? `${c.inquilino_nome}: vistoria de saída marcada para ${dataBr(data2)}${hora ? ` às ${hora}` : ""}` : `${c.inquilino_nome}: data da vistoria de saída desmarcada`
+    );
   }
   function marcarArquivoFisico(d2, contratoId, data2, usuario) {
     const c = buscar(d2, "contratos", contratoId);
@@ -9250,7 +9291,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, depositosGarantiaDo, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -9627,7 +9668,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       COMPROVANTES_NO_CONTRATO = [
         ["comprovante_caucao", "caucao", (c) => c.caucao_pago_em || c.caucao_data, "comprovante da caução"],
         ["comprovante_deposito", "deposito-garantia", (c) => c.deposito_pago_em || c.deposito_data, "comprovante do depósito de garantia"],
-        ["comprovante_reserva", "reserva", (c) => c.reserva_data, "comprovante da reserva"]
+        ["comprovante_reserva", "reserva", (c) => c.reserva_data, "comprovante da reserva"],
+        // não é comprovante de dinheiro: o termo de devolução das chaves assinado na saída (B4), com o nome termo-devolucao-chaves-<data da saída>
+        ["termo_chaves_saida", "termo-devolucao-chaves", (c) => c.data_saida, "termo de devolução das chaves assinado"]
       ];
       porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
       aditivosDo = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
@@ -9794,6 +9837,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       mesmoAlvo = (x, tipo, alvo) => x.tipo === tipo && (x.contrato_id || null) === alvo.contrato_id && (x.imovel_id || null) === alvo.imovel_id;
       desligamentosOrfaos = (d2) => (d2.alertas_desligados || []).filter((x) => !(x.contrato_id ? buscar(d2, "contratos", x.contrato_id) : buscar(d2, "imoveis", x.imovel_id)));
       TIPOS_ALERTA_DO_IMOVEL = ["IPTU do proprietário", "Titularidade"];
+      PRAZO_CONTESTAR_SAIDA = 5;
+      prazoContestarSaida = (envio) => somarDiasUteis(envio, PRAZO_CONTESTAR_SAIDA);
       mudarRegraSistema = (d2, chave, valor, usuario) => salvarRegrasSistema(d2, { ...escolhasDe(d2), [chave]: valor }, usuario);
       voltarRegrasAoPadrao = (d2, usuario) => salvarRegrasSistema(d2, {}, usuario, "Regras do sistema (volta ao padrão)");
     }
@@ -18573,7 +18618,8 @@ Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qual
       nome: "Devolução das chaves e vistoria de saída",
       etapa: "Devolução das chaves",
       assunto: "Vistoria de saída e devolução das chaves – {imovel}",
-      anexos: "Vistoria de saída, termo de devolução das chaves e orçamentos (PDF)",
+      anexos: "Vistoria de saída e orçamentos (PDF)",
+      prontos: ["assinado:chaves_saida"],
       perguntas: [["pendencias", "Pendências da vistoria (uma por linha, com o orçamento)", "area"]],
       texto: `Olá, {nome},
 
@@ -18690,6 +18736,7 @@ ${FECHO}` };
     reserva: "Recibo da reserva",
     devolucao_reserva: "Termo de devolução da reserva",
     garantia: "Recibo da garantia",
+    devolucao_chaves: "Termo de devolução das chaves",
     quitacao: "Termo de quitação",
     ficha: "Ficha cadastral",
     ficha_fiador: "Ficha cadastral do fiador"
@@ -18753,6 +18800,10 @@ ${FECHO}` };
       if (!c) return { ok: false, motivo: "O recibo da garantia é do contrato." };
       if (!temCaucao(c) && !temDeposito(c)) return { ok: false, motivo: "O contrato não tem caução nem depósito em dinheiro." };
       return garantiaPaga(d2, c) ? { ok: true } : { ok: false, motivo: "Registre antes o depósito da garantia (data e comprovante)." };
+    }
+    if (tipo === "devolucao_chaves") {
+      if (!c) return { ok: false, motivo: "O termo de devolução das chaves é do contrato." };
+      return c.data_saida ? { ok: true } : { ok: false, motivo: "Informe antes a data de saída." };
     }
     if (tipo === "quitacao") {
       if (!c) return { ok: false, motivo: "O termo de quitação é do contrato." };
@@ -18833,6 +18884,7 @@ ${FECHO}` };
         arquivo: nomeArq(caucao ? "Recibo caucao" : "Recibo deposito garantia", g.data)
       };
     }
+    if (tipo === "devolucao_chaves") return termoDevolucaoChaves(d2, c, base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     const enc = encerramentoDo(d2, c.id);
     const vist = resultadoVistoriaSaida(d2, c);
     const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : "") : "";
@@ -18862,6 +18914,37 @@ ${FECHO}` };
       ],
       assinaturas: [assinaEmpresa, assinaPessoa("LOCATÁRIO"), ...c.solidario_nome ? [{ nome: c.solidario_nome, linha: "LOCATÁRIO SOLIDÁRIO" }] : []],
       arquivo: nomeArq("Termo quitacao", enc.garantia_devolvida_em || enc.data_saida)
+    };
+  }
+  function chavesDaSaida(d2, c) {
+    const linhas2 = (t) => String(t || "").split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    const saida = vistoriasDo(d2, c.id).find((v) => v.tipo === "Saída");
+    const entrada = vistoriaDeEntrada(d2, c);
+    const i = buscar(d2, "imoveis", c.imovel_id) || {};
+    for (const t of [saida && saida.chaves, entrada && entrada.chaves, i.chaves]) if (linhas2(t).length) return linhas2(t);
+    return [];
+  }
+  function termoDevolucaoChaves(d2, c, base, x) {
+    const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : "") : "";
+    const chaves = chavesDaSaida(d2, c);
+    const horas = c.finalidade === "Não residencial" ? "48 (quarenta e oito)" : "72 (setenta e duas)";
+    const vistoria = c.vistoria_saida_data ? `A vistoria de saída fica marcada para ${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? `, às ${c.vistoria_saida_hora}` : ""}, no imóvel` : `A vistoria de saída será feita pela LOCADORA em até ${horas} horas desta devolução, em data e horário informados por escrito`;
+    return {
+      ...base,
+      data: c.data_saida,
+      titulo: "TERMO DE DEVOLUÇÃO DAS CHAVES",
+      paragrafos: [
+        `LOCADORA: ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ""}. LOCATÁRIO: ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ""}. IMÓVEL: ${x.endereco}.`,
+        `1. DEVOLUÇÃO. Em ${dataBr(c.data_saida)}, às ____:____, o LOCATÁRIO devolve à LOCADORA as chaves e os controles do imóvel relacionados abaixo, que a partir deste momento volta à guarda da LOCADORA.`
+      ],
+      tabela: [["CHAVES E CONTROLES DEVOLVIDOS", null], ...chaves.length ? chaves.map((l) => [l, ""]) : [["______________________________________________", ""], ["______________________________________________", ""]]],
+      depois: [
+        `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada.`,
+        "3. SEM QUITAÇÃO. O recebimento das chaves não dá quitação. Os aluguéis e encargos até esta data, as contas de consumo e os tributos do período da locação e os reparos apontados na vistoria de saída serão apurados no acerto final, descontados da garantia, se houver, ou cobrados do LOCATÁRIO, conforme o contrato (Lei 8.245/91, artigo 23, III).",
+        "4. ALUGUEL. O aluguel e os encargos são devidos até esta data, proporcionais aos dias do mês."
+      ],
+      assinaturas: [{ ...x.assinaEmpresa, linha: `${x.assinaEmpresa.linha} · REPRESENTANTE DA ADMINISTRADORA` }, x.assinaPessoa("LOCATÁRIO"), ...c.solidario_nome ? [{ nome: c.solidario_nome, linha: "LOCATÁRIO SOLIDÁRIO" }] : []],
+      arquivo: x.nomeArq("Termo devolucao chaves", c.data_saida)
     };
   }
   var EM_BRANCO = "______________________________";
@@ -19082,7 +19165,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
       prazo_assinatura: somarDias(hoje3, 7),
       opcoes_entrega: c && c.data_entrada ? `${dataBr(c.data_entrada)} às 10h` : "",
       data_aviso: hoje3,
-      data_vistoria: c && c.data_saida ? `${dataBr(c.data_saida)} às 10h` : "",
+      // B3: a data e a hora marcadas no roteiro da saída (sem marcar: o dia da saída, às 10h, para a equipe ajustar)
+      data_vistoria: c && c.vistoria_saida_data ? `${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ""}` : c && c.data_saida ? `${dataBr(c.data_saida)} às 10h` : "",
       pendencias: pend.length ? pend.map((x) => `- ${x}`).join("\n") : "- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.",
       ano: String(Number(hoje3.slice(0, 4)) - 1),
       prazo: "30 meses"
@@ -19203,6 +19287,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
         if (qual === "aditivo") {
           const a = alvo.aditivo || null;
           if (a && a.arquivo) arquivo("aditivos", a.contrato_id, a.arquivo, `termo aditivo de ${dataBr(a.data)} assinado por todos`);
+        } else if (qual === "chaves_saida" && c) {
+          arquivo("contrato", c.id, c.termo_chaves_saida, "termo de devolução das chaves assinado");
         } else if (qual === "quitacao" && c) {
           const e = encerramentoDo(d2, c.id);
           if (e) arquivo("contrato", c.id, e.termo_assinado, "termo de quitação assinado por todos");
@@ -20255,6 +20341,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <input type="hidden" name="id" value="${v ? v.id : ""}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data2)}" required></div>
+        ${tipo === "Saída" ? `<div><label>O inquilino acompanhou?</label><select name="inquilino_presente" required>${["", ...PRESENCA_VISTORIA_SAIDA].map((x) => `<option value="${esc(x)}"${(v ? v.inquilino_presente || "" : "") === x ? " selected" : ""}>${esc(x || "Escolha…")}</option>`).join("")}</select></div>` : ""}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || "" : tipo === "Entrada" ? c.vistoria_link || "" : "")}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
       <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>
@@ -21986,8 +22073,12 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     if (!etapas.length) return "";
     const feitas = etapas.filter((x) => x.feito).length;
     const acao = (x) => {
+      if (x.chave === "chaves" && (c.termo_chaves_saida || opera() && !x.feito)) {
+        return `${opera() ? link(`#/imprimir/recibo?tipo=devolucao_chaves&contrato=${c.id}`, "🧾 Termo de devolução das chaves", "botao secundario pequeno") : ""}
+        <span class="suave">Assinado:</span> ${linkComprovante(c.id, c.termo_chaves_saida, { tabela: "contratos", id: c.id, campo: "termo_chaves_saida", tipo: "termo-devolucao-chaves", data: c.data_saida }).replace("📎 comprovante", "📎 termo assinado").replace("anexar comprovante", "anexar o termo assinado")}`;
+      }
       if (!opera() || x.feito) return "";
-      if (x.chave === "vistoria") return link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, "Registrar vistoria de saída", "botao pequeno");
+      if (x.chave === "vistoria") return `${botao("marcarVistoriaSaida", c.vistoria_saida_data ? "Mudar a data marcada" : "Marcar data e hora", { id: c.id }, "secundario pequeno")} ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, "Registrar vistoria de saída", "botao pequeno")}`;
       if (x.chave === "contas") return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, "Registrar protocolo", "botao pequeno") : ""} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, "Registrar leitura", "botao pequeno") : ""}`;
       if (x.chave === "calculo" && c.data_saida <= hoje3) return link(`#/novo/encerramentos?contrato=${c.id}`, "Fazer cálculo final", "botao pequeno");
       if (x.chave === "garantia" && e) return botao("garantiaDevolvida", e.saldo >= 0 ? "Marcar garantia devolvida" : "Marcar saldo cobrado", { id: e.id }, "pequeno");
@@ -22529,7 +22620,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
   }
   var xAnexo = (acao, dados, confirmar) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
-  var ANEXOS_COM_X = { contratos: ["comprovante_reserva"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"] };
+  var ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"] };
   var linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || "")}"></label>` : etiqueta("sem comprovante", "aviso");
   var fiadoresMudancas = { novos: [], alterados: [] };
@@ -26170,6 +26261,27 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso(`Saída em ${dataBr(data2)}. Depois que ele sair: vistoria de saída e cálculo final.`);
       await mostrar();
     },
+    /** Roteiro da saída (B3): data e hora da vistoria de saída, para o convite por e-mail e o termo de devolução das chaves. */
+    async marcarVistoriaSaida({ id }) {
+      const c = buscar2("contratos", id);
+      if (!c) throw new Error("Inquilino não encontrado.");
+      const horas = c.finalidade === "Não residencial" ? 48 : 72;
+      const r = await janela({
+        titulo: `Vistoria de saída - ${c.inquilino_nome}`,
+        sim: "Salvar",
+        nao: "Cancelar",
+        html: `<p>Saída em <b>${dataBr(c.data_saida)}</b>. O contrato prevê a vistoria em até ${horas} horas da devolução das chaves, com o inquilino convidado por escrito. Depois de salvar, mande o convite pelo botão de e-mail da etapa.</p>
+        <label>Data da vistoria</label><input type="date" name="data" value="${esc(c.vistoria_saida_data || c.data_saida || hojeIso())}" required>
+        <label>Hora</label><input type="time" name="hora" value="${esc(c.vistoria_saida_hora || "10:00")}" required>
+        ${c.vistoria_saida_data ? '<p class="check"><label><input type="checkbox" name="desmarcar" value="1"> Desmarcar a data</label></p>' : ""}`
+      });
+      if (!r) return;
+      const desmarcar = String((r.desmarcar || [])[0] || "") === "1";
+      const data2 = desmarcar ? "" : String((r.data || [])[0] || "");
+      await mudarContrato(c.id, (db) => marcarVistoriaSaida(db, c.id, data2, String((r.hora || [])[0] || ""), login()));
+      aviso(data2 ? `Vistoria marcada para ${dataBr(data2)}. Mande o convite ao inquilino (botão de e-mail da etapa).` : "Data da vistoria desmarcada.");
+      await mostrar();
+    },
     /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
     /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
     async arquivoFisico({ id, desfazer }) {
@@ -27496,6 +27608,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         texto_abertura: String(f.texto_abertura || "").trim(),
         texto_final: f.tipo === "Entrada" ? String(f.texto_final || "").trim() : ""
       };
+      if (f.tipo === "Saída") {
+        if (!PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new Error("Diga se o inquilino acompanhou a vistoria.");
+        dados.inquilino_presente = f.inquilino_presente;
+      }
       const semEspacos = (x) => String(x).replace(/\s+/g, " ").trim();
       if ([VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK].map(semEspacos).includes(semEspacos(dados.texto_abertura))) dados.texto_abertura = "";
       if (semEspacos(dados.texto_final) === semEspacos(vistoriaFinal(3))) dados.texto_final = "";
