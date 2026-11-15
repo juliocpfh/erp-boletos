@@ -2553,7 +2553,7 @@ export function comprovantesPendentes(d, c) {
 
 /** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
 export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
-  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
   if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
   const r = buscar(d, tabela, id);
@@ -2631,7 +2631,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
  * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
  */
 export function removerAnexo(d, tabela, id, campo, usuario) {
-  const ok = { contratos: ['comprovante_reserva'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
+  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
   const r = buscar(d, tabela, id);
   if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
@@ -3851,7 +3851,7 @@ export function arquivosReferenciados(d) {
   // o mesmo PDF pode ser apontado por dois registros (pagamento pelo banco e a movimentação que o confirmou): entra uma vez
   const usa = (escopo, id, nome) => { const k = `${escopo}:${id}|${nome}`; if (nome && id && !vistos.has(k)) { vistos.add(k); out.push({ escopo, id, nome }); } };
   for (const c of d.contratos) {
-    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
+    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
     for (const [campo] of DOCUMENTOS_ENTRADA) {
       usa('assinados', c.id, c[campoArquivoDoc(campo)]);
       usa('assinados', c.id, (c[campoParcialDoc(campo)] || {}).arquivo);
@@ -3880,6 +3880,8 @@ const COMPROVANTES_NO_CONTRATO = [
   ['comprovante_caucao', 'caucao', (c) => c.caucao_pago_em || c.caucao_data, 'comprovante da caução'],
   ['comprovante_deposito', 'deposito-garantia', (c) => c.deposito_pago_em || c.deposito_data, 'comprovante do depósito de garantia'],
   ['comprovante_reserva', 'reserva', (c) => c.reserva_data, 'comprovante da reserva'],
+  // não é comprovante de dinheiro: o termo de devolução das chaves assinado na saída (B4), com o nome termo-devolucao-chaves-<data da saída>
+  ['termo_chaves_saida', 'termo-devolucao-chaves', (c) => c.data_saida, 'termo de devolução das chaves assinado'],
 ];
 
 /**
@@ -6386,10 +6388,24 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
     if (e.saldo < 0) return { feito: false, detalhe: `cobrar ${C.reais(-e.saldo)} do inquilino (garantia não cobre os débitos)` };
     return { feito: true, detalhe: 'nada a devolver nem a cobrar' };
   })();
+  // B3 (revisão jurídica): a vistoria de saída com data marcada, o convite por e-mail, se o inquilino veio e o prazo dele
+  // para contestar o relatório (5 dias úteis do e-mail com a vistoria e as pendências, o da devolução das chaves)
+  const convite = ultimoEnvioEmail(d, c.id, 'saida_vistoria');
+  const relatorio = ultimoEnvioEmail(d, c.id, 'saida_chaves');
+  const comoEnvio = (x) => (x.como === 'enviado' ? 'enviado' : 'aberto no Gmail');
+  const vistoriaDetalhe = vist
+    ? [`feita em ${C.dataBr(vist.data)}`, vist.inquilino_presente ? `inquilino: ${vist.inquilino_presente.toLocaleLowerCase('pt-BR')}` : null,
+      relatorio ? `relatório ${comoEnvio(relatorio)} em ${C.dataBr(relatorio.data)}; ele pode contestar até ${C.dataBr(prazoContestarSaida(relatorio.data))}`
+        : 'falta enviar o relatório ao inquilino (e-mail da devolução das chaves)']
+    : [c.vistoria_saida_data ? `marcada para ${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : saiu ? 'ainda não registrada; data não marcada' : `a partir de ${C.dataBr(c.data_saida)}; data não marcada`,
+      c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null];
+  // B4: a etapa das chaves fecha com o termo de devolução assinado (saídas já acertadas antes do termo: pelo cálculo final)
+  const termo = c.termo_chaves_saida;
   return [
     { chave: 'aviso', titulo: 'Aviso prévio: data de saída informada', feito: true, detalhe: `saída em ${C.dataBr(c.data_saida)}` },
-    { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vist ? `feita em ${C.dataBr(vist.data)}` : saiu ? 'ainda não registrada' : `a partir de ${C.dataBr(c.data_saida)}` },
-    { chave: 'chaves', titulo: 'Devolução das chaves', feito: saiu, detalhe: saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}` : `prevista para ${C.dataBr(c.data_saida)}` },
+    { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vistoriaDetalhe.filter(Boolean).join(' · ') },
+    { chave: 'chaves', titulo: 'Devolução das chaves (termo assinado)', feito: !!termo || (saiu && !!e),
+      detalhe: termo ? `chaves devolvidas em ${C.dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}${e ? '' : '; falta anexar o termo de devolução assinado'}` : `prevista para ${C.dataBr(c.data_saida)}` },
     { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
       detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
@@ -6400,6 +6416,30 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
     { chave: 'arquivo', titulo: 'Arquivo físico: imprimir o processo e guardar em papel', feito: !!c.arquivo_fisico_em,
       detalhe: c.arquivo_fisico_em ? `arquivado em ${C.dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)` },
   ];
+}
+
+/** Prazo do inquilino para contestar o relatório da vistoria de saída: 5 dias úteis do envio (cláusula da vistoria de saída). */
+export const PRAZO_CONTESTAR_SAIDA = 5;
+export const prazoContestarSaida = (envio) => C.somarDiasUteis(envio, PRAZO_CONTESTAR_SAIDA);
+
+/** Último e-mail de uma etapa (aberto ou enviado) do contrato: registro de ``envios_email`` ou null. */
+export function ultimoEnvioEmail(d, contratoId, chave) {
+  return (d.envios_email || []).filter((x) => x.contrato_id === contratoId && x.chave === chave)
+    .reduce((a, x) => (!a || x.data > a.data || (x.data === a.data && x.id > a.id) ? x : a), null);
+}
+
+/**
+ * Vistoria de saída marcada (B3): data e hora combinadas com o inquilino, para o convite por e-mail e o termo de devolução das
+ * chaves. ``data`` vazia desmarca. Ex.: saída em 10/03/2027, vistoria marcada para 12/03/2027 às 14:00.
+ */
+export function marcarVistoriaSaida(d, contratoId, data, hora, usuario, hoje = C.hojeIso()) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (!c.data_saida) throw new C.ErroUsuario('Informe antes a data de saída.');
+  if (data && !C.dataValida(data)) throw new C.ErroUsuario('Informe a data da vistoria.');
+  if (hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) throw new C.ErroUsuario('Informe a hora da vistoria (ex.: 14:00).');
+  atualizar(d, 'contratos', c.id, { vistoria_saida_data: data || null, vistoria_saida_hora: data ? hora || null : null, vistoria_saida_marcada_em: data ? hoje : null }, usuario,
+    data ? `${c.inquilino_nome}: vistoria de saída marcada para ${C.dataBr(data)}${hora ? ` às ${hora}` : ''}` : `${c.inquilino_nome}: data da vistoria de saída desmarcada`);
 }
 
 /** Marca o processo do inquilino que saiu como impresso e guardado em papel (``data`` vazia desfaz). */

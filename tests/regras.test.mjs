@@ -2617,13 +2617,29 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   let r = R.roteiroSaida(d, c, '2026-11-07');
   assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto', 'arquivo']);
   assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false, false]);
-  assert.equal(r[2].titulo, 'Devolução das chaves');
+  assert.equal(r[2].titulo, 'Devolução das chaves (termo assinado)');
   assert.match(r[7].detalhe, /guardar até 30\/11\/2036/);
   assert.match(r[2].detalhe, /prevista para 30\/11\/2026/);
-  // saiu: chaves feitas; vistoria registrada; leitura e protocolo da titularidade fecham "contas"
+  assert.match(r[1].detalhe, /data não marcada/);
+  // B3: vistoria marcada e convite por e-mail
+  R.marcarVistoriaSaida(d, c.id, '2026-12-02', '14:00', 'julio', '2026-11-07');
+  r = R.roteiroSaida(d, c, '2026-11-07');
+  assert.match(r[1].detalhe, /marcada para 02\/12\/2026 às 14:00 · falta mandar o convite/);
+  R.inserir(d, 'envios_email', { data: '2026-11-08', chave: 'saida_vistoria', contrato_id: c.id, como: 'enviado' }, 'julio');
+  assert.match(R.roteiroSaida(d, c, '2026-11-08')[1].detalhe, /convite enviado em 08\/11\/2026/);
+  assert.throws(() => R.marcarVistoriaSaida(d, c.id, '2026-12-02', '25:00', 'julio'), /hora/);
+  // saiu: as chaves só fecham com o termo de devolução assinado (B4)
+  r = R.roteiroSaida(d, c, '2026-12-02');
+  assert.equal(r[2].feito, false);
+  assert.match(r[2].detalhe, /falta anexar o termo de devolução assinado/);
+  R.anexarComprovante(d, 'contratos', c.id, 'termo_chaves_saida', 'termo-devolucao-chaves-2026-11-30.pdf', 'julio');
   r = R.roteiroSaida(d, c, '2026-12-02');
   assert.equal(r[2].feito, true);
-  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [] }, 'julio');
+  assert.ok(R.arquivosReferenciados(d).some((x) => x.nome === 'termo-devolucao-chaves-2026-11-30.pdf'));
+  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Saída', data: '2026-11-30', itens: [], inquilino_presente: 'Não veio' }, 'julio');
+  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /inquilino: não veio · falta enviar o relatório/);
+  R.inserir(d, 'envios_email', { data: '2026-12-01', chave: 'saida_chaves', contrato_id: c.id, como: 'enviado' }, 'julio');
+  assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /relatório enviado em 01\/12\/2026; ele pode contestar até 08\/12\/2026/);
   R.inserir(d, 'leituras', { contrato_id: c.id, imovel_id: c.imovel_id, momento: 'Saída do inquilino', data: '2026-11-30', agua: '100', energia: '200' }, 'julio');
   R.inserir(d, 'titularidades', { imovel_id: c.imovel_id, contrato_id: c.id, tipo: 'Volta para o proprietário', data: '2026-12-01', concessionaria: 'Copel' }, 'julio');
   r = R.roteiroSaida(d, c, '2026-12-02');

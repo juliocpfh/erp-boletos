@@ -234,6 +234,11 @@ export const FORMULARIOS = {
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '',
       texto_abertura: String(f.texto_abertura || '').trim(), texto_final: f.tipo === 'Entrada' ? String(f.texto_final || '').trim() : '' };
+    // B3: na saída, se o inquilino acompanhou (sem ele, o relatório vai por e-mail com 5 dias úteis para contestar)
+    if (f.tipo === 'Saída') {
+      if (!K.PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new Error('Diga se o inquilino acompanhou a vistoria.');
+      dados.inquilino_presente = f.inquilino_presente;
+    }
     // texto igual ao padrão fica em branco: vale o padrão (a abertura muda sozinha com ou sem o link das fotos)
     const semEspacos = (x) => String(x).replace(/\s+/g, ' ').trim();
     if ([K.VISTORIA_ABERTURA, K.VISTORIA_ABERTURA_SEM_LINK].map(semEspacos).includes(semEspacos(dados.texto_abertura))) dados.texto_abertura = '';
