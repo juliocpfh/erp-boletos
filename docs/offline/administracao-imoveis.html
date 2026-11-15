@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-ICPvTNmEG7A52rz8RFYulEzWiR3Zp2lbwb3WqVV9in4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-dyXnuD/7aqfKMn+OrVau5Qd5didu4P5l48XoMzWGq8Q='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="19dbb5ab796ecc95">
+<meta name="fontes" content="78b4a23b5a8781c4">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3397,7 +3397,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
   }
   function resultadoVistoriaSaida(d2, c) {
     const vistoria = (d2.vistorias || []).filter((v) => v.contrato_id === c.id && v.tipo === "Saída").sort(maisRecentePrimeiro)[0] || null;
-    if (!vistoria) return { texto: "Não feita", vistoria: null, pendencias: [] };
+    if (!vistoria) return { texto: "Não feita", vistoria: null, pendencias: [], reparos: [], totalReparos: 0, semValor: 0 };
     const entrada = vistoriaDeEntrada(d2, c);
     const naEntrada = new Map((entrada && entrada.itens || []).map((x) => [`${x.comodo}|${x.item}`, x.situacao]));
     let pendencias = (vistoria.itens || []).filter((x) => {
@@ -3405,7 +3405,10 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       return ent ? piorou(ent, x.situacao) : ["Avaria", "Não funciona"].includes(x.situacao);
     }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ""})`);
     if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ""));
-    return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias };
+    const guardados = vistoria.reparos || {};
+    const reparos = pendencias.map((p2) => ({ pendencia: p2, valor: guardados[p2] ? guardados[p2].valor : null, orcamento: guardados[p2] ? guardados[p2].orcamento || "" : "" }));
+    const totalReparos = reparos.reduce((s, x) => s + (x.valor || 0), 0);
+    return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias, reparos, totalReparos, semValor: reparos.filter((x) => x.valor === null).length };
   }
   function textoVistoriaSaida(d2, c, encerramento) {
     const r = resultadoVistoriaSaida(d2, c);
@@ -3502,7 +3505,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
@@ -3614,6 +3617,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       NAO_SE_APLICA = "Não se aplica";
       GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
       piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+      textoReparo = (x) => `${x.pendencia}: ${x.valor === null ? "valor a definir" : reais(x.valor)}${x.orcamento ? ` (${x.orcamento})` : ""}`;
       PRESENCA_VISTORIA_SAIDA = ["Acompanhou", "Mandou representante", "Não veio"];
       FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
     }
@@ -4204,6 +4208,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     validarFciPrevios: () => validarFciPrevios,
     valorGarantia: () => valorGarantia,
     valorNoBanco: () => valorNoBanco,
+    valoresReparos: () => valoresReparos,
     vencimentoDoContrato: () => vencimentoDoContrato,
     vencimentoDoReajuste: () => vencimentoDoReajuste,
     vencimentoGuia: () => vencimentoGuia,
@@ -9099,9 +9104,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const convite = ultimoEnvioEmail(d2, c.id, "saida_vistoria");
     const relatorio2 = ultimoEnvioEmail(d2, c.id, "saida_chaves");
     const comoEnvio = (x) => x.como === "enviado" ? "enviado" : "aberto no Gmail";
+    const res = vist ? resultadoVistoriaSaida(d2, c) : null;
     const vistoriaDetalhe = vist ? [
       `feita em ${dataBr(vist.data)}`,
       vist.inquilino_presente ? `inquilino: ${vist.inquilino_presente.toLocaleLowerCase("pt-BR")}` : null,
+      // B5: o valor de cada reparo, que vai para o cálculo final
+      !res.pendencias.length ? "sem pendências" : res.semValor ? `${res.pendencias.length} reparo(s); falta o valor de ${res.semValor}` : `${res.pendencias.length} reparo(s): ${reais(res.totalReparos)}`,
       relatorio2 ? `relatório ${comoEnvio(relatorio2)} em ${dataBr(relatorio2.data)}; ele pode contestar até ${dataBr(prazoContestarSaida(relatorio2.data))}` : "falta enviar o relatório ao inquilino (e-mail da devolução das chaves)"
     ] : [
       c.vistoria_saida_data ? `marcada para ${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ""}` : saiu ? "ainda não registrada; data não marcada" : `a partir de ${dataBr(c.data_saida)}; data não marcada`,
@@ -9158,6 +9166,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       usuario,
       data2 ? `${c.inquilino_nome}: vistoria de saída marcada para ${dataBr(data2)}${hora ? ` às ${hora}` : ""}` : `${c.inquilino_nome}: data da vistoria de saída desmarcada`
     );
+  }
+  function valoresReparos(d2, vistoriaId, lista3, usuario) {
+    const v = buscar(d2, "vistorias", vistoriaId);
+    if (!v || v.tipo !== "Saída") throw new Error("Vistoria de saída não encontrada.");
+    const c = buscar(d2, "contratos", v.contrato_id);
+    const atuais = new Set(resultadoVistoriaSaida(d2, c).pendencias);
+    const reparos = {};
+    for (const x of lista3) {
+      if (!atuais.has(x.pendencia)) continue;
+      if (x.valor !== null && !(Number.isInteger(x.valor) && x.valor >= 0)) throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
+      if (x.valor === null && !String(x.orcamento || "").trim()) continue;
+      reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || "").trim() };
+    }
+    const total = Object.values(reparos).reduce((s, x) => s + (x.valor || 0), 0);
+    atualizar(d2, "vistorias", v.id, { reparos }, usuario, `${c.inquilino_nome}: valores dos reparos da vistoria de saída (${reais(total)})`);
   }
   function marcarArquivoFisico(d2, contratoId, data2, usuario) {
     const c = buscar(d2, "contratos", contratoId);
@@ -18620,7 +18643,7 @@ Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qual
       assunto: "Vistoria de saída e devolução das chaves – {imovel}",
       anexos: "Vistoria de saída e orçamentos (PDF)",
       prontos: ["assinado:chaves_saida"],
-      perguntas: [["pendencias", "Pendências da vistoria (uma por linha, com o orçamento)", "area"]],
+      perguntas: [["pendencias", "Pendências da vistoria (uma por linha, com o valor do orçamento)", "area"]],
       texto: `Olá, {nome},
 
 Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o termo de devolução das chaves.
@@ -18628,7 +18651,7 @@ Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o term
 PENDÊNCIAS (comparadas com a vistoria de entrada)
 {pendencias}
 
-Se discordar de algum item, responda em até 5 dias úteis, com fotos ou documentos.
+O valor de cada reparo vem do orçamento (ou da nota do serviço) e é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Se discordar de algum item ou valor, responda em até 5 dias úteis, com fotos ou documentos.
 
 O recebimento das chaves não dá quitação: os valores em aberto e as pendências da vistoria entram no acerto final, que enviaremos em seguida.`
     },
@@ -19160,14 +19183,15 @@ ${DICA_DOCUMENTOS}`].join("\n");
     return l && l.url && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: l.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
   }
   function respostasPadrao(d2, c, hoje3) {
-    const pend = c ? resultadoVistoriaSaida(d2, c).pendencias : [];
+    const reparos = c ? resultadoVistoriaSaida(d2, c).reparos : [];
     return {
       prazo_assinatura: somarDias(hoje3, 7),
       opcoes_entrega: c && c.data_entrada ? `${dataBr(c.data_entrada)} às 10h` : "",
       data_aviso: hoje3,
       // B3: a data e a hora marcadas no roteiro da saída (sem marcar: o dia da saída, às 10h, para a equipe ajustar)
       data_vistoria: c && c.vistoria_saida_data ? `${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ""}` : c && c.data_saida ? `${dataBr(c.data_saida)} às 10h` : "",
-      pendencias: pend.length ? pend.map((x) => `- ${x}`).join("\n") : "- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.",
+      // B5: cada pendência com o valor do reparo (orçamento), que entra no acerto final
+      pendencias: reparos.length ? reparos.map((x) => `- ${textoReparo(x)}`).join("\n") : "- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.",
       ano: String(Number(hoje3.slice(0, 4)) - 1),
       prazo: "30 meses"
     };
@@ -22077,6 +22101,8 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
         return `${opera() ? link(`#/imprimir/recibo?tipo=devolucao_chaves&contrato=${c.id}`, "🧾 Termo de devolução das chaves", "botao secundario pequeno") : ""}
         <span class="suave">Assinado:</span> ${linkComprovante(c.id, c.termo_chaves_saida, { tabela: "contratos", id: c.id, campo: "termo_chaves_saida", tipo: "termo-devolucao-chaves", data: c.data_saida }).replace("📎 comprovante", "📎 termo assinado").replace("anexar comprovante", "anexar o termo assinado")}`;
       }
+      const res = x.chave === "vistoria" && x.feito ? resultadoVistoriaSaida(d(), c) : null;
+      if (res && res.pendencias.length && opera() && !e) return botao("valoresReparos", res.semValor ? "Valores dos reparos" : "Mudar os valores", { id: res.vistoria.id }, res.semValor ? "pequeno" : "secundario pequeno");
       if (!opera() || x.feito) return "";
       if (x.chave === "vistoria") return `${botao("marcarVistoriaSaida", c.vistoria_saida_data ? "Mudar a data marcada" : "Marcar data e hora", { id: c.id }, "secundario pequeno")} ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, "Registrar vistoria de saída", "botao pequeno")}`;
       if (x.chave === "contas") return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, "Registrar protocolo", "botao pequeno") : ""} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, "Registrar leitura", "botao pequeno") : ""}`;
@@ -23419,20 +23445,24 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
         const c = buscar2("contratos", q.contrato);
         const aberto = cobrancasEmAberto(d(), c.id);
         const lt = leituraDo(d(), c.id, "Saída do inquilino") || {};
+        const v = resultadoVistoriaSaida(d(), c);
+        const comFci = temFci(c) || depositosFci(d(), c).length > 0;
+        const reparos = v.reparos.map((x) => `Reparo da vistoria${comFci ? " (pago pelo FCI)" : ""}: ${textoReparo(x)}`);
         return {
           fci_credito: saldoFci(d(), c).corrigido || null,
+          fci_danos: comFci && v.totalReparos ? v.totalReparos : null,
           leitura_agua: lt.agua || "",
           leitura_energia: lt.energia || "",
           leitura_gas: lt.gas || "",
           garantia_valor: valorGarantia(d(), c),
-          debitos: aberto.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto, 0),
-          debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(totais(cb).a_pagar_sem_desconto)}`).join("\n")
+          debitos: aberto.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto, 0) + (comFci ? 0 : v.totalReparos),
+          debitos_descricao: [...aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(totais(cb).a_pagar_sem_desconto)}`), ...reparos].join("\n")
         };
       },
       aviso: (r, q) => {
         const c = buscar2("contratos", q.contrato);
         const v = resultadoVistoriaSaida(d(), c);
-        const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase("pt-BR")}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join("; ")}${v.pendencias.length > 5 ? "…" : ""}): confira os débitos` : ""}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
+        const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase("pt-BR")}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join("; ")}${v.pendencias.length > 5 ? "…" : ""}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ""}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
         return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
       },
       // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
@@ -26280,6 +26310,38 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const data2 = desmarcar ? "" : String((r.data || [])[0] || "");
       await mudarContrato(c.id, (db) => marcarVistoriaSaida(db, c.id, data2, String((r.hora || [])[0] || ""), login()));
       aviso(data2 ? `Vistoria marcada para ${dataBr(data2)}. Mande o convite ao inquilino (botão de e-mail da etapa).` : "Data da vistoria desmarcada.");
+      await mostrar();
+    },
+    /** Roteiro da saída (B5): valor de cada reparo da vistoria de saída, com o orçamento; entra nos débitos do cálculo final. */
+    async valoresReparos({ id }) {
+      const v = buscar2("vistorias", id);
+      const c = v && buscar2("contratos", v.contrato_id);
+      if (!c) throw new Error("Vistoria de saída não encontrada.");
+      const res = resultadoVistoriaSaida(d(), c);
+      const r = await janela({
+        titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`,
+        sim: "Salvar",
+        nao: "Cancelar",
+        html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
+        ${res.reparos.map((x) => `<fieldset style="margin:8px 0"><legend>${esc(x.pendencia)}</legend>
+          <label>Valor (R$)</label><input name="valor" inputmode="decimal" value="${x.valor === null ? "" : esc(dinheiroTexto(x.valor))}" placeholder="ex.: 350,00">
+          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join("")}`
+      });
+      if (!r) return;
+      const lista3 = res.reparos.map((x, k) => {
+        const t = String((r.valor || [])[k] || "").trim();
+        let valor = null;
+        if (t) {
+          try {
+            valor = centavos(t);
+          } catch {
+            throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
+          }
+        }
+        return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || "") };
+      });
+      await alterar((db) => valoresReparos(db, v.id, lista3, login()));
+      aviso("Valores dos reparos salvos: entram nos débitos do cálculo final.");
       await mostrar();
     },
     /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
