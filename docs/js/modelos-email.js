@@ -15,32 +15,14 @@ const CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0
 Pix (CNPJ): 58.492.818/0001-59`;
 
 const CONDICOES = `CONDIÇÕES DA LOCAÇÃO
-- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
-- Vencimento: todo dia {vencimento}
-[se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
+[se aluguel]- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
+[fim][se vencimento]- Vencimento: todo dia {vencimento}
+[fim][se iptu]- IPTU: cobrado junto com o aluguel[se iptu_valor] (cerca de {iptu_valor} por mês)[fim]
 [fim][se seguro_incendio]- Seguro contra incêndio: cobrado junto com o aluguel[se seguro_valor] (cerca de {seguro_valor} por ano)[fim]
 [fim][se contas]- Contas de {contas_texto}: por conta do locatário
 [fim][se inclusos]- Incluso no aluguel: {inclusos}
 [fim]- Garantia: {garantia}
 - Prazo do contrato: {prazo}`;
-
-const DOCUMENTOS = `[se pj]1. Contrato social e última alteração
-2. Cartão do CNPJ
-3. Documento com foto e CPF do representante
-4. Comprovante de faturamento dos 3 últimos meses
-5. Comprovante de endereço da empresa[senão]1. Documento com foto e CPF
-2. Certidão de casamento ou declaração de união estável, se for o caso
-3. Comprovante de renda dos 3 últimos meses
-4. Comprovante de residência atual[fim][se fiador]
-
-DO FIADOR
-1. Documento com foto e CPF
-2. Comprovante de renda e de residência
-3. Matrícula atualizada de um imóvel em nome dele
-4. Se for casado ou viver em união estável: os mesmos documentos do cônjuge ou companheiro, que também assina o contrato[fim][se seguro_fianca]
-
-SEGURO FIANÇA
-A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]`;
 
 /**
  * Modelos padrão: ``chave`` (fixa), ``nome`` e ``etapa`` (onde fica o botão), ``assunto``, ``texto`` (sem o fecho, que vai
@@ -52,7 +34,7 @@ export const MODELOS_EMAIL = [
   {
     chave: 'ficha_envio', nome: 'Envio de ficha cadastral', etapa: 'Ficha',
     assunto: '{imovel}: ficha cadastral e condições da locação',
-    anexos: 'Ficha cadastral (PDF)', prontos: ['recibo:reserva', 'comprovante:reserva'],
+    anexos: '', prontos: ['recibo:ficha', 'recibo:ficha_fiador', 'recibo:reserva', 'comprovante:reserva'],
     perguntas: [['prazo', 'Prazo do contrato', 'texto']],
     texto: `Olá, {nome}, tudo bem?
 
@@ -62,8 +44,22 @@ ${CONDICOES}
 
 Estas condições dependem da aprovação da ficha. A locação só se forma com a assinatura do contrato por todas as partes.
 
-DOCUMENTOS PARA A FICHA (responda este e-mail com a ficha anexa preenchida e):
-${DOCUMENTOS}
+FICHA CADASTRAL
+Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
+
+DOCUMENTOS
+{documentos_ficha}[se seguro_fianca]
+
+SEGURO FIANÇA
+A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]
+
+[se link]PELA INTERNET
+Se preferir, preencha a ficha, mande os documentos e, depois, a ficha assinada por este link, que é só seu e vale até {link_validade}:
+{link}[se link_fiador]
+
+Link para o fiador (encaminhe para ele): {link_fiador}[fim]
+
+[fim]Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
 
 COMO FUNCIONA
 1. Análise da ficha em até 2 dias úteis

@@ -1,12 +1,16 @@
 // Fichas em análise: pré-cadastro do interessado (dados, reserva e documentos), aprovar ou reprovar e, aprovada, o contrato (#/ficha/ID, caixa em Inquilinos e alerta no Painel).
-import { alterar, aviso, ir, janela, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, E, ir, janela, login, mostrar, podeUsuario } from '../app.js';
+import * as S from '../armazenamento.js';
+import * as CP from '../conferir-pdf.js';
+import * as FO from '../ficha-online.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
 import { esc, pctTexto } from '../formularios.js';
 import * as REC from '../recibos.js';
 import * as R from '../regras.js';
+import { pdfDoRecibo } from './documentos.js';
 import { botaoEmail } from './emails.js';
-import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera } from './comum.js';
+import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera, PASTA_FICHAS, pastaDoEscopo } from './comum.js';
 
 const COR_SITUACAO = { 'Em análise': 'aviso', Aprovada: 'ok', Reprovada: 'neutra', Desistiu: 'neutra' };
 
@@ -38,9 +42,10 @@ export function caixaFichas() {
 /** Painel: uma linha com o que falta nas fichas (em análise, aprovada sem contrato, reserva a devolver). */
 export function alertaFichas() {
   const p = R.pendenciasDasFichas(d());
-  if (!p.length) return '';
+  const online = E.nuvem && opera() ? '<div data-alertas-ficha-online></div>' : '';
+  if (!p.length) return online;
   const devolver = p.some((x) => /devolução/.test(x.texto));
-  return `<div class="alerta ${devolver ? 'aviso' : 'info'}"><b>Fichas em análise:</b> ${p.map((x) => `<a href="#/ficha/${x.ficha.id}">${esc(x.texto)}</a>`).join('; ')}.</div>`;
+  return `<div class="alerta ${devolver ? 'aviso' : 'info'}"><b>Fichas em análise:</b> ${p.map((x) => `<a href="#/ficha/${x.ficha.id}">${esc(x.texto)}</a>`).join('; ')}.</div>${online}`;
 }
 
 const item = (rotulo, valor) => (valor ? itemGrade(rotulo, valor) : '');
@@ -61,6 +66,18 @@ export function telaFicha(id) {
     item('Profissão', esc(f.inquilino_profissao)), item('Endereço', esc(f.inquilino_endereco)),
     item('Representante', esc(f.representante_nome)), item('Inquilino solidário', esc(f.solidario_nome)),
   ].join('');
+  // renda, cônjuge e quem vai morar (vão na ficha cadastral em PDF)
+  const renda = [
+    item('Tipo de renda', esc(f.renda_tipo)), item(pj ? 'Faturamento mensal' : 'Renda mensal', f.renda_mensal > 0 ? reais(f.renda_mensal) : ''),
+    item('Fonte da renda', `${esc(f.renda_fonte)}${f.renda_fonte && f.renda_fonte_telefone ? ` · ${esc(f.renda_fonte_telefone)}` : ''}`),
+    item('Desde', f.renda_desde ? C.compBr(f.renda_desde) : ''),
+    item('Cônjuge', f.conjuge_nome ? `${esc(f.conjuge_nome)}${f.conjuge_cpf ? `, CPF ${esc(f.conjuge_cpf)}` : ''}${f.conjuge_renda > 0 ? ` · renda ${reais(f.conjuge_renda)}` : ''}` : ''),
+    item('Quem vai morar', esc(f.moradores).replace(/\n/g, '<br>')), item('Animais', esc(f.animais)),
+  ].join('');
+  const fiadores = R.fiadoresDaFicha(f);
+  const fichaPdf = (tipo, extra, texto) => (REC.reciboDisponivel(d(), tipo, { ficha: f }).ok ? link(`#/imprimir/recibo?tipo=${tipo}&ficha=${f.id}${extra}`, `🧾 ${texto}`, '') : '');
+  const fichasPdf = [fichaPdf('ficha', '', 'Ficha cadastral para assinar'),
+    ...(fiadores.length ? fiadores.map((x) => fichaPdf('ficha_fiador', `&fiador=${x.n}`, `Ficha do fiador ${esc(x.nome)}`)) : [fichaPdf('ficha_fiador', '&fiador=1', 'Ficha do fiador (em branco)')])].filter(Boolean).join(' · ');
   // proposta combinada (vai preenchida para o contrato)
   const bonificado = f.aluguel_inicial > 0 && f.bonificacao !== false && f.desconto_pontualidade_percentual > 0 ? f.aluguel_inicial - C.descontoPorPercentual(f.aluguel_inicial, f.desconto_pontualidade_percentual) : null;
   const incluso = REC.itensDaProposta(f).filter(([rot]) => ['Prazo do contrato', 'IPTU', 'Seguro contra incêndio', 'Contas'].includes(rot));
@@ -101,16 +118,20 @@ export function telaFicha(id) {
       ${botaoDesistencia(f)}
       ${devolucao}
       ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da decisão).</p>` : ''}</div>
+    ${caixaFichaOnline(f)}
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um dos imóveis')}</b>.` : ''}</p>
       <ul>${contratos || '<li class="suave">Nenhum imóvel marcado.</li>'}</ul>
       ${f.situacao === 'Aprovada' && paraFazer.length ? `<p class="suave">${primeiro ? 'O contrato abre com os dados da pessoa já preenchidos (a reserva e os documentos ficaram no primeiro contrato).' : 'O contrato abre com os dados da pessoa e a reserva já preenchidos. Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}</p>` : ''}</div>
     <div class="cartao"><h2>${esc(pj ? 'Empresa' : 'Interessado')}</h2><div class="grade">${pessoa || '<p class="suave">Só o nome foi preenchido.</p>'}</div></div>
+    <div class="cartao"><h2>Renda e moradia</h2>${renda ? `<div class="grade">${renda}</div>` : '<p class="suave">Renda, cônjuge e quem vai morar ainda não preenchidos (em "Editar", ou o interessado completa na ficha cadastral).</p>'}</div>
+    ${fiadores.length ? `<div class="cartao"><h2>Fiador</h2><ul>${fiadores.map((x) => `<li><b>${esc(x.nome)}</b>${x.cpf ? `, CPF ${esc(x.cpf)}` : ''}${x.telefone ? ` · ${esc(x.telefone)}` : ''}${x.nome_conjuge ? ` · cônjuge: ${esc(x.nome_conjuge)}` : ''}</li>`).join('')}</ul><p class="suave">Ao fazer o contrato, os fiadores vão preenchidos.</p></div>` : ''}
     <div class="cartao"><h2>Proposta</h2>${proposta ? `<div class="grade">${proposta}</div>` : '<p class="suave">Aluguel, vencimento, bonificação, garantia e o que está incluso ainda não preenchidos (em "Editar"). Eles vão no e-mail da ficha, no recibo da reserva e preenchidos para o contrato.</p>'}</div>
     <div class="cartao"><h2>Reserva</h2>${f.reserva_valor > 0 ? `<p>${reais(f.reserva_valor)}${f.reserva_data ? ` em ${dataBr(f.reserva_data)}` : ''} ${f.comprovante_reserva ? abrir(f.comprovante_reserva, 'comprovante') : primeiro ? '<span class="suave">(o comprovante foi para a pasta do inquilino)</span>' : etiqueta('sem comprovante', 'aviso')}
       ${REC.reciboDisponivel(d(), 'reserva', { ficha: f }).ok ? ` · ${link(`#/imprimir/recibo?tipo=reserva&ficha=${f.id}`, '🧾 Recibo da reserva', '')}` : ''}</p>
       <p class="suave">O recibo e o comprovante vão anexos no e-mail de envio da ficha cadastral, com as condições propostas.</p>` : '<p class="suave">Sem reserva.</p>'}</div>
     <div class="cartao"><h2>Documentos</h2>
+      ${fichasPdf ? `<p>${fichasPdf} <span class="suave">· com os dados já preenchidos, a lista de documentos e a declaração antes da assinatura (vão anexas no e-mail de envio da ficha)</span></p>` : ''}
       <p>${[sim(f.doc_ficha, 'Ficha cadastral'), sim(f.doc_pessoais, 'Documentos pessoais'), sim(f.doc_renda, 'Comprovante de renda'), sim(f.doc_residencia, 'Comprovante de residência')].join(' · ')}</p>
       ${f.analise_serasa ? `<p>Análise do Serasa: ${abrir(f.analise_serasa, f.analise_serasa)}</p>` : primeiro || f.documentos_apagados_em ? '' : '<p class="suave">Sem a análise do Serasa (anexe em "Editar").</p>'}
       ${documentos}
@@ -139,8 +160,351 @@ export function botaoDesistenciaContrato(c) {
   return botao('desistirAntesDeAssinar', 'Desistiu antes de assinar', { contrato: c.id }, 'secundario');
 }
 
+// --------------------------------------------------------------------------
+// Ficha pela internet (pedido do dono em 2026-11-14): um link por pessoa (interessado e fiadores), que vale 7 dias, em
+// ficha.ankjck.com.br (fora do login do sistema). A pessoa preenche, manda os documentos e a ficha assinada; o que ela
+// manda fica como resposta na nuvem e só entra na ficha quando a equipe confere (ficha-online.js, nuvem/ficha-publica.mjs).
+// --------------------------------------------------------------------------
+const TEXTO_SITUACAO_LINK = {
+  Aguardando: 'link enviado, sem resposta ainda', Respondida: 'respondeu', 'Falta documento': 'falta documento', Assinar: 'falta assinar',
+  Assinada: 'ficha assinada recebida', Desistiu: 'avisou que não vai seguir', Encerrado: 'link encerrado',
+};
+const COR_LINK = { Respondida: 'info', Assinada: 'ok', Desistiu: 'perigo', 'Falta documento': 'aviso', Assinar: 'aviso' };
+
+/** Link guardado na ficha ainda no prazo (ou null). */
+const linkValido = (f, pessoa) => { const l = (f.links_ficha || {})[pessoa]; return l && l.url && String(l.vence_em) > new Date().toISOString() ? l : null; };
+
+/** Caixa "Ficha pela internet" da página da ficha: uma linha por pessoa; o que ela mandou aparece depois (ligarFichaOnline). */
+function caixaFichaOnline(f) {
+  if (!opera() || R.fichaSemContrato(f) || f.documentos_no_contrato) return '';
+  const titulo = '<h2>Ficha pela internet</h2>';
+  if (!E.nuvem) return `<div class="cartao">${titulo}<p class="suave">Só no sistema na nuvem (erp.ankjck.com.br): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
+  const linhas = FO.pessoasDaFicha(f).map((p) => {
+    const l = (f.links_ficha || {})[p];
+    const valido = linkValido(f, p);
+    return `<li style="margin:6px 0"><b>${esc(FO.nomeDaPessoa(f, p))}</b>${p === 'interessado' ? '' : ' <span class="suave">(fiador)</span>'}
+      <span data-situacao-link="${p}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta('link vencido', 'aviso') : '<span class="suave">sem link</span>'}</span><br>
+      ${botao('gerarLinkFicha', valido ? 'Gerar novo link' : 'Gerar link', { id: f.id, pessoa: p }, valido ? 'secundario pequeno' : 'pequeno', valido ? 'Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado).' : '')}
+      ${valido ? botao('compartilharLinkFicha', 'Copiar / WhatsApp', { id: f.id, pessoa: p }, 'secundario pequeno') : ''}</li>`;
+  }).join('');
+  return `<div class="cartao" data-ficha-online="${f.id}">${titulo}
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
+    <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
+}
+
+/** Depois de desenhar a página da ficha: busca na nuvem a situação de cada link (e o que foi mandado). */
+export async function ligarFichaOnline(raiz) {
+  const painel = raiz.querySelector('[data-alertas-ficha-online]');
+  if (painel && E.nuvem) await avisosDoPainel(painel).catch(() => {});
+  const caixa = raiz.querySelector('[data-ficha-online]');
+  if (!caixa || !E.nuvem) return;
+  linhaDoAvisoNoAparelho(caixa.querySelector('[data-aviso-aparelho]')).catch(() => {});
+  let links;
+  try { links = await FO.linksNaNuvem(Number(caixa.dataset.fichaOnline)); } catch (e) { const r = caixa.querySelector('[data-respostas-link]'); if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`; return; }
+  for (const l of links) {
+    const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
+    if (!el) continue;
+    const ultimo = (l.respostas || []).at(-1);
+    el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || 'neutra')}
+      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).length ? ` · ${l.arquivos.length} arquivo(s)` : ''} · link até ${new Date(l.vence_em).toLocaleDateString('pt-BR')}</span>`;
+  }
+  caixa._links = links;
+  const fichaAqui = buscar('fichas', Number(caixa.dataset.fichaOnline));
+  const area = caixa.querySelector('[data-respostas-link]');
+  if (area && fichaAqui) {
+    area.innerHTML = links.filter((l) => l.situacao !== 'Encerrado' || (l.respostas || []).length).map((l) => blocoDoLink(fichaAqui, l)).join('');
+    conferirArquivosDoLink(area, fichaAqui).catch((e) => console.warn('conferência dos arquivos do link', e));
+    // quem abriu a ficha viu as novidades: o Painel para de avisar
+    for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) FO.atualizarLinkNaNuvem({ ficha_id: fichaAqui.id, pessoa: l.pessoa, visto: true }).catch(() => {});
+  }
+  // documentos que chegaram pelo link desde a última vez: a lista da pasta guardada neste aparelho fica velha; busca de novo
+  const id = Number(caixa.dataset.fichaOnline);
+  const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
+  if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
+  const antes = arquivosDoLinkVistos.get(id);
+  arquivosDoLinkVistos.set(id, total);
+  const f = buscar('fichas', id);
+  if (total && f && E.anexos?.esquecerLista) {
+    E.anexos.esquecerLista(['arquivos', PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+    if (antes !== undefined || total) await mostrar();
+  }
+}
+/** Quantos arquivos dos links de cada ficha já foram vistos nesta abertura (ficha → quantidade). */
+const arquivosDoLinkVistos = new Map();
+
+/** Linha "Avisos neste aparelho" (celular ou computador): ligar ou desligar o aviso quando chega algo pelos links. */
+async function linhaDoAvisoNoAparelho(el) {
+  if (!el) return;
+  const e = await FO.estadoDoAviso();
+  if (!e.possivel) { el.innerHTML = '🔔 Aviso no celular: abra pelo aplicativo instalado (no iPhone: Compartilhar → Adicionar à Tela de Início).'; return; }
+  if (!e.ligadoNaNuvem) { el.innerHTML = '🔔 Aviso no celular: ainda não ligado na nuvem (o administrador cadastra as chaves; o Painel e o e-mail continuam avisando).'; return; }
+  el.innerHTML = e.ligadoAqui
+    ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao('desligarAvisoFicha', 'Desligar neste aparelho', {}, 'secundario mini')}`
+    : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao('ligarAvisoFicha', 'Ligar', {}, 'mini')}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ''}`;
+}
+
+/** Valor de um campo do link para mostrar (dinheiro em reais, datas, sim/não). */
+function valorDoCampo(c, v) {
+  if (v === null || v === undefined || v === '') return '<span class="suave">-</span>';
+  if (c.tipo === 'dinheiro') return reais(v);
+  if (c.tipo === 'data') return dataBr(v);
+  if (c.tipo === 'mes') return C.compBr(v);
+  if (c.tipo === 'simnao') return v ? 'Sim' : 'Não';
+  return esc(v).replace(/\n/g, '<br>');
+}
+
+/** Dados do último envio que diferem da ficha: [{ campo, na_ficha, enviado }]. */
+function diferencasDoEnvio(f, l) {
+  const ultimo = (l.respostas || []).at(-1);
+  if (!ultimo) return [];
+  return (l.formulario || []).filter((c) => c.nome && ultimo.valores[c.nome] !== null && ultimo.valores[c.nome] !== undefined
+    && String(ultimo.valores[c.nome]) !== String(f[c.nome] ?? '')).map((c) => ({ campo: c, na_ficha: f[c.nome], enviado: ultimo.valores[c.nome] }));
+}
+
+/** O que a pessoa mandou pelo link: desistência, dados (com o que muda na ficha), documentos (com a conferência) e as ações. */
+function blocoDoLink(f, l) {
+  const p = l.pessoa;
+  const nome = FO.nomeDaPessoa(f, p);
+  const ultimo = (l.respostas || []).at(-1);
+  const guardado = (f.links_ficha || {})[p] || {};
+  const trazido = ultimo && guardado.trazido_em === ultimo.em;
+  const partes = [];
+  if (l.situacao === 'Desistiu' && p === 'interessado' && !R.fichaSemContrato(f)) {
+    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : ''}.</div><p>${botaoDesistencia(f)}</p>`);
+  }
+  if (ultimo && !trazido) {
+    const dif = diferencasDoEnvio(f, l);
+    partes.push(`<p><b>Dados enviados em ${C.dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>
+      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join('')}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
+      <p class="acoes">${botao('trazerRespostaFicha', dif.length ? 'Trazer para a ficha…' : 'Marcar como conferido…', { id: f.id, pessoa: p }, 'pequeno')}</p>`);
+  } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${C.dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
+  if ((l.arquivos || []).length) {
+    partes.push(`<p><b>Documentos mandados pelo link</b> <span class="suave">(estão na pasta da ficha, abaixo; a conferência olha por dentro de cada arquivo)</span></p>
+      <ul style="padding-left:18px">${l.arquivos.map((a) => `<li data-conferir="${esc(a.arquivo)}" data-nome-pessoa="${esc(nome)}">${esc(a.documento)}: <a href="#" data-acao="abrirArquivo" data-escopo="ficha" data-id="${f.id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.nome_original || a.arquivo)}</a> <span class="suave">${C.dataHoraBr(a.em)}</span> <span data-sinais class="suave">conferindo…</span></li>`).join('')}</ul>`);
+  }
+  if (l.faltando && l.faltando.length && l.situacao === 'Falta documento') partes.push(`<p class="suave">Pedido à pessoa: ${esc(l.faltando.join('; '))}.</p>`);
+  const ativo = !['Encerrado', 'Desistiu'].includes(l.situacao);
+  if (ativo) {
+    partes.push(`<p class="acoes">${botao('pedirDocumentoFicha', 'Pedir o que falta', { id: f.id, pessoa: p })}
+      ${botao('mandarAssinarFicha', 'Mandar a ficha para assinar', { id: f.id, pessoa: p }, 'secundario pequeno', `Gerar a ficha em PDF com os dados de agora e pedir a assinatura de ${nome} pelo link?`)}
+      ${botao('lembrarFicha', 'Lembrar', { id: f.id, pessoa: p })}
+      ${botao('encerrarLinkFicha', 'Encerrar o link', { id: f.id, pessoa: p }, 'secundario pequeno', `Encerrar o link de ${nome}? A pessoa não consegue mais abrir nem mandar nada (o que já mandou continua guardado).`)}</p>`);
+  }
+  if (!partes.length) return '';
+  return `<div class="cartao" style="margin:8px 0"><h3>${esc(nome)}${p === 'interessado' ? '' : ' (fiador)'}</h3>${partes.join('')}</div>`;
+}
+
+/** Conferência dos documentos que chegaram pelo link (programa que fez o PDF, assinatura); guardada nesta abertura. */
+const conferidos = new Map(); // "ficha|arquivo" → html dos sinais
+async function conferirArquivosDoLink(area, f) {
+  const itens = [...area.querySelectorAll('[data-conferir]')];
+  if (!itens.length) return;
+  const pasta = await pastaDoEscopo('ficha', f.id, false);
+  for (const li of itens) {
+    const nome = li.dataset.conferir;
+    const chave = `${f.id}|${nome}`;
+    if (!conferidos.has(chave)) {
+      let html;
+      try {
+        const blob = await S.abrirArquivo(pasta, nome);
+        const r = await CP.conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
+        html = sinaisHtml(r, li.dataset.nomePessoa);
+      } catch { html = '<span class="suave">não foi possível conferir o arquivo</span>'; }
+      conferidos.set(chave, html);
+    }
+    const alvo = li.querySelector('[data-sinais]');
+    if (alvo) { alvo.className = ''; alvo.innerHTML = conferidos.get(chave); }
+  }
+}
+
+/** Sinais da conferência de um arquivo: alertas (editor), atenção, informação e as assinaturas (com o nome da ficha). */
+function sinaisHtml(r, nomePessoa) {
+  const cor = { alerta: 'perigo', atencao: 'aviso', info: 'neutra' };
+  const titulo = { alerta: '⚠ possível montagem', atencao: 'atenção', info: 'impresso de página' };
+  const out = r.sinais.map((s) => `<span class="etiqueta ${cor[s.nivel]}" title="${esc(s.texto)}">${titulo[s.nivel]}</span> <span class="suave">${esc(s.texto)}</span>`);
+  for (const a of r.assinaturas) {
+    const bate = CP.mesmoNome(a.nome, nomePessoa);
+    out.push(`${etiqueta(`✓ assinado${a.govbr ? ' pelo gov.br' : a.icp ? ' (ICP-Brasil)' : ''}`, bate ? 'ok' : 'aviso')} <span class="suave">por ${esc(a.nome || 'nome não lido')}${a.data ? ` em ${dataBr(a.data.slice(0, 10))}` : ''}${bate ? '' : ` · o nome não bate com a ficha (${esc(nomePessoa)})`}</span>`);
+  }
+  if (r.assinaturas.length) out.push('<span class="suave">confirme a assinatura em validar.iti.gov.br</span>');
+  if (!r.sinais.length) out.push(`<span class="suave">nenhum sinal de edição encontrado${r.programa ? ` (feito em: ${esc(r.programa)})` : ''}: isso não prova que é verdadeiro, confira com a fonte</span>`);
+  return out.join('<br>');
+}
+
+/** Painel: o que chegou pelos links (ainda não visto), link sem resposta há dias e link vencido sem resposta. */
+async function avisosDoPainel(el) {
+  const links = await FO.linksNaNuvem();
+  const agora = Date.now();
+  const dias = R.regra('dias_ficha_parada');
+  const linhas = [];
+  for (const l of links) {
+    const f = buscar('fichas', l.ficha_id);
+    if (!f || l.situacao === 'Encerrado' || f.documentos_no_contrato) continue;
+    const nome = esc(l.nome || FO.nomeDaPessoa(f, l.pessoa));
+    const ir = `<a href="#/ficha/${f.id}">${nome}${l.pessoa === 'interessado' ? '' : ' (fiador)'}</a>`;
+    if (l.situacao === 'Desistiu' && !R.fichaSemContrato(f)) { linhas.push(`${ir} avisou pelo link que não vai seguir: registre a desistência${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)}` : ''}`); continue; }
+    if (R.fichaSemContrato(f)) continue;
+    const novo = !l.visto_em && (l.ultimo_envio || l.arquivos);
+    const esperando = (!l.ultimo_envio && !l.arquivos) || ['Falta documento', 'Assinar'].includes(l.situacao);
+    if (novo) linhas.push(`${ir} ${l.situacao === 'Assinada' ? 'mandou a ficha assinada' : l.ultimo_envio ? 'mandou dados pelo link' : 'mandou documentos pelo link'}: conferir`);
+    else if (esperando) {
+      const vencido = Date.parse(l.vence_em) < agora;
+      // conta desde a última coisa feita: o link, o pedido da equipe (falta documento, assinar) ou o lembrete
+      const lembrado = ((f.links_ficha || {})[l.pessoa] || {}).lembrado_em;
+      const desde = Math.max(...[l.criado_em, ['Falta documento', 'Assinar'].includes(l.situacao) ? l.mudou_em : null, lembrado].filter(Boolean).map(Date.parse));
+      const parado = Number.isFinite(desde) ? Math.floor((agora - desde) / 86400000) : 0;
+      const oque = l.situacao === 'Falta documento' ? 'pedido de documento sem resposta' : l.situacao === 'Assinar' ? 'ficha para assinar sem resposta' : 'link sem resposta';
+      if (vencido) linhas.push(`${ir}: o link venceu (${oque}; gere um novo na ficha)`);
+      else if (parado >= dias) linhas.push(`${ir}: ${oque} há ${parado} dia(s) ${botao('lembrarFicha', 'Lembrar', { id: f.id, pessoa: l.pessoa }, 'secundario mini')}`);
+    }
+  }
+  el.innerHTML = linhas.length ? `<div class="alerta info"><b>Ficha pela internet:</b> ${linhas.join('; ')}.</div>` : '';
+}
+
+/** Janela com o link: copiar, WhatsApp (com o texto pronto) e o lembrete do e-mail. ``lembrete``: texto de lembrar quem não respondeu. */
+async function janelaDoLink(f, pessoa, link, { lembrete = false, faltando = [] } = {}) {
+  const tel = FO.telefoneWhatsapp(f, pessoa);
+  const texto = FO.textoWhatsapp(f, pessoa, link, { lembrete, faltando });
+  await janela({
+    titulo: `Link da ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Fechar', nao: 'Voltar',
+    html: `<p>Vale até <b>${dataBr(String(link.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto)}</textarea></p>
+      <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
+      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(texto)}">Abrir no WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
+      ${pessoa === 'interessado' ? '<p class="suave">O e-mail "Envio de ficha cadastral" já leva este link (e o do fiador, se houver).</p>' : ''}`,
+    ligar: (dlg) => {
+      dlg.querySelector('[data-copiar-link]').addEventListener('click', async (ev) => {
+        try { await navigator.clipboard.writeText(dlg.querySelector('[data-texto-link]').value); ev.target.textContent = 'Copiado ✓'; } catch { dlg.querySelector('[data-texto-link]').select(); }
+      });
+    },
+  });
+}
+
 /** Botão "Aprovar" da página da ficha (operador ou administrador). */
 export const ACOES_FICHAS = {
+  /** Cria o link da pessoa na nuvem (com a ficha em PDF para baixar), guarda na ficha e mostra para copiar ou mandar. */
+  async gerarLinkFicha({ id, pessoa }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode gerar o link da ficha.');
+    if (!E.nuvem) throw new C.ErroUsuario('A ficha pela internet só funciona no sistema na nuvem.');
+    const f = buscar('fichas', id);
+    if (!f || !FO.pessoasDaFicha(f).includes(pessoa)) throw new C.ErroUsuario('Ficha ou pessoa não encontrada.');
+    const link = await FO.criarLinkNaNuvem(FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)));
+    // a ficha em PDF (com o que já se sabe) para quem prefere imprimir; sem ela, o link funciona do mesmo jeito
+    try {
+      const tipo = pessoa === 'interessado' ? 'ficha' : 'ficha_fiador';
+      const pdf = await pdfDoRecibo(tipo, { ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: Number(pessoa.slice(6)) } : {}) });
+      await FO.guardarPdfNaNuvem(f.id, pessoa, pdf.blob);
+    } catch (e) { console.warn('ficha em PDF do link', e); }
+    const guardado = { url: link.url, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login() };
+    await alterar((db) => R.atualizar(db, 'fichas', f.id, { links_ficha: { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}), [pessoa]: guardado } }, login(),
+      `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} gerado (vale até ${dataBr(link.vence_em.slice(0, 10))})`));
+    await mostrar();
+    await janelaDoLink(buscar('fichas', id), pessoa, guardado);
+  },
+  /** Traz para a ficha os dados do último envio pelo link (só os preenchidos) e marca os documentos recebidos. */
+  async trazerRespostaFicha({ id, pessoa }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode mudar a ficha.');
+    const f = buscar('fichas', id);
+    const l = (await FO.linksNaNuvem(id)).find((x) => x.pessoa === pessoa);
+    const ultimo = l && (l.respostas || []).at(-1);
+    if (!f || !ultimo) throw new C.ErroUsuario('Não há dados enviados por este link.');
+    const sugestao = FO.dadosParaFicha(f, l);
+    const dif = diferencasDoEnvio(f, l);
+    const marcas = [['doc_ficha', 'Ficha cadastral assinada'], ['doc_pessoais', 'Documentos pessoais'], ['doc_renda', 'Comprovante de renda'], ['doc_residencia', 'Comprovante de residência']]
+      .filter(([k]) => sugestao[k] && !f[k]);
+    // a equipe escolhe: cada dado que muda (desmarque o que a ficha já tem certo) e as marcas de documento recebido
+    const resp = await janela({
+      titulo: `Trazer para a ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Trazer os marcados',
+      html: `${dif.length ? `<p><b>Dados</b> (desmarque o que a ficha já tem certo):</p>${dif.map((x) => `<p><label class="check"><input type="checkbox" name="campo" value="${esc(x.campo.nome)}" checked> ${esc(x.campo.rotulo)}: ${valorDoCampo(x.campo, x.na_ficha)} → <b>${valorDoCampo(x.campo, x.enviado)}</b></label></p>`).join('')}` : '<p>Os dados enviados já estão na ficha.</p>'}
+        ${marcas.length ? `<p><b>Marcar como recebido</b> (só o que está completo e conferido; veja os avisos de cada documento):</p>${marcas.map(([k, t]) => `<p><label class="check"><input type="checkbox" name="marca" value="${k}"> ${esc(t)}</label></p>`).join('')}` : ''}`,
+    });
+    if (!resp) return;
+    const campos = new Set(resp.campo || []);
+    const dados = Object.fromEntries([...Object.entries(sugestao).filter(([k]) => campos.has(k)), ...(resp.marca || []).map((k) => [k, true])]);
+    await alterar((db) => {
+      const atual = R.buscar(db, 'fichas', f.id);
+      const links = { ...(atual.links_ficha || {}) };
+      links[pessoa] = { ...(links[pessoa] || {}), trazido_em: ultimo.em };
+      R.atualizar(db, 'fichas', f.id, { ...dados, links_ficha: links }, login(), `Dados enviados pelo link por ${FO.nomeDaPessoa(f, pessoa)} trazidos para a ficha`);
+    });
+    FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, visto: true }).catch(() => {});
+    aviso(`Dados de ${FO.nomeDaPessoa(f, pessoa)} trazidos para a ficha. Confira e, se estiver tudo certo, mande a ficha para assinar.`);
+    await mostrar();
+  },
+  /** Marca na nuvem o que falta (a pessoa vê no link) e abre a mensagem para avisar. */
+  async pedirDocumentoFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    const l = f && (await FO.linksNaNuvem(id)).find((x) => x.pessoa === pessoa);
+    if (!l) throw new C.ErroUsuario('Gere o link antes.');
+    const docs = FO.documentosDoLink(f, l);
+    const resp = await janela({
+      titulo: `O que falta: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Pedir pelo link',
+      html: `<p>A pessoa vê a lista no link e manda por lá.</p>${docs.map((t, k) => `<p><label class="check"><input type="checkbox" name="doc" value="${k}"> ${esc(t)}</label></p>`).join('')}
+        <p><label>Outro (escreva)</label><textarea name="outro" rows="2"></textarea></p>`,
+    });
+    if (!resp) return;
+    const faltando = [...(resp.doc || []).map((k) => docs[Number(k)]), ...String((resp.outro || [])[0] || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)];
+    if (!faltando.length) throw new C.ErroUsuario('Marque ou escreva o que falta.');
+    await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Falta documento', faltando });
+    aviso('Pedido registrado no link.');
+    const link = linkValido(f, pessoa);
+    if (link) await janelaDoLink(f, pessoa, link, { lembrete: true, faltando });
+    await mostrar();
+  },
+  /** Gera a ficha em PDF com os dados de agora, guarda no link e pede a assinatura (gov.br ou à mão). */
+  async mandarAssinarFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+    const tipo = pessoa === 'interessado' ? 'ficha' : 'ficha_fiador';
+    const pdf = await pdfDoRecibo(tipo, { ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: Number(pessoa.slice(6)) } : {}) });
+    await FO.guardarPdfNaNuvem(f.id, pessoa, pdf.blob);
+    await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Assinar', faltando: [] });
+    aviso('A ficha com os dados de agora está no link para assinar.');
+    const link = linkValido(f, pessoa);
+    if (link) await janelaDoLink(f, pessoa, link, { lembrete: true, faltando: ['assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)'] });
+    await mostrar();
+  },
+  async lembrarFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    const l = f && linkValido(f, pessoa);
+    if (!l) throw new C.ErroUsuario('O link venceu: gere um novo na página da ficha.');
+    await janelaDoLink(f, pessoa, l, { lembrete: true });
+    // a contagem de "sem resposta" do Painel recomeça do lembrete
+    await alterar((db) => {
+      const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
+      links[pessoa] = { ...links[pessoa], lembrado_em: new Date().toISOString() };
+      R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Lembrete da ficha mandado a ${FO.nomeDaPessoa(f, pessoa)}`);
+    });
+    await mostrar();
+  },
+  async encerrarLinkFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+    await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Encerrado' });
+    await alterar((db) => {
+      const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
+      if (links[pessoa]) links[pessoa] = { ...links[pessoa], vence_em: new Date().toISOString(), encerrado: true };
+      R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} encerrado`);
+    });
+    aviso('Link encerrado.');
+    await mostrar();
+  },
+  async ligarAvisoFicha() {
+    await FO.ligarAviso();
+    aviso('Pronto: este aparelho avisa quando chegar algo pelos links da ficha.');
+    await mostrar();
+  },
+  async desligarAvisoFicha() {
+    await FO.desligarAviso();
+    aviso('Aviso desligado neste aparelho.');
+    await mostrar();
+  },
+  async compartilharLinkFicha({ id, pessoa }) {
+    const f = buscar('fichas', id);
+    const l = f && linkValido(f, pessoa);
+    if (!l) throw new C.ErroUsuario('O link venceu: gere um novo.');
+    await janelaDoLink(f, pessoa, l);
+  },
   /**
    * Desistência antes de assinar: pergunta a data e o motivo, leva os arquivos do contrato não assinado para a pasta da
    * ficha, grava (ficha "Desistiu", contrato cancelado) e só então apaga os originais.

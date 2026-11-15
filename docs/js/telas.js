@@ -21,7 +21,7 @@ import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, t
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
-import { alertaFichas, telaFicha } from './telas/fichas.js';
+import { alertaFichas, ligarFichaOnline, telaFicha } from './telas/fichas.js';
 import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
@@ -48,6 +48,7 @@ export const TELAS = {
     ligarCamposAutomaticos(raiz);
     ligarEditorIcone(raiz);
     ligarGarantiasCorrigidas(raiz);
+    ligarFichaOnline(raiz);
     ligarIndiceBancoCentral(raiz);
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];
