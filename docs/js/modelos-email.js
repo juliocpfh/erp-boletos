@@ -261,7 +261,7 @@ Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qual
   {
     chave: 'saida_chaves', nome: 'Devolução das chaves e vistoria de saída', etapa: 'Devolução das chaves',
     assunto: 'Vistoria de saída e devolução das chaves – {imovel}',
-    anexos: 'Vistoria de saída, termo de devolução das chaves e orçamentos (PDF)',
+    anexos: 'Vistoria de saída e orçamentos (PDF)', prontos: ['assinado:chaves_saida'],
     perguntas: [['pendencias', 'Pendências da vistoria (uma por linha, com o orçamento)', 'area']],
     texto: `Olá, {nome},
 

@@ -8,6 +8,8 @@
 //   recebe (Código Civil, arts. 319 e 320).
 // - O locador deve dar recibo discriminado do que o locatário paga; é proibida a quitação genérica (Lei 8.245/91, art. 22, VI).
 // - Caução em dinheiro: até 3 aluguéis, em caderneta de poupança, com os rendimentos para o locatário (Lei 8.245/91, art. 38, § 2º).
+// - Receber as chaves não dá quitação: o locatário responde pelo estado do imóvel e pelos débitos até a entrega (Lei 8.245/91,
+//   art. 23, III); a vistoria de saída e o acerto final vêm depois (revisão jurídica, B3 e B4).
 // - Documentos pessoais da ficha reprovada são apagados; os comprovantes de dinheiro ficam (LGPD, art. 16, I).
 import * as C from './calculos.js';
 import * as K from './contratos.js';
@@ -21,6 +23,7 @@ export const TIPOS_RECIBO = {
   reserva: 'Recibo da reserva',
   devolucao_reserva: 'Termo de devolução da reserva',
   garantia: 'Recibo da garantia',
+  devolucao_chaves: 'Termo de devolução das chaves',
   quitacao: 'Termo de quitação',
   ficha: 'Ficha cadastral',
   ficha_fiador: 'Ficha cadastral do fiador',
@@ -101,6 +104,10 @@ export function reciboDisponivel(d, tipo, alvo) {
     if (!c) return { ok: false, motivo: 'O recibo da garantia é do contrato.' };
     if (!R.temCaucao(c) && !R.temDeposito(c)) return { ok: false, motivo: 'O contrato não tem caução nem depósito em dinheiro.' };
     return garantiaPaga(d, c) ? { ok: true } : { ok: false, motivo: 'Registre antes o depósito da garantia (data e comprovante).' };
+  }
+  if (tipo === 'devolucao_chaves') {
+    if (!c) return { ok: false, motivo: 'O termo de devolução das chaves é do contrato.' };
+    return c.data_saida ? { ok: true } : { ok: false, motivo: 'Informe antes a data de saída.' };
   }
   if (tipo === 'quitacao') {
     if (!c) return { ok: false, motivo: 'O termo de quitação é do contrato.' };
@@ -193,6 +200,8 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     };
   }
 
+  if (tipo === 'devolucao_chaves') return termoDevolucaoChaves(d, c, base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
+
   // quitacao: entrega do imóvel, acerto final e quitação recíproca, com os valores discriminados
   const enc = R.encerramentoDo(d, c.id);
   const vist = K.resultadoVistoriaSaida(d, c);
@@ -224,6 +233,44 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     ],
     assinaturas: [assinaEmpresa, assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
     arquivo: nomeArq('Termo quitacao', enc.garantia_devolvida_em || enc.data_saida),
+  };
+}
+
+/** Chaves e controles do contrato: os da vistoria de saída, senão os da vistoria de entrada, senão os do imóvel. */
+function chavesDaSaida(d, c) {
+  const linhas = (t) => String(t || '').split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  const saida = R.vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída');
+  const entrada = K.vistoriaDeEntrada(d, c);
+  const i = R.buscar(d, 'imoveis', c.imovel_id) || {};
+  for (const t of [saida && saida.chaves, entrada && entrada.chaves, i.chaves]) if (linhas(t).length) return linhas(t);
+  return [];
+}
+
+/**
+ * Termo de devolução das chaves (B4), assinado no dia da devolução: a relação das chaves, a vistoria de saída marcada (B3) e a
+ * ressalva de que receber as chaves não dá quitação. Ex.: saída em 10/03/2027, vistoria marcada para 12/03/2027 às 14:00.
+ */
+function termoDevolucaoChaves(d, c, base, x) {
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  const chaves = chavesDaSaida(d, c);
+  const horas = c.finalidade === 'Não residencial' ? '48 (quarenta e oito)' : '72 (setenta e duas)';
+  const vistoria = c.vistoria_saida_data
+    ? `A vistoria de saída fica marcada para ${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? `, às ${c.vistoria_saida_hora}` : ''}, no imóvel`
+    : `A vistoria de saída será feita pela LOCADORA em até ${horas} horas desta devolução, em data e horário informados por escrito`;
+  return {
+    ...base, data: c.data_saida, titulo: 'TERMO DE DEVOLUÇÃO DAS CHAVES',
+    paragrafos: [
+      `LOCADORA: ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ''}. LOCATÁRIO: ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ''}. IMÓVEL: ${x.endereco}.`,
+      `1. DEVOLUÇÃO. Em ${C.dataBr(c.data_saida)}, às ____:____, o LOCATÁRIO devolve à LOCADORA as chaves e os controles do imóvel relacionados abaixo, que a partir deste momento volta à guarda da LOCADORA.`,
+    ],
+    tabela: [['CHAVES E CONTROLES DEVOLVIDOS', null], ...(chaves.length ? chaves.map((l) => [l, '']) : [['______________________________________________', ''], ['______________________________________________', '']])],
+    depois: [
+      `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada.`,
+      '3. SEM QUITAÇÃO. O recebimento das chaves não dá quitação. Os aluguéis e encargos até esta data, as contas de consumo e os tributos do período da locação e os reparos apontados na vistoria de saída serão apurados no acerto final, descontados da garantia, se houver, ou cobrados do LOCATÁRIO, conforme o contrato (Lei 8.245/91, artigo 23, III).',
+      '4. ALUGUEL. O aluguel e os encargos são devidos até esta data, proporcionais aos dias do mês.',
+    ],
+    assinaturas: [{ ...x.assinaEmpresa, linha: `${x.assinaEmpresa.linha} · REPRESENTANTE DA ADMINISTRADORA` }, x.assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
+    arquivo: x.nomeArq('Termo devolucao chaves', c.data_saida),
   };
 }
 

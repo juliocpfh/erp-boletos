@@ -91,7 +91,8 @@ function respostasPadrao(d, c, hoje) {
     prazo_assinatura: C.somarDias(hoje, 7),
     opcoes_entrega: c && c.data_entrada ? `${C.dataBr(c.data_entrada)} às 10h` : '',
     data_aviso: hoje,
-    data_vistoria: c && c.data_saida ? `${C.dataBr(c.data_saida)} às 10h` : '',
+    // B3: a data e a hora marcadas no roteiro da saída (sem marcar: o dia da saída, às 10h, para a equipe ajustar)
+    data_vistoria: c && c.vistoria_saida_data ? `${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : c && c.data_saida ? `${C.dataBr(c.data_saida)} às 10h` : '',
     pendencias: pend.length ? pend.map((x) => `- ${x}`).join('\n') : '- Nenhuma: o imóvel foi devolvido como na vistoria de entrada.',
     ano: String(Number(hoje.slice(0, 4)) - 1),
     prazo: '30 meses',
@@ -193,6 +194,8 @@ export function anexosProntos(d, modelo, alvo) {
       if (qual === 'aditivo') {
         const a = alvo.aditivo || null;
         if (a && a.arquivo) arquivo('aditivos', a.contrato_id, a.arquivo, `termo aditivo de ${C.dataBr(a.data)} assinado por todos`);
+      } else if (qual === 'chaves_saida' && c) {
+        arquivo('contrato', c.id, c.termo_chaves_saida, 'termo de devolução das chaves assinado');
       } else if (qual === 'quitacao' && c) {
         const e = R.encerramentoDo(d, c.id);
         if (e) arquivo('contrato', c.id, e.termo_assinado, 'termo de quitação assinado por todos');

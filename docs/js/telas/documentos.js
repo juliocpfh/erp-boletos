@@ -417,6 +417,7 @@ export function telaVistoria(rota) {
       <input type="hidden" name="id" value="${v ? v.id : ''}"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tipo" value="${tipo}">
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data)}" required></div>
+        ${tipo === 'Saída' ? `<div><label>O inquilino acompanhou?</label><select name="inquilino_presente" required>${['', ...K.PRESENCA_VISTORIA_SAIDA].map((x) => `<option value="${esc(x)}"${(v ? v.inquilino_presente || '' : '') === x ? ' selected' : ''}>${esc(x || 'Escolha…')}</option>`).join('')}</select></div>` : ''}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
       <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>

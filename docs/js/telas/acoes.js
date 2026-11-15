@@ -1035,6 +1035,24 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Roteiro da saída (B3): data e hora da vistoria de saída, para o convite por e-mail e o termo de devolução das chaves. */
+  async marcarVistoriaSaida({ id }) {
+    const c = buscar('contratos', id);
+    if (!c) throw new Error('Inquilino não encontrado.');
+    const horas = c.finalidade === 'Não residencial' ? 48 : 72;
+    const r = await janela({ titulo: `Vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
+      html: `<p>Saída em <b>${dataBr(c.data_saida)}</b>. O contrato prevê a vistoria em até ${horas} horas da devolução das chaves, com o inquilino convidado por escrito. Depois de salvar, mande o convite pelo botão de e-mail da etapa.</p>
+        <label>Data da vistoria</label><input type="date" name="data" value="${esc(c.vistoria_saida_data || c.data_saida || C.hojeIso())}" required>
+        <label>Hora</label><input type="time" name="hora" value="${esc(c.vistoria_saida_hora || '10:00')}" required>
+        ${c.vistoria_saida_data ? '<p class="check"><label><input type="checkbox" name="desmarcar" value="1"> Desmarcar a data</label></p>' : ''}` });
+    if (!r) return;
+    const desmarcar = String((r.desmarcar || [])[0] || '') === '1';
+    const data = desmarcar ? '' : String((r.data || [])[0] || '');
+    await mudarContrato(c.id, (db) => R.marcarVistoriaSaida(db, c.id, data, String((r.hora || [])[0] || ''), login()));
+    aviso(data ? `Vistoria marcada para ${dataBr(data)}. Mande o convite ao inquilino (botão de e-mail da etapa).` : 'Data da vistoria desmarcada.');
+    await mostrar();
+  },
+
   /** Roteiro da saída (D6): marca a garantia como devolvida (ou o saldo cobrado) no cálculo final. */
   /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
   async arquivoFisico({ id, desfazer }) {

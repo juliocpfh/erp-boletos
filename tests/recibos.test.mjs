@@ -201,3 +201,26 @@ test('tipos de renda: cada opção do formulário tem a sua lista de documentos'
   assert.equal(dados.fiador1_nome, 'Ana Lima');
   assert.ok(F.CAMPOS_FIADOR_FICHA.every((k) => F.CAMPOS_FIADOR.some((c) => c.nome === k)));
 });
+
+test('termo de devolução das chaves (B4): só com a data de saída; chaves, vistoria marcada (B3) e sem quitação', () => {
+  const { d, c } = base();
+  assert.match(reciboDisponivel(d, 'devolucao_chaves', { contrato: c }).motivo, /data de saída/);
+  R.informarSaida(d, c.id, '2029-05-14', 'j');
+  let r = montarRecibo(d, 'devolucao_chaves', { contrato: c }, '2029-05-14');
+  assert.equal(r.titulo, 'TERMO DE DEVOLUÇÃO DAS CHAVES');
+  assert.match(r.paragrafos[1], /Em 14\/05\/2029, às ____:____, o LOCATÁRIO devolve/);
+  assert.equal(r.tabela.length, 3); // título + 2 linhas em branco (sem relação de chaves)
+  assert.match(r.depois[0], /em até 72 \(setenta e duas\) horas/);
+  assert.match(r.depois[1], /não dá quitação.*artigo 23, III/);
+  R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Entrada', data: '2026-11-14', itens: [], chaves: '02 Chaves da porta\n01 Controle do portão' }, 'j');
+  R.marcarVistoriaSaida(d, c.id, '2029-05-16', '14:00', 'j');
+  r = montarRecibo(d, 'devolucao_chaves', { contrato: R.buscar(d, 'contratos', c.id) }, '2029-05-14');
+  assert.deepEqual(r.tabela.slice(1).map((x) => x[0]), ['02 Chaves da porta', '01 Controle do portão']);
+  assert.match(r.depois[0], /marcada para 16\/05\/2029, às 14:00/);
+  assert.deepEqual(r.assinaturas.map((a) => a.nome), ['ANK ADMINISTRADORA DE BENS LTDA', 'Maria Souza', 'João Souza']);
+  // o e-mail da devolução das chaves anexa o termo assinado e o do convite já vem com a data marcada
+  const cc = R.buscar(d, 'contratos', c.id);
+  cc.termo_chaves_saida = 'termo-devolucao-chaves-2029-05-14.pdf';
+  assert.match(anexosProntos(d, modeloEmail(d, 'saida_chaves'), { contrato: cc }).map((x) => x.rotulo).join(), /termo de devolução das chaves assinado/);
+  assert.equal(dadosDoEmail(d, { contrato: cc }).perguntas.data_vistoria, '16/05/2029 às 14:00');
+});

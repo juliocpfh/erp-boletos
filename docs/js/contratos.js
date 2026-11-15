@@ -854,6 +854,9 @@ export function textoVistoriaSaida(d, c, encerramento) {
   return guardado === 'Contestada' ? `${r.texto} (contestada pelo inquilino)` : r.texto;
 }
 
+/** Vistoria de saída (B3): se o inquilino acompanhou. */
+export const PRESENCA_VISTORIA_SAIDA = ['Acompanhou', 'Mandou representante', 'Não veio'];
+
 export const FOTOS_VISTORIA = [['fachada', 'Fachada'], ['agua', 'Relógio de água'], ['energia', 'Relógio de energia'], ['gas', 'Relógio de gás'], ['disjuntores', 'Quadro de disjuntores']];
 
 /** Modelo de vistoria do imóvel (texto): "## Cômodo" e um item por linha. Linha terminada em ":" (ex.: "Móvel:") fica de fora. */
@@ -933,6 +936,8 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
   }
   blocos.push({ tipo: 'secao', runs: negritos('CONDIÇÕES GERAIS') }, ...linhasDe(v.condicoes).map(it));
   if (!saida) blocos.push(...linhasDe(String(v.texto_final || '').trim() || vistoriaFinal(v.prazo_dias || 3)).map(it));
+  // B3: quem acompanhou a vistoria de saída; sem o locatário, o prazo para contestar o relatório enviado por e-mail
+  if (saida && v.inquilino_presente) blocos.push(it(v.inquilino_presente === 'Não veio' ? 'O LOCATÁRIO, convidado por escrito, não compareceu. Este relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar.' : `Vistoria acompanhada pelo LOCATÁRIO${v.inquilino_presente === 'Mandou representante' ? ', por pessoa autorizada por escrito' : ''}.`));
   blocos.push({ tipo: 'direita', runs: negritos(`${dados.campos.cidade}, ${dados.campos.data_assinatura}.`) });
   blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas.filter((a) => !a.papel.startsWith('TESTEMUNHA')) });
   return { blocos, rodape: dados.rodape };
