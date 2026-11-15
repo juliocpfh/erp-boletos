@@ -30,7 +30,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 9. Nomes dos campos e caminhos da API do C6 só via `docs/js/mapa-c6.js` (cópia idêntica `ponte-c6/mapa-c6.mjs`; `tests/banco.test.mjs` confere). A ponte nunca registra pagamento sozinha: propõe e o usuário confirma.
 
 ## Fluxo de trabalho com o usuário
-- O usuário é o dono do negócio, fala português e não é programador: respostas curtas, sem jargão, com exemplos de datas e valores.
+- O usuário é o dono do negócio, fala português e não é programador: respostas **sempre em português** (nunca em inglês, nem resumos ou tabelas), curtas, sem jargão, com exemplos de datas e valores.
 - Antes de mudar uma regra de negócio, confirme o entendimento com um exemplo numérico.
 - PR só quando o usuário pedir. A versão PC (`docs/offline/`) é gerada pelo GitHub a cada merge na `main` (`.github/workflows/versao-pc.yml`): não a gere nem a envie nas PRs. Commits em português (título + tópicos `- `).
 - Teste no navegador o que mudou na tela (Playwright, se disponível, no modo `?teste`) e diga o resultado.
