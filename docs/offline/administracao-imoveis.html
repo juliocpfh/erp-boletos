@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-dyXnuD/7aqfKMn+OrVau5Qd5didu4P5l48XoMzWGq8Q='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-bvrtjhBU20aexJjg0zKSEOdVuwIxwkD2Z8CpydIgENs=' 'sha256-i+w2n7GF8jEMqpi/kTje/cr9/JI2x/LPm8lQ6dMqWdk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="78b4a23b5a8781c4">
+<meta name="fontes" content="42bcadbc766deb33">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -11878,6 +11878,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           this.naoEnviados = [];
           this.avisos = [];
           this.enviando = null;
+          this.aoMudar = null;
         }
         async pedir(metodo, rota, { corpo, cabecalhos = {} } = {}) {
           let r;
@@ -12002,22 +12003,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
             }
             return l;
           };
+          for (const a of await this.listaCrua(partes)) {
+            const p2 = a.caminho.split("/");
+            let chave = raiz;
+            for (let i = 0; i < p2.length - 1; i += 1) {
+              pasta(chave).pastas.add(p2[i]);
+              chave = `${chave}/${p2[i]}`;
+            }
+            pasta(chave).arquivos.set(p2.at(-1), a.tamanho);
+          }
+          return arvore;
+        }
+        /** Todos os arquivos dentro de `partes`, como a nuvem lista: [{ caminho (relativo), tamanho, alterado }]. Falha lança. */
+        async listaCrua(partes) {
+          const todos = [];
           let cursor;
           for (let n = 0; n < 1e3; n += 1) {
             const r = await (await this.pedir("GET", `lista-tudo/${codificar(partes)}/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`)).json();
-            for (const a of r.arquivos) {
-              const p2 = a.caminho.split("/");
-              let chave = raiz;
-              for (let i = 0; i < p2.length - 1; i += 1) {
-                pasta(chave).pastas.add(p2[i]);
-                chave = `${chave}/${p2[i]}`;
-              }
-              pasta(chave).arquivos.set(p2.at(-1), a.tamanho);
-            }
+            todos.push(...r.arquivos);
             if (!r.mais) break;
             cursor = r.cursor;
           }
-          return arvore;
+          return todos;
         }
         /** A árvore de ``raiz`` (ou acima dela) veio por inteiro há menos de VALIDADE_LISTA? */
         tudoFresco(chave) {
@@ -12070,6 +12077,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           try {
             await this.pedir("PUT", codificar(partes), { corpo: blob });
             this.anotarNaLista(partes, blob.size);
+            this.aoMudar?.();
           } catch (e) {
             if (!passageiro(e) || !this.guardar) throw e;
             const fila = await this.carregarFila();
@@ -12101,6 +12109,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
             if (e.status !== 404) throw e;
           }
           this.esquecerLista(pasta ? partes : partes.slice(0, -1));
+          this.aoMudar?.();
         }
         async mover(de, para) {
           try {
@@ -12122,6 +12131,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           }
           this.esquecerLista(de);
           this.esquecerLista(para);
+          this.aoMudar?.();
         }
         /**
          * Sobe os anexos guardados sem internet. Se outro aparelho gravou um arquivo com o mesmo nome no meio tempo,
@@ -12154,6 +12164,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
               this.fila = this.fila.filter((x) => x.id !== f.id);
               await this.gravarFila();
               this.esquecerLista(f.partes.slice(0, -1));
+              if (!recusado) this.aoMudar?.();
             }
           })();
           try {
@@ -13667,6 +13678,10 @@ O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lug
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
 - ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 
+SEM CIFRAR (para abrir, imprimir e copiar no Windows):
+- Arquivos dos imoveis/   copia aberta dos arquivos do sistema (imovel -> Inquilinos -> pessoa), atualizada sozinha.
+  E so para consulta: o que for posto ou mudado ali NAO vai para o sistema (anexe sempre pelo sistema).
+
 SE O SITE OU O CLOUDFLARE CAIREM (ou sem internet):
 Abra o sistema pelo icone do aplicativo instalado (ou pelo endereco de sempre no Chrome). Ele abre com os dados da
 ultima vez que este computador esteve conectado; trabalhe normalmente: o que voce fizer sobe sozinho quando o site voltar.
@@ -13973,6 +13988,97 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
 
   // docs/js/app.js
   init_calculos();
+
+  // docs/js/copia-aberta.js
+  var PASTA_COPIA = "Arquivos dos imoveis";
+  var ARQUIVO_COPIA = "copia-aberta.json";
+  var PROIBIDOS = /[<>:"|?*]/g;
+  var RESERVADOS = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
+  function nomeWindows(parte) {
+    let t = String(parte).replace(PROIBIDOS, "_").replace(/[. ]+$/, "");
+    if (!t) t = "_";
+    if (RESERVADOS.test(t)) t = `_${t}`;
+    return t;
+  }
+  var caminhoLocal = (caminho) => caminho.split("/").map(nomeWindows);
+  function planoCopia(nuvem, anterior = {}) {
+    const atual = {};
+    const baixar2 = [];
+    for (const a of nuvem) {
+      const info = { tamanho: a.tamanho, alterado: a.alterado || "" };
+      atual[a.caminho] = info;
+      const ant = anterior[a.caminho];
+      if (!ant || ant.tamanho !== info.tamanho || (ant.alterado || "") !== info.alterado) baixar2.push(a.caminho);
+    }
+    const apagar = Object.keys(anterior).filter((c) => !(c in atual));
+    return { baixar: baixar2, apagar, atual };
+  }
+  async function lerRegistro(dir) {
+    try {
+      return JSON.parse(await (await (await dir.getFileHandle(ARQUIVO_COPIA)).getFile()).text());
+    } catch {
+      return null;
+    }
+  }
+  async function gravarRegistro(dir, reg) {
+    const w = await (await dir.getFileHandle(ARQUIVO_COPIA, { create: true })).createWritable();
+    await w.write(JSON.stringify(reg));
+    await w.close();
+  }
+  async function situacaoCopia(dir) {
+    const r = await lerRegistro(dir);
+    return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0 } : null;
+  }
+  async function pastaDe(dir, partes, criar) {
+    let p2 = dir;
+    for (const parte of partes) p2 = await p2.getDirectoryHandle(parte, { create: criar });
+    return p2;
+  }
+  async function atualizarCopia(dir, { listar: listar2, ler: ler2, aoAndar = () => {
+  }, por = "site" }) {
+    const reg = await lerRegistro(dir) || { arquivos: {} };
+    const arquivos = { ...reg.arquivos || {} };
+    const { baixar: baixar2, apagar, atual } = planoCopia(await listar2(), arquivos);
+    const raiz = await dir.getDirectoryHandle(PASTA_COPIA, { create: true });
+    const salvar = (falhas2) => gravarRegistro(dir, { atualizado_em: (/* @__PURE__ */ new Date()).toISOString(), por, falhas: falhas2, arquivos });
+    let falhas = 0;
+    let feitos = 0;
+    const total = baixar2.length + apagar.length;
+    for (const c of apagar) {
+      const p2 = caminhoLocal(c);
+      try {
+        const pai = await pastaDe(raiz, p2.slice(0, -1), false);
+        await pai.removeEntry(p2.at(-1));
+      } catch {
+      }
+      for (let i = p2.length - 1; i >= 1; i -= 1) {
+        try {
+          await (await pastaDe(raiz, p2.slice(0, i - 1), false)).removeEntry(p2[i - 1]);
+        } catch {
+          break;
+        }
+      }
+      delete arquivos[c];
+      aoAndar({ feitos: feitos += 1, total });
+    }
+    for (const c of baixar2) {
+      const p2 = caminhoLocal(c);
+      try {
+        const blob = await ler2(c);
+        const w = await (await (await pastaDe(raiz, p2.slice(0, -1), true)).getFileHandle(p2.at(-1), { create: true })).createWritable();
+        await w.write(blob);
+        await w.close();
+        arquivos[c] = atual[c];
+      } catch {
+        falhas += 1;
+      }
+      feitos += 1;
+      aoAndar({ feitos, total });
+      if (feitos % 50 === 0) await salvar(falhas);
+    }
+    await salvar(falhas);
+    return { baixados: baixar2.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
+  }
 
   // docs/js/fatura.js
   init_calculos();
@@ -23871,6 +23977,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
     }
     const lista3 = await listarBackups(E.seguro.dir);
+    const copia2 = await situacaoCopia(E.seguro.dir);
     const ultimo = (pasta) => lista3.find((x) => x.pasta === pasta);
     const quando3 = (x) => x ? dataHoraBr(x.alterado) : "nenhum ainda";
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
@@ -23885,6 +23992,15 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       <div class="acoes">${botao("backupCompletoAgora", "Fazer backup completo agora", {}, "")}
         ${botao("desconectarSeguro", "Desligar neste computador", {}, "perigo pequeno", "Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.")}</div>
       <div id="progresso-backup" aria-live="polite"></div></div>
+    <div class="cartao"><h2>Cópia aberta dos arquivos</h2>
+      <p>Na pasta segura, a subpasta <b>${PASTA_COPIA}</b> tem os arquivos do sistema <b>sem cifrar</b>, como no sistema (imóvel → Inquilinos → pessoa), para abrir, imprimir e copiar direto no Windows. É só para consulta: o que for posto ou mudado lá não vai para o sistema (anexe sempre pelo sistema).</p>
+      ${E.nuvem ? `<div class="grade">
+        ${item("Arquivos na cópia", copia2 ? String(copia2.total) : "ainda não feita")}
+        ${item("Atualizada em", copia2 ? `${dataHoraBr(copia2.atualizado_em)} (${copia2.por === "atualizador" ? "pelo atualizador do PC" : "por este computador"})` : "-")}
+        ${copia2 && copia2.falhas ? item("Ficaram para a próxima", `${copia2.falhas} arquivo(s) não baixaram`) : ""}</div>
+      <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
+      <div class="acoes">${botao("atualizarCopiaAberta", "Atualizar a pasta agora", {}, "secundario")}</div>
+      <div id="progresso-copia" aria-live="polite"></div>` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista3.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
@@ -25803,6 +25919,16 @@ Sair mesmo assim?`)) return;
       }
       if (E.seguroErro) throw new Error(E.seguroErro);
       aviso("Backup completo gravado na pasta segura.");
+      await mostrar();
+    },
+    /** Backup seguro: atualiza agora a cópia aberta dos arquivos (copia-aberta.js). */
+    async atualizarCopiaAberta() {
+      const caixa = document.getElementById("progresso-copia");
+      const r = await atualizarCopiaAberta(({ feitos, total }) => {
+        if (caixa) caixa.textContent = `Atualizando: ${feitos} de ${total}…`;
+      });
+      if (!r) throw new ErroUsuario("A cópia aberta precisa dos dados na nuvem e do backup seguro ligado neste computador.");
+      aviso(`Pasta atualizada: ${r.baixados} arquivo(s) baixado(s), ${r.apagados} tirado(s)${r.falhas ? `, ${r.falhas} ficaram para a próxima` : ""}. Total: ${r.total}.`, r.falhas ? "aviso" : "ok");
       await mostrar();
     },
     async desconectarSeguro() {
@@ -28740,6 +28866,28 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
     if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
   }
+  var filaCopia = Promise.resolve();
+  function atualizarCopiaAberta(aoAndar = () => {
+  }) {
+    const tarefa = filaCopia.then(async () => {
+      if (!E.anexos || !E.seguro || !E.seguro.chave) return null;
+      return atualizarCopia(E.seguro.dir, {
+        listar: () => E.anexos.listaCrua([PASTA_ARQUIVOS]),
+        ler: (caminho) => E.anexos.ler([PASTA_ARQUIVOS, ...caminho.split("/")]),
+        aoAndar
+      });
+    });
+    filaCopia = tarefa.catch(() => {
+    });
+    return tarefa;
+  }
+  var copiaAgendada = null;
+  function agendarCopiaAberta() {
+    clearTimeout(copiaAgendada);
+    copiaAgendada = setTimeout(() => {
+      atualizarCopiaAberta().catch(logarErro);
+    }, 2e4);
+  }
   async function rotinaSegura() {
     if (!await conectarSeguro(false) || !E.d) return;
     espelharSeguro();
@@ -28921,6 +29069,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const guardar = guardarCifrado(cru, () => E.cofrinho.chave);
     E.nuvem = new Sincronia({ api: apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: travaDoNavegador, normalizar, tabelas: TABELAS_DO_SISTEMA });
     E.anexos = new AnexosNuvem({ guardar });
+    E.anexos.aoMudar = agendarCopiaAberta;
     E.pasta = E.anexos.raiz();
     await E.anexos.carregarFila();
     E.emailNuvem = null;
