@@ -12,6 +12,8 @@ workers_dev = false
 routes = [
   { pattern = "erp.ankjck.com.br/api/*", zone_name = "ankjck.com.br" },
   { pattern = "ficha.ankjck.com.br", custom_domain = true },
+  # Painel de vendas das licenças (painel-vendas.mjs): atrás de um aplicativo próprio do Access (ACCESS_AUD_VENDAS)
+  { pattern = "vendas.ankjck.com.br", custom_domain = true },
 ]
 
 [[r2_buckets]]
@@ -22,6 +24,8 @@ bucket_name = "imoveis-dados"
 ORIGEM = "https://erp.ankjck.com.br"
 HOST_FICHA = "ficha.ankjck.com.br"
 URL_FICHA = "https://ficha.ankjck.com.br/"
+HOST_VENDAS = "vendas.ankjck.com.br"
+# Painel de vendas: ACCESS_AUD_VENDAS, GERENTES_VENDAS e LICENCA_CHAVE_PRIVADA (segredo) no painel
 # ACCESS_EQUIPE (ex.: ankjck.cloudflareaccess.com), ACCESS_AUD e EMAILS: no painel
 
 # Cofre dos dados (cofre.mjs): um Durable Object com SQLite, grátis até 5 GB
@@ -32,3 +36,12 @@ class_name = "CofreDO"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CofreDO"]
+
+# Cofre das licenças (cofre-licencas.mjs): separado dos dados dos clientes
+[[durable_objects.bindings]]
+name = "LICENCAS"
+class_name = "CofreLicencasDO"
+
+[[migrations]]
+tag = "v2-licencas"
+new_sqlite_classes = ["CofreLicencasDO"]
