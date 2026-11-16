@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-bSb5WtgGsKTNAjTNcKYFQ9IXhKmHB+h0hMSu0YZaQVs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-hMQtJ38oo9/bkQiFpvZ5ijAEHCTVLVGt8TzbXDbZPI8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7f2cf3875150eadd">
+<meta name="fontes" content="bd7912ce5083bcda">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2349,6 +2349,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     for (const [campo2, nome, feito] of DOCUMENTOS_ENTRADA) {
       const arq = c[campoArquivoDoc(campo2)];
       if (arq) poe({ vaga: `doc:${campo2}`, grupo: "contrato", rotulo: `${nome} ${feito}`, data: c[campo2] || null, escopo: "assinados", pasta: c.id, nome: arq });
+      if (campo2 === "doc_vistoria_em" && c.contra_vistoria) poe({ vaga: "contra_vistoria", grupo: "contrato", rotulo: "Contra-vistoria do inquilino", data: c.contra_vistoria_em || null, escopo: "contrato", pasta: c.id, nome: c.contra_vistoria });
     }
     for (const a of d2.aditivos.filter((x) => x.contrato_id === c.id && x.arquivo).sort((x, y) => String(x.data).localeCompare(String(y.data)) || x.id - y.id)) {
       poe({ vaga: `aditivo:${a.id}`, grupo: "contrato", rotulo: `Termo aditivo${a.numero ? ` nº ${a.numero}` : ""}${a.assunto ? ` (${a.assunto})` : a.tipo ? ` (${a.tipo.toLocaleLowerCase("pt-BR")})` : ""}`, data: a.data || null, escopo: "aditivos", pasta: c.id, nome: a.arquivo });
@@ -4362,6 +4363,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     registrarCancelamentoBancario: () => registrarCancelamentoBancario,
     registrarCancelamentoNegativacao: () => registrarCancelamentoNegativacao,
     registrarComplementoDepositado: () => registrarComplementoDepositado,
+    registrarContraVistoria: () => registrarContraVistoria,
     registrarDepositoGarantia: () => registrarDepositoGarantia,
     registrarErroBancario: () => registrarErroBancario,
     registrarLeitura: () => registrarLeitura,
@@ -6403,7 +6405,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return out;
   }
   function anexarComprovante(d2, tabela, id, campo2, arquivo, usuario) {
-    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Comprovante desconhecido.");
     if (!arquivo) throw new Error("Escolha o arquivo do comprovante.");
     const r = buscar(d2, tabela, id);
@@ -6470,7 +6472,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     sincronizarGarantiaHerdeiro(d2, c.id, usuario);
   }
   function removerAnexo(d2, tabela, id, campo2, usuario) {
-    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Este arquivo não pode ser apagado por aqui.");
     const r = buscar(d2, tabela, id);
     if (!r || !r[campo2]) throw new Error("Arquivo não encontrado.");
@@ -7195,6 +7197,32 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const x = [...cadeiaDeContratos(d2, c).antes].reverse().find((a) => a[campo2]);
     return x ? { data: x[campo2], arquivo: x[arq] || null, contrato: x } : null;
   }
+  function situacaoContraVistoria(d2, c, hoje3) {
+    if (c.contra_vistoria) return { situacao: "feita", data: c.contra_vistoria_em || null, texto: "recebida" };
+    const anterior = contratoHerdado(d2, c);
+    if (anterior) {
+      const a = [...cadeiaDeContratos(d2, c).antes].reverse().find((x) => x.contra_vistoria);
+      return { situacao: "feita", data: a ? a.contra_vistoria_em || null : null, texto: a ? `herdada de ${a.inquilino_nome}` : `herdado de ${anterior.inquilino_nome}` };
+    }
+    if (!c.data_entrada) return void 0;
+    const limite = limiteVistoriaEntrada(c.data_entrada);
+    if (hoje3 > limite) return { situacao: "pulada", data: null, texto: `não houve (prazo acabou em ${dataBr(limite)}; vistoria aceita)` };
+    return { situacao: "andamento", texto: `aguardando o inquilino até ${dataBr(limite)} (5 dias úteis da entrega das chaves)` };
+  }
+  function registrarContraVistoria(d2, contratoId, { data: data2, arquivo }, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new Error("Inquilino não encontrado.");
+    if (!data2) throw new ErroUsuario("Informe a data em que o inquilino mandou a contra-vistoria.");
+    if (!arquivo) throw new ErroUsuario("Escolha o arquivo da contra-vistoria.");
+    atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { contra_vistoria: arquivo, contra_vistoria_em: data2 },
+      usuario,
+      `${c.inquilino_nome}: contra-vistoria do inquilino recebida em ${dataBr(data2)} (${arquivo})`
+    );
+  }
   function concessionariaDaConta(d2, c, re, padrao) {
     const t = d2.titularidades.filter((x) => x.imovel_id === c.imovel_id && re.test(x.concessionaria || "")).sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))[0];
     return t && t.concessionaria || lista2(d2, "concessionarias").find((x) => re.test(x)) || padrao;
@@ -7262,6 +7290,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       },
       chaves_gerado: () => anterior ? feita(null, herdou) : jaGerado("doc_chaves_em", "termo já assinado"),
       vistoria_assinada: () => docAssinado("doc_vistoria_em", "vistoria_assinada"),
+      contra_vistoria: () => situacaoContraVistoria(d2, c, hoje3),
       chaves_assinado: () => docAssinado("doc_chaves_em", "chaves_assinado"),
       seguro: () => {
         const data2 = c.data_entrada || c.vigencia_inicio || "";
@@ -7299,7 +7328,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Seguro fiança": "Apólice do seguro fiança"
       }[c.garantia_tipo] || "Garantia (tipo não informado)" : concessionaria ? `${titulo2} (${concessionaria})` : titulo2;
       const m = marcas[chave];
-      const e = auto && auto.situacao === "feita" ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) } : m && m.pulada ? { situacao: "pulada", data: m.data, texto: "não se aplica", manual: true } : m && m.data && !doc ? { situacao: "feita", data: m.data, texto: `marcada por ${m.por || "-"}`, manual: true } : auto || { situacao: "pendente", texto: "" };
+      const e = auto && auto.situacao === "feita" ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) } : m && m.pulada ? { situacao: "pulada", data: m.data, texto: chave === "contra_vistoria" ? "não houve" : "não se aplica", manual: true } : m && m.data && !doc ? { situacao: "feita", data: m.data, texto: `marcada por ${m.por || "-"}`, manual: true } : auto || { situacao: "pendente", texto: "" };
       out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
     }
     if (ligado()) {
@@ -7371,7 +7400,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       }
     };
     for (const c of d2.contratos) {
-      for (const k of ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida"]) usa("contrato", c[`${k}_contrato`] || c.id, c[k]);
+      for (const k of ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"]) usa("contrato", c[`${k}_contrato`] || c.id, c[k]);
       for (const [campo2] of DOCUMENTOS_ENTRADA) {
         usa("assinados", c.id, c[campoArquivoDoc(campo2)]);
         usa("assinados", c.id, (c[campoParcialDoc(campo2)] || {}).arquivo);
@@ -9971,6 +10000,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         ["vistoria_gerada", "Gerar a vistoria de entrada"],
         ["chaves_gerado", "Gerar o termo de entrega das chaves"],
         ["vistoria_assinada", "Vistoria de entrada assinada", "doc_vistoria_em"],
+        // contra-vistoria (pedido do dono em 2026-11-15): o que o inquilino apontou de diferente da vistoria, no prazo da cláusula
+        ["contra_vistoria", "Contra-vistoria do inquilino"],
         ["chaves_assinado", "Termo de entrega das chaves assinado", "doc_chaves_em"],
         ...CONTAS_ENTRADA.map(([k, , t]) => [k, t]),
         ["seguro", "Contratação do seguro"]
@@ -9981,7 +10012,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         ["comprovante_deposito", "deposito-garantia", (c) => c.deposito_pago_em || c.deposito_data, "comprovante do depósito de garantia"],
         ["comprovante_reserva", "reserva", (c) => c.reserva_data, "comprovante da reserva"],
         // não é comprovante de dinheiro: o termo de devolução das chaves assinado na saída (B4), com o nome termo-devolucao-chaves-<data da saída>
-        ["termo_chaves_saida", "termo-devolucao-chaves", (c) => c.data_saida, "termo de devolução das chaves assinado"]
+        ["termo_chaves_saida", "termo-devolucao-chaves", (c) => c.data_saida, "termo de devolução das chaves assinado"],
+        // contra-vistoria de entrada mandada pelo inquilino (2026-11-15), com a data em que ele mandou
+        ["contra_vistoria", "contra-vistoria", (c) => c.contra_vistoria_em, "contra-vistoria do inquilino"]
       ];
       porDataAditivo = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
       aditivosDo = (d2, contratoId) => d2.aditivos.filter((a) => a.contrato_id === contratoId && a.arquivo).sort(porDataAditivo);
@@ -23052,6 +23085,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       return etiqueta("pendente", "perigo");
     };
     const acoes = (e) => {
+      if (e.chave === "contra_vistoria") return acoesContraVistoria(e);
       if (e.chave === "pasta_fisica") return e.situacao === "feita" ? link(`#/pasta-fisica/${c.id}`, "Ver a pasta", mini) : link(`#/pasta-fisica/${c.id}`, "Montar a pasta", e.situacao === "pendente" ? "botao mini" : mini);
       if (!opera()) return "";
       if (["feita", "pulada"].includes(e.situacao)) return e.manual ? botao("desfazerEtapaEntrada", "Desfazer", { contrato: c.id, chave: e.chave }, "link-botao") : "";
@@ -23067,8 +23101,19 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
         <input type="date" name="data" value="${hoje3}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
     };
-    const limite = c.data_entrada ? limiteVistoriaEntrada(c.data_entrada) : null;
-    const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ""}${e.chave === "vistoria_assinada" && limite && hoje3 <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (5 dias úteis da entrega das chaves).</span>` : ""}`;
+    function acoesContraVistoria(e) {
+      if (c.contra_vistoria) {
+        return linkComprovante(c.id, c.contra_vistoria, { tabela: "contratos", id: c.id, campo: "contra_vistoria", tipo: "contra-vistoria", data: c.contra_vistoria_em }).replace("📎 comprovante", "📎 contra-vistoria").replace("anexar comprovante", "anexar a contra-vistoria").replace("Apagar o comprovante", "Apagar a contra-vistoria");
+      }
+      if (!opera() || anterior) return "";
+      if (e.manual) return botao("desfazerEtapaEntrada", "Desfazer", { contrato: c.id, chave: e.chave }, "link-botao");
+      return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
+        <input type="date" name="data" value="${hoje3}" style="width:auto" title="Data em que o inquilino mandou">
+        <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+        <button class="secundario mini">Anexar</button></form>
+      ${e.situacao === "pulada" ? "" : botao("pularEtapaEntrada", "Não houve", { contrato: c.id, chave: e.chave }, "link-botao")}</div>`;
+    }
+    const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ""}`;
     const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join("")}</table></div>`;
     const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
@@ -23337,7 +23382,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
   }
   var xAnexo = (acao, dados, confirmar) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
-  var ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+  var ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
   var linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || "")}"></label>` : etiqueta("sem comprovante", "aviso");
   var fiadoresMudancas = { novos: [], alterados: [] };
@@ -28341,6 +28386,17 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
       const nome = await salvarAssinado("assinados", Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
       await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
+      await mostrar();
+    },
+    /** Rotina de entrada: contra-vistoria do inquilino (data em que ele mandou e o arquivo, na pasta do inquilino). */
+    async contraVistoria(form) {
+      const f = Object.fromEntries(new FormData(form));
+      if (!f.data) throw new ErroUsuario("Informe a data em que o inquilino mandou a contra-vistoria.");
+      const arq = form.querySelector("[name=arquivo]").files[0];
+      if (!arq) throw new ErroUsuario("Escolha o arquivo da contra-vistoria (PDF, foto ou o e-mail salvo em PDF).");
+      const nome = await salvarArquivo(await pastaDoEscopo("contrato", Number(f.contrato)), new File([arq], nomeComprovante2("contra-vistoria", f.data, arq)));
+      await alterarApagandoAnexos((db) => registrarContraVistoria(db, Number(f.contrato), { data: f.data, arquivo: nome }, login()));
+      aviso("Contra-vistoria anexada.");
       await mostrar();
     },
     /** Rotina de entrada: marca a etapa como feita na data escolhida. */
