@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-9HqA0bKNZUl36bFMgjnwsKvho/9CrwX9yxJvUqRwolQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-9+O0/u4OeJl3bWkcoRyHfrqFjX3m3w+Uy1pLNyn/hks='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="41ae354fe1fb9dbc">
+<meta name="fontes" content="cf4a88f4de85592c">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2419,7 +2419,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return itensDaPasta(d2, a, soltos).filter((i) => !reg.has(i.vaga));
   }
   function situacaoPasta(d2, c, hoje3 = hojeIso(), soltos = null) {
-    const itens = itensDaPasta(d2, c, soltos);
+    const itens = itensDaPasta(d2, c, soltos || soltosConhecidos.get(c.id) || null);
     const reg = registrados(d2, c.id);
     const montada = pastaMontada(d2, c.id);
     const anterior = herancaPendente(d2, c, hoje3);
@@ -2516,13 +2516,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       `${c.inquilino_nome}: pasta física (${MOMENTOS[momento]}) · ${[resumo(l), pastaAnterior && `pasta de ${buscar(d2, "contratos", pastaAnterior.contrato_id).inquilino_nome} posta dentro`].filter(Boolean).join("; ")}`
     );
   }
-  var ligado, GRUPOS_PASTA, MOMENTOS, MONTADA, semAcento2, RENDA, PESSOA, PAGAMENTO, montagensDe, pastaMontada, saidaFechada, guardarAte;
+  var ligado, soltosConhecidos, anotarSoltos, GRUPOS_PASTA, MOMENTOS, MONTADA, semAcento2, RENDA, PESSOA, PAGAMENTO, montagensDe, pastaMontada, saidaFechada, guardarAte;
   var init_arquivo_impresso = __esm({
     "docs/js/arquivo-impresso.js"() {
       init_calculos();
       init_config_regras();
       init_regras();
       ligado = () => !!regra("arquivo_impresso");
+      soltosConhecidos = /* @__PURE__ */ new Map();
+      anotarSoltos = (contratoId, nomes) => {
+        soltosConhecidos.set(Number(contratoId), [...nomes]);
+      };
       GRUPOS_PASTA = [
         ["contrato", "Contrato e termos"],
         ["pessoa", "Documentos da pessoa"],
@@ -18815,6 +18819,7 @@ Salvar assim mesmo?`)) {
     garantia: "Recibo da garantia",
     devolucao_chaves: "Termo de devolução das chaves",
     quitacao: "Termo de quitação",
+    acordo: "Termo de confissão de dívida e acordo",
     ficha: "Ficha cadastral",
     ficha_fiador: "Ficha cadastral do fiador"
   };
@@ -18881,6 +18886,12 @@ Salvar assim mesmo?`)) {
     if (tipo === "devolucao_chaves") {
       if (!c) return { ok: false, motivo: "O termo de devolução das chaves é do contrato." };
       return c.data_saida ? { ok: true } : { ok: false, motivo: "Informe antes a data de saída." };
+    }
+    if (tipo === "acordo") {
+      if (!c) return { ok: false, motivo: "O termo do acordo é do contrato." };
+      const a = acordoDe(d2, c, alvo);
+      if (!a) return { ok: false, motivo: "Acordo não encontrado." };
+      return a.desfeito_em ? { ok: false, motivo: "Este acordo foi desfeito." } : { ok: true };
     }
     if (tipo === "quitacao") {
       if (!c) return { ok: false, motivo: "O termo de quitação é do contrato." };
@@ -18961,6 +18972,7 @@ Salvar assim mesmo?`)) {
         arquivo: nomeArq(caucao ? "Recibo caucao" : "Recibo deposito garantia", g.data)
       };
     }
+    if (tipo === "acordo") return termoDoAcordo(d2, c, acordoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     if (tipo === "devolucao_chaves") return termoDevolucaoChaves(d2, c, base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     const enc = encerramentoDo(d2, c.id);
     const vist = resultadoVistoriaSaida(d2, c);
@@ -18991,6 +19003,55 @@ Salvar assim mesmo?`)) {
       ],
       assinaturas: [assinaEmpresa, assinaPessoa("LOCATÁRIO"), ...c.solidario_nome ? [{ nome: c.solidario_nome, linha: "LOCATÁRIO SOLIDÁRIO" }] : []],
       arquivo: nomeArq("Termo quitacao", enc.garantia_devolvida_em || enc.data_saida)
+    };
+  }
+  var acordoDe = (d2, c, alvo) => {
+    const a = buscar(d2, "acordos", Number(alvo.acordo));
+    return a && a.contrato_id === c.id ? a : null;
+  };
+  function termoDoAcordo(d2, c, a, base, x) {
+    const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : "") : "";
+    const fiadores = fiadoresDoContrato(d2, c.id).filter((f) => !f.data_saida || f.data_saida >= a.data);
+    const origens = origensDoAcordo(d2, a);
+    const parcelas2 = parcelasDoAcordo(d2, a);
+    const multa = String(c.multa_percentual || 0).replace(".", ",");
+    const juros = String(c.juros_mensal_percentual || 0).replace(".", ",");
+    const nomeBoleto = (cb) => ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || "única"} de acordo anterior` : `aluguel de ${compBr(cb.competencia)}`;
+    const tabela = [
+      ["BOLETOS VENCIDOS INCLUÍDOS NO ACORDO", null],
+      ...origens.map((cb) => [`${nomeBoleto(cb)} (venceu em ${dataBr(cb.vencimento)})`, reais(totais(cb).a_pagar_sem_desconto)]),
+      ["Valor original", reais(a.valor_original)],
+      [`Valor em ${dataBr(a.data)}, com multa e juros`, reais(a.divida_na_data)],
+      ["PARCELAS DO ACORDO", null],
+      ...parcelas2.map((cb, k) => [`${parcelas2.length > 1 ? `${k + 1}ª parcela` : "Parcela única"}, vencimento ${dataBr(cb.vencimento)}`, reais(totais(cb).a_pagar_sem_desconto)]),
+      ["Total do acordo", reais(a.valor_total)]
+    ];
+    const nomesFiadores = fiadores.map((f) => pessoa(f.nome, f.cpf ? `CPF ${f.cpf}` : "")).join("; ");
+    return {
+      ...base,
+      data: a.data,
+      titulo: "TERMO DE CONFISSÃO DE DÍVIDA E ACORDO DE PAGAMENTO",
+      paragrafos: [
+        `CREDORA (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ""}. DEVEDOR (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ""}${nomesFiadores ? `. FIADOR(ES), como intervenientes anuentes: ${nomesFiadores}` : ""}. IMÓVEL: ${x.endereco}.`,
+        `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos, discriminados abaixo. A dívida é líquida, certa e exigível.`
+      ],
+      tabela,
+      depois: [
+        `2. PAGAMENTO. O valor será pago em ${parcelas2.length} ${parcelas2.length > 1 ? "parcelas mensais" : "parcela"}, por boleto bancário, nos vencimentos acima. O pagamento de cada parcela dá quitação somente dela.`,
+        `3. ATRASO. O não pagamento de qualquer parcela no vencimento torna vencidas de imediato as demais (vencimento antecipado), acrescidas da multa de ${multa}% e dos juros de ${juros}% ao mês previstos no contrato de locação, e permite à LOCADORA cobrar o saldo, inclusive judicialmente, e tomar as demais medidas previstas no contrato e na Lei 8.245/91.`,
+        "4. SEM NOVAÇÃO. Este acordo não é novação (Código Civil, artigo 361): o contrato de locação e as suas garantias continuam valendo em todos os termos. Os boletos vencidos acima só ficam quitados com o pagamento de todas as parcelas.",
+        ...fiadores.length ? ["5. FIADORES. O(s) fiador(es) assina(m) este termo concordando com o parcelamento e mantendo a fiança, inclusive sobre esta dívida (Código Civil, artigo 838, I)."] : [],
+        `${fiadores.length ? 6 : 5}. TÍTULO EXECUTIVO. Assinado pelo devedor e por duas testemunhas, este termo vale como título executivo extrajudicial (Código de Processo Civil, artigo 784, III).`
+      ],
+      assinaturas: [
+        x.assinaEmpresa,
+        x.assinaPessoa("DEVEDOR (LOCATÁRIO)"),
+        ...c.solidario_nome ? [{ nome: c.solidario_nome, linha: "LOCATÁRIO SOLIDÁRIO" }] : [],
+        ...fiadores.flatMap((f) => [{ nome: f.nome, linha: [f.cpf ? `CPF ${f.cpf}` : "", "FIADOR (anuente)"].filter(Boolean).join(" · ") }, ...f.nome_conjuge ? [{ nome: f.nome_conjuge, linha: "CÔNJUGE DO FIADOR (anuente)" }] : []]),
+        { nome: `TESTEMUNHA 1: ${EM_BRANCO}`, linha: `CPF: ${EM_BRANCO}` },
+        { nome: `TESTEMUNHA 2: ${EM_BRANCO}`, linha: `CPF: ${EM_BRANCO}` }
+      ],
+      arquivo: x.nomeArq("Termo acordo", a.data)
     };
   }
   function chavesDaSaida(d2, c) {
@@ -20494,7 +20555,7 @@ ${m.texto}
     <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao("copiar", "Copiar descrição", { texto: b.descricao }, "")}</div></div>`;
   }
   function etapasAcordo(a) {
-    const termo = (x) => x.chave !== "termo" || a.desfeito_em ? "" : ` ${linkComprovante(a.contrato_id, a.termo_assinado || null, { tabela: "acordos", id: a.id, campo: "termo_assinado", tipo: "termo-acordo-assinado", data: a.data }).replace("📎 comprovante", "📎 termo assinado").replace("anexar comprovante", "anexar o termo assinado").replace("Sem comprovante: buscar no banco e anexar", "Anexar o termo do acordo assinado")}`;
+    const termo = (x) => x.chave !== "termo" || a.desfeito_em ? "" : ` ${link(`#/imprimir/recibo?tipo=acordo&contrato=${a.contrato_id}&id=${a.id}`, "🧾 Termo para assinar", "botao secundario mini")} ${linkComprovante(a.contrato_id, a.termo_assinado || null, { tabela: "acordos", id: a.id, campo: "termo_assinado", tipo: "termo-acordo-assinado", data: a.data }).replace("📎 comprovante", "📎 termo assinado").replace("anexar comprovante", "anexar o termo assinado").replace("Sem comprovante: buscar no banco e anexar", "Anexar o termo do acordo assinado")}`;
     return `<ol style="margin:4px 0 6px 18px">${etapasDoAcordo(d(), a).map((x) => `<li>${x.feito ? "✅" : "⬜"} ${esc(x.titulo)} <span class="suave">${esc(x.detalhe)}</span>${termo(x)}</li>`).join("")}</ol>`;
   }
   function caixaAcordo(cb) {
@@ -20938,7 +20999,7 @@ ${m.texto}
       return f ? { ficha: f, ...q.fiador ? { fiador: Number(q.fiador) } : {} } : null;
     }
     const c = buscar2("contratos", q.contrato);
-    return c ? { contrato: c } : null;
+    return c ? { contrato: c, ...q.id ? { acordo: Number(q.id) } : {} } : null;
   }
   function reciboHtml(r) {
     const e = r.emitente;
@@ -21395,15 +21456,30 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   var DESLIGADA = '<div class="alerta info">A rotina <b>Arquivo impresso</b> está desligada. Para ligar: Dados e backup → Regras do sistema → "Arquivo impresso (pasta física de cada inquilino)".</div>';
   var SITUACAO_ITEM = { impresso: "impresso", ja_tinha: "já estava em papel", fora: "fora da pasta" };
   async function soltosDe(c) {
+    let nomes = [];
     try {
-      return (await listar(await pastaDoEscopo("contrato", c.id, false))).map((a) => a.nome);
+      nomes = (await listar(await pastaDoEscopo("contrato", c.id, false))).map((a) => a.nome);
     } catch {
-      return [];
+      nomes = [];
     }
+    anotarSoltos(c.id, nomes);
+    return nomes;
+  }
+  var soltosConferidos = false;
+  async function conferirSoltosUmaVez() {
+    if (soltosConferidos || !ligado()) return;
+    soltosConferidos = true;
+    const antes = alertaPastas(d());
+    for (const c of contratosDaRotina(d()).filter((x) => pastaMontada(d(), x.id))) await soltosDe(c);
+    const depois = alertaPastas(d());
+    const noPainel = ["", "#", "#/"].includes(location.hash);
+    if (JSON.stringify(antes) !== JSON.stringify(depois) && noPainel) await mostrar();
   }
   var nomeImovel = (c) => (buscar2("imoveis", c.imovel_id) || {}).nome || "sem imóvel";
   function telaArquivoImpresso(q = {}) {
     const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
+    conferirSoltosUmaVez().catch(() => {
+    });
     if (!ligado()) return `${topo}${DESLIGADA}`;
     const hoje3 = hojeIso();
     const todos = q.todos === "1";
@@ -21411,7 +21487,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const visiveis = linhas2.filter((x) => todos || x.s.precisa);
     const tipo = (s) => s.precisa ? "aviso" : s.aguardando ? "neutra" : "ok";
     return `${topo}
-    <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo solto novo na pasta do inquilino aparece ao abrir a pasta dele.</p>
+    <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo posto à mão na pasta do inquilino (ex.: uma notificação) aparece como documento novo depois que o Painel confere as pastas (a cada abertura do sistema).</p>
     <div class="acoes" style="margin-bottom:10px"><span class="suave">Mostrar:</span> ${link("#/arquivo-impresso", "Com pendência", `botao ${todos ? "secundario " : ""}pequeno`)} ${link("#/arquivo-impresso?todos=1", "Todos", `botao ${todos ? "" : "secundario "}pequeno`)}</div>
     <div class="cartao"><table class="responsiva"><tr><th>Inquilino</th><th>Imóvel</th><th>Situação</th><th></th></tr>
     ${visiveis.map(({ c, s }) => `<tr><td><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></td><td>${esc(nomeImovel(c))}</td>
@@ -29123,7 +29199,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     </form></div></main>`,
     // ------------------------------------------------------------------------
     painel(rota) {
-      organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso")).then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, "aviso")).then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, "aviso")).then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, "aviso"));
+      organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso")).then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, "aviso")).then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, "aviso")).then(() => conferirSoltosUmaVez()).catch((e) => aviso(`Pasta física: ${e.message}`, "aviso")).then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, "aviso"));
       trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
       const hoje3 = hojeIso();
       const todosOsAlertas = alertasComAdiamento(d(), hoje3);
