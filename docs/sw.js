@@ -379,11 +379,15 @@ function guardar(chave, resposta) {
 
 // Aviso no celular (ficha pela internet: dados, ficha assinada, desistência), mandado pela nuvem (nuvem/push.mjs).
 // Tocar no aviso abre o sistema na ficha (ou traz para a frente a janela já aberta).
+// Figura do aviso: o ícone escolhido em Empresas (o mesmo do aplicativo; na nuvem, api/icone-192.png, que sem ícone
+// escolhido vai para o ERP). Ícone da barra de cima do Android (badge): só a silhueta branca em fundo transparente
+// (o Android pinta de uma cor só; figura colorida vira um quadrado branco).
+const ICONE_AVISO = /^(localhost|127\.0\.0\.1)$/.test(self.location.hostname) ? 'icones/erp-192.png' : 'api/icone-192.png';
 self.addEventListener('push', (ev) => {
   let d = {};
   try { d = ev.data ? ev.data.json() : {}; } catch { d = {}; }
   ev.waitUntil(self.registration.showNotification(d.titulo || 'Administração de Imóveis', {
-    body: d.texto || 'Novidade na ficha pela internet.', icon: 'icones/erp-192.png', badge: 'icones/erp-192.png', tag: d.tag || 'ficha', renotify: true, data: { url: d.url || './' },
+    body: d.texto || 'Novidade na ficha pela internet.', icon: ICONE_AVISO, badge: 'icones/aviso-96.png', tag: d.tag || 'ficha', renotify: true, data: { url: d.url || './' },
   }));
 });
 
