@@ -163,3 +163,16 @@ test('acordo de dívida: o termo assinado é uma etapa, anexado pelo sistema; se
   R.removerAnexo(d, 'acordos', a.id, 'termo_assinado', 'julio');
   assert.equal(R.etapasDoAcordo(d, a)[1].feito, false);
 });
+
+test('arquivo solto novo (ex.: notificação posta na pasta): com a lista da pasta lida pelo Painel, avisa como documento novo', () => {
+  const { d, c } = base('2026-01-07');
+  const hoje = '2027-03-01';
+  AI.registrarPasta(d, c.id, { momento: 'inicio', itens: marcar(AI.itensDaPasta(d, c, ['RG Ana.jpg'])), data: hoje }, 'julio');
+  assert.equal(AI.situacaoPasta(d, c, hoje).precisa, false);
+  AI.anotarSoltos(c.id, ['RG Ana.jpg', 'notificacao-atraso-2027-03-05.pdf', 'link-3-ultimos-holerites.pdf']);
+  const s = AI.situacaoPasta(d, c, hoje);
+  assert.deepEqual(s.novos.map((i) => i.vaga), ['solto:notificacao-atraso-2027-03-05.pdf'], 'holerite nunca; o RG já estava na pasta');
+  assert.match(AI.alertaPastas(d, hoje).texto, /1 com documento novo para imprimir/);
+  AI.esquecerSoltos();
+  assert.equal(AI.situacaoPasta(d, c, hoje).precisa, false);
+});

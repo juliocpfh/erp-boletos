@@ -13,6 +13,14 @@ import * as R from './regras.js';
 /** A rotina está ligada (Regras do sistema → Arquivo impresso)? */
 export const ligado = () => !!CR.regra('arquivo_impresso');
 
+/**
+ * Arquivos de cada pasta de inquilino lidos neste aparelho (conferência do Painel, a cada abertura, ou ao abrir a pasta):
+ * contratoId → nomes. Com eles, o arquivo solto novo (ex.: notificação posta na pasta) também avisa no Painel e na página.
+ */
+const soltosConhecidos = new Map();
+export const anotarSoltos = (contratoId, nomes) => { soltosConhecidos.set(Number(contratoId), [...nomes]); };
+export const esquecerSoltos = () => soltosConhecidos.clear();
+
 /** Grupos da lista, na ordem da pasta. */
 export const GRUPOS_PASTA = [
   ['contrato', 'Contrato e termos'],
@@ -174,7 +182,7 @@ export function faltaDoAnterior(d, a, soltos = null) {
  * Ex.: pasta de Ana montada em 16/12/2026; termo aditivo nº 2 anexado em 10/02/2027 → momento 'durante', novos = [termo nº 2].
  */
 export function situacaoPasta(d, c, hoje = C.hojeIso(), soltos = null) {
-  const itens = itensDaPasta(d, c, soltos);
+  const itens = itensDaPasta(d, c, soltos || soltosConhecidos.get(c.id) || null);
   const reg = registrados(d, c.id);
   const montada = pastaMontada(d, c.id);
   const anterior = herancaPendente(d, c, hoje);

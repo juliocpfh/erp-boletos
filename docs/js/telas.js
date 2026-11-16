@@ -25,7 +25,7 @@ import { alertaFichas, ligarFichaOnline, telaFicha } from './telas/fichas.js';
 import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
-import { ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
+import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
 import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
@@ -223,6 +223,8 @@ export const TELAS = {
       .then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, 'aviso'))
       // arquivos dos lançamentos: os que estão em outra pasta voltam; os que sumiram viram alerta
       .then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, 'aviso'))
+      // Arquivo impresso: com a lista já trazida, os arquivos soltos novos nas pastas dos inquilinos (notificação etc.)
+      .then(() => conferirSoltosUmaVez()).catch((e) => aviso(`Pasta física: ${e.message}`, 'aviso'))
       // fichas reprovadas há 3 meses: os documentos pessoais saem da pasta
       .then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, 'aviso'));
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes

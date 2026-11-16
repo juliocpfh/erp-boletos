@@ -273,7 +273,7 @@ function caixaBoleto(cb) {
 
 /** Etapas do acordo (registrado, termo assinado com o anexo, parcelas pagas). */
 function etapasAcordo(a) {
-  const termo = (x) => (x.chave !== 'termo' || a.desfeito_em ? '' : ` ${linkComprovante(a.contrato_id, a.termo_assinado || null, { tabela: 'acordos', id: a.id, campo: 'termo_assinado', tipo: 'termo-acordo-assinado', data: a.data })
+  const termo = (x) => (x.chave !== 'termo' || a.desfeito_em ? '' : ` ${link(`#/imprimir/recibo?tipo=acordo&contrato=${a.contrato_id}&id=${a.id}`, '🧾 Termo para assinar', 'botao secundario mini')} ${linkComprovante(a.contrato_id, a.termo_assinado || null, { tabela: 'acordos', id: a.id, campo: 'termo_assinado', tipo: 'termo-acordo-assinado', data: a.data })
     .replace('📎 comprovante', '📎 termo assinado').replace('anexar comprovante', 'anexar o termo assinado').replace('Sem comprovante: buscar no banco e anexar', 'Anexar o termo do acordo assinado')}`);
   return `<ol style="margin:4px 0 6px 18px">${R.etapasDoAcordo(d(), a).map((x) => `<li>${x.feito ? '✅' : '⬜'} ${esc(x.titulo)} <span class="suave">${esc(x.detalhe)}</span>${termo(x)}</li>`).join('')}</ol>`;
 }
