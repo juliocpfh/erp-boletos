@@ -18,7 +18,25 @@ const SITUACAO_ITEM = { impresso: 'impresso', ja_tinha: 'já estava em papel', f
 
 /** Nomes dos arquivos soltos na pasta do inquilino (a lista é da nuvem ou do disco; sem pasta, nenhum). */
 async function soltosDe(c) {
-  try { return (await S.listar(await pastaDoEscopo('contrato', c.id, false))).map((a) => a.nome); } catch { return []; }
+  let nomes = [];
+  try { nomes = (await S.listar(await pastaDoEscopo('contrato', c.id, false))).map((a) => a.nome); } catch { nomes = []; }
+  AI.anotarSoltos(c.id, nomes);
+  return nomes;
+}
+
+let soltosConferidos = false;
+/**
+ * Painel, uma vez por abertura (depois da conferência dos arquivos, que já trouxe a lista inteira da nuvem numa ida): lê a pasta
+ * de cada inquilino de pasta montada, para o arquivo solto novo (ex.: notificação) também avisar no Painel e na página dele.
+ */
+export async function conferirSoltosUmaVez() {
+  if (soltosConferidos || !AI.ligado()) return;
+  soltosConferidos = true;
+  const antes = AI.alertaPastas(d());
+  for (const c of AI.contratosDaRotina(d()).filter((x) => AI.pastaMontada(d(), x.id))) await soltosDe(c);
+  const depois = AI.alertaPastas(d());
+  const noPainel = ['', '#', '#/'].includes(location.hash);
+  if (JSON.stringify(antes) !== JSON.stringify(depois) && noPainel) await mostrar();
 }
 
 const nomeImovel = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || 'sem imóvel';
@@ -28,6 +46,7 @@ const nomeImovel = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || 'sem im
 // --------------------------------------------------------------------------
 export function telaArquivoImpresso(q = {}) {
   const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
+  conferirSoltosUmaVez().catch(() => { /* fica para a próxima abertura */ });
   if (!AI.ligado()) return `${topo}${DESLIGADA}`;
   const hoje = C.hojeIso();
   const todos = q.todos === '1';
@@ -36,7 +55,7 @@ export function telaArquivoImpresso(q = {}) {
   const visiveis = linhas.filter((x) => todos || x.s.precisa);
   const tipo = (s) => (s.precisa ? 'aviso' : s.aguardando ? 'neutra' : 'ok');
   return `${topo}
-    <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo solto novo na pasta do inquilino aparece ao abrir a pasta dele.</p>
+    <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo posto à mão na pasta do inquilino (ex.: uma notificação) aparece como documento novo depois que o Painel confere as pastas (a cada abertura do sistema).</p>
     <div class="acoes" style="margin-bottom:10px"><span class="suave">Mostrar:</span> ${link('#/arquivo-impresso', 'Com pendência', `botao ${todos ? 'secundario ' : ''}pequeno`)} ${link('#/arquivo-impresso?todos=1', 'Todos', `botao ${todos ? '' : 'secundario '}pequeno`)}</div>
     <div class="cartao"><table class="responsiva"><tr><th>Inquilino</th><th>Imóvel</th><th>Situação</th><th></th></tr>
     ${visiveis.map(({ c, s }) => `<tr><td><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></td><td>${esc(nomeImovel(c))}</td>
