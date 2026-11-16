@@ -10,6 +10,7 @@
 // saldo(c6) → { conta_id, ...BalanceResponse } (GET /v1/statement/balance)
 
 import { janelas, validarData, diasEntre } from './c6-datas.mjs';
+import { comNovasTentativas } from './c6-tentativas.mjs';
 
 export const DIAS_JANELA_EXTRATO = 30;
 export const MAX_DIAS_EXTRATO = 366; // proteção: ninguém pede mais de um ano de uma vez
@@ -48,7 +49,8 @@ export async function extrato(c6, { de, ate }) {
   const conta_id = contaDe(c6);
   const todos = [];
   for (const j of janelas(de, ate, DIAS_JANELA_EXTRATO)) {
-    const r = await c6.chamar('GET', '/v1/statement/', { query: { start_date: j.de, end_date: j.ate } });
+    // consulta: se o banco estiver ocupado (429, 502, 503, 504) ou não responder a tempo, tenta de novo (c6-tentativas.mjs)
+    const r = await comNovasTentativas('GET', () => c6.chamar('GET', '/v1/statement/', { query: { start_date: j.de, end_date: j.ate } }), { pausas: c6.pausas });
     if (r.status !== 200) throw erroDoC6(r, `buscar o extrato de ${j.de} a ${j.ate}`);
     const entries = Array.isArray(r.corpo?.entries) ? r.corpo.entries : [];
     for (const e of entries) todos.push({ ...e, conta_id });

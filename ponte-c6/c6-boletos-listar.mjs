@@ -10,6 +10,7 @@
 
 import { janelas, validarData, diasEntre } from './c6-datas.mjs';
 import { erroDoC6 } from './c6-extrato.mjs';
+import { comNovasTentativas } from './c6-tentativas.mjs';
 
 export const DIAS_JANELA_BOLETOS = 60;
 export const TAMANHO_PAGINA = 100;
@@ -21,7 +22,7 @@ const FILTROS = ['payment_date', 'credit_date', 'due_date'];
 export async function listarPaginas(c6, filtros, { caminho = '/v2/bank_slips', vistos = new Set(), rotulo = 'listar os boletos' } = {}) {
   const content = [];
   for (let page = 0, totalPaginas = 1; page < totalPaginas && page < MAX_PAGINAS; page++) {
-    const r = await c6.chamar('GET', caminho, { query: { ...filtros, page, size: TAMANHO_PAGINA } });
+    const r = await comNovasTentativas('GET', () => c6.chamar('GET', caminho, { query: { ...filtros, page, size: TAMANHO_PAGINA } }), { pausas: c6.pausas });
     if (r.status !== 200) throw erroDoC6(r, `${rotulo} (página ${page})`);
     const itens = Array.isArray(r.corpo) ? r.corpo : Array.isArray(r.corpo?.content) ? r.corpo.content : [];
     for (const b of itens) {
