@@ -114,3 +114,12 @@ test('atualizador do PC: chave de serviço recusada avisa', async () => {
   const n = nuvemFalsa({});
   await assert.rejects(A.atualizarCopia({ site: 'https://x', clientId: 'errado', clientSecret: 's', pasta: pasta() }, { buscar: n.buscar }), /não aceitou a chave/);
 });
+
+test('sem internet, o anexo abre da cópia aberta deste computador (lerDaCopia, mesmo nome que a cópia gravou)', async () => {
+  const raiz = pasta(); const dir = new PastaDisco(raiz);
+  const n = nuvemFalsa({ 'Casa 1/Inquilinos/Maria Exemplo/Vistoria: entrada.pdf': { texto: 'vistoria', alterado: '2026-11-01T10:00:00Z' } });
+  await CA.atualizarCopia(dir, { listar: n.listar, ler: n.ler });
+  const f = await CA.lerDaCopia(dir, 'Casa 1/Inquilinos/Maria Exemplo/Vistoria: entrada.pdf');
+  assert.equal(await f.text(), 'vistoria');
+  await assert.rejects(CA.lerDaCopia(dir, 'Casa 1/Inquilinos/Maria Exemplo/Outro.pdf'));
+});

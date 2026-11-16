@@ -25,6 +25,7 @@ import { alertaFichas, ligarFichaOnline, telaFicha } from './telas/fichas.js';
 import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
 import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fechamento.js';
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
+import { ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
 import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
@@ -50,6 +51,7 @@ export const TELAS = {
     ligarGarantiasCorrigidas(raiz);
     ligarFichaOnline(raiz);
     ligarIndiceBancoCentral(raiz);
+    ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, 'erro'));
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];
     const valorDe = (form, nome) => {
@@ -395,6 +397,9 @@ export const TELAS = {
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
   dados: () => telaDados(),
+  'arquivo-impresso': (rota) => telaArquivoImpresso(rota.q),
+  'pasta-fisica': (rota) => telaPastaFisica(Number(rota.partes[1])),
+  'pasta-impressao': (rota) => telaPastaImpressao(Number(rota.partes[1])),
   conflitos: () => telaConflitos(),
   async usuarios() {
     if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';

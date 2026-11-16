@@ -15,10 +15,11 @@ function caixaAcordos(hoje) {
   const ativos = (d().acordos || []).filter((a) => !a.desfeito_em).map((a) => ({ a, parcelas: R.parcelasDoAcordo(d(), a) }))
     .filter((x) => x.parcelas.some((cb) => !cb.data_pagamento)).sort((x, y) => y.a.data.localeCompare(x.a.data));
   if (!ativos.length) return '';
-  return `<div class="cartao rolagem"><h2>Acordos em andamento</h2><table><tr><th>Inquilino</th><th>Acordo</th><th>Boletos</th><th class="n">Falta pagar</th></tr>
+  return `<div class="cartao rolagem"><h2>Acordos em andamento</h2><table><tr><th>Inquilino</th><th>Acordo</th><th>Boletos</th><th>Termo assinado</th><th class="n">Falta pagar</th></tr>
     ${ativos.map(({ a, parcelas }) => { const c = buscar('contratos', a.contrato_id) || {}; const abertos = parcelas.filter((cb) => !cb.data_pagamento);
       return `<tr><td><a href="#/contrato/${c.id}">${esc(c.inquilino_nome || '')}</a></td><td>${dataBr(a.data)} · ${esc(a.referente)}<br><span class="suave">total ${reais(a.valor_total)} em ${a.parcelas}</span></td>
         <td>${parcelas.map((cb) => `<a href="#/cobranca/${cb.id}">${esc(cb.acordo_parcela || 'boleto')}</a> ${dataBr(cb.vencimento)} ${cb.data_pagamento ? etiqueta('pago', 'ok') : C.vencido(cb.vencimento, hoje) ? etiqueta('vencido', 'perigo') : ''}`).join('<br>')}</td>
+        <td>${a.termo_assinado ? etiqueta('anexado', 'ok') : etiqueta('falta', 'aviso')} ${parcelas[0] ? `<a href="#/cobranca/${parcelas[0].id}">${a.termo_assinado ? 'ver' : 'anexar'}</a>` : ''}</td>
         <td class="n">${reais(abertos.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0))}</td></tr>`; }).join('')}</table></div>`;
 }
 
