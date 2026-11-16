@@ -1,7 +1,7 @@
 // Ícone do aplicativo (celular): o administrador enquadra a logo (arrastar e zoom) e a nuvem guarda os PNG de 192 e 512
 // (rotas /api/icone-*.png e /api/icone/<tamanho>, nuvem/worker.mjs); sem ícone escolhido, a nuvem manda o padrão "ERP".
 import { aviso, E, login, mostrar, podeUsuario, trocarIconeDaAba } from '../app.js';
-import { d } from './comum.js';
+import { buscarComLimite, d } from './comum.js';
 
 // enquadramento em uso na tela (zoom 1 = a logo inteira dentro do círculo que o celular sempre mostra)
 const enquadro = { zoom: 1, x: 0, y: 0, fundo: '#ffffff' };
@@ -199,7 +199,8 @@ function pngDoIcone(lado) {
 }
 
 async function pedirNuvem(rota, metodo, corpo) {
-  const r = await fetch(`api/${rota}`, { method: metodo, body: corpo, headers: { 'X-Sistema': 'imoveis', ...(corpo ? { 'Content-Type': 'image/png' } : {}) } });
+  // enviar a imagem pode demorar mais que uma consulta: 20 segundos; sem imagem, os 8 de sempre ("Sem resposta, tente de novo.")
+  const r = await buscarComLimite(`api/${rota}`, { method: metodo, body: corpo, headers: { 'X-Sistema': 'imoveis', ...(corpo ? { 'Content-Type': 'image/png' } : {}) } }, corpo ? 20000 : undefined);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.erro || `A nuvem recusou (erro ${r.status}).`);

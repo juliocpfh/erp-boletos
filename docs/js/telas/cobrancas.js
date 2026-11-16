@@ -93,18 +93,22 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   const url = (q) => `#/cobrancas?${new URLSearchParams({ comp, ordem, ...(filtro !== 'todos' ? { filtro } : {}), ...(busca ? { busca: String(buscaPedida).trim() } : {}), ...q })}`;
   // as NFs de cada boleto saem de um índice montado uma vez por desenho, e cada boleto é montado uma vez só
   const nfs = R.indiceFaturas(d());
+  // boleto cujo contrato não está mais no banco (dado antigo ou exclusão pela metade) não derruba a tela: fica fora da lista, com aviso
+  const semContrato = [];
   const montar = (cb) => {
     const c = buscar('contratos', cb.contrato_id);
+    if (!c) { semContrato.push(cb); return null; }
     return { cb, c, i: buscar('imoveis', c.imovel_id), t: R.totais(cb), fs: nfs.nfs('cobranca', cb.id) };
   };
-  const todasMontadas = d().cobrancas.map(montar);
+  const todasMontadas = d().cobrancas.map(montar).filter(Boolean);
+  const avisoSemContrato = semContrato.length ? `<div class="alerta aviso">${semContrato.length} boleto(s) com contrato não encontrado no cadastro não aparecem na lista (${semContrato.slice(0, 8).map((cb) => `${compBr(cb.competencia)}, código ${Number(cb.id)}`).join('; ')}${semContrato.length > 8 ? '…' : ''}). Avise o suporte.</div>` : '';
   const doMes = todasMontadas.filter((x) => x.cb.competencia === comp);
   const todas = F_.todosMeses ? todasMontadas : doMes;
   const lista = todas.filter((x) => F_.f(x, hoje) && (!busca || [x.c.inquilino_nome, x.c.inquilino_apelido, x.i && x.i.nome].some((t) => R.textoDeBusca(t).includes(busca))))
     .sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
   // contagem de cada filtro (todos os meses nos três primeiros, o mês nos outros) para os botões
   const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje)).length;
-  const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${k === 'todos' ? `Todos de ${compBr(comp)}` : `${x.titulo.replace('Boletos ', '').replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(' ')}
+  const filtros = `${avisoSemContrato}<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${k === 'todos' ? `Todos de ${compBr(comp)}` : `${x.titulo.replace('Boletos ', '').replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(' ')}
     <form data-form="ir" data-ir="cobrancas" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}">${filtro !== 'todos' ? `<input type="hidden" name="filtro" value="${esc(filtro)}">` : ''}<input name="busca" value="${esc(String(buscaPedida || ''))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: '' }).replace(/&busca=[^&]*/, '')}">Limpar</a>` : ''}</form></div>`;
   if (filtro !== 'todos') {
     // lista de trabalho (em aberto, vencidos, sem NF, pagos): sem as caixas do mês (gerar boletos, caução, recálculo)

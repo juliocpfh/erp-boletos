@@ -14,6 +14,7 @@ import { AnexosNuvem } from './pasta-nuvem.js';
 import { Cofrinho, guardarCifrado } from './cofrinho.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
+import { SELETOR_FORMULARIO } from './telas/comum.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
@@ -335,13 +336,23 @@ function aoMudarNuvem(externo) {
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
   if (E.anexos) E.anexos.tudo = null;
   if (!E.usuario) return mostrar();
-  const editando = document.querySelector('main form[data-form]');
+  const editando = document.querySelector(SELETOR_FORMULARIO);
   if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
   else mostrar();
 }
 
+// Pasta: data e tamanho do arquivo do banco na última conferência que deixou a memória igual ao disco. Enquanto o arquivo
+// continuar com a mesma data e o mesmo tamanho, a conferência (a cada 30 s e a cada volta à janela) não lê nem interpreta
+// o banco inteiro de novo. A gravação do próprio sistema muda a data: a conferência seguinte lê uma vez e guarda a nova.
+let arquivoConferido = null; // { pasta, assinatura }
+let conferindo = false; // uma conferência por vez (foco + relógio + volta da internet chegam juntos)
 async function verificarMudancasExternas() {
   tentarSeguroDeNovo(); // chave do backup seguro que não deu para ler: tenta de novo (no máximo uma vez por minuto)
+  if (conferindo) return;
+  conferindo = true;
+  try { await conferirMudancasExternas(); } finally { conferindo = false; }
+}
+async function conferirMudancasExternas() {
   if (E.nuvem) {
     if (document.hidden) return;
     await E.nuvem.sincronizar().catch(() => {}); // aoMudar avisa
@@ -354,14 +365,19 @@ async function verificarMudancasExternas() {
   }
   if (!E.pasta || !E.d || document.hidden) return;
   try {
-    const disco = await S.lerBanco(E.pasta);
+    const pasta = E.pasta;
+    if (arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.assinatura === await S.assinaturaDoBanco(pasta)) return;
+    const disco = await S.lerBanco(pasta);
+    if (pasta !== E.pasta) return; // trocou de pasta no meio da leitura
+    // a memória fica igual a este arquivo (já estava, ou passa a ser logo abaixo): guarda a data e o tamanho dele
+    arquivoConferido = disco && S.assinaturaLida(disco) ? { pasta, assinatura: S.assinaturaLida(disco) } : null;
     if (disco && disco.revisao !== E.d.revisao) {
       const soSessao = soSessaoNoDisco(disco);
       E.d = disco;
       renovarUsuario();
       atualizarFaixa();
       if (soSessao) return; // alguém só entrou ou saiu: nada mudou nos dados
-      const editando = document.querySelector('main form[data-form]');
+      const editando = document.querySelector(SELETOR_FORMULARIO);
       if (editando) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
       else await mostrar();
     }
@@ -474,12 +490,11 @@ export function carregarScript(url, global) {
 // Na versão de arquivo único (sem internet) eles já vêm carregados e carregarScript só devolve o que existe.
 export const excelJs = () => carregarScript('vendor/exceljs.min.js', 'ExcelJS');
 export const jsZip = () => carregarScript('vendor/jszip.min.js', 'JSZip');
+/** Só o jsPDF, para o PDF escrito direto (sem fotografar a tela): não baixa o html2canvas. */
+export const jsPdf = async () => (await carregarScript('vendor/jspdf.umd.min.js', 'jspdf')).jsPDF;
 export async function bibliotecasPdf() {
-  const [h2c, jspdf] = await Promise.all([
-    carregarScript('vendor/html2canvas.min.js', 'html2canvas'),
-    carregarScript('vendor/jspdf.umd.min.js', 'jspdf'),
-  ]);
-  return { html2canvas: h2c, jsPDF: jspdf.jsPDF };
+  const [h2c, jsPDF] = await Promise.all([carregarScript('vendor/html2canvas.min.js', 'html2canvas'), jsPdf()]);
+  return { html2canvas: h2c, jsPDF };
 }
 
 // --------------------------------------------------------------------------
@@ -673,6 +688,29 @@ export function trocarIconeDaAba(nova = true) {
   for (const l of document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')) if (l.getAttribute('href') !== href) l.setAttribute('href', href);
 }
 
+// Logo do topo: o texto data: (centenas de KB) não é colado de novo no HTML a cada desenho; vira um endereço blob: curto,
+// refeito só quando a logo muda. Impressão, PDF e NF usam a logo por outro caminho (continuam com o data:).
+const logoDoTopo = { texto: null, url: '' };
+function enderecoDaLogo() {
+  const logo = E.d.logo;
+  if (typeof logo !== 'string' || !logo.startsWith('data:')) return logo || '';
+  if (logoDoTopo.texto === logo) return logoDoTopo.url;
+  if (logoDoTopo.url.startsWith('blob:')) URL.revokeObjectURL(logoDoTopo.url);
+  let url = logo;
+  try {
+    const m = /^data:([^;,]*)(;base64)?,/.exec(logo);
+    if (m && m[2]) {
+      const bin = atob(logo.slice(m[0].length));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([bytes], { type: m[1] || 'image/png' }));
+    }
+  } catch { url = logo; /* logo fora do padrão: vai como estava */ }
+  logoDoTopo.texto = logo;
+  logoDoTopo.url = url;
+  return url;
+}
+
 function layout(conteudo, rota) {
   trocarIconeDaAba(false);
   // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
@@ -683,7 +721,7 @@ function layout(conteudo, rota) {
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
   return `<header class="topo nao-imprimir">
-      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ''}Administração de Imóveis</a>
+      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(enderecoDaLogo())}" alt="Logo">` : ''}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
       <form data-form="ir" data-ir="buscar" class="busca-topo" role="search"><input name="q" type="search" maxlength="100" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
@@ -716,8 +754,11 @@ function guardarClipes() {
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
 let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
+let subirAoTopo = false; // o endereço mudou (hashchange): o próximo desenho que chegar à tela começa do topo
 export async function mostrar(estadoForm = null) {
+  // dois desenhos ao mesmo tempo (dois cliques seguidos, mudança de outro aparelho no meio): só o último chega à tela
   desenhos += 1;
+  const meu = desenhos;
   const app = document.getElementById('app');
   const rota = rotaAtual();
   try {
@@ -733,8 +774,10 @@ export async function mostrar(estadoForm = null) {
       const nome = rota.partes[0] || 'painel';
       const tela = TELAS[nome];
       const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
+      if (meu !== desenhos) return;
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
     }
+    if (meu !== desenhos) return;
     // na mesma página, as caixas recolhíveis (<details id>) que estavam abertas continuam abertas depois de uma ação
     const endereco = location.hash.split('?')[0];
     const abertos = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id][open]')].map((el) => el.id) : [];
@@ -742,13 +785,20 @@ export async function mostrar(estadoForm = null) {
     // redesenho da mesma página (ex.: chegou mudança de outro aparelho): a tela não pode encolher nem voltar ao topo.
     // Mantém a altura e as listas de anexos já mostradas até as novas chegarem, e devolve a posição da rolagem.
     const mesma = endereco === paginaDesenhada;
-    const rolagem = mesma ? window.scrollY : 0;
-    if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
+    // página nova (ou a mesma com outro filtro, pelo endereço) começa do topo já aqui, sem esperar as listas de anexos;
+    // com ?ir= a própria tela rola até a caixa
+    const subir = subirAoTopo && !rota.q.ir;
+    subirAoTopo = false;
+    const rolagem = mesma && !subir ? window.scrollY : 0;
+    if (mesma && !subir) app.style.minHeight = `${app.offsetHeight}px`;
+    else app.style.minHeight = '';
+    if (!mesma) document.querySelector('.visualizador')?.fecharSemVoltar?.(); // anexo aberto por cima da página antiga
     app.innerHTML = html;
+    if (subir) window.scrollTo(0, 0);
     // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
     if (E.usuario) carregarClipes();
     for (const el of app.querySelectorAll('[data-arquivos]')) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
-    if (mesma) window.scrollTo(0, rolagem);
+    if (mesma && !subir) window.scrollTo(0, rolagem);
     paginaDesenhada = endereco;
     for (const id of abertos) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = true; }
     for (const id of fechados) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = false; }
@@ -763,7 +813,8 @@ export async function mostrar(estadoForm = null) {
     atualizarFaixa();
     desenharMensagens();
     mensagens = [];
-    try { await montarExtras(app); } finally { app.style.minHeight = ''; }
+    try { await montarExtras(app, () => meu === desenhos); } finally { if (meu === desenhos) app.style.minHeight = ''; }
+    if (meu !== desenhos) return;
     // ?ir=secao rola a página até a caixa (ex.: alerta de IPTU leva à caixa do IPTU do imóvel).
     // Depois tira o ?ir= do endereço: assim o mesmo atalho funciona de novo e outras ações na página não pulam para a caixa.
     const alvo = rota.q.ir && document.getElementById(rota.q.ir);
@@ -771,31 +822,45 @@ export async function mostrar(estadoForm = null) {
     if (alvo) alvo.scrollIntoView({ block: 'start' });
     if (rota.q.ir) history.replaceState(null, '', location.href.replace(/([?&])ir=[^&]*&?/, '$1').replace(/[?&]$/, ''));
   } catch (e) {
-    console.error(e);
+    logarErro(e);
+    if (meu !== desenhos) return; // desenho antigo que falhou: a tela é do mais novo
+    app.style.minHeight = '';
+    paginaDesenhada = null; // a tela de erro não é a página: o próximo desenho não guarda rolagem nem caixas abertas dela
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
   }
 }
 
 /** Partes que precisam ler a pasta depois de desenhadas: listas de arquivos e fotos. */
-async function montarExtras(raiz) {
+async function montarExtras(raiz, vivo = () => true) {
   // primeiro arruma as tabelas (cartões no celular) com o que já está na tela: não espera os anexos
   arrumarTabelas(raiz);
   // todas as listas de anexos ao mesmo tempo (na nuvem, uma de cada vez deixava a tela aparecendo aos poucos)
   let mudou = false; let clipesMudaram = false;
+  // campos automáticos (CEP, desconto, prévias) funcionam já: não esperam as listas de anexos
+  TELAS._ligarDesconto(raiz);
   const listas = [...raiz.querySelectorAll('[data-arquivos]')];
   // nuvem, tela com muitas listas (Imóveis, IPTU's): a árvore inteira dos anexos numa ida só, em vez de várias por imóvel
   if (E.nuvem && E.anexos?.carregarSeVelho && listas.filter((el) => !el.dataset.arquivos.startsWith('anuncio')).length >= 6) {
     await E.anexos.carregarSeVelho([S.PASTA_ARQUIVOS]).catch(() => {});
+    if (!vivo()) return;
   }
   await Promise.all(listas.map(async (el) => {
     const chave = el.dataset.arquivos;
     const [escopo, id, modo] = chave.split(':');
-    const html = await TELAS._listaArquivos(escopo, Number(id), modo);
+    let html;
+    try {
+      html = await TELAS._listaArquivos(escopo, Number(id), modo);
+    } catch (e) {
+      // uma lista que falhou não derruba a tela: a mensagem fica só na caixa dela (e não é guardada)
+      logarErro(e);
+      if (el.isConnected && vivo()) el.innerHTML = `<span class="suave">Não consegui ler os arquivos desta lista (${esc(e.message)}).</span>`;
+      return;
+    }
     if (escopo !== 'anuncio') { if (ehClipe(chave) && anexosVistos.get(chave) !== html) clipesMudaram = true; anexosVistos.set(chave, html); }
     if (el.isConnected && el.innerHTML !== html) { el.innerHTML = html; mudou = true; }
   }));
   if (clipesMudaram) guardarClipes();
-  TELAS._ligarDesconto(raiz);
+  if (!vivo()) return;
   if (mudou) arrumarTabelas(raiz); // a lista de anexos dentro de uma tabela pode ter deixado ela larga
 }
 
@@ -814,7 +879,9 @@ function arrumarTabelas(raiz) {
       }
     }
   }
-  for (const caixa of raiz.querySelectorAll('.rolagem')) caixa.classList.toggle('tem-rolagem', caixa.scrollWidth > caixa.clientWidth + 2);
+  // mede todas primeiro e só depois marca: medir e marcar uma a uma fazia o navegador recalcular a página a cada caixa
+  const caixas = [...raiz.querySelectorAll('.rolagem')].map((caixa) => [caixa, caixa.scrollWidth > caixa.clientWidth + 2]);
+  for (const [caixa, tem] of caixas) caixa.classList.toggle('tem-rolagem', tem);
 }
 
 /** Tabelas com desenho próprio (fatura, contrato, vistoria, boleto, cartas): continuam como estão no celular. */
@@ -963,12 +1030,21 @@ document.addEventListener('change', async (ev) => {
   // arquivo escolhido → ação: data-acao-arquivo="nome da ação" (anexar arquivos, comprovante, documento assinado, extrato OFX…);
   // os outros data-* do campo vão como dados da ação, como nos botões com data-acao
   const arquivo = ev.target.closest('input[data-acao-arquivo]');
-  if (!arquivo || !arquivo.files.length) return;
+  if (!arquivo || !arquivo.files.length || arquivo.dataset.ocupado) return;
+  // enquanto a ação roda (enviar o anexo, ler o extrato) o campo fica travado: escolher outro arquivo no meio repetia a ação
+  arquivo.dataset.ocupado = '1';
   try {
-    await ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
+    const feito = ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
+    arquivo.disabled = true; // depois de a ação começar (ela já leu os arquivos escolhidos)
+    await feito;
   } catch (e) {
     logarErro(e);
     aviso(e.message, 'erro');
+  } finally {
+    delete arquivo.dataset.ocupado;
+    arquivo.disabled = false;
+    // campo que continua na página: fica vazio, para o mesmo arquivo poder ser escolhido de novo
+    if (arquivo.isConnected) arquivo.value = '';
   }
 });
 
@@ -991,9 +1067,8 @@ document.addEventListener('keydown', (ev) => {
 
 // Página nova começa do topo (com ?ir= a própria tela rola até a caixa).
 window.addEventListener('hashchange', async () => {
-  const ir = rotaAtual().q.ir;
+  subirAoTopo = true; // mostrar sobe logo depois de trocar a tela (antes subia só depois de esperar as listas de anexos)
   await mostrar();
-  if (!ir) scrollTo(0, 0);
 });
 
 // Link para o endereço em que já estamos (ex.: atalho clicado pela 2ª vez): o navegador não avisa a mudança, então desenhamos de novo.

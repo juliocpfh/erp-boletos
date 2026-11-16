@@ -199,8 +199,32 @@ export async function ligarFichaOnline(raiz) {
   const caixa = raiz.querySelector('[data-ficha-online]');
   if (!caixa || !E.nuvem) return;
   linhaDoAvisoNoAparelho(caixa.querySelector('[data-aviso-aparelho]')).catch(() => {});
+  // desenha na hora com a última lista guardada (se houver) e de novo quando a da nuvem chegar (se for outra)
+  const guardada = FO.linksGuardados(Number(caixa.dataset.fichaOnline));
+  if (guardada) desenharLinksDaFicha(caixa, guardada, false);
   let links;
-  try { links = await FO.linksNaNuvem(Number(caixa.dataset.fichaOnline)); } catch (e) { const r = caixa.querySelector('[data-respostas-link]'); if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`; return; }
+  try { links = await FO.linksRecentes(Number(caixa.dataset.fichaOnline)); } catch (e) { const r = caixa.querySelector('[data-respostas-link]'); if (r && !guardada) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`; return; }
+  if (!caixa.isConnected) return;
+  if (links !== guardada) desenharLinksDaFicha(caixa, links, true);
+  else marcarLinksVistos(Number(caixa.dataset.fichaOnline), links);
+  // documentos que chegaram pelo link desde a última vez: a lista da pasta guardada neste aparelho fica velha; busca de novo
+  const id = Number(caixa.dataset.fichaOnline);
+  const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
+  if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
+  const antes = arquivosDoLinkVistos.get(id);
+  arquivosDoLinkVistos.set(id, total);
+  const f = buscar('fichas', id);
+  if (total && f && E.anexos?.esquecerLista) {
+    E.anexos.esquecerLista(['arquivos', PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+    if (antes !== undefined || total) await mostrar();
+  }
+}
+/** Quem abriu a ficha viu as novidades: o Painel para de avisar. */
+function marcarLinksVistos(fichaId, links) {
+  for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) FO.atualizarLinkNaNuvem({ ficha_id: fichaId, pessoa: l.pessoa, visto: true }).catch(() => {});
+}
+/** Situação de cada link e o que foi mandado, na caixa da ficha. ``marcar``: avisa a nuvem que as novidades foram vistas. */
+function desenharLinksDaFicha(caixa, links, marcar) {
   for (const l of links) {
     const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
     if (!el) continue;
@@ -214,19 +238,7 @@ export async function ligarFichaOnline(raiz) {
   if (area && fichaAqui) {
     area.innerHTML = links.filter((l) => l.situacao !== 'Encerrado' || (l.respostas || []).length).map((l) => blocoDoLink(fichaAqui, l)).join('');
     conferirArquivosDoLink(area, fichaAqui).catch((e) => console.warn('conferência dos arquivos do link', e));
-    // quem abriu a ficha viu as novidades: o Painel para de avisar
-    for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) FO.atualizarLinkNaNuvem({ ficha_id: fichaAqui.id, pessoa: l.pessoa, visto: true }).catch(() => {});
-  }
-  // documentos que chegaram pelo link desde a última vez: a lista da pasta guardada neste aparelho fica velha; busca de novo
-  const id = Number(caixa.dataset.fichaOnline);
-  const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
-  if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
-  const antes = arquivosDoLinkVistos.get(id);
-  arquivosDoLinkVistos.set(id, total);
-  const f = buscar('fichas', id);
-  if (total && f && E.anexos?.esquecerLista) {
-    E.anexos.esquecerLista(['arquivos', PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
-    if (antes !== undefined || total) await mostrar();
+    if (marcar) marcarLinksVistos(fichaAqui.id, links);
   }
 }
 /** Quantos arquivos dos links de cada ficha já foram vistos nesta abertura (ficha → quantidade). */
@@ -333,7 +345,13 @@ function sinaisHtml(r, nomePessoa) {
 
 /** Painel: o que chegou pelos links (ainda não visto), link sem resposta há dias e link vencido sem resposta. */
 async function avisosDoPainel(el) {
-  const links = await FO.linksNaNuvem();
+  // na hora com a lista guardada; a da nuvem (se a guardada passou de um minuto e meio) troca quando chegar
+  const guardada = FO.linksGuardados();
+  if (guardada) desenharAvisosDoPainel(el, guardada);
+  const links = await FO.linksRecentes();
+  if (links !== guardada && el.isConnected) desenharAvisosDoPainel(el, links);
+}
+function desenharAvisosDoPainel(el, links) {
   const agora = Date.now();
   const dias = R.regra('dias_ficha_parada');
   const linhas = [];

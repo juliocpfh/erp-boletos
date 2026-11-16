@@ -10,7 +10,7 @@ import * as R from '../regras.js';
 import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
 import { caixaConfigBanco2 } from './banco.js';
 import { CADASTROS } from './cadastros.js';
-import { botao, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
+import { botao, buscarComLimite, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 import { caixaIcone } from './icone.js';
 
 // --------------------------------------------------------------------------
@@ -43,7 +43,8 @@ export async function telaBackupSeguro() {
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao('reconectarSeguro', 'Reconectar', {}, 'pequeno')}</div>` : ''}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
         <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, no seu OneDrive pessoal ou num HD externo). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
-        <p>${botao('escolherPastaSegura', nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : 'Escolher a pasta segura', {}, nova ? 'secundario' : '')}</p></div>
+        <p>${!E.teste && !S.suportado() ? '<span class="alerta aviso" style="display:block">Faça isto no computador (Chrome ou Edge): este navegador não deixa o sistema gravar numa pasta.</span>'
+    : botao('escolherPastaSegura', nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : 'Escolher a pasta segura', {}, nova ? 'secundario' : '')}</p></div>
       ${nova ? `<div class="cartao"><h2>2. ${chaveExistente ? 'Digite a senha do backup' : 'Crie a senha do backup'}</h2>
         ${chaveExistente ? `<p>Esta pasta já tem backups seguros (chave criada em ${new Date(chaveExistente.criada_em).toLocaleDateString('pt-BR')}). Digite a senha para ligar este computador a ela.</p>`
     : '<div class="alerta aviso"><b>Guarde esta senha em local seguro.</b> Ela é pedida só para restaurar. Sem ela, nenhum backup pode ser aberto, nem por você nem pelo suporte. Use pelo menos 12 caracteres (uma frase curta serve).</div>'}
@@ -169,12 +170,14 @@ async function versaoDoSistema() {
   const emUso = new Date(document.lastModified);
   if (location.protocol === 'file:' || Number.isNaN(emUso.getTime())) return `versão PC${window.VERSAO_OFFLINE ? ` de ${dataBr(window.VERSAO_OFFLINE)}` : ''}`;
   let publicada = null;
+  let semResposta = false;
   try {
-    const r = await fetch('index.html', { method: 'HEAD', cache: 'no-store', credentials: 'include' });
+    const r = await buscarComLimite('index.html', { method: 'HEAD', cache: 'no-store', credentials: 'include' });
     const lm = r.ok && r.headers.get('last-modified');
     if (lm) publicada = new Date(lm);
-  } catch { /* sem internet: mostra só a em uso */ }
+  } catch (e) { semResposta = !!(e && e.semResposta); /* sem internet: mostra só a em uso */ }
   const nova = publicada && publicada.getTime() - emUso.getTime() > 60000;
+  if (semResposta) return `${fmt(emUso)} <span class="suave">(a conferência da versão publicada ficou sem resposta, tente de novo)</span>`;
   return `${fmt(emUso)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao('atualizarSistema', 'Atualizar agora')}`
     : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ''}`;
 }

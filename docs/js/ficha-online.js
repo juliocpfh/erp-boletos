@@ -171,10 +171,34 @@ async function pedir(caminho, op = {}) {
   return dados;
 }
 
-export const criarLinkNaNuvem = (corpo) => pedir('link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
-export const guardarPdfNaNuvem = (fichaId, pessoa, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob });
-export const linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ''}`).then((r) => r.links || []);
-export const atualizarLinkNaNuvem = (corpo) => pedir('atualizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+// A lista dos links fica guardada por um minuto e meio: o Painel e a ficha desenham na hora com a guardada, em vez de ir
+// à nuvem a cada desenho da tela. Qualquer ação da ficha (gerar link, pedir documento, lembrar, conferir, encerrar) esquece.
+export const VALIDADE_LINKS = 90000;
+const linksGuardadosPorFicha = new Map(); // '' (todas) ou o código da ficha → { em, links }
+let geracaoDosLinks = 0; // lista pedida antes de uma ação e que chega depois dela não é guardada
+const chaveDosLinks = (fichaId) => (fichaId ? String(Number(fichaId)) : '');
+export function esquecerLinks() { geracaoDosLinks += 1; linksGuardadosPorFicha.clear(); }
+const esquecendo = (promessa) => promessa.finally(esquecerLinks);
+
+export const criarLinkNaNuvem = (corpo) => esquecendo(pedir('link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }));
+export const guardarPdfNaNuvem = (fichaId, pessoa, blob) => esquecendo(pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob }));
+/** Sempre vai à nuvem (as ações de conferir usam esta); o que veio fica guardado para os desenhos seguintes. */
+export const linksNaNuvem = (fichaId = null) => {
+  const geracao = geracaoDosLinks;
+  return pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ''}`).then((r) => {
+    const links = r.links || [];
+    if (geracao === geracaoDosLinks) linksGuardadosPorFicha.set(chaveDosLinks(fichaId), { em: Date.now(), links });
+    return links;
+  });
+};
+/** A última lista guardada (de qualquer idade), ou null: para desenhar na hora enquanto a nova não chega. */
+export const linksGuardados = (fichaId = null) => (linksGuardadosPorFicha.get(chaveDosLinks(fichaId)) || {}).links || null;
+/** A lista guardada se tem menos de um minuto e meio; senão busca na nuvem. */
+export async function linksRecentes(fichaId = null, agora = Date.now()) {
+  const g = linksGuardadosPorFicha.get(chaveDosLinks(fichaId));
+  return g && agora - g.em < VALIDADE_LINKS ? g.links : linksNaNuvem(fichaId);
+}
+export const atualizarLinkNaNuvem = (corpo) => esquecendo(pedir('atualizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }));
 
 // ---------------------------------------------------------------------------
 // Aviso no celular (Web Push): cada aparelho da equipe liga o seu (o navegador pergunta a permissão)

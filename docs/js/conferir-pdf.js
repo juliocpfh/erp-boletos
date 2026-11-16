@@ -61,8 +61,10 @@ async function abrirTrechos(bytes, texto, limite = 4 * 1024 * 1024) {
   if (typeof DecompressionStream === 'undefined') return '';
   const out = [];
   let total = 0;
-  const re = /(?<!end)stream\r?\n/g;
+  // sem "olhar para trás" na expressão (o Safari antes do 16.4 não abria o sistema por causa dela): o "stream" de "endstream" é pulado à mão
+  const re = /stream\r?\n/g;
   for (let m = re.exec(texto); m && total < limite; m = re.exec(texto)) {
+    if (m.index >= 3 && texto.slice(m.index - 3, m.index) === 'end') continue;
     const ini = m.index + m[0].length;
     let fim = texto.indexOf('endstream', ini);
     if (fim < 0) break;

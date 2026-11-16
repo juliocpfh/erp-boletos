@@ -261,7 +261,31 @@ async function completarHeranca(id) {
 }
 
 /** Há formulário aberto na página (o usuário pode estar digitando)? A mesma conferência da mudança vinda de outro aparelho (app.js). */
-export const formularioAberto = () => !!document.querySelector('main form[data-form]');
+/** O filtro e a busca (``data-form="ir"``, só mudam o endereço) não contam: não há o que perder neles. */
+export const SELETOR_FORMULARIO = 'main form[data-form]:not([data-form="ir"])';
+export const formularioAberto = () => !!document.querySelector(SELETOR_FORMULARIO);
+
+/**
+ * ``fetch`` com tempo-limite (8 segundos): consulta a outro site (CEP, Receita, Banco Central) ou à nuvem que não responde
+ * deixava a tela esperando sem fim. Passado o tempo, lança um erro com ``semResposta`` e a mensagem "sem resposta, tente de novo".
+ */
+export const TEMPO_DE_RESPOSTA = 8000;
+export async function buscarComLimite(url, opcoes = {}, ms = TEMPO_DE_RESPOSTA) {
+  const controle = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  // o relógio continua valendo enquanto o corpo da resposta é lido (resposta que começa e para no meio)
+  const relogio = controle ? setTimeout(() => controle.abort(), ms) : null;
+  try {
+    return await fetch(url, controle ? { ...opcoes, signal: controle.signal } : opcoes);
+  } catch (e) {
+    clearTimeout(relogio);
+    if (controle && controle.signal.aborted) {
+      const erro = new C.ErroUsuario('Sem resposta, tente de novo.');
+      erro.semResposta = true;
+      throw erro;
+    }
+    throw e;
+  }
+}
 
 /**
  * Tarefa em segundo plano (Painel: heranças, nomes dos comprovantes, limpeza, conferência dos arquivos) terminou e mudou algo:

@@ -1,5 +1,5 @@
 // ACOES: o que cada botão faz (data-acao="nome"), com os auxiliares de PDF, Excel, exclusão (TABELAS_EXCLUSAO) e reajuste.
-import { alterar, atualizarCopiaAberta, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
+import { alterar, atualizarCopiaAberta, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsPdf, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
 import * as S from '../armazenamento.js';
 import { PAPEIS } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -89,6 +89,13 @@ function andamentoZip(id) {
  * (aba nova), inclusive se o visualizador não carregar (sem internet e ainda não guardado no aparelho).
  * ``esperar``: termina só quando o arquivo estiver desenhado.
  */
+/** Abre o arquivo numa aba nova; o endereço temporário é liberado 1 minuto depois (a aba já carregou; antes ficava na memória até fechar o sistema). */
+function abrirEmAbaNova(blob, opcoes = '') {
+  const url = URL.createObjectURL(blob);
+  if (opcoes) window.open(url, '_blank', opcoes); else window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 async function noVisualizador(blob, nome, tipo, esperar = true) {
   let V;
   try { V = await import('../visualizador.js'); } catch { return false; }
@@ -516,6 +523,8 @@ export const ACOES = {
 
   async escolherPastaSegura() {
     if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    // celular, Safari, Firefox: o navegador não deixa escolher uma pasta para gravar
+    if (!E.teste && !S.suportado()) throw new C.ErroUsuario('Faça isto no computador (Chrome ou Edge).');
     try {
       E.pastaSeguraNova = E.teste ? await pastaSeguraDeTeste() : await window.showDirectoryPicker({ id: 'backup-seguro', mode: 'readwrite' });
     } catch (e) {
@@ -1549,15 +1558,19 @@ export const ACOES = {
     const pagos = ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && cb.data_pagamento);
     if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);
     if (!confirm(`Excluir ${ids.length} boleto(s) de ${compBr(comp)}? Eles podem ser gerados de novo depois.`)) return;
+    let excluidos = 0;
     await alterar((db) => {
+      excluidos = 0;
       for (const id of ids) {
         const cb = R.buscar(db, 'cobrancas', id);
+        if (!cb) continue; // já excluído por outra pessoa (ou noutra aba) enquanto a lista estava aberta
         const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
         if (problema) throw new Error(`${nome(cb)}: ${problema}`);
         R.excluir(db, 'cobrancas', id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
+        excluidos += 1;
       }
     });
-    aviso(`${ids.length} boleto(s) excluído(s).`);
+    aviso(`${excluidos} boleto(s) excluído(s).${excluidos < ids.length ? ` ${ids.length - excluidos} já não existia(m) mais.` : ''}`);
     await mostrar();
   },
 
@@ -1796,7 +1809,8 @@ export const ACOES = {
   },
 
   async exportarPlanilhaPdf() {
-    const [ExcelJS, { jsPDF }, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), bibliotecasPdf(), carregarParte(() => import('../exportar.js'))]);
+    // só o jsPDF: este PDF é escrito direto (não fotografa a tela, então não precisa baixar o html2canvas)
+    const [ExcelJS, jsPDF, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), jsPdf(), carregarParte(() => import('../exportar.js'))]);
     const quando = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
@@ -1856,7 +1870,7 @@ export const ACOES = {
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
     if (await noVisualizador(arq, nome, tipo)) return; // celular: mostra na tela em vez de baixar
-    window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), '_blank', 'noopener');
+    abrirEmAbaNova(new Blob([arq], { type: tipo }), 'noopener');
   },
 
   /**
@@ -2077,7 +2091,7 @@ export const ACOES = {
       const r = await fetch(url, o);
       if (!r.ok) return r;
       const blob = await r.blob();
-      if (!(await noVisualizador(blob, 'boleto.pdf', 'application/pdf', false))) window.open(URL.createObjectURL(blob), '_blank');
+      if (!(await noVisualizador(blob, 'boleto.pdf', 'application/pdf', false))) abrirEmAbaNova(blob);
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     } });
   },
