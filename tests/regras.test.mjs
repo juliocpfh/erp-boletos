@@ -464,7 +464,7 @@ test('IPTU: parcelas de imóvel vazio ficam com o proprietário, com alerta até
   assert.equal(R.alertasIptu(d, '2026-05-05').filter((a) => a.nivel === 'aviso').length, 0);
   // quitado à vista com desconto: o inquilino paga 1/12 do valor PARCELADO por mês ocupado (a diferença fica com o proprietário)
   Object.assign(p, { pago_avista: true, valor_avista: 90000, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[1] });
-  assert.deepEqual(R.iptuNaCompetencia(p, '2026-11'), [11, 8334]); // 11 de R$ 83,34 e a última (dezembro) de R$ 83,26
+  assert.deepEqual(R.iptuNaCompetencia(p, '2026-11'), [11, 8333]);
   assert.equal(R.parcelasIptu(d, p)[0].valor, 90000); // custo do proprietário: o valor à vista
   assert.deepEqual(R.iptuNaCompetencia(p, '2027-01'), [null, 0]);
   assert.equal(R.alertasIptu(d, '2026-02-10').length, 1);

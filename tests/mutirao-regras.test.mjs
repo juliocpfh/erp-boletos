@@ -145,23 +145,48 @@ test('parcelas: as primeiras mais caras e a última menor; nunca zero ou negativ
   assert.equal(C.parcelas(-350, 3).reduce((s, v) => s + v, 0), -350);
 });
 
-test('parcelas nos usos: IPTU 1/12 e parcelado, seguro e acordo somam o total, com a última menor', () => {
-  // IPTU de R$ 1.200,05 em 10 parcelas
+test('parcelamento novo (IPTU de 2027, seguro a partir de 12/2026, acordo): a última menor, e a soma fecha', () => {
+  // IPTU 2027 de R$ 1.200,05 em 10 parcelas
   const { d, loja, c } = base({ cobrar_iptu: true });
-  const p = R.inserir(d, 'iptus', { imovel_id: loja.id, ano: 2026, valor_total: 120005, num_parcelas: 10, primeiro_vencimento_boleto: '2026-08', vencimento_primeira: '2026-08-10' }, 'julio');
+  const p = R.inserir(d, 'iptus', { imovel_id: loja.id, ano: 2027, valor_total: 120005, num_parcelas: 10, primeiro_vencimento_boleto: '2027-03', vencimento_primeira: '2027-03-10' }, 'julio');
   const valores = R.parcelasIptu(d, p).map((x) => x.valor);
   assert.deepEqual([valores[0], valores[8], valores[9], valores.reduce((s, v) => s + v, 0)], [12001, 12001, 11996, 120005]);
-  assert.deepEqual(R.iptuNaCompetencia(p, '2026-07', c), [1, 12001], 'boleto que vence em 08/2026 = aluguel de 07/2026');
-  assert.deepEqual(R.iptuNaCompetencia(p, '2027-04', c), [10, 11996]);
-  assert.deepEqual([R.iptuNaCompetencia(p, '2026-06', c), R.iptuNaCompetencia(p, '2027-05', c)], [[null, 0], [null, 0]]);
+  assert.deepEqual(R.iptuNaCompetencia(p, '2027-02', c), [1, 12001], 'boleto que vence em 03/2027 = aluguel de 02/2027');
+  assert.deepEqual(R.iptuNaCompetencia(p, '2027-11', c), [10, 11996]);
+  assert.deepEqual([R.iptuNaCompetencia(p, '2027-01', c), R.iptuNaCompetencia(p, '2027-12', c)], [[null, 0], [null, 0]]);
   // quitado à vista, 1/12 por mês: 11 de R$ 100,01 e dezembro de R$ 99,94
   Object.assign(p, { pago_avista: true, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[1] });
-  assert.deepEqual([R.iptuNaCompetencia(p, '2026-01')[1], R.iptuNaCompetencia(p, '2026-11')[1], R.iptuNaCompetencia(p, '2026-12')[1]], [10001, 10001, 9994]);
-  // seguro de R$ 1.000,00 em 3
-  assert.deepEqual(['2026-07', '2026-08', '2026-09', '2026-10'].map((m) => C.parcelaNaCompetencia(100000, 3, '2026-07', m)[1]), [33334, 33334, 33332, 0]);
+  assert.deepEqual([R.iptuNaCompetencia(p, '2027-01')[1], R.iptuNaCompetencia(p, '2027-11')[1], R.iptuNaCompetencia(p, '2027-12')[1]], [10001, 10001, 9994]);
+  assert.equal(R.mapaIptuAvista(d, p).reduce((s, x) => s + x.valor, 0), 120005);
+  // seguro de R$ 1.000,00 em 3: 1ª parcela em 12/2026 (novo) e em 11/2026 (já em andamento: diferença na 1ª)
+  assert.deepEqual(['2026-12', '2027-01', '2027-02', '2027-03'].map((m) => C.parcelaNaCompetencia(100000, 3, '2026-12', m)[1]), [33334, 33334, 33332, 0]);
+  assert.deepEqual(['2026-11', '2026-12', '2027-01', '2027-02'].map((m) => C.parcelaNaCompetencia(100000, 3, '2026-11', m)[1]), [33334, 33333, 33333, 0]);
   // acordo de R$ 1.000,00 em 3
   for (const comp of ['2026-06', '2026-07']) R.gerarCobrancas(d, comp, 'julio');
   const junho = R.boletoDoMes(d, c.id, '2026-06');
   const previa = R.previaAcordo(d, { contrato_id: c.id, ids: [junho.id], total: 100000, parcelas: 3, primeiro_vencimento: '2026-12-10' }, '2026-09-19');
   assert.deepEqual(previa.boletos.map((b) => b.valor), [33334, 33334, 33332]);
+});
+
+test('parcelamento em andamento (IPTU 2026 de R$ 1.200,05 em 10, 1ª paga a R$ 119,96): recalculado, as abertas continuam R$ 120,01 e o total R$ 1.200,05', () => {
+  const { d, loja, c } = base({ cobrar_iptu: true });
+  const p = R.inserir(d, 'iptus', { imovel_id: loja.id, ano: 2026, valor_total: 120005, num_parcelas: 10, primeiro_vencimento_boleto: '2026-08', vencimento_primeira: '2026-08-10' }, 'julio');
+  const meses = ['2026-07', '2026-08', '2026-09', '2026-10'];
+  for (const comp of meses) R.gerarCobrancas(d, comp, 'julio');
+  const iptus = () => meses.map((m) => R.boletoDoMes(d, c.id, m).iptu);
+  assert.deepEqual(iptus(), [11996, 12001, 12001, 12001]);
+  const julho = R.boletoDoMes(d, c.id, '2026-07');
+  R.registrarPagamento(d, julho.id, julho.vencimento, null, 'julio');
+  assert.equal(R.recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, 'julio'), 0, 'nenhum boleto em aberto muda');
+  assert.deepEqual(iptus(), [11996, 12001, 12001, 12001]);
+  const valores = R.parcelasIptu(d, p).map((x) => x.valor);
+  assert.deepEqual([valores[0], valores[9], valores.reduce((s, v) => s + v, 0)], [11996, 12001, 120005]);
+  // os meses que faltam: ao todo o inquilino paga R$ 1.200,05
+  for (const comp of ['2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04']) R.gerarCobrancas(d, comp, 'julio');
+  assert.equal(d.cobrancas.filter((cb) => cb.contrato_id === c.id).reduce((s, cb) => s + (cb.iptu || 0), 0), 120005);
+  // IPTU 1/12 de 2026 (quitado à vista): também a divisão de antes (janeiro com a diferença)
+  const q = { ano: 2026, valor_total: 100000, pago_avista: true, cobranca_inquilino: R.COBRANCA_IPTU_QUITADO[1] };
+  assert.deepEqual([R.iptuNaCompetencia(q, '2026-01')[1], R.iptuNaCompetencia(q, '2026-12')[1]], [8337, 8333]);
+  // seguro em andamento (1ª parcela em 07/2026): R$ 1.200,05 em 10 continua com a 1ª de R$ 119,96
+  assert.deepEqual([C.parcelaNaCompetencia(120005, 10, '2026-07', '2026-07'), C.parcelaNaCompetencia(120005, 10, '2026-07', '2027-04')], [[1, 11996], [10, 12001]]);
 });

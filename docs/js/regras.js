@@ -1169,7 +1169,14 @@ export function emCarencia(c, comp) {
 export const COBRANCA_IPTU_QUITADO = ['Parcelas normais nos meses em que ocupar', 'Proporcional: 1/12 do valor por mês ocupado no ano', 'Não cobrar do inquilino'];
 
 /** Valores das parcelas do IPTU parcelado (o que é repassado ao inquilino). */
-const valoresIptu = (p) => (p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : C.parcelas(p.valor_total, p.num_parcelas));
+const valoresIptu = (p) => (p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : dividirIptu(p, p.num_parcelas));
+/**
+ * Divisão do IPTU em parcelas: a nova (última menor, decisão de 2026-11-15) só do IPTU de 2027 em diante; o de 2026 e anteriores
+ * já estava em andamento e continua com a antiga (diferença na 1ª), para os boletos em aberto não mudarem. O corte é o ano do
+ * IPTU (fixo, não depende do contrato nem de data que mude).
+ */
+const IPTU_DIVISAO_NOVA_DESDE = 2027;
+const dividirIptu = (p, n) => (Number(p.ano) >= IPTU_DIVISAO_NOVA_DESDE ? C.parcelas : C.parcelasAntigas)(p.valor_total, n);
 /** Vencimento da parcela n na prefeitura (as seguintes vencem no mesmo dia dos meses seguintes). */
 const vencimentoParcela = (p, n) => (p.vencimento_primeira ? C.somarMesesData(p.vencimento_primeira, n - 1) : null);
 
@@ -1197,7 +1204,7 @@ export function iptuNaCompetencia(p, comp, c = {}) {
   if (p.pago_avista && p.cobranca_inquilino === COBRANCA_IPTU_QUITADO[1]) {
     if (Number(comp.slice(0, 4)) !== Number(p.ano)) return [null, 0];
     const mes = Number(comp.slice(5, 7));
-    return [mes, C.parcelas(p.valor_total, 12)[mes - 1]];
+    return [mes, dividirIptu(p, 12)[mes - 1]];
   }
   // o número da parcela sai direto da distância em meses até a competência da 1ª (uma parcela por mês)
   const primeira = competenciaDaParcela(p, 1, c);
@@ -1342,7 +1349,7 @@ export function mapaIptuAvista(d, p) {
   const primeiro = p.primeiro_vencimento_boleto || (p.primeira_competencia && C.somarMeses(p.primeira_competencia, 1));
   const esquema = p.cobranca_inquilino !== COBRANCA_IPTU_QUITADO[1] && n && primeiro
     ? valoresIptu(p).map((valor, k) => ({ mesBoleto: C.somarMeses(primeiro, k), rotulo: `${k + 1}ª parcela`, valor }))
-    : C.parcelas(p.valor_total, 12).map((valor, k) => ({ mesBoleto: C.somarMeses(`${p.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, '0')}/${p.ano})`, valor }));
+    : dividirIptu(p, 12).map((valor, k) => ({ mesBoleto: C.somarMeses(`${p.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, '0')}/${p.ano})`, valor }));
   const porMes = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
   for (const m of mesesIptuAvista(d, p)) {
     const it = porMes.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(' (você pagou à vista)', ''), valor: m.valor, valorInquilino: 0 };
