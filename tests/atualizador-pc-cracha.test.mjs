@@ -125,3 +125,76 @@ test('cifra do Windows (DPAPI): abre de volta só nesta conta', { skip: process.
   assert.ok(!c.includes(t));
   assert.equal(L.abrirNoWindows(c), t);
 });
+
+test('atualizador: todo pedido tem tempo-limite; cópia aberta baixa 5 de cada vez, guarda as primeiras falhas e não roda duas vezes ao mesmo tempo', async () => {
+  const pasta = pastaDoBackup();
+  const cfg = { site: SITE, pasta, cracha: `ap1_${'A'.repeat(43)}` };
+  const nomes = Array.from({ length: 23 }, (_, i) => `Sala 101/arquivo ${String(i + 1).padStart(2, '0')}.pdf`);
+  const ruins = new Set(nomes.filter((_, i) => i % 3 === 0)); // 8 falham
+  let juntos = 0; let maximo = 0; const semPrazo = []; let soltar; const primeiroPedido = new Promise((ok) => { soltar = ok; });
+  const buscar = async (url, op = {}) => {
+    const u = new URL(url);
+    if (!(op.signal instanceof AbortSignal)) semPrazo.push(u.pathname);
+    if (u.pathname.includes('/lista-tudo/')) return new Response(JSON.stringify({ arquivos: nomes.map((caminho) => ({ caminho, tamanho: 3, alterado: '1' })), mais: false }), { headers: { 'content-type': 'application/json' } });
+    const c = decodeURIComponent(u.pathname.split('/arquivos/')[1]);
+    juntos += 1; maximo = Math.max(maximo, juntos);
+    soltar();
+    await new Promise((ok) => { setTimeout(ok, 5); });
+    juntos -= 1;
+    if (ruins.has(c)) return c.endsWith('01.pdf') ? Promise.reject(Object.assign(new Error('abortado'), { name: 'TimeoutError' })) : new Response('{}', { status: 503 });
+    return new Response('pdf');
+  };
+  const erros = [];
+  const rodada = A.atualizarCopia(cfg, { buscar, erros });
+  await primeiroPedido;
+  assert.ok(fs.existsSync(path.join(pasta, A.ARQUIVO_TRAVA)), 'a trava fica na pasta enquanto roda');
+  assert.deepEqual(await A.atualizarCopia(cfg, { buscar }), { ocupada: true }, 'outra rodada ao mesmo tempo não mexe em nada');
+  assert.deepEqual(await rodada, { baixados: 15, apagados: 0, falhas: 8, total: 15 });
+  assert.equal(maximo, A.BAIXAR_JUNTOS, 'cinco de cada vez');
+  assert.deepEqual(semPrazo, [], 'nenhum pedido sem tempo-limite');
+  assert.equal(erros.length, A.MAX_ERROS_REGISTRO, 'só as 5 primeiras falhas');
+  assert.deepEqual(erros[0], { caminho: 'Sala 101/arquivo 01.pdf', motivo: 'demorou mais de 120 segundos' });
+  assert.equal(erros[1].motivo, 'resposta 503');
+  assert.match(A.linhasDeErros(erros), /^ {2}falhou: Sala 101\/arquivo 01\.pdf: demorou mais de 120 segundos\n {2}falhou: /);
+  assert.ok(!fs.existsSync(path.join(pasta, A.ARQUIVO_TRAVA)), 'terminou: solta a trava');
+  assert.ok(!fs.readdirSync(path.join(pasta, A.PASTA_COPIA, 'Sala 101')).some((n) => n.endsWith('.parte')));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(pasta, A.ARQUIVO_COPIA), 'utf8')).falhas, 8);
+
+  // trava de uma rodada que morreu (computador desligado no meio): nova, espera; velha, passa por cima
+  fs.writeFileSync(path.join(pasta, A.ARQUIVO_TRAVA), `1 ${new Date(Date.now() - 60000).toISOString()}\n`);
+  assert.deepEqual(await A.atualizarCopia(cfg, { buscar }), { ocupada: true });
+  fs.writeFileSync(path.join(pasta, A.ARQUIVO_TRAVA), `1 ${new Date(Date.now() - A.VALIDADE_TRAVA - 60000).toISOString()}\n`);
+  ruins.clear();
+  assert.deepEqual(await A.atualizarCopia(cfg, { buscar }), { baixados: 8, apagados: 0, falhas: 0, total: 23 }, 'as que falharam voltam na rodada seguinte');
+  fs.rmSync(pasta, { recursive: true, force: true });
+});
+
+test('atualizador: a versão PC é gravada inteira (.parte e troca) e os pedidos dos dados e do programa têm tempo-limite', async () => {
+  const { buscar: nuvemBuscar } = await nuvem();
+  const pasta = pastaDoBackup();
+  fs.writeFileSync(path.join(pasta, A.ARQUIVO_CHAVE), JSON.stringify(await B.criarChave('senha do backup de teste')));
+  const semPrazo = [];
+  const buscar = (url, op = {}) => { if (!(op.signal instanceof AbortSignal)) semPrazo.push(`${op.method || 'GET'} ${new URL(url).pathname}`); return nuvemBuscar(url, op); };
+  const { cracha } = await L.entrarNaNuvem(SITE, { email: 'dono@exemplo.com.br', senha: SENHA, computador: 'PC' }, buscar);
+  assert.equal((await A.atualizar(A.carregarConfig({}, { site: SITE, pasta, cracha }), { buscar, hoje: '2026-11-15' })).programa, 'atualizado');
+  assert.deepEqual(semPrazo, []);
+  assert.deepEqual(fs.readdirSync(path.join(pasta, A.PASTA_PROGRAMA)).sort(), [A.ARQUIVO_PROGRAMA, 'versao.txt'], 'sem .parte sobrando');
+  fs.rmSync(pasta, { recursive: true, force: true });
+});
+
+test('ligar: a senha não vai para a nuvem (só o resumo calculado aqui, igual ao do site) e resposta estranha é recusada', async () => {
+  const { buscar } = await nuvem();
+  const corpos = [];
+  const espiao = (url, op = {}) => { corpos.push(String(op.body)); return buscar(url, op); };
+  const d = await L.entrarNaNuvem(SITE, { email: 'dono@exemplo.com.br', senha: SENHA, computador: 'PC' }, espiao);
+  assert.match(d.cracha, /^ap1_/);
+  assert.equal(corpos.length, 2, 'dois pedidos: o sal e o resumo');
+  assert.ok(corpos.every((c) => !c.includes(SENHA)), 'a senha não sai do computador');
+  assert.equal(JSON.parse(corpos[1]).senha, `pbkdf2:${await resumoSenha(SENHA, 's1', 1000)}`);
+  assert.equal(await L.resumoDaSenha('senha de teste 2026', 'sal', 150000), await resumoSenha('senha de teste 2026', 'sal', 150000), 'mesma conta de docs/js/auth.js');
+  await assert.rejects(L.entrarNaNuvem(SITE, { email: 'dono@exemplo.com.br', senha: 'senha errada', computador: 'PC' }, buscar), /E-mail ou senha errados/);
+  const resposta = (d2) => async () => new Response(JSON.stringify(d2), { headers: { 'content-type': 'application/json' } });
+  for (const ruim of [{}, { desafio: { sal: 's', iteracoes: 5 } }, { desafio: { sal: 's', iteracoes: 9e9 } }, { desafio: { iteracoes: 600000 } }]) {
+    await assert.rejects(L.entrarNaNuvem(SITE, { email: 'a@exemplo.com.br', senha: 'x', computador: 'PC' }, resposta(ruim)), /baixe a versão nova do programa/);
+  }
+});

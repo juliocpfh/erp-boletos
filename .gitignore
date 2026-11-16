@@ -8,3 +8,4 @@ previas/
 .claude/worktrees/
 nuvem/.local/
 atualizador-pc/.env
+atualizador-pc/dist/
