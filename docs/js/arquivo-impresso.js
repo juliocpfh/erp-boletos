@@ -66,6 +66,8 @@ export function itensDaPasta(d, c, soltos = null) {
   for (const [campo, nome, feito] of R.DOCUMENTOS_ENTRADA) {
     const arq = c[R.campoArquivoDoc(campo)];
     if (arq) poe({ vaga: `doc:${campo}`, grupo: 'contrato', rotulo: `${nome} ${feito}`, data: c[campo] || null, escopo: 'assinados', pasta: c.id, nome: arq });
+    // contra-vistoria do inquilino (2026-11-15): logo depois da vistoria de entrada
+    if (campo === 'doc_vistoria_em' && c.contra_vistoria) poe({ vaga: 'contra_vistoria', grupo: 'contrato', rotulo: 'Contra-vistoria do inquilino', data: c.contra_vistoria_em || null, escopo: 'contrato', pasta: c.id, nome: c.contra_vistoria });
   }
   for (const a of d.aditivos.filter((x) => x.contrato_id === c.id && x.arquivo).sort((x, y) => String(x.data).localeCompare(String(y.data)) || x.id - y.id)) {
     poe({ vaga: `aditivo:${a.id}`, grupo: 'contrato', rotulo: `Termo aditivo${a.numero ? ` nº ${a.numero}` : ''}${a.assunto ? ` (${a.assunto})` : a.tipo ? ` (${a.tipo.toLocaleLowerCase('pt-BR')})` : ''}`, data: a.data || null, escopo: 'aditivos', pasta: c.id, nome: a.arquivo });

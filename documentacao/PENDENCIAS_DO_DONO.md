@@ -18,8 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (feita; falta a 1ª rodada) | você + Claude | 5 min |
-| 10 | Opção de anexar a contra-vistoria de entrada | Claude | — |
+| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
 
 ---
 
@@ -173,9 +172,14 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   - **Troca de titular:** passo 1 com o que falta da pasta do anterior e a caixinha "Pus a pasta de fulano dentro".
   - **Falta você (depois do merge):** abrir **Dados e backup → Arquivo impresso** e, para cada inquilino, conferir a pasta de papel: o que já está nela, marque e use "Já está tudo em papel"; o que falta, "Ver a capa e imprimir tudo". Termo do acordo: anexe no boleto do acordo (Etapas do acordo → "anexar o termo assinado"); enquanto faltar, o Painel avisa.
 
-## 10. Anexar a contra-vistoria de entrada  `[ ]`
+## 10. Anexar a contra-vistoria de entrada  `[x]` (feito em 15/11)
 
-**Pedido do dono em 15/11.** Criar um lugar próprio para anexar a **contra-vistoria de entrada** (a resposta do inquilino à vistoria de entrada, com o que ele encontrou de diferente). Hoje ela só pode ir solta em "Arquivos do inquilino". Antes de fazer, confirmar com o dono: onde fica o botão (junto da vistoria de entrada?), se vira etapa da entrada com prazo e se entra na pasta física (9c).
+**Pedido do dono em 15/11.** Lugar próprio para anexar a **contra-vistoria de entrada** (o que o inquilino encontrou de diferente da vistoria de entrada). Decisões do dono: vira etapa da entrada, logo abaixo de "Vistoria de entrada assinada", com prazo, e entra na pasta física.
+- **Prazo:** 5 dias úteis da entrega das chaves (cláusula da vistoria). Ex.: chaves em 13/11/2026 → até 23/11/2026 (20/11 é feriado).
+- **Na etapa:** data em que o inquilino mandou + arquivo (PDF, foto ou o e-mail salvo em PDF) → **Anexar**. Se ele avisar que não vai mandar, **Não houve**.
+- **Passado o prazo sem nada anexado:** a etapa fecha sozinha como "não houve" (a vistoria vale como aceita) e não segura a pasta física; ainda dá para anexar depois. Inquilinos antigos ficam assim.
+- **Troca de titular:** vale a contra-vistoria do contrato anterior.
+- **Falta você (depois do merge):** nada obrigatório. Se algum inquilino recente mandou contra-vistoria, anexe na etapa.
 
 ## Ficou de fora de propósito (não é defeito)
 

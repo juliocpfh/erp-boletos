@@ -18,7 +18,7 @@ import { FORMULARIOS_EMAILS } from './emails.js';
 import { FORMULARIOS_REGRAS } from './regras-sistema.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
-import { acertarNomesDosComprovantes, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
+import { acertarNomesDosComprovantes, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
@@ -175,6 +175,18 @@ export const FORMULARIOS = {
     if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
     const nome = await salvarAssinado('assinados', Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
     await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
+    await mostrar();
+  },
+
+  /** Rotina de entrada: contra-vistoria do inquilino (data em que ele mandou e o arquivo, na pasta do inquilino). */
+  async contraVistoria(form) {
+    const f = Object.fromEntries(new FormData(form));
+    if (!f.data) throw new C.ErroUsuario('Informe a data em que o inquilino mandou a contra-vistoria.');
+    const arq = form.querySelector('[name=arquivo]').files[0];
+    if (!arq) throw new C.ErroUsuario('Escolha o arquivo da contra-vistoria (PDF, foto ou o e-mail salvo em PDF).');
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante('contra-vistoria', f.data, arq)));
+    await alterarApagandoAnexos((db) => R.registrarContraVistoria(db, Number(f.contrato), { data: f.data, arquivo: nome }, login()));
+    aviso('Contra-vistoria anexada.');
     await mostrar();
   },
 

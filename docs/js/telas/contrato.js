@@ -12,7 +12,7 @@ import { esc } from '../formularios.js';
 import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { caixaReservaAbatida, linkComprovante, xAnexo } from './cadastros.js';
-import { alertaArquivosFaltando, alertaDesligado, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
+import { ACEITA_DOCUMENTOS, alertaArquivosFaltando, alertaDesligado, botao, buscar, caixaArquivos, caixaHistorico, classeAlerta, d, endereco, etiqueta, item, link, nomePastaContrato, opera, situacao, tabelaHistorico, ultimos } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Contrato / inquilino
@@ -602,6 +602,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
   };
   const acoes = (e) => {
     // Arquivo impresso: a pasta se monta na tela da pasta (não se marca à mão)
+    if (e.chave === 'contra_vistoria') return acoesContraVistoria(e);
     if (e.chave === 'pasta_fisica') return e.situacao === 'feita' ? link(`#/pasta-fisica/${c.id}`, 'Ver a pasta', mini) : link(`#/pasta-fisica/${c.id}`, 'Montar a pasta', e.situacao === 'pendente' ? 'botao mini' : mini);
     if (!opera()) return '';
     if (['feita', 'pulada'].includes(e.situacao)) return e.manual ? botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao') : '';
@@ -618,9 +619,22 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
         <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
-  // vistoria de entrada: o inquilino tem 5 dias úteis, desde a entrega das chaves, para apontar defeito não descrito (cláusula da vistoria)
-  const limite = c.data_entrada ? C.limiteVistoriaEntrada(c.data_entrada) : null;
-  const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}${e.chave === 'vistoria_assinada' && limite && hoje <= limite ? `<br><span class="suave">O inquilino pode apontar defeitos até ${dataBr(limite)} (5 dias úteis da entrega das chaves).</span>` : ''}`;
+  // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
+  // a etapa antes do prazo. Passado o prazo, fecha sozinha, e ainda dá para anexar. Na troca de titular vale a do anterior.
+  function acoesContraVistoria(e) {
+    if (c.contra_vistoria) {
+      return linkComprovante(c.id, c.contra_vistoria, { tabela: 'contratos', id: c.id, campo: 'contra_vistoria', tipo: 'contra-vistoria', data: c.contra_vistoria_em })
+        .replace('📎 comprovante', '📎 contra-vistoria').replace('anexar comprovante', 'anexar a contra-vistoria').replace('Apagar o comprovante', 'Apagar a contra-vistoria');
+    }
+    if (!opera() || anterior) return '';
+    if (e.manual) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao');
+    return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
+        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que o inquilino mandou">
+        <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+        <button class="secundario mini">Anexar</button></form>
+      ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: c.id, chave: e.chave }, 'link-botao')}</div>`;
+  }
+  const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}`;
   const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
     <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join('')}</table></div>`;
   const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
