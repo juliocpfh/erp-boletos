@@ -3,6 +3,7 @@ import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } fro
 import * as S from '../armazenamento.js';
 import { dataBr, dataHoraBr, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
+import * as N from '../nuvem.js';
 import * as R from '../regras.js';
 import { botao, carregarParte } from './comum.js';
 
@@ -123,7 +124,33 @@ function relatorio(r) {
   return `<div class="alerta ${r.ok && !r.recusados.length ? 'ok' : 'perigo'}"><b>${r.ok && !r.recusados.length ? 'Pronto: os dados estão na nuvem.' : 'Terminou, mas confira:'}</b><ul>${itens.map((i) => `<li>${i}</li>`).join('')}</ul></div>`;
 }
 
+const apiDados = () => N.apiDoSite('api/dados/');
+
+/**
+ * "Aparelhos ligados" (em Usuários): computadores com o programa do PC (atualizador-pc/), cada um com o crachá que só lê.
+ * Só na nuvem (o crachá é dela). Desligar para o crachá na hora (nos anexos, em até 1 minuto).
+ */
+export async function aparelhosLigadosHtml() {
+  if (!E.nuvem) return '';
+  let lista;
+  try { lista = (await apiDados()('GET', 'aparelhos')).aparelhos || []; } catch (e) {
+    return `<div class="cartao"><h2>Aparelhos ligados</h2><div class="alerta erro">Não deu para ver os aparelhos agora: ${esc(e.message)}</div></div>`;
+  }
+  const linhas = lista.map((a) => `<tr><td>${esc(a.computador)}</td><td>${esc(a.nome)}${a.usuario_ativo ? '' : ' <span class="suave">(usuário bloqueado: o crachá não vale)</span>'}</td>
+    <td>${dataHoraBr(a.ligado_em)}</td><td>${dataHoraBr(a.ultimo_uso)}${a.parado ? ' <span class="suave">(parado há mais de 90 dias: precisa ligar de novo)</span>' : ''}</td>
+    <td class="n">${botao('desligarAparelho', 'Desligar', { id: a.id }, 'perigo pequeno', `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join('');
+  return `<div class="cartao"><h2>Aparelhos ligados</h2>
+    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
+    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
+}
+
 export const ACOES_NUVEM = {
+  async desligarAparelho({ id }) {
+    await apiDados()('POST', 'desligar-aparelho', { id: Number(id) });
+    aviso('Computador desligado.');
+    await mostrar();
+  },
+
   /** Etapa 4: escolhe a pasta de sempre e leva tudo para a nuvem (nuvem vazia; ou o administrador substitui). */
   async levarParaNuvem(ds) {
     if (!S.suportado()) throw Object.assign(new Error('Faça isto no computador (Chrome ou Edge), onde está a pasta do OneDrive.'), { esperado: true });

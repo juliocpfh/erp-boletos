@@ -27,7 +27,7 @@ import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fe
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
-import { telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
+import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
@@ -401,8 +401,9 @@ export const TELAS = {
   'pasta-fisica': (rota) => telaPastaFisica(Number(rota.partes[1])),
   'pasta-impressao': (rota) => telaPastaImpressao(Number(rota.partes[1])),
   conflitos: () => telaConflitos(),
-  usuarios() {
+  async usuarios() {
     if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
+    const aparelhos = await aparelhosLigadosHtml(); // programa do PC (só na nuvem)
     const pendentes = d().usuarios.filter((u) => u.pendente);
     const papeis = Object.entries(PAPEIS).map(([k, v]) => `<option value="${k}" ${k === 'operador' ? 'selected' : ''}>${v}</option>`).join('');
     return `<div class="cabecalho"><h1>Usuários</h1>${link('#/novo/usuarios', 'Novo usuário', 'botao')}</div>
@@ -413,7 +414,7 @@ export const TELAS = {
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>
       ${ordenar(d().usuarios.filter((u) => !u.pendente), 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}</td>
         <td class="n nw">${u.id === E.usuario.id ? '<span class="suave">você</span>' : botao('bloquearUsuario', u.ativo ? 'Bloquear' : 'Desbloquear', { id: u.id }, u.ativo ? 'perigo pequeno' : 'pequeno', u.ativo ? `Bloquear o acesso de ${u.nome}?` : '')} ${link(`#/editar/usuarios/${u.id}`, 'Editar')}</td></tr>`).join('')}</table>
-      <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>`;
+      <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
   },
   'minha-senha': () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label>Senha atual</label><input type="password" name="atual"></p>

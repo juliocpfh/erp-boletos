@@ -64,8 +64,12 @@ test('chave de serviço errada, pasta sem chave do backup e configuração incom
   await assert.rejects(A.atualizar(cfg, { buscar: siteFalso().buscar }), /não é uma pasta de backup seguro/);
   fs.writeFileSync(path.join(pasta, A.ARQUIVO_CHAVE), JSON.stringify(await B.criarChave(SENHA)));
   await assert.rejects(A.atualizar({ ...cfg, clientSecret: 'outro' }, { buscar: siteFalso().buscar }), /não aceitou a chave de serviço/);
-  assert.throws(() => A.carregarConfig({ SITE: 'https://x' }), /Falta no .env: ACCESS_CLIENT_ID, ACCESS_CLIENT_SECRET, PASTA_BACKUP/);
-  assert.equal(A.carregarConfig({ ACCESS_CLIENT_ID: 'a', ACCESS_CLIENT_SECRET: 'b', PASTA_BACKUP: pasta, SITE: 'https://erp.exemplo.com.br/' }).site, 'https://erp.exemplo.com.br');
+  assert.throws(() => A.carregarConfig({ SITE: 'https://x' }, null), /ainda não está ligado ao sistema: dê dois cliques em ligar-computador.cmd/);
+  assert.throws(() => A.carregarConfig({ ACCESS_CLIENT_ID: 'a' }, null), /Falta no .env: ACCESS_CLIENT_SECRET, PASTA_BACKUP/);
+  assert.equal(A.carregarConfig({ ACCESS_CLIENT_ID: 'a', ACCESS_CLIENT_SECRET: 'b', PASTA_BACKUP: pasta, SITE: 'https://erp.exemplo.com.br/' }, null).site, 'https://erp.exemplo.com.br');
+  // o crachá, quando há, passa na frente do .env antigo
+  const comCracha = A.carregarConfig({ ACCESS_CLIENT_ID: 'a', ACCESS_CLIENT_SECRET: 'b', PASTA_BACKUP: 'outra' }, { site: 'https://erp.exemplo.com.br', pasta, cracha: 'ap1_x' });
+  assert.deepEqual([comCracha.cracha, comCracha.pasta, comCracha.clientId], ['ap1_x', pasta, undefined]);
   fs.rmSync(pasta, { recursive: true, force: true });
 });
 

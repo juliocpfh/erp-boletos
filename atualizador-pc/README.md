@@ -6,37 +6,54 @@ Programinha que roda **no computador do administrador**, sozinho (pelo Agendador
 
 Tudo que ele grava é cifrado com a mesma chave do backup seguro: sem a senha do backup, ninguém lê nada na pasta.
 
+## Como ele entra na nuvem: o "crachá do aparelho" (desde 15/11/2026)
+
+O computador entra **com o e-mail e a senha do sistema**, uma vez só (decisão do dono, `documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md`, seção 8, item 10). A nuvem confere a senha e entrega um **crachá** só deste computador:
+
+- O crachá **só lê** (dados, arquivos e versão PC): não grava nada no sistema.
+- Vale o acesso de quem ligou: se essa pessoa for bloqueada em Usuários, o computador para também.
+- Aparece no sistema em **Usuários → Aparelhos ligados** (computador, quem ligou, quando, última vez), com o botão **Desligar** (computador roubado, funcionário que saiu): para na hora (nos arquivos, em até 1 minuto).
+- Computador que passa **90 dias** sem rodar precisa ser ligado de novo.
+- A **senha não fica guardada**. O crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre) em `%LOCALAPPDATA%\Administracao de Imoveis\cracha.dat`, ao lado de `config.json` (site, pasta e nome do computador). Fora do OneDrive; copiar a pasta para outro computador não leva o crachá.
+- Errou a senha 5 vezes: espera 15 minutos.
+
+Não precisa mais de chave de serviço do Cloudflare, de `.env` nem do segredo `SERVICOS`.
+
+**Por que uma página no navegador?** É o jeito mais simples sem instalar nada além do Node: o programa abre no navegador uma página que só existe neste computador (`http://127.0.0.1:<porta>/<código sorteado>`; outro site ou outro computador não chega nela), com os campos e-mail, senha, nome do computador e a pasta (botão **Escolher…** abre a janela de pastas do Windows). Quando liga, a página diz "Pronto" e pode ser fechada.
+
 ## O que precisa ter
 
 - [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais.
 - O backup seguro já ligado neste computador (Dados e backup → Backup seguro): a pasta escolhida tem o arquivo `chave-do-backup.json`.
-- Uma **chave de serviço** do Cloudflare Access (abaixo).
+- Na nuvem, a regra **Bypass** do caminho `/api/aparelho` no Cloudflare Access (uma vez só, feita pelo dono: passo a passo em `nuvem/README.md`, "Programa do PC"). Sem ela a página avisa: *"falta a regra Bypass"*.
 
-## Passo a passo
+## Passo a passo (computador novo)
 
 1. Copie a pasta `atualizador-pc` para o computador (ex.: `C:\Imoveis\atualizador-pc`).
-2. Crie a chave de serviço no painel do Cloudflare (conta do sistema): **Zero Trust → Access → Service Auth → Service Tokens → Create Service Token**. Nome `atualizador-pc`, duração 1 ano. Copie o **Client ID** e o **Client Secret** (o Secret só aparece uma vez).
-3. Deixe a chave entrar no sistema: **Zero Trust → Access → Applications → "Sistema de Imoveis" → Policies → Add a policy**: nome `Atualizador`, ação **Service Auth**, regra *Include → Service Token → atualizador-pc*. Salve.
-4. Diga ao Worker de quem é essa chave: **Workers & Pages → erp-boletos → Settings → Variables and secrets → Add**, tipo **Secret**, nome `SERVICOS`, valor `<Client ID>=<seu e-mail do sistema>`, tudo junto e sem espaços (ex.: `1a2b3c.access=fulano@gmail.com`; o e-mail de um administrador cadastrado em Usuários; mais de uma chave: separe por vírgula). Sem isso a nuvem recusa a chave com "Este e-mail não tem acesso ao sistema": é o mesmo aviso quando o Client ID foi copiado com o começo `CF-Access-Client-Id:` ou com espaço sobrando.
-5. Na pasta copiada, copie `.env.exemplo` para `.env` e preencha `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET` e `PASTA_BACKUP` (a pasta do backup seguro).
-6. Clique com o botão direito em `instalar-tarefa.cmd` → **Executar como administrador**: cria as duas tarefas no Windows e já roda a primeira atualização (com dois cliques normais só a das 20h é criada; a "ao entrar" dá "Acesso negado" sem administrador). Deve aparecer `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
+2. Clique com o botão direito em `instalar-tarefa.cmd` → **Executar como administrador**: cria as tarefas no Windows e roda a primeira atualização. Como o computador ainda não está ligado, abre a página de ligar no navegador: e-mail e senha do sistema, a pasta do backup seguro → **Ligar**. Em seguida aparece `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
+3. Confira no sistema: **Usuários → Aparelhos ligados** mostra o computador.
 
-Para rodar na mão a qualquer hora: `node atualizador.mjs`. Para desfazer as tarefas: `desinstalar-tarefa.cmd`.
+Para ligar de novo (depois de Desligar, de 90 dias parado, ou para trocar de usuário): dois cliques em `ligar-computador.cmd`. Para rodar na mão a qualquer hora: `node atualizador.mjs`. Para desfazer as tarefas: `desinstalar-tarefa.cmd`.
+
+## Para quem já usava o jeito antigo (chave de serviço + `.env`)
+
+1. Copie por cima os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`). Até ligar, ele continua funcionando com o `.env` de antes.
+2. Dois cliques em `ligar-computador.cmd` e entre com e-mail e senha (a pasta já vem preenchida com a do `.env`). Dali em diante o crachá passa na frente do `.env`.
+3. Confira `ultima-atualizacao.txt` no dia seguinte (`ok …`). Só então apague: o arquivo `.env` desta pasta; no Cloudflare, a chave de serviço `atualizador-pc` (Zero Trust → Access controls → Service credentials), a política "Atualizador" do aplicativo "Sistema de Imoveis" e o segredo `SERVICOS` do Worker (Workers & Pages → `erp-boletos` → Settings → Variables and secrets). A nuvem continua aceitando a chave de serviço até lá.
 
 ## Cópia aberta dos arquivos (desde 15/11/2026)
 
 Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subpasta **`Arquivos dos imoveis`**: os arquivos do sistema **sem cifrar**, como estão na nuvem (imóvel → Inquilinos → pessoa), para abrir, imprimir e copiar direto no Windows. Ela é só para consulta: o que for posto ou mudado lá não volta para o sistema. A cada vez ele baixa só o que é novo ou mudou e tira da cópia o que foi apagado no sistema (arquivo apagado à mão na cópia volta). O registro fica em `copia-aberta.json`.
 
 - Todo dia às 20h e ao entrar no Windows: dados, versão PC e arquivos.
-- **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta).
+- **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta; escondida, ela nunca abre a página de ligar: só registra o erro).
 - O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Dados e backup → Backup seguro).
-
-**Para quem já tinha o atualizador instalado:** copie por cima, na pasta onde ele está, os arquivos novos `atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd` e `rodar-escondido.vbs` (o `.env` continua o mesmo) e rode `instalar-tarefa.cmd` de novo **como administrador** (cria a tarefa de hora em hora). A primeira vez baixa todos os arquivos e pode demorar.
 
 ## Como saber se está funcionando
 
-- Na pasta do backup seguro, `ultima-atualizacao.txt` tem a data e o resultado da última execução (`ok` ou `FALHOU` com o motivo).
-- Em `copias-diarias/` aparece um arquivo por dia (`imoveis-dados-AAAA-MM-DD.bkp`, ficam 60); em `programa/`, a versão PC (`administracao-imoveis.html`) e a data dela (`versao.txt`).
+- Na pasta do backup seguro, `ultima-atualizacao.txt` tem a data e o resultado da última execução (`ok` ou `FALHOU` com o motivo). "Não está mais ligado ao sistema" = foi desligado em Usuários ou ficou 90 dias parado: `ligar-computador.cmd`.
+- Em `copias-diarias/` aparece um arquivo por dia (`imoveis-dados-AAAA-MM-DD.bkp`, ficam 60); em `programa/`, a versão PC (`administracao-imoveis.html`) e a versão dela (`versao.txt`).
+- No sistema: **Usuários → Aparelhos ligados → Última vez**.
 - No Windows: Agendador de Tarefas → "Imoveis - atualizador da versao PC" → Histórico.
 
 ## Quando o site cair
@@ -45,6 +62,11 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 
 ## Segurança
 
-- O `.env` tem a chave de serviço, que dá acesso de leitura aos dados: a pasta fica só neste computador, nunca no GitHub (`.gitignore`) nem no OneDrive compartilhado. Quem tiver acesso ao computador tem acesso à chave: proteja o Windows com senha.
-- A chave só lê (`GET`); a nuvem continua exigindo o site para gravar. Se a chave vazar: no painel do Cloudflare, Service Tokens → revogar, e tirar o Client ID de `SERVICOS`.
-- O Worker confere a chave do mesmo jeito que confere o login por e-mail (assinatura do Access); `SERVICOS` só diz com qual usuário do sistema a chave entra, e esse usuário precisa estar ativo.
+- O crachá só lê e só funciona nesta conta do Windows (DPAPI). Quem usa este computador com a sua conta consegue rodar o atualizador: proteja o Windows com senha. Computador perdido: **Desligar** em Usuários.
+- A porta `/api/aparelho/` fica fora do login do Access, por isso: só entra quem sabe e-mail e senha de um usuário ativo (5 erros por e-mail, 10 por endereço de internet ou 50 no total = espera), o crachá é sorteado (256 bits) e a nuvem guarda só o resumo (hash) dele. As outras rotas da nuvem continuam exigindo o Access.
+- A versão PC vem do GitHub (o repositório é público; é o próprio programa, sem dados), buscada pela nuvem.
+
+## Falta (etapa 2 da proposta)
+
+- **Instalador `.exe` assinado** (sem instalar o Node, "Avançar, Avançar, Concluir", cria as tarefas sozinho, ícone na Área de Trabalho e atualização do próprio programa). Até lá: Node + esta pasta + `instalar-tarefa.cmd`. A assinatura do instalador (certificado de assinatura de código) ainda espera a decisão do dono (proposta, seção 8, item 11).
+- Com o login próprio (etapa 4), a página de ligar pede também o código de confirmação.

@@ -18,7 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
+| 9 | Programa no PC: ícone (você) e entrar com e-mail e senha em vez da chave de serviço (feito; falta a regra Bypass no Cloudflare, item 9e). Cópia aberta e pasta física: feitas | você | 15 min |
 
 ---
 
@@ -146,7 +146,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ## 8. Lembretes com data
 
-- **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
+- **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`) — só se o computador ainda não foi ligado com o crachá (item 9e; depois dele, a chave é apagada). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
 - **15/12/2026**: prazo do Senado para a alíquota final da CBS. **Em 16/12/2026** retomar o item CBS 2027 (item 6): conferir a alíquota aprovada e falar com o contador antes de mudar a aba Impostos.
 
 ---
@@ -171,6 +171,11 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   - Tela da pasta com caixinhas, **Ver a capa e imprimir tudo** (capa + documentos numa impressão só; depois "Saiu tudo certo?") e **Já está tudo em papel**. Fora da pasta: NF, comprovantes, boletos, WhatsApp, documentos de renda e Serasa, fotos da vistoria, apólices e e-mails.
   - **Troca de titular:** passo 1 com o que falta da pasta do anterior e a caixinha "Pus a pasta de fulano dentro".
   - **Falta você (depois do merge):** abrir **Dados e backup → Arquivo impresso** e, para cada inquilino, conferir a pasta de papel: o que já está nela, marque e use "Já está tudo em papel"; o que falta, "Ver a capa e imprimir tudo". Termo do acordo: anexe no boleto do acordo (Etapas do acordo → "anexar o termo assinado"); enquanto faltar, o Painel avisa.
+- [ ] **9e. Programa do PC sem chave de serviço** (feito em 15/11, etapa 1 da proposta de licença; falta você, depois do merge, ~15 min): o computador entra com o **seu e-mail e senha do sistema** e recebe um "crachá" que só lê, guardado cifrado pelo Windows; aparece em **Usuários → Aparelhos ligados** com o botão **Desligar**.
+  1. No Cloudflare, criar a regra **Bypass** do caminho `erp.ankjck.com.br/api/aparelho` (passo a passo em `nuvem/README.md`, "Programa do PC: regra Bypass no Access"). Teste: abrir `https://erp.ankjck.com.br/api/aparelho/saude` sem login mostra "Este computador não está ligado ao sistema".
+  2. Copiar para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`) e dar dois cliques em `ligar-computador.cmd`: abre uma página no navegador; e-mail, senha e a pasta (já vem preenchida) → **Ligar**.
+  3. No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker (o lembrete de 08/11/2027 deixa de valer).
+  - Fica para a etapa 2: instalador `.exe` (sem instalar o Node); sem assinatura no seu computador, certificado só antes do primeiro cliente de fora (proposta, item 11).
 
 ## Ficou de fora de propósito (não é defeito)
 
