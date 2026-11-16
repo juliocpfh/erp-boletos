@@ -68,5 +68,5 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 
 ## Falta (etapa 2 da proposta)
 
-- **Instalador `.exe` assinado** (sem instalar o Node, "Avançar, Avançar, Concluir", cria as tarefas sozinho, ícone na Área de Trabalho e atualização do próprio programa). Até lá: Node + esta pasta + `instalar-tarefa.cmd`. A assinatura do instalador (certificado de assinatura de código) ainda espera a decisão do dono (proposta, seção 8, item 11).
+- **Instalador `.exe` assinado** (sem instalar o Node, "Avançar, Avançar, Concluir", cria as tarefas sozinho, ícone na Área de Trabalho e atualização do próprio programa). Até lá: Node + esta pasta + `instalar-tarefa.cmd`. Assinatura do instalador (certificado de assinatura de código): sem assinatura no computador do dono; comprar antes do primeiro cliente de fora (proposta, seção 8, item 11).
 - Com o login próprio (etapa 4), a página de ligar pede também o código de confirmação.
