@@ -1,7 +1,7 @@
 # Proposta: rotina "Arquivo impresso" (pasta física do inquilino)
 
 Item **9c** de `PENDENCIAS_DO_DONO.md` e decisão de 15/11/2026 em `DECISOES.md`.
-**Nada foi programado ainda.** Leia, responda as perguntas da seção 8 e diga "aprovado" (ou o que mudar).
+**Nada foi programado ainda.** O dono respondeu as perguntas da seção 8 em 15/11/2026 e o texto abaixo já está ajustado às respostas. Falta só o "aprovado" para implementar.
 
 Nomes e datas abaixo são de exemplo: **Ana Souza** (inquilina do Apto 2, Rua das Flores, 100), **Pedro Lima** e **Lúcia Lima** (troca de titular na Loja 1).
 
@@ -25,13 +25,15 @@ Nomes e datas abaixo são de exemplo: **Ana Souza** (inquilina do Apto 2, Rua da
 ┌─ Regras do sistema ─────────────────────────────────────────────────┐
 │ Rotina                                                               │
 │                                                                      │
-│ Arquivo impresso (pasta física de cada inquilino)   [ Sim | ●Não ]  │
+│ Arquivo impresso (pasta física de cada inquilino)   [ ●Sim | Não ]  │
 │   O sistema avisa o que imprimir na entrada, na saída e quando chega │
 │   documento novo importante, e guarda o que já está em papel.        │
 │   Consequência: ao ligar, cada inquilino ativo ganha uma pendência   │
 │   "Montar a pasta física" (veja a lista em Arquivo impresso).        │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+**Começa ligada** (resposta 1): ao publicar, a rotina já funciona e a primeira rodada (seção 5) aparece.
 
 **Ligada:**
 - aparece a etapa **"Montar a pasta física"** no fim da entrada e da saída;
@@ -72,19 +74,14 @@ Exemplo: Ana assinou o contrato em 05/12/2026, a vistoria e as chaves em 10/12/2
 │ [x] Fiador Carlos Dias: documento com foto e CPF                       1    │
 │                                                                             │
 │ RECIBOS (gerados pelo sistema)                                              │
-│ [x] Recibo da reserva (R$ 500,00, 25/11/2026)                          1    │
-│ [x] Recibo da caução (R$ 6.000,00, 05/12/2026)                         1    │
-│                                                                             │
-│ SEGURO                                                                      │
-│ [x] Apólice contra incêndio (16/12/2026 a 15/12/2027)                  4    │
+│ [x] Recibo da reserva, cópia da locadora (R$ 500,00, 25/11/2026)       1    │
+│ [x] Recibo da caução, cópia da locadora (R$ 6.000,00, 05/12/2026)      1    │
 │                                                                             │
 │ ESCOLHER SE QUISER (vêm desmarcados)                                        │
-│ [ ] Fotos da vistoria de entrada (32 fotos)                           32    │
-│ [ ] E-mail "Boas-vindas" (enviado em 10/12/2026): imprima pelo Gmail        │
 │ [ ] Outros arquivos da pasta: planta-apto2.pdf                         2    │
 │                                                                             │
 │ ─────────────────────────────────────────────────────────────────────────── │
-│ Marcados: 10 documentos, 34 páginas + capa                                  │
+│ Marcados: 9 documentos, 30 páginas + capa                                   │
 │                                                                             │
 │  [ Ver a capa ]   [ Imprimir tudo ]   [ Já está tudo em papel ]             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -98,12 +95,11 @@ Cada linha tem um **olho** (abrir só aquele documento) e, depois da primeira im
 - Comprovantes de pagamento (caução, depósito, reserva, aplicação, devolução, saldo da saída, contas pagas). O **recibo** entra; o **comprovante do banco**, não.
 - Boletos (pagos ou em aberto).
 - Textos do WhatsApp (lembretes de cobrança).
-- Itens da ficha que não precisam: declaração do imposto de renda, holerites, extratos bancários, pró-labore, carteira de trabalho, análise do Serasa (veja a pergunta 2).
+- Itens da ficha que não precisam: declaração do imposto de renda, holerites, extratos bancários, pró-labore, carteira de trabalho, análise do Serasa (resposta 2).
+- Fotos da vistoria (resposta 3): a vistoria assinada já descreve o estado do imóvel.
+- Apólices do seguro, nem a da entrada nem as renovações (resposta 4).
+- E-mails (resposta 6).
 - Cópias para o contador e qualquer coisa da pasta do imóvel (contas pagas, IPTU).
-
-### E-mails
-
-Só aparecem na parte "Escolher se quiser", desmarcados. O sistema **não guarda o texto** do e-mail (só a data, para quem e o assunto). Por isso, ao marcar um e-mail, ele entra na capa e o sistema lembra de **imprimir pelo próprio Gmail** (assim sai a data e o destinatário verdadeiros). Veja a pergunta 6.
 
 ### O botão "Imprimir tudo"
 
@@ -141,7 +137,7 @@ Uma página A4, para ser a primeira folha da pasta:
 │  3  Termo de entrega das chaves assinado 10/12/2026    1     │
 │  4  Ficha cadastral assinada             28/11/2026    3     │
 │  ...                                                         │
-│ 10  Apólice contra incêndio              16/12/2026    4     │
+│  9  Recibo da caução (cópia da locadora) 05/12/2026    1     │
 │     Imprimir à parte: —                                      │
 │                                                              │
 │ Montada em 16/12/2026 por julio (entrada)                    │
@@ -161,7 +157,9 @@ Uma página A4, para ser a primeira folha da pasta:
 
 ### Documento novo importante durante o contrato
 
-Contam como importantes: **termo aditivo assinado**, **termo de confissão de dívida (acordo) assinado**, **termos e recibos assinados** e **notificações** anexadas na pasta do inquilino.
+Contam como importantes: **termo aditivo assinado**, **carta de reajuste** (pelo índice e pelo novo valor negociado, resposta 5), **termo de confissão de dívida (acordo) assinado** (resposta 7), **termos e recibos assinados** e **notificações** anexadas na pasta do inquilino.
+
+Acordo: hoje o sistema não guarda o termo do acordo assinado. Ao fazer um acordo, o aviso diz "anexe o termo assinado do acordo na pasta do inquilino para imprimir"; só o termo assinado entra (as parcelas são parte financeira e ficam fora, como os boletos).
 
 Exemplo: em 10/02/2027 é anexado o termo aditivo nº 2 de Ana (troca do vencimento para o dia 10).
 
@@ -181,7 +179,9 @@ Exemplo: em 10/02/2027 é anexado o termo aditivo nº 2 de Ana (troca do vencime
 
 **Onde some:** ao confirmar "saiu tudo certo", ao marcar "já está em papel" ou "não vai". O que foi impresso continua listado na parte **"Pasta física"** da página da inquilina (histórico: o que está no papel, quando e por quem).
 
-Não geram aviso durante o contrato: carta de reajuste, renovação anual do seguro, fotos, e-mails (veja as perguntas 4 e 5).
+Não geram aviso durante o contrato: seguro (apólice nova ou renovação), fotos, e-mails.
+
+Exemplo da carta: reajuste de Ana em 12/2027 pelo IGP-M, carta enviada em 05/11/2027 → aviso "Carta de reajuste de 12/2027 (enviada em 05/11/2027)". O mesmo para um novo valor negociado.
 
 ### Saída
 
@@ -195,8 +195,6 @@ Exemplo: Ana sai em 30/11/2029; vistoria de saída em 02/12/2029; termo de devol
 │ [x] Termo de devolução das chaves assinado (02/12/2029)            │
 │ [x] Termo de quitação assinado (20/12/2029)                        │
 │ [x] Notificações e documentos novos ainda não impressos            │
-│ [ ] Fotos da vistoria de saída (18 fotos)                          │
-│ [ ] E-mails da saída (imprimir pelo Gmail)                         │
 │                                                                    │
 │ Guardar a pasta até 20/12/2039 (10 anos)                           │
 ```
@@ -208,7 +206,7 @@ O comprovante da devolução do saldo **não** entra (é comprovante de pagament
 
 ## 4. Arquivo importante trocado
 
-Vale para os documentos que vêm **marcados** (contrato, vistoria, termos, aditivos, recibos, documentos da pessoa, apólice). Se o arquivo de um deles for trocado **depois de impresso** (anexaram outro no lugar, ou o arquivo foi substituído na pasta), aparece no Painel e na página do inquilino:
+Vale para os documentos que vêm **marcados** (contrato, vistoria, termos, aditivos, cartas de reajuste, recibos, documentos da pessoa). Se o arquivo de um deles for trocado **depois de impresso** (anexaram outro no lugar, ou o arquivo foi substituído na pasta), aparece no Painel e na página do inquilino:
 
 ```
 ┌─ Pasta física: arquivo trocado ──────────────────────────────────────┐
@@ -220,13 +218,15 @@ Vale para os documentos que vêm **marcados** (contrato, vistoria, termos, aditi
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-"A troca não muda o papel" serve para quando só mudou o nome ou a qualidade do PDF. Foto ou arquivo da parte "escolher se quiser" trocado não avisa.
+"A troca não muda o papel" serve para quando só mudou o nome ou a qualidade do PDF. Arquivo da parte "escolher se quiser" trocado não avisa.
 
 ---
 
 ## 5. Começo: o que já existe
 
 Ao ligar a chave, **cada inquilino ativo** que já passou da entrada ganha uma pendência "Montar a pasta física (o que já existe)". Quem ainda está no meio da entrada segue a etapa normal (seção 2).
+
+**Ex-inquilinos** (resposta 9): só entram os que **passaram o contrato adiante numa troca de titular** (ex.: Pedro Lima, que passou a Loja 1 para Lúcia Lima). Eles não aparecem sozinhos na lista: a pasta deles é o passo 1 da pendência de quem herdou (seção 6). Os outros que já saíram ficam de fora.
 
 **Onde aparece a lista:** um botão novo **Arquivo impresso** em Dados e backup (e um link no alerta do Painel):
 
@@ -264,7 +264,7 @@ A etapa "Montar a pasta física" de **Lúcia** (fim da entrada dela, que inclui 
 │ PASSO 1 · Pasta de Pedro Lima                                          │
 │   Situação: 2 documentos de Pedro ainda não estão em papel             │
 │   [x] Termo aditivo nº 1 de Pedro (troca do vencimento, 05/2025)       │
-│   [x] Apólice contra incêndio 2025/2026                                │
+│   [x] Carta de reajuste de 03/2025 de Pedro                           │
 │   [ Imprimir o que falta de Pedro ]                                    │
 │   [ ] Pus a pasta de Pedro Lima dentro da pasta de Lúcia Lima          │
 │                                                                        │
@@ -293,7 +293,7 @@ A etapa "Montar a pasta física" de **Lúcia** (fim da entrada dela, que inclui 
 
 **O que fica guardado** (parte técnica, seguindo as regras do `CLAUDE.md`):
 
-- **Regra nova** em `DEFINICOES_REGRAS` (`config-regras.js`): `arquivo_impresso`, grupo "rotina", tipo sim/não, **padrão "Não"** (igual a hoje), com explicação, consequência e lei (Código Civil, art. 205: prazo geral de 10 anos; LGPD, arts. 16 e 46: guardar só o necessário e com segurança, também no papel). Lida sempre por `regra('arquivo_impresso')`.
+- **Regra nova** em `DEFINICOES_REGRAS` (`config-regras.js`): `arquivo_impresso`, grupo "rotina", tipo sim/não, **padrão "Sim"** (decisão do dono, resposta 1; foge da regra "padrão igual a hoje" do `CLAUDE.md` por pedido explícito), com explicação, consequência e lei (Código Civil, art. 205: prazo geral de 10 anos; LGPD, arts. 16 e 46: guardar só o necessário e com segurança, também no papel). Lida sempre por `regra('arquivo_impresso')`.
 - **Tabela nova** `pastas_fisicas` em `TABELAS` (`regras.js`), uma linha por vez que a pasta foi montada ou completada:
   - `contrato_id`; `momento`: `entrada`, `durante`, `saida`, `inicio` (o que já existia) ou `heranca`;
   - `data` (`'AAAA-MM-DD'`) e `por` (login de quem confirmou);
@@ -311,32 +311,21 @@ A etapa "Montar a pasta física" de **Lúcia** (fim da entrada dela, que inclui 
 
 ---
 
-## 8. Perguntas para você decidir
+## 8. Respostas do dono (15/11/2026)
 
-Cada uma com a minha recomendação. Basta responder "concordo" ou dizer o que prefere.
+| Nº | Pergunta | Resposta do dono |
+|---|---|---|
+| 1 | A chave começa desligada? | **Não**: começa **ligada** |
+| 2 | Documentos de renda e Serasa | **Nunca aparecem** |
+| 3 | Fotos da vistoria | **Não entram** (nem desmarcadas) |
+| 4 | Apólice do seguro | **Não entra**, nem a da entrada nem as renovações |
+| 5 | Carta de reajuste | **Entra e avisa** durante o contrato: reajuste pelo índice e novo valor negociado |
+| 6 | E-mails | **Não precisa**: não aparecem |
+| 7 | Acordo de dívida | **Sim**: só o termo assinado, com aviso para anexá-lo |
+| 8 | Recibos gerados pelo sistema | **Sim**: cópia gerada, com "cópia da locadora" |
+| 9 | Ex-inquilinos na primeira rodada | **Só os que passaram o contrato adiante na troca de titular** (pasta deles = passo 1 de quem herdou) |
+| 10 | "Conferido por" na capa | **Sim** |
+| 11 | Um alerta só no Painel no começo | **Sim** |
+| 12 | Saída liberada depois da devolução da garantia | **Sim** |
 
-1. **Chave ao publicar: começa desligada?**
-   Recomendo **sim, desligada**: você liga quando tiver um tempo para a primeira rodada (seção 5). Desligada, a saída continua com a etapa simples de hoje.
-
-2. **Documentos de renda e Serasa nunca aparecem?** (imposto de renda, holerites, extratos, pró-labore, carteira de trabalho, análise do Serasa)
-   Recomendo **nunca aparecer**: só serviram para aprovar a ficha, e quanto menos papel com dados financeiros da pessoa, menor o risco (LGPD). Contrato social e cartão do CNPJ (empresa) **entram**, marcados.
-
-3. **Fotos da vistoria:** recomendo **aparecer desmarcadas e juntas** ("32 fotos", um clique marca todas), porque a vistoria assinada já descreve o estado.
-
-4. **Apólice do seguro:** recomendo a **apólice da entrada marcada**; as renovações de cada ano **não avisam** durante o contrato (aparecem desmarcadas na saída).
-
-5. **Carta de reajuste:** recomendo **não avisar** durante o contrato (é todo ano); aparece desmarcada na saída.
-
-6. **E-mails:** o sistema não guarda o texto. Recomendo **imprimir pelo Gmail** quando você escolher um (prova a data e o destinatário). Alternativa: o sistema passa a guardar o texto dos e-mails daqui para frente e imprime ele mesmo (mais trabalho, e o texto guardado não é prova tão boa quanto o Gmail).
-
-7. **Acordo de dívida:** hoje o acordo não tem termo assinado anexado. Recomendo que o aviso diga **"anexe o termo assinado do acordo na pasta da inquilina para imprimir"** e que só o termo assinado entre (o resumo das parcelas é parte financeira e fica fora, como os boletos).
-
-8. **Recibos que o sistema gera** (reserva, caução): recomendo **imprimir a cópia gerada**, com "cópia da locadora" no rodapé, já que a via assinada fica com o inquilino.
-
-9. **Ex-inquilinos** (já saíram, ainda dentro dos 10 anos): recomendo **não** entrarem na primeira rodada; só os ativos, como você decidiu.
-
-10. **"Conferido por" na capa** (linha para assinar e datar à mão): recomendo **sim**, ajuda a saber que alguém olhou a pasta de verdade.
-
-11. **Alerta do começo no Painel:** recomendo **um alerta só** com o número de inquilinos ("4 inquilinos com a pasta física a montar") em vez de um por inquilino.
-
-12. **Saída liberada quando?** Recomendo **depois da devolução da garantia** (ou da cobrança do saldo), para a pasta fechar uma vez só com tudo. Alternativa: liberar já com o termo das chaves e completar depois.
+O texto das seções 1 a 7 já está ajustado a estas respostas.
