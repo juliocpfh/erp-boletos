@@ -28,6 +28,7 @@ export const MAX_ARQUIVOS = 40;
 export const MAX_ENVIOS = 20;
 const MAX_PDF = 5 * 1024 * 1024;
 const MAX_PEDIDO = 128 * 1024;
+const LEITURAS_JUNTAS = 10; // registros lidos ao mesmo tempo na lista dos links
 const RAIZ_FICHAS = 'arquivos/Fichas em analise/';
 const TIPOS_CAMPO = ['texto', 'cpf', 'cpfcnpj', 'tel', 'email', 'data', 'mes', 'dinheiro', 'opcao', 'area', 'simnao', 'inteiro'];
 
@@ -44,13 +45,42 @@ async function lerJson(request, maximo = MAX_PEDIDO) {
   try { return JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroFicha(400, 'Pedido inválido.'); }
 }
 
+/**
+ * Corpo do pedido lido aos pedaços, contando os bytes: passou do máximo, para de ler na hora (o Content-Length pode faltar
+ * ou mentir). Devolve o ArrayBuffer, ou null se passou. Com o tamanho declarado, a memória é reservada uma vez só.
+ */
+export async function lerAteLimite(request, maximo) {
+  const declarado = Number(request.headers.get('Content-Length') || 0);
+  if (declarado > maximo) return null;
+  if (!request.body) return new ArrayBuffer(0);
+  const leitor = request.body.getReader();
+  let alvo = declarado > 0 ? new Uint8Array(declarado) : null; // caminho comum: tudo cabe aqui
+  const partes = []; let total = 0;
+  for (;;) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    if (total + value.byteLength > maximo) { try { await leitor.cancel(); } catch { /* já fechado */ } return null; }
+    if (alvo && total + value.byteLength <= alvo.byteLength) alvo.set(value, total);
+    else {
+      if (alvo) { partes.push(alvo.slice(0, total)); alvo = null; } // veio mais do que o declarado: junta no fim
+      partes.push(value);
+    }
+    total += value.byteLength;
+  }
+  if (alvo) return total === alvo.byteLength ? alvo.buffer : alvo.slice(0, total).buffer;
+  const junto = new Uint8Array(total); let pos = 0;
+  for (const p of partes) { junto.set(p, pos); pos += p.byteLength; }
+  return junto.buffer;
+}
+
 async function lerBytes(request, maximo) {
-  const grande = new ErroFicha(413, `Arquivo grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
-  if (Number(request.headers.get('Content-Length') || 0) > maximo) throw grande;
-  const corpo = await request.arrayBuffer();
-  if (corpo.byteLength > maximo) throw grande;
+  const corpo = await lerAteLimite(request, maximo);
+  if (!corpo) throw new ErroFicha(413, `Arquivo grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
   return corpo;
 }
+
+/** Grava só se ainda não existe nada com esse nome (uma chamada só ao R2, sem "olhar e depois gravar"). */
+export const SO_SE_NOVO = () => ({ onlyIf: new Headers({ 'If-None-Match': '*' }) });
 
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 export const hashDaChave = async (chave) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(chave))));
@@ -179,18 +209,28 @@ export async function criarLink(request, env, email) {
   const hash = await hashDaChave(chave);
   const agora = new Date();
   const vence = new Date(agora.getTime() + DIAS_LINK * 86400000).toISOString();
-  const anterior = await lerRegistro(env, fichaId, pessoa);
-  if (anterior && anterior.registro.hash) await env.DADOS.delete(chaveToken(anterior.registro.hash));
-  const velho = anterior ? anterior.registro : {};
-  const registro = {
-    ficha_id: fichaId, pessoa, hash, pasta, contexto, formulario, valores_iniciais: valores,
-    criado_em: agora.toISOString(), criado_por: email, vence_em: vence, atualizado_em: agora.toISOString(),
-    situacao: velho.situacao && !['Encerrado', 'Desistiu'].includes(velho.situacao) ? velho.situacao : 'Aguardando',
-    faltando: velho.faltando || [], respostas: velho.respostas || [], arquivos: velho.arquivos || [], eventos: [...(velho.eventos || []), { em: agora.toISOString(), texto: `link ${anterior ? 'renovado' : 'criado'} por ${email}` }].slice(-50),
-    visto_em: velho.visto_em || null, desistiu_em: null, pdf: !!velho.pdf,
-  };
-  await env.DADOS.put(chaveRegistro(fichaId, pessoa), JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
+  // O registro só entra se ninguém mexeu nele desde a leitura (a pessoa pode estar enviando pelo link antigo agora mesmo):
+  // senão lê de novo e repete, para não perder a resposta ou o arquivo que acabou de chegar.
+  let hashAntigo = null; let gravado = false;
+  for (let i = 0; i < 4 && !gravado; i += 1) {
+    const anterior = await lerRegistro(env, fichaId, pessoa);
+    const velho = anterior ? anterior.registro : {};
+    hashAntigo = velho.hash || null;
+    const registro = {
+      ficha_id: fichaId, pessoa, hash, pasta, contexto, formulario, valores_iniciais: valores,
+      criado_em: agora.toISOString(), criado_por: email, vence_em: vence, atualizado_em: agora.toISOString(),
+      situacao: velho.situacao && !['Encerrado', 'Desistiu'].includes(velho.situacao) ? velho.situacao : 'Aguardando',
+      faltando: velho.faltando || [], respostas: velho.respostas || [], arquivos: velho.arquivos || [], eventos: [...(velho.eventos || []), { em: agora.toISOString(), texto: `link ${anterior ? 'renovado' : 'criado'} por ${email}` }].slice(-50),
+      visto_em: velho.visto_em || null, desistiu_em: null, pdf: !!velho.pdf,
+    };
+    gravado = !!(await env.DADOS.put(chaveRegistro(fichaId, pessoa), JSON.stringify(registro), {
+      ...(anterior ? { onlyIf: { etagMatches: anterior.etag } } : SO_SE_NOVO()), httpMetadata: { contentType: 'application/json' },
+    }));
+  }
+  if (!gravado) throw new ErroFicha(409, 'Outra mudança ao mesmo tempo: tente de novo.');
   await env.DADOS.put(chaveToken(hash), JSON.stringify({ ficha_id: fichaId, pessoa }));
+  // o ponteiro antigo só sai depois de gravados o registro e o ponteiro novos (ele já não vale: o registro tem outro hash)
+  if (hashAntigo && hashAntigo !== hash) await env.DADOS.delete(chaveToken(hashAntigo));
   const base = String(env.URL_FICHA || 'https://ficha.ankjck.com.br/');
   return json(200, { ok: true, url: `${base}#${chave}`, vence_em: vence });
 }
@@ -213,24 +253,30 @@ export async function listarLinks(env, url) {
   const ficha = url.searchParams.get('ficha');
   const prefixo = ficha ? `publico/fichas/${fichaIdValido(ficha)}/` : 'publico/fichas/';
   const lista = [];
+  /** Um registro: lê e devolve a linha da lista (ou null, se saiu ou passou da guarda). */
+  const ler = async (chave) => {
+    const obj = await env.DADOS.get(chave);
+    if (!obj) return null;
+    const reg = JSON.parse(await obj.text());
+    // guarda: 90 dias depois do prazo o link sai inteiro (registro, ponteiro e PDF); os documentos ficam na pasta da ficha
+    if (passou(reg.vence_em, DIAS_GUARDA)) {
+      await env.DADOS.delete([chave, chave.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
+      return null;
+    }
+    return ficha ? paraEquipe(reg) : {
+      ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
+      vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
+      nome: reg.contexto.nome,
+    };
+  };
   let cursor;
   do {
     const r = await env.DADOS.list({ prefix: prefixo, cursor, limit: 1000 });
-    for (const o of r.objects) {
-      if (!o.key.endsWith('.json')) continue;
-      const obj = await env.DADOS.get(o.key);
-      if (!obj) continue;
-      const reg = JSON.parse(await obj.text());
-      // guarda: 90 dias depois do prazo o link sai inteiro (registro, ponteiro e PDF); os documentos ficam na pasta da ficha
-      if (passou(reg.vence_em, DIAS_GUARDA)) {
-        await env.DADOS.delete([o.key, o.key.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
-        continue;
-      }
-      lista.push(ficha ? paraEquipe(reg) : {
-        ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-        vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
-        nome: reg.contexto.nome,
-      });
+    const chaves = r.objects.map((o) => o.key).filter((k) => k.endsWith('.json'));
+    // em blocos de LEITURAS_JUNTAS ao mesmo tempo (um a um, o Painel esperava uma ida ao R2 por link); a ordem da lista não muda
+    for (let i = 0; i < chaves.length; i += LEITURAS_JUNTAS) {
+      const bloco = await Promise.all(chaves.slice(i, i + LEITURAS_JUNTAS).map(ler));
+      lista.push(...bloco.filter(Boolean));
     }
     cursor = r.truncated ? r.cursor : undefined;
   } while (cursor);
@@ -307,6 +353,8 @@ export async function enviarFichaPublica(request, env, avisar) {
   if (registro.respostas.length >= MAX_ENVIOS) throw new ErroFicha(429, 'Limite de envios deste link. Fale com quem enviou o link.');
   const em = new Date().toISOString();
   const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
+    // conferido de novo com o registro de agora: dois envios ao mesmo tempo não passam do limite
+    if (r.respostas.length >= MAX_ENVIOS) throw new ErroFicha(429, 'Limite de envios deste link. Fale com quem enviou o link.');
     r.respostas.push({ em, valores, declaracao: true });
     if (['Aguardando', 'Falta documento'].includes(r.situacao)) r.situacao = 'Respondida';
     r.visto_em = null;
@@ -338,15 +386,27 @@ export async function receberArquivoPublico(request, env, url, avisar) {
   const sufixo = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const base = `${registro.pasta}/link-${quem}${nomeSimples(documento)}-${dia}-${sufixo}`;
   let nome = `${base}.${ext}`;
-  for (let n = 2; await env.DADOS.head(nome); n += 1) nome = `${base}-${n}.${ext}`;
-  await env.DADOS.put(nome, corpo, { customMetadata: { por: `link da ficha (${pessoa})` } });
+  // grava só se o nome está livre (uma chamada só); ocupado, tenta o próximo
+  for (let n = 2; !(await env.DADOS.put(nome, corpo, { ...SO_SE_NOVO(), customMetadata: { por: `link da ficha (${pessoa})` } })); n += 1) {
+    if (n > 20) throw new ErroFicha(409, 'Outra mudança ao mesmo tempo: tente de novo.');
+    nome = `${base}-${n}.${ext}`;
+  }
   const em = new Date().toISOString();
-  const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
-    r.arquivos.push({ documento, arquivo: nome.slice(nome.lastIndexOf('/') + 1), nome_original: texto(url.searchParams.get('nome'), 120), em, tamanho: corpo.byteLength, tipo: ext });
-    if (qual === 'assinada') { r.situacao = 'Assinada'; r.eventos.push({ em, texto: 'ficha assinada enviada pelo link' }); }
-    r.visto_em = null;
-    r.eventos = r.eventos.slice(-50);
-  });
+  let novo;
+  try {
+    novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
+      // conferido de novo com o registro de agora: vários arquivos ao mesmo tempo não passam do limite
+      if (r.arquivos.length >= MAX_ARQUIVOS) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
+      r.arquivos.push({ documento, arquivo: nome.slice(nome.lastIndexOf('/') + 1), nome_original: texto(url.searchParams.get('nome'), 120), em, tamanho: corpo.byteLength, tipo: ext });
+      if (qual === 'assinada') { r.situacao = 'Assinada'; r.eventos.push({ em, texto: 'ficha assinada enviada pelo link' }); }
+      r.visto_em = null;
+      r.eventos = r.eventos.slice(-50);
+    });
+  } catch (e) {
+    // o registro não aceitou (limite, disputa perdida, link trocado no meio): o arquivo não fica solto na pasta da ficha
+    try { await env.DADOS.delete(nome); } catch (e2) { console.error('arquivo do link sem registro', e2); }
+    throw e;
+  }
   if (avisar) await avisar(env, novo, qual === 'assinada' ? 'assinou' : 'documento', documento);
   return json(200, { ok: true, documento });
 }
