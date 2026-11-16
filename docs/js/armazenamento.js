@@ -2,6 +2,8 @@
 // usando a File System Access API do Chrome/Edge. Nada é enviado para a internet.
 import { ErroUsuario, hojeIso } from './calculos.js';
 import { normalizar } from './regras.js';
+import { regra } from './config-regras.js';
+import { compactarAnexo } from './compactar.js';
 
 export const ARQUIVO_BANCO = 'imoveis-dados.json';
 export const PASTA_ARQUIVOS = 'arquivos';
@@ -178,8 +180,15 @@ export function tipoParaAbrir(nome) {
   return (ext && TIPOS_ABRIR[ext.toLowerCase()]) || '';
 }
 
-export async function salvarArquivo(dir, arquivo) {
+/**
+ * Grava o anexo na pasta com um nome livre (acrescenta " (2)" se já existir) e devolve o nome gravado.
+ * Foto e PDF escaneado são compactados antes (compactar.js, regra "Compactar anexos"; a foto pode virar .jpg, por isso use o
+ * nome devolvido). `compactar: false`: arquivo que só muda de lugar ou de nome, e os documentos da ficha em análise
+ * (a conferência de conferir-pdf.js olha dentro do arquivo como ele chegou).
+ */
+export async function salvarArquivo(dir, arquivo, { compactar = true } = {}) {
   if (!nomeAnexavel(arquivo.name)) throw new ErroUsuario(ERRO_TIPO_ARQUIVO); // o usuário escolheu o arquivo errado: só na tela
+  if (compactar && regra('compactar_anexos')) arquivo = (await compactarAnexo(arquivo)).arquivo;
   const nome = limparNome(arquivo.name);
   const ponto = nome.lastIndexOf('.');
   const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ''];

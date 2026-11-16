@@ -191,6 +191,22 @@ export async function conferirArquivo(entrada) {
   return { tipo: 'pdf', programa: programas.join(' · '), criado, alterado, sinais, assinaturas: sig.map(({ fim, ...s }) => s) };
 }
 
+/** Sinais de assinatura digital, de formulário assinável ou de proteção (gov.br, ICP-Brasil, banco, carimbo do tempo). */
+const SINAIS_ASSINATURA = /\/ByteRange\s*\[|\/Type\s*\/Sig\b|\/FT\s*\/Sig\b|\/SigFlags\b|\/DocMDP\b|\/Perms\b|\/DocTimeStamp\b|adbe\.pkcs7|adbe\.x509|ETSI\.CAdES|ETSI\.RFC3161|\/Encrypt\b/;
+
+/**
+ * O PDF tem (ou pode ter) assinatura digital ou proteção? Olha o arquivo aberto e os trechos comprimidos (objetos guardados
+ * dentro de outros). Na dúvida responde que sim: quem chama (compactar.js) só mexe no PDF quando é `false`.
+ * Ex.: contrato assinado pelo gov.br → true; extrato escaneado sem assinatura → false.
+ */
+export async function pdfTemAssinatura(entrada) {
+  const bytes = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
+  const texto = latin(bytes);
+  if (SINAIS_ASSINATURA.test(texto)) return true;
+  if (typeof DecompressionStream === 'undefined' && /\/ObjStm\b/.test(texto)) return true; // não dá para olhar dentro
+  return SINAIS_ASSINATURA.test(await abrirTrechos(bytes, texto, 16 * 1024 * 1024));
+}
+
 /** Nome sem acento, em minúsculas e sem espaços repetidos, para comparar quem assinou com o nome da ficha. */
 export const nomeComparavel = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
 
