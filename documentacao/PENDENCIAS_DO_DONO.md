@@ -21,11 +21,13 @@ Marque com `[x]` o que for concluindo.
 | 9 | Programa no PC: instalado em 16/11; falta só a limpeza da chave antiga a partir de 17/11 (item 9e, passo 3) | você | 5 min |
 | 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; falta só a 2ª rodada (Claude, quando pedir) | Claude | — |
 
-**Próximos passos (combinado em 16/11):** (1) **17/11 ou depois:** item 9e, passo 3 (apagar a chave antiga, se `ultima-atualizacao.txt` estiver com `ok`); (2) item 2, aviso no celular (o arquivo das chaves já está em Documentos); (3) item 1, Gmail; (4) item 3, teste da ficha com um conhecido. Em 16/12: CBS 2027.
+**Próximos passos (combinado em 16/11, fim do dia):** (1) aceitar a PR #264 e fazer o **Testar o aviso** no celular (item 2); (2) **Claude:** fazer o botão **Conectar o Gmail** ("Entrar com o Google", item 1) e depois ligar o Gmail com o dono; (3) **17/11 ou depois:** item 9e, passo 3 (apagar a chave antiga, se `ultima-atualizacao.txt` estiver com `ok`); (4) item 3, teste da ficha com um conhecido. Em 16/12: CBS 2027.
 
 ---
 
 ## 1. Ligar o envio de e-mail pelo Gmail  `[ ]`
+
+**Decisão do dono em 16/11: "Entrar com o Google".** O passo 4 abaixo (rodar `node tools/gmail-token.mjs` no computador e colar o código no Cloudflare) vira um botão no sistema: **Conectar o Gmail → escolher a conta → Permitir**, como em qualquer site. É o mesmo caminho do produto para vender (cada cliente só clica; ver `ESTUDO_PRODUTO_COMERCIAL.md`, seção 6). **Falta (Claude, próxima sessão):** fazer o botão (a nuvem guarda a autorização, cifrada, e renova sozinha; Desconectar; mostra a conta ligada). Depois, com o dono: passos 1 a 3 (projeto e credencial no Google, tipo **Aplicativo da Web**, com o endereço de retorno que o sistema mostrar), 5 a 7 e o botão. **Não cadastrar cartão** no Google Cloud: o "teste gratuito"/faturamento que ele oferece não é preciso, a Gmail API é gratuita. Descartado por ora: mandar pelo serviço do produto com o endereço do cliente ("alias": só com domínio próprio e linhas no DNS).
 
 **Por que importa:** sem isto, o botão **Enviar agora** fica desligado (só "Copiar texto" e "Abrir no Gmail") e **os e-mails automáticos da ficha pela internet não saem** (para a pessoa: "recebemos seus dados", "falta documento", "pronta para assinar"; para a equipe: "chegou documento"). É o primeiro a fazer.
 
@@ -46,7 +48,7 @@ Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você ent
 
 ## 2. Ligar o aviso no celular  `[ ]`
 
-**16/11:** chaves cadastradas no Cloudflare e aviso ligado no celular do dono (passos 1 a 6). No teste o celular não tocou: a ficha nova herdou o arquivo de uma ficha de teste antiga com o mesmo número, e o aviso só toca no primeiro documento; na mesma hora o "Documento inválido" barrava o documento com foto e a renda. Os dois foram corrigidos na PR "Ficha pela internet: documentos aceitos e link sem herança". **Falta (depois do merge):** apagar `Documentos\chaves-aviso.txt` (e da lixeira), se ainda não apagou; gerar um link novo numa ficha de teste, mandar um documento e conferir se o celular toca.
+**16/11:** chaves cadastradas no Cloudflare e aviso ligado no celular do dono (Samsung S23 Ultra, Android; passos 1 a 6). PR #263 (aceita) corrigiu a ficha; mesmo assim **nada tocou** (nem dados, nem documento, nem desistência): o envio do aviso falha em silêncio. PR #264: a nuvem limpa as chaves (espaço, quebra de linha, "NOME=" colados juntos, suspeita principal) e o botão **Testar o aviso** diz na tela onde está o erro. **Falta o dono (depois do merge da #264, uns 5 min):** no celular, fechar e abrir o aplicativo → ficha → **Desligar neste aparelho** → **Ligar** → **Testar o aviso** → mandar ao Claude a mensagem que aparece. Conferir também no S23: Configurações → Aplicativos → o aplicativo (ou o Chrome) → Notificações ligadas e Bateria "Sem restrições"; Bateria → Limites de uso em segundo plano: fora de "Apps em suspensão". Histórico: No teste o celular não tocou: a ficha nova herdou o arquivo de uma ficha de teste antiga com o mesmo número, e o aviso só toca no primeiro documento; na mesma hora o "Documento inválido" barrava o documento com foto e a renda. Os dois foram corrigidos na PR "Ficha pela internet: documentos aceitos e link sem herança". **Falta (depois do merge):** apagar `Documentos\chaves-aviso.txt` (e da lixeira), se ainda não apagou; gerar um link novo numa ficha de teste, mandar um documento e conferir se o celular toca.
 
 Quando alguém manda a ficha pelo link, a equipe recebe **e-mail** (depois do item 1). O aviso que aparece na tela do celular (como o do WhatsApp) ainda está desligado, porque precisa de duas "chaves" guardadas no Cloudflare.
 

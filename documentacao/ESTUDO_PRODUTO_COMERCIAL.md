@@ -124,6 +124,12 @@ Pesquisa feita em 11/11/2026 (bancos e concorrentes pela internet; o resto pela 
 
 **Recomendação:** caminho 2, com cópia oculta para a caixa da empresa (assim fica guardado no Gmail também). Não é complicado: a parte da nuvem já existe. Só funciona com internet; sem internet o e-mail fica na fila, como as outras mudanças. O mesmo motor serve depois para o envio **automático** (boleto do mês, lembrete da régua, carta de reajuste), que é o que os concorrentes têm.
 
+**Decisão do dono (2026-11-16): envio pela conta Google do cliente, com o botão "Entrar com o Google".** Hoje o envio pelo Gmail exige criar um projeto no Google Cloud, a tela de permissão e rodar `tools/gmail-token.mjs` (uns 30 minutos): serve para a ANK/JCK, mas não para vender. No produto:
+- o aplicativo no Google é criado **uma vez só, em nome do produto**, e passa pela aprovação do Google (permissão "enviar e-mail", `gmail.send`: política de privacidade, site do produto e vídeo curto; costuma ser gratuita e leva semanas);
+- cada cliente só clica em **Conectar meu Gmail → escolhe a conta → Permitir** (uns 30 segundos); o e-mail sai da conta dele e fica em "Enviados"; ele tira a permissão quando quiser na conta Google;
+- o console do Google oferece "teste gratuito"/faturamento: **não é preciso** (a Gmail API é gratuita; não cadastrar cartão).
+- Descartado por ora (16/11): mandar pelo serviço de e-mail do produto com o endereço do cliente (o "alias"). Funciona só com domínio próprio (o cliente cola 2 ou 3 linhas no DNS); com @gmail.com/@hotmail.com o Google e a Microsoft barram. Fica como alternativa futura.
+
 ## 7. Caminho sugerido
 
 | Fase | O que | Serve para nós hoje? |
