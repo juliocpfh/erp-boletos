@@ -3,6 +3,8 @@
 // sem se verem = conflito: o campo fica com o valor anterior até alguém escolher (DECISOES.md, 2026-11-06).
 // Também: faixas de códigos por aparelho (sem internet não repete), contador da NF (só com internet), backup diário no R2.
 // A lógica fica em `Cofre` (recebe `sql` e `transacao`) para os testes rodarem no Node com node:sqlite.
+// Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria.
+import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 
 export const FORMATO = 'imoveis-v1';
 export const MAX_OPS = 2000;
@@ -567,6 +569,7 @@ export class CofreDO {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env;
     this.cofre = new Cofre(ctx.storage.sql, (fn) => ctx.storage.transactionSync(fn));
+    this.aparelhos = new Aparelhos(this.cofre);
     this.alarmeMarcado = false;
   }
 
@@ -610,10 +613,15 @@ export class CofreDO {
     const email = request.headers.get('X-Email-Conferido') || '';
     const corpo = async () => { try { return await request.json(); } catch { throw new ErroCofre(400, 'Pedido inválido.'); } };
     try {
-      if (!email) throw new ErroCofre(401, 'Sem login.');
       const c = this.cofre; const rota = url.pathname;
       let r;
-      if (rota === '/papel' && request.method === 'GET') {
+      // programa do PC, sem o login do Access: o Worker só manda estas duas a partir de /api/aparelho/ (atenderAparelho)
+      if (rota === '/aparelho/entrar' && request.method === 'POST') return resposta(200, await this.aparelhos.entrar(await corpo(), request.headers.get('X-Ip') || ''));
+      if (rota === '/aparelho/conferir' && request.method === 'POST') return resposta(200, await this.aparelhos.conferir((await corpo())?.cracha));
+      if (!email) throw new ErroCofre(401, 'Sem login.');
+      if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
+      else if (rota === '/desligar-aparelho' && request.method === 'POST') r = this.aparelhos.desligar(await corpo(), c.exigir(email, 'consulta'), email);
+      else if (rota === '/papel' && request.method === 'GET') {
         // o Worker pede 'admin' para os backups (banco inteiro, com as senhas de todos): nível desconhecido é recusado, nunca vira 'consulta'
         const nivel = url.searchParams.get('nivel');
         if (!Object.hasOwn(NIVEL, nivel || '')) throw new ErroCofre(400, 'Nível de acesso desconhecido.');
@@ -640,6 +648,7 @@ export class CofreDO {
       return resposta(200, r);
     } catch (e) {
       if (e instanceof ErroCofre) return resposta(e.status, { erro: e.message, ...e.extra });
+      if (e instanceof ErroAparelho) return resposta(e.status, { erro: e.message });
       console.error(e);
       return resposta(500, { erro: 'Erro no cofre da nuvem.' });
     }

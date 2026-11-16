@@ -3,11 +3,14 @@
 // Assim a cópia do PC fica em dia mesmo nos dias em que o sistema só foi usado no celular.
 // Também mantém a cópia ABERTA dos arquivos (pasta "Arquivos dos imoveis", sem cifrar, para abrir no Windows): mesma regra de
 // docs/js/copia-aberta.js (tests/copia-aberta.test.mjs confere as duas).
-// Uso: node atualizador.mjs (dados, versão PC e arquivos) ou node atualizador.mjs --arquivos (só a cópia aberta, de hora em hora).
-// Configuração em .env; passo a passo em README.md. Não precisa de nada além do Node 20+.
+// Uso: node atualizador.mjs (dados, versão PC e arquivos) ou node atualizador.mjs --arquivos (só a cópia aberta, de hora em hora);
+// node atualizador.mjs --ligar (ligar-computador.cmd) abre a página para entrar com e-mail e senha (ligar.mjs): o computador
+// recebe o crachá do aparelho, guardado cifrado pelo Windows. Sem crachá, ainda vale o .env antigo com a chave de serviço do Access
+// (transição; README.md). Não precisa de nada além do Node 20+.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ErroNaoLigado, SITE_PADRAO, janelaDeLigar, lerLigacao } from './ligar.mjs';
 
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
 export const PASTA_DIARIO = 'copias-diarias';
@@ -67,9 +70,15 @@ export function diariosParaApagar(nomes) {
 // ---------------------------------------------------------------------------
 // A atualização
 // ---------------------------------------------------------------------------
-export function carregarConfig(env = lerEnv(path.join(PASTA, '.env'))) {
+/**
+ * Como este computador entra: o crachá do aparelho (ligado com e-mail e senha, ligar.mjs) ou, na transição, a chave de serviço
+ * do .env antigo. `ligacao` = lerLigacao() (trocada nos testes). Sem nenhum dos dois: ErroNaoLigado.
+ */
+export function carregarConfig(env = lerEnv(path.join(PASTA, '.env')), ligacao = lerLigacao(env)) {
+  if (ligacao?.cracha) return { site: String(ligacao.site || SITE_PADRAO).replace(/\/+$/, ''), pasta: ligacao.pasta, cracha: ligacao.cracha, computador: ligacao.computador };
+  if (!env.ACCESS_CLIENT_ID && !env.ACCESS_CLIENT_SECRET) throw new ErroNaoLigado('Este computador ainda não está ligado ao sistema: dê dois cliques em ligar-computador.cmd e entre com o e-mail e a senha do sistema.');
   const cfg = {
-    site: String(env.SITE || 'https://erp.ankjck.com.br').replace(/\/+$/, ''),
+    site: String(env.SITE || SITE_PADRAO).replace(/\/+$/, ''),
     clientId: String(env.ACCESS_CLIENT_ID || '').trim(),
     clientSecret: String(env.ACCESS_CLIENT_SECRET || '').trim(),
     pasta: String(env.PASTA_BACKUP || '').trim(),
@@ -77,6 +86,27 @@ export function carregarConfig(env = lerEnv(path.join(PASTA, '.env'))) {
   const faltam = Object.entries({ ACCESS_CLIENT_ID: cfg.clientId, ACCESS_CLIENT_SECRET: cfg.clientSecret, PASTA_BACKUP: cfg.pasta }).filter(([, v]) => !v).map(([k]) => k);
   if (faltam.length) throw new Error(`Falta no .env: ${faltam.join(', ')} (veja .env.exemplo).`);
   return cfg;
+}
+
+/**
+ * Endereços e cabeçalhos para falar com a nuvem. Crachá: tudo por /api/aparelho/ (fora do login do Access, só leitura) e a
+ * versão PC também por lá. Chave de serviço (antiga): /api/ e /offline/ pelo Access.
+ */
+export function acesso(cfg) {
+  if (cfg.cracha) {
+    return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}` },
+      recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo com ligar-computador.cmd; se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
+  }
+  return { api: `${cfg.site}/api/`, programa: `${cfg.site}/${CAMINHO_PROGRAMA}`, cabecalhos: { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret },
+    recusou: (status) => `A nuvem não aceitou a chave de serviço (resposta ${status}). Confira ACCESS_CLIENT_ID/SECRET, a política "Service Auth" do Access e a variável SERVICOS do Worker.` };
+}
+
+/** Resposta da nuvem em JSON; erro com o motivo (o Access responde com a página de login, que não é JSON). */
+async function lerJson(r, a) {
+  if (!(r.headers.get('content-type') || '').includes('json')) throw new Error(a.recusou(r.status));
+  const corpo = await r.text();
+  if (!r.ok) throw new Error(`A nuvem recusou: ${JSON.parse(corpo).erro || r.status}`);
+  return corpo;
 }
 
 /**
@@ -89,13 +119,11 @@ export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) 
   if (!fs.existsSync(caminhoChave)) throw new Error(`A pasta ${cfg.pasta} não é uma pasta de backup seguro (falta ${ARQUIVO_CHAVE}). Ligue o backup seguro no sistema (Dados e backup) nesta pasta primeiro.`);
   const chave = JSON.parse(fs.readFileSync(caminhoChave, 'utf8'));
   if (chave.formato !== MAGICO) throw new Error(`${ARQUIVO_CHAVE} não é deste sistema.`);
-  const cabecalhos = { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret };
+  const a = acesso(cfg);
+  const { cabecalhos } = a;
 
   // 1. os dados, como estão agora na nuvem
-  const r = await buscar(`${cfg.site}/api/dados/tudo`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' });
-  if (!(r.headers.get('content-type') || '').includes('json')) throw new Error(`A nuvem não aceitou a chave de serviço (resposta ${r.status}). Confira ACCESS_CLIENT_ID/SECRET, a política "Service Auth" do Access e a variável SERVICOS do Worker.`);
-  const corpo = await r.text();
-  if (!r.ok) throw new Error(`A nuvem recusou: ${JSON.parse(corpo).erro || r.status}`);
+  const corpo = await lerJson(await buscar(`${a.api}dados/tudo`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' }), a);
   const dados = JSON.parse(corpo);
   if (dados.formato !== 'imoveis-v1') throw new Error('A nuvem devolveu algo que não é o banco do sistema.');
   const pastaDiario = path.join(cfg.pasta, PASTA_DIARIO);
@@ -113,10 +141,12 @@ export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) 
     fs.mkdirSync(pastaPrograma, { recursive: true });
     const versaoArq = path.join(pastaPrograma, 'versao.txt');
     const atual = fs.existsSync(versaoArq) ? fs.readFileSync(versaoArq, 'utf8').trim() : '';
-    const cab = await buscar(`${cfg.site}/${CAMINHO_PROGRAMA}`, { method: 'HEAD', headers: cabecalhos, redirect: 'manual' });
-    const publicada = cab.ok ? (cab.headers.get('last-modified') || '') : '';
+    const cab = await buscar(a.programa, { method: 'HEAD', headers: cabecalhos, redirect: 'manual' });
+    // pelo crachá a versão PC vem do GitHub (ETag); pela chave de serviço, do site (Last-Modified)
+    const publicada = cab.ok ? (cab.headers.get('etag') || cab.headers.get('last-modified') || '') : '';
+    if (!cab.ok && cab.status !== 304) throw new Error(`resposta ${cab.status}`);
     if (publicada && publicada !== atual) {
-      const p = await buscar(`${cfg.site}/${CAMINHO_PROGRAMA}`, { headers: cabecalhos, redirect: 'manual' });
+      const p = await buscar(a.programa, { headers: cabecalhos, redirect: 'manual' });
       const html = await p.text();
       if (!p.ok || !html.includes('<html')) throw new Error(`resposta ${p.status}`);
       fs.writeFileSync(path.join(pastaPrograma, ARQUIVO_PROGRAMA), html);
@@ -162,7 +192,8 @@ const codificar = (caminho) => caminho.split('/').map(encodeURIComponent).join('
  * Arquivo que sumiu da cópia (apagado à mão) volta. Devolve { baixados, apagados, falhas, total }.
  */
 export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
-  const cabecalhos = { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret };
+  const a = acesso(cfg);
+  const { cabecalhos } = a;
   const raiz = path.join(cfg.pasta, PASTA_COPIA);
   const arqReg = path.join(cfg.pasta, ARQUIVO_COPIA);
   let reg = { arquivos: {} };
@@ -172,8 +203,8 @@ export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
   const nuvem = [];
   let cursor;
   for (let n = 0; n < 1000; n += 1) {
-    const r = await buscar(`${cfg.site}/api/lista-tudo/arquivos/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' });
-    if (!(r.headers.get('content-type') || '').includes('json')) throw new Error(`A nuvem não aceitou a chave de serviço (resposta ${r.status}).`);
+    const r = await buscar(`${a.api}lista-tudo/arquivos/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' });
+    if (!(r.headers.get('content-type') || '').includes('json')) throw new Error(a.recusou(r.status));
     const corpo = await r.json();
     if (!r.ok) throw new Error(`A nuvem recusou a lista dos arquivos: ${corpo.erro || r.status}`);
     nuvem.push(...corpo.arquivos);
@@ -192,7 +223,7 @@ export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
   for (const c of baixar) {
     const destino = path.join(raiz, ...caminhoLocal(c));
     try {
-      const r = await buscar(`${cfg.site}/api/arquivos/${codificar(c)}`, { headers: cabecalhos, redirect: 'manual' });
+      const r = await buscar(`${a.api}arquivos/${codificar(c)}`, { headers: cabecalhos, redirect: 'manual' });
       if (!r.ok) throw new Error(`resposta ${r.status}`);
       const bytes = Buffer.from(await r.arrayBuffer());
       fs.mkdirSync(path.dirname(destino), { recursive: true });
@@ -212,8 +243,19 @@ const resumoCopia = (c) => `arquivos=${c.total} (baixados ${c.baixados}, tirados
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const cfg = carregarConfig();
     const soArquivos = process.argv.includes('--arquivos');
+    let cfg;
+    try { cfg = process.argv.includes('--ligar') ? null : carregarConfig(); } catch (e) {
+      // sem crachá: só abre a página quando há alguém olhando (a tarefa de hora em hora roda escondida)
+      if (!(e instanceof ErroNaoLigado) || soArquivos || !process.stdout.isTTY) throw e;
+    }
+    if (!cfg) {
+      const env = lerEnv(path.join(PASTA, '.env'));
+      console.log('Abrindo no navegador a página para ligar este computador (e-mail e senha do sistema)…');
+      const lig = await janelaDeLigar({ site: String(env.SITE || SITE_PADRAO).replace(/\/+$/, ''), padrao: { pasta: env.PASTA_BACKUP || '' }, aoAbrir: (url) => console.log(`Se não abriu sozinha: ${url}`) });
+      console.log(`Ligado: ${lig.computador} (${lig.login}). Fazendo a primeira atualização…`);
+      cfg = carregarConfig();
+    }
     const r = soArquivos ? null : await atualizar(cfg);
     let copia;
     try { copia = resumoCopia(await atualizarCopia(cfg)); } catch (e) { copia = `arquivos=FALHOU ${e.message}`; }
