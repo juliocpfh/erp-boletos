@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-CM71GlcH+AbrS4DwxMTwAY7t2fVKIgHdVYOmUyg1s4g='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-/bqEv98o5TuGXsE2x4SwA0b+XfR5zazLEUFDpnn1pDU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b2a290d311dabf2d">
+<meta name="fontes" content="5e07be933044c4ec">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -22809,6 +22809,13 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
     await pedir("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inscricao.toJSON()) });
   }
+  async function testarAviso() {
+    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    if (!inscricao) return { ok: false, etapa: "aparelho", mensagem: 'Este aparelho não está inscrito: toque em "Ligar".' };
+    if (Notification.permission !== "granted") return { ok: false, etapa: "aparelho", mensagem: "As notificações deste aplicativo estão desligadas no aparelho: libere nas configurações do celular." };
+    return pedir("push-teste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) });
+  }
   async function desligarAviso() {
     const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
     const inscricao = reg ? await reg.pushManager.getSubscription() : null;
@@ -23052,7 +23059,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       el.innerHTML = "🔔 Aviso no celular: ainda não ligado na nuvem (o administrador cadastra as chaves; o Painel e o e-mail continuam avisando).";
       return;
     }
-    el.innerHTML = e.ligadoAqui ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao("desligarAvisoFicha", "Desligar neste aparelho", {}, "secundario mini")}` : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao("ligarAvisoFicha", "Ligar", {}, "mini")}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ""}`;
+    el.innerHTML = e.ligadoAqui ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao("testarAvisoFicha", "Testar o aviso", {}, "mini")} ${botao("desligarAvisoFicha", "Desligar neste aparelho", {}, "secundario mini")}` : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao("ligarAvisoFicha", "Ligar", {}, "mini")}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ""}`;
   }
   function valorDoCampo(c, v) {
     if (v === null || v === void 0 || v === "") return '<span class="suave">-</span>';
@@ -23357,6 +23364,10 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       await ligarAviso();
       aviso("Pronto: este aparelho avisa quando chegar algo pelos links da ficha.");
       await mostrar();
+    },
+    async testarAvisoFicha() {
+      const r = await testarAviso();
+      aviso(r.ok ? `Teste enviado. ${r.mensagem}` : `O aviso não saiu. ${r.mensagem}`, r.ok ? void 0 : "aviso");
     },
     async desligarAvisoFicha() {
       await desligarAviso();
