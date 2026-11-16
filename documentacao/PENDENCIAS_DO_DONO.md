@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 14/11/2026. Tudo o que foi feito até hoje já está no ar (PRs #232 a #236 aceitas, Cloudflare publicou sem erro e `ficha.ankjck.com.br` responde).
+Situação em 16/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #259).
 
 Marque com `[x]` o que for concluindo.
 
@@ -18,8 +18,8 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: ícone (você) e entrar com e-mail e senha em vez da chave de serviço (feito; falta a regra Bypass no Cloudflare, item 9e). Cópia aberta e pasta física: feitas | você | 15 min |
-| 11 | **Mutirão de 16/11 (onde paramos):** conferir depois do merge (B, C1, C2), regra de limite na ficha pública e 2ª rodada | você + Claude | 15 min |
+| 9 | Programa no PC: instalado em 16/11; falta só a limpeza da chave antiga a partir de 17/11 (item 9e, passo 3) | você | 5 min |
+| 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; falta só a 2ª rodada (Claude, quando pedir) | Claude | — |
 | 12 | Compactação dos anexos: apertar o botão dos anexos antigos e conferir uma foto nova | você | 10 min |
 
 ---
@@ -44,6 +44,8 @@ Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você ent
 ---
 
 ## 2. Ligar o aviso no celular  `[ ]`
+
+**16/11:** o arquivo `Documentos\chaves-aviso.txt` já foi gerado no computador do dono (passo 1 feito); falta cadastrar no Cloudflare e apagar o arquivo.
 
 Quando alguém manda a ficha pelo link, a equipe recebe **e-mail** (depois do item 1). O aviso que aparece na tela do celular (como o do WhatsApp) ainda está desligado, porque precisa de duas "chaves" guardadas no Cloudflare.
 
@@ -174,10 +176,11 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   - **Troca de titular:** passo 1 com o que falta da pasta do anterior e a caixinha "Pus a pasta de fulano dentro".
   - **Falta você (depois do merge):** abrir **Dados e backup → Arquivo impresso** e, para cada inquilino, conferir a pasta de papel: o que já está nela, marque e use "Já está tudo em papel"; o que falta, "Ver a capa e imprimir tudo". Termo do acordo: no boleto do acordo, "Termo para assinar" gera o termo (inquilino, fiadores e 2 testemunhas assinam) e "anexar o termo assinado" guarda o assinado; enquanto faltar, o Painel avisa. Arquivo posto à mão na pasta do inquilino (ex.: notificação) aparece no Painel na abertura seguinte do sistema.
 - [ ] **9e. Programa do PC sem chave de serviço** (feito em 15/11, etapa 1 da proposta de licença; falta você, depois do merge, ~15 min): o computador entra com o **seu e-mail e senha do sistema** e recebe um "crachá" que só lê, guardado cifrado pelo Windows; aparece em **Usuários → Aparelhos ligados** com o botão **Desligar**. **Atenção (15/11, correção):** a conta da senha passou a ser feita no computador (o Cloudflare recusaria a conta no servidor), então só o programa novo entra: use o `.exe` desta versão ou os arquivos novos de `atualizador-pc/`; o programa antigo avisa "este programa do computador é antigo".
-  1. No Cloudflare, criar a regra **Bypass** do caminho `erp.ankjck.com.br/api/aparelho` (passo a passo em `nuvem/README.md`, "Programa do PC: regra Bypass no Access"). Teste: abrir `https://erp.ankjck.com.br/api/aparelho/saude` sem login mostra "Este computador não está ligado ao sistema".
+  1. [x] (feito em 16/11; teste deu a mensagem certa) No Cloudflare, criar a regra **Bypass** do caminho `erp.ankjck.com.br/api/aparelho` (passo a passo em `nuvem/README.md`, "Programa do PC: regra Bypass no Access"). Teste: abrir `https://erp.ankjck.com.br/api/aparelho/saude` sem login mostra "Este computador não está ligado ao sistema".
   2. Copiar para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`) e dar dois cliques em `ligar-computador.cmd`: abre uma página no navegador; e-mail, senha e a pasta (já vem preenchida) → **Ligar**.
   3. No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker (o lembrete de 08/11/2027 deixa de valer).
   - **Etapa 2: programa num arquivo só, sem instalar o Node** (feito em 15/11; falta você, depois do merge, ~5 min). Pode fazer no lugar do passo 2 acima (ou depois dele: o computador já ligado continua ligado):
+    - [x] **Instalado pelo dono em 16/11** (`.exe`; 1ª rodada 16/11 13:04 UTC: `ok`, `arquivos=298`). Falta o passo 3 acima a partir de 17/11.
     1. Uns 10 minutos depois do merge, baixe `Instalar-Administracao-de-Imoveis.exe` em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc (uns 90 MB; o GitHub gera sozinho).
     2. Dois cliques. No aviso azul "O Windows protegeu o computador" (o programa não tem assinatura, como combinado no item 11 da proposta): **Mais informações → Executar assim mesmo**. Se perguntar "Deseja permitir?", **Sim**.
     3. Ele cria as três tarefas (20h, ao entrar e de hora em hora, no lugar das antigas), liga o computador se ainda não estiver ligado (página do navegador: e-mail, senha, pasta) e faz a primeira atualização. Deve terminar com **Pronto**.
@@ -200,15 +203,17 @@ Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 1
 
 **Conferências depois do merge (o dono estava fazendo quando parou):**
 - [x] **A.** Anexar duas vezes o mesmo arquivo em "Arquivos do inquilino": os dois aparecem e abrem (conferido em 16/11).
-- [ ] **B.** Ficha pela internet: Fichas → ficha de teste → **Gerar link** → abrir no celular e enviar 1 foto ou PDF. Certo: a página confirma e o documento aparece na ficha. No fim, **Encerrar o link**.
-- [ ] **C1.** No celular, abrir um anexo em PDF e apertar o **Voltar** do aparelho. Certo: o PDF fecha e a página continua a mesma.
-- [ ] **C2.** Fechar o aplicativo, ligar o modo avião e abrir de novo. Certo: abre com os dados.
+- [x] (conferido em 16/11) **B.** Ficha pela internet: Fichas → ficha de teste → **Gerar link** → abrir no celular e enviar 1 foto ou PDF. Certo: a página confirma e o documento aparece na ficha. No fim, **Encerrar o link**.
+- [x] (conferido em 16/11) **C1.** No celular, abrir um anexo em PDF e apertar o **Voltar** do aparelho. Certo: o PDF fecha e a página continua a mesma.
+- [x] (conferido em 16/11) **C2.** Fechar o aplicativo, ligar o modo avião e abrir de novo. Certo: abre com os dados.
 
 **Falta você:**
-- [ ] **Cloudflare (5 min):** limite de pedidos na ficha pública. Security → WAF → Rate limiting rules → host `ficha.ankjck.com.br`, caminho começando por `/api/publico/`, 60 pedidos por minuto por IP, bloquear por 1 minuto.
-- [ ] **Programa do PC:** regra Bypass (item 9e) e depois baixar o `.exe` em <https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc> e dar dois cliques (aviso azul → "Mais informações → Executar assim mesmo"). **Depois da #253 o programa antigo do PC não entra mais** ("programa antigo, baixe o novo"): a cópia de hora em hora fica parada até instalar o novo.
+- [x] **Cloudflare (feito em 16/11):** limite de pedidos na ficha pública, regra `Ficha publica - limite` (host `ficha.ankjck.com.br`, caminho começando por `/api/publico/`). No plano grátis a janela é fixa: ficou **20 pedidos em 10 segundos por IP, bloqueio de 10 segundos** (a regra grátis única está usada; a trava opcional de `/api/aparelho/entrar` do `nuvem/README.md` fica sem regra própria, o cofre já limita as senhas).
+- [x] **Programa do PC (16/11):** regra Bypass criada e `.exe` instalado (ver item 9e).
 
 **2ª rodada (Claude, quando o dono pedir; sempre a partir da `main`, sem empilhar):** carregar as telas raras só quando usadas (nº 23), compactar o código no GitHub (nº 24), faixas de código do primeiro acesso numa ida só (nº 37), a tela de ressarcimento barrar mês com boleto em acordo, verificador separado da senha para o crachá do PC (hoje quem tem o banco aberto consegue um crachá só de leitura), Voltar do celular nas janelas de confirmação. Ficou de fora por segurança: adiar a regravação do banco no aparelho (nº 29).
+
+**Ideia do dono em 16/11:** compactar os anexos. Feita no mesmo dia (item 12).
 
 ## 12. Compactação dos anexos (feita em 16/11, PRs #257 e #258)  `[ ]`
 
