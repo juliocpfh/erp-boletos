@@ -239,6 +239,15 @@ export async function ligarAviso() {
   await pedir('push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inscricao.toJSON()) });
 }
 
+/** "Testar o aviso": a nuvem manda um aviso a este aparelho e diz o que deu ({ ok, etapa, mensagem }). */
+export async function testarAviso() {
+  const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+  const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+  if (!inscricao) return { ok: false, etapa: 'aparelho', mensagem: 'Este aparelho não está inscrito: toque em "Ligar".' };
+  if (Notification.permission !== 'granted') return { ok: false, etapa: 'aparelho', mensagem: 'As notificações deste aplicativo estão desligadas no aparelho: libere nas configurações do celular.' };
+  return pedir('push-teste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: inscricao.endpoint }) });
+}
+
 /** Desliga o aviso neste aparelho. */
 export async function desligarAviso() {
   const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;

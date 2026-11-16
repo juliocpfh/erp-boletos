@@ -252,7 +252,7 @@ async function linhaDoAvisoNoAparelho(el) {
   if (!e.possivel) { el.innerHTML = '🔔 Aviso no celular: abra pelo aplicativo instalado (no iPhone: Compartilhar → Adicionar à Tela de Início).'; return; }
   if (!e.ligadoNaNuvem) { el.innerHTML = '🔔 Aviso no celular: ainda não ligado na nuvem (o administrador cadastra as chaves; o Painel e o e-mail continuam avisando).'; return; }
   el.innerHTML = e.ligadoAqui
-    ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao('desligarAvisoFicha', 'Desligar neste aparelho', {}, 'secundario mini')}`
+    ? `🔔 Este aparelho recebe aviso quando chega algo pelos links. ${botao('testarAvisoFicha', 'Testar o aviso', {}, 'mini')} ${botao('desligarAvisoFicha', 'Desligar neste aparelho', {}, 'secundario mini')}`
     : `🔔 Receber aviso neste aparelho quando chegar algo pelos links? ${botao('ligarAvisoFicha', 'Ligar', {}, 'mini')}${e.negado ? ' <span class="suave">(as notificações deste site estão bloqueadas no navegador)</span>' : ''}`;
 }
 
@@ -550,6 +550,10 @@ export const ACOES_FICHAS = {
     await FO.ligarAviso();
     aviso('Pronto: este aparelho avisa quando chegar algo pelos links da ficha.');
     await mostrar();
+  },
+  async testarAvisoFicha() {
+    const r = await FO.testarAviso();
+    aviso(r.ok ? `Teste enviado. ${r.mensagem}` : `O aviso não saiu. ${r.mensagem}`, r.ok ? undefined : 'aviso');
   },
   async desligarAvisoFicha() {
     await FO.desligarAviso();

@@ -13,7 +13,7 @@
 //   pasta da ficha (arquivos/Fichas em analise/<pasta>/), com nome dado aqui, e aparecem na caixa de arquivos da ficha.
 // - Os dados enviados nunca entram sozinhos na ficha: a equipe confere e traz (telas/fichas.js).
 // - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
-import { desinscrever, inscrever, pushLigado } from './push.mjs';
+import { desinscrever, inscrever, publica, pushLigado, testarAparelho } from './push.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
@@ -471,12 +471,13 @@ export async function atenderEquipe(request, env, rota, email, { avisar = null }
   const m = request.method;
   try {
     // aviso no celular: a chave pública para o aparelho se inscrever, inscrever e sair
-    if (rota === 'push' && m === 'GET') return json(200, { ligado: pushLigado(env), chave: pushLigado(env) ? env.VAPID_PUBLICA : null });
+    if (rota === 'push' && m === 'GET') return json(200, { ligado: pushLigado(env), chave: pushLigado(env) ? publica(env) : null });
     if (rota === 'push' && m === 'POST') {
       if (!pushLigado(env)) throw new ErroFicha(503, 'O aviso no celular ainda não foi ligado na nuvem.');
       try { await inscrever(env, await lerJson(request, 8 * 1024), email); } catch (e) { throw e instanceof ErroFicha ? e : new ErroFicha(400, e.message); }
       return json(200, { ok: true });
     }
+    if (rota === 'push-teste' && m === 'POST') return json(200, await testarAparelho(env, (await lerJson(request, 8 * 1024)).endpoint));
     if (rota === 'push-sair' && m === 'POST') { await desinscrever(env, (await lerJson(request, 8 * 1024)).endpoint); return json(200, { ok: true }); }
     if (rota === 'link' && m === 'POST') return await criarLink(request, env, email);
     if (rota === 'pdf' && m === 'PUT') return await guardarPdf(request, env, url);

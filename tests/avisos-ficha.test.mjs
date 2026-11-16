@@ -132,3 +132,28 @@ test('fluxo: a pessoa manda os dados → e-mail para ela e para a equipe; a equi
     assert.deepEqual(feitos, []);
   } finally { console.log = original; }
 });
+
+test('"Testar o aviso": chaves limpas (espaço, quebra de linha, "NOME="), par conferido, inscrição e resposta do serviço', async () => {
+  const { testarAparelho, limparChave } = await import('../nuvem/push.mjs');
+  const chaves = await vapid();
+  assert.equal(limparChave(` VAPID_PUBLICA=${chaves.VAPID_PUBLICA}\r\n`), chaves.VAPID_PUBLICA);
+  assert.equal(limparChave(`﻿${chaves.VAPID_PRIVADA} `), chaves.VAPID_PRIVADA);
+  const env = { ...chaves, VAPID_PUBLICA: `${chaves.VAPID_PUBLICA}\n`, VAPID_PRIVADA: ` ${chaves.VAPID_PRIVADA}`, DADOS: r2Falso() };
+  const ap = await aparelho();
+  const endpoint = 'https://fcm.googleapis.com/fcm/send/teste';
+  const sem = await testarAparelho(env, endpoint, { buscar: async () => new Response(null, { status: 201 }) });
+  assert.equal(sem.etapa, 'inscricao');
+  await inscrever(env, { endpoint, keys: { p256dh: ap.p256dh, auth: ap.auth } }, 'dono@exemplo.com.br');
+  let cab;
+  const ok = await testarAparelho(env, endpoint, { buscar: async (_u, op) => { cab = op.headers.Authorization; return new Response(null, { status: 201 }); } });
+  assert.equal(ok.ok, true);
+  assert.match(cab, new RegExp(`, k=${chaves.VAPID_PUBLICA}$`), 'a chave vai limpa no cabeçalho');
+  const recusado = await testarAparelho(env, endpoint, { buscar: async () => new Response('invalid JWT', { status: 403 }) });
+  assert.equal(recusado.ok, false);
+  assert.match(recusado.mensagem, /recusou a assinatura \(403\)/);
+  // chaves de pares diferentes
+  const outra = await vapid();
+  const trocada = await testarAparelho({ ...env, VAPID_PRIVADA: outra.VAPID_PRIVADA }, endpoint, { buscar: async () => new Response(null, { status: 201 }) });
+  assert.match(trocada.mensagem, /não formam um par/);
+  assert.equal((await testarAparelho({ DADOS: env.DADOS }, endpoint)).etapa, 'chaves');
+});
