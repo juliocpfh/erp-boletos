@@ -217,9 +217,10 @@ test('contra-vistoria do inquilino: prazo de 5 dias úteis das chaves, "não hou
   assert.equal(e('2026-06-10').situacao, 'andamento');
   assert.ok(e('2026-06-10').texto.includes('aguardando o inquilino até 12/06/2026'));
   assert.equal(e('2026-06-12').situacao, 'andamento', 'o último dia ainda conta');
-  // passado o prazo sem nada: a vistoria vale como aceita e a etapa fecha sozinha (não trava a pasta física)
-  assert.equal(e('2026-06-13').situacao, 'pulada');
-  assert.ok(e('2026-06-13').texto.startsWith('não houve (prazo acabou em 12/06/2026'));
+  // passado o prazo sem nada: continua pendente até anexar ou marcar "Não houve" (segura a pasta física do inquilino novo)
+  assert.equal(e('2026-06-13').situacao, 'andamento');
+  assert.ok(e('2026-06-13').texto.startsWith('prazo acabou em 12/06/2026'));
+  assert.equal(R.rotinaEntrada(d, c, '2026-06-13').find((y) => y.chave === 'pasta_fisica').texto, 'aguardando as outras etapas');
   // "Não houve" à mão, antes do prazo
   R.marcarEtapaEntrada(d, c.id, 'contra_vistoria', { pular: true, data: '2026-06-09' }, 'julio');
   assert.deepEqual([e('2026-06-10').situacao, e('2026-06-10').texto, e('2026-06-10').manual], ['pulada', 'não houve', true]);
