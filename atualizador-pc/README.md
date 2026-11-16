@@ -8,14 +8,14 @@ Tudo que ele grava é cifrado com a mesma chave do backup seguro: sem a senha do
 
 ## Como ele entra na nuvem: o "crachá do aparelho" (desde 15/11/2026)
 
-O computador entra **com o e-mail e a senha do sistema**, uma vez só (decisão do dono, `documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md`, seção 8, item 10). A nuvem confere a senha e entrega um **crachá** só deste computador:
+O computador entra **com o e-mail e a senha do sistema**, uma vez só (decisão do dono, `documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md`, seção 8, item 10). A conta da senha é feita neste computador, igual ao site (a senha em si não viaja: a nuvem manda o sal, recebe só o resumo e compara); conferido, a nuvem entrega um **crachá** só deste computador:
 
 - O crachá **só lê** (dados, arquivos e versão PC): não grava nada no sistema.
 - Vale o acesso de quem ligou: se essa pessoa for bloqueada em Usuários, o computador para também.
 - Aparece no sistema em **Usuários → Aparelhos ligados** (computador, quem ligou, quando, última vez), com o botão **Desligar** (computador roubado, funcionário que saiu): para na hora (nos arquivos, em até 1 minuto).
 - Computador que passa **90 dias** sem rodar precisa ser ligado de novo.
 - A **senha não fica guardada**. O crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre) em `%LOCALAPPDATA%\Administracao de Imoveis\cracha.dat`, ao lado de `config.json` (site, pasta e nome do computador). Fora do OneDrive; copiar a pasta para outro computador não leva o crachá.
-- Errou a senha 5 vezes: espera 15 minutos.
+- Errou a senha 5 vezes: espera 15 minutos. Programa antigo (de antes de 15/11/2026) não entra mais ("este programa do computador é antigo"): baixe o novo.
 
 Não precisa mais de chave de serviço do Cloudflare, de `.env` nem do segredo `SERVICOS`.
 
@@ -76,7 +76,7 @@ Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subp
 
 ## Como saber se está funcionando
 
-- Na pasta do backup seguro, `ultima-atualizacao.txt` tem a data e o resultado da última execução (`ok` ou `FALHOU` com o motivo). "Não está mais ligado ao sistema" = foi desligado em Usuários ou ficou 90 dias parado: `ligar-computador.cmd`.
+- Na pasta do backup seguro, `ultima-atualizacao.txt` tem a data e o resultado da última execução (`ok` ou `FALHOU` com o motivo; se algum arquivo da cópia aberta não baixou, as 5 primeiras falhas vêm nas linhas de baixo, `falhou: <arquivo>: <motivo>`, e voltam sozinhas na rodada seguinte). Cada pedido à nuvem tem tempo-limite (30 s nas consultas, 2 min por arquivo): conexão presa vira `FALHOU`, não trava a tarefa. A cópia aberta baixa 5 arquivos de cada vez e só uma rodada por vez (`copia-aberta.trava` na pasta, vale 15 min). "Não está mais ligado ao sistema" = foi desligado em Usuários ou ficou 90 dias parado: `ligar-computador.cmd`.
 - Em `copias-diarias/` aparece um arquivo por dia (`imoveis-dados-AAAA-MM-DD.bkp`, ficam 60); em `programa/`, a versão PC (`administracao-imoveis.html`) e a versão dela (`versao.txt`).
 - No sistema: **Usuários → Aparelhos ligados → Última vez**.
 - No Windows: Agendador de Tarefas → "Imoveis - atualizador da versao PC" → Histórico.
@@ -88,7 +88,7 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 ## Segurança
 
 - O crachá só lê e só funciona nesta conta do Windows (DPAPI). Quem usa este computador com a sua conta consegue rodar o atualizador: proteja o Windows com senha. Computador perdido: **Desligar** em Usuários.
-- A porta `/api/aparelho/` fica fora do login do Access, por isso: só entra quem sabe e-mail e senha de um usuário ativo (5 erros por e-mail, 10 por endereço de internet ou 50 no total = espera), o crachá é sorteado (256 bits) e a nuvem guarda só o resumo (hash) dele. As outras rotas da nuvem continuam exigindo o Access.
+- A porta `/api/aparelho/` fica fora do login do Access, por isso: só entra quem sabe e-mail e senha de um usuário ativo (5 erros por e-mail ou 10 por endereço de internet = espera 15 min; mais de 50 erros por hora somando todo mundo só deixa cada tentativa 2 s mais lenta, sem trancar ninguém), o crachá é sorteado (256 bits) e a nuvem guarda só o resumo (hash) dele. Limite conhecido: como a conta da senha é feita no computador (o Cloudflare não faz PBKDF2 acima de 100.000 voltas), quem já tiver o resumo gravado da senha de um usuário (um administrador, ou um backup aberto) consegue um crachá, que só lê, sem saber a senha. As outras rotas da nuvem continuam exigindo o Access.
 - A versão PC vem do GitHub (o repositório é público; é o próprio programa, sem dados), buscada pela nuvem.
 
 ## Falta (etapa 2 da proposta)

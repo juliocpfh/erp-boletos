@@ -26,6 +26,13 @@ export const ARQUIVO_PROGRAMA = 'administracao-imoveis.html';
 export const CAMINHO_PROGRAMA = 'offline/administracao-imoveis.html';
 export const PASTA_COPIA = 'Arquivos dos imoveis'; // iguais a docs/js/copia-aberta.js
 export const ARQUIVO_COPIA = 'copia-aberta.json';
+export const ARQUIVO_TRAVA = 'copia-aberta.trava'; // uma rodada da cópia aberta por vez (a de hora em hora e a das 20h podem se cruzar)
+export const VALIDADE_TRAVA = 15 * 60000; // trava parada há mais que isso é de uma rodada que morreu: a próxima passa por cima
+export const TEMPO_CONSULTA = 30000; // tempo-limite de cada consulta à nuvem (sem ele, uma conexão presa travaria a tarefa para sempre)
+export const TEMPO_DOWNLOAD = 120000; // idem para baixar um arquivo (dados, versão PC, anexo)
+export const BAIXAR_JUNTOS = 5; // arquivos da cópia aberta baixados ao mesmo tempo
+export const MAX_ERROS_REGISTRO = 5; // falhas da cópia aberta que vão para ultima-atualizacao.txt (caminho e motivo)
+const prazo = (ms) => AbortSignal.timeout(ms);
 export const MANTER_DIARIOS = 60; // igual a MANTER_DIARIOS de docs/js/backup-seguro.js
 const MAGICO = 'IMOVEIS-BACKUP-SEGURO-1'; // igual ao de docs/js/backup-seguro.js (tests/atualizador-pc.test.mjs confere abrindo o arquivo)
 
@@ -128,7 +135,7 @@ export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) 
   const { cabecalhos } = a;
 
   // 1. os dados, como estão agora na nuvem
-  const corpo = await lerJson(await buscar(`${a.api}dados/tudo`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' }), a);
+  const corpo = await lerJson(await buscar(`${a.api}dados/tudo`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual', signal: prazo(TEMPO_DOWNLOAD) }), a);
   const dados = JSON.parse(corpo);
   if (dados.formato !== 'imoveis-v1') throw new Error('A nuvem devolveu algo que não é o banco do sistema.');
   const pastaDiario = path.join(cfg.pasta, PASTA_DIARIO);
@@ -146,15 +153,17 @@ export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) 
     fs.mkdirSync(pastaPrograma, { recursive: true });
     const versaoArq = path.join(pastaPrograma, 'versao.txt');
     const atual = fs.existsSync(versaoArq) ? fs.readFileSync(versaoArq, 'utf8').trim() : '';
-    const cab = await buscar(a.programa, { method: 'HEAD', headers: cabecalhos, redirect: 'manual' });
+    const cab = await buscar(a.programa, { method: 'HEAD', headers: cabecalhos, redirect: 'manual', signal: prazo(TEMPO_CONSULTA) });
     // pelo crachá a versão PC vem do GitHub (ETag); pela chave de serviço, do site (Last-Modified)
     const publicada = cab.ok ? (cab.headers.get('etag') || cab.headers.get('last-modified') || '') : '';
     if (!cab.ok && cab.status !== 304) throw new Error(`resposta ${cab.status}`);
     if (publicada && publicada !== atual) {
-      const p = await buscar(a.programa, { headers: cabecalhos, redirect: 'manual' });
+      const p = await buscar(a.programa, { headers: cabecalhos, redirect: 'manual', signal: prazo(TEMPO_DOWNLOAD) });
       const html = await p.text();
       if (!p.ok || !html.includes('<html')) throw new Error(`resposta ${p.status}`);
-      fs.writeFileSync(path.join(pastaPrograma, ARQUIVO_PROGRAMA), html);
+      const destino = path.join(pastaPrograma, ARQUIVO_PROGRAMA);
+      fs.writeFileSync(`${destino}.parte`, html);
+      fs.renameSync(`${destino}.parte`, destino); // troca inteira: a versão PC nunca fica pela metade
       fs.writeFileSync(versaoArq, publicada);
       programa = 'atualizado';
     }
@@ -193,10 +202,40 @@ export function planoCopia(nuvem, anterior = {}) {
 const codificar = (caminho) => caminho.split('/').map(encodeURIComponent).join('/');
 
 /**
- * Baixa da nuvem (lista-tudo/arquivos/ e arquivos/<caminho>) o que é novo ou mudou e apaga da cópia o que saiu da nuvem.
- * Arquivo que sumiu da cópia (apagado à mão) volta. Devolve { baixados, apagados, falhas, total }.
+ * Trava da cópia aberta: um arquivo na pasta, criado só se não existe. Devolve { renovar, soltar } ou null (outra rodada em
+ * andamento). Trava sem renovação há mais de VALIDADE_TRAVA é de uma rodada que morreu (computador desligado no meio): sai.
  */
-export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
+export function travarCopia(pasta, agora = () => Date.now()) {
+  const arq = path.join(pasta, ARQUIVO_TRAVA);
+  const criar = () => { try { fs.writeFileSync(arq, `${process.pid} ${new Date(agora()).toISOString()}\n`, { flag: 'wx' }); return true; } catch (e) { if (e.code === 'EEXIST') return false; throw e; } };
+  if (!criar()) {
+    let parada = true;
+    try {
+      const desde = Date.parse(fs.readFileSync(arq, 'utf8').trim().split(' ')[1]);
+      parada = agora() - (Number.isNaN(desde) ? fs.statSync(arq).mtimeMs : desde) > VALIDADE_TRAVA; // ilegível: vale a data do arquivo
+    } catch { /* sumiu agora: tenta de novo */ }
+    if (!parada) return null;
+    try { fs.unlinkSync(arq); } catch { /* outra rodada tirou */ }
+    if (!criar()) return null;
+  }
+  return {
+    renovar: () => { try { fs.writeFileSync(arq, `${process.pid} ${new Date(agora()).toISOString()}\n`); } catch { /* segue sem renovar */ } },
+    soltar: () => { try { fs.unlinkSync(arq); } catch { /* já saiu */ } },
+  };
+}
+
+/**
+ * Baixa da nuvem (lista-tudo/arquivos/ e arquivos/<caminho>) o que é novo ou mudou e apaga da cópia o que saiu da nuvem.
+ * Arquivo que sumiu da cópia (apagado à mão) volta. Devolve { baixados, apagados, falhas, total }; com outra rodada em
+ * andamento, não faz nada e devolve { ocupada: true }. `erros` recebe as primeiras falhas ({ caminho, motivo }).
+ */
+export async function atualizarCopia(cfg, { buscar = fetch, erros = [] } = {}) {
+  const trava = travarCopia(cfg.pasta);
+  if (!trava) return { ocupada: true };
+  try { return await copiar(cfg, buscar, erros, trava); } finally { trava.soltar(); }
+}
+
+async function copiar(cfg, buscar, erros, trava) {
   const a = acesso(cfg);
   const { cabecalhos } = a;
   const raiz = path.join(cfg.pasta, PASTA_COPIA);
@@ -208,9 +247,10 @@ export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
   const nuvem = [];
   let cursor;
   for (let n = 0; n < 1000; n += 1) {
-    const r = await buscar(`${a.api}lista-tudo/arquivos/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual' });
+    const r = await buscar(`${a.api}lista-tudo/arquivos/${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: { ...cabecalhos, Accept: 'application/json' }, redirect: 'manual', signal: prazo(TEMPO_CONSULTA) });
     if (!(r.headers.get('content-type') || '').includes('json')) throw new Error(a.recusou(r.status));
     const corpo = await r.json();
+    trava.renovar();
     if (!r.ok) throw new Error(`A nuvem recusou a lista dos arquivos: ${corpo.erro || r.status}`);
     nuvem.push(...corpo.arquivos);
     if (!corpo.mais) break;
@@ -225,26 +265,36 @@ export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
     delete arquivos[c];
   }
   let falhas = 0; let feitos = 0;
-  for (const c of baixar) {
+  const baixarUm = async (c) => {
     const destino = path.join(raiz, ...caminhoLocal(c));
     try {
-      const r = await buscar(`${a.api}arquivos/${codificar(c)}`, { headers: cabecalhos, redirect: 'manual' });
+      const r = await buscar(`${a.api}arquivos/${codificar(c)}`, { headers: cabecalhos, redirect: 'manual', signal: prazo(TEMPO_DOWNLOAD) });
       if (!r.ok) throw new Error(`resposta ${r.status}`);
       const bytes = Buffer.from(await r.arrayBuffer());
       fs.mkdirSync(path.dirname(destino), { recursive: true });
       fs.writeFileSync(`${destino}.parte`, bytes);
       fs.renameSync(`${destino}.parte`, destino);
       arquivos[c] = atual[c];
-    } catch { falhas += 1; try { fs.unlinkSync(`${destino}.parte`); } catch { /* nada */ } }
+    } catch (e) {
+      falhas += 1;
+      if (erros.length < MAX_ERROS_REGISTRO) erros.push({ caminho: c, motivo: e.name === 'TimeoutError' ? `demorou mais de ${TEMPO_DOWNLOAD / 1000} segundos` : String(e.message || e) });
+      try { fs.unlinkSync(`${destino}.parte`); } catch { /* nada */ }
+    }
     feitos += 1;
-    if (feitos % 50 === 0) salvar(falhas);
-  }
+    if (feitos % 50 === 0) { salvar(falhas); trava.renovar(); }
+  };
+  // BAIXAR_JUNTOS de cada vez: cada "fila" pega o próximo da lista quando termina o seu
+  let proximo = 0;
+  const fila = async () => { while (proximo < baixar.length) { const c = baixar[proximo]; proximo += 1; await baixarUm(c); } };
+  await Promise.all(Array.from({ length: Math.min(BAIXAR_JUNTOS, baixar.length) }, fila));
   salvar(falhas);
   return { baixados: baixar.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
 }
 
 /** Texto da cópia aberta para o registro (ultima-atualizacao.txt). */
-const resumoCopia = (c) => `arquivos=${c.total} (baixados ${c.baixados}, tirados ${c.apagados}${c.falhas ? `, ${c.falhas} falharam` : ''})`;
+const resumoCopia = (c) => (c.ocupada ? 'arquivos=outra atualização dos arquivos em andamento (esta não repetiu)' : `arquivos=${c.total} (baixados ${c.baixados}, tirados ${c.apagados}${c.falhas ? `, ${c.falhas} falharam` : ''})`);
+/** As primeiras falhas, uma por linha, para o registro: "  falhou: <caminho>: <motivo>". */
+export const linhasDeErros = (erros) => erros.map((e) => `  falhou: ${e.caminho}: ${String(e.motivo).replace(/\s+/g, ' ').slice(0, 200)}\n`).join('');
 
 /** A rotina inteira (o que `node atualizador.mjs` e o .exe fazem): liga se for preciso, atualiza e registra. `true` se deu certo. */
 export async function principal(args = []) {
@@ -263,15 +313,19 @@ export async function principal(args = []) {
       cfg = carregarConfig();
     }
     const r = soArquivos ? null : await atualizar(cfg);
-    let copia;
-    try { copia = resumoCopia(await atualizarCopia(cfg)); } catch (e) { copia = `arquivos=FALHOU ${e.message}`; }
-    const linha = r ? `ok dados=${r.dados} programa=${r.programa} ${copia}` : `ok ${copia}`;
-    fs.writeFileSync(path.join(cfg.pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} ${linha}\n`);
+    let copia; let copiaOk = true; const erros = [];
+    try { copia = resumoCopia(await atualizarCopia(cfg, { erros })); } catch (e) { copiaOk = false; copia = `arquivos=FALHOU ${e.name === 'TimeoutError' ? 'a nuvem demorou demais para responder' : e.message}`; }
+    // a cópia aberta inteira falhou: a linha começa com FALHOU e o programa sai com erro (o Agendador de Tarefas mostra)
+    const linha = `${copiaOk ? 'ok' : 'FALHOU'} ${r ? `dados=${r.dados} programa=${r.programa} ` : ''}${copia}`;
+    fs.writeFileSync(path.join(cfg.pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} ${linha}\n${linhasDeErros(erros)}`);
     console.log(r ? `Atualizado: ${r.dados} em ${path.join(cfg.pasta, PASTA_DIARIO)}; versão PC ${r.programa}; ${copia}.` : `Cópia aberta: ${copia}.`);
-    return true;
+    for (const e of erros) console.log(`  falhou: ${e.caminho}: ${e.motivo}`);
+    if (!copiaOk) process.exitCode = 1;
+    return copiaOk;
   } catch (e) {
-    console.error(`Falhou: ${e.message}`);
-    try { fs.writeFileSync(path.join(carregarConfig().pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} FALHOU ${e.message}\n`); } catch { /* sem pasta */ }
+    const motivo = e.name === 'TimeoutError' ? 'a nuvem demorou demais para responder (sem internet ou conexão ruim)' : e.message;
+    console.error(`Falhou: ${motivo}`);
+    try { fs.writeFileSync(path.join(carregarConfig().pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} FALHOU ${motivo}\n`); } catch { /* sem pasta */ }
     process.exitCode = 1;
     return false;
   }

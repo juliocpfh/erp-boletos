@@ -1,6 +1,7 @@
 // Ligar este computador ao sistema (crachá do aparelho, decisão do dono de 15/11/2026): uma página simples, só neste computador
-// (http://127.0.0.1, aberta no navegador), pede e-mail, senha e a pasta do backup seguro. A nuvem confere a senha e devolve o
-// crachá; o crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre) e a senha não fica guardada.
+// (http://127.0.0.1, aberta no navegador), pede e-mail, senha e a pasta do backup seguro. A conta da senha (PBKDF2, igual à do
+// site) é feita aqui: a nuvem manda o sal e as voltas, recebe só o resumo, confere e devolve o crachá (a senha não sai deste
+// computador nem fica guardada); o crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre).
 // Onde fica: %LOCALAPPDATA%\Administracao de Imoveis\ (config.json com o site e a pasta; cracha.dat cifrado). Fora do OneDrive.
 // Uso: node atualizador.mjs --ligar (ou ligar-computador.cmd). Passo a passo em README.md.
 import { spawn, spawnSync } from 'node:child_process';
@@ -59,18 +60,40 @@ export function esquecerLigacao(env = process.env) {
 // ---------------------------------------------------------------------------
 // Falar com a nuvem
 // ---------------------------------------------------------------------------
-/** E-mail e senha → crachá. Erros com texto para a pessoa. */
+const MAX_ITERACOES = 2000000; // igual a nuvem/aparelhos.mjs: a nuvem não manda este computador fazer uma conta sem fim
+const MIN_ITERACOES = 1000;
+export const TEMPO_LIGAR = 30000; // tempo-limite de cada pedido à nuvem
+
+/** O resumo da senha (PBKDF2-SHA256, 256 bits, em hex): a mesma conta de docs/js/auth.js, feita neste computador. */
+export const resumoDaSenha = (senha, sal, iteracoes) => new Promise((ok, falha) => {
+  crypto.pbkdf2(String(senha), String(sal), iteracoes, 32, 'sha256', (e, bytes) => (e ? falha(e) : ok(bytes.toString('hex'))));
+});
+
+/**
+ * E-mail e senha → crachá, em dois pedidos à mesma rota: 1) só o e-mail → a nuvem diz o sal e as voltas; 2) o e-mail e o resumo
+ * da senha calculado aqui. A senha em si nunca vai para a nuvem. Erros com texto para a pessoa.
+ */
 export async function entrarNaNuvem(site, { email, senha, computador }, buscar = fetch) {
-  let r;
-  try {
-    r = await buscar(`${site}/api/aparelho/entrar`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ email, senha, computador }) });
-  } catch { throw new Error('Sem internet (ou o site não respondeu). Confira a conexão e tente de novo.'); }
-  if (!(r.headers.get('content-type') || '').includes('json')) {
-    throw new Error(`A nuvem ainda não deixa o programa entrar (resposta ${r.status}): falta a regra "Bypass" do caminho /api/aparelho no Cloudflare Access (nuvem/README.md, "Programa do PC").`);
+  if (!email || !senha) throw new Error('Informe o e-mail e a senha do sistema.');
+  const pedir = async (corpo) => {
+    let r;
+    try {
+      r = await buscar(`${site}/api/aparelho/entrar`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(corpo), signal: AbortSignal.timeout(TEMPO_LIGAR) });
+    } catch { throw new Error('Sem internet (ou o site não respondeu). Confira a conexão e tente de novo.'); }
+    if (!(r.headers.get('content-type') || '').includes('json')) {
+      throw new Error(`A nuvem ainda não deixa o programa entrar (resposta ${r.status}): falta a regra "Bypass" do caminho /api/aparelho no Cloudflare Access (nuvem/README.md, "Programa do PC").`);
+    }
+    let d;
+    try { d = await r.json(); } catch { throw new Error('Sem internet (ou o site não respondeu). Confira a conexão e tente de novo.'); }
+    if (!r.ok) throw new Error(d.erro || `A nuvem recusou (${r.status}).`);
+    return d;
+  };
+  const { desafio } = await pedir({ email, computador });
+  const voltas = Number(desafio?.iteracoes);
+  if (!desafio?.sal || !Number.isSafeInteger(voltas) || voltas < MIN_ITERACOES || voltas > MAX_ITERACOES) {
+    throw new Error('A nuvem respondeu de um jeito que este programa não entende: baixe a versão nova do programa e tente de novo.');
   }
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.erro || `A nuvem recusou (${r.status}).`);
-  return d;
+  return pedir({ email, senha: `pbkdf2:${await resumoDaSenha(senha, desafio.sal, voltas)}`, computador });
 }
 
 /** Abre a janela do Windows para escolher a pasta; '' se a pessoa cancelou. */

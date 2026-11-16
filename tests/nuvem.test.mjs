@@ -302,8 +302,17 @@ async function nuvemComCofre() {
     method: metodo, body: corpo === undefined ? undefined : JSON.stringify(corpo),
     headers: { 'CF-Connecting-IP': ip, ...(cracha ? { Authorization: `Bearer ${cracha}` } : {}), ...cab },
   }), env, buscar);
-  const entrar = (email, senha, extra = {}) => pedir('POST', 'aparelho/entrar', { corpo: { email, senha, computador: 'ESCRITORIO-01' }, ...extra });
-  return { dobj, env, pedir, entrar, github };
+  // como o programa do PC (ligar.mjs): 1) pede o sal e as voltas; 2) manda o resumo da senha calculado no computador
+  const desafio = (email, extra = {}) => pedir('POST', 'aparelho/entrar', { corpo: { email, computador: 'ESCRITORIO-01' }, ...extra });
+  const entrar = async (email, senha, extra = {}) => {
+    const r = await desafio(email, extra);
+    if (!r.ok) return r;
+    const { sal, iteracoes } = (await r.json()).desafio;
+    return pedir('POST', 'aparelho/entrar', { corpo: { email, senha: `pbkdf2:${await resumoSenha(senha, sal, iteracoes)}`, computador: 'ESCRITORIO-01' }, ...extra });
+  };
+  dobj.aparelhos.esperas = [];
+  dobj.aparelhos.esperar = async (ms) => { dobj.aparelhos.esperas.push(ms); }; // a espera do limite geral não atrasa o teste
+  return { dobj, env, pedir, entrar, desafio, github };
 }
 
 test('crachá do aparelho: entra com e-mail e senha conferidos no servidor e só lê; nada fora de /api/aparelho/ passa sem o Access', async () => {
@@ -348,7 +357,33 @@ test('crachá do aparelho: entra com e-mail e senha conferidos no servidor e só
   assert.equal((await pedir('GET', 'aparelho/%2e%2e/dados/tudo', { cracha })).status, 401, '"../" sai do caminho do aparelho e cai no Access');
 });
 
-test('crachá do aparelho: senha errada e limite de tentativas (por e-mail, por endereço e no total); usuário antigo e pendente', async () => {
+test('crachá do aparelho: a conta da senha é feita no computador (o Workers recusa PBKDF2 acima de 100.000 voltas); a senha não chega à nuvem', async () => {
+  const { dobj, pedir, desafio } = await nuvemComCofre();
+  // passo 1: sal e voltas do usuário; e-mail desconhecido recebe um sal de mentira, sempre o mesmo (não entrega quem tem cadastro)
+  assert.deepEqual(await (await desafio('Dono@Exemplo.com.br')).json(), { desafio: { sal: 'sal1', iteracoes: 1000 } });
+  assert.deepEqual(await (await desafio('antigo@exemplo.com.br')).json(), { desafio: { sal: 'sal3', iteracoes: 150000 } }, 'usuário antigo: as voltas antigas');
+  const falso = (await (await desafio('ninguem@exemplo.com.br')).json()).desafio;
+  assert.match(falso.sal, /^[0-9a-f]{32}$/, 'parece um sal de verdade (docs/js/auth.js novoSal)');
+  assert.equal(falso.iteracoes, 600000);
+  assert.deepEqual((await (await desafio('ninguem@exemplo.com.br')).json()).desafio, falso, 'o mesmo a cada pedido');
+  assert.notEqual((await (await desafio('outro@exemplo.com.br')).json()).desafio.sal, falso.sal);
+  assert.equal(dobj.cofre.q('SELECT COUNT(*) AS n FROM tentativas_aparelho')[0].n, 0, 'pedir o sal não conta como tentativa');
+  // o cofre não faz PBKDF2 nenhum: nem com a senha certa em texto (programa antigo) entra
+  const original = crypto.subtle.deriveBits;
+  crypto.subtle.deriveBits = () => { throw new Error('o cofre não pode fazer PBKDF2 (limite de 100.000 voltas do Workers)'); };
+  try {
+    const antigo = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: 'senha do dono 2026', computador: 'PC' } });
+    assert.equal(antigo.status, 400);
+    assert.match((await antigo.json()).erro, /programa do computador é antigo/);
+    const certo = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: `pbkdf2:${dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 1").map((x) => JSON.parse(x.dados))[0].senha_hash}`, computador: 'PC' } });
+    assert.equal(certo.status, 200, 'com o resumo certo entra, sem conta pesada no servidor');
+  } finally { crypto.subtle.deriveBits = original; }
+  assert.equal((await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: '', computador: 'PC' } })).status, 400, 'senha vazia não é pedido de sal');
+  assert.equal((await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: `pbkdf2:${'0'.repeat(64)}`, computador: 'PC' } })).status, 401);
+  assert.equal((await pedir('POST', 'aparelho/entrar', { corpo: { email: 'ninguem@exemplo.com.br', senha: `pbkdf2:${'0'.repeat(64)}`, computador: 'PC' } })).status, 401, 'sem usuário, o resumo de comparação nunca bate');
+});
+
+test('crachá do aparelho: senha errada e limite de tentativas (por e-mail e por endereço; o total só atrasa); usuário antigo e pendente', async () => {
   const { dobj, entrar } = await nuvemComCofre();
   const r = await entrar('dono@exemplo.com.br', 'senha errada');
   assert.equal(r.status, 401);
@@ -365,11 +400,17 @@ test('crachá do aparelho: senha errada e limite de tentativas (por e-mail, por 
   // por endereço: 10 erros com e-mails diferentes do mesmo lugar
   for (let i = 0; i < 10; i += 1) await entrar(`x${i}@exemplo.com.br`, 'errada', { ip: '192.0.2.7' });
   assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '192.0.2.7' })).status, 429);
-  // no total: 50 erros por hora param todo mundo (sem o Access na frente, é a trava contra quem tenta de muitos lugares)
+  // no total: 50 erros por hora NÃO param todo mundo (qualquer pessoa de fora trancaria o dono): cada tentativa só demora
   dobj.cofre.relogio = () => new Date(Date.now() + 2 * 3600000);
   for (let i = 0; i < 50; i += 1) await entrar(`y${i}@exemplo.com.br`, 'errada', { ip: `10.0.${i}.1` });
-  assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '10.9.9.9' })).status, 429);
+  assert.deepEqual(dobj.aparelhos.esperas, [], 'até 50, sem espera');
+  assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '10.9.9.9' })).status, 200, 'o dono entra mesmo com 50 erros de outros');
+  assert.deepEqual(dobj.aparelhos.esperas, [A.ATRASO_GERAL], 'só esperou um pouco');
+  // faxina: as linhas vencidas (e-mails e endereços que nunca mais voltam) saem na tentativa seguinte
+  assert.ok(dobj.cofre.q('SELECT COUNT(*) AS n FROM tentativas_aparelho')[0].n > 50);
   dobj.cofre.relogio = () => new Date(Date.now() + 4 * 3600000);
+  await entrar('z@exemplo.com.br', 'errada', { ip: '10.8.8.8' });
+  assert.deepEqual(dobj.cofre.q('SELECT chave FROM tentativas_aparelho ORDER BY chave').map((l) => l.chave), ['email:z@exemplo.com.br', 'geral', 'ip:10.8.8.8']);
   assert.equal((await entrar('antigo@exemplo.com.br', 'senha antiga 2026', { ip: '10.9.9.9' })).status, 200, 'senha gravada com as voltas antigas (sem senha_iteracoes)');
   // pedido de acesso ainda não aprovado não liga computador
   const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 2").map((x) => JSON.parse(x.dados))[0];
