@@ -92,3 +92,29 @@ test('acordo: barra boleto não vencido, de outro inquilino, emitido no C6 ou co
   julho.banco = { situacao: 'emitido' };
   assert.throws(() => R.previaAcordo(d, ok, hoje), /cancele no banco/);
 });
+
+test('termo do acordo: dívida confessada, boletos incluídos, parcelas, vencimento antecipado, sem novação, fiador anuente e duas testemunhas', async () => {
+  const REC = await import('../docs/js/recibos.js');
+  const { d, c, julho } = base();
+  R.registrarPagamento(d, R.boletoDoMes(d, c.id, '2026-06').id, '2026-07-10', null, 'julio');
+  R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Carlos Dias', cpf: '529.982.247-25', nome_conjuge: 'Rita Dias' }, 'julio');
+  const { acordo } = R.fazerAcordo(d, { contrato_id: c.id, ids: [julho.id], total: 150000, parcelas: 3, primeiro_vencimento: '2026-12-10' }, 'julio', '2026-09-19');
+  assert.deepEqual(REC.reciboDisponivel(d, 'acordo', { contrato: c }), { ok: false, motivo: 'Acordo não encontrado.' });
+  const r = REC.montarRecibo(d, 'acordo', { contrato: c, acordo: acordo.id }, '2026-09-20');
+  assert.equal(r.titulo, 'TERMO DE CONFISSÃO DE DÍVIDA E ACORDO DE PAGAMENTO');
+  assert.equal(r.data, '2026-09-19', 'data do acordo');
+  assert.match(r.paragrafos[0], /FIADOR\(ES\), como intervenientes anuentes: Carlos Dias/);
+  assert.match(r.paragrafos[1], /confessa dever à LOCADORA a importância de R\$ 1\.500,00 \(mil e quinhentos reais\)/);
+  assert.deepEqual(r.tabela.filter(([a]) => /parcela/.test(a)).map(([a, b]) => [a, b]),
+    [['1ª parcela, vencimento 10/12/2026', 'R$ 500,00'], ['2ª parcela, vencimento 10/01/2027', 'R$ 500,00'], ['3ª parcela, vencimento 10/02/2027', 'R$ 500,00']]);
+  assert.ok(r.tabela.some(([a]) => /aluguel de 07\/2026 \(venceu em 10\/08\/2026\)/.test(a)));
+  const texto = r.depois.join(' ');
+  assert.match(texto, /vencimento antecipado/);
+  assert.match(texto, /multa de 10% e dos juros de 1% ao mês/);
+  assert.match(texto, /não é novação \(Código Civil, artigo 361\)/);
+  assert.match(texto, /artigo 838, I/);
+  assert.match(texto, /784, III/);
+  assert.deepEqual(r.assinaturas.map((x) => x.linha.split(' · ').pop()), ['LOCADORA', 'DEVEDOR (LOCATÁRIO)', 'FIADOR (anuente)', 'CÔNJUGE DO FIADOR (anuente)', `CPF: ${REC.EM_BRANCO}`, `CPF: ${REC.EM_BRANCO}`]);
+  R.desfazerAcordo(d, acordo.id, 'julio', '2026-09-20');
+  assert.equal(REC.reciboDisponivel(d, 'acordo', { contrato: c, acordo: acordo.id }).ok, false);
+});

@@ -1,7 +1,7 @@
 # Proposta: rotina "Arquivo impresso" (pasta física do inquilino)
 
 Item **9c** de `PENDENCIAS_DO_DONO.md` e decisão de 15/11/2026 em `DECISOES.md`.
-**Aprovada e implementada em 15/11/2026** (respostas da seção 8 e "aprovado" no mesmo dia). Diferenças da implementação: a etapa simples antiga da saída (`arquivo_fisico_em`) continua valendo como pasta fechada, sem migração de dados; arquivo solto novo (ex.: notificação) só aparece ao abrir a pasta do inquilino (o Painel não abre pastas); arquivo trocado é percebido quando o lançamento passa a apontar para outro arquivo.
+**Aprovada e implementada em 15/11/2026** (respostas da seção 8 e "aprovado" no mesmo dia). Diferenças da implementação: a etapa simples antiga da saída (`arquivo_fisico_em`) continua valendo como pasta fechada, sem migração de dados; arquivo solto novo (ex.: notificação) aparece no Painel na abertura seguinte do sistema (a conferência dos arquivos já traz a lista da nuvem); arquivo trocado é percebido quando o lançamento passa a apontar para outro arquivo.
 
 Nomes e datas abaixo são de exemplo: **Ana Souza** (inquilina do Apto 2, Rua das Flores, 100), **Pedro Lima** e **Lúcia Lima** (troca de titular na Loja 1).
 
