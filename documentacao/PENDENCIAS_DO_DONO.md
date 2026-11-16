@@ -20,6 +20,7 @@ Marque com `[x]` o que for concluindo.
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: ícone (você) e entrar com e-mail e senha em vez da chave de serviço (feito; falta a regra Bypass no Cloudflare, item 9e). Cópia aberta e pasta física: feitas | você | 15 min |
 | 11 | **Mutirão de 16/11 (onde paramos):** conferir depois do merge (B, C1, C2), regra de limite na ficha pública e 2ª rodada | você + Claude | 15 min |
+| 12 | Compactação dos anexos: apertar o botão dos anexos antigos e conferir uma foto nova | você | 10 min |
 
 ---
 
@@ -208,6 +209,14 @@ Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 1
 - [ ] **Programa do PC:** regra Bypass (item 9e) e depois baixar o `.exe` em <https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc> e dar dois cliques (aviso azul → "Mais informações → Executar assim mesmo"). **Depois da #253 o programa antigo do PC não entra mais** ("programa antigo, baixe o novo"): a cópia de hora em hora fica parada até instalar o novo.
 
 **2ª rodada (Claude, quando o dono pedir; sempre a partir da `main`, sem empilhar):** carregar as telas raras só quando usadas (nº 23), compactar o código no GitHub (nº 24), faixas de código do primeiro acesso numa ida só (nº 37), a tela de ressarcimento barrar mês com boleto em acordo, verificador separado da senha para o crachá do PC (hoje quem tem o banco aberto consegue um crachá só de leitura), Voltar do celular nas janelas de confirmação. Ficou de fora por segurança: adiar a regravação do banco no aparelho (nº 29).
+
+## 12. Compactação dos anexos (feita em 16/11, PRs #257 e #258)  `[ ]`
+
+O sistema agora diminui sozinho, ao anexar, as fotos e os PDFs escaneados, sem guardar o original. PDF com texto (do banco, de um sistema, do Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos mandados pelo link da ficha diminuem quando alguém abre a ficha no sistema, logo depois da conferência (o alerta "⚠ possível montagem" continua). Enquanto um PDF escaneado é compactado, o topo da tela mostra "página 3 de 10… Aguarde". Liga e desliga em Dados e backup → Regras do sistema → "Compactar anexos".
+
+**Falta você:**
+- [ ] **A. Anexos que já estavam no sistema (5 a 10 min):** Dados e backup → **Compactar os anexos que já estão no sistema** → confirmar. Deixe a tela aberta até o fim. Certo: no fim aparece quantos foram compactados e quanto diminuiu (ex.: "40 de 298 arquivo(s) compactado(s): de 350,0 MB para 60,0 MB").
+- [ ] **B. Anexo novo:** anexe uma foto grande (3 a 4 MB, tirada no celular) em qualquer inquilino. Certo: na lista de arquivos ela aparece com algumas centenas de KB (ex.: 400 KB) e abre de pé, sem estar virada.
 
 ## Ficou de fora de propósito (não é defeito)
 
