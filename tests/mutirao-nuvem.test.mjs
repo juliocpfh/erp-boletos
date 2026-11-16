@@ -69,12 +69,12 @@ test('anexo "só se novo": dois aparelhos com o mesmo nome ao mesmo tempo, um gr
   assert.equal(ctx.env.DADOS.m.get('arquivos/Sala/contrato.pdf').customMetadata.por, 'dono@exemplo.com.br');
 });
 
-test('anexo: resposta guardável com conferência (no-cache) e 304 quando o navegador já tem o mesmo arquivo', async () => {
+test('anexo: nunca guardado no navegador (no-store); 304 se o pedido trouxer a etiqueta do mesmo arquivo', async () => {
   const ctx = ambiente();
   await ctx.sistema('PUT', 'arquivos/Sala/a.pdf', PDF);
   const r = await ctx.sistema('GET', 'arquivos/Sala/a.pdf');
   assert.equal(r.status, 200);
-  assert.equal(r.headers.get('Cache-Control'), 'private, no-cache');
+  assert.equal(r.headers.get('Cache-Control'), 'private, no-store', 'documento pessoal não fica guardado no navegador');
   const etiqueta = r.headers.get('ETag');
   assert.deepEqual(new Uint8Array(await r.arrayBuffer()), PDF);
   for (const se of [etiqueta, `W/${etiqueta}`, `"outra", ${etiqueta}`]) {

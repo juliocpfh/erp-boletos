@@ -171,7 +171,7 @@ async function listarTudo(env, prefixo, delimitador) {
 
 /** O arquivo guardado no navegador ainda é o mesmo? (If-None-Match com a etiqueta de agora, com ou sem W/, ou "*") */
 const mesmaEtiqueta = (se, etiqueta) => !!se && se.split(',').map((x) => x.trim().replace(/^W\//, '')).some((x) => x === '*' || x === etiqueta);
-const CACHE_ANEXO = 'private, no-cache'; // o navegador pode guardar, mas pergunta antes de usar (e a pergunta passa pelo login)
+const CACHE_ANEXO = 'private, no-store'; // documentos pessoais: o navegador não guarda em disco (o site busca sempre de novo)
 
 async function lerArquivo(env, chave, request = null) {
   const se = request ? request.headers.get('If-None-Match') : null;
