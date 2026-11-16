@@ -283,8 +283,32 @@ export function percentualPorBonificado(base, bonificado) {
 // Parcelamentos (IPTU e seguro)
 // --------------------------------------------------------------------------
 
-/** Divide um total em parcelas; a diferença de centavos fica na primeira. */
+/**
+ * Divide um total em parcelas. Quando os centavos não dividem, as primeiras ficam mais caras e a última menor
+ * (decisão de 2026-11-15). Ex.: R$ 1.200,05 em 10 = nove de R$ 120,01 e a última de R$ 119,96. A soma sempre fecha.
+ * Se a última ficaria zerada ou negativa (total minúsculo), a sobra vai centavo a centavo para as primeiras.
+ */
 export function parcelas(total, quantidade) {
+  quantidade = Math.trunc(quantidade || 0);
+  if (quantidade <= 0) return [];
+  const cheia = Math.ceil(total / quantidade);
+  const ultima = total - cheia * (quantidade - 1);
+  if (ultima > 0) {
+    const lista = Array(quantidade).fill(cheia);
+    lista[quantidade - 1] = ultima;
+    return lista;
+  }
+  const base = Math.floor(total / quantidade);
+  const sobra = total - base * quantidade;
+  return Array.from({ length: quantidade }, (_, k) => base + (k < sobra ? 1 : 0));
+}
+
+/**
+ * A divisão de antes de 15/11/2026 (a diferença de centavos fica na primeira parcela). Continua valendo para os parcelamentos
+ * que já estavam em andamento (IPTU até 2026 e seguro com a 1ª parcela antes de PARCELAS_NOVAS_DESDE), para nenhum boleto em
+ * aberto mudar de valor e o total cobrado fechar. Ex.: R$ 1.200,05 em 10 = a 1ª de R$ 119,96 e nove de R$ 120,01.
+ */
+export function parcelasAntigas(total, quantidade) {
   quantidade = Math.trunc(quantidade || 0);
   if (quantidade <= 0) return [];
   const base = arred(total / quantidade);
@@ -293,11 +317,16 @@ export function parcelas(total, quantidade) {
   return lista;
 }
 
+/** Competência da 1ª parcela a partir da qual o parcelamento usa a divisão nova (última menor); antes dela, a antiga. Não mude. */
+export const PARCELAS_NOVAS_DESDE = '2026-12';
+/** As parcelas de um parcelamento cuja 1ª parcela é da competência ``primeiraComp``: divisão antiga ou nova, pelo corte. */
+export const parcelasDesde = (total, quantidade, primeiraComp) => (String(primeiraComp || '') < PARCELAS_NOVAS_DESDE ? parcelasAntigas : parcelas)(total, quantidade);
+
 /** [número da parcela, valor] cobrado na competência, ou [null, 0]. */
 export function parcelaNaCompetencia(total, quantidade, primeiraComp, comp) {
   if (!primeiraComp || !quantidade) return [null, 0];
   const i = mesesEntre(primeiraComp, comp);
-  const lista = parcelas(total, quantidade);
+  const lista = parcelasDesde(total, quantidade, primeiraComp);
   return i >= 0 && i < lista.length ? [i + 1, lista[i]] : [null, 0];
 }
 

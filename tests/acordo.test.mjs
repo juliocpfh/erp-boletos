@@ -37,7 +37,7 @@ test('acordo: R$ 1.353,50 vencido há 40 dias vira 3 boletos de R$ 500,00; o ori
   const dados = { contrato_id: c.id, ids: [julho.id], total: 150000, parcelas: 3, primeiro_vencimento: '2026-12-10', observacoes: 'por telefone' };
   const p = R.previaAcordo(d, dados, hoje);
   assert.deepEqual(p.boletos.map((b) => [b.vencimento, b.valor, b.nf, b.outros]),
-    [['2026-12-10', 50000, 49884, 116], ['2027-01-10', 50000, 49883, 117], ['2027-02-10', 50000, 49883, 117]],
+    [['2026-12-10', 50000, 49883, 117], ['2027-01-10', 50000, 49883, 117], ['2027-02-10', 50000, 49884, 116]],
     'a tarifa (R$ 3,50) fica fora da NF; o resto (aluguel + multa e juros do acordo) vai na NF');
   assert.equal(p.foraDaNf, 350);
   const { acordo, parcelas } = R.fazerAcordo(d, dados, 'julio', hoje);
@@ -56,7 +56,7 @@ test('acordo: R$ 1.353,50 vencido há 40 dias vira 3 boletos de R$ 500,00; o ori
   assert.match(R.textoLembrete(d, parcelas[0], '2026-12-01').texto, /parcela 1\/3 do acordo \(07\/2026\)/);
   // parcela paga em dia: NF com a parte do aluguel, período do aluguel de julho
   R.registrarPagamento(d, parcelas[0].id, '2026-12-10', null, 'julio');
-  assert.equal(parcelas[0].valor_nf, 49884);
+  assert.equal(parcelas[0].valor_nf, 49883);
   const b = R.baseDaFatura(d, 'cobranca', parcelas[0]);
   assert.deepEqual([b.periodo_inicio, b.periodo_fim], ['2026-07-01', '2026-07-31']);
   assert.match(b.observacoes, /Parcela do acordo 1\/3 \(07\/2026\)/);
