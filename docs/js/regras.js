@@ -2554,7 +2554,7 @@ export function comprovantesPendentes(d, c) {
 
 /** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
 export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
-  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
   if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
   const r = buscar(d, tabela, id);
@@ -2632,7 +2632,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
  * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
  */
 export function removerAnexo(d, tabela, id, campo, usuario) {
-  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
+  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
   const r = buscar(d, tabela, id);
   if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
@@ -3682,10 +3682,43 @@ export const ETAPAS_ENTRADA = [
   ['vistoria_gerada', 'Gerar a vistoria de entrada'],
   ['chaves_gerado', 'Gerar o termo de entrega das chaves'],
   ['vistoria_assinada', 'Vistoria de entrada assinada', 'doc_vistoria_em'],
+  // contra-vistoria (pedido do dono em 2026-11-15): o que o inquilino apontou de diferente da vistoria, no prazo da cláusula
+  ['contra_vistoria', 'Contra-vistoria do inquilino'],
   ['chaves_assinado', 'Termo de entrega das chaves assinado', 'doc_chaves_em'],
   ...CONTAS_ENTRADA.map(([k, , t]) => [k, t]),
   ['seguro', 'Contratação do seguro'],
 ];
+
+/**
+ * Etapa "Contra-vistoria do inquilino" (pedido do dono em 2026-11-15): o inquilino tem 5 dias úteis desde a entrega das
+ * chaves para apontar o que não está na vistoria de entrada (cláusula da vistoria, C.limiteVistoriaEntrada). Com o arquivo
+ * anexado, feita na data em que ele mandou; dentro do prazo, aguardando; passado o prazo sem nada anexado, a vistoria vale
+ * como aceita e a etapa se fecha sozinha ("não houve"), mas ainda dá para anexar se ele tiver mandado. Troca de titular: a
+ * do contrato anterior vale (a vistoria de entrada é a mesma).
+ * Ex.: chaves em 02/03/2026 (segunda) → prazo até 09/03/2026; em 05/03 aguardando; em 10/03, sem arquivo, "não houve".
+ */
+function situacaoContraVistoria(d, c, hoje) {
+  if (c.contra_vistoria) return { situacao: 'feita', data: c.contra_vistoria_em || null, texto: 'recebida' };
+  const anterior = contratoHerdado(d, c);
+  if (anterior) {
+    const a = [...cadeiaDeContratos(d, c).antes].reverse().find((x) => x.contra_vistoria);
+    return { situacao: 'feita', data: a ? a.contra_vistoria_em || null : null, texto: a ? `herdada de ${a.inquilino_nome}` : `herdado de ${anterior.inquilino_nome}` };
+  }
+  if (!c.data_entrada) return undefined;
+  const limite = C.limiteVistoriaEntrada(c.data_entrada);
+  if (hoje > limite) return { situacao: 'pulada', data: null, texto: `não houve (prazo acabou em ${C.dataBr(limite)}; vistoria aceita)` };
+  return { situacao: 'andamento', texto: `aguardando o inquilino até ${C.dataBr(limite)} (5 dias úteis da entrega das chaves)` };
+}
+
+/** Anexa a contra-vistoria do inquilino: o arquivo e a data em que ele mandou (troca o arquivo anterior, se houver). */
+export function registrarContraVistoria(d, contratoId, { data, arquivo }, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (!data) throw new C.ErroUsuario('Informe a data em que o inquilino mandou a contra-vistoria.');
+  if (!arquivo) throw new C.ErroUsuario('Escolha o arquivo da contra-vistoria.');
+  atualizar(d, 'contratos', c.id, { contra_vistoria: arquivo, contra_vistoria_em: data }, usuario,
+    `${c.inquilino_nome}: contra-vistoria do inquilino recebida em ${C.dataBr(data)} (${arquivo})`);
+}
 
 /** Inquilino novo para a rotina: entrou há até 6 meses (ou ainda vai entrar). */
 export const rotinaRecente = (c, hoje = C.hojeIso()) => !c.data_entrada || c.data_entrada >= C.somarMesesData(hoje, -6);
@@ -3771,6 +3804,7 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     },
     chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),
     vistoria_assinada: () => docAssinado('doc_vistoria_em', 'vistoria_assinada'),
+    contra_vistoria: () => situacaoContraVistoria(d, c, hoje),
     chaves_assinado: () => docAssinado('doc_chaves_em', 'chaves_assinado'),
     seguro: () => {
       const data = c.data_entrada || c.vigencia_inicio || '';
@@ -3808,7 +3842,7 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     const m = marcas[chave];
     // o registrado na página vale mais que a marca à mão; a data de "gerado" sem data própria vem da marca
     const e = auto && auto.situacao === 'feita' ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) }
-      : m && m.pulada ? { situacao: 'pulada', data: m.data, texto: 'não se aplica', manual: true }
+      : m && m.pulada ? { situacao: 'pulada', data: m.data, texto: chave === 'contra_vistoria' ? 'não houve' : 'não se aplica', manual: true }
         : m && m.data && !doc ? { situacao: 'feita', data: m.data, texto: `marcada por ${m.por || '-'}`, manual: true }
           : auto || { situacao: 'pendente', texto: '' };
     out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
@@ -3884,7 +3918,7 @@ export function arquivosReferenciados(d) {
   // o mesmo PDF pode ser apontado por dois registros (pagamento pelo banco e a movimentação que o confirmou): entra uma vez
   const usa = (escopo, id, nome) => { const k = `${escopo}:${id}|${nome}`; if (nome && id && !vistos.has(k)) { vistos.add(k); out.push({ escopo, id, nome }); } };
   for (const c of d.contratos) {
-    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
+    for (const k of ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria']) usa('contrato', c[`${k}_contrato`] || c.id, c[k]);
     for (const [campo] of DOCUMENTOS_ENTRADA) {
       usa('assinados', c.id, c[campoArquivoDoc(campo)]);
       usa('assinados', c.id, (c[campoParcialDoc(campo)] || {}).arquivo);
@@ -3916,6 +3950,8 @@ const COMPROVANTES_NO_CONTRATO = [
   ['comprovante_reserva', 'reserva', (c) => c.reserva_data, 'comprovante da reserva'],
   // não é comprovante de dinheiro: o termo de devolução das chaves assinado na saída (B4), com o nome termo-devolucao-chaves-<data da saída>
   ['termo_chaves_saida', 'termo-devolucao-chaves', (c) => c.data_saida, 'termo de devolução das chaves assinado'],
+  // contra-vistoria de entrada mandada pelo inquilino (2026-11-15), com a data em que ele mandou
+  ['contra_vistoria', 'contra-vistoria', (c) => c.contra_vistoria_em, 'contra-vistoria do inquilino'],
 ];
 
 /**

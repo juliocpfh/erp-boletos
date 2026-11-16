@@ -13,7 +13,7 @@ Marque com `[x]` o que for concluindo.
 | 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele) | você, no Google e no Cloudflare | 30 min |
 | 2 | Aviso no celular (ficha pela internet) | você, no Cloudflare | 10 min |
 | 3 | Teste da ficha pela internet com uma pessoa de verdade | você + um conhecido | 20 min |
-| 4 | Conferências no celular (ícone, "Enviar agora", caução da troca) | você | 15 min |
+| 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
 | 5 | Banco C6 (boleto e extrato automáticos) | o C6 liberar as chaves | depende do C6 |
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
@@ -103,9 +103,9 @@ Ponto que ainda não testei na tela depois das últimas correções: a janela do
 
 Coisas que funcionaram no computador mas não foram vistas num celular de verdade:
 
-1. **Ícone do aplicativo** (PR #193): em **Empresas**, enquadre a logo e grave. No iPhone, apague o ícone da Tela de Início e adicione de novo para pegar o novo.
-2. **"Enviar agora" com anexos** (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
-3. **Caução na troca de titular** (PR #210): abra o **Painel** uma vez (ele corrige as trocas antigas sozinho) e depois confira cada contrato que teve troca de titular. Se a data paga da caução estiver errada, use **✎ corrigir data**.
+1. [x] **Ícone do aplicativo** (conferido pelo dono em 15/11: deu certo) (PR #193): em **Empresas**, enquadre a logo e grave. No iPhone, apague o ícone da Tela de Início e adicione de novo para pegar o novo.
+2. [ ] **"Enviar agora" com anexos** (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
+3. [x] **Caução na troca de titular** (conferido pelo dono em 15/11: deu certo) (PR #210): abra o **Painel** uma vez (ele corrige as trocas antigas sozinho) e depois confira cada contrato que teve troca de titular. Se a data paga da caução estiver errada, use **✎ corrigir data**.
 
 ---
 
@@ -176,6 +176,15 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   2. Copiar para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`) e dar dois cliques em `ligar-computador.cmd`: abre uma página no navegador; e-mail, senha e a pasta (já vem preenchida) → **Ligar**.
   3. No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker (o lembrete de 08/11/2027 deixa de valer).
   - Fica para a etapa 2: instalador `.exe` (sem instalar o Node); sem assinatura no seu computador, certificado só antes do primeiro cliente de fora (proposta, item 11).
+
+## 10. Anexar a contra-vistoria de entrada  `[x]` (feito em 15/11)
+
+**Pedido do dono em 15/11.** Lugar próprio para anexar a **contra-vistoria de entrada** (o que o inquilino encontrou de diferente da vistoria de entrada). Decisões do dono: vira etapa da entrada, logo abaixo de "Vistoria de entrada assinada", com prazo, e entra na pasta física.
+- **Prazo:** 5 dias úteis da entrega das chaves (cláusula da vistoria). Ex.: chaves em 13/11/2026 → até 23/11/2026 (20/11 é feriado).
+- **Na etapa:** data em que o inquilino mandou + arquivo (PDF, foto ou o e-mail salvo em PDF) → **Anexar**. Se ele avisar que não vai mandar, **Não houve**.
+- **Passado o prazo sem nada anexado:** a etapa fecha sozinha como "não houve" (a vistoria vale como aceita) e não segura a pasta física; ainda dá para anexar depois. Inquilinos antigos ficam assim.
+- **Troca de titular:** vale a contra-vistoria do contrato anterior.
+- **Falta você (depois do merge):** nada obrigatório. Se algum inquilino recente mandou contra-vistoria, anexe na etapa.
 
 ## Ficou de fora de propósito (não é defeito)
 

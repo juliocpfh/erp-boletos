@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as AI from '../docs/js/arquivo-impresso.js';
 import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 
@@ -56,7 +57,7 @@ test('rotina de entrada: etapas pelo que já está registrado, marca à mão com
   const hoje = '2026-07-01';
   let rot = R.rotinaEntrada(d, c, hoje);
   assert.deepEqual(rot.map((e) => e.chave), ['reserva', 'contrato_gerado', 'contrato_assinado', 'garantia', 'vistoria_gerada', 'chaves_gerado',
-    'vistoria_assinada', 'chaves_assinado', 'agua', 'energia', 'seguro', 'pasta_fisica'], 'sem gás e condomínio; sem aditivo; a pasta física por último');
+    'vistoria_assinada', 'contra_vistoria', 'chaves_assinado', 'agua', 'energia', 'seguro', 'pasta_fisica'], 'sem gás e condomínio; sem aditivo; a pasta física por último');
   assert.equal(rot.find((e) => e.chave === 'pasta_fisica').texto, 'aguardando as outras etapas');
   assert.equal(rot.find((e) => e.chave === 'agua').titulo, 'Transferência da água (Sanepar)');
   assert.equal(rot.find((e) => e.chave === 'garantia').titulo, 'Assinatura do fiador');
@@ -207,6 +208,40 @@ test('contrato excluído: a garantia marcada como passada a ele volta ao anterio
   c.garantia_transferida_para = 999;
   R.normalizar(d);
   assert.equal(c.garantia_transferida_para, null, 'dados antigos');
+});
+
+test('contra-vistoria do inquilino: prazo de 5 dias úteis das chaves, "não houve", anexo, pasta física e troca de titular', () => {
+  const { d, c } = base(); // chaves em 07/06/2026 (domingo) → prazo até 12/06/2026 (sexta)
+  const e = (hoje, x = c) => R.rotinaEntrada(d, x, hoje).find((y) => y.chave === 'contra_vistoria');
+  assert.equal(C.limiteVistoriaEntrada(c.data_entrada), '2026-06-12');
+  assert.equal(e('2026-06-10').situacao, 'andamento');
+  assert.ok(e('2026-06-10').texto.includes('aguardando o inquilino até 12/06/2026'));
+  assert.equal(e('2026-06-12').situacao, 'andamento', 'o último dia ainda conta');
+  // passado o prazo sem nada: a vistoria vale como aceita e a etapa fecha sozinha (não trava a pasta física)
+  assert.equal(e('2026-06-13').situacao, 'pulada');
+  assert.ok(e('2026-06-13').texto.startsWith('não houve (prazo acabou em 12/06/2026'));
+  // "Não houve" à mão, antes do prazo
+  R.marcarEtapaEntrada(d, c.id, 'contra_vistoria', { pular: true, data: '2026-06-09' }, 'julio');
+  assert.deepEqual([e('2026-06-10').situacao, e('2026-06-10').texto, e('2026-06-10').manual], ['pulada', 'não houve', true]);
+  // anexada: feita na data em que o inquilino mandou, mesmo depois do "não houve"
+  assert.throws(() => R.registrarContraVistoria(d, c.id, { data: '', arquivo: 'x.pdf' }, 'julio'), /data/);
+  R.registrarContraVistoria(d, c.id, { data: '2026-06-11', arquivo: 'comprovante-contra-vistoria-2026-06-11.pdf' }, 'julio');
+  assert.deepEqual([e('2026-07-01').situacao, e('2026-07-01').data], ['feita', '2026-06-11']);
+  // o arquivo fica ligado ao lançamento (não é apagado como solto) e vai para a pasta física, logo depois da vistoria
+  assert.ok(R.arquivosReferenciados(d).some((x) => x.escopo === 'contrato' && x.id === c.id && x.nome === 'comprovante-contra-vistoria-2026-06-11.pdf'));
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-06-07', 'julio', 'vistoria.pdf');
+  const itens = AI.itensDaPasta(d, c);
+  const i = itens.findIndex((x) => x.vaga === 'contra_vistoria');
+  assert.equal(itens[i - 1].vaga, 'doc:doc_vistoria_em');
+  assert.equal(itens[i].rotulo, 'Contra-vistoria do inquilino');
+  // o "×" apaga só o arquivo: volta a pendência (o prazo já passou: "não houve" à mão continua)
+  R.removerAnexo(d, 'contratos', c.id, 'contra_vistoria', 'julio');
+  assert.equal(e('2026-07-01').situacao, 'pulada');
+  // troca de titular: a contra-vistoria do anterior vale para o novo
+  R.registrarContraVistoria(d, c.id, { data: '2026-06-11', arquivo: 'cv.pdf' }, 'julio');
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-12-15', contra_vistoria: null, contra_vistoria_em: null, rotina_entrada: null }, 'julio');
+  assert.deepEqual([e('2026-12-16', novo).situacao, e('2026-12-16', novo).texto], ['feita', 'herdada de Maria Exemplo']);
 });
 
 test('alerta único da rotina de entrada: documentos e contas juntos; cor do alerta antigo passa a valer', () => {
