@@ -39,6 +39,7 @@ import * as M from './mapa-c6.mjs';
 import { c6SimuladoDaConta } from './c6-simulado.mjs';
 import { listarPaginas } from './c6-boletos-listar.mjs';
 import { rotasFase2 } from './rotas-fase2.mjs';
+import { comNovasTentativas } from './c6-tentativas.mjs';
 
 export const VERSAO = '0.1.0';
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
@@ -164,16 +165,40 @@ export function faltamNaConta(conta) {
 // Chamadas ao C6: token OAuth2 (renovado sozinho) e requisições com certificado mTLS
 // --------------------------------------------------------------------------
 const tokens = new Map(); // id da conta → { token, expira }
+const tokensEmAndamento = new Map(); // id da conta → promessa do token que está sendo pedido agora
 const MARGEM_TOKEN_MS = 60000;
 
-function pedir(url, { metodo = 'GET', cabecalhos = {}, corpo = null, conta = null, binario = false } = {}) {
+// Conexões mTLS de cada conta: o certificado e a chave são lidos do disco UMA vez e ficam no agente (antes, cada chamada lia os
+// dois arquivos e abria conexão nova). Se os arquivos mudarem (data ou tamanho: certificado renovado), os agentes são refeitos.
+// `consultas` (GET) mantém a conexão aberta entre chamadas; `escritas` (emissão, alteração, baixa, pagamento, token) abre uma
+// conexão por chamada, como sempre foi: conexão reaproveitada pode cair no meio, e escrita não se repete.
+const agentes = new Map(); // id da conta → { assinatura, consultas, escritas }
+export function agentesDaConta(conta) {
+  const assinatura = [conta.certificado, conta.chave].map((p) => { const s = fs.statSync(p); return `${p}|${s.mtimeMs}|${s.size}`; }).join('|');
+  const atual = agentes.get(conta.id);
+  if (atual && atual.assinatura === assinatura) return atual;
+  if (atual) { atual.consultas.destroy(); atual.escritas.destroy(); }
+  const tls = { cert: fs.readFileSync(conta.certificado), key: fs.readFileSync(conta.chave), ...(conta.senha_chave ? { passphrase: conta.senha_chave } : {}) };
+  const novo = { assinatura, consultas: new https.Agent({ keepAlive: true, ...tls }), escritas: new https.Agent({ keepAlive: false, ...tls }) };
+  agentes.set(conta.id, novo);
+  return novo;
+}
+
+let transporte = null;
+/** Só para os testes: troca a chamada HTTPS ao banco por uma função `(url, opcoes) → { status, tipo, dados | corpo }` (null desfaz). */
+export function trocarTransporteParaTeste(fn) { transporte = fn; }
+
+function pedir(url, opcoes = {}) {
+  return transporte ? transporte(url, opcoes) : pedirNoBanco(url, opcoes);
+}
+
+function pedirNoBanco(url, { metodo = 'GET', cabecalhos = {}, corpo = null, conta = null, binario = false } = {}) {
   return new Promise((resolver, falhar) => {
     const u = new URL(url);
     const opcoes = { method: metodo, hostname: u.hostname, port: u.port || 443, path: `${u.pathname}${u.search}`, headers: { ...cabecalhos }, timeout: 25000 };
     if (conta) {
-      opcoes.cert = fs.readFileSync(conta.certificado);
-      opcoes.key = fs.readFileSync(conta.chave);
-      if (conta.senha_chave) opcoes.passphrase = conta.senha_chave;
+      const a = agentesDaConta(conta);
+      opcoes.agent = metodo === 'GET' ? a.consultas : a.escritas;
     }
     if (corpo !== null) opcoes.headers['Content-Length'] = Buffer.byteLength(corpo);
     const req = https.request(opcoes, (res) => {
@@ -188,8 +213,8 @@ function pedir(url, { metodo = 'GET', cabecalhos = {}, corpo = null, conta = nul
         resolver({ status: res.statusCode, tipo: res.headers['content-type'] || '', dados });
       });
     });
-    req.on('timeout', () => req.destroy(new Error('O banco não respondeu a tempo.')));
-    req.on('error', falhar);
+    req.on('timeout', () => req.destroy(Object.assign(new Error('O banco não respondeu a tempo.'), { code: 'TEMPO_ESGOTADO' })));
+    req.on('error', (e) => { if (req.reusedSocket) e.socketReusado = true; falhar(e); }); // conexão reaproveitada que caiu: a consulta tenta de novo
     if (corpo !== null) req.write(corpo);
     req.end();
   });
@@ -199,9 +224,18 @@ function pedir(url, { metodo = 'GET', cabecalhos = {}, corpo = null, conta = nul
 export const ESCOPOS_BOLEPIX = M.ESCOPOS;
 
 /** Token da conta, pedindo um novo quando não há ou está perto de vencer. */
-export async function obterToken(conta, forcar = false, cfg = null) {
+export function obterToken(conta, forcar = false, cfg = null) {
   const atual = tokens.get(conta.id);
-  if (!forcar && atual && atual.expira - MARGEM_TOKEN_MS > Date.now()) return atual.token;
+  if (!forcar && atual && atual.expira - MARGEM_TOKEN_MS > Date.now()) return Promise.resolve(atual.token);
+  // dois pedidos ao mesmo tempo esperam o MESMO token (um pedido ao banco, não dois)
+  const andando = tokensEmAndamento.get(conta.id);
+  if (andando) return andando;
+  const promessa = pedirToken(conta, cfg).finally(() => { if (tokensEmAndamento.get(conta.id) === promessa) tokensEmAndamento.delete(conta.id); });
+  tokensEmAndamento.set(conta.id, promessa);
+  return promessa;
+}
+
+async function pedirToken(conta, cfg) {
   const corpo = new URLSearchParams({ grant_type: 'client_credentials', client_id: conta.client_id, client_secret: conta.client_secret }).toString();
   const r = await pedir(`${conta.url_base}${M.CAMINHOS.token}`, { metodo: 'POST', corpo, conta, cabecalhos: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' } }); // roteiro AT_01: POST /auth
   registrarChamada(cfg, conta, 'POST', M.CAMINHOS.token, r.status, r.dados ? { ...r.dados, access_token: r.dados.access_token ? '(oculto)' : undefined } : null);
@@ -267,6 +301,18 @@ export function apagarAntigos(cfg, dias = cfg.retencao_registros_dias || 30) {
   return apagados;
 }
 
+/** Repete `apagarAntigos` uma vez por dia enquanto a ponte estiver ligada (o relógio não segura o programa aberto: `unref`). */
+export function agendarLimpeza(cfg, intervaloMs = 86400000) {
+  const relogio = setInterval(() => {
+    try {
+      const n = apagarAntigos(cfg);
+      if (n) console.log(`${n} arquivo(s) de registro com mais de ${cfg.retencao_registros_dias} dias apagado(s).`);
+    } catch (e) { console.error(`Não deu para apagar os registros antigos: ${e.message}`); }
+  }, intervaloMs);
+  relogio.unref();
+  return relogio;
+}
+
 /** Últimos registros por teste do roteiro (e os últimos ``n`` de cada), lendo os arquivos de registros/. */
 export function registrosDoRoteiro(cfg, n = 3) {
   if (!fs.existsSync(cfg.pastaRegistros)) return {};
@@ -299,14 +345,24 @@ const resumo = (x) => {
   return JSON.stringify(x).slice(0, 300);
 };
 
-/** Chamada autenticada à API do C6; se o token foi recusado (401), pede outro e tenta de novo uma vez. */
+/**
+ * Chamada autenticada à API do C6; se o token foi recusado (401), pede outro e tenta de novo uma vez.
+ * Consulta (GET) com o banco ocupado (429, 502, 503, 504) ou sem resposta a tempo: até 2 novas tentativas, pausas de 1 s e 3 s
+ * (c6-tentativas.mjs). Emissão, alteração, baixa e negativação (POST, PATCH, PUT, DELETE) nunca são repetidas.
+ */
 export async function chamarC6(cfg, conta, metodo, caminho, corpo = null, { binario = false, tentativa = 0 } = {}) {
   const token = await obterToken(conta, tentativa > 0, cfg);
   const cabecalhos = { Authorization: `Bearer ${token}`, Accept: binario ? 'application/pdf' : 'application/json',
     'partner-software-name': cfg.software.nome, 'partner-software-version': cfg.software.versao };
   if (corpo !== null) cabecalhos['Content-Type'] = 'application/json';
-  const r = await pedir(`${conta.url_base}${caminho}`, { metodo, cabecalhos, corpo: corpo !== null ? JSON.stringify(corpo) : null, conta, binario });
-  registrarChamada(cfg, conta, metodo, caminho, r.status, binario ? `(${r.corpo ? r.corpo.length : 0} bytes, ${r.tipo})` : r.dados);
+  const r = await comNovasTentativas(metodo, async () => {
+    const x = await pedir(`${conta.url_base}${caminho}`, { metodo, cabecalhos, corpo: corpo !== null ? JSON.stringify(corpo) : null, conta, binario });
+    registrarChamada(cfg, conta, metodo, caminho, x.status, binario ? `(${x.corpo ? x.corpo.length : 0} bytes, ${x.tipo})` : x.dados);
+    return x;
+  }, { pausas: cfg.pausas_tentativas }).catch((e) => {
+    if (e && e.tentativasEsgotadas) throw new ErroHttp(504, 'O banco não respondeu a tempo, mesmo tentando de novo. Tente daqui a pouco.');
+    throw e;
+  });
   if (r.status === 401 && tentativa === 0) return chamarC6(cfg, conta, metodo, caminho, corpo, { binario, tentativa: 1 });
   if (r.status === 403) throw new ErroHttp(502, `O banco recusou (403): o usuário da API não tem o escopo necessário (${ESCOPOS_BOLEPIX.join(', ')}). Peça ao C6 para liberar. ${resumo(r.dados)}`, r.dados);
   if (r.status >= 300) throw new ErroHttp(r.status === 404 ? 404 : 502, `O banco respondeu ${r.status}: ${resumo(r.dados)}`, r.dados);
@@ -640,7 +696,7 @@ export const SERVICOS = {
     rotas: [
       { metodo: 'GET', padrao: /^\/notificacoes\/?$/, async executar({ cfg, conta, query }) {
         const desde = query.get('desde') || '';
-        return { status: 200, dados: { conta: conta.id, notificacoes: lerNotificacoes(cfg, conta.id).filter((n) => !desde || n.recebida_em >= desde) } };
+        return { status: 200, dados: { conta: conta.id, notificacoes: lerNotificacoes(cfg, conta.id, desde).filter((n) => !desde || n.recebida_em >= desde) } };
       } },
     ],
   },
@@ -672,9 +728,15 @@ function guardarNotificacao(cfg, contaId, corpo) {
   return n;
 }
 
-export function lerNotificacoes(cfg, contaId) {
+/**
+ * Avisos guardados da conta. Com `desde` (data ou data e hora ISO), abre só os arquivos do dia em diante (a data está no nome:
+ * <conta>-AAAA-MM-DD.jsonl, no mesmo fuso de `recebida_em`); o arquivo antigo sem data (<conta>.jsonl) é sempre lido.
+ */
+export function lerNotificacoes(cfg, contaId, desde = '') {
   if (!fs.existsSync(cfg.pastaNotificacoes)) return [];
-  return fs.readdirSync(cfg.pastaNotificacoes).filter((a) => a === `${contaId}.jsonl` || (a.startsWith(`${contaId}-`) && a.endsWith('.jsonl'))).sort()
+  const dia = (/^\d{4}-\d{2}-\d{2}/.exec(String(desde || '')) || [''])[0];
+  const diaDoArquivo = (a) => (a.startsWith(`${contaId}-`) && /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(a.slice(contaId.length + 1)) ? a.slice(contaId.length + 1, contaId.length + 11) : null);
+  return fs.readdirSync(cfg.pastaNotificacoes).filter((a) => { if (a === `${contaId}.jsonl`) return true; const d = diaDoArquivo(a); return d !== null && (!dia || d >= dia); }).sort()
     .flatMap((a) => fs.readFileSync(path.join(cfg.pastaNotificacoes, a), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean));
 }
 
@@ -804,6 +866,7 @@ function c6RealDaConta(cfg, conta) {
   if (clientesC6.has(chave)) return clientesC6.get(chave);
   const cliente = {
     conta: conta.id,
+    pausas: cfg.pausas_tentativas, // pausas das novas tentativas das consultas (padrão de c6-tentativas.mjs)
     async chamar(metodo, caminho, { query = {}, corpo = null, aceitar = 'application/json' } = {}) {
       exigirConfigurada(conta);
       const q = new URLSearchParams(Object.entries(query || {}).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]));
@@ -920,6 +983,7 @@ async function principal() {
   if (process.argv.includes('--roteiro')) { console.log(textoRoteiro(cfg)); return null; }
   const apagados = apagarAntigos(cfg);
   if (apagados) console.log(`${apagados} arquivo(s) de registro com mais de ${cfg.retencao_registros_dias} dias apagado(s).`);
+  agendarLimpeza(cfg); // a ponte fica ligada por semanas: a limpeza repete uma vez por dia
   const servidor = criarServidor(cfg);
   servidor.listen(cfg.porta, cfg.host, async () => {
     const s = await saude(cfg, false);

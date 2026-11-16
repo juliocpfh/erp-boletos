@@ -14,6 +14,16 @@ export const CABECALHO_SENHA = 'X-Senha-Ponte';
 const TEMPO_LIMITE_MS = 30000;
 
 /**
+ * Consultas que a ponte faz em várias chamadas ao banco, uma depois da outra (1 ano de extrato são 13 chamadas de até 25 s cada;
+ * a lista de boletos vem em páginas): esperar só 30 s fazia o site desistir com a ponte ainda trabalhando.
+ */
+export const TEMPO_LIMITE_LONGO_MS = 5 * 60000;
+const ROTAS_DEMORADAS = /^\/(extrato|boletos\/pagos|boletos|comprovante\/[^/?]+)\/?(\?|$)/;
+
+/** Tempo de espera padrão de uma rota da conta: 5 minutos nas consultas de extrato, comprovante e listas de boletos; 30 s no resto. */
+export const tempoLimiteDaRota = (metodo, caminho) => (String(metodo).toUpperCase() === 'GET' && ROTAS_DEMORADAS.test(`/${String(caminho).replace(/^\/+/, '')}`) ? TEMPO_LIMITE_LONGO_MS : TEMPO_LIMITE_MS);
+
+/**
  * Endereço e senha da ponte DESTE navegador (IndexedDB, como o atalho da pasta): o JSON compartilhado na pasta/OneDrive não leva
  * a senha. Cada computador que usa o banco informa os dois em Dados e backup.
  */
@@ -109,7 +119,7 @@ export async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes = {}
 /** Chamada a um serviço de uma conta: ``chamarPonte('ank', 'POST', '/boletos', pedido)`` → ``POST <ponte>/contas/ank/boletos``. */
 export function chamarPonte(contaId, metodo, caminho, corpo = null, opcoes = {}) {
   if (!contaId) throw new Error('Conta bancária não informada.');
-  return chamarPonteCrua(metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith('/') ? '' : '/'}${caminho}`, corpo, opcoes);
+  return chamarPonteCrua(metodo, `/contas/${encodeURIComponent(contaId)}${caminho.startsWith('/') ? '' : '/'}${caminho}`, corpo, { tempoLimite: tempoLimiteDaRota(metodo, caminho), ...opcoes });
 }
 
 /**

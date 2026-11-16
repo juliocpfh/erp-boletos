@@ -80,9 +80,29 @@ export function montarPdfComprovante(l, { conta, empresa = String(conta ?? '').t
   });
 }
 
-export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, agora = () => new Date() }) {
+/** Por quanto tempo o extrato buscado para um comprovante serve aos próximos comprovantes da mesma conta e janela. */
+export const VALIDADE_EXTRATO_COMPROVANTE_MS = 90000;
+
+export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, agora = () => new Date(), validadeExtratoMs = VALIDADE_EXTRATO_COMPROVANTE_MS, relogio = () => Date.now() }) {
   if (typeof c6DaConta !== 'function') throw new Error('rotasFase2 precisa de c6DaConta(conta).');
   const hojeTxt = () => hoje();
+
+  // Extrato guardado na memória por pouco tempo, só para os comprovantes: baixar 40 comprovantes do mesmo dia fazia 40 consultas
+  // quase iguais ao banco. Chave: conta e janela; serve também a janela guardada que contém a pedida. A rota /extrato não usa isto.
+  const extratosGuardados = new Map(); // "conta|de|ate" → { conta, de, ate, vence, promessa }
+  const extratoGuardado = (conta, de, ate) => {
+    const t = relogio();
+    for (const [k, g] of extratosGuardados) if (g.vence <= t) extratosGuardados.delete(k);
+    for (const g of extratosGuardados.values()) if (g.conta === conta && g.de <= de && g.ate >= ate) return g.promessa;
+    return null;
+  };
+  const buscarExtrato = (c6, conta, de, ate) => {
+    const chave = `${conta}|${de}|${ate}`;
+    const promessa = extrato(c6, { de, ate });
+    extratosGuardados.set(chave, { conta, de, ate, vence: relogio() + validadeExtratoMs, promessa });
+    promessa.catch(() => { if ((extratosGuardados.get(chave) || {}).promessa === promessa) extratosGuardados.delete(chave); }); // erro não fica guardado
+    return promessa;
+  };
 
   /** Monta uma rota: valida a conta, chama `fn` e traduz erros para { status, corpo }. */
   const rota = (metodo, padrao, fn) => {
@@ -162,9 +182,12 @@ export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, ago
       let de; let ate;
       if (query.data) { const d = validarData(String(query.data), 'data'); de = somarDias(d, -1); ate = somarDias(d, 1); }
       else ({ de, ate } = periodo(query, 90));
-      const { lancamentos } = await extrato(c6, { de, ate });
       // pelo reference; linha que só veio do arquivo OFX do app chega com a referência local (local_reference)
-      const l = lancamentos.find((x) => x.reference === reference) || lancamentos.find((x) => x.local_reference && x.local_reference === reference);
+      const achar = (lancamentos) => lancamentos.find((x) => x.reference === reference) || lancamentos.find((x) => x.local_reference && x.local_reference === reference);
+      const guardado = validadeExtratoMs > 0 ? extratoGuardado(conta, de, ate) : null;
+      let l = guardado ? achar((await guardado).lancamentos) : null;
+      // não está no extrato guardado (ou não havia): busca no banco agora (o lançamento pode ter acabado de entrar)
+      if (!l) l = achar((await buscarExtrato(c6, conta, de, ate)).lancamentos);
       if (!l) return erro(404, `Não achei o lançamento ${reference} no extrato de ${dataBr(de)} a ${dataBr(ate)}. Informe a data (?data=AAAA-MM-DD).`, 'nao_encontrado');
       const pdf = montarPdfComprovante(l, { conta, empresa: empresas[conta], agora: agora() });
       const nome = `comprovante-${String(reference).replace(/[^A-Za-z0-9_-]/g, '')}.pdf`;
