@@ -5,6 +5,7 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - `worker.mjs`: porta de entrada (`https://erp.ankjck.com.br/api/`). Confere o login, guarda os anexos no R2 e repassa os dados ao cofre.
 - `cofre.mjs`: o cofre dos dados (Durable Object com SQLite). Recebe as filas de mudanças de cada aparelho, uma por vez, e guarda cada registro numa linha.
 - Testes: `tests/nuvem.test.mjs` e `tests/cofre.test.mjs` (o `checar.mjs` roda os dois).
+- Licenças (base das etapas 5 e 6 de `documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md`; seção "Licenças e painel de vendas" abaixo): `licencas.mjs` (regras puras), `cofre-licencas.mjs` (cofre próprio das licenças) e `painel-vendas.mjs` (painel do vendedor em `vendas.ankjck.com.br`). Testes: `tests/licencas.test.mjs` e `tests/cofre-licencas.test.mjs`.
 
 **Situação:** publicado em 2026-11-06 (etapa 5) e os dados levados da pasta (conferência ok). O site `erp.ankjck.com.br` abre sempre pela nuvem (vê que `/api/saude` responde); a pasta do OneDrive ficou de reserva.
 
@@ -45,6 +46,30 @@ Programas que rodam no Cloudflare e guardam os dados no lugar da pasta do OneDri
 - DNS: `erp` CNAME `juliocpfh.github.io` com nuvem laranja; SSL/TLS **Full (strict)**.
 - Usuários: o login de cada um é o próprio e-mail, igual ao "E-mail de acesso" e à lista do Access.
 - Conferir: sem login, `curl -I https://erp.ankjck.com.br/api/saude` dá 302 para `…cloudflareaccess.com`; com login, `{"ok":true,"email":…,"teste":false}`.
+
+## Licenças e painel de vendas (base pronta em 2026-11-15; trava no sistema do cliente ainda não ligada)
+Proposta e decisões do dono: `documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md` (seções 1, 2, 4 e 8).
+
+**O que existe:**
+- `licencas.mjs` (puro, roda no Node e no navegador): chave `IMOV-XXXX-XXXX-XXXX-XXXX` (32 símbolos sem O/0/I/1, 80 bits sorteados), `normalizarChave` (aceita minúsculas e espaços), ficha da chave (`novaFicha`: plano, duração, limites, vendedor, `usar_ate` = 90 dias), `ativar` (uso único), `renovar` (soma o prazo: antes de vencer, à data antiga; depois, da renovação), `darCortesia`, `revogar`, `licencaIlimitada` (a da casa), `situacao` (`ativa`, `aviso` 60/30/7, `carencia` 15 dias, `so_leitura`, `apagar` 3 meses depois, `revogada`; `pode_gravar`), `marcos` (datas dos avisos e do apagamento), `conferirLimites`/`podeCadastrar` (20 imóveis, 20 inquilinos com contrato ativo, 4 usuários, 2 CNPJs; "perto" com 90%) e o certificado Ed25519 (`assinarCertificado`, `conferirCertificado`: confere sem internet; data mudada = assinatura não bate).
+  Ex.: ativada em 20/01/2027 por 2 anos → até 20/01/2029; carência até 04/02/2029; só leitura de 05/02/2029; apagar em 20/04/2029 (e-mails em 20/03, 05/04 e 15/04).
+- `cofre-licencas.mjs`: Durable Object `CofreLicencasDO` (binding `LICENCAS`, nome fixo `licencas`), separado dos cofres de dados. Tabelas `chaves`, `licencas`, `equipe`, `historico`. Rotas do painel: `GET eu, planos, lista (?filtro=vence60), equipe, historico` · `POST gerar, revogar, cortesia, reenviar, equipe, casa`. Rotas do sistema do cliente: `POST cliente/ativar`, `POST cliente/renovar`, `GET cliente/certificado` (empresa no cabeçalho `X-Empresa`, sempre tirada do login pelo Worker; `pedirAoCofreDeLicencas`). Sem a chave de assinatura a ativação nem começa (a chave do cliente não é gasta). O vendedor só vê empresa, plano, datas e situação.
+- `painel-vendas.mjs`: a página (um arquivo só, CSP com nonce, texto só por `textContent`) e `/api/<rota>` em `HOST_VENDAS`. Login pelo Access com o AUD próprio do painel (`ACCESS_AUD_VENDAS`), conferido também no Worker (sem ele, tudo responde 503). Gravação só com `X-Sistema: vendas` e da mesma origem. As rotas `cliente/` não passam pelo painel. "Mandar por e-mail" abre o programa de e-mail com o texto pronto (envio pelo Gmail fica para depois).
+- Papéis: **gerente** (segredo `GERENTES_VENDAS`, e-mails separados por vírgula: no começo, só o dono) gera com limites próprios, vê tudo, revoga (com motivo), dá cortesia, cria a licença da casa e cadastra vendedores; **vendedor** (cadastrado pelo gerente na aba Equipe) gera só os planos liberados para ele, vê e reenvia só as chaves dele. Tudo fica no histórico.
+- Ligação: `worker.mjs` só desvia o endereço (`ehEnderecoDeVendas`, como a ficha) e exporta `CofreLicencasDO`; `wrangler.toml` tem a rota `vendas.ankjck.com.br` (`custom_domain`), `HOST_VENDAS`, o binding `LICENCAS` e a migração `v2-licencas`.
+
+**O que o dono faz no painel do Cloudflare (uma vez, antes de usar):**
+1. **Access** (Zero Trust → Access → Applications → Add an application → Self-hosted): nome "Painel de vendas", domínio `vendas.ankjck.com.br`, política "Permitir" com o e-mail do dono (depois, dos vendedores). Copie o **Application Audience (AUD) Tag**.
+2. **Chave de assinatura:** no computador, `node tools/chave-licencas.mjs`. A **privada** vai só para o segredo (passo 3; não guarde em arquivo); a **pública** vai para o código do sistema quando a trava for ligada. Gerar de novo invalida os certificados já emitidos.
+3. Workers & Pages → `erp-boletos` → Settings → Variables and secrets: `ACCESS_AUD_VENDAS` = o AUD do passo 1; `GERENTES_VENDAS` = o e-mail do dono; `LICENCA_CHAVE_PRIVADA` (tipo **Secret**) = a privada do passo 2.
+4. O domínio `vendas.ankjck.com.br` é criado sozinho no próximo deploy (`custom_domain`); se o build reclamar, crie em Settings → Domains & Routes → Add → Custom domain. Conferir: sem login, `curl -I https://vendas.ankjck.com.br/` dá 302 para o Access.
+5. Quando a trava for ligada: no painel, criar a licença da casa do dono (rota `casa`, empresa `ankjck`, sem prazo nem limites).
+
+**Como a trava vai entrar no sistema do cliente (próximo passo, não feito):**
+- Worker: `/api/licenca/ativar` e `/api/licenca/renovar` (só administrador, `exigirPapel(…, 'admin')`) e `/api/licenca/certificado` (qualquer usuário), chamando `pedirAoCofreDeLicencas(env, 'cliente/…', { email, empresa })`. Com uma empresa só, `empresa` = `ankjck` (variável); com vários clientes, a empresa do login (etapa 3), nunca a que o navegador manda.
+- Cofre dos dados: antes de aplicar `lote`, `faixa`, `contador` e `importar` (e o Worker antes de gravar, mover ou apagar anexos), conferir `pode_gravar` com o certificado guardado no próprio cofre (renovado a cada abertura com internet); `so_leitura`/`revogada` → 403 "Licença vencida: só leitura". Ler, `tudo`, `mudancas`, backups e exportar continuam sempre.
+- Site: tela **Ativar** (chave, nome e CNPJ), **Dados e backup → Licença** (`fraseDaSituacao`, limites com `conferirLimites`, Renovar) e faixa de aviso no Painel (60/30/7 dias, carência). O certificado fica no aparelho e é conferido com a chave pública (`conferirCertificado`) também sem internet; passou do vencimento sem internet → só leitura na tela. Acima do limite barra só o cadastro novo (`podeCadastrar`), nunca o que já existe. `licencas.mjs` é puro: o site pode importar o mesmo arquivo (ou uma cópia conferida por teste, como `mapa-c6`).
+- Avisos por e-mail (vencimento e apagamento, `marcos`): pelo alarme diário do cofre das licenças, com o Gmail (`gmail.mjs`). O apagamento em si fica para quando houver um cofre por empresa.
 
 ## Próximos passos
 1. ~~Manifest com `crossorigin="use-credentials"`~~ feito (PR #148, `docs/index.html`).

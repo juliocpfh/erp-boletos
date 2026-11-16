@@ -11,7 +11,9 @@
 import { avisar } from './avisos-ficha.mjs';
 import { atenderEquipe, atenderFicha } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
+import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
+export { CofreLicencasDO } from './cofre-licencas.mjs'; // licenças (painel de vendas, HOST_VENDAS): separado dos dados
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
 const SO_LEITURA = ['backups']; // backups só o cofre grava
 const MAX_DADOS = 30 * 1024 * 1024; // carga inicial do banco inteiro
@@ -399,5 +401,7 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
 export const ehEnderecoDaFicha = (request, env) => new URL(request.url).hostname === String(env.HOST_FICHA || 'ficha.ankjck.com.br');
 
 export default {
-  fetch: (request, env, ctx) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env, { avisar: avisador(ctx) }) : atender(request, env, fetch, ctx)),
+  fetch: (request, env, ctx) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env, { avisar: avisador(ctx) })
+    : ehEnderecoDeVendas(request, env) ? atenderVendas(request, env, { conferirLogin })
+      : atender(request, env, fetch, ctx)),
 };

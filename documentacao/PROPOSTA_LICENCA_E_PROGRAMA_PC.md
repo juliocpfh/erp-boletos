@@ -1,6 +1,6 @@
 # Proposta: licença por chave e programa de PC sem arquivo de configuração (2026-11-15)
 
-*Proposta para o dono aprovar. Nada disto foi feito no código ainda. Continua o [estudo do produto comercial](ESTUDO_PRODUTO_COMERCIAL.md) (gargalos 1 e 7). Os nomes de empresa, pessoa e chave são **fictícios**.*
+*Aprovada pelo dono em 15/11/2026 (respostas na seção 8). Já feito: a base das etapas 5 e 6, sem a trava no sistema do cliente (veja "Andamento", no fim). Continua o [estudo do produto comercial](ESTUDO_PRODUTO_COMERCIAL.md) (gargalos 1 e 7). Os nomes de empresa, pessoa e chave são **fictícios**.*
 
 **O pedido:** vender o sistema como se vende um antivírus. O cliente contrata, recebe uma chave, abre o programa, cola a chave, o sistema diz "vale até 20/01/2029" e pronto. Sem `.env`, sem chave do Cloudflare guardada numa pasta, sem o programa num lugar e a configuração em outro. E um gerador de chaves para o vendedor.
 
@@ -277,3 +277,11 @@ A assinatura é um **certificado de assinatura de código**, comprado de uma emp
 - Programa de PC: device authorization (RFC 8628) → token de aparelho só de leitura, revogável, no cofre da empresa; guardado com DPAPI (Gerenciador de Credenciais); substitui `SERVICOS`/`emailDoServico` e a chave de serviço do Access.
 - Multi-cliente: `idFromName(<empresa>)` no lugar de `'principal'` (`nuvem/worker.mjs`, `repassarAoCofre` e `exigirPapel`), prefixo `clientes/<empresa>/` no R2, empresa sempre tirada do login.
 - Login: sessão no Worker (cookie `HttpOnly`, `Secure`, `SameSite=Strict`), senha conferida no servidor, 2 etapas.
+
+## Andamento
+**15/11/2026 — base das etapas 5 e 6 (sem a trava no sistema do cliente):**
+- Regras da licença em `nuvem/licencas.mjs`: chave, ativação de uso único, renovação somando o prazo, avisos 60/30/7 dias, carência de 15 dias, só leitura, apagar 3 meses depois, revogação, cortesia, licença da casa ilimitada, limites de 20 imóveis, 20 inquilinos, 4 usuários e 2 CNPJs, e o certificado assinado conferido sem internet.
+- Cofre das licenças `nuvem/cofre-licencas.mjs` (separado dos dados dos clientes) e o painel `nuvem/painel-vendas.mjs` em `vendas.ankjck.com.br` (Nova chave, Licenças e chaves, Equipe; papéis gerente e vendedor).
+- Testes: `tests/licencas.test.mjs` e `tests/cofre-licencas.test.mjs` (ex.: ativada em 20/01/2027 por 2 anos → até 20/01/2029, só leitura em 05/02/2029, apagar em 20/04/2029).
+- **Falta (o dono):** criar o Access do painel e os 3 segredos; passo a passo em `nuvem/README.md`, "Licenças e painel de vendas".
+- **Falta (código):** a trava no sistema do cliente (tela Ativar, Dados e backup → Licença, avisos, só leitura conferido no cofre) e os e-mails de aviso; como vai entrar está no mesmo trecho do `nuvem/README.md`. A licença do dono será a "licença da casa" (sem prazo nem limites).
