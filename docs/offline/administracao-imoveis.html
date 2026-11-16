@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-1QmI3KhLnHHm/UIqpn5Amr/wn7CB35x/KzwRIiWQwzs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-bSb5WtgGsKTNAjTNcKYFQ9IXhKmHB+h0hMSu0YZaQVs='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="71beb17c37342e19">
+<meta name="fontes" content="7f2cf3875150eadd">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -25595,6 +25595,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   init_armazenamento();
   init_calculos();
   init_formularios();
+  init_nuvem();
   init_regras();
   var valorTexto = (v) => {
     if (v === null || v === void 0 || v === "") return "(vazio)";
@@ -25699,7 +25700,28 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     ];
     return `<div class="alerta ${r.ok && !r.recusados.length ? "ok" : "perigo"}"><b>${r.ok && !r.recusados.length ? "Pronto: os dados estão na nuvem." : "Terminou, mas confira:"}</b><ul>${itens.map((i) => `<li>${i}</li>`).join("")}</ul></div>`;
   }
+  var apiDados = () => apiDoSite("api/dados/");
+  async function aparelhosLigadosHtml() {
+    if (!E.nuvem) return "";
+    let lista3;
+    try {
+      lista3 = (await apiDados()("GET", "aparelhos")).aparelhos || [];
+    } catch (e) {
+      return `<div class="cartao"><h2>Aparelhos ligados</h2><div class="alerta erro">Não deu para ver os aparelhos agora: ${esc(e.message)}</div></div>`;
+    }
+    const linhas2 = lista3.map((a) => `<tr><td>${esc(a.computador)}</td><td>${esc(a.nome)}${a.usuario_ativo ? "" : ' <span class="suave">(usuário bloqueado: o crachá não vale)</span>'}</td>
+    <td>${dataHoraBr(a.ligado_em)}</td><td>${dataHoraBr(a.ultimo_uso)}${a.parado ? ' <span class="suave">(parado há mais de 90 dias: precisa ligar de novo)</span>' : ""}</td>
+    <td class="n">${botao("desligarAparelho", "Desligar", { id: a.id }, "perigo pequeno", `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join("");
+    return `<div class="cartao"><h2>Aparelhos ligados</h2>
+    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
+    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas2 || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
+  }
   var ACOES_NUVEM = {
+    async desligarAparelho({ id }) {
+      await apiDados()("POST", "desligar-aparelho", { id: Number(id) });
+      aviso("Computador desligado.");
+      await mostrar();
+    },
     /** Etapa 4: escolhe a pasta de sempre e leva tudo para a nuvem (nuvem vazia; ou o administrador substitui). */
     async levarParaNuvem(ds) {
       if (!suportado()) throw Object.assign(new Error("Faça isto no computador (Chrome ou Edge), onde está a pasta do OneDrive."), { esperado: true });
@@ -29211,8 +29233,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     "pasta-fisica": (rota) => telaPastaFisica(Number(rota.partes[1])),
     "pasta-impressao": (rota) => telaPastaImpressao(Number(rota.partes[1])),
     conflitos: () => telaConflitos(),
-    usuarios() {
+    async usuarios() {
       if (!podeUsuario("admin")) return "<h1>Acesso só para administradores</h1>";
+      const aparelhos = await aparelhosLigadosHtml();
       const pendentes = d().usuarios.filter((u) => u.pendente);
       const papeis = Object.entries(PAPEIS).map(([k, v]) => `<option value="${k}" ${k === "operador" ? "selected" : ""}>${v}</option>`).join("");
       return `<div class="cabecalho"><h1>Usuários</h1>${link("#/novo/usuarios", "Novo usuário", "botao")}</div>
@@ -29223,7 +29246,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>
       ${ordenar(d().usuarios.filter((u) => !u.pendente), "nome").map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta("Ativo", "ok") : etiqueta("Bloqueado", "perigo")}</td>
         <td class="n nw">${u.id === E.usuario.id ? '<span class="suave">você</span>' : botao("bloquearUsuario", u.ativo ? "Bloquear" : "Desbloquear", { id: u.id }, u.ativo ? "perigo pequeno" : "pequeno", u.ativo ? `Bloquear o acesso de ${u.nome}?` : "")} ${link(`#/editar/usuarios/${u.id}`, "Editar")}</td></tr>`).join("")}</table>
-      <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>`;
+      <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
     },
     "minha-senha": () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label>Senha atual</label><input type="password" name="atual"></p>
