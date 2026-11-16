@@ -233,6 +233,45 @@ Cada uma com a recomendação. Responda item por item (como em `PENDENCIAS_DO_DO
 
 ---
 
+## 8. Respostas do dono (15/11/2026)
+
+Valem por cima do que está nas seções acima.
+
+| # | Decisão |
+|---|---|
+| 1 | Mensal **e** anual (com 2 e 3 anos). A licença do dono é **ilimitada** (sem prazo e sem limites). |
+| 2 | O plano limita o que mais pesa: **até 20 imóveis, até 20 inquilinos (contratos ativos) e até 4 usuários**. Planos maiores, se houver, seguem o mesmo molde. Avisar quando chegar perto (ex.: 18 de 20) e barrar só o cadastro novo, nunca o que já existe. |
+| 3 | Teste grátis de 30 dias: **sim** (mesmos limites do plano básico). |
+| 4 | Venceu: **15 dias com tudo funcionando**; depois só leitura e exportação; **os dados são apagados 3 meses depois do vencimento**, com avisos antes (ex.: vencida em 20/01/2029 → só leitura de 05/02/2029 → apagada em 20/04/2029; e-mails em 20/03, 05/04 e 15/04). Lembrar o cliente de que NF e comprovantes precisam ser guardados por 5 anos para o Fisco: é ele quem guarda, por isso o botão de exportar tudo fica sempre visível. |
+| 5 | Uma chave vale para **no máximo 2 empresas (CNPJs)** dentro do mesmo sistema. |
+| 6 | Vendedores como recomendado (no começo só o dono). |
+| 7 | Por enquanto continua **ankjck**. Quando houver outras empresas, cada uma ganha um **endereço personalizado** (ex.: `imoveis.silvapatrimonial.com.br`). |
+| 8 | Uma nuvem para todos, um cofre por cliente. |
+| 9 | Login próprio: sim, o que for preciso para simplificar. |
+| 10 | Programa de PC: **e-mail e senha** na janela do programa (no lugar do código de pareamento). O programa confere no servidor, recebe o "crachá" do aparelho e o guarda cifrado no Windows; a senha não fica guardada. Com o login próprio (etapa 4), pede também o código de confirmação. |
+| 11 | Explicação abaixo; decisão pendente. |
+| 12 | Suporte vê os dados só com liberação do cliente, por tempo limitado. |
+| 13 | Ver o que a lei permite (abaixo); confirmar com advogado. |
+
+### 11. Assinatura do instalador, explicada
+Quando alguém baixa um programa da internet, o Windows olha quem o fez. Programa sem "assinatura" mostra a tela azul **"O Windows protegeu o computador — editor desconhecido"**, e a pessoa precisa clicar em "Mais informações → Executar assim mesmo". Para cliente comum isso parece vírus, e muitos desistem.
+
+A assinatura é um **certificado de assinatura de código**, comprado de uma empresa certificadora (como o certificado digital da NF, mas para programas). Com ele, o instalador aparece como "Editor: ANKJCK Ltda" e o aviso some ou fica brando.
+
+| Opção | Como é | Custo aproximado (conferir na hora) |
+|---|---|---|
+| Sem assinatura | Aviso azul toda vez que alguém instala | Zero |
+| Certificado comum (OV) | Exige CNPJ e conferência da empresa (alguns dias). Desde 2023 vem num token físico ou guardado na nuvem da certificadora. O aviso some depois que o programa ganha "fama" com várias instalações | ~US$ 200 a 500 por ano |
+| Assinatura na nuvem da Microsoft | Serviço por assinatura mensal; aceitação de empresa brasileira a conferir | ~US$ 10 por mês |
+
+*Recomendação:* para o seu computador, sem assinatura (você sabe que o programa é seu). Antes do primeiro cliente de fora, contratar um dos dois pagos; a escolha entre eles se faz nessa hora, pelo preço e por aceitarem CNPJ brasileiro.
+
+### 13. Travar quem não pagou: o que a lei permite (para confirmar com advogado)
+- Não há lei específica para sistema por assinatura: vale o **contrato** (termo de uso). O Código Civil (art. 476) deixa uma parte não cumprir a sua enquanto a outra não cumpre a dela: quem não paga não pode exigir o serviço completo.
+- Se o cliente for **pessoa física** (locador pessoa física), pode valer o **Código de Defesa do Consumidor**: precisa de cláusula clara, aviso antes de travar e nada de cobrança que constranja (art. 42). Empresa em geral não é consumidora, mas o juiz pode tratar como tal se ela for pequena e dependente.
+- **Os dados são do cliente** (LGPD): não dá para segurar os dados como forma de cobrança. Ele tem direito de levá-los (art. 18, portabilidade); terminado o contrato, os dados devem ser apagados (art. 16), e o prazo de 3 meses precisa estar escrito no termo.
+- *O que isso dá na prática (e é o que a proposta já faz):* aviso por e-mail antes; trava só para criar coisas novas, nunca para ver ou exportar; prazo de apagamento escrito no termo de uso; não cobrar para devolver os dados. Proposta de prazo: só leitura 10 dias depois do vencimento da fatura, com avisos no 1º e no 7º dia (fraude: na hora).
+
 ## Resumo para o desenvolvedor
 - Licença: chave curta sorteada + ficha no cofre de licenças + certificado Ed25519 guardado no cliente; validade e plano conferidos no cofre da empresa (só leitura barrado no servidor) e no aparelho (sem internet).
 - Programa de PC: device authorization (RFC 8628) → token de aparelho só de leitura, revogável, no cofre da empresa; guardado com DPAPI (Gerenciador de Credenciais); substitui `SERVICOS`/`emailDoServico` e a chave de serviço do Access.
