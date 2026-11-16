@@ -144,6 +144,11 @@ export const DEFINICOES_REGRAS = [
     explica: 'Os documentos pessoais da ficha reprovada são apagados este número de meses depois da decisão.',
     consequencia: 'Prazo maior guarda dados sem necessidade, o que a LGPD manda evitar; prazo curto pode apagar o que ainda seria útil numa reclamação.',
     lei: 'LGPD (Lei 13.709/2018), art. 6º, III, e arts. 15 e 16.' },
+  // pasta de papel de cada inquilino (decisão do dono em 2026-11-15: começa ligada)
+  { chave: 'arquivo_impresso', grupo: 'rotina', rotulo: 'Arquivo impresso (pasta física de cada inquilino)', tipo: 'simnao', padrao: true,
+    explica: 'O sistema diz o que imprimir para a pasta de papel do inquilino: no fim da entrada (etapa "Montar a pasta física"), quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída, e guarda o que já está em papel. Ex.: Ana assina o termo aditivo nº 2 em 10/02/2027 → aviso "1 documento novo para a pasta física".',
+    consequencia: 'Não: some a etapa da entrada, os avisos e a lista Arquivo impresso; a saída volta à etapa simples "Arquivo físico" (marcada à mão). O que já foi marcado como impresso fica guardado e volta se religar.',
+    lei: 'Código Civil, art. 205 (prazo geral de 10 anos: por isso a pasta fica guardada 10 anos depois da saída); LGPD (Lei 13.709/2018), arts. 6º, III, e 46 (guardar só o necessário e com segurança, também no papel: a pasta não leva documentos de renda).' },
   { chave: 'dias_ficha_parada', grupo: 'rotina', rotulo: 'Ficha pela internet: avisar link sem resposta depois de (dias)', tipo: 'inteiro', padrao: 2, min: 1, max: 7,
     explica: 'Link da ficha mandado e sem nenhum dado ou documento depois deste número de dias vira alerta no Painel, com o botão "Lembrar". O link vale 7 dias.',
     consequencia: 'Só muda o alerta: nada é mandado sem alguém apertar o botão.', lei: 'Sem lei: rotina.' },

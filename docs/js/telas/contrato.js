@@ -1,5 +1,6 @@
 // Página do inquilino/contrato (#/contrato/ID): selos, garantia, saída, leituras, ressarcimentos, solicitações, boletos,
 // documentos de entrada e termos aditivos.
+import { caixaPastaFisica } from './arquivo-impresso.js';
 import { botaoEmail } from './emails.js';
 import { botaoDesistenciaContrato } from './fichas.js';
 import { janela, podeUsuario } from '../app.js';
@@ -300,6 +301,8 @@ function roteiroSaidaHtml(c, e) {
         <span class="suave">Assinado:</span> ${linkComprovante(c.id, c.termo_chaves_saida, { tabela: 'contratos', id: c.id, campo: 'termo_chaves_saida', tipo: 'termo-devolucao-chaves', data: c.data_saida }).replace('📎 comprovante', '📎 termo assinado').replace('anexar comprovante', 'anexar o termo assinado')}`;
     }
     // B5: valor de cada reparo da vistoria de saída (vai para o cálculo final), também com a vistoria já feita
+    // Arquivo impresso ligado: a pasta da saída se monta na tela da pasta, depois da devolução da garantia
+    if (x.pasta) return x.feito || x.pronta ? link(`#/pasta-fisica/${c.id}`, x.feito ? 'Ver a pasta' : 'Montar a pasta', x.feito ? 'botao secundario pequeno' : 'botao pequeno') : '';
     const res = x.chave === 'vistoria' && x.feito ? K.resultadoVistoriaSaida(d(), c) : null;
     if (res && res.pendencias.length && opera() && !e) return botao('valoresReparos', res.semValor ? 'Valores dos reparos' : 'Mudar os valores', { id: res.vistoria.id }, res.semValor ? 'pequeno' : 'secundario pequeno');
     if (!opera() || x.feito) return '';
@@ -312,7 +315,7 @@ function roteiroSaidaHtml(c, e) {
     return '';
   };
   const email = (x) => (EMAIL_SAIDA[x.chave] ? botaoEmail(EMAIL_SAIDA[x.chave], { contrato: c.id }) : '');
-  const desfazer = (x) => (x.chave === 'arquivo' && x.feito && opera() ? botao('arquivoFisico', 'Desfazer', { id: c.id, desfazer: '1' }, 'link-botao') : '');
+  const desfazer = (x) => (x.chave === 'arquivo' && !x.pasta && x.feito && opera() ? botao('arquivoFisico', 'Desfazer', { id: c.id, desfazer: '1' }, 'link-botao') : '');
   return `<p class="suave">Roteiro da saída: <b>${feitas} de ${etapas.length}</b> etapas feitas. A ordem é a do dia a dia; cada etapa fica marcada sozinha quando o registro dela existe.</p>
     <ol class="fechamento roteiro-saida">${etapas.map((x) => `<li class="${x.feito ? 'feito' : ''}"><div class="cabecalho"><div>${x.feito ? '✅' : '⬜'} <b>${esc(x.titulo)}</b><br><span class="suave">${esc(x.detalhe)}</span></div><div class="acoes">${acao(x)} ${email(x)} ${desfazer(x)}</div></div></li>`).join('')}</ol>`;
 }
@@ -598,6 +601,8 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     return etiqueta('pendente', 'perigo');
   };
   const acoes = (e) => {
+    // Arquivo impresso: a pasta se monta na tela da pasta (não se marca à mão)
+    if (e.chave === 'pasta_fisica') return e.situacao === 'feita' ? link(`#/pasta-fisica/${c.id}`, 'Ver a pasta', mini) : link(`#/pasta-fisica/${c.id}`, 'Montar a pasta', e.situacao === 'pendente' ? 'botao mini' : mini);
     if (!opera()) return '';
     if (['feita', 'pulada'].includes(e.situacao)) return e.manual ? botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao') : '';
     const pular = botao('pularEtapaEntrada', 'Não se aplica', { contrato: c.id, chave: e.chave }, 'link-botao');
@@ -793,6 +798,7 @@ export function telaContrato(c) {
     ${anteriorAgendado && R.trocaAguardaAditivo(d(), c) ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}, aguardando o termo aditivo assinado.</b> Até assinar, os boletos, as correções do aluguel, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>, mesmo depois dessa data.</div>` : anteriorAgendado ? `<div class="alerta info"><b>Troca de titular em ${dataBr(agendada)}.</b> Até ${dataBr(C.somarDias(agendada, -1))}, os boletos, a garantia, o seguro e a reserva continuam com <a href="#/contrato/${anteriorAgendado.id}">${esc(anteriorAgendado.inquilino_nome)}</a>. A partir de ${dataBr(agendada)}, os boletos saem no nome de ${esc(c.inquilino_nome)} e o resto passa para cá (ao abrir o Painel nesse dia).</div>` : ''}
     ${rotinaAberta(c, hoje) ? '' : faixaDocumentosEntrada(c)}
     ${rotina}
+    ${caixaPastaFisica(c)}
     ${caixaVerificar(c.verificar)}
     ${outros.length ? `<div class="alerta info">Este inquilino também aluga: ${outros.map((x) => `<a href="#/contrato/${x.id}">${esc((buscar('imoveis', x.imovel_id) || {}).nome || 'sem imóvel')}</a>`).join(', ')}.</div>` : ''}
     ${cadeia.antes.length || cadeia.depois.length ? `<div class="alerta info">${cadeia.antes.length ? `Continua o contrato de ${cadeia.antes.map(lig).join(' → ')}. ` : ''}${cadeia.depois.length ? `Continuado por ${cadeia.depois.map(lig).join(' → ')}.` : ''}</div>` : ''}

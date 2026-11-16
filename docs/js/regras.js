@@ -1,6 +1,7 @@
 // Regras de negócio sobre o banco de dados (um objeto JSON em memória).
 // Toda gravação passa por inserir/atualizar/excluir, que registram o histórico.
 import * as alertas from './alertas.js';
+import * as AI from './arquivo-impresso.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
 import { locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
@@ -18,7 +19,7 @@ export const TABELAS = {
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
-  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
+  movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', pastas_fisicas: 'Pasta física (arquivo impresso)', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
@@ -3787,6 +3788,13 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
           : auto || { situacao: 'pendente', texto: '' };
     out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
   }
+  // última etapa (Arquivo impresso, 2026-11-15): montar a pasta física, depois de todas as outras; marca-se na tela da pasta
+  if (AI.ligado()) {
+    const m = AI.pastaMontada(d, c.id);
+    const prontas = out.every((e) => ['feita', 'pulada'].includes(e.situacao));
+    out.push({ chave: 'pasta_fisica', titulo: 'Montar a pasta física', doc: null, concessionaria: null,
+      ...(m ? { situacao: 'feita', data: m.data, texto: m.por ? `por ${m.por}` : '' } : prontas ? { situacao: 'pendente', texto: '' } : { situacao: 'andamento', texto: 'aguardando as outras etapas' }) });
+  }
   return out;
 }
 
@@ -4214,6 +4222,8 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   const banco = alertaBanco(d, hoje);
   if (banco) lista.push(banco);
   lista.push(...alertasBoletosSemOcupacao(d));
+  const pastas = AI.alertaPastas(d, hoje); // Arquivo impresso: um alerta só, com os números
+  if (pastas) lista.push(pastas);
   for (const x of inadimplencia(d, hoje).devedores) {
     const i = buscar(d, 'imoveis', x.contrato.imovel_id);
     lista.push({ nivel: x.diasMax > DIAS_VERMELHO ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
@@ -4227,7 +4237,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
-  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'A verificar'];
+  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'Pasta física', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
@@ -6415,9 +6425,16 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
     { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
     { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
       detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
-    // arquivo físico (pedido do dono em 2026-11-12): imprimir o processo inteiro e guardar em papel por 10 anos depois do fim
-    { chave: 'arquivo', titulo: 'Arquivo físico: imprimir o processo e guardar em papel', feito: !!c.arquivo_fisico_em,
-      detalhe: c.arquivo_fisico_em ? `arquivado em ${C.dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)` },
+    // arquivo físico (pedido do dono em 2026-11-12): imprimir o processo inteiro e guardar em papel por 10 anos depois do fim;
+    // com a rotina Arquivo impresso ligada (2026-11-15), a pasta da saída se monta na tela da pasta, depois da devolução da garantia
+    AI.ligado() ? (() => {
+      const f = AI.saidaFechada(d, c);
+      return { chave: 'arquivo', titulo: 'Montar a pasta física da saída', feito: !!f, pasta: true, pronta: !!garantia.feito,
+        detalhe: f ? `pasta fechada em ${C.dataBr(f.data)}; guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)`
+          : garantia.feito ? `escolha o que imprimir (sem comprovantes nem boletos); guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)` : 'depois da devolução da garantia (ou da cobrança do saldo)' };
+    })()
+      : { chave: 'arquivo', titulo: 'Arquivo físico: imprimir o processo e guardar em papel', feito: !!c.arquivo_fisico_em,
+        detalhe: c.arquivo_fisico_em ? `arquivado em ${C.dataBr(c.arquivo_fisico_em)}` : `contrato, aditivos, vistorias, termos, cálculo final e comprovantes; guardar até ${C.dataBr(C.somarMesesData(c.data_saida, 120))} (10 anos)` },
   ];
 }
 

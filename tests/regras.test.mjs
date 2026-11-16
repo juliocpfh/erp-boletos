@@ -2619,7 +2619,9 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.deepEqual(r.map((x) => x.chave), ['aviso', 'vistoria', 'chaves', 'contas', 'calculo', 'garantia', 'boleto', 'arquivo']);
   assert.deepEqual(r.map((x) => x.feito), [true, false, false, false, false, false, false, false]);
   assert.equal(r[2].titulo, 'Devolução das chaves (termo assinado)');
-  assert.match(r[7].detalhe, /guardar até 30\/11\/2036/);
+  // Arquivo impresso ligado (padrão desde 2026-11-15): a pasta da saída espera a devolução da garantia
+  assert.equal(r[7].titulo, 'Montar a pasta física da saída');
+  assert.match(r[7].detalhe, /depois da devolução da garantia/);
   assert.match(r[2].detalhe, /prevista para 30\/11\/2026/);
   assert.match(r[1].detalhe, /data não marcada/);
   // B3: vistoria marcada e convite por e-mail
@@ -2658,8 +2660,11 @@ test('D6: roteiro de saída segue a ordem e marca as etapas conforme os registro
   assert.match(r[5].detalhe, /devolvida em 05\/12\/2026/);
   assert.equal(r[6].feito, false); // boleto de 11/2026 ainda não gerado
   assert.match(r[6].detalhe, /não gerado/);
+  assert.match(r[7].detalhe, /guardar até 30\/11\/2036/); // garantia devolvida: a pasta já pode fechar
+  assert.equal(r[7].pronta, true);
+  // a etapa simples de antes (marcada à mão) continua valendo como pasta fechada
   R.marcarArquivoFisico(d, c.id, '2026-12-10', 'julio');
-  assert.match(R.roteiroSaida(d, c, '2026-12-11')[7].detalhe, /arquivado em 10\/12\/2026/);
+  assert.match(R.roteiroSaida(d, c, '2026-12-11')[7].detalhe, /pasta fechada em 10\/12\/2026/);
 });
 
 test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago, e inclui o contrato anterior da cadeia', () => {

@@ -6,7 +6,8 @@ const PDFJS = 'vendor/pdf.min.js';
 const PDFJS_TRABALHO = 'vendor/pdf.worker.min.js';
 
 let carregando = null;
-function carregarPdfJs() {
+/** Carrega o pdf.js (também para a impressão da pasta física, telas/arquivo-impresso.js). */
+export function carregarPdfJs() {
   if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
   carregando = carregando || new Promise((ok, erro) => {
     const s = document.createElement('script');
