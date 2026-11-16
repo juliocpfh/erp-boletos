@@ -59,6 +59,16 @@ async function pastaDe(dir, partes, criar) {
 }
 
 /**
+ * Lê um arquivo da cópia aberta (caminho dentro de arquivos/), para abrir anexos sem internet neste computador
+ * (pasta-nuvem.js, `daCopiaLocal`). Pode ser a versão da última atualização da cópia. Sem o arquivo, lança erro.
+ */
+export async function lerDaCopia(dir, caminho) {
+  const p = caminhoLocal(caminho);
+  const pai = await pastaDe(await dir.getDirectoryHandle(PASTA_COPIA), p.slice(0, -1), false);
+  return (await pai.getFileHandle(p.at(-1))).getFile();
+}
+
+/**
  * Atualiza a cópia na pasta `dir` (a do backup seguro). `listar()` devolve a lista da nuvem; `ler(caminho)` o Blob do arquivo
  * (caminho dentro de arquivos/). `aoAndar({ feitos, total })`. Devolve { baixados, apagados, falhas, total }.
  */

@@ -522,6 +522,8 @@ export async function abrirNuvem() {
   E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar, tabelas: TABELAS_DO_SISTEMA });
   E.anexos = new AnexosNuvem({ guardar });
   E.anexos.aoMudar = agendarCopiaAberta; // cópia aberta dos arquivos no computador do administrador
+  // sem internet, neste computador: o anexo abre da cópia aberta (só precisa da pasta do backup seguro com permissão)
+  E.anexos.daCopiaLocal = (partes) => (partes[0] === S.PASTA_ARQUIVOS && E.seguro?.dir ? CA.lerDaCopia(E.seguro.dir, partes.slice(1).join('/')) : null);
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador
   await E.anexos.carregarFila();
   // quem passou pelo login da internet (null sem internet). Não segura a abertura (com sinal fraco eram até 10 s de tela em branco,
