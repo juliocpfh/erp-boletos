@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-fCAHFfNPwsTuPIB43TM5Ibfj19sxDe005RfpCf5JIW4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-JFhXkzGVZB6ZfcWxZGRcdeM6sPGA1guZ6aiS8ZcZXXU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="20f07ea95b9a43e4">
+<meta name="fontes" content="34dba04df9c71477">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5895,7 +5895,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const foraDeOrdem = ultima ? pendentes.filter((p2) => p2.data < ultima.emissao) : [];
     if (foraDeOrdem.length && !forcar) return { numeradas: [], foraDeOrdem, problema: null, ultima };
     const numeradas = [];
-    const lote = (d2.ultimo_lote || 0) + 1;
+    const lote2 = (d2.ultimo_lote || 0) + 1;
     for (const p2 of pendentes) {
       const base = baseDaFatura(d2, p2.tipo, p2.registro);
       const problema = problemaDaFatura(d2, base);
@@ -5922,11 +5922,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           tomador_endereco: base.tomador.endereco,
           observacoes: base.observacoes || "",
           situacao: "Emitida",
-          lote
+          lote: lote2
         }, usuario, `NF nº ${numeroFatura(numero2)} · ${e.nome} · ${base.descricao}`);
       });
       d2.proxima_fatura = numero2 + 1;
-      d2.ultimo_lote = lote;
+      d2.ultimo_lote = lote2;
       numeradas.push({ numero: numero2, ...p2, descricao: base.descricao });
     }
     return { numeradas, foraDeOrdem: [], problema: null, ultima };
@@ -5988,10 +5988,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function ultimoCicloDeNumeracao(d2) {
     const comLote = d2.faturas.filter((f) => f.lote);
     if (!comLote.length) return null;
-    const lote = Math.max(...comLote.map((f) => f.lote));
-    const fs = comLote.filter((f) => f.lote === lote);
+    const lote2 = Math.max(...comLote.map((f) => f.lote));
+    const fs = comLote.filter((f) => f.lote === lote2);
     const nums = [...new Set(fs.map((f) => f.numero))].sort((a, b) => a - b);
-    return { lote, de: nums[0], ate: nums.at(-1), qtd: nums.length, emissoes: [fs.map((f) => f.emissao).sort()[0], fs.map((f) => f.emissao).sort().at(-1)] };
+    return { lote: lote2, de: nums[0], ate: nums.at(-1), qtd: nums.length, emissoes: [fs.map((f) => f.emissao).sort()[0], fs.map((f) => f.emissao).sort().at(-1)] };
   }
   function desfazerUltimaNumeracao(d2, usuario) {
     const ciclo = ultimoCicloDeNumeracao(d2);
@@ -10744,9 +10744,19 @@ ${xref}
     const V = await Promise.resolve().then(() => (init_visualizador(), visualizador_exports));
     return V.carregarPdfJs();
   }
-  function avisarAndamento(texto3, fim = false) {
+  function avisarAndamento(texto3, fim = false, fracao = 0) {
     if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
+    if (lote && !lote.acabou) {
+      texto3 = textoDoLote(fim ? "" : texto3, fim ? 0 : fracao);
+      fim = false;
+    }
     window.dispatchEvent(new CustomEvent("compactar-andamento", { detail: { texto: texto3, fim } }));
+  }
+  function textoDoLote(detalhe = "", fracao = 0) {
+    if (!lote) return detalhe;
+    const pct2 = lote.total ? Math.min(100, Math.floor(100 * (lote.feitos + Math.max(0, Math.min(1, fracao))) / lote.total)) : 100;
+    const mb2 = `${(lote.economia / 1048576).toFixed(1).replace(".", ",")} MB`;
+    return `Compactando os anexos: ${pct2}% (${lote.feitos} de ${lote.total} arquivos, ${lote.compactados} compactado(s), ${mb2} a menos). Aguarde, não feche esta tela.${detalhe ? ` Agora: ${detalhe}` : ""}`;
   }
   async function compactarPdf(blob, aoAndar = () => {
   }) {
@@ -10762,7 +10772,7 @@ ${xref}
       if (doc.numPages < 1 || doc.numPages > MAX_PAGINAS) return null;
       const OPS = lib.OPS;
       const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== void 0));
-      avisarAndamento(`Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
+      avisarAndamento(lote ? `conferindo "${nome}"` : `Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
       for (let i = 1; i <= doc.numPages; i += 1) {
         const p2 = await doc.getPage(i);
         const t = await p2.getTextContent();
@@ -10773,7 +10783,7 @@ ${xref}
       let total = 0;
       for (let i = 1; i <= doc.numPages; i += 1) {
         aoAndar(i, doc.numPages);
-        avisarAndamento(`Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`);
+        avisarAndamento(lote ? `página ${i} de ${doc.numPages} de "${nome}"` : `Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`, false, (i - 1) / doc.numPages);
         const p2 = await doc.getPage(i);
         const ops = await p2.getOperatorList({ intent: "print" });
         if (!ops.fnArray.some((f) => imagens.has(f))) return null;
@@ -10815,22 +10825,32 @@ ${xref}
     };
     await juntar2(raiz, []);
     const r = { vistos: lista3.length, compactados: 0, antes: 0, depois: 0, falhas: 0 };
-    for (let i = 0; i < lista3.length; i += 1) {
-      const { dir, nome, h } = lista3[i];
-      try {
-        const f = await ler2(h);
-        const c = await compactar(f, { manterNome: true });
-        if (c.mudou) {
-          await gravar2(dir, nome, c.arquivo);
-          r.compactados += 1;
-          r.antes += c.antes;
-          r.depois += c.depois;
+    lote = { feitos: 0, total: lista3.length, compactados: 0, economia: 0 };
+    try {
+      for (let i = 0; i < lista3.length; i += 1) {
+        const { dir, nome, h } = lista3[i];
+        lote.feitos = i;
+        avisarAndamento(`"${nome}"`);
+        try {
+          const f = await ler2(h);
+          const c = await compactar(f, { manterNome: true });
+          if (c.mudou) {
+            await gravar2(dir, nome, c.arquivo);
+            r.compactados += 1;
+            r.antes += c.antes;
+            r.depois += c.depois;
+          }
+        } catch (e) {
+          r.falhas += 1;
+          console.warn(`Compactar "${nome}": ${e.message}`);
         }
-      } catch (e) {
-        r.falhas += 1;
-        console.warn(`Compactar "${nome}": ${e.message}`);
+        Object.assign(lote, { feitos: i + 1, compactados: r.compactados, economia: r.antes - r.depois });
+        aoAndar({ feitos: i + 1, total: lista3.length, compactados: r.compactados, economia: r.antes - r.depois });
       }
-      aoAndar({ feitos: i + 1, total: lista3.length, compactados: r.compactados, economia: r.antes - r.depois });
+    } finally {
+      lote.acabou = true;
+      avisarAndamento("", true);
+      lote = null;
     }
     return r;
   }
@@ -10858,7 +10878,7 @@ ${xref}
       return igual2;
     }
   }
-  var LADO_MAXIMO, QUALIDADE_FOTO, QUALIDADE_PDF, DPI_MAXIMO, GANHO_MINIMO, MINIMO_FOTO, MINIMO_PDF, MAX_PAGINAS, compensa, MIME, num, temCanvas, PASTA_FICHAS, CANDIDATO, candidato, ehDoLink;
+  var LADO_MAXIMO, QUALIDADE_FOTO, QUALIDADE_PDF, DPI_MAXIMO, GANHO_MINIMO, MINIMO_FOTO, MINIMO_PDF, MAX_PAGINAS, compensa, MIME, num, temCanvas, lote, PASTA_FICHAS, CANDIDATO, candidato, ehDoLink;
   var init_compactar = __esm({
     "docs/js/compactar.js"() {
       init_conferir_pdf();
@@ -10874,6 +10894,7 @@ ${xref}
       MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
       num = (x) => (Math.round(x * 100) / 100).toString();
       temCanvas = () => typeof document !== "undefined" && typeof document.createElement === "function";
+      lote = null;
       PASTA_FICHAS = "Fichas em analise";
       CANDIDATO = /\.(jpe?g|png|webp|heic|pdf)$/i;
       candidato = (nome, tamanho2) => CANDIDATO.test(nome) && tamanho2 >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
@@ -12571,7 +12592,7 @@ ${xref}
             } catch (e) {
               throw passageiro(e) ? new ErroNuvem("A NF só é numerada com internet. Conecte e tente de novo.") : e;
             }
-            const { resultado, lote } = await this.trava(async () => {
+            const { resultado, lote: lote2 } = await this.trava(async () => {
               await this.releFila();
               if (this.pendentes.length) throw new ErroNuvem("Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.");
               const antes = this.atual();
@@ -12584,8 +12605,8 @@ ${xref}
               await this.guardar.gravar("faixas", this.faixas);
               return { resultado: r, lote: l };
             });
-            const [primeira, ...resto] = dividirLote(lote);
-            const meus = chavesDosLotes([lote]);
+            const [primeira, ...resto] = dividirLote(lote2);
+            const meus = chavesDosLotes([lote2]);
             let gravou = false;
             let puxou = false;
             let duvida = null;
@@ -12622,7 +12643,7 @@ ${xref}
                 if (!passageiro(e)) throw e;
               }
             }
-            const paraFila = puxou ? resto : [lote];
+            const paraFila = puxou ? resto : [lote2];
             if (paraFila.length) {
               await this.trava(async () => {
                 await this.releFila();
@@ -12788,16 +12809,16 @@ ${xref}
           await this.trava(async () => {
             const lista3 = await this.guardar.ler("recusas") || this.recusas;
             const ja = new Set(lista3.map((r) => r.id || r.lote));
-            for (const { lote, parte, erro } of recusadas) {
+            for (const { lote: lote2, parte, erro } of recusadas) {
               if (ja.has(parte.id)) continue;
               ja.add(parte.id);
               await this.guardar.gravar(`recusa:${parte.id}`, parte.ops);
-              lista3.push({ id: parte.id, lote: lote.id, em: lote.em, erro, mudancas: parte.ops.length });
+              lista3.push({ id: parte.id, lote: lote2.id, em: lote2.em, erro, mudancas: parte.ops.length });
             }
             this.recusas = lista3;
             await this.guardar.gravar("recusas", lista3);
             await this.releFila();
-            const inteiros = new Set(recusadas.filter(({ lote }) => recusadas.filter((x) => x.lote === lote).length === dividirLote(lote).length).map(({ lote }) => lote.id));
+            const inteiros = new Set(recusadas.filter(({ lote: lote2 }) => recusadas.filter((x) => x.lote === lote2).length === dividirLote(lote2).length).map(({ lote: lote2 }) => lote2.id));
             for (const id of inteiros) enviados.delete(id);
             const antes = this.pendentes.length;
             this.pendentes = this.pendentes.filter((x) => !inteiros.has(x.id));
@@ -18101,7 +18122,7 @@ ${xref}
     const itemLote = (p2) => `<tr><td><b>${esc(p2.tipo_conta)}</b> ${compBr(p2.competencia)}</td><td>${esc(p2.beneficiario && p2.beneficiario.nome || "-")}</td>
     <td class="nw">${p2.vencimento ? dataBr(p2.vencimento) : "-"}</td><td class="n">${reais(p2.valor)}</td>
     <td>${p2.situacao === "erro" ? etiqueta(p2.erro || "erro no banco", "perigo") : p2.grupo_id ? etiqueta(p2.situacao === "aguardando_aprovacao" ? "aprovado · validado pelo banco" : "validado pelo banco", "ok") : etiqueta("o banco ainda não leu", "aviso")}</td></tr>`;
-    const lote = ([g, l]) => `<h3>Pagamento preparado · ${esc(nomeConta(l[0].conta_id))}${g ? "" : ' <span class="suave">(sem leitura do banco)</span>'}</h3>
+    const lote2 = ([g, l]) => `<h3>Pagamento preparado · ${esc(nomeConta(l[0].conta_id))}${g ? "" : ' <span class="suave">(sem leitura do banco)</span>'}</h3>
     <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Beneficiário</th><th>Vencimento</th><th class="n">Valor</th><th>Banco disse</th></tr>${l.map(itemLote).join("")}</table></div>
     <p class="acoes">${g ? podeUsuario("admin") ? botaoPonte("enviarGrupoAprovacao", "Aprovar e enviar para aprovação no app do C6", { conta: l[0].conta_id, grupo: g }, "botao") : '<span class="suave">Só o administrador aprova e envia para o banco.</span>' : botaoPonte("lerNoBanco", "Mandar o banco ler os códigos", { ids: l.map((p2) => p2.id).join(",") }, "botao")}
       ${g && l.some((p2) => p2.situacao === "aguardando_aprovacao") ? botaoPonte("atualizarSituacaoPagamento", "Atualizar situação", { conta: l[0].conta_id, grupo: g }) : ""}
@@ -18114,7 +18135,7 @@ ${xref}
       ${permitidas.tipos.length ? `<div class="rolagem"><table><tr><th>Conta</th><th>Código de barras ou Pix</th><th>Valor</th><th>Pagar em</th></tr>${TIPOS_DESPESA.filter((t) => permitidas.tipos.includes(t)).map((t) => linha(t, TIPOS_DESPESA.indexOf(t))).join("")}</table></div>
       <p class="suave">Preencha só as contas que quer pagar. "Preparar pagamento" guarda o pagamento como rascunho e manda os códigos ao banco, que confere o beneficiário e o vencimento e mostra aqui. Nada é pago nesta etapa.${config().limite_pagamento > 0 ? ` Limite por pagamento: ${reais(config().limite_pagamento)}.` : ""}</p>
       <div class="acoes">${bancoAtivo2() ? "<button>Preparar pagamento</button>" : `<button disabled title="${TITULO_AGUARDANDO}">Preparar pagamento</button>`}</div>` : `<p class="suave">Em ${compBr(comp)} o inquilino paga todas as contas, conforme o contrato: não há conta nossa para pagar neste mês.</p>`}</form>`}
-    ${lotes.map(lote).join("")}
+    ${lotes.map(lote2).join("")}
     ${outros.length ? `<h3>Pagamentos deste imóvel</h3><div class="rolagem"><table class="cobrancas responsiva">${CABECALHO_PAG}${outros.map(linhaPagamento).join("")}</table></div>` : ""}
     <p class="suave">${link("#/banco/pagamentos", "Ver todos os pagamentos pelo banco")}</p></div>`;
   }
@@ -21724,10 +21745,10 @@ ${m.texto}
     }
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     let n = 0;
-    for (const lote of lotes) {
-      const canvas = await html2canvas(el, lote.inteiro ? opcoes2 : { ...opcoes2, y: lote.ini, height: Math.ceil(lote.fim - lote.ini) });
+    for (const lote2 of lotes) {
+      const canvas = await html2canvas(el, lote2.inteiro ? opcoes2 : { ...opcoes2, y: lote2.ini, height: Math.ceil(lote2.fim - lote2.ini) });
       const escala = canvas.width / el.offsetWidth;
-      for (const [ini, fim] of lote.fatias) {
+      for (const [ini, fim] of lote2.fatias) {
         if (n) pdf.addPage();
         const pedaco = document.createElement("canvas");
         pedaco.width = canvas.width;
@@ -21735,7 +21756,7 @@ ${m.texto}
         const g = pedaco.getContext("2d");
         g.fillStyle = "#ffffff";
         g.fillRect(0, 0, pedaco.width, pedaco.height);
-        const y = Math.round((ini - lote.ini) * escala);
+        const y = Math.round((ini - lote2.ini) * escala);
         const h = Math.min(pedaco.height, canvas.height - y);
         if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
         pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, topoDa(n), largura, (fim - ini) / pxMm);
@@ -27049,16 +27070,16 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       }
     }
   }
-  async function escolherContaC6(cb, lote = "") {
+  async function escolherContaC6(cb, lote2 = "") {
     const sugerida = cb && contaSugerida(d(), cb);
-    if (sugerida && !lote) return sugerida;
+    if (sugerida && !lote2) return sugerida;
     const contas2 = configBanco(d()).contas;
     if (!contas2.length) throw new Error("Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).");
     if (contas2.length === 1) return contas2[0];
     const marcada = cb ? contaPreMarcada(d(), cb) : contaEmissora(d());
     const resp = await janela({
       titulo: "Por qual empresa emitir o boleto?",
-      html: `<p>${lote || `Boleto de <b>${esc(buscar2("contratos", cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}, ${esc(reais(totais(cb).a_pagar_sem_desconto))}).`} Escolha a conta do C6 que recebe:</p>
+      html: `<p>${lote2 || `Boleto de <b>${esc(buscar2("contratos", cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}, ${esc(reais(totais(cb).a_pagar_sem_desconto))}).`} Escolha a conta do C6 que recebe:</p>
       ${contas2.map((x) => `<p><label class="check-mini"><input type="radio" name="conta" value="${esc(x.id)}" ${marcada && marcada.id === x.id ? "checked" : ""}> <b>${esc((buscar2("emitentes", x.emitente_id) || {}).nome || x.apelido)}</b> · conta ${esc(x.apelido)}${x.ambiente === "sandbox" ? " (sandbox: teste)" : ""}</label></p>`).join("")}
       <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Empresas.</p>`,
       sim: "Emitir",
@@ -29091,7 +29112,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         conferido: (pastaFicha, nome) => conferidos2.has(`${pastaFicha}|${nome}`),
         ler: (h) => lerConteudo(h),
         gravar: (dir, nome, arq) => escreverTexto(dir, nome, arq),
-        aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`)
+        aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${total ? Math.floor(100 * feitos / total) : 100}%: ${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`)
       });
       const texto3 = r.compactados ? `${r.compactados} de ${r.vistos} arquivo(s) compactado(s): de ${MB(r.antes)} para ${MB(r.depois)} (${MB(r.antes - r.depois)} a menos).` : `Nenhum dos ${r.vistos} arquivo(s) olhados ficaria bem menor: nada foi trocado.`;
       mostrarAndamento(`${texto3}${r.falhas ? ` ${r.falhas} não puderam ser lidos.` : ""}`);
