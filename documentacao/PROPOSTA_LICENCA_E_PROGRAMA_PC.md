@@ -249,7 +249,7 @@ Valem por cima do que está nas seções acima.
 | 8 | Uma nuvem para todos, um cofre por cliente. |
 | 9 | Login próprio: sim, o que for preciso para simplificar. |
 | 10 | Programa de PC: **e-mail e senha** na janela do programa (no lugar do código de pareamento). O programa confere no servidor, recebe o "crachá" do aparelho e o guarda cifrado no Windows; a senha não fica guardada. Com o login próprio (etapa 4), pede também o código de confirmação. |
-| 11 | Explicação abaixo; decisão pendente. |
+| 11 | Instalador **sem assinatura** no computador do dono; comprar o certificado **antes do primeiro cliente de fora** (explicação abaixo). |
 | 12 | Suporte vê os dados só com liberação do cliente, por tempo limitado. |
 | 13 | Ver o que a lei permite (abaixo); confirmar com advogado. |
 
