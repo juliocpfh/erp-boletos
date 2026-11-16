@@ -286,7 +286,7 @@ function declaracaoHtml(r, g) {
 export function alvoDoRecibo(q) {
   if (q.ficha) { const f = buscar('fichas', q.ficha); return f ? { ficha: f, ...(q.fiador ? { fiador: Number(q.fiador) } : {}) } : null; }
   const c = buscar('contratos', q.contrato);
-  return c ? { contrato: c } : null;
+  return c ? { contrato: c, ...(q.id ? { acordo: Number(q.id) } : {}) } : null; // id: o acordo (termo do acordo)
 }
 
 /** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */

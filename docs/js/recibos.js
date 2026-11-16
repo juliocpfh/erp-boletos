@@ -25,6 +25,7 @@ export const TIPOS_RECIBO = {
   garantia: 'Recibo da garantia',
   devolucao_chaves: 'Termo de devolução das chaves',
   quitacao: 'Termo de quitação',
+  acordo: 'Termo de confissão de dívida e acordo',
   ficha: 'Ficha cadastral',
   ficha_fiador: 'Ficha cadastral do fiador',
 };
@@ -108,6 +109,12 @@ export function reciboDisponivel(d, tipo, alvo) {
   if (tipo === 'devolucao_chaves') {
     if (!c) return { ok: false, motivo: 'O termo de devolução das chaves é do contrato.' };
     return c.data_saida ? { ok: true } : { ok: false, motivo: 'Informe antes a data de saída.' };
+  }
+  if (tipo === 'acordo') {
+    if (!c) return { ok: false, motivo: 'O termo do acordo é do contrato.' };
+    const a = acordoDe(d, c, alvo);
+    if (!a) return { ok: false, motivo: 'Acordo não encontrado.' };
+    return a.desfeito_em ? { ok: false, motivo: 'Este acordo foi desfeito.' } : { ok: true };
   }
   if (tipo === 'quitacao') {
     if (!c) return { ok: false, motivo: 'O termo de quitação é do contrato.' };
@@ -200,6 +207,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     };
   }
 
+  if (tipo === 'acordo') return termoDoAcordo(d, c, acordoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
   if (tipo === 'devolucao_chaves') return termoDevolucaoChaves(d, c, base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
 
   // quitacao: entrega do imóvel, acerto final e quitação recíproca, com os valores discriminados
@@ -233,6 +241,52 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     ],
     assinaturas: [assinaEmpresa, assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
     arquivo: nomeArq('Termo quitacao', enc.garantia_devolvida_em || enc.data_saida),
+  };
+}
+
+/** Acordo do documento (``alvo.acordo`` = id), só se for deste contrato. */
+const acordoDe = (d, c, alvo) => { const a = R.buscar(d, 'acordos', Number(alvo.acordo)); return a && a.contrato_id === c.id ? a : null; };
+
+/**
+ * Termo de confissão de dívida e acordo de pagamento (pedido do dono em 2026-11-15): a dívida confessada, os boletos que o
+ * acordo substituiu, as parcelas, o vencimento antecipado no atraso, sem novação, a concordância dos fiadores e duas testemunhas.
+ * Ex.: boletos de ago/2026 e set/2026 (R$ 2.700,00, R$ 2.910,00 com multa e juros em 10/11/2026), acordo de R$ 2.910,00 em
+ * 3 boletos de R$ 970,00 vencendo 10/12/2026, 10/01/2027 e 10/02/2027.
+ * Base legal: confissão de dívida assinada pelo devedor e por duas testemunhas é título executivo (CPC, artigo 784, III); sem
+ * ânimo de novar não há novação (Código Civil, artigo 361); o fiador se desobriga se o credor der prazo ao devedor sem o
+ * consentimento dele (Código Civil, artigo 838, I): por isso os fiadores assinam concordando.
+ */
+function termoDoAcordo(d, c, a, base, x) {
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  const fiadores = R.fiadoresDoContrato(d, c.id).filter((f) => !f.data_saida || f.data_saida >= a.data);
+  const origens = R.origensDoAcordo(d, a);
+  const parcelas = R.parcelasDoAcordo(d, a);
+  const multa = String(c.multa_percentual || 0).replace('.', ',');
+  const juros = String(c.juros_mensal_percentual || 0).replace('.', ',');
+  const nomeBoleto = (cb) => (R.ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || 'única'} de acordo anterior` : `aluguel de ${C.compBr(cb.competencia)}`);
+  const tabela = [['BOLETOS VENCIDOS INCLUÍDOS NO ACORDO', null], ...origens.map((cb) => [`${nomeBoleto(cb)} (venceu em ${C.dataBr(cb.vencimento)})`, C.reais(R.totais(cb).a_pagar_sem_desconto)]),
+    ['Valor original', C.reais(a.valor_original)], [`Valor em ${C.dataBr(a.data)}, com multa e juros`, C.reais(a.divida_na_data)],
+    ['PARCELAS DO ACORDO', null], ...parcelas.map((cb, k) => [`${parcelas.length > 1 ? `${k + 1}ª parcela` : 'Parcela única'}, vencimento ${C.dataBr(cb.vencimento)}`, C.reais(R.totais(cb).a_pagar_sem_desconto)]),
+    ['Total do acordo', C.reais(a.valor_total)]];
+  const nomesFiadores = fiadores.map((f) => pessoa(f.nome, f.cpf ? `CPF ${f.cpf}` : '')).join('; ');
+  return {
+    ...base, data: a.data, titulo: 'TERMO DE CONFISSÃO DE DÍVIDA E ACORDO DE PAGAMENTO',
+    paragrafos: [
+      `CREDORA (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ''}. DEVEDOR (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ''}${nomesFiadores ? `. FIADOR(ES), como intervenientes anuentes: ${nomesFiadores}` : ''}. IMÓVEL: ${x.endereco}.`,
+      `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${K.valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos, discriminados abaixo. A dívida é líquida, certa e exigível.`,
+    ],
+    tabela,
+    depois: [
+      `2. PAGAMENTO. O valor será pago em ${parcelas.length} ${parcelas.length > 1 ? 'parcelas mensais' : 'parcela'}, por boleto bancário, nos vencimentos acima. O pagamento de cada parcela dá quitação somente dela.`,
+      `3. ATRASO. O não pagamento de qualquer parcela no vencimento torna vencidas de imediato as demais (vencimento antecipado), acrescidas da multa de ${multa}% e dos juros de ${juros}% ao mês previstos no contrato de locação, e permite à LOCADORA cobrar o saldo, inclusive judicialmente, e tomar as demais medidas previstas no contrato e na Lei 8.245/91.`,
+      '4. SEM NOVAÇÃO. Este acordo não é novação (Código Civil, artigo 361): o contrato de locação e as suas garantias continuam valendo em todos os termos. Os boletos vencidos acima só ficam quitados com o pagamento de todas as parcelas.',
+      ...(fiadores.length ? ['5. FIADORES. O(s) fiador(es) assina(m) este termo concordando com o parcelamento e mantendo a fiança, inclusive sobre esta dívida (Código Civil, artigo 838, I).'] : []),
+      `${fiadores.length ? 6 : 5}. TÍTULO EXECUTIVO. Assinado pelo devedor e por duas testemunhas, este termo vale como título executivo extrajudicial (Código de Processo Civil, artigo 784, III).`,
+    ],
+    assinaturas: [x.assinaEmpresa, x.assinaPessoa('DEVEDOR (LOCATÁRIO)'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : []),
+      ...fiadores.flatMap((f) => [{ nome: f.nome, linha: [f.cpf ? `CPF ${f.cpf}` : '', 'FIADOR (anuente)'].filter(Boolean).join(' · ') }, ...(f.nome_conjuge ? [{ nome: f.nome_conjuge, linha: 'CÔNJUGE DO FIADOR (anuente)' }] : [])]),
+      { nome: `TESTEMUNHA 1: ${EM_BRANCO}`, linha: `CPF: ${EM_BRANCO}` }, { nome: `TESTEMUNHA 2: ${EM_BRANCO}`, linha: `CPF: ${EM_BRANCO}` }],
+    arquivo: x.nomeArq('Termo acordo', a.data),
   };
 }
 
