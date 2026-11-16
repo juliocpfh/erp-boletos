@@ -2124,7 +2124,7 @@ export const ACOES = {
       conferido: (pastaFicha, nome) => conferidos.has(`${pastaFicha}|${nome}`),
       ler: (h) => S.lerConteudo(h),
       gravar: (dir, nome, arq) => S.escreverTexto(dir, nome, arq),
-      aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`),
+      aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${total ? Math.floor((100 * feitos) / total) : 100}%: ${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`),
     });
     const texto = r.compactados
       ? `${r.compactados} de ${r.vistos} arquivo(s) compactado(s): de ${MB(r.antes)} para ${MB(r.depois)} (${MB(r.antes - r.depois)} a menos).`

@@ -136,3 +136,24 @@ test('compactar os que já estão no sistema: mesmo nome, mesmo lugar; documento
   assert.ok(!olhados.includes('link-holerite-2026-11-16-ab12cd.jpg'), 'documento do link ainda não conferido não é mexido');
   assert.ok(CP.ehDoLink('link-rg-2026-11-16-ef34ab.jpg') && !CP.ehDoLink('rg.jpg'));
 });
+
+test('compactar os que já estão no sistema: o aviso do topo mostra o andamento geral em % e some no fim', async () => {
+  const MB = 1024 * 1024;
+  const raiz = pasta('arquivos', { 'Ana Teste': pasta('Ana Teste', { 'a.jpg': 4 * MB, 'b.jpg': 4 * MB, 'c.jpg': 4 * MB, 'd.jpg': 4 * MB }) });
+  const avisos = [];
+  const antigos = { window: globalThis.window, CustomEvent: globalThis.CustomEvent };
+  globalThis.CustomEvent = class { constructor(tipo, op) { this.type = tipo; this.detail = op.detail; } };
+  globalThis.window = { dispatchEvent: (ev) => avisos.push(ev.detail) };
+  try {
+    await CP.compactarTodos(raiz, {
+      ler: async (h) => h.getFile(),
+      gravar: async () => {},
+      compactar: async (f) => ({ arquivo: f, antes: f.size, depois: MB, mudou: f.name === 'a.jpg' }),
+    });
+  } finally { Object.assign(globalThis, antigos); }
+  const textos = avisos.filter((a) => !a.fim).map((a) => a.texto);
+  assert.match(textos[0], /^Compactando os anexos: 0% \(0 de 4 arquivos/);
+  assert.ok(textos.some((t) => /: 25% \(1 de 4 arquivos, 1 compactado\(s\), 3,0 MB a menos\)/.test(t)), textos.join('\n'));
+  assert.ok(textos.some((t) => /: 75% .*Agora: "d\.jpg"/.test(t)));
+  assert.equal(avisos.at(-1).fim, true, 'o aviso some no fim');
+});
