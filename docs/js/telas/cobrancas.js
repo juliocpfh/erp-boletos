@@ -7,6 +7,7 @@ import * as R from '../regras.js';
 import { botoesMesC6, caixaBancoC6, resumoBancoLinha } from './banco-c6.js';
 import { botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera, situacao } from './comum.js';
 import { AVISO_CONTROLE, seloControle, situacaoBoleto } from './contrato.js';
+import { linkComprovante } from './cadastros.js';
 import { nomeArquivoDoc } from './documentos.js';
 import { formNfExterna } from './faturas.js';
 
@@ -270,6 +271,13 @@ function caixaBoleto(cb) {
     <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div></div>`;
 }
 
+/** Etapas do acordo (registrado, termo assinado com o anexo, parcelas pagas). */
+function etapasAcordo(a) {
+  const termo = (x) => (x.chave !== 'termo' || a.desfeito_em ? '' : ` ${linkComprovante(a.contrato_id, a.termo_assinado || null, { tabela: 'acordos', id: a.id, campo: 'termo_assinado', tipo: 'termo-acordo-assinado', data: a.data })
+    .replace('📎 comprovante', '📎 termo assinado').replace('anexar comprovante', 'anexar o termo assinado').replace('Sem comprovante: buscar no banco e anexar', 'Anexar o termo do acordo assinado')}`);
+  return `<ol style="margin:4px 0 6px 18px">${R.etapasDoAcordo(d(), a).map((x) => `<li>${x.feito ? '✅' : '⬜'} ${esc(x.titulo)} <span class="suave">${esc(x.detalhe)}</span>${termo(x)}</li>`).join('')}</ol>`;
+}
+
 /** Acordo de dívida (D8): no boleto original, de qual acordo ele faz parte; na parcela, a que ela se refere. Os dois com os boletos do acordo e "Desfazer". */
 function caixaAcordo(cb) {
   const a = R.buscar(d(), 'acordos', cb.acordo_id || cb.acordo_parcela_de);
@@ -281,6 +289,7 @@ function caixaAcordo(cb) {
   const podeDesfazer = opera() && !a.desfeito_em && !depois && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x));
   return `<div class="alerta info nao-imprimir"><b>Acordo de ${dataBr(a.data)}</b> com ${esc(R.buscar(d(), 'contratos', a.contrato_id).inquilino_nome)}: ${esc(a.referente)}
     (${reais(a.divida_na_data)} na data) em ${a.parcelas} boleto(s), total ${reais(a.valor_total)}.${a.observacoes ? ` <i>${esc(a.observacoes)}</i>` : ''}
+    <br><b>Etapas do acordo:</b>${etapasAcordo(a)}
     <br><b>Boletos do acordo:</b><br>${lista(parcelas)}
     <br><b>Boletos que ele substituiu:</b><br>${lista(R.origensDoAcordo(d(), a))}
     ${podeDesfazer ? `<br>${botao('desfazerAcordo', 'Desfazer o acordo', { id: a.id }, 'secundario pequeno', 'Desfazer o acordo? Os boletos do acordo serão excluídos e os originais voltam a ser cobrados.')}` : ''}

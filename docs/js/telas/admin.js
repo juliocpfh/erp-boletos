@@ -1,6 +1,7 @@
 // Administração: backup seguro, empresas emitentes, histórico de alterações e Dados e backup.
 import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
+import * as AI from '../arquivo-impresso.js';
 import * as B from '../backup-seguro.js';
 import { dataBr, dataHoraBr, reais } from '../calculos.js';
 import * as CA from '../copia-aberta.js';
@@ -196,7 +197,7 @@ export async function telaDados() {
     await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
     modeloProprio = true;
   } catch { /* usa o modelo padrão */ }
-  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
+  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${AI.ligado() ? link('#/arquivo-impresso', 'Arquivo impresso', 'botao secundario') : ''}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', dataHoraBr(d().criado_em))}
