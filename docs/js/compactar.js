@@ -152,9 +152,25 @@ async function pdfJs() {
  * Aviso na tela enquanto um PDF é compactado (pode levar alguns segundos por página): app.js mostra o texto numa mensagem
  * que se atualiza e some com `fim`. Ex.: 'Compactando "extrato.pdf" (PDF escaneado): página 3 de 10…'.
  */
-function avisarAndamento(texto, fim = false) {
+function avisarAndamento(texto, fim = false, fracao = 0) {
   if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+  if (lote && !lote.acabou) {
+    // compactando todos: o aviso mostra o andamento geral; o arquivo da vez vai no fim (fim de um PDF não fecha o aviso)
+    texto = textoDoLote(fim ? '' : texto, fim ? 0 : fracao);
+    fim = false;
+  }
   window.dispatchEvent(new CustomEvent('compactar-andamento', { detail: { texto, fim } }));
+}
+
+/** Andamento de compactarTodos (null fora dele): { feitos, total, compactados, economia }. */
+let lote = null;
+
+/** Ex.: 'Compactando os anexos: 45% (135 de 298 arquivos, 12 compactado(s), 80,5 MB a menos)… Agora: página 3 de 10 de "RG.pdf"'. */
+export function textoDoLote(detalhe = '', fracao = 0) {
+  if (!lote) return detalhe;
+  const pct = lote.total ? Math.min(100, Math.floor((100 * (lote.feitos + Math.max(0, Math.min(1, fracao)))) / lote.total)) : 100;
+  const mb = `${(lote.economia / 1048576).toFixed(1).replace('.', ',')} MB`;
+  return `Compactando os anexos: ${pct}% (${lote.feitos} de ${lote.total} arquivos, ${lote.compactados} compactado(s), ${mb} a menos). Aguarde, não feche esta tela.${detalhe ? ` Agora: ${detalhe}` : ''}`;
 }
 
 /**
@@ -175,7 +191,7 @@ export async function compactarPdf(blob, aoAndar = () => {}) {
     const OPS = lib.OPS;
     const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== undefined));
     // antes de tudo, o que é rápido: nenhuma página com texto nem anotação (uma com texto e o PDF fica como está)
-    avisarAndamento(`Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
+    avisarAndamento(lote ? `conferindo "${nome}"` : `Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
     for (let i = 1; i <= doc.numPages; i += 1) {
       const p = await doc.getPage(i);
       const t = await p.getTextContent();
@@ -187,7 +203,7 @@ export async function compactarPdf(blob, aoAndar = () => {}) {
     let total = 0;
     for (let i = 1; i <= doc.numPages; i += 1) {
       aoAndar(i, doc.numPages);
-      avisarAndamento(`Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`);
+      avisarAndamento(lote ? `página ${i} de ${doc.numPages} de "${nome}"` : `Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`, false, (i - 1) / doc.numPages);
       const p = await doc.getPage(i);
       // "print": o desenho não espera o quadro da tela (com a aba em segundo plano, o modo da tela trava)
       const ops = await p.getOperatorList({ intent: 'print' });
@@ -243,20 +259,31 @@ export async function compactarTodos(raiz, { ler, gravar, compactar = compactarA
   };
   await juntar(raiz, []);
   const r = { vistos: lista.length, compactados: 0, antes: 0, depois: 0, falhas: 0 };
-  for (let i = 0; i < lista.length; i += 1) {
-    const { dir, nome, h } = lista[i];
-    try {
-      const f = await ler(h);
-      const c = await compactar(f, { manterNome: true });
-      if (c.mudou) {
-        await gravar(dir, nome, c.arquivo);
-        r.compactados += 1; r.antes += c.antes; r.depois += c.depois;
+  // o aviso do topo mostra o andamento geral em % (avisarAndamento); o arquivo da vez vai no fim do texto
+  lote = { feitos: 0, total: lista.length, compactados: 0, economia: 0 };
+  try {
+    for (let i = 0; i < lista.length; i += 1) {
+      const { dir, nome, h } = lista[i];
+      lote.feitos = i;
+      avisarAndamento(`"${nome}"`);
+      try {
+        const f = await ler(h);
+        const c = await compactar(f, { manterNome: true });
+        if (c.mudou) {
+          await gravar(dir, nome, c.arquivo);
+          r.compactados += 1; r.antes += c.antes; r.depois += c.depois;
+        }
+      } catch (e) {
+        r.falhas += 1;
+        console.warn(`Compactar "${nome}": ${e.message}`);
       }
-    } catch (e) {
-      r.falhas += 1;
-      console.warn(`Compactar "${nome}": ${e.message}`);
+      Object.assign(lote, { feitos: i + 1, compactados: r.compactados, economia: r.antes - r.depois });
+      aoAndar({ feitos: i + 1, total: lista.length, compactados: r.compactados, economia: r.antes - r.depois });
     }
-    aoAndar({ feitos: i + 1, total: lista.length, compactados: r.compactados, economia: r.antes - r.depois });
+  } finally {
+    lote.acabou = true;
+    avisarAndamento('', true);
+    lote = null;
   }
   return r;
 }
