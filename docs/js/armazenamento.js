@@ -70,6 +70,18 @@ async function arquivoExiste(dir, nome) {
   }
 }
 
+/** Data e tamanho do arquivo (muda a cada gravação, daqui ou de outro computador). */
+const assinaturaDoArquivo = (arq) => `${arq.lastModified}:${arq.size}`;
+const assinaturas = new WeakMap(); // banco lido → data e tamanho do arquivo de onde ele saiu
+/** Data e tamanho do arquivo de onde ``dados`` (devolvido por lerBanco) foi lido, ou null. */
+export const assinaturaLida = (dados) => assinaturas.get(dados) || null;
+/** Data e tamanho do arquivo do banco agora, sem ler o conteúdo; null se não deu para ver (a conferência então lê tudo). */
+export async function assinaturaDoBanco(pasta) {
+  try {
+    return assinaturaDoArquivo(await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile());
+  } catch { return null; }
+}
+
 export async function lerBanco(pasta) {
   if (!(await arquivoExiste(pasta, ARQUIVO_BANCO))) return null;
   const arq = await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile();
@@ -81,7 +93,10 @@ export async function lerBanco(pasta) {
     throw new Error(`O arquivo ${ARQUIVO_BANCO} está danificado. Restaure uma cópia da pasta ${PASTA_BACKUPS}.`);
   }
   if (dados.formato !== 'imoveis-v1') throw new Error(`${ARQUIVO_BANCO} não é um banco deste sistema.`);
-  return normalizar(dados);
+  const banco = normalizar(dados);
+  // o arquivo lido tinha o tamanho anunciado? (gravação pela metade no meio da leitura: sem assinatura, lê de novo na próxima)
+  if (banco && typeof banco === 'object' && Number.isFinite(arq.lastModified)) assinaturas.set(banco, assinaturaDoArquivo(arq));
+  return banco;
 }
 
 export async function escreverTexto(dir, nome, conteudo) {

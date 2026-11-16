@@ -55,7 +55,7 @@ export async function carregarSite() {
     hidden: false,
     addEventListener: (t, f) => (ouvintes[t] ||= []).push(f),
     getElementById: (id) => (porId[id] ||= elemento('div')),
-    querySelector: (sel) => (sel === 'main form[data-form]' && pagina.formulario ? elemento('form') : null),
+    querySelector: (sel) => (sel.startsWith('main form[data-form]') && pagina.formulario ? elemento('form') : null),
     querySelectorAll: () => [],
     createElement: (tag) => elemento(tag),
     body: elemento('body'),

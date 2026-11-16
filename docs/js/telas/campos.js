@@ -9,7 +9,7 @@ import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import { poupancaDaGarantia } from '../poupanca.js';
 import * as R from '../regras.js';
-import { buscar, d, endereco, memoria } from './comum.js';
+import { buscar, buscarComLimite, d, endereco, memoria } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Campos que ajudam a preencher: máscara, CEP, CNPJ e pessoa já cadastrada
@@ -42,7 +42,7 @@ async function consultarCep(el, cfg) {
   if (n.length !== 8) return;
   mensagemAuto(el, 'Consultando o CEP…');
   try {
-    const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
+    const r = await (await buscarComLimite(`https://viacep.com.br/ws/${n}/json/`)).json();
     if (r.erro) return mensagemAuto(el, 'CEP não encontrado.');
     if (cfg.linha) return enderecoNaLinha(el, cfg, r);
     const feitos = preencherVazios(el.form, { [cfg.endereco]: r.logradouro ? `${r.logradouro}, ` : '', [cfg.bairro]: r.bairro, [cfg.cidade]: r.localidade });
@@ -52,10 +52,10 @@ async function consultarCep(el, cfg) {
     mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(', '))}. Complete o número.` : 'CEP conferido.');
     const end = el.form.querySelector(`[name="${cfg.endereco}"]`);
     if (feitos.length && end) end.focus();
-  } catch {
+  } catch (e) {
     const uf = cfg.uf && el.form.querySelector(`[name="${cfg.uf}"]`);
     if (uf && C.ufDoCep(n)) uf.value = C.ufDoCep(n); // sem internet, o Estado sai das faixas de CEP
-    mensagemAuto(el, 'Não deu para consultar o CEP agora (sem internet?). Preencha à mão.');
+    mensagemAuto(el, e && e.semResposta ? 'A consulta do CEP ficou sem resposta, tente de novo (ou preencha à mão).' : 'Não deu para consultar o CEP agora (sem internet?). Preencha à mão.');
   }
 }
 
@@ -80,7 +80,7 @@ async function consultarCnpj(el, cfg) {
   if (n.length !== 14 || !F.cnpjValido(n)) return;
   mensagemAuto(el, 'Consultando o CNPJ…');
   try {
-    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${n}`);
+    const resp = await buscarComLimite(`https://brasilapi.com.br/api/cnpj/v1/${n}`);
     if (!resp.ok) return mensagemAuto(el, 'CNPJ não encontrado na Receita.');
     const r = await resp.json();
     const endereco = [[r.descricao_tipo_de_logradouro, r.logradouro].filter(Boolean).join(' '), r.numero, r.complemento, r.bairro].filter(Boolean).map(titulo).join(', ')
@@ -94,8 +94,8 @@ async function consultarCnpj(el, cfg) {
       [cfg.endereco]: endereco, [cfg.sede]: endereco, [cfg.telefone]: tel.length >= 10 ? F.mascarar('tel', tel) : '', [cfg.email]: String(r.email || '').toLowerCase(),
       [cfg.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : '' });
     mensagemAuto(el, `${esc(r.razao_social || '')}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ''}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(', '))}.` : ''}`);
-  } catch {
-    mensagemAuto(el, 'Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.');
+  } catch (e) {
+    mensagemAuto(el, e && e.semResposta ? 'A consulta do CNPJ ficou sem resposta, tente de novo (ou preencha à mão).' : 'Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.');
   }
 }
 
@@ -460,7 +460,7 @@ export async function acumuladoNoBancoCentral(serie, mesRef) {
   if (acumuladosTrazidos.has(chave)) return acumuladosTrazidos.get(chave);
   const de = C.somarMeses(mesRef, -11);
   const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
-  const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(mesRef)}`);
+  const resp = await buscarComLimite(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(mesRef)}`);
   const lista = resp.ok ? await resp.json() : [];
   // a resposta traz "01/MM/AAAA"; só vale com os 12 meses publicados
   const meses = new Map((Array.isArray(lista) ? lista : []).map((x) => [`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`, Number(x.valor)]));
@@ -487,12 +487,12 @@ export async function indicesMensaisFci(indice, de, ate) {
   let lista = null;
   for (let n = 1; n <= 3 && !lista; n += 1) {
     try {
-      const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`);
+      const resp = await buscarComLimite(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`);
       if (resp.ok) lista = await resp.json();
     } catch { /* sem internet ou Banco Central ocupado */ }
     if (!lista && n < 3) await new Promise((ok) => { setTimeout(ok, 2000 * n); });
   }
-  if (!lista) throw new Error('Não deu para consultar o Banco Central agora (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.');
+  if (!lista) throw new Error('O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.');
   const out = {};
   for (const x of Array.isArray(lista) ? lista : []) if (Number.isFinite(Number(x.valor))) out[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`] = Number(x.valor);
   return out;

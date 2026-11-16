@@ -280,12 +280,31 @@ export function telaPastaImpressao(id) {
 }
 
 /** Depois de desenhar a página de impressão: põe cada PDF (página a página) e cada foto no lugar, e conta as páginas na capa. */
+// fotos postas na página de impressão (endereços temporários): liberadas quando a página sai da tela
+let impressaoAberta = null; // { pagina, urls }
+let afterprintLigado = false;
+function soltarImpressao() {
+  if (!impressaoAberta || impressaoAberta.pagina.isConnected) return;
+  impressaoAberta.urls.forEach((u) => URL.revokeObjectURL(u));
+  impressaoAberta = null;
+}
+
 export async function ligarPastaImpressao(raiz) {
+  soltarImpressao(); // chamada a cada desenho de tela: se a página de impressão anterior já saiu, solta as fotos dela
   const pagina = raiz.querySelector('[data-pasta-impressao]');
   if (!pagina) return;
-  window.addEventListener('afterprint', () => { const x = document.getElementById('pasta-confirmar'); if (x) { x.classList.add('destaque'); x.scrollIntoView({ block: 'center' }); } }, { once: true });
+  // ligado uma vez só (antes, cada desenho da página pendurava mais um): só age se a página de impressão estiver na tela
+  if (!afterprintLigado) {
+    afterprintLigado = true;
+    window.addEventListener('afterprint', () => { const x = document.getElementById('pasta-confirmar'); if (x) { x.classList.add('destaque'); x.scrollIntoView({ block: 'center' }); } });
+  }
+  const urls = [];
+  if (impressaoAberta && impressaoAberta.pagina !== pagina) { impressaoAberta.urls.forEach((u) => URL.revokeObjectURL(u)); impressaoAberta = null; }
+  impressaoAberta = impressaoAberta || { pagina, urls };
+  const guardar = (u) => { (impressaoAberta && impressaoAberta.pagina === pagina ? impressaoAberta.urls : urls).push(u); return u; };
   let pdfjs = null;
   for (const caixa of pagina.querySelectorAll('[data-pasta-arquivo]')) {
+    if (!pagina.isConnected) { soltarImpressao(); return; } // saiu da página no meio: não lê nem desenha o resto
     const { escopo, id, nome, vaga } = caixa.dataset;
     const conta = (n) => { const td = pagina.querySelector(`[data-paginas="${CSS.escape(vaga)}"]`); if (td) td.textContent = String(n); };
     try {
@@ -295,7 +314,7 @@ export async function ligarPastaImpressao(raiz) {
         const img = document.createElement('img');
         img.className = 'pasta-pagina';
         img.alt = nome;
-        img.src = URL.createObjectURL(new Blob([arq], { type: tipo }));
+        img.src = guardar(URL.createObjectURL(new Blob([arq], { type: tipo })));
         caixa.replaceChildren(img);
         conta(1);
         continue;
@@ -304,6 +323,7 @@ export async function ligarPastaImpressao(raiz) {
       const pdf = await pdfjs.getDocument({ data: new Uint8Array(await arq.arrayBuffer()), isEvalSupported: false }).promise;
       const telas = [];
       for (let n = 1; n <= pdf.numPages; n += 1) {
+        if (!pagina.isConnected) { pdf.destroy?.(); soltarImpressao(); return; }
         const p = await pdf.getPage(n);
         const vista = p.getViewport({ scale: 1240 / p.getViewport({ scale: 1 }).width }); // A4 a ~150 dpi
         const tela = document.createElement('canvas');

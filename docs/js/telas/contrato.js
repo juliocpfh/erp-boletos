@@ -506,8 +506,9 @@ export function situacaoBoleto(cb, hoje = C.hojeIso()) {
 const BOLETOS_INQUILINO = 12;
 
 function caixaBoletosInquilino(c, cobs, hoje) {
+  const nfs = R.indiceFaturas(d()); // as NFs de todos os boletos numa passada só (em vez de varrer as NFs a cada linha)
   const linha = (x) => {
-    const fs = R.faturasDe(d(), 'cobranca', x.id);
+    const fs = nfs.nfs('cobranca', x.id);
     const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : '';
     return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('caução', 'info')}` : ''}${R.ehParcelaAcordo(x) ? ` ${etiqueta(`acordo ${x.acordo_parcela || ''}`.trim(), 'info')}` : ''}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td>

@@ -147,7 +147,17 @@ async function marcaDaguaPdf(img) {
  * PDF A4 do documento que está na tela: a imagem do documento é cortada em folhas entre um bloco e outro
  * (parágrafo, linha de tabela, foto, assinatura) ou entre as linhas de um parágrafo, com o rodapé das empresas e "Página X de Y" embaixo.
  */
-export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
+// A imagem do documento tem limite de tamanho no navegador: 32.767 pixels de altura (Chrome) e, no iPhone, cerca de 16,7 milhões
+// de pixels no total. Documento que passa disso (contrato longo, vistoria com muitas fotos) é fotografado em lotes de folhas.
+const ESCALA_PDF = 2;
+function alturaQueCabe(el) {
+  const toque = /iP(hone|ad|od)/.test(navigator.userAgent) || !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+  const larguraPx = Math.max(1, Math.ceil(el.offsetWidth) * ESCALA_PDF);
+  return Math.floor(Math.min(32000, (toque ? 16000000 : 200000000) / larguraPx) / ESCALA_PDF); // em pixels da tela
+}
+
+/** ``alturaMaxima`` (pixels da tela): só para testar o desenho em lotes; o normal é o limite do aparelho. */
+export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
   const caixa = el.getBoundingClientRect();
   const topo = caixa.top;
@@ -155,13 +165,12 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
   const cortes = cortesDoDocumento(el, topo);
   const marca = await marcaDaguaPdf(el.querySelector('.ct-marca'));
-  const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', onclone: (doc) => {
+  const opcoes = { scale: ESCALA_PDF, backgroundColor: '#ffffff', onclone: (doc) => {
     // a marca-d'água da tela repete a cada altura de A4, mas as folhas do PDF são cortadas entre os blocos: sai da imagem
     // e entra por cima de cada folha, sempre no centro (como na impressão e no Word)
     doc.querySelectorAll('.ct-rodape, .ct-marcas').forEach((x) => x.remove());
     doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
-  } });
-  const escala = canvas.width / el.offsetWidth;
+  } };
   const largura = 210 - 2 * margemLado;
   const pxMm = el.offsetWidth / largura;
   const [margemTopo, margemPe] = [12, 24];
@@ -180,8 +189,22 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     fatias.push([ini, fim]);
     ini = fim;
   }
+  // cabe numa imagem só (o caso comum): uma fotografia do documento inteiro, como sempre. Senão, um lote de folhas por vez.
+  const limite = alturaMaxima || alturaQueCabe(el);
+  const lotes = [];
+  if (total <= limite) lotes.push({ inteiro: true, ini: 0, fim: total, fatias });
+  else {
+    for (const f of fatias) {
+      const ultimo = lotes.at(-1);
+      if (ultimo && f[1] - ultimo.ini <= limite) { ultimo.fim = f[1]; ultimo.fatias.push(f); } else lotes.push({ ini: f[0], fim: f[1], fatias: [f] });
+    }
+  }
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  fatias.forEach(([ini, fim], n) => {
+  let n = 0;
+  for (const lote of lotes) {
+    const canvas = await html2canvas(el, lote.inteiro ? opcoes : { ...opcoes, y: lote.ini, height: Math.ceil(lote.fim - lote.ini) });
+    const escala = canvas.width / el.offsetWidth;
+    for (const [ini, fim] of lote.fatias) {
     if (n) pdf.addPage();
     const pedaco = document.createElement('canvas');
     pedaco.width = canvas.width;
@@ -190,7 +213,7 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     // fundo branco: o último pedaço pode passar 1 pixel do fim da imagem, e o pixel vazio virava um risco preto no JPEG
     g.fillStyle = '#ffffff';
     g.fillRect(0, 0, pedaco.width, pedaco.height);
-    const y = Math.round(ini * escala);
+    const y = Math.round((ini - lote.ini) * escala);
     const h = Math.min(pedaco.height, canvas.height - y);
     if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
     pdf.addImage(pedaco.toDataURL('image/jpeg', 0.92), 'JPEG', margemLado, topoDa(n), largura, (fim - ini) / pxMm);
@@ -200,7 +223,11 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
     pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: 'right' });
     pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
     rodape.forEach((linha, k) => pdf.text(linha, 105, 297 - margemPe + 12 + k * 3.5, { align: 'center' }));
-  });
+    pedaco.width = 0; pedaco.height = 0; // devolve a memória da folha já (o iPhone tem pouca para imagens)
+    n += 1;
+    }
+    canvas.width = 0; canvas.height = 0;
+  }
   return pdf.output('blob');
 }
 
@@ -535,14 +562,23 @@ async function fotosDaVistoria(v) {
   if (!v.fotos) return out;
   let dir;
   try { dir = await pastaDoEscopo('contrato', v.contrato_id); } catch { return out; }
-  for (const [k, nome] of Object.entries(v.fotos)) {
+  // todas as fotos ao mesmo tempo (uma a uma, a vistoria com 40 fotos demorava a abrir); a ordem do documento é a das chaves
+  const lidas = await Promise.all(Object.entries(v.fotos).map(async ([k, nome]) => {
     try {
       const arq = await (await dir.getFileHandle(nome)).getFile();
-      const img = await createImageBitmap(arq);
-      const src = URL.createObjectURL(arq);
-      urls.push(src);
-      out[k] = { src, bytes: new Uint8Array(await arq.arrayBuffer()), largura: img.width, altura: img.height };
-    } catch { /* foto apagada da pasta */ }
+      // o tamanho e o conteúdo (o Word usa os bytes) ao mesmo tempo; a imagem aberta só para medir é fechada em seguida
+      const [img, conteudo] = await Promise.all([createImageBitmap(arq), arq.arrayBuffer()]);
+      const [largura, altura] = [img.width, img.height];
+      img.close?.();
+      return [k, arq, { bytes: new Uint8Array(conteudo), largura, altura }];
+    } catch { return null; /* foto apagada da pasta */ }
+  }));
+  for (const lida of lidas) {
+    if (!lida) continue;
+    const [k, arq, foto] = lida;
+    const src = URL.createObjectURL(arq);
+    urls.push(src);
+    out[k] = { src, ...foto };
   }
   return out;
 }

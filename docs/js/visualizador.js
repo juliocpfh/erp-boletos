@@ -25,11 +25,20 @@ export function usarVisualizador() {
   return !!window.matchMedia?.('(max-width: 760px), (hover: none) and (pointer: coarse)').matches;
 }
 
-function fechar(janela, urls) {
+/**
+ * Fecha a janela. ``voltar``: tira do histórico a entrada que a abertura pôs (botão Fechar e Esc); o Voltar do aparelho
+ * já tirou, e quando a página mudou por baixo (``fecharSemVoltar``, chamado por ``mostrar``) não se mexe no histórico.
+ */
+function fechar(janela, urls, voltar = true) {
+  if (janela.fechada) return;
+  janela.fechada = true;
   janela.remove();
   urls.forEach((u) => URL.revokeObjectURL(u));
   document.body.classList.remove('com-visualizador');
   document.removeEventListener('keydown', janela.teclado);
+  window.removeEventListener('popstate', janela.aoVoltar);
+  // a entrada tem o mesmo endereço da página: voltar por ela não muda o endereço (não há hashchange, a tela não é redesenhada)
+  if (voltar && janela.marca && history.state && history.state.visualizador === janela.marca) history.back();
 }
 
 /**
@@ -53,6 +62,18 @@ export async function visualizar(blob, nome, tipo, baixar) {
   });
   janela.teclado = (ev) => { if (ev.key === 'Escape') fechar(janela, urls); };
   document.addEventListener('keydown', janela.teclado);
+  // Voltar do aparelho fecha o anexo (antes saía da página, ou do aplicativo): a abertura põe uma entrada no histórico,
+  // com o mesmo endereço, e o Voltar só a consome
+  document.querySelector('.visualizador')?.fecharSemVoltar?.(); // outro anexo ainda aberto: um de cada vez
+  janela.aoVoltar = () => fechar(janela, urls, false);
+  janela.fecharSemVoltar = janela.aoVoltar;
+  try {
+    const marca = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (history.state && history.state.visualizador) history.replaceState({ visualizador: marca }, ''); // sobrou de um anexo fechado sem voltar
+    else history.pushState({ visualizador: marca }, '');
+    janela.marca = marca;
+    window.addEventListener('popstate', janela.aoVoltar);
+  } catch { /* navegador que não deixa mexer no histórico: fecha só pelo botão */ }
   document.body.appendChild(janela);
   document.body.classList.add('com-visualizador');
   const corpo = janela.querySelector('.vis-corpo');
