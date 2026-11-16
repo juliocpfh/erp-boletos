@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 16/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #259).
+Situação em 16/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #261).
 
 Marque com `[x]` o que for concluindo.
 
@@ -20,7 +20,8 @@ Marque com `[x]` o que for concluindo.
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: instalado em 16/11; falta só a limpeza da chave antiga a partir de 17/11 (item 9e, passo 3) | você | 5 min |
 | 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; falta só a 2ª rodada (Claude, quando pedir) | Claude | — |
-| 12 | Compactação dos anexos: apertar o botão dos anexos antigos e conferir uma foto nova | você | 10 min |
+
+**Próximos passos (combinado em 16/11):** (1) **17/11 ou depois:** item 9e, passo 3 (apagar a chave antiga, se `ultima-atualizacao.txt` estiver com `ok`); (2) item 2, aviso no celular (o arquivo das chaves já está em Documentos); (3) item 1, Gmail; (4) item 3, teste da ficha com um conhecido. Em 16/12: CBS 2027.
 
 ---
 
@@ -215,13 +216,16 @@ Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 1
 
 **Ideia do dono em 16/11:** compactar os anexos. Feita no mesmo dia (item 12).
 
-## 12. Compactação dos anexos (feita em 16/11, PRs #257 e #258)  `[ ]`
+## 12. Compactação dos anexos (feita em 16/11, PRs #257, #258 e #261)  `[x]` (conferida em 16/11)
 
 O sistema agora diminui sozinho, ao anexar, as fotos e os PDFs escaneados, sem guardar o original. PDF com texto (do banco, de um sistema, do Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos mandados pelo link da ficha diminuem quando alguém abre a ficha no sistema, logo depois da conferência (o alerta "⚠ possível montagem" continua). Enquanto um PDF escaneado é compactado, o topo da tela mostra "página 3 de 10… Aguarde". Liga e desliga em Dados e backup → Regras do sistema → "Compactar anexos".
 
-**Falta você:**
-- [ ] **A. Anexos que já estavam no sistema (5 a 10 min):** Dados e backup → **Compactar os anexos que já estão no sistema** → confirmar. Deixe a tela aberta até o fim. Certo: no fim aparece quantos foram compactados e quanto diminuiu (ex.: "40 de 298 arquivo(s) compactado(s): de 350,0 MB para 60,0 MB").
-- [ ] **B. Anexo novo:** anexe uma foto grande (3 a 4 MB, tirada no celular) em qualquer inquilino. Certo: na lista de arquivos ela aparece com algumas centenas de KB (ex.: 400 KB) e abre de pé, sem estar virada.
+**16/11, PR #261 (pedido do dono):** ao compactar todos, o aviso do topo mostra o andamento geral em % (ex.: "Compactando os anexos: 45% (135 de 298 arquivos…)") e o arquivo da vez no fim.
+
+**Conferido pelo dono em 16/11:**
+- [x] **A. Anexos que já estavam no sistema (5 a 10 min):** Dados e backup → **Compactar os anexos que já estão no sistema** → confirmar. Deixe a tela aberta até o fim. Certo: no fim aparece quantos foram compactados e quanto diminuiu (ex.: "40 de 298 arquivo(s) compactado(s): de 350,0 MB para 60,0 MB").
+  - **Resultado (16/11): 167 olhados, 0 compactados, e está certo.** Antes: 298 arquivos, 161 MB (71 PDFs assinados, 48 MB; 27 PDFs com texto, 29 MB; 136 pequenos, 20 MB; 60 PDFs escaneados, 60 MB). Os escaneados já vieram com uns 300 KB por página, o mesmo que a compactação daria, e o sistema só troca se ficar 15% menor. Apertar mais os escaneados (letra menos nítida) ganharia no máximo 20 a 30 MB: o dono não pediu.
+- [x] **B. Anexo novo:** (16/11: a foto abriu na mesma posição da galeria; o sistema respeita a posição gravada pelo celular e não gira o papel sozinho. Ideia, se o dono pedir: botão "Girar" antes de anexar.) anexe uma foto grande (3 a 4 MB, tirada no celular) em qualquer inquilino. Certo: na lista de arquivos ela aparece com algumas centenas de KB (ex.: 400 KB) e abre de pé, sem estar virada.
 
 ## Ficou de fora de propósito (não é defeito)
 
