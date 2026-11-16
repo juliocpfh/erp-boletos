@@ -283,14 +283,24 @@ export function percentualPorBonificado(base, bonificado) {
 // Parcelamentos (IPTU e seguro)
 // --------------------------------------------------------------------------
 
-/** Divide um total em parcelas; a diferença de centavos fica na primeira. */
+/**
+ * Divide um total em parcelas. Quando os centavos não dividem, as primeiras ficam mais caras e a última menor
+ * (decisão de 2026-11-15). Ex.: R$ 1.200,05 em 10 = nove de R$ 120,01 e a última de R$ 119,96. A soma sempre fecha.
+ * Se a última ficaria zerada ou negativa (total minúsculo), a sobra vai centavo a centavo para as primeiras.
+ */
 export function parcelas(total, quantidade) {
   quantidade = Math.trunc(quantidade || 0);
   if (quantidade <= 0) return [];
-  const base = arred(total / quantidade);
-  const lista = Array(quantidade).fill(base);
-  lista[0] = total - base * (quantidade - 1);
-  return lista;
+  const cheia = Math.ceil(total / quantidade);
+  const ultima = total - cheia * (quantidade - 1);
+  if (ultima > 0) {
+    const lista = Array(quantidade).fill(cheia);
+    lista[quantidade - 1] = ultima;
+    return lista;
+  }
+  const base = Math.floor(total / quantidade);
+  const sobra = total - base * quantidade;
+  return Array.from({ length: quantidade }, (_, k) => base + (k < sobra ? 1 : 0));
 }
 
 /** [número da parcela, valor] cobrado na competência, ou [null, 0]. */

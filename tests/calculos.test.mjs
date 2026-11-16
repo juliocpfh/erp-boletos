@@ -33,8 +33,8 @@ test('desconto em % e em R$ andam juntos', () => {
   assert.equal(C.percentualPorDesconto(135000, 13500), 10);
 });
 
-test('parcelas somam o total e a sobra fica na primeira', () => {
-  assert.deepEqual(C.parcelas(100000, 3), [33334, 33333, 33333]);
+test('parcelas somam o total; quando os centavos não dividem, a última fica menor (decisão de 2026-11-15)', () => {
+  assert.deepEqual(C.parcelas(100000, 3), [33334, 33334, 33332]);
   assert.deepEqual(C.parcelaNaCompetencia(100000, 10, '2026-02', '2026-11'), [10, 10000]);
   assert.deepEqual(C.parcelaNaCompetencia(100000, 10, '2026-02', '2026-12'), [null, 0]);
 });

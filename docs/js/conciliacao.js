@@ -127,12 +127,34 @@ function mesmaDescricao(a, b) {
  * mesmo id do Pix (end to end), com o mesmo valor e tipo; ou, entre fontes diferentes (OFX × API), mesma data, valor, tipo e
  * descrição, ainda não juntada a outra. ``usadas``: as já casadas nesta importação (dois Pix iguais no mesmo dia são dois).
  */
-function mesmoLancamento(daConta, m, usadas) {
+function mesmoLancamento(indice, m, usadas) {
   const livre = (x) => !usadas.has(x.id) && x.valor === m.valor && x.tipo === m.tipo;
-  const porRef = daConta.find((x) => livre(x) && ((m.local_reference && x.local_reference === m.local_reference) || (m.end_to_end_id && x.end_to_end_id === m.end_to_end_id)));
-  if (porRef) return porRef;
+  // a primeira (na ordem do extrato já importado) com a mesma referência local ou o mesmo id do Pix
+  const a = m.local_reference ? (indice.porReferencia.get(m.local_reference) || []).find((it) => livre(it.x)) : null;
+  const b = m.end_to_end_id ? (indice.porPix.get(m.end_to_end_id) || []).find((it) => livre(it.x)) : null;
+  const porRef = a && b ? (a.pos <= b.pos ? a : b) : a || b;
+  if (porRef) return porRef.x;
   const fonte = fonteDe(m);
-  return daConta.find((x) => livre(x) && x.data === m.data && fonteDe(x) !== fonte && fonteDe(x) !== 'ofx+api' && mesmaDescricao(x.descricao, m.descricao)) || null;
+  const it = (indice.porDia.get(`${m.data}|${m.valor}|${m.tipo}`) || []).find(({ x }) => livre(x) && fonteDe(x) !== fonte && fonteDe(x) !== 'ofx+api' && mesmaDescricao(x.descricao, m.descricao));
+  return it ? it.x : null;
+}
+
+/**
+ * As movimentações já importadas da conta, separadas uma vez por importação (antes cada lançamento novo percorria o extrato
+ * inteiro): por referência local, por id do Pix e por data|valor|tipo, cada lista na ordem do extrato (``pos``).
+ */
+function indiceDaConta(daConta) {
+  const porReferencia = new Map();
+  const porPix = new Map();
+  const porDia = new Map();
+  const guardar = (mapa, k, it) => { const l = mapa.get(k); if (l) l.push(it); else mapa.set(k, [it]); };
+  daConta.forEach((x, pos) => {
+    const it = { x, pos };
+    if (x.local_reference) guardar(porReferencia, x.local_reference, it);
+    if (x.end_to_end_id) guardar(porPix, x.end_to_end_id, it);
+    guardar(porDia, `${x.data}|${x.valor}|${x.tipo}`, it);
+  });
+  return { porReferencia, porPix, porDia };
 }
 
 /** Junta os identificadores das duas origens na movimentação que já existe: o ``reference`` da API passa a ser o id (é por ele que a ponte acha o lançamento) e o FITID fica em ``id_ofx``. */
@@ -168,13 +190,15 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
   const novas = [];
   let repetidas = 0;
   let maior = null;
+  let indice = null; // só é montado se aparecer lançamento com identificador novo
   for (const e of lancamentos || []) {
     const m = movimentacaoDoC6(contaId, e);
     if (!m.data) throw new Error(`Lançamento ${m.id_externo} sem data.`);
     if (existentes.has(m.id_externo)) { repetidas += 1; continue; }
     existentes.add(m.id_externo);
     // o mesmo lançamento com outro identificador (OFX × API): não entra de novo, só junta os identificadores
-    const igual = mesmoLancamento(daConta, m, usadas);
+    indice = indice || indiceDaConta(daConta);
+    const igual = mesmoLancamento(indice, m, usadas);
     if (igual) { usadas.add(igual.id); juntarIdentificadores(d, igual, m, usuario); repetidas += 1; continue; }
     if (!maior || m.data > maior) maior = m.data;
     // sem linha de histórico por lançamento (o lançamento É o registro do banco): fica uma linha só da importação, abaixo, e quem importou no registro
@@ -313,8 +337,10 @@ const pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) =
  * ``movId``: na linha do extrato, o boleto já ligado a outra linha não conta. Ex.: boleto 07/2026 de R$ 1.318,50 pago à mão em 10/08 e
  * a entrada de 10/08 → só o 07/2026 (jaPago), e não o 08/2026 de mesmo valor, que vence em 10/09.
  */
-function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null } = {}) {
-  const abertos = d.cobrancas.filter(emAberto);
+function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null } = {}) {
+  // com o índice da tela (um por desenho), os boletos em aberto e os pagos por valor já estão separados, na mesma ordem
+  const ib = indice && indice.boletos ? indice.boletos() : null;
+  const abertos = ib ? ib.abertos : d.cobrancas.filter(emAberto);
   if (idExterno || nossoNumero) {
     const cb = abertos.find((x) => x.banco && ((idExterno && x.banco.id_externo === idExterno) || (nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero))));
     if (cb) {
@@ -325,14 +351,14 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   const credito = dataCredito || data;
   const naLinha = movId !== null;
   const jaPago = (cb) => ({ cobranca: cb, certeza: 'exata', previsto: cb.valor_pago, pagouEmDia: !!cb.pagou_em_dia, jaPago: true });
-  const pagos = d.cobrancas.filter((cb) => cb.data_pagamento && cb.valor_pago === valor && (!naLinha || ligavel(cb, movId)));
+  const pagos = (ib ? ib.pagosPorValor.get(valor) || [] : d.cobrancas.filter((cb) => cb.data_pagamento && cb.valor_pago === valor)).filter((cb) => !naLinha || ligavel(cb, movId));
   const pagosNaData = pagos.filter((cb) => pagoEntre(cb, data < credito ? data : credito, data > credito ? data : credito));
   if (pagosNaData.length) return marcarProvaveis(pagosNaData.map(jaPago));
   const lista = [];
   const limite = C.somarDias(data, regra('dias_antecipacao_banco'));
   for (const cb of abertos) {
     if (cb.vencimento > limite) continue;
-    const pontual = totais(cb).a_pagar_pontual;
+    const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
     const noPrazo = valor === pontual && data <= C.somarDias(cb.vencimento, dias);
     const comEncargos = !noPrazo && data > cb.vencimento && valor === previstoNoPagamento(cb, data).valor_devido;
     if (noPrazo || comEncargos) lista.push({ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : valor, pagouEmDia: noPrazo && data > cb.vencimento });
@@ -420,12 +446,12 @@ export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, 
 }
 
 /** Entradas do extrato que parecem boletos (em aberto, ou já pagos à mão: jaPago): [{ movimentacao_id, cobranca_id, certeza, previsto, pagouEmDia, jaPago }] (sem gravar). */
-export function conciliarMovimentacoes(d, movs, { dias = null } = {}) {
+export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } = {}) {
   const tol = dias ?? regra('tolerancia_boleto_dias');
   const out = [];
   for (const m of movs || []) {
     if (m.tipo !== 'entrada' || m.classificacao) continue;
-    for (const a of casarBoletos(d, m.valor, m.data, tol, { nossoNumero: m.nosso_numero, movId: m.id })) {
+    for (const a of casarBoletos(d, m.valor, m.data, tol, { nossoNumero: m.nosso_numero, movId: m.id, indice })) {
       out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago });
     }
   }
@@ -443,6 +469,7 @@ export function confirmarPagamentoPeloBanco(d, cobrancaId, origem, usuario, { pa
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (!cb) throw new Error('Boleto não encontrado.');
   if (cb.data_pagamento) throw new Error(`Este boleto já está pago (${C.dataBr(cb.data_pagamento)}). Nada foi alterado.`);
+  if (cb.situacao === 'Em acordo') throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} está em acordo: não recebe pagamento. Valem os boletos das parcelas do acordo (ou desfaça o acordo antes). Nada foi alterado.`);
   const mov = typeof origem === 'number' || typeof origem === 'string' ? buscar(d, 'movimentacoes_banco', origem) : null;
   if (!mov && (typeof origem !== 'object' || !origem)) throw new Error('Movimentação não encontrada.');
   if (mov && mov.tipo !== 'entrada') throw new Error('Só uma entrada no extrato pode confirmar o pagamento de um boleto.');
@@ -539,7 +566,42 @@ export function indiceDeSugestoes(d) {
     const doc = m.contrapartida ? String(m.contrapartida.documento || '').replace(/\D/g, '') : '';
     if (doc) guardar(porDocumento, `${m.tipo}|${doc}`, m);
   }
-  return { porDescricao, porDocumento };
+  // montados só quando pedidos, uma vez por índice (um por desenho da tela): boletos, contas já ligadas e pontas de transferência
+  let boletos = null;
+  let despesasLigadas = null;
+  let pontas = null;
+  return { porDescricao, porDocumento,
+    boletos: () => (boletos || (boletos = indiceDeBoletos(d))),
+    despesasLigadas: () => (despesasLigadas || (despesasLigadas = despesasLigadasAoExtrato(d))),
+    pontas: () => (pontas || (pontas = pontasDeTransferencia(d))) };
+}
+
+/** Boletos para casar com o extrato, separados uma vez: os em aberto (com o total em dia de cada um) e os pagos por valor pago, na ordem de ``d.cobrancas``. */
+function indiceDeBoletos(d) {
+  const abertos = [];
+  const pontual = new Map();
+  const pagosPorValor = new Map();
+  for (const cb of d.cobrancas) {
+    if (emAberto(cb)) { abertos.push(cb); pontual.set(cb, totais(cb).a_pagar_pontual); }
+    if (cb.data_pagamento) { const l = pagosPorValor.get(cb.valor_pago); if (l) l.push(cb); else pagosPorValor.set(cb.valor_pago, [cb]); }
+  }
+  return { abertos, pontual, pagosPorValor };
+}
+
+/** Contas pagas por nós que já têm uma linha do extrato ligada (ids). */
+const despesasLigadasAoExtrato = (d) => new Set((d.movimentacoes_banco || []).filter((m) => m.despesa_id).map((m) => m.despesa_id));
+
+/** Movimentação que pode ser a outra ponta de uma transferência entre as nossas contas (falta conferir conta, tipo, valor e data). */
+const podeSerPonta = (m) => !m.par_movimentacao_id && (!m.classificacao || m.classificacao === 'transferencia') && /TRANSFER|PIX|TED/.test(`${m.categoria_banco || ''} ${textoDaMov(m)}`);
+/** As possíveis pontas de transferência, por valor, na ordem do extrato. */
+function pontasDeTransferencia(d) {
+  const porValor = new Map();
+  for (const m of d.movimentacoes_banco || []) {
+    if (!podeSerPonta(m)) continue;
+    const l = porValor.get(m.valor);
+    if (l) l.push(m); else porValor.set(m.valor, [m]);
+  }
+  return porValor;
 }
 
 let indiceGuardado = { d: null, indice: null };
@@ -567,7 +629,7 @@ export function sugerirDestino(d, mov, indice = null) {
     if (pag) return { classificacao: classificacaoDaOrigem(pag.origem), imovel_id: pag.imovel_id, tipo_despesa: pag.tipo_conta, pagamento_banco_id: pag.id, motivo: `pagamento pelo banco nº ${pag.id} (${pag.beneficiario && pag.beneficiario.nome ? pag.beneficiario.nome : pag.tipo_conta})`, confianca: 'alta' };
   }
   // 2) transferência entre as nossas contas: a outra ponta no extrato da outra conta, ou a outra empresa citada
-  const par = parDaTransferencia(d, mov);
+  const par = parDaTransferencia(d, mov, indice);
   if (par) return { classificacao: 'transferencia', par_movimentacao_id: par.id, motivo: `a outra ponta está no extrato ${apelidoDaConta(d, par.conta_id)} (${C.dataBr(par.data)})`, confianca: 'alta' };
   for (const c of contasConfiguradas(d)) {
     if (c.id === mov.conta_id) continue;
@@ -581,7 +643,7 @@ export function sugerirDestino(d, mov, indice = null) {
   if (mov.tipo === 'entrada' && /AIRBNB/.test(texto)) return { classificacao: 'airbnb', motivo: 'descrição do Airbnb', confianca: 'alta' };
   // 3) entrada que parece boleto
   if (mov.tipo === 'entrada' && !mov.classificacao) {
-    const casa = conciliarMovimentacoes(d, [mov]);
+    const casa = conciliarMovimentacoes(d, [mov], { indice });
     if (casa.length === 1) {
       const cb = buscar(d, 'cobrancas', casa[0].cobranca_id);
       const c = buscar(d, 'contratos', cb.contrato_id);
@@ -612,8 +674,8 @@ export function sugerirDestino(d, mov, indice = null) {
     else porPalavra = { classificacao: 'conta_imovel', imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === 'nome' ? 'descrição' : 'matrícula/UC cadastrada'}` : `descrição de ${tipo}`, confianca: imv ? 'media' : 'baixa' };
     break;
   }
-  if (porPalavra && (porPalavra.imovel_id || porPalavra.classificacao !== 'conta_imovel')) return comContaLancada(d, mov, porPalavra);
-  if (imv) return comContaLancada(d, mov, { classificacao: imv.tipo === 'IPTU' ? 'iptu' : 'conta_imovel', imovel_id: imv.imovel.id, tipo_despesa: imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : 'Outra', motivo: 'imóvel citado na descrição', confianca: 'media' });
+  if (porPalavra && (porPalavra.imovel_id || porPalavra.classificacao !== 'conta_imovel')) return comContaLancada(d, mov, porPalavra, indice);
+  if (imv) return comContaLancada(d, mov, { classificacao: imv.tipo === 'IPTU' ? 'iptu' : 'conta_imovel', imovel_id: imv.imovel.id, tipo_despesa: imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : 'Outra', motivo: 'imóvel citado na descrição', confianca: 'media' }, indice);
   // 5) memória: última movimentação já classificada com a mesma descrição (sem números) ou a mesma contrapartida (vale mais que a palavra sem imóvel)
   const chave = semDigitos(mov.descricao);
   const doc = mov.contrapartida && mov.contrapartida.documento ? String(mov.contrapartida.documento).replace(/\D/g, '') : '';
@@ -624,7 +686,7 @@ export function sugerirDestino(d, mov, indice = null) {
   if (antiga) {
     const de = antiga.despesa_id ? buscar(d, 'despesas', antiga.despesa_id) : null;
     return comContaLancada(d, mov, { classificacao: antiga.classificacao, imovel_id: antiga.imovel_id, tipo_despesa: de ? de.tipo : null, iptu: antiga.iptu_id ? { id: antiga.iptu_id, n: null } : null,
-      motivo: `igual à movimentação de ${C.dataBr(antiga.data)}`, confianca: 'media' });
+      motivo: `igual à movimentação de ${C.dataBr(antiga.data)}`, confianca: 'media' }, indice);
   }
   return porPalavra;
 }
@@ -634,8 +696,8 @@ export function sugerirDestino(d, mov, indice = null) {
  * extrato nem pagamento pelo banco ligados, paga até 7 dias antes ou depois (sem data de pagamento: do mês da saída ou dos 2 antes).
  * A de data mais perto primeiro; null se não há. Ex.: água de R$ 123,45 da Loja 1 lançada com pagamento em 05/11 e a saída de 05/11.
  */
-export function contaJaLancada(d, imovelId, tipo, mov) {
-  const ligadas = new Set((d.movimentacoes_banco || []).filter((m) => m.despesa_id).map((m) => m.despesa_id));
+export function contaJaLancada(d, imovelId, tipo, mov, indice = null) {
+  const ligadas = indice && indice.despesasLigadas ? indice.despesasLigadas() : despesasLigadasAoExtrato(d);
   const mes = String(mov.data).slice(0, 7);
   const perto = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) <= 7 : x.competencia <= mes && x.competencia >= C.somarMeses(mes, -2));
   const distancia = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) : 99);
@@ -644,19 +706,19 @@ export function contaJaLancada(d, imovelId, tipo, mov) {
 }
 
 /** Sugestão de "conta do imóvel" com a conta já lançada à mão, para LIGAR (``despesa_id``) em vez de lançar de novo. */
-function comContaLancada(d, mov, s) {
+function comContaLancada(d, mov, s, indice = null) {
   if (!s || s.classificacao !== 'conta_imovel' || !s.imovel_id || !s.tipo_despesa || mov.tipo !== 'saida') return s;
-  const de = contaJaLancada(d, s.imovel_id, s.tipo_despesa, mov);
+  const de = contaJaLancada(d, s.imovel_id, s.tipo_despesa, mov, indice);
   return de ? { ...s, despesa_id: de.id, motivo: `${s.motivo} · conta já lançada em Contas pagas por nós (${de.tipo} de ${C.compBr(de.competencia)}): só ligar` } : s;
 }
 
 const classificacaoDaOrigem = (origem) => ({ despesa: 'conta_imovel', avulso: 'conta_imovel', iptu: 'iptu', guia_imposto: 'imposto' }[(origem || {}).tipo] || 'outro');
 
 /** A outra ponta de uma transferência entre as nossas contas: mesmo valor, tipo oposto, outra conta, até 1 dia de diferença, ainda sem par. */
-export function parDaTransferencia(d, mov) {
-  return (d.movimentacoes_banco || []).find((m) => m.id !== mov.id && m.conta_id !== mov.conta_id && m.valor === mov.valor && m.tipo !== mov.tipo
-    && Math.abs(C.diasEntre(m.data, mov.data)) <= 1 && !m.par_movimentacao_id && (!m.classificacao || m.classificacao === 'transferencia')
-    && /TRANSFER|PIX|TED/.test(`${m.categoria_banco || ''} ${textoDaMov(m)}`)) || null;
+export function parDaTransferencia(d, mov, indice = null) {
+  const candidatas = indice && indice.pontas ? indice.pontas().get(mov.valor) || [] : (d.movimentacoes_banco || []).filter((m) => m.valor === mov.valor);
+  return candidatas.find((m) => m.id !== mov.id && m.conta_id !== mov.conta_id && m.valor === mov.valor && m.tipo !== mov.tipo
+    && Math.abs(C.diasEntre(m.data, mov.data)) <= 1 && podeSerPonta(m)) || null;
 }
 
 // --------------------------------------------------------------------------
