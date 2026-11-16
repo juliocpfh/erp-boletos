@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-DGnXxGGvWbJcNWKg9tQ3QsIMPl/4m/lDe+4+S7N65Z8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-L6CSQWMdgfOGwRwff+nXCFM161rJU52nKmO2bLE9Mg8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="e769c9f08c3d2f88">
+<meta name="fontes" content="149534e89271a844">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1557,6 +1557,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           explica: 'O sistema diz o que imprimir para a pasta de papel do inquilino: no fim da entrada (etapa "Montar a pasta física"), quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída, e guarda o que já está em papel. Ex.: Ana assina o termo aditivo nº 2 em 10/02/2027 → aviso "1 documento novo para a pasta física".',
           consequencia: 'Não: some a etapa da entrada, os avisos e a lista Arquivo impresso; a saída volta à etapa simples "Arquivo físico" (marcada à mão). O que já foi marcado como impresso fica guardado e volta se religar.',
           lei: "Código Civil, art. 205 (prazo geral de 10 anos: por isso a pasta fica guardada 10 anos depois da saída); LGPD (Lei 13.709/2018), arts. 6º, III, e 46 (guardar só o necessário e com segurança, também no papel: a pasta não leva documentos de renda)."
+        },
+        // decisão do dono em 2026-11-16: compactar sozinho ao anexar, sem perguntar e sem guardar o original (compactar.js)
+        {
+          chave: "compactar_anexos",
+          grupo: "rotina",
+          rotulo: "Compactar anexos (fotos e PDFs escaneados)",
+          tipo: "simnao",
+          padrao: true,
+          explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos da ficha em análise ficam como chegaram (a conferência de montagem olha dentro do arquivo). Os que já estavam no sistema: botão "Compactar os anexos" em Dados e backup.',
+          consequencia: "Não: os arquivos são guardados como chegaram (ocupam mais espaço e demoram mais para abrir no celular). Os que já foram compactados não voltam ao tamanho de antes.",
+          lei: "Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020)."
         },
         {
           chave: "dias_ficha_parada",
@@ -10278,6 +10289,589 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
   });
 
+  // docs/js/conferir-pdf.js
+  function textoDoPdf(bruto) {
+    let b = [];
+    const t = String(bruto || "").trim();
+    if (t.startsWith("<") && !t.startsWith("<<")) {
+      const h = t.slice(1, t.indexOf(">") > 0 ? t.indexOf(">") : void 0).replace(/\s+/g, "");
+      for (let i = 0; i < h.length; i += 2) b.push(parseInt(h.slice(i, i + 2).padEnd(2, "0"), 16));
+    } else {
+      const s = t.startsWith("(") ? t.slice(1, t.lastIndexOf(")") > 0 ? t.lastIndexOf(")") : void 0) : t;
+      for (let i = 0; i < s.length; i += 1) {
+        const c = s[i];
+        if (c !== "\\") {
+          b.push(s.charCodeAt(i) & 255);
+          continue;
+        }
+        const n = s[i + 1];
+        i += 1;
+        if (/[0-7]/.test(n)) {
+          let o = n;
+          while (o.length < 3 && /[0-7]/.test(s[i + 1])) {
+            i += 1;
+            o += s[i];
+          }
+          b.push(parseInt(o, 8) & 255);
+        } else b.push({ n: 10, r: 13, t: 9, b: 8, f: 12 }[n] ?? n.charCodeAt(0));
+      }
+    }
+    if (b[0] === 254 && b[1] === 255) {
+      let s = "";
+      for (let i = 2; i + 1 < b.length; i += 2) s += String.fromCharCode(b[i] << 8 | b[i + 1]);
+      return s.trim();
+    }
+    return new TextDecoder("latin1").decode(new Uint8Array(b)).trim();
+  }
+  function dataDoPdf(t) {
+    const x = String(t || "");
+    const iso2 = x.match(/(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (iso2) {
+      const [, a2, me2, d3, h2 = "00", mi2 = "00", s2 = "00"] = iso2;
+      return `${a2}-${me2}-${d3}T${h2}:${mi2}:${s2}`;
+    }
+    const m = x.match(/(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
+    if (!m) return null;
+    const [, a, me = "01", d2 = "01", h = "00", mi = "00", s = "00"] = m;
+    return `${a}-${me}-${d2}T${h}:${mi}:${s}`;
+  }
+  function chaveDoPdf(texto3, chave) {
+    const re = new RegExp(`/${chave}\\s*(\\((?:\\\\.|[^\\\\)])*\\)|<[0-9A-Fa-f\\s]*>)`, "g");
+    const out = [];
+    for (let m = re.exec(texto3); m; m = re.exec(texto3)) out.push(textoDoPdf(m[1]));
+    return out;
+  }
+  async function abrirTrechos(bytes2, texto3, limite = 4 * 1024 * 1024) {
+    if (typeof DecompressionStream === "undefined") return "";
+    const out = [];
+    let total = 0;
+    const re = /stream\r?\n/g;
+    for (let m = re.exec(texto3); m && total < limite; m = re.exec(texto3)) {
+      if (m.index >= 3 && texto3.slice(m.index - 3, m.index) === "end") continue;
+      const ini = m.index + m[0].length;
+      let fim = texto3.indexOf("endstream", ini);
+      if (fim < 0) break;
+      const depois = fim;
+      while (fim > ini && /[\r\n]/.test(texto3[fim - 1])) fim -= 1;
+      const antes = texto3.slice(Math.max(0, m.index - 300), m.index);
+      if (!/\/FlateDecode/.test(antes) || !/\/(ObjStm|Metadata|XRef)|\/Type\s*\/Metadata/.test(antes)) {
+        re.lastIndex = depois;
+        continue;
+      }
+      try {
+        const ds = new DecompressionStream("deflate");
+        const w = ds.writable.getWriter();
+        w.write(bytes2.slice(ini, fim)).catch(() => {
+        });
+        w.close().catch(() => {
+        });
+        const buf = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+        total += buf.length;
+        out.push(latin(buf));
+      } catch {
+      }
+      re.lastIndex = depois;
+    }
+    return out.join("\n");
+  }
+  function nomesDoCertificado(hex2) {
+    const h = String(hex2 || "").replace(/[^0-9a-f]/gi, "").toLowerCase();
+    const nomes = [];
+    for (let i = h.indexOf("0603550403"); i >= 0; i = h.indexOf("0603550403", i + 10)) {
+      const tipo = h.slice(i + 10, i + 12);
+      const tam = parseInt(h.slice(i + 12, i + 14), 16);
+      if (!tam || tam > 120) continue;
+      const bytes2 = h.slice(i + 14, i + 14 + tam * 2).match(/../g) || [];
+      const b = Uint8Array.from(bytes2.map((x) => parseInt(x, 16)));
+      const nome = tipo === "1e" ? String.fromCharCode(...Array.from({ length: b.length / 2 }, (_, k) => b[2 * k] << 8 | b[2 * k + 1])) : new TextDecoder().decode(b);
+      if (nome && !nomes.includes(nome)) nomes.push(nome);
+    }
+    return nomes;
+  }
+  async function assinaturas(texto3) {
+    const out = [];
+    const re = /\/Type\s*\/Sig\b|\/ByteRange\s*\[/g;
+    const vistos = /* @__PURE__ */ new Set();
+    for (let m = re.exec(texto3); m; m = re.exec(texto3)) {
+      const ini = texto3.lastIndexOf("<<", m.index);
+      const obj = Math.max(texto3.lastIndexOf(" obj", m.index), 0);
+      const fimObj = texto3.indexOf("endobj", m.index);
+      const trecho = texto3.slice(obj, fimObj < 0 ? m.index + 2e5 : fimObj);
+      const rel = trecho.indexOf("/Contents");
+      const contents = rel < 0 ? -1 : obj + rel;
+      if (contents < 0) continue;
+      const abre = texto3.indexOf("<", contents + 9);
+      const fecha = texto3.indexOf(">", abre + 1);
+      if (abre < 0 || fecha < 0 || vistos.has(abre)) continue;
+      vistos.add(abre);
+      const hex2 = texto3.slice(abre + 1, fecha);
+      const dic = texto3.slice(ini, Math.min(texto3.length, Math.max(fecha + 400, m.index + 400)));
+      const certs = nomesDoCertificado(hex2);
+      const emissores = certs.filter(ehAutoridade);
+      const govbr = emissores.some((c) => /governo federal do brasil/i.test(c));
+      const icp = !govbr && emissores.some((c) => /icp-brasil|serasa|certisign|soluti|valid|serpro|safeweb|digitalsign|caixa|receita federal|\brfb\b/i.test(c));
+      const pessoa2 = certs.find((c) => !ehAutoridade(c)) || "";
+      const nome = (pessoa2.replace(/:\d{11,14}$/, "") || chaveDoPdf(dic, "Name")[0] || "").trim();
+      out.push({ nome, data: dataDoPdf(chaveDoPdf(dic, "M")[0]), govbr, icp, certificados: certs, fim: fecha });
+    }
+    return out;
+  }
+  async function conferirArquivo(entrada) {
+    const bytes2 = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
+    const sinais = [];
+    if (bytes2[0] === 255 && bytes2[1] === 216 || bytes2[0] === 137 && bytes2[1] === 80) {
+      const t = latin(bytes2.slice(0, 256 * 1024));
+      const prog = (t.match(/(Adobe Photoshop[^\0<]{0,40}|GIMP[^\0<]{0,20}|Canva|Pixelmator[^\0<]{0,20}|Snapseed|PicsArt|Lightroom[^\0<]{0,20})/i) || [])[1] || "";
+      if (prog) sinais.push({ nivel: "alerta", texto: `Foto passou pelo programa "${prog.trim()}" (edição de imagem). Peça o documento original.` });
+      return { tipo: bytes2[0] === 255 ? "jpg" : "png", programa: prog.trim(), criado: null, alterado: null, sinais, assinaturas: [] };
+    }
+    if (!(bytes2[0] === 37 && bytes2[1] === 80 && bytes2[2] === 68 && bytes2[3] === 70)) return { tipo: null, programa: "", criado: null, alterado: null, sinais: [{ nivel: "atencao", texto: "Não é PDF nem foto." }], assinaturas: [] };
+    const texto3 = latin(bytes2);
+    const dentro = await abrirTrechos(bytes2, texto3);
+    const tudo = `${texto3}
+${dentro}`;
+    const xmp = (re) => (tudo.match(re) || [])[1] || "";
+    const produtor = [...chaveDoPdf(tudo, "Producer"), xmp(/<pdf:Producer>([^<]+)</)].filter(Boolean);
+    const criador = [...chaveDoPdf(tudo, "Creator"), xmp(/<xmp:CreatorTool>([^<]+)</)].filter(Boolean);
+    const programas = [...new Set([...criador, ...produtor].map((x) => x.trim()).filter(Boolean))];
+    const criado = dataDoPdf(chaveDoPdf(tudo, "CreationDate")[0] || xmp(/<xmp:CreateDate>([^<]+)</));
+    const alterado = dataDoPdf(chaveDoPdf(tudo, "ModDate")[0] || xmp(/<xmp:ModifyDate>([^<]+)</));
+    const editor = programas.find((p2) => EDITORES.test(p2));
+    const escritorio = programas.find((p2) => ESCRITORIO.test(p2));
+    const impressao = programas.find((p2) => IMPRESSAO.test(p2));
+    if (editor) sinais.push({ nivel: "alerta", texto: `Feito ou alterado no programa "${editor}" (editor de PDF ou de imagem). Extrato e holerite saem do aplicativo do banco ou do sistema do empregador: peça o arquivo original e confira com a fonte.` });
+    else if (escritorio) sinais.push({ nivel: "atencao", texto: `Feito no programa "${escritorio}" (editor de texto ou planilha). Holerite de empresa pequena pode sair assim; extrato de banco, não. Confira com a fonte.` });
+    else if (impressao) sinais.push({ nivel: "info", texto: `PDF "impresso" de uma página (${impressao}). Comum no extrato tirado do site do banco; confira o valor com a fonte.` });
+    const sig = await assinaturas(texto3 + (dentro ? `
+${dentro}` : ""));
+    if (criado && alterado && !sig.length && Date.parse(alterado) - Date.parse(criado) > 864e5) {
+      sinais.push({ nivel: "info", texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
+    }
+    const posicoes = [...texto3.matchAll(/%%EOF/g)].map((x) => x.index);
+    const ultimaAssinatura = sig.length ? Math.max(...sig.map((s) => s.fim)) : -1;
+    const linearizado = /\/Linearized\b/.test(texto3.slice(0, 2048)) ? 1 : 0;
+    const extras = sig.length ? posicoes.filter((p2) => p2 < ultimaAssinatura).length - linearizado - sig.length : posicoes.length - 1 - linearizado;
+    if (extras > 0 && !editor) sinais.push({ nivel: "atencao", texto: `O arquivo foi salvo de novo ${extras} vez(es) depois de gerado.` });
+    return { tipo: "pdf", programa: programas.join(" · "), criado, alterado, sinais, assinaturas: sig.map(({ fim, ...s }) => s) };
+  }
+  async function pdfTemAssinatura(entrada) {
+    const bytes2 = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
+    const texto3 = latin(bytes2);
+    if (SINAIS_ASSINATURA.test(texto3)) return true;
+    if (typeof DecompressionStream === "undefined" && /\/ObjStm\b/.test(texto3)) return true;
+    return SINAIS_ASSINATURA.test(await abrirTrechos(bytes2, texto3, 16 * 1024 * 1024));
+  }
+  function mesmoNome(a, b) {
+    const pal = (t) => nomeComparavel(t).split(" ").filter((p2) => p2.length > 2 && !["das", "dos", "del"].includes(p2));
+    const x = pal(a);
+    const y = pal(b);
+    if (!x.length || !y.length) return false;
+    const comuns = x.filter((p2) => y.includes(p2)).length;
+    return comuns >= (x.length === 1 && y.length === 1 ? 1 : 2) && (x.every((p2) => y.includes(p2)) || y.every((p2) => x.includes(p2)));
+  }
+  var EDITORES, ESCRITORIO, IMPRESSAO, latin, ehAutoridade, SINAIS_ASSINATURA, nomeComparavel;
+  var init_conferir_pdf = __esm({
+    "docs/js/conferir-pdf.js"() {
+      EDITORES = /canva|ilovepdf|smallpdf|sejda|pdfescape|pdfelement|wondershare|pdf24|pdf-xchange|nitro|foxit (phantom|pdf editor)|photoshop|gimp|inkscape|pixelmator|soda ?pdf|pdffiller|dochub|online2pdf|pdf ?candy|pdfsam|pdf editor|corel|affinity|paint\.net|gerador|fake|acrobat (pro|standard|dc)|pdf expert|xodo|lightpdf|pdfgear|pdf2go|hipdf|sodapdf|libreoffice draw/i;
+      ESCRITORIO = /microsoft.*(word|excel|powerpoint)|libreoffice|openoffice|google docs|wps office|pages|keynote|numbers/i;
+      IMPRESSAO = /skia\/pdf|chrom|microsoft: print to pdf|quartz pdfcontext|mac os x .*quartz|cairo|wkhtmltopdf|safari|firefox/i;
+      latin = (bytes2) => {
+        let s = "";
+        for (let i = 0; i < bytes2.length; i += 1) s += String.fromCharCode(bytes2[i]);
+        return s;
+      };
+      ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
+      SINAIS_ASSINATURA = /\/ByteRange\s*\[|\/Type\s*\/Sig\b|\/FT\s*\/Sig\b|\/SigFlags\b|\/DocMDP\b|\/Perms\b|\/DocTimeStamp\b|adbe\.pkcs7|adbe\.x509|ETSI\.CAdES|ETSI\.RFC3161|\/Encrypt\b/;
+      nomeComparavel = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+    }
+  });
+
+  // docs/js/visualizador.js
+  var visualizador_exports = {};
+  __export(visualizador_exports, {
+    carregarPdfJs: () => carregarPdfJs,
+    usarVisualizador: () => usarVisualizador,
+    visualizar: () => visualizar
+  });
+  function carregarPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    carregando = carregando || new Promise((ok, erro) => {
+      const s = document.createElement("script");
+      s.src = PDFJS;
+      s.onload = () => window.pdfjsLib ? ok(window.pdfjsLib) : erro(new Error("pdf.js não carregou"));
+      s.onerror = () => {
+        carregando = null;
+        erro(new Error("Não consegui carregar o leitor de PDF."));
+      };
+      document.head.appendChild(s);
+    });
+    return carregando.then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_TRABALHO;
+      return lib;
+    });
+  }
+  function usarVisualizador() {
+    if (location.protocol === "file:") return false;
+    return !!window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
+  }
+  function fechar(janela2, urls2, voltar = true) {
+    if (janela2.fechada) return;
+    janela2.fechada = true;
+    janela2.remove();
+    urls2.forEach((u) => URL.revokeObjectURL(u));
+    document.body.classList.remove("com-visualizador");
+    document.removeEventListener("keydown", janela2.teclado);
+    window.removeEventListener("popstate", janela2.aoVoltar);
+    if (voltar && janela2.marca && history.state && history.state.visualizador === janela2.marca) history.back();
+  }
+  async function visualizar(blob, nome, tipo, baixar2) {
+    const urls2 = [];
+    const janela2 = document.createElement("div");
+    janela2.className = "visualizador nao-imprimir";
+    janela2.setAttribute("role", "dialog");
+    janela2.setAttribute("aria-modal", "true");
+    janela2.innerHTML = `<div class="vis-topo"><span class="vis-nome"></span><button type="button" class="botao secundario pequeno" data-vis="baixar">Baixar</button><button type="button" class="botao pequeno" data-vis="fechar" aria-label="Fechar">✕ Fechar</button></div><div class="vis-corpo"><p class="vis-aviso">Abrindo…</p></div>`;
+    janela2.querySelector(".vis-nome").textContent = nome;
+    janela2.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-vis]");
+      if (!b) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (b.dataset.vis === "fechar") fechar(janela2, urls2);
+      else baixar2(blob, nome);
+    });
+    janela2.teclado = (ev) => {
+      if (ev.key === "Escape") fechar(janela2, urls2);
+    };
+    document.addEventListener("keydown", janela2.teclado);
+    document.querySelector(".visualizador")?.fecharSemVoltar?.();
+    janela2.aoVoltar = () => fechar(janela2, urls2, false);
+    janela2.fecharSemVoltar = janela2.aoVoltar;
+    try {
+      const marca2 = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (history.state && history.state.visualizador) history.replaceState({ visualizador: marca2 }, "");
+      else history.pushState({ visualizador: marca2 }, "");
+      janela2.marca = marca2;
+      window.addEventListener("popstate", janela2.aoVoltar);
+    } catch {
+    }
+    document.body.appendChild(janela2);
+    document.body.classList.add("com-visualizador");
+    const corpo = janela2.querySelector(".vis-corpo");
+    try {
+      if (tipo.startsWith("image/")) {
+        const u = URL.createObjectURL(new Blob([blob], { type: tipo }));
+        urls2.push(u);
+        const img = document.createElement("img");
+        img.alt = nome;
+        img.src = u;
+        corpo.replaceChildren(img);
+        return;
+      }
+      const lib = await carregarPdfJs();
+      const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
+      corpo.replaceChildren();
+      const largura = Math.max(320, corpo.clientWidth - 16);
+      const nitidez = Math.min(window.devicePixelRatio || 1, 2);
+      const paginas = [];
+      for (let n = 1; n <= pdf.numPages; n += 1) {
+        if (!janela2.isConnected) return;
+        const pagina = await pdf.getPage(n);
+        const escala = largura / pagina.getViewport({ scale: 1 }).width;
+        const vista = pagina.getViewport({ scale: escala * nitidez });
+        const tela = document.createElement("canvas");
+        tela.width = Math.floor(vista.width);
+        tela.height = Math.floor(vista.height);
+        tela.style.width = `${Math.floor(vista.width / nitidez)}px`;
+        tela.style.height = `${Math.floor(vista.height / nitidez)}px`;
+        corpo.appendChild(tela);
+        paginas.push({ pagina, vista, tela });
+      }
+      for (const { pagina, vista, tela } of paginas) {
+        if (!janela2.isConnected) return;
+        await pagina.render({ canvasContext: tela.getContext("2d"), viewport: vista }).promise;
+      }
+      pdf.destroy?.();
+    } catch (e) {
+      const p2 = document.createElement("p");
+      p2.className = "vis-aviso";
+      p2.textContent = `Não consegui mostrar o arquivo (${e.message}). Use o botão Baixar.`;
+      corpo.replaceChildren(p2);
+    }
+  }
+  var PDFJS, PDFJS_TRABALHO, carregando;
+  var init_visualizador = __esm({
+    "docs/js/visualizador.js"() {
+      PDFJS = "vendor/pdf.min.js";
+      PDFJS_TRABALHO = "vendor/pdf.worker.min.js";
+      carregando = null;
+    }
+  });
+
+  // docs/js/compactar.js
+  function tipoPelosBytes(b) {
+    if (!b || b.length < 12) return null;
+    if (b[0] === 255 && b[1] === 216 && b[2] === 255) return "jpg";
+    if (b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71) return "png";
+    if (b[0] === 37 && b[1] === 80 && b[2] === 68 && b[3] === 70) return "pdf";
+    const s = (i, n) => String.fromCharCode(...b.slice(i, i + n));
+    if (s(0, 4) === "RIFF" && s(8, 4) === "WEBP") return "webp";
+    if (s(0, 3) === "GIF") return "gif";
+    if (s(4, 4) === "ftyp" && /^(heic|heix|hevc|heim|heis|mif1|msf1)$/.test(s(8, 4))) return "heic";
+    return null;
+  }
+  function medidasReduzidas(largura, altura, maximo = LADO_MAXIMO) {
+    const escala = Math.min(1, maximo / Math.max(largura, altura, 1));
+    return { largura: Math.max(1, Math.round(largura * escala)), altura: Math.max(1, Math.round(altura * escala)), escala };
+  }
+  function trocarExtensao(nome, ext) {
+    const p2 = nome.lastIndexOf(".");
+    return `${p2 > 0 ? nome.slice(0, p2) : nome}${ext}`;
+  }
+  function montarPdfDeImagens(paginas) {
+    const enc = new TextEncoder();
+    const partes = [];
+    let pos = 0;
+    const offsets = [];
+    const por = (x) => {
+      const b = typeof x === "string" ? enc.encode(x) : x;
+      partes.push(b);
+      pos += b.length;
+    };
+    const objeto = (n2, corpo, fluxo) => {
+      offsets[n2] = pos;
+      por(`${n2} 0 obj
+${corpo}
+`);
+      if (fluxo) {
+        por("stream\n");
+        por(fluxo);
+        por("\nendstream\n");
+      }
+      por("endobj\n");
+    };
+    por(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10, 37, 226, 227, 207, 211, 10]));
+    const n = paginas.length;
+    const kids = paginas.map((_, i) => `${3 + i * 3} 0 R`).join(" ");
+    objeto(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    objeto(2, `<< /Type /Pages /Kids [${kids}] /Count ${n} >>`);
+    paginas.forEach((p2, i) => {
+      const pg = 3 + i * 3;
+      const im = pg + 1;
+      const ct = pg + 2;
+      const w = num(p2.largura);
+      const h = num(p2.altura);
+      objeto(pg, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${ct} 0 R >>`);
+      objeto(im, `<< /Type /XObject /Subtype /Image /Width ${p2.px} /Height ${p2.py} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p2.jpeg.length} >>`, p2.jpeg);
+      const conteudo = enc.encode(`q ${w} 0 0 ${h} 0 0 cm /Im0 Do Q`);
+      objeto(ct, `<< /Length ${conteudo.length} >>`, conteudo);
+    });
+    const total = 3 + n * 3;
+    const xref = pos;
+    let tabela = `xref
+0 ${total}
+0000000000 65535 f 
+`;
+    for (let i = 1; i < total; i += 1) tabela += `${String(offsets[i]).padStart(10, "0")} 00000 n 
+`;
+    por(`${tabela}trailer
+<< /Size ${total} /Root 1 0 R >>
+startxref
+${xref}
+%%EOF
+`);
+    const out = new Uint8Array(pos);
+    let o = 0;
+    for (const b of partes) {
+      out.set(b, o);
+      o += b.length;
+    }
+    return out;
+  }
+  function emBlob(canvas, tipo, qualidade) {
+    return new Promise((ok) => {
+      canvas.toBlob((b) => ok(b), tipo, qualidade);
+    });
+  }
+  function telaBranca(largura, altura) {
+    const cv = document.createElement("canvas");
+    cv.width = largura;
+    cv.height = altura;
+    const g = cv.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, largura, altura);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = "high";
+    return { cv, g };
+  }
+  async function abrirFoto(blob) {
+    if (typeof createImageBitmap === "function") {
+      try {
+        return await createImageBitmap(blob, { imageOrientation: "from-image" });
+      } catch {
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    try {
+      return await new Promise((ok, falha) => {
+        const i = new Image();
+        i.onload = () => ok(i);
+        i.onerror = () => falha(new Error("foto não abre"));
+        i.src = url;
+      });
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+  }
+  async function compactarFoto(blob, tipo, saida = "jpg") {
+    const img = await abrirFoto(blob);
+    try {
+      const largura = img.naturalWidth || img.width;
+      const altura = img.naturalHeight || img.height;
+      const m = medidasReduzidas(largura, altura);
+      if (saida === "png" && m.escala >= 1) return null;
+      const { cv, g } = telaBranca(m.largura, m.altura);
+      g.drawImage(img, 0, 0, m.largura, m.altura);
+      const novo = await emBlob(cv, MIME[saida], saida === "png" ? void 0 : QUALIDADE_FOTO);
+      cv.width = 0;
+      cv.height = 0;
+      return novo && compensa(blob.size, novo.size) ? novo : null;
+    } finally {
+      img.close?.();
+    }
+  }
+  async function pdfJs() {
+    const V = await Promise.resolve().then(() => (init_visualizador(), visualizador_exports));
+    return V.carregarPdfJs();
+  }
+  async function compactarPdf(blob, aoAndar = () => {
+  }) {
+    const bytes2 = new Uint8Array(await blob.arrayBuffer());
+    if (await pdfTemAssinatura(bytes2)) return null;
+    if (typeof location !== "undefined" && location.protocol === "file:") return null;
+    const lib = await pdfJs();
+    const doc = await lib.getDocument({ data: bytes2.slice(), isEvalSupported: false }).promise;
+    try {
+      const { info } = await doc.getMetadata().catch(() => ({ info: {} }));
+      if (info && (info.IsSignaturesPresent || info.IsAcroFormPresent || info.IsXFAPresent || info.IsCollectionPresent)) return null;
+      if (doc.numPages < 1 || doc.numPages > MAX_PAGINAS) return null;
+      const OPS = lib.OPS;
+      const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== void 0));
+      for (let i = 1; i <= doc.numPages; i += 1) {
+        const p2 = await doc.getPage(i);
+        const t = await p2.getTextContent();
+        if (t.items.some((x) => x.str && x.str.trim())) return null;
+        if ((await p2.getAnnotations()).length) return null;
+        const ops = await p2.getOperatorList({ intent: "print" });
+        if (!ops.fnArray.some((f) => imagens.has(f))) return null;
+        p2.cleanup();
+      }
+      const paginas = [];
+      let total = 0;
+      for (let i = 1; i <= doc.numPages; i += 1) {
+        aoAndar(i, doc.numPages);
+        const p2 = await doc.getPage(i);
+        const um = p2.getViewport({ scale: 1 });
+        const escala = Math.min(LADO_MAXIMO / Math.max(um.width, um.height), DPI_MAXIMO / 72);
+        const vista = p2.getViewport({ scale: escala });
+        const { cv, g } = telaBranca(Math.max(1, Math.round(vista.width)), Math.max(1, Math.round(vista.height)));
+        await p2.render({ canvasContext: g, viewport: vista, intent: "print" }).promise;
+        const jpeg = await emBlob(cv, "image/jpeg", QUALIDADE_PDF);
+        if (!jpeg) return null;
+        const b = new Uint8Array(await jpeg.arrayBuffer());
+        total += b.length;
+        if (total > blob.size * GANHO_MINIMO) return null;
+        paginas.push({ largura: um.width, altura: um.height, px: cv.width, py: cv.height, jpeg: b });
+        cv.width = 0;
+        cv.height = 0;
+        p2.cleanup();
+      }
+      const novo = new Blob([montarPdfDeImagens(paginas)], { type: "application/pdf" });
+      return compensa(blob.size, novo.size) ? novo : null;
+    } finally {
+      doc.destroy();
+    }
+  }
+  async function compactarTodos(raiz, { ler: ler2, gravar: gravar2, compactar = compactarAnexo, aoAndar = () => {
+  } }) {
+    const lista3 = [];
+    const juntar2 = async (dir, nivel) => {
+      for await (const [nome, h] of dir.entries()) {
+        if (h.kind === "directory") {
+          if (!(nivel === 0 && nome === PASTA_FICHAS)) await juntar2(h, nivel + 1);
+          continue;
+        }
+        const tamanho2 = h.tamanho ?? (await h.getFile()).size;
+        if (candidato(nome, tamanho2)) lista3.push({ dir, nome, h });
+      }
+    };
+    await juntar2(raiz, 0);
+    const r = { vistos: lista3.length, compactados: 0, antes: 0, depois: 0, falhas: 0 };
+    for (let i = 0; i < lista3.length; i += 1) {
+      const { dir, nome, h } = lista3[i];
+      try {
+        const f = await ler2(h);
+        const c = await compactar(f, { manterNome: true });
+        if (c.mudou) {
+          await gravar2(dir, nome, c.arquivo);
+          r.compactados += 1;
+          r.antes += c.antes;
+          r.depois += c.depois;
+        }
+      } catch (e) {
+        r.falhas += 1;
+        console.warn(`Compactar "${nome}": ${e.message}`);
+      }
+      aoAndar({ feitos: i + 1, total: lista3.length, compactados: r.compactados, economia: r.antes - r.depois });
+    }
+    return r;
+  }
+  async function compactarAnexo(arquivo, { manterNome = false, aoAndar } = {}) {
+    const igual2 = { arquivo, antes: arquivo.size, depois: arquivo.size, mudou: false };
+    if (!temCanvas() || !arquivo || !arquivo.size) return igual2;
+    try {
+      const tipo = tipoPelosBytes(new Uint8Array(await arquivo.slice(0, 16).arrayBuffer()));
+      let novo = null;
+      let nome = arquivo.name;
+      if (tipo === "pdf") {
+        if (arquivo.size < MINIMO_PDF) return igual2;
+        novo = await compactarPdf(arquivo, aoAndar);
+      } else if (["jpg", "png", "webp", "heic"].includes(tipo)) {
+        if (arquivo.size < MINIMO_FOTO) return igual2;
+        const saida = manterNome ? tipo === "heic" ? null : tipo : "jpg";
+        if (!saida) return igual2;
+        novo = await compactarFoto(arquivo, tipo, saida);
+        if (novo && !manterNome && tipo !== "jpg") nome = trocarExtensao(nome, ".jpg");
+      }
+      if (!novo) return igual2;
+      return { arquivo: new File([novo], nome, { type: novo.type }), antes: arquivo.size, depois: novo.size, mudou: true };
+    } catch (e) {
+      console.warn(`Compactação de "${arquivo.name}" não feita: ${e.message}`);
+      return igual2;
+    }
+  }
+  var LADO_MAXIMO, QUALIDADE_FOTO, QUALIDADE_PDF, DPI_MAXIMO, GANHO_MINIMO, MINIMO_FOTO, MINIMO_PDF, MAX_PAGINAS, compensa, MIME, num, temCanvas, PASTA_FICHAS, CANDIDATO, candidato;
+  var init_compactar = __esm({
+    "docs/js/compactar.js"() {
+      init_conferir_pdf();
+      LADO_MAXIMO = 2e3;
+      QUALIDADE_FOTO = 0.8;
+      QUALIDADE_PDF = 0.75;
+      DPI_MAXIMO = 200;
+      GANHO_MINIMO = 0.85;
+      MINIMO_FOTO = 200 * 1024;
+      MINIMO_PDF = 300 * 1024;
+      MAX_PAGINAS = 80;
+      compensa = (antes, depois) => depois > 0 && depois <= antes * GANHO_MINIMO;
+      MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+      num = (x) => (Math.round(x * 100) / 100).toString();
+      temCanvas = () => typeof document !== "undefined" && typeof document.createElement === "function";
+      PASTA_FICHAS = "Fichas em analise";
+      CANDIDATO = /\.(jpe?g|png|webp|heic|pdf)$/i;
+      candidato = (nome, tamanho2) => CANDIDATO.test(nome) && tamanho2 >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
+    }
+  });
+
   // docs/js/armazenamento.js
   var armazenamento_exports = {};
   __export(armazenamento_exports, {
@@ -10376,7 +10970,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     if (dados.formato !== "imoveis-v1") throw new Error(`${ARQUIVO_BANCO} não é um banco deste sistema.`);
     const banco = normalizar(dados);
-    if (banco && typeof banco === "object" && Number.isFinite(arq.lastModified)) assinaturas.set(banco, assinaturaDoArquivo(arq));
+    if (banco && typeof banco === "object" && Number.isFinite(arq.lastModified)) assinaturas2.set(banco, assinaturaDoArquivo(arq));
     return banco;
   }
   async function escreverTexto(dir, nome, conteudo) {
@@ -10431,8 +11025,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const ext = (String(nome || "").match(/\.([a-z0-9]+)$/i) || [])[1];
     return ext && TIPOS_ABRIR[ext.toLowerCase()] || "";
   }
-  async function salvarArquivo(dir, arquivo) {
+  async function salvarArquivo(dir, arquivo, { compactar = true } = {}) {
     if (!nomeAnexavel(arquivo.name)) throw new ErroUsuario(ERRO_TIPO_ARQUIVO);
+    if (compactar && regra("compactar_anexos")) arquivo = (await compactarAnexo(arquivo)).arquivo;
     const nome = limparNome(arquivo.name);
     const ponto = nome.lastIndexOf(".");
     const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ""];
@@ -10707,11 +11302,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for await (const [nome, h] of dir.entries()) if (h.kind === "directory") nomes.push(nome);
     return nomes;
   }
-  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR;
+  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR;
   var init_armazenamento = __esm({
     "docs/js/armazenamento.js"() {
       init_calculos();
       init_regras();
+      init_config_regras();
+      init_compactar();
       ARQUIVO_BANCO = "imoveis-dados.json";
       PASTA_ARQUIVOS = "arquivos";
       PASTA_BACKUPS = "backups";
@@ -10728,8 +11325,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ponteLembrada = () => idbOp("readonly", (s) => s.get("ponte")).catch(() => null);
       esquecerPonte = () => idbOp("readwrite", (s) => s.delete("ponte"));
       assinaturaDoArquivo = (arq) => `${arq.lastModified}:${arq.size}`;
-      assinaturas = /* @__PURE__ */ new WeakMap();
-      assinaturaLida = (dados) => assinaturas.get(dados) || null;
+      assinaturas2 = /* @__PURE__ */ new WeakMap();
+      assinaturaLida = (dados) => assinaturas2.get(dados) || null;
       EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
       ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.";
       TIPOS_ABRIR = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
@@ -13280,128 +13877,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
   });
 
-  // docs/js/visualizador.js
-  var visualizador_exports = {};
-  __export(visualizador_exports, {
-    carregarPdfJs: () => carregarPdfJs,
-    usarVisualizador: () => usarVisualizador,
-    visualizar: () => visualizar
-  });
-  function carregarPdfJs() {
-    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
-    carregando = carregando || new Promise((ok, erro) => {
-      const s = document.createElement("script");
-      s.src = PDFJS;
-      s.onload = () => window.pdfjsLib ? ok(window.pdfjsLib) : erro(new Error("pdf.js não carregou"));
-      s.onerror = () => {
-        carregando = null;
-        erro(new Error("Não consegui carregar o leitor de PDF."));
-      };
-      document.head.appendChild(s);
-    });
-    return carregando.then((lib) => {
-      lib.GlobalWorkerOptions.workerSrc = PDFJS_TRABALHO;
-      return lib;
-    });
-  }
-  function usarVisualizador() {
-    if (location.protocol === "file:") return false;
-    return !!window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
-  }
-  function fechar(janela2, urls2, voltar = true) {
-    if (janela2.fechada) return;
-    janela2.fechada = true;
-    janela2.remove();
-    urls2.forEach((u) => URL.revokeObjectURL(u));
-    document.body.classList.remove("com-visualizador");
-    document.removeEventListener("keydown", janela2.teclado);
-    window.removeEventListener("popstate", janela2.aoVoltar);
-    if (voltar && janela2.marca && history.state && history.state.visualizador === janela2.marca) history.back();
-  }
-  async function visualizar(blob, nome, tipo, baixar2) {
-    const urls2 = [];
-    const janela2 = document.createElement("div");
-    janela2.className = "visualizador nao-imprimir";
-    janela2.setAttribute("role", "dialog");
-    janela2.setAttribute("aria-modal", "true");
-    janela2.innerHTML = `<div class="vis-topo"><span class="vis-nome"></span><button type="button" class="botao secundario pequeno" data-vis="baixar">Baixar</button><button type="button" class="botao pequeno" data-vis="fechar" aria-label="Fechar">✕ Fechar</button></div><div class="vis-corpo"><p class="vis-aviso">Abrindo…</p></div>`;
-    janela2.querySelector(".vis-nome").textContent = nome;
-    janela2.addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-vis]");
-      if (!b) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      if (b.dataset.vis === "fechar") fechar(janela2, urls2);
-      else baixar2(blob, nome);
-    });
-    janela2.teclado = (ev) => {
-      if (ev.key === "Escape") fechar(janela2, urls2);
-    };
-    document.addEventListener("keydown", janela2.teclado);
-    document.querySelector(".visualizador")?.fecharSemVoltar?.();
-    janela2.aoVoltar = () => fechar(janela2, urls2, false);
-    janela2.fecharSemVoltar = janela2.aoVoltar;
-    try {
-      const marca2 = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      if (history.state && history.state.visualizador) history.replaceState({ visualizador: marca2 }, "");
-      else history.pushState({ visualizador: marca2 }, "");
-      janela2.marca = marca2;
-      window.addEventListener("popstate", janela2.aoVoltar);
-    } catch {
-    }
-    document.body.appendChild(janela2);
-    document.body.classList.add("com-visualizador");
-    const corpo = janela2.querySelector(".vis-corpo");
-    try {
-      if (tipo.startsWith("image/")) {
-        const u = URL.createObjectURL(new Blob([blob], { type: tipo }));
-        urls2.push(u);
-        const img = document.createElement("img");
-        img.alt = nome;
-        img.src = u;
-        corpo.replaceChildren(img);
-        return;
-      }
-      const lib = await carregarPdfJs();
-      const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
-      corpo.replaceChildren();
-      const largura = Math.max(320, corpo.clientWidth - 16);
-      const nitidez = Math.min(window.devicePixelRatio || 1, 2);
-      const paginas = [];
-      for (let n = 1; n <= pdf.numPages; n += 1) {
-        if (!janela2.isConnected) return;
-        const pagina = await pdf.getPage(n);
-        const escala = largura / pagina.getViewport({ scale: 1 }).width;
-        const vista = pagina.getViewport({ scale: escala * nitidez });
-        const tela = document.createElement("canvas");
-        tela.width = Math.floor(vista.width);
-        tela.height = Math.floor(vista.height);
-        tela.style.width = `${Math.floor(vista.width / nitidez)}px`;
-        tela.style.height = `${Math.floor(vista.height / nitidez)}px`;
-        corpo.appendChild(tela);
-        paginas.push({ pagina, vista, tela });
-      }
-      for (const { pagina, vista, tela } of paginas) {
-        if (!janela2.isConnected) return;
-        await pagina.render({ canvasContext: tela.getContext("2d"), viewport: vista }).promise;
-      }
-      pdf.destroy?.();
-    } catch (e) {
-      const p2 = document.createElement("p");
-      p2.className = "vis-aviso";
-      p2.textContent = `Não consegui mostrar o arquivo (${e.message}). Use o botão Baixar.`;
-      corpo.replaceChildren(p2);
-    }
-  }
-  var PDFJS, PDFJS_TRABALHO, carregando;
-  var init_visualizador = __esm({
-    "docs/js/visualizador.js"() {
-      PDFJS = "vendor/pdf.min.js";
-      PDFJS_TRABALHO = "vendor/pdf.worker.min.js";
-      carregando = null;
-    }
-  });
-
   // docs/js/migracao.js
   var migracao_exports = {};
   __export(migracao_exports, {
@@ -14663,12 +15138,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     return linhas2.slice(0, maxLinhas);
   }
   function linhas(f, emitente) {
-    const num = `Nº ${numeroFatura(f.numero)}`;
+    const num2 = `Nº ${numeroFatura(f.numero)}`;
     const periodo2 = `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`;
     const vazio = (n, cls = "") => [n, "", cls];
     return {
       3: [[1, "", "be bt"], [9, `<span class="f-empresa">${esc(maiusc(emitente.nome))}</span>`, "bt bd"], [3, '<b class="f-titulo">FATURA DE LOCAÇÃO</b>', "be bt bd centro"]],
-      4: [[1, "", "be"], [9, esc(emitente.razao_social), "bd f-12"], [3, `<span class="f-num">${num}</span>`, "be bd centro topo"]],
+      4: [[1, "", "be"], [9, esc(emitente.razao_social), "bd f-12"], [3, `<span class="f-num">${num2}</span>`, "be bd centro topo"]],
       5: [[1, "", "be"], [9, esc(emitente.cnpj ? `CNPJ ${emitente.cnpj}` : ""), "bd f-12"], [3, `<span class="f-12 f-light">Emissão: ${dataBr(f.emissao)}</span>`, "be bd centro topo"]],
       6: [[1, "", "be bb"], [9, esc(emitente.endereco || ""), "bd bb f-12 f-light"], [3, "", "be bd bb"]],
       7: [vazio(13, "be bd bt bb")],
@@ -14689,7 +15164,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       ...Object.fromEntries([27, 28, 29, 30, 31].map((r, n) => [r, [[1, "", "be"], [12, esc(linhasObservacoes(f.observacoes)[n] || ""), "bd f-11 f-light"]]])),
       32: [vazio(13, "be bd preto")],
       33: [[10, `RECEBEMOS DE ${esc(maiusc(f.tomador_nome))} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`, "be bd f-canhoto"], [3, "<b>FATURA DE LOCAÇÃO</b>", "be bd centro f-12"]],
-      34: [[4, "DATA DO RECEBIMENTO", "be bd bt f-canhoto"], [6, "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", "be bd bt f-canhoto"], [3, `<b>${num}</b>`, "be bd bt centro f-12"]],
+      34: [[4, "DATA DO RECEBIMENTO", "be bd bt f-canhoto"], [6, "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR", "be bd bt f-canhoto"], [3, `<b>${num2}</b>`, "be bd bt centro f-12"]],
       35: [[4, "", "be bd bb"], [6, "", "be bd bb"], [3, "", "be bd bb"]]
     };
   }
@@ -14749,7 +15224,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       const ws = abaDaEmpresa(wb, e, usadas);
       if (!ws) throw new Error("O modelo Excel tem menos abas do que empresas nesta fatura.");
       usadas.add(ws.id);
-      const num = `Nº ${numeroFatura(f.numero)}`;
+      const num2 = `Nº ${numeroFatura(f.numero)}`;
       const valor = f.valor / 100;
       const set = (ref, v) => {
         ws.getCell(ref).value = v;
@@ -14758,7 +15233,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       set("B4", e.razao_social || "");
       set("B5", e.cnpj ? `CNPJ ${e.cnpj}` : "");
       set("B6", e.endereco || "");
-      set("L4", num);
+      set("L4", num2);
       set("L5", `Emissão: ${dataBr(f.emissao)}`);
       set("E10", maiusc(corta2(f.tomador_nome, 60)));
       set("L10", f.tomador_telefone || "");
@@ -14771,7 +15246,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       set("M22", { formula: "K22", result: valor });
       set("M26", { formula: "M22", result: valor });
       set("A33", `RECEBEMOS DE ${maiusc(f.tomador_nome)} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`);
-      set("L34", num);
+      set("L34", num2);
       ws.pageSetup.fitToPage = true;
       ws.pageSetup.fitToWidth = 1;
       ws.pageSetup.fitToHeight = 1;
@@ -14994,7 +15469,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var pastaContador2 = () => d().config_banco && d().config_banco.pasta_contador || PASTA_CONTADOR;
   var SUB_SEGURO = "Seguro (apólices)";
   var PASTA_SEM_IMOVEL = "Sem imóvel";
-  var PASTA_FICHAS = "Fichas em analise";
+  var PASTA_FICHAS2 = "Fichas em analise";
   var nomePastaFicha = (f) => limparNome(`${f.inquilino_nome} (ficha ${dataBr(f.data_recebida || hojeIso()).replace(/\//g, "-")})`);
   function pastaPaiContrato(c) {
     const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
@@ -15017,7 +15492,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   function chavePasta(escopo, id) {
     if (escopo === "ficha") {
       const f = buscar2("fichas", id);
-      return f ? [PASTA_FICHAS, f.pasta].join("/") : null;
+      return f ? [PASTA_FICHAS2, f.pasta].join("/") : null;
     }
     if (escopoDoContrato(escopo)) {
       const c = buscar2("contratos", id);
@@ -15206,7 +15681,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       try {
         const dir = await pastaDoEscopo("contrato", x.contratoId, false);
         const arq = await abrirArquivo(dir, x.nome);
-        const novo = await salvarArquivo(dir, new File([arq], `${x.esperado}${extensao(x.nome)}`));
+        const novo = await salvarArquivo(dir, new File([arq], `${x.esperado}${extensao(x.nome)}`), { compactar: false });
         await dir.removeEntry(x.nome);
         await alterar((db) => renomearReferencias(db, x.contratoId, x.nome, novo, login()));
         n += 1;
@@ -15261,7 +15736,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     if (escopo === "ficha") {
       const f = buscar2("fichas", id);
       if (!f) throw new Error("Ficha não encontrada.");
-      return subpasta(raiz, [PASTA_FICHAS, f.pasta || nomePastaFicha(f)], criar);
+      return subpasta(raiz, [PASTA_FICHAS2, f.pasta || nomePastaFicha(f)], criar);
     }
     if (escopoDoContrato(escopo)) {
       const c = contrato || buscar2("contratos", id);
@@ -15307,16 +15782,16 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var pastasComArquivos = [];
   async function pastaDaFicha(pastaNome) {
     try {
-      return await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, pastaNome], false);
+      return await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS2, pastaNome], false);
     } catch {
       return null;
     }
   }
   async function apagarPastaDaFichaSeVazia(pastaNome) {
     try {
-      const mae = await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), [PASTA_FICHAS], false);
+      const mae = await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), [PASTA_FICHAS2], false);
       await apagarPastaVazia(mae, pastaNome);
-      if (!(await subpastas(mae)).length) await apagarPastaVazia(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), PASTA_FICHAS);
+      if (!(await subpastas(mae)).length) await apagarPastaVazia(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), PASTA_FICHAS2);
     } catch {
     }
   }
@@ -15348,7 +15823,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     return nomes.length;
   }
   async function copiarDocumentosParaFicha(contratos, pastaNome) {
-    const para = await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, pastaNome]);
+    const para = await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS2, pastaNome]);
     const usados = new Set((await listar(para)).map((a) => a.nome));
     const nomes = [];
     const copiados = [];
@@ -15641,7 +16116,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     if (!arquivos.length) return 0;
     const destino = await pastaDoEscopo("iptuano", idGuiasDoAno(imovelId, anterior.ano));
     for (const a of arquivos) {
-      await salvarArquivo(destino, new File([await abrirArquivo(solta, a.nome)], a.nome));
+      await salvarArquivo(destino, new File([await abrirArquivo(solta, a.nome)], a.nome), { compactar: false });
       await solta.removeEntry(a.nome);
     }
     return arquivos.length;
@@ -19981,13 +20456,13 @@ ${FECHO}` };
     return `aluguel de ${compBr(comp)}, vence em ${dataBr(venc)}`;
   }
   function documentosDoEmail(f) {
-    const num = (l) => l.map((t, k) => `${k + 1}. ${t}`).join("\n");
+    const num2 = (l) => l.map((t, k) => `${k + 1}. ${t}`).join("\n");
     const lista3 = fiadoresDaFicha(f);
     const fiadores = lista3.length ? lista3 : temFiador(f) ? [{}] : [];
     const blocos = fiadores.map((x) => `
 DO FIADOR${x.nome && fiadores.length > 1 ? ` (${x.nome})` : ""}
-${num(documentosDoFiador(x))}`);
-    return [num(documentosDaFicha(f)), ...blocos, `
+${num2(documentosDoFiador(x))}`);
+    return [num2(documentosDaFicha(f)), ...blocos, `
 ${DICA_DOCUMENTOS}`].join("\n");
   }
   function linkDaFicha(f, pessoa2, hoje3) {
@@ -20851,14 +21326,14 @@ ${m.texto}
   function caixaBoleto(cb) {
     const b = dadosBoleto(d(), cb);
     const linha = (rotulo, valor, copia2 = valor) => `<tr><td class="suave">${rotulo}</td><td><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: copia2 })}</td></tr>`;
-    const num = (c) => reais(c, false);
+    const num2 = (c) => reais(c, false);
     return `<div class="cartao boleto"><h2>Dados para emitir o boleto no banco</h2>
     <table>${linha("Pagador", `${b.pagador}${b.documento_pagador ? ` · ${b.documento_pagador}` : ""}`, b.pagador)}
     ${linha("Nº do documento", b.numero_documento)}${linha("Vencimento", dataBr(b.vencimento))}
-    ${linha("Valor do documento", reais(b.valor), num(b.valor))}
-    ${b.desconto ? linha(`Desconto se pago até ${dataBr(b.vencimento)}`, `${reais(b.desconto)} (fica ${reais(b.valor_com_desconto)})`, num(b.desconto)) : ""}
-    ${b.multa_valor !== null ? linha("Multa após o vencimento (em valor, R$)", `${reais(b.multa_valor)} (${pct(b.multa_percentual)} sem o FCI)`, num(b.multa_valor)) : linha("Multa após o vencimento", pct(b.multa_percentual), String(b.multa_percentual).replace(".", ","))}
-    ${linha("Juros (mora) ao dia", reais(b.juros_ao_dia), num(b.juros_ao_dia))}</table>
+    ${linha("Valor do documento", reais(b.valor), num2(b.valor))}
+    ${b.desconto ? linha(`Desconto se pago até ${dataBr(b.vencimento)}`, `${reais(b.desconto)} (fica ${reais(b.valor_com_desconto)})`, num2(b.desconto)) : ""}
+    ${b.multa_valor !== null ? linha("Multa após o vencimento (em valor, R$)", `${reais(b.multa_valor)} (${pct(b.multa_percentual)} sem o FCI)`, num2(b.multa_valor)) : linha("Multa após o vencimento", pct(b.multa_percentual), String(b.multa_percentual).replace(".", ","))}
+    ${linha("Juros (mora) ao dia", reais(b.juros_ao_dia), num2(b.juros_ao_dia))}</table>
     <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao("copiar", "Copiar descrição", { texto: b.descricao }, "")}</div></div>`;
   }
   function etapasAcordo(a) {
@@ -20923,11 +21398,11 @@ ${m.texto}
     if (!opera()) return { carta, correcao: "" };
     const k = r.calculo || calcularReajuste(d(), c, r.competencia);
     const pctBonif = percentualBonificacao(c);
-    const num = (n) => n === null ? "" : n.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+    const num2 = (n) => n === null ? "" : n.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
     const valor = (v) => v === null ? "" : reais(v, false);
     return { carta, correcao: `<form data-form="aplicarReajusteManual" data-contrato="${c.id}" data-comp="${r.competencia}" data-atual="${k.atual}" data-bonif="${pctBonif}"
       data-pct-indice="${k.percentual === null ? "" : k.percentual}" class="acoes form-reajuste">
-      <label class="nw" title="Percentual da correção (pode arredondar): recalcula os aluguéis">Índice <input name="percentual" value="${num(k.percentual)}" placeholder="%" inputmode="decimal" style="width:72px">%</label>
+      <label class="nw" title="Percentual da correção (pode arredondar): recalcula os aluguéis">Índice <input name="percentual" value="${num2(k.percentual)}" placeholder="%" inputmode="decimal" style="width:72px">%</label>
       <label class="nw" title="Novo aluguel cheio (pode arredondar): recalcula o índice e o bonificado">Cheio <input name="valor_novo" value="${valor(k.novo)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>
       ${pctBonif > 0 ? `<label class="nw" title="Novo aluguel com bonificação (pode arredondar): recalcula o cheio e o índice">Bonificado <input name="bonificado" value="${valor(k.novoBonificado)}" placeholder="0,00" inputmode="decimal" style="width:100px"></label>` : ""}
       <button class="secundario pequeno">Aplicar correção</button></form>` };
@@ -22108,190 +22583,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 
   // docs/js/telas/fichas.js
   init_armazenamento();
-
-  // docs/js/conferir-pdf.js
-  var EDITORES = /canva|ilovepdf|smallpdf|sejda|pdfescape|pdfelement|wondershare|pdf24|pdf-xchange|nitro|foxit (phantom|pdf editor)|photoshop|gimp|inkscape|pixelmator|soda ?pdf|pdffiller|dochub|online2pdf|pdf ?candy|pdfsam|pdf editor|corel|affinity|paint\.net|gerador|fake|acrobat (pro|standard|dc)|pdf expert|xodo|lightpdf|pdfgear|pdf2go|hipdf|sodapdf|libreoffice draw/i;
-  var ESCRITORIO = /microsoft.*(word|excel|powerpoint)|libreoffice|openoffice|google docs|wps office|pages|keynote|numbers/i;
-  var IMPRESSAO = /skia\/pdf|chrom|microsoft: print to pdf|quartz pdfcontext|mac os x .*quartz|cairo|wkhtmltopdf|safari|firefox/i;
-  var latin = (bytes2) => {
-    let s = "";
-    for (let i = 0; i < bytes2.length; i += 1) s += String.fromCharCode(bytes2[i]);
-    return s;
-  };
-  function textoDoPdf(bruto) {
-    let b = [];
-    const t = String(bruto || "").trim();
-    if (t.startsWith("<") && !t.startsWith("<<")) {
-      const h = t.slice(1, t.indexOf(">") > 0 ? t.indexOf(">") : void 0).replace(/\s+/g, "");
-      for (let i = 0; i < h.length; i += 2) b.push(parseInt(h.slice(i, i + 2).padEnd(2, "0"), 16));
-    } else {
-      const s = t.startsWith("(") ? t.slice(1, t.lastIndexOf(")") > 0 ? t.lastIndexOf(")") : void 0) : t;
-      for (let i = 0; i < s.length; i += 1) {
-        const c = s[i];
-        if (c !== "\\") {
-          b.push(s.charCodeAt(i) & 255);
-          continue;
-        }
-        const n = s[i + 1];
-        i += 1;
-        if (/[0-7]/.test(n)) {
-          let o = n;
-          while (o.length < 3 && /[0-7]/.test(s[i + 1])) {
-            i += 1;
-            o += s[i];
-          }
-          b.push(parseInt(o, 8) & 255);
-        } else b.push({ n: 10, r: 13, t: 9, b: 8, f: 12 }[n] ?? n.charCodeAt(0));
-      }
-    }
-    if (b[0] === 254 && b[1] === 255) {
-      let s = "";
-      for (let i = 2; i + 1 < b.length; i += 2) s += String.fromCharCode(b[i] << 8 | b[i + 1]);
-      return s.trim();
-    }
-    return new TextDecoder("latin1").decode(new Uint8Array(b)).trim();
-  }
-  function dataDoPdf(t) {
-    const x = String(t || "");
-    const iso2 = x.match(/(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (iso2) {
-      const [, a2, me2, d3, h2 = "00", mi2 = "00", s2 = "00"] = iso2;
-      return `${a2}-${me2}-${d3}T${h2}:${mi2}:${s2}`;
-    }
-    const m = x.match(/(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
-    if (!m) return null;
-    const [, a, me = "01", d2 = "01", h = "00", mi = "00", s = "00"] = m;
-    return `${a}-${me}-${d2}T${h}:${mi}:${s}`;
-  }
-  function chaveDoPdf(texto3, chave) {
-    const re = new RegExp(`/${chave}\\s*(\\((?:\\\\.|[^\\\\)])*\\)|<[0-9A-Fa-f\\s]*>)`, "g");
-    const out = [];
-    for (let m = re.exec(texto3); m; m = re.exec(texto3)) out.push(textoDoPdf(m[1]));
-    return out;
-  }
-  async function abrirTrechos(bytes2, texto3, limite = 4 * 1024 * 1024) {
-    if (typeof DecompressionStream === "undefined") return "";
-    const out = [];
-    let total = 0;
-    const re = /stream\r?\n/g;
-    for (let m = re.exec(texto3); m && total < limite; m = re.exec(texto3)) {
-      if (m.index >= 3 && texto3.slice(m.index - 3, m.index) === "end") continue;
-      const ini = m.index + m[0].length;
-      let fim = texto3.indexOf("endstream", ini);
-      if (fim < 0) break;
-      const depois = fim;
-      while (fim > ini && /[\r\n]/.test(texto3[fim - 1])) fim -= 1;
-      const antes = texto3.slice(Math.max(0, m.index - 300), m.index);
-      if (!/\/FlateDecode/.test(antes) || !/\/(ObjStm|Metadata|XRef)|\/Type\s*\/Metadata/.test(antes)) {
-        re.lastIndex = depois;
-        continue;
-      }
-      try {
-        const ds = new DecompressionStream("deflate");
-        const w = ds.writable.getWriter();
-        w.write(bytes2.slice(ini, fim)).catch(() => {
-        });
-        w.close().catch(() => {
-        });
-        const buf = new Uint8Array(await new Response(ds.readable).arrayBuffer());
-        total += buf.length;
-        out.push(latin(buf));
-      } catch {
-      }
-      re.lastIndex = depois;
-    }
-    return out.join("\n");
-  }
-  function nomesDoCertificado(hex2) {
-    const h = String(hex2 || "").replace(/[^0-9a-f]/gi, "").toLowerCase();
-    const nomes = [];
-    for (let i = h.indexOf("0603550403"); i >= 0; i = h.indexOf("0603550403", i + 10)) {
-      const tipo = h.slice(i + 10, i + 12);
-      const tam = parseInt(h.slice(i + 12, i + 14), 16);
-      if (!tam || tam > 120) continue;
-      const bytes2 = h.slice(i + 14, i + 14 + tam * 2).match(/../g) || [];
-      const b = Uint8Array.from(bytes2.map((x) => parseInt(x, 16)));
-      const nome = tipo === "1e" ? String.fromCharCode(...Array.from({ length: b.length / 2 }, (_, k) => b[2 * k] << 8 | b[2 * k + 1])) : new TextDecoder().decode(b);
-      if (nome && !nomes.includes(nome)) nomes.push(nome);
-    }
-    return nomes;
-  }
-  var ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
-  async function assinaturas2(texto3) {
-    const out = [];
-    const re = /\/Type\s*\/Sig\b|\/ByteRange\s*\[/g;
-    const vistos = /* @__PURE__ */ new Set();
-    for (let m = re.exec(texto3); m; m = re.exec(texto3)) {
-      const ini = texto3.lastIndexOf("<<", m.index);
-      const obj = Math.max(texto3.lastIndexOf(" obj", m.index), 0);
-      const fimObj = texto3.indexOf("endobj", m.index);
-      const trecho = texto3.slice(obj, fimObj < 0 ? m.index + 2e5 : fimObj);
-      const rel = trecho.indexOf("/Contents");
-      const contents = rel < 0 ? -1 : obj + rel;
-      if (contents < 0) continue;
-      const abre = texto3.indexOf("<", contents + 9);
-      const fecha = texto3.indexOf(">", abre + 1);
-      if (abre < 0 || fecha < 0 || vistos.has(abre)) continue;
-      vistos.add(abre);
-      const hex2 = texto3.slice(abre + 1, fecha);
-      const dic = texto3.slice(ini, Math.min(texto3.length, Math.max(fecha + 400, m.index + 400)));
-      const certs = nomesDoCertificado(hex2);
-      const emissores = certs.filter(ehAutoridade);
-      const govbr = emissores.some((c) => /governo federal do brasil/i.test(c));
-      const icp = !govbr && emissores.some((c) => /icp-brasil|serasa|certisign|soluti|valid|serpro|safeweb|digitalsign|caixa|receita federal|\brfb\b/i.test(c));
-      const pessoa2 = certs.find((c) => !ehAutoridade(c)) || "";
-      const nome = (pessoa2.replace(/:\d{11,14}$/, "") || chaveDoPdf(dic, "Name")[0] || "").trim();
-      out.push({ nome, data: dataDoPdf(chaveDoPdf(dic, "M")[0]), govbr, icp, certificados: certs, fim: fecha });
-    }
-    return out;
-  }
-  async function conferirArquivo(entrada) {
-    const bytes2 = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
-    const sinais = [];
-    if (bytes2[0] === 255 && bytes2[1] === 216 || bytes2[0] === 137 && bytes2[1] === 80) {
-      const t = latin(bytes2.slice(0, 256 * 1024));
-      const prog = (t.match(/(Adobe Photoshop[^\0<]{0,40}|GIMP[^\0<]{0,20}|Canva|Pixelmator[^\0<]{0,20}|Snapseed|PicsArt|Lightroom[^\0<]{0,20})/i) || [])[1] || "";
-      if (prog) sinais.push({ nivel: "alerta", texto: `Foto passou pelo programa "${prog.trim()}" (edição de imagem). Peça o documento original.` });
-      return { tipo: bytes2[0] === 255 ? "jpg" : "png", programa: prog.trim(), criado: null, alterado: null, sinais, assinaturas: [] };
-    }
-    if (!(bytes2[0] === 37 && bytes2[1] === 80 && bytes2[2] === 68 && bytes2[3] === 70)) return { tipo: null, programa: "", criado: null, alterado: null, sinais: [{ nivel: "atencao", texto: "Não é PDF nem foto." }], assinaturas: [] };
-    const texto3 = latin(bytes2);
-    const dentro = await abrirTrechos(bytes2, texto3);
-    const tudo = `${texto3}
-${dentro}`;
-    const xmp = (re) => (tudo.match(re) || [])[1] || "";
-    const produtor = [...chaveDoPdf(tudo, "Producer"), xmp(/<pdf:Producer>([^<]+)</)].filter(Boolean);
-    const criador = [...chaveDoPdf(tudo, "Creator"), xmp(/<xmp:CreatorTool>([^<]+)</)].filter(Boolean);
-    const programas = [...new Set([...criador, ...produtor].map((x) => x.trim()).filter(Boolean))];
-    const criado = dataDoPdf(chaveDoPdf(tudo, "CreationDate")[0] || xmp(/<xmp:CreateDate>([^<]+)</));
-    const alterado = dataDoPdf(chaveDoPdf(tudo, "ModDate")[0] || xmp(/<xmp:ModifyDate>([^<]+)</));
-    const editor = programas.find((p2) => EDITORES.test(p2));
-    const escritorio = programas.find((p2) => ESCRITORIO.test(p2));
-    const impressao = programas.find((p2) => IMPRESSAO.test(p2));
-    if (editor) sinais.push({ nivel: "alerta", texto: `Feito ou alterado no programa "${editor}" (editor de PDF ou de imagem). Extrato e holerite saem do aplicativo do banco ou do sistema do empregador: peça o arquivo original e confira com a fonte.` });
-    else if (escritorio) sinais.push({ nivel: "atencao", texto: `Feito no programa "${escritorio}" (editor de texto ou planilha). Holerite de empresa pequena pode sair assim; extrato de banco, não. Confira com a fonte.` });
-    else if (impressao) sinais.push({ nivel: "info", texto: `PDF "impresso" de uma página (${impressao}). Comum no extrato tirado do site do banco; confira o valor com a fonte.` });
-    const sig = await assinaturas2(texto3 + (dentro ? `
-${dentro}` : ""));
-    if (criado && alterado && !sig.length && Date.parse(alterado) - Date.parse(criado) > 864e5) {
-      sinais.push({ nivel: "info", texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
-    }
-    const posicoes = [...texto3.matchAll(/%%EOF/g)].map((x) => x.index);
-    const ultimaAssinatura = sig.length ? Math.max(...sig.map((s) => s.fim)) : -1;
-    const linearizado = /\/Linearized\b/.test(texto3.slice(0, 2048)) ? 1 : 0;
-    const extras = sig.length ? posicoes.filter((p2) => p2 < ultimaAssinatura).length - linearizado - sig.length : posicoes.length - 1 - linearizado;
-    if (extras > 0 && !editor) sinais.push({ nivel: "atencao", texto: `O arquivo foi salvo de novo ${extras} vez(es) depois de gerado.` });
-    return { tipo: "pdf", programa: programas.join(" · "), criado, alterado, sinais, assinaturas: sig.map(({ fim, ...s }) => s) };
-  }
-  var nomeComparavel = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
-  function mesmoNome(a, b) {
-    const pal = (t) => nomeComparavel(t).split(" ").filter((p2) => p2.length > 2 && !["das", "dos", "del"].includes(p2));
-    const x = pal(a);
-    const y = pal(b);
-    if (!x.length || !y.length) return false;
-    const comuns = x.filter((p2) => y.includes(p2)).length;
-    return comuns >= (x.length === 1 && y.length === 1 ? 1 : 2) && (x.every((p2) => y.includes(p2)) || y.every((p2) => x.includes(p2)));
-  }
+  init_conferir_pdf();
 
   // docs/js/ficha-online.js
   init_calculos();
@@ -22692,7 +22984,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     arquivosDoLinkVistos.set(id, total);
     const f = buscar2("fichas", id);
     if (total && f && E.anexos?.esquecerLista) {
-      E.anexos.esquecerLista(["arquivos", PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+      E.anexos.esquecerLista(["arquivos", PASTA_FICHAS2, f.pasta || nomePastaFicha(f)]);
       if (antes !== void 0 || total) await mostrar();
     }
   }
@@ -23860,11 +24152,12 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
   }
   var nomeComprovante2 = (tipo, data2, arq) => `comprovante-${tipo}-${data2 || hojeIso()}${extensao(arq.name)}`;
-  async function guardarComprovantes(lista3, dados, form, pasta) {
+  var SEM_COMPACTAR = { compactar: false };
+  async function guardarComprovantes(lista3, dados, form, pasta, opcoes2 = {}) {
     for (const k of lista3) {
       const arq = arquivoEscolhido(form, k.campo);
       if (!arq || !k.vale(dados) || !(dados[k.valor] > 0)) continue;
-      dados[k.campo] = await salvarArquivo(await pasta(), new File([arq], nomeComprovante2(k.nome, dados[k.data], arq)));
+      dados[k.campo] = await salvarArquivo(await pasta(), new File([arq], nomeComprovante2(k.nome, dados[k.data], arq)), opcoes2);
     }
   }
   var xAnexo = (acao, dados, confirmar) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
@@ -24300,10 +24593,10 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
         conferirComprovantes(COMPROVANTES_FICHA, dados, r, form);
       },
       async ajustarAsync(dados, erros, r, form) {
-        const pasta = r ? () => pastaDoEscopo("ficha", r.id) : async () => subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, dados.pasta]);
-        await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta);
+        const pasta = r ? () => pastaDoEscopo("ficha", r.id) : async () => subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS2, dados.pasta]);
+        await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta, SEM_COMPACTAR);
         const serasa = arquivoEscolhido(form, "analise_serasa");
-        if (serasa) dados.analise_serasa = await salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${hojeIso()}${extensao(serasa.name)}`));
+        if (serasa) dados.analise_serasa = await salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${hojeIso()}${extensao(serasa.name)}`), SEM_COMPACTAR);
       }
     },
     correcoes: {
@@ -25258,6 +25551,9 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     ${opera() ? `<div class="cartao"><h2>Conferir arquivos</h2><p>Ao abrir o Painel, o sistema confere se cada arquivo ligado a um lançamento (comprovantes, documentos assinados, aditivos, cartas, apólices, fotos da vistoria) está na pasta.
       O que estiver em outra pasta volta sozinho para o lugar; o que sumiu aparece como alerta no Painel e na página do inquilino, para anexar de novo.</p>
       ${botao("conferirArquivos", "Conferir arquivos agora")}</div>` : ""}
+    ${podeUsuario("admin") ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link("#/regras", "Regras do sistema")} → "Compactar anexos"${regra("compactar_anexos") ? "" : ", hoje desligada"}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
+      Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco), PDF com texto e os documentos das fichas em análise ficam como estão.</p>
+      ${botao("compactarAnexos", "Compactar os anexos que já estão no sistema", {}, "secundario", "Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.")}<div id="progresso-compactar" aria-live="polite" class="suave"></div></div>` : ""}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento")}</div>` : ""}
@@ -26573,6 +26869,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   init_armazenamento();
   init_calculos();
   init_calculos();
+  init_compactar();
   init_contratos();
   init_formularios();
   init_modelos_contrato();
@@ -28479,7 +28776,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (escopo === "seguro") return enviarArquivosSeguro(Number(id), el);
       const dir = await pastaDoEscopo(escopo, Number(id));
       const nomes = [];
-      for (const f of el.files) nomes.push(await salvarArquivo(dir, escopo === "matricula" && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
+      for (const f of el.files) nomes.push(await salvarArquivo(dir, escopo === "matricula" && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f, { compactar: escopo !== "ficha" }));
       const vinc = vinculoDoEscopo(escopo, id);
       await alterar((db) => registrar(db, login(), "Inclusão", "arquivos", null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(", ") }, vinc));
       aviso(`${nomes.length} arquivo(s) anexado(s).`);
@@ -28716,6 +29013,40 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await conferirHerancas();
       const r = await conferirArquivos();
       aviso(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ""}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : " Nenhum faltando."}`, r.faltando.length ? "aviso" : "ok");
+    },
+    /**
+     * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
+     * no lugar com o mesmo nome. PDF assinado e documentos das fichas em análise ficam como estão.
+     */
+    async compactarAnexos() {
+      if (!podeUsuario("admin")) throw new Error("Só o administrador compacta os anexos que já estão no sistema.");
+      const caixa = document.getElementById("progresso-compactar");
+      const mostrarAndamento = (t) => {
+        if (caixa) caixa.textContent = t;
+      };
+      const MB = (b) => `${(b / 1048576).toFixed(1).replace(".", ",")} MB`;
+      mostrarAndamento("Procurando os anexos…");
+      let raiz;
+      try {
+        raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS);
+      } catch {
+        aviso("Não há anexos para compactar.", "info");
+        mostrarAndamento("");
+        return;
+      }
+      const r = await compactarTodos(raiz, {
+        ler: (h) => lerConteudo(h),
+        gravar: (dir, nome, arq) => escreverTexto(dir, nome, arq),
+        aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`)
+      });
+      const texto3 = r.compactados ? `${r.compactados} de ${r.vistos} arquivo(s) compactado(s): de ${MB(r.antes)} para ${MB(r.depois)} (${MB(r.antes - r.depois)} a menos).` : `Nenhum dos ${r.vistos} arquivo(s) olhados ficaria bem menor: nada foi trocado.`;
+      mostrarAndamento(`${texto3}${r.falhas ? ` ${r.falhas} não puderam ser lidos.` : ""}`);
+      if (r.compactados) {
+        await alterar((db) => registrar(db, login(), "Alteração", "arquivos", null, `Anexos compactados: ${texto3}`, null, {}, false));
+        atualizarCopiaAberta().catch(() => {
+        });
+      }
+      aviso(texto3, r.falhas ? "aviso" : "ok");
     },
     async excluirArquivo({ escopo, id, nome }) {
       if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
@@ -29492,7 +29823,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (!pctEl || !valEl) return;
       const form = pctEl.closest("form");
       const aluguel = raiz.querySelector("[name=aluguel_inicial]") || raiz.querySelector("[data-vinculo-base]");
-      const num = (t) => {
+      const num2 = (t) => {
         try {
           return t.trim() === "" ? NaN : numero(t);
         } catch {
@@ -29515,7 +29846,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       };
       const calcularBonificado = () => {
         const b = base();
-        const p2 = num(pctEl.value);
+        const p2 = num2(pctEl.value);
         avisar(Number.isFinite(p2) && (p2 < 0 || p2 > 100) ? "O % precisa ficar entre 0 e 100" : "");
         if (Number.isFinite(b) && b > 0 && Number.isFinite(p2) && p2 >= 0 && p2 <= 100) valEl.value = dinheiroTexto(b - descontoPorPercentual(b, p2));
       };
@@ -29535,7 +29866,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       };
       const calcularAluguel = () => {
         const v = cent(valEl.value);
-        const p2 = num(pctEl.value);
+        const p2 = num2(pctEl.value);
         avisar(Number.isFinite(p2) && (p2 < 0 || p2 >= 100) ? "O % precisa ficar entre 0 e 100 (menos de 100 para calcular o aluguel)" : "");
         if (Number.isFinite(v) && v > 0 && Number.isFinite(p2) && p2 >= 0 && p2 < 100) aluguel.value = dinheiroTexto(cheioPorBonificado(v, p2));
       };
