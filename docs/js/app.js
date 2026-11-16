@@ -450,6 +450,21 @@ function desenharMensagens() {
   el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo} mensagem" data-msg="${m.id}">${esc(m.texto)}<button type="button" class="fechar" title="Fechar" data-fechar-msg="${m.id}">×</button></div>`).join('');
 }
 
+/**
+ * Compactação de PDF escaneado (compactar.js): leva alguns segundos por página. Enquanto dura, uma mensagem no topo diz
+ * o andamento ("página 3 de 10… Aguarde") e some sozinha no fim.
+ */
+let msgCompactar = null;
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('compactar-andamento', (ev) => {
+    const { texto, fim } = ev.detail || {};
+    if (fim || !texto) { if (msgCompactar) fecharMensagem(msgCompactar.id); msgCompactar = null; return; }
+    if (!msgCompactar || !mensagens.includes(msgCompactar)) { msgCompactar = { id: proximaMensagem++, texto, tipo: 'info' }; mensagens.push(msgCompactar); }
+    msgCompactar.texto = texto;
+    desenharMensagens();
+  });
+}
+
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-fechar-msg]');
   if (b) fecharMensagem(Number(b.dataset.fecharMsg));

@@ -1857,8 +1857,7 @@ export const ACOES = {
     if (escopo === 'seguro') return enviarArquivosSeguro(Number(id), el);
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
-    // documentos da ficha em análise ficam como chegaram (a conferência olha dentro do arquivo); os outros são compactados
-    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f, { compactar: escopo !== 'ficha' }));
+    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
     const vinc = vinculoDoEscopo(escopo, id);
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
@@ -2109,7 +2108,7 @@ export const ACOES = {
 
   /**
    * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
-   * no lugar com o mesmo nome. PDF assinado e documentos das fichas em análise ficam como estão.
+   * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
    */
   async compactarAnexos() {
     if (!podeUsuario('admin')) throw new Error('Só o administrador compacta os anexos que já estão no sistema.');
@@ -2119,7 +2118,10 @@ export const ACOES = {
     mostrarAndamento('Procurando os anexos…');
     let raiz;
     try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { aviso('Não há anexos para compactar.', 'info'); mostrarAndamento(''); return; }
+    // documentos do link da ficha: só os já conferidos (a conferência guardada na ficha olhou o arquivo como chegou)
+    const conferidos = new Set((d().fichas || []).flatMap((f) => Object.keys(f.conferencias_link || {}).map((n) => `${S.limparNome(f.pasta || nomePastaFicha(f))}|${n}`)));
     const r = await CP.compactarTodos(raiz, {
+      conferido: (pastaFicha, nome) => conferidos.has(`${pastaFicha}|${nome}`),
       ler: (h) => S.lerConteudo(h),
       gravar: (dir, nome, arq) => S.escreverTexto(dir, nome, arq),
       aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`),

@@ -4,6 +4,8 @@
 // - PDF escaneado (todas as páginas são imagem, sem texto): cada página vira um JPEG menor, num PDF novo;
 // - PDF com texto (gerado por sistema, banco, Word) fica como está; PDF com assinatura digital ou protegido NUNCA é mexido
 //   (quebraria a assinatura e a conferência de conferir-pdf.js). Na dúvida, não mexe. O original não é guardado.
+// Documentos que a pessoa manda pelo link da ficha: compactados depois que chegam, quando a equipe abre a ficha, logo depois
+// da conferência (que olha dentro do arquivo como ele chegou e fica guardada na ficha, `fichas.conferencias_link`; telas/fichas.js).
 // Só troca quando o arquivo fica bem menor (GANHO_MINIMO). Nunca lança erro: se algo falhar, fica o arquivo como chegou.
 // As partes puras (tipo pelos bytes, medidas, montar o PDF) rodam no Node (tests/compactar.test.mjs); o resto precisa de canvas.
 import { pdfTemAssinatura } from './conferir-pdf.js';
@@ -147,6 +149,15 @@ async function pdfJs() {
 }
 
 /**
+ * Aviso na tela enquanto um PDF é compactado (pode levar alguns segundos por página): app.js mostra o texto numa mensagem
+ * que se atualiza e some com `fim`. Ex.: 'Compactando "extrato.pdf" (PDF escaneado): página 3 de 10…'.
+ */
+function avisarAndamento(texto, fim = false) {
+  if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('compactar-andamento', { detail: { texto, fim } }));
+}
+
+/**
  * PDF escaneado menor (Blob) ou null (assinado, protegido, com texto, com formulário ou anotações, ou sem ganho).
  * `aoAndar(pagina, total)`: progresso.
  */
@@ -154,6 +165,7 @@ export async function compactarPdf(blob, aoAndar = () => {}) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   if (await pdfTemAssinatura(bytes)) return null; // nunca: assinatura digital ou proteção
   if (typeof location !== 'undefined' && location.protocol === 'file:') return null; // versão PC: sem o leitor de PDF
+  const nome = blob.name || 'PDF';
   const lib = await pdfJs();
   const doc = await lib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
   try {
@@ -162,22 +174,24 @@ export async function compactarPdf(blob, aoAndar = () => {}) {
     if (doc.numPages < 1 || doc.numPages > MAX_PAGINAS) return null;
     const OPS = lib.OPS;
     const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== undefined));
-    // 1ª volta: toda página é só imagem (sem texto, sem anotação). Uma com texto e o PDF fica como está.
+    // antes de tudo, o que é rápido: nenhuma página com texto nem anotação (uma com texto e o PDF fica como está)
+    avisarAndamento(`Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
     for (let i = 1; i <= doc.numPages; i += 1) {
       const p = await doc.getPage(i);
       const t = await p.getTextContent();
       if (t.items.some((x) => x.str && x.str.trim())) return null;
       if ((await p.getAnnotations()).length) return null;
-      const ops = await p.getOperatorList({ intent: 'print' }); // "print": o desenho não espera o quadro da tela (aba em segundo plano)
-      if (!ops.fnArray.some((f) => imagens.has(f))) return null;
-      p.cleanup();
     }
-    // 2ª volta: cada página vira um JPEG
+    // cada página: confirma que é imagem e já desenha em JPEG (a leitura das imagens serve às duas coisas)
     const paginas = [];
     let total = 0;
     for (let i = 1; i <= doc.numPages; i += 1) {
       aoAndar(i, doc.numPages);
+      avisarAndamento(`Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`);
       const p = await doc.getPage(i);
+      // "print": o desenho não espera o quadro da tela (com a aba em segundo plano, o modo da tela trava)
+      const ops = await p.getOperatorList({ intent: 'print' });
+      if (!ops.fnArray.some((f) => imagens.has(f))) return null;
       const um = p.getViewport({ scale: 1 });
       const escala = Math.min(LADO_MAXIMO / Math.max(um.width, um.height), DPI_MAXIMO / 72);
       const vista = p.getViewport({ scale: escala });
@@ -195,33 +209,39 @@ export async function compactarPdf(blob, aoAndar = () => {}) {
     const novo = new Blob([montarPdfDeImagens(paginas)], { type: 'application/pdf' });
     return compensa(blob.size, novo.size) ? novo : null;
   } finally {
+    avisarAndamento('', true);
     doc.destroy();
   }
 }
 
-/** Pasta dos documentos da ficha em análise (fica como chegou; comum.js PASTA_FICHAS). */
+/** Pasta das fichas em análise (comum.js PASTA_FICHAS). */
 export const PASTA_FICHAS = 'Fichas em analise';
 const CANDIDATO = /\.(jpe?g|png|webp|heic|pdf)$/i;
 /** Arquivo que vale abrir para tentar compactar (pelo nome e tamanho; o conteúdo decide depois). */
 export const candidato = (nome, tamanho) => CANDIDATO.test(nome) && tamanho >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
+/** Documento mandado pela pessoa no link da ficha (o nome é dado pela nuvem, nuvem/ficha-publica.mjs: "link-..."). */
+export const ehDoLink = (nome) => /^link-/.test(nome);
 
 /**
  * Os anexos que já estão no sistema (botão do administrador em Dados e backup): passa por todos dentro de `raiz` (a pasta
- * `arquivos`), menos a pasta das fichas em análise, e troca no lugar, com o MESMO nome, os que ficam bem menores.
+ * `arquivos`) e troca no lugar, com o MESMO nome, os que ficam bem menores.
  * Mesmo nome = o lançamento continua apontando para ele e o arquivo impresso não acusa "arquivo trocado".
+ * Documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha; antes disso o
+ * arquivo precisa ficar como chegou): `conferido(pastaDaFicha, nome)` diz se já foi.
  * `ler(handle)` → File, `gravar(dir, nome, File)`; `aoAndar({ feitos, total, compactados, economia })`.
  * Devolve { vistos, compactados, antes, depois, falhas }.
  */
-export async function compactarTodos(raiz, { ler, gravar, compactar = compactarAnexo, aoAndar = () => {} }) {
+export async function compactarTodos(raiz, { ler, gravar, compactar = compactarAnexo, conferido = () => false, aoAndar = () => {} }) {
   const lista = [];
-  const juntar = async (dir, nivel) => {
+  const juntar = async (dir, partes) => {
     for await (const [nome, h] of dir.entries()) {
-      if (h.kind === 'directory') { if (!(nivel === 0 && nome === PASTA_FICHAS)) await juntar(h, nivel + 1); continue; }
+      if (h.kind === 'directory') { await juntar(h, [...partes, nome]); continue; }
+      if (partes[0] === PASTA_FICHAS && ehDoLink(nome) && !conferido(partes[1], nome)) continue;
       const tamanho = h.tamanho ?? (await h.getFile()).size;
       if (candidato(nome, tamanho)) lista.push({ dir, nome, h });
     }
   };
-  await juntar(raiz, 0);
+  await juntar(raiz, []);
   const r = { vistos: lista.length, compactados: 0, antes: 0, depois: 0, falhas: 0 };
   for (let i = 0; i < lista.length; i += 1) {
     const { dir, nome, h } = lista[i];
