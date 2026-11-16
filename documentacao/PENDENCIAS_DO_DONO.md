@@ -19,6 +19,7 @@ Marque com `[x]` o que for concluindo.
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: ícone (você) e entrar com e-mail e senha em vez da chave de serviço (feito; falta a regra Bypass no Cloudflare, item 9e). Cópia aberta e pasta física: feitas | você | 15 min |
+| 11 | **Mutirão de 16/11 (onde paramos):** conferir depois do merge (B, C1, C2), regra de limite na ficha pública e 2ª rodada | você + Claude | 15 min |
 
 ---
 
@@ -191,6 +192,22 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - **Passado o prazo sem nada anexado:** a etapa continua pendente ("prazo acabou em …: anexe o que o inquilino mandou ou marque Não houve") até alguém anexar ou marcar **Não houve** (mudado a pedido do dono em 15/11: alguns inquilinos mandaram contra-vistoria e ela precisa ir para o sistema). No inquilino novo, segura a montagem da pasta física até isso.
 - **Falta você (depois do merge):** nos inquilinos que mandaram contra-vistoria, anexe na etapa (página do inquilino → Rotina de entrada); nos outros, clique em **Não houve**.
 - **Troca de titular:** vale a contra-vistoria do contrato anterior.
+
+## 11. Mutirão de correções de 15–16/11 (onde paramos)  `[ ]`
+
+Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 16/11 pelas PRs #250 (ponte C6), #251 (servidor da nuvem), #252 (regras), #253 (`.exe` + programa do PC), #254 (telas) e #255 (sincronia e aplicativo sem internet). Cloudflare publicou sem erro. Lista completa em `ROTINA_DE_MELHORIA.md` ("Mutirão de 2026-11-16").
+
+**Conferências depois do merge (o dono estava fazendo quando parou):**
+- [x] **A.** Anexar duas vezes o mesmo arquivo em "Arquivos do inquilino": os dois aparecem e abrem (conferido em 16/11).
+- [ ] **B.** Ficha pela internet: Fichas → ficha de teste → **Gerar link** → abrir no celular e enviar 1 foto ou PDF. Certo: a página confirma e o documento aparece na ficha. No fim, **Encerrar o link**.
+- [ ] **C1.** No celular, abrir um anexo em PDF e apertar o **Voltar** do aparelho. Certo: o PDF fecha e a página continua a mesma.
+- [ ] **C2.** Fechar o aplicativo, ligar o modo avião e abrir de novo. Certo: abre com os dados.
+
+**Falta você:**
+- [ ] **Cloudflare (5 min):** limite de pedidos na ficha pública. Security → WAF → Rate limiting rules → host `ficha.ankjck.com.br`, caminho começando por `/api/publico/`, 60 pedidos por minuto por IP, bloquear por 1 minuto.
+- [ ] **Programa do PC:** regra Bypass (item 9e) e depois baixar o `.exe` em <https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc> e dar dois cliques (aviso azul → "Mais informações → Executar assim mesmo"). **Depois da #253 o programa antigo do PC não entra mais** ("programa antigo, baixe o novo"): a cópia de hora em hora fica parada até instalar o novo.
+
+**2ª rodada (Claude, quando o dono pedir; sempre a partir da `main`, sem empilhar):** carregar as telas raras só quando usadas (nº 23), compactar o código no GitHub (nº 24), faixas de código do primeiro acesso numa ida só (nº 37), a tela de ressarcimento barrar mês com boleto em acordo, verificador separado da senha para o crachá do PC (hoje quem tem o banco aberto consegue um crachá só de leitura), Voltar do celular nas janelas de confirmação. Ficou de fora por segurança: adiar a regravação do banco no aparelho (nº 29).
 
 ## Ficou de fora de propósito (não é defeito)
 
