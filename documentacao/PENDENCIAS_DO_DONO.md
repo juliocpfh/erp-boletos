@@ -13,7 +13,7 @@ Marque com `[x]` o que for concluindo.
 | 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele) | você, no Google e no Cloudflare | 30 min |
 | 2 | Aviso no celular (ficha pela internet) | você, no Cloudflare | 10 min |
 | 3 | Teste da ficha pela internet com uma pessoa de verdade | você + um conhecido | 20 min |
-| 4 | Conferências no celular (ícone, "Enviar agora", caução da troca) | você | 15 min |
+| 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
 | 5 | Banco C6 (boleto e extrato automáticos) | o C6 liberar as chaves | depende do C6 |
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
@@ -103,9 +103,9 @@ Ponto que ainda não testei na tela depois das últimas correções: a janela do
 
 Coisas que funcionaram no computador mas não foram vistas num celular de verdade:
 
-1. **Ícone do aplicativo** (PR #193): em **Empresas**, enquadre a logo e grave. No iPhone, apague o ícone da Tela de Início e adicione de novo para pegar o novo.
-2. **"Enviar agora" com anexos** (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
-3. **Caução na troca de titular** (PR #210): abra o **Painel** uma vez (ele corrige as trocas antigas sozinho) e depois confira cada contrato que teve troca de titular. Se a data paga da caução estiver errada, use **✎ corrigir data**.
+1. [x] **Ícone do aplicativo** (conferido pelo dono em 15/11: deu certo) (PR #193): em **Empresas**, enquadre a logo e grave. No iPhone, apague o ícone da Tela de Início e adicione de novo para pegar o novo.
+2. [ ] **"Enviar agora" com anexos** (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
+3. [x] **Caução na troca de titular** (conferido pelo dono em 15/11: deu certo) (PR #210): abra o **Painel** uma vez (ele corrige as trocas antigas sozinho) e depois confira cada contrato que teve troca de titular. Se a data paga da caução estiver errada, use **✎ corrigir data**.
 
 ---
 
