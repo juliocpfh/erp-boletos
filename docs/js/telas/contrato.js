@@ -620,7 +620,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
         <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
   // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
-  // a etapa antes do prazo. Passado o prazo, fecha sozinha, e ainda dá para anexar. Na troca de titular vale a do anterior.
+  // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior.
   function acoesContraVistoria(e) {
     if (c.contra_vistoria) {
       return linkComprovante(c.id, c.contra_vistoria, { tabela: 'contratos', id: c.id, campo: 'contra_vistoria', tipo: 'contra-vistoria', data: c.contra_vistoria_em })

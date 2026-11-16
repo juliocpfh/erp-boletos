@@ -182,9 +182,9 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 **Pedido do dono em 15/11.** Lugar próprio para anexar a **contra-vistoria de entrada** (o que o inquilino encontrou de diferente da vistoria de entrada). Decisões do dono: vira etapa da entrada, logo abaixo de "Vistoria de entrada assinada", com prazo, e entra na pasta física.
 - **Prazo:** 5 dias úteis da entrega das chaves (cláusula da vistoria). Ex.: chaves em 13/11/2026 → até 23/11/2026 (20/11 é feriado).
 - **Na etapa:** data em que o inquilino mandou + arquivo (PDF, foto ou o e-mail salvo em PDF) → **Anexar**. Se ele avisar que não vai mandar, **Não houve**.
-- **Passado o prazo sem nada anexado:** a etapa fecha sozinha como "não houve" (a vistoria vale como aceita) e não segura a pasta física; ainda dá para anexar depois. Inquilinos antigos ficam assim.
+- **Passado o prazo sem nada anexado:** a etapa continua pendente ("prazo acabou em …: anexe o que o inquilino mandou ou marque Não houve") até alguém anexar ou marcar **Não houve** (mudado a pedido do dono em 15/11: alguns inquilinos mandaram contra-vistoria e ela precisa ir para o sistema). No inquilino novo, segura a montagem da pasta física até isso.
+- **Falta você (depois do merge):** nos inquilinos que mandaram contra-vistoria, anexe na etapa (página do inquilino → Rotina de entrada); nos outros, clique em **Não houve**.
 - **Troca de titular:** vale a contra-vistoria do contrato anterior.
-- **Falta você (depois do merge):** nada obrigatório. Se algum inquilino recente mandou contra-vistoria, anexe na etapa.
 
 ## Ficou de fora de propósito (não é defeito)
 

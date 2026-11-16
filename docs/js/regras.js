@@ -3692,10 +3692,10 @@ export const ETAPAS_ENTRADA = [
 /**
  * Etapa "Contra-vistoria do inquilino" (pedido do dono em 2026-11-15): o inquilino tem 5 dias úteis desde a entrega das
  * chaves para apontar o que não está na vistoria de entrada (cláusula da vistoria, C.limiteVistoriaEntrada). Com o arquivo
- * anexado, feita na data em que ele mandou; dentro do prazo, aguardando; passado o prazo sem nada anexado, a vistoria vale
- * como aceita e a etapa se fecha sozinha ("não houve"), mas ainda dá para anexar se ele tiver mandado. Troca de titular: a
- * do contrato anterior vale (a vistoria de entrada é a mesma).
- * Ex.: chaves em 02/03/2026 (segunda) → prazo até 09/03/2026; em 05/03 aguardando; em 10/03, sem arquivo, "não houve".
+ * anexado, feita na data em que ele mandou; dentro do prazo, aguardando; passado o prazo, continua pendente até alguém
+ * anexar o que ele mandou ou marcar "Não houve" (decisão do dono em 2026-11-15: alguns inquilinos mandaram e precisa ir
+ * para o sistema). Troca de titular: a do contrato anterior vale (a vistoria de entrada é a mesma).
+ * Ex.: chaves em 02/03/2026 (segunda) → prazo até 09/03/2026; em 05/03 aguardando; em 10/03, sem arquivo, "prazo acabou".
  */
 function situacaoContraVistoria(d, c, hoje) {
   if (c.contra_vistoria) return { situacao: 'feita', data: c.contra_vistoria_em || null, texto: 'recebida' };
@@ -3706,7 +3706,7 @@ function situacaoContraVistoria(d, c, hoje) {
   }
   if (!c.data_entrada) return undefined;
   const limite = C.limiteVistoriaEntrada(c.data_entrada);
-  if (hoje > limite) return { situacao: 'pulada', data: null, texto: `não houve (prazo acabou em ${C.dataBr(limite)}; vistoria aceita)` };
+  if (hoje > limite) return { situacao: 'andamento', texto: `prazo acabou em ${C.dataBr(limite)}: anexe o que o inquilino mandou ou marque "Não houve"` };
   return { situacao: 'andamento', texto: `aguardando o inquilino até ${C.dataBr(limite)} (5 dias úteis da entrega das chaves)` };
 }
 
