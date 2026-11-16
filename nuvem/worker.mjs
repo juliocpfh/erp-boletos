@@ -14,7 +14,7 @@
 
 import { crachaValido, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
-import { atenderEquipe, atenderFicha } from './ficha-publica.mjs';
+import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
 import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
@@ -24,6 +24,7 @@ const SO_LEITURA = ['backups']; // backups só o cofre grava
 const MAX_DADOS = 30 * 1024 * 1024; // carga inicial do banco inteiro
 const MAX_ARQUIVO = 50 * 1024 * 1024;
 const POR_PEDIDO = 200; // arquivos movidos por pedido (limite de chamadas do plano grátis)
+const MOVER_JUNTOS = 3; // arquivos movidos ao mesmo tempo: cada um segura 2 ligações (ler e gravar) e o Worker só abre 6 de cada vez
 const LISTA_TUDO_POR_PEDIDO = 5000; // arquivos por resposta de lista-tudo (5 chamadas ao R2 por pedido)
 const VALIDADE_PAPEL = 60 * 1000; // ms: o papel conferido no cofre vale por 1 min (o Painel faz muitos pedidos de anexos seguidos)
 const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i; // igual a nomeAnexavel (docs/js/armazenamento.js)
@@ -128,11 +129,10 @@ function conferirGravacao(request, env) {
   if (origem && origem !== permitida) throw new ErroHttp(403, 'Pedido recusado (origem).');
 }
 
+/** Corpo do pedido, lido aos pedaços e contado (lerAteLimite): não confia só no tamanho declarado. */
 async function lerCorpo(request, maximo) {
-  const declarado = Number(request.headers.get('Content-Length') || 0);
-  if (declarado > maximo) throw new ErroHttp(413, `Arquivo grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
-  const corpo = await request.arrayBuffer();
-  if (corpo.byteLength > maximo) throw new ErroHttp(413, `Arquivo grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
+  const corpo = await lerAteLimite(request, maximo);
+  if (!corpo) throw new ErroHttp(413, `Arquivo grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
   return corpo;
 }
 
@@ -169,7 +169,16 @@ async function listarTudo(env, prefixo, delimitador) {
   return delimitador ? { objetos, pastas } : objetos;
 }
 
-async function lerArquivo(env, chave) {
+/** O arquivo guardado no navegador ainda é o mesmo? (If-None-Match com a etiqueta de agora, com ou sem W/, ou "*") */
+const mesmaEtiqueta = (se, etiqueta) => !!se && se.split(',').map((x) => x.trim().replace(/^W\//, '')).some((x) => x === '*' || x === etiqueta);
+const CACHE_ANEXO = 'private, no-cache'; // o navegador pode guardar, mas pergunta antes de usar (e a pergunta passa pelo login)
+
+async function lerArquivo(env, chave, request = null) {
+  const se = request ? request.headers.get('If-None-Match') : null;
+  if (se) { // só o navegador que já tem o arquivo manda isso: confere pela etiqueta, sem baixar do R2
+    const cab = await env.DADOS.head(chave);
+    if (cab && mesmaEtiqueta(se, cab.httpEtag)) return new Response(null, { status: 304, headers: { ETag: cab.httpEtag, 'Cache-Control': CACHE_ANEXO } });
+  }
   const obj = await env.DADOS.get(chave);
   if (!obj) return json(404, { erro: 'Arquivo não encontrado.' });
   const nome = nomeDe(chave);
@@ -179,7 +188,7 @@ async function lerArquivo(env, chave) {
     headers: {
       'Content-Type': tipo || 'application/octet-stream',
       'Content-Disposition': `${tipo ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(nome)}`,
-      'Content-Length': String(obj.size), ETag: obj.httpEtag, 'Cache-Control': 'private, no-store',
+      'Content-Length': String(obj.size), ETag: obj.httpEtag, 'Cache-Control': CACHE_ANEXO,
       'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
     },
   });
@@ -191,7 +200,8 @@ async function gravarArquivo(request, env, chave, email) {
   if (EXTENSOES_PROIBIDAS.test(nomeDe(chave))) throw new ErroHttp(415, 'Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.');
   const corpo = await lerCorpo(request, MAX_ARQUIVO);
   const seNovo = request.headers.get('If-None-Match') === '*';
-  const gravado = seNovo && (await env.DADOS.head(chave)) ? null : await env.DADOS.put(chave, corpo, { customMetadata: { por: email } });
+  // "só se novo" numa chamada só ao R2: dois aparelhos com o mesmo nome ao mesmo tempo, um grava e o outro recebe o 412
+  const gravado = await env.DADOS.put(chave, corpo, { ...(seNovo ? SO_SE_NOVO() : {}), customMetadata: { por: email } });
   if (!gravado) throw new ErroHttp(412, 'Já existe um arquivo com esse nome.');
   return json(200, { ok: true, nome: nomeDe(chave), tamanho: corpo.byteLength });
 }
@@ -249,18 +259,26 @@ async function mover(request, env) {
   const itens = arquivoSo ? [{ key: de, rel: '' }] : (await listarTudo(env, `${de}/`)).map((o) => ({ key: o.key, rel: o.key.slice(de.length) }));
   if (!itens.length) throw new ErroHttp(404, 'Nada para mover.');
   const destinos = itens.slice(0, POR_PEDIDO).map((i) => ({ ...i, novo: `${para}${i.rel}` }));
-  const existentes = new Set();
-  for (const d of destinos) if (await env.DADOS.head(d.novo)) existentes.add(d.novo);
+  // o que já existe no destino: uma listagem (em vez de perguntar arquivo por arquivo); arquivo só, uma pergunta
+  const noDestino = arquivoSo ? ((await env.DADOS.head(para)) ? [para] : []) : (await listarTudo(env, `${para}/`)).map((o) => o.key);
+  const ocupados = new Set(noDestino);
+  const existentes = new Set(destinos.filter((d) => ocupados.has(d.novo)).map((d) => d.novo));
   if (existentes.size && !pedido.juntar) throw new ErroHttp(409, 'Já existe uma pasta ou arquivo com esse nome no destino.');
   let movidos = 0; const sobraram = [];
-  for (const d of destinos) {
-    if (existentes.has(d.novo)) { sobraram.push(d.rel.replace(/^\//, '') || nomeDe(d.key)); continue; }
+  const moverUm = async (d) => {
     const obj = await env.DADOS.get(d.key);
-    if (!obj) continue;
-    await env.DADOS.put(d.novo, await obj.arrayBuffer(), { httpMetadata: obj.httpMetadata, customMetadata: obj.customMetadata });
+    if (!obj) return;
+    // o conteúdo passa direto da leitura para a gravação (sem carregar o arquivo inteiro na memória do Worker)
+    await env.DADOS.put(d.novo, obj.body, { httpMetadata: obj.httpMetadata, customMetadata: obj.customMetadata });
     await env.DADOS.delete(d.key);
     movidos += 1;
+  };
+  const aMover = [];
+  for (const d of destinos) {
+    if (existentes.has(d.novo)) sobraram.push(d.rel.replace(/^\//, '') || nomeDe(d.key));
+    else aMover.push(d);
   }
+  for (let i = 0; i < aMover.length; i += MOVER_JUNTOS) await Promise.all(aMover.slice(i, i + MOVER_JUNTOS).map(moverUm));
   return json(200, { ok: true, movidos, sobraram, mais: itens.length > POR_PEDIDO });
 }
 
@@ -296,7 +314,7 @@ async function apagarPasta(request, env) {
 }
 
 /** Leituras que o site e o crachá do aparelho fazem igual (só GET); null = não é uma delas. */
-async function lerRecurso(env, rota, email, url) {
+async function lerRecurso(env, rota, email, url, request = null) {
   if (rota.startsWith('lista/')) { await exigirPapel(env, email, 'consulta'); return listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
   if (rota.startsWith('lista-tudo/')) {
     const chave = caminhoSeguro(rota.slice(11), { pasta: true });
@@ -306,7 +324,7 @@ async function lerRecurso(env, rota, email, url) {
   if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
     const chave = caminhoSeguro(rota);
     await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta'); // backups têm o banco inteiro (com as senhas de todos)
-    return lerArquivo(env, chave);
+    return lerArquivo(env, chave, request);
   }
   return null;
 }
@@ -368,7 +386,7 @@ async function atenderAparelho(request, env, rota, url, buscar) {
   if (m !== 'GET') throw new ErroHttp(405, 'Método não aceito.');
   if (rota === 'saude') return json(200, { ok: true, email });
   if (rota.startsWith('dados/') && ROTAS_DADOS_APARELHO.includes(rota.slice(6))) return repassarAoCofre(request, env, rota.slice(6), email, url);
-  return (await lerRecurso(env, rota, email, url)) || json(404, { erro: 'Não encontrado.' });
+  return (await lerRecurso(env, rota, email, url, request)) || json(404, { erro: 'Não encontrado.' });
 }
 
 // ---------------------------------------------------------------------------
@@ -413,10 +431,8 @@ async function rotaEnviarEmail(request, env, email, url, buscar) {
   conferirGravacao(request, env);
   const simular = simularGmail(env, url);
   if (!estadoEmail(env, { simular }).ligado) throw new ErroHttp(503, 'O envio pelo Gmail ainda não foi ligado.');
-  const excesso = new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
-  if (Number(request.headers.get('Content-Length') || 0) > MAX_PEDIDO) throw excesso;
-  const corpo = await request.arrayBuffer();
-  if (corpo.byteLength > MAX_PEDIDO) throw excesso;
+  const corpo = await lerAteLimite(request, MAX_PEDIDO);
+  if (!corpo) throw new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
   let pedido;
   try { pedido = JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
   const r = await enviarEmail(env, pedido, { buscar, simular });
@@ -461,7 +477,7 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
     }
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
-    if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url); if (lido) return lido; }
+    if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url, request); if (lido) return lido; }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
       await exigirPapel(env, email, 'operador');

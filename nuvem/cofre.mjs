@@ -101,7 +101,18 @@ export class Cofre {
       CREATE TABLE IF NOT EXISTS excluidos (tabela TEXT NOT NULL, id INTEGER NOT NULL, dados TEXT NOT NULL, por TEXT, em TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS controle (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS log_em ON log (em);
-      CREATE INDEX IF NOT EXISTS lotes_em ON lotes (em);`);
+      CREATE INDEX IF NOT EXISTS lotes_em ON lotes (em);
+      CREATE INDEX IF NOT EXISTS registros_ordem ON registros (ordem);
+      CREATE INDEX IF NOT EXISTS conflitos_abertos ON conflitos (tabela, reg_id, campo) WHERE resolvido_em IS NULL;`);
+    // os dois últimos índices entram também em cofre que já existia (IF NOT EXISTS: roda a cada abertura sem repetir)
+    this.maiorOrdem = null; // maior `ordem` de registros, guardada durante um lote (proximaOrdem)
+  }
+
+  /** Ordem do próximo registro novo: lê a maior uma vez por lote (não a cada registro) e segue contando na memória. */
+  proximaOrdem() {
+    if (this.maiorOrdem === null) this.maiorOrdem = Number(this.q('SELECT MAX(ordem) AS m FROM registros')[0]?.m || 0);
+    this.maiorOrdem += 1;
+    return this.maiorOrdem;
   }
 
   q(consulta, ...p) { return this.sql.exec(consulta, ...p).toArray(); }
@@ -257,6 +268,7 @@ export class Cofre {
     const quem = this.exigir(email, 'consulta');
     if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
     return this.transacao(() => {
+      this.maiorOrdem = null; // cada lote lê a maior ordem de novo (lote desfeito por erro não deixa número velho)
       const resultados = []; const novosConflitos = [];
       for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
       if (lote.ops.length) {
@@ -314,7 +326,7 @@ export class Cofre {
       }
       if (!this.q('SELECT 1 AS x FROM tabelas WHERE nome = ?', tabela).length) this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?)', tabela, id + 1);
       const meta = Object.fromEntries(Object.keys(dados).map((c) => [c, { por: email, em: this.agora() }]));
-      this.sql.exec('INSERT INTO registros (tabela, id, dados, meta, ordem) VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(ordem), 0) + 1 FROM registros))', tabela, id, texto(dados), JSON.stringify(meta));
+      this.sql.exec('INSERT INTO registros (tabela, id, dados, meta, ordem) VALUES (?, ?, ?, ?, ?)', tabela, id, texto(dados), JSON.stringify(meta), this.proximaOrdem());
       this.sql.exec('UPDATE tabelas SET proximo = MAX(proximo, ?) WHERE nome = ?', id + 1, tabela);
       this.registrarLog('registro', tabela, id, dados, email);
       return { ok: true };
