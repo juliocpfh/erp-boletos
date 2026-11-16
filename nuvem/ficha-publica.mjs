@@ -214,8 +214,11 @@ export async function criarLink(request, env, email) {
   let hashAntigo = null; let gravado = false;
   for (let i = 0; i < 4 && !gravado; i += 1) {
     const anterior = await lerRegistro(env, fichaId, pessoa);
-    const velho = anterior ? anterior.registro : {};
-    hashAntigo = velho.hash || null;
+    const lido = anterior ? anterior.registro : {};
+    hashAntigo = lido.hash || null;
+    // registro de outra ficha com o mesmo código (pasta diferente: a ficha antiga saiu e o código voltou a ser usado):
+    // começa do zero, senão a pessoa nova veria os dados e os arquivos da antiga (e o primeiro documento não avisaria)
+    const velho = lido.pasta && lido.pasta !== pasta ? {} : lido;
     const registro = {
       ficha_id: fichaId, pessoa, hash, pasta, contexto, formulario, valores_iniciais: valores,
       criado_em: agora.toISOString(), criado_por: email, vence_em: vence, atualizado_em: agora.toISOString(),
@@ -599,20 +602,23 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
   }
 
   /** Lista de documentos: a do link ou, na pessoa física, montada pelo tipo de renda e o estado civil escolhidos agora. */
+  // (este script fica dentro de um texto do servidor: nada de barra invertida aqui, ela some ao servir a página)
   function documentosAgora() {
     const l = F.contexto.listas;
     if (!l) return F.contexto.documentos;
-    const v = valoresDoForm();
+    // antes do formulário estar na tela (o primeiro desenho), vale o que a ficha já tem
+    const v = document.getElementById('form') ? valoresDoForm() : F.valores;
     const casado = ['Casado(a)', 'União estável'].includes(v.inquilino_estado_civil);
     return [...l.inicio, ...(casado ? l.conjuge : []), ...(l.renda[v.renda_tipo] || l.renda_padrao), ...l.fim];
   }
 
+  let listaDesenhada = []; // a lista de documentos como está na tela (o campo "d3" é o 4º dela)
   function documentosHtml() {
     const enviados = (doc) => F.arquivos.filter((a) => a.documento === doc).map((a) => '✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')').join('<br>');
     const linha = (doc, qual) => '<div class="doc"><div><b>' + esc(doc) + '</b></div><div class="enviados">' + enviados(doc) + '</div>'
       + '<input type="file" accept="application/pdf,image/jpeg,image/png" multiple data-documento="' + esc(qual) + '" aria-label="' + esc(doc) + '"><div class="suave" data-estado="' + esc(qual) + '"></div></div>';
     return '<div class="cartao"><h2>Documentos</h2><p class="suave">' + esc(F.contexto.dica) + ' PDF ou foto (JPG, PNG), até 10 MB cada. Pode mandar mais de um arquivo em cada item.</p>'
-      + '<div id="lista-documentos">' + documentosAgora().map((d, k) => linha(d, 'd' + k)).join('') + '</div>' + linha('Outro documento', 'outro') + '</div>';
+      + '<div id="lista-documentos">' + (listaDesenhada = documentosAgora()).map((d, k) => linha(d, 'd' + k)).join('') + '</div>' + linha('Outro documento', 'outro') + '</div>';
   }
 
   function desenhar(mensagem = '') {
@@ -679,7 +685,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
         const qual = input.dataset.documento;
         const estado = input.parentElement.querySelector('[data-estado]');
         // o servidor recebe o nome do documento (da lista de agora), "assinada" ou "outro"
-        const documento = /^d\d+$/.test(qual) ? documentosAgora()[Number(qual.slice(1))] : qual;
+        const documento = /^d[0-9]+$/.test(qual) ? listaDesenhada[Number(qual.slice(1))] : qual;
         for (const arq of input.files) {
           if (arq.size > 10 * 1024 * 1024) { estado.innerHTML = '<span class="erro">' + esc(arq.name) + ': passa de 10 MB.</span>'; continue; }
           estado.textContent = 'Enviando ' + arq.name + '…';

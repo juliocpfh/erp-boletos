@@ -182,3 +182,33 @@ test('o endereço da ficha não abre o sistema; as rotas da equipe pedem login e
   // fora do computador, sem Access: recusa
   assert.equal((await W.atender(new Request('https://erp.ankjck.com.br/api/ficha-online/lista'), { ...ctx.env })).status, 503);
 });
+
+test('página: o script não tem barra invertida (ela some ao servir a página e o documento da lista virava "d0")', async () => {
+  const ctx = ambiente();
+  const html = await (await FP.atenderFicha(new Request(`${FICHA}/`), ctx.env)).text();
+  const script = html.slice(html.indexOf('<script'), html.lastIndexOf('</script>'));
+  // no código-fonte: o texto da página (do "const PAGINA" até o fim) não pode ter barra invertida
+  const fonte = (await import('node:fs')).readFileSync(new URL('../nuvem/ficha-publica.mjs', import.meta.url), 'utf8');
+  assert.ok(!fonte.slice(fonte.indexOf('const PAGINA = `')).includes(String.fromCharCode(92)), 'barra invertida no texto da página');
+  assert.match(script, /listaDesenhada\[Number\(qual\.slice\(1\)\)\]/, 'o documento enviado é o nome da lista desenhada');
+});
+
+test('ficha nova com o código de uma ficha que saiu (outra pasta): o link começa do zero, sem os arquivos da antiga', async () => {
+  const ctx = ambiente();
+  const chave = await criar(ctx);
+  assert.equal((await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=outro&nome=antigo.pdf', PDF)).status, 200);
+  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza' }, declaracao: true })).status, 200);
+  // mesma ficha (mesma pasta): o link renovado guarda o que já veio
+  const renovada = await criar(ctx);
+  assert.equal((await (await ctx.publico(renovada, 'GET', 'ficha')).json()).arquivos.length, 1);
+  // outra ficha com o mesmo código: nada da antiga
+  const nova = await criar(ctx, { pasta: 'arquivos/Fichas em analise/Joao Lima (ficha 16-11-2026)' });
+  const d = await (await ctx.publico(nova, 'GET', 'ficha')).json();
+  assert.equal(d.arquivos.length, 0);
+  assert.equal(d.enviado_em, null);
+  assert.equal(d.situacao, 'Aguardando');
+  ctx.avisos.length = 0;
+  assert.equal((await ctx.publico(nova, 'PUT', 'ficha/arquivo?documento=outro&nome=novo.pdf', PDF)).status, 200);
+  assert.deepEqual(ctx.avisos, [['interessado', 'documento']], 'o primeiro documento da ficha nova avisa');
+  assert.equal((await ctx.publico(renovada, 'GET', 'ficha')).status, 404, 'o link da antiga não vale mais');
+});

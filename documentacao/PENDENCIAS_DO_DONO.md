@@ -46,7 +46,7 @@ Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você ent
 
 ## 2. Ligar o aviso no celular  `[ ]`
 
-**16/11:** o arquivo `Documentos\chaves-aviso.txt` já foi gerado no computador do dono (passo 1 feito); falta cadastrar no Cloudflare e apagar o arquivo.
+**16/11:** chaves cadastradas no Cloudflare e aviso ligado no celular do dono (passos 1 a 6). No teste o celular não tocou: a ficha nova herdou o arquivo de uma ficha de teste antiga com o mesmo número, e o aviso só toca no primeiro documento; na mesma hora o "Documento inválido" barrava o documento com foto e a renda. Os dois foram corrigidos na PR "Ficha pela internet: documentos aceitos e link sem herança". **Falta (depois do merge):** apagar `Documentos\chaves-aviso.txt` (e da lixeira), se ainda não apagou; gerar um link novo numa ficha de teste, mandar um documento e conferir se o celular toca.
 
 Quando alguém manda a ficha pelo link, a equipe recebe **e-mail** (depois do item 1). O aviso que aparece na tela do celular (como o do WhatsApp) ainda está desligado, porque precisa de duas "chaves" guardadas no Cloudflare.
 

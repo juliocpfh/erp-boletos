@@ -153,9 +153,25 @@ function fichaDoNovoContrato(q = {}) {
 }
 
 /** Fim do formulário da ficha: documentos e proposta, os fiadores (com fiador na garantia), a reserva e as observações. */
-function fimDaFicha() {
-  const k = F.FICHA_FIM.findIndex((c) => c.secao === 'Reserva');
-  return [...F.FICHA_FIM.slice(0, k), ...F.FICHA_FIADORES, ...F.FICHA_FIM.slice(k)];
+/** Contato do interessado: o que se sabe dele ao abrir a ficha (o resto ele preenche pelo link). */
+const CONTATO_FICHA = ['inquilino_nome', 'inquilino_telefone', 'inquilino_whatsapp', 'inquilino_email'];
+/**
+ * Ordem da ficha (pedido do dono, 2026-11-16): situação, imóvel, contato do interessado, proposta, incluso e reserva
+ * (o que a equipe preenche ao abrir); depois os dados da pessoa, renda e fiadores (o interessado manda pelo link),
+ * documentos recebidos, devolução da reserva e observações.
+ */
+function partesDaFicha(pessoa) {
+  const fim = F.FICHA_FIM;
+  const em = (titulo) => fim.findIndex((c) => c.secao && c.secao.startsWith(titulo));
+  const [docs, proposta, devolucao] = [em('Documentos recebidos'), em('Proposta'), em('Devolução da reserva')];
+  const contato = CONTATO_FICHA.map((nome) => pessoa.find((c) => c.nome === nome)).filter(Boolean);
+  return {
+    contato: [{ secao: 'Interessado (contato)' }, ...contato],
+    proposta: fim.slice(proposta, devolucao),
+    pessoa: pessoa.filter((c) => !CONTATO_FICHA.includes(c.nome))
+      .map((c) => (c.secao && c.secao.startsWith('Interessado') ? { ...c, secao: 'Dados do interessado (ele preenche pelo link; o sistema traz para cá)' } : c)),
+    fim: [...fim.slice(docs, proposta), ...fim.slice(devolucao)],
+  };
 }
 
 /**
@@ -470,15 +486,15 @@ export const CADASTROS = {
         const outra = R.fichaAbertaDoImovel(d(), i.id, r && r.id);
         return { nome: `imovel_${i.id}`, rotulo: `${i.nome}${imovelVago(i.id) ? '' : ' · ocupado'}${outra ? ` · já tem a ficha de ${outra.inquilino_nome}` : ''}`, tipo: 'simnao' };
       });
+      // "Usar o endereço do imóvel": o de interesse (com um só marcado)
+      const p = partesDaFicha(F.camposDaPessoa([...R.CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)])
+        .map((c) => (ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: 'Usar o endereço do imóvel de interesse', ajuda: 'Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)' } : c)));
       return [...F.FICHA_INICIO,
         { secao: 'Imóveis de interesse' },
         { nome: 'modo_imoveis', rotulo: 'A ficha é para', tipo: 'opcao', obrig: true, padrao: R.MODOS_FICHA[0], opcoes: R.MODOS_FICHA, largo: true,
           ajuda: `Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada). Só aparecem os imóveis vagos${imoveis.length ? '' : ' (nenhum vago no momento)'}` },
         { quebra: true }, ...imoveis,
-        // "Usar o endereço do imóvel": o de interesse (com um só marcado)
-        ...F.camposDaPessoa([...R.CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)])
-          .map((c) => (ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: 'Usar o endereço do imóvel de interesse', ajuda: 'Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)' } : c)),
-        ...F.FICHA_RENDA, ...fimDaFicha()];
+        ...p.contato, ...p.proposta, ...p.pessoa, ...F.FICHA_RENDA, ...F.FICHA_FIADORES, ...p.fim];
     },
     padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
     valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', bonificacao: r.bonificacao !== false,
