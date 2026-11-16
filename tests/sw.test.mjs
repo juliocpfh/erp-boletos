@@ -1,6 +1,7 @@
 // Aplicativo instalável (docs/sw.js): uma conferência por abertura (data de publicação do index.html); mesma versão → arquivos
-// da cópia sem ir ao site; versão nova → cópia refeita (bibliotecas e modelos baixados de novo em segundo plano); arquivo velho
-// de um cache no caminho não fica guardado como novo; sem internet → cópia; localhost → confere arquivo a arquivo.
+// da cópia sem ir ao site; versão nova → chega numa cópia à parte e só troca a em uso quando está inteira (queda de internet no
+// meio: abre a versão anterior completa); arquivo velho de um cache no caminho não fica guardado como novo; sem internet → cópia;
+// localhost → confere arquivo a arquivo.
 // Também carregarScript (docs/js/app.js), que carrega essas bibliotecas na página.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -28,7 +29,8 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
   const fundo = []; // o que o service worker deixou rodando em segundo plano (ev.waitUntil)
   // erro: o site responde com página de erro (ex.: 502 do Cloudflare)
   // lento: o site não responde (sinal fraco) até `site.soltar()`; os prazos do service worker vencem antes
-  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {} };
+  // caiu: caminhos que não respondem mais (a internet caiu no meio da abertura, depois da conferência)
+  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), caiu: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {} };
   const chave = (k) => (k instanceof Request ? k.url : new URL(k, `${origem}/`).href);
   const cacheFalso = (nome) => {
     if (!armazem.has(nome)) armazem.set(nome, new Map());
@@ -58,7 +60,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
     const metodo = init.method || (req instanceof Request ? req.method : 'GET');
     pedidos.push(`${metodo} ${url.pathname}${url.search}${init.cache ? ` (${init.cache})` : ''}`);
     if (site.lento) await new Promise((ok) => { const antes = site.soltar; site.soltar = () => { antes(); ok(); }; });
-    if (!site.internet || (site.semInternetNoFundo && url.searchParams.has('v'))) throw new TypeError('Failed to fetch');
+    if (!site.internet || site.caiu.has(url.pathname) || (site.semInternetNoFundo && url.searchParams.has('v'))) throw new TypeError('Failed to fetch');
     const data = site.noCaminho.get(url.pathname + url.search) || site.naOrigem.get(url.pathname) || site.publicada;
     const r = site.erro ? new Response('Bad gateway', { status: site.erro })
       : site.fora.has(url.pathname) ? new Response('Not found', { status: 404 })
@@ -111,9 +113,16 @@ test('partes carregadas só quando usadas (planilha, regras em texto, visualizad
   for (const a of ['/js/exportar.js', '/js/regras-texto.js', '/js/visualizador.js', '/js/migracao.js']) {
     assert.ok(m.guardados().includes(a), `guardou ${a}`);
   }
+  // bibliotecas de PDF e ZIP: aparelho recém-instalado gera PDF e ZIP sem internet; planilha e visualizador de PDF só depois do 1º uso
+  for (const a of ['/vendor/jspdf.umd.min.js', '/vendor/html2canvas.min.js', '/vendor/jszip.min.js']) {
+    assert.ok(m.guardados().includes(a), `guardou ${a}`);
+    assert.ok(fs.existsSync(new URL(`../docs${a}`, import.meta.url)), `${a} existe em docs/vendor`);
+  }
+  for (const a of ['/vendor/exceljs.min.js', '/vendor/pdf.min.js', '/vendor/pdf.worker.min.js']) assert.ok(!m.guardados().includes(a), `${a} fica para o 1º uso`);
   m.site.internet = false;
   await m.abrir();
   assert.match(await m.pedir('js/exportar.js'), /exportar\.js/, 'sem internet, a planilha de tudo ainda carrega');
+  assert.match(await m.pedir('vendor/jspdf.umd.min.js'), /jspdf/, 'e o PDF também');
   // em localhost não baixa nada em segundo plano (lá cada arquivo é conferido quando a página pede)
   const local = mundo({ hostname: 'localhost' });
   await local.abrir();
@@ -133,6 +142,72 @@ test('versão nova publicada: a cópia é refeita com os arquivos novos', async 
   const depois = await m.abrir();
   assert.equal(m.pedidos.filter((p) => p.includes('js/')).length, 0);
   assert.match(depois[1], /08 Nov 2026/, 'a cópia é a nova');
+});
+
+test('versão nova e a internet cai no meio da atualização: o aplicativo abre com a versão anterior inteira, sem mistura; depois completa e troca', async () => {
+  const m = mundo();
+  await m.abrir(); // versão A guardada
+  m.site.publicada = B;
+  m.site.caiu.add('/js/regras.js'); m.site.semInternetNoFundo = true; // a conferência e o app.js passam; depois a internet cai
+  const naQueda = await m.abrir();
+  assert.match(naQueda[0], /app\.js @ Sun, 08/, 'o que chegou do site é o novo');
+  assert.match(naQueda[1], /regras\.js @ Sat, 07/, 'o que não chegou abre o anterior, em vez de o aplicativo não abrir');
+  // a cópia em uso continua sendo a versão A inteira (nada foi apagado nem trocado por arquivo da B)
+  const emUso = m.armazem.get('imoveis-telas-v3');
+  for (const a of ['js/app.js', 'js/regras.js', 'css/estilo.css', 'js/exportar.js']) {
+    assert.match(await emUso.get(`https://erp.exemplo.com.br/${a}`).clone().text(), /@ Sat, 07/, `${a} da versão anterior continua guardado`);
+  }
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), A);
+  // sem internet nenhuma: abre tudo da versão A (página e arquivos), nada da B misturado
+  m.site.internet = false;
+  assert.match(await m.pedir('', 'navigate'), /conteudo de \/ @ Sat, 07/);
+  for (const t of await m.abrir()) assert.match(t, /@ Sat, 07/);
+  assert.match(await m.pedir('js/exportar.js'), /@ Sat, 07/);
+  // a internet volta: a página recebe a B, o que já tinha chegado não é baixado de novo, e o resto completa em segundo plano
+  m.site.internet = true; m.site.caiu.clear(); m.site.semInternetNoFundo = false; m.pedidos.length = 0;
+  for (const t of await m.abrir()) assert.match(t, /@ Sun, 08/);
+  assert.ok(!m.pedidos.some((p) => p.startsWith('GET /js/app.js')), 'o app.js da B já estava guardado');
+  assert.ok(!m.armazem.has('imoveis-telas-nova'), 'a versão nova chegou inteira e virou a cópia em uso');
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), B);
+  // daí em diante, sem internet, é a B inteira
+  m.site.internet = false;
+  for (const t of await m.abrir()) assert.match(t, /@ Sun, 08/);
+  assert.match(await m.pedir('js/exportar.js'), /@ Sun, 08/);
+  assert.match(await m.pedir('', 'navigate'), /conteudo de \/ @ Sun, 08/);
+});
+
+test('versão nova pela metade e sai outra: recomeça com a mais nova; arquivo que saiu do site sai da cópia só na troca', async () => {
+  const m = mundo();
+  await m.abrir();
+  await m.pedir('js/antigo.js'); await m.terminarFundo(); // parte que a versão A tinha
+  m.site.publicada = B; m.site.semInternetNoFundo = true;
+  await m.abrir(); // a B chega pela metade
+  m.site.publicada = C; m.site.semInternetNoFundo = false; m.site.fora.add('/js/antigo.js');
+  for (const t of await m.abrir()) assert.match(t, /@ Mon, 09/);
+  assert.ok(!m.armazem.has('imoveis-telas-nova'));
+  assert.ok(!m.guardados().includes('/js/antigo.js'), 'o que saiu do site saiu da cópia');
+  m.site.internet = false;
+  for (const t of await m.abrir()) assert.match(t, /@ Mon, 09/, 'nada da B ficou');
+  assert.match(await m.pedir('js/migracao.js'), /@ Mon, 09/);
+});
+
+test('o aparelho para no meio da troca pela versão nova: a abertura seguinte termina, mesmo sem internet', async () => {
+  const m = mundo();
+  await m.abrir();
+  m.site.publicada = B; m.site.semInternetNoFundo = true;
+  await m.abrir(); // a B chega pela metade (falta o que vem em segundo plano)
+  // como se tudo tivesse chegado e o aparelho parasse antes de trocar: NOVA completa (lista vazia), cópia em uso ainda na A
+  const nova = m.armazem.get('imoveis-telas-nova'); const emUso = m.armazem.get('imoveis-telas-v3');
+  for (const u of Object.keys(JSON.parse(await nova.get('https://erp.exemplo.com.br/__para-baixar').clone().text()))) {
+    nova.set(u, new Response(`conteudo de ${new URL(u).pathname} @ ${B}`, { headers: { 'last-modified': B } }));
+  }
+  nova.set('https://erp.exemplo.com.br/__para-baixar', new Response('{}'));
+  const outro = mundo({ armazem: m.armazem, publicada: B }); // o service worker sobe de novo
+  outro.site.internet = false;
+  for (const t of await outro.abrir()) assert.match(t, /@ Sun, 08/);
+  assert.match(await outro.pedir('js/exportar.js'), /@ Sun, 08/);
+  assert.ok(!outro.armazem.has('imoveis-telas-nova'));
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), B);
 });
 
 test('sem internet: a página e os arquivos vêm da cópia', async () => {
