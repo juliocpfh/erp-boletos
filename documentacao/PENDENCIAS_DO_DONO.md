@@ -18,7 +18,8 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
+| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (feita; falta a 1ª rodada) | você + Claude | 5 min |
+| 10 | Opção de anexar a contra-vistoria de entrada | Claude | — |
 
 ---
 
@@ -171,6 +172,10 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   - Tela da pasta com caixinhas, **Ver a capa e imprimir tudo** (capa + documentos numa impressão só; depois "Saiu tudo certo?") e **Já está tudo em papel**. Fora da pasta: NF, comprovantes, boletos, WhatsApp, documentos de renda e Serasa, fotos da vistoria, apólices e e-mails.
   - **Troca de titular:** passo 1 com o que falta da pasta do anterior e a caixinha "Pus a pasta de fulano dentro".
   - **Falta você (depois do merge):** abrir **Dados e backup → Arquivo impresso** e, para cada inquilino, conferir a pasta de papel: o que já está nela, marque e use "Já está tudo em papel"; o que falta, "Ver a capa e imprimir tudo". Termo do acordo: anexe no boleto do acordo (Etapas do acordo → "anexar o termo assinado"); enquanto faltar, o Painel avisa.
+
+## 10. Anexar a contra-vistoria de entrada  `[ ]`
+
+**Pedido do dono em 15/11.** Criar um lugar próprio para anexar a **contra-vistoria de entrada** (a resposta do inquilino à vistoria de entrada, com o que ele encontrou de diferente). Hoje ela só pode ir solta em "Arquivos do inquilino". Antes de fazer, confirmar com o dono: onde fica o botão (junto da vistoria de entrada?), se vira etapa da entrada com prazo e se entra na pasta física (9c).
 
 ## Ficou de fora de propósito (não é defeito)
 
