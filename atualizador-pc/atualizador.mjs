@@ -314,7 +314,7 @@ export async function principal(args = []) {
     }
     const r = soArquivos ? null : await atualizar(cfg);
     let copia; let copiaOk = true; const erros = [];
-    try { copia = resumoCopia(await atualizarCopia(cfg, { erros })); } catch (e) { copiaOk = false; copia = `arquivos=FALHOU ${e.name === 'TimeoutError' ? 'a nuvem demorou demais para responder' : e.message}`; }
+    try { copia = resumoCopia(await atualizarCopia(cfg, { erros })); } catch (e) { copiaOk = false; copia = `arquivos: ${e.name === 'TimeoutError' ? 'a nuvem demorou demais para responder' : e.message}`; }
     // a cópia aberta inteira falhou: a linha começa com FALHOU e o programa sai com erro (o Agendador de Tarefas mostra)
     const linha = `${copiaOk ? 'ok' : 'FALHOU'} ${r ? `dados=${r.dados} programa=${r.programa} ` : ''}${copia}`;
     fs.writeFileSync(path.join(cfg.pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} ${linha}\n${linhasDeErros(erros)}`);
