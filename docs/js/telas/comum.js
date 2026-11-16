@@ -378,7 +378,7 @@ export async function acertarNomesDosComprovantes(contratoId = null) {
     try {
       const dir = await pastaDoEscopo('contrato', x.contratoId, false);
       const arq = await S.abrirArquivo(dir, x.nome);
-      const novo = await S.salvarArquivo(dir, new File([arq], `${x.esperado}${extensao(x.nome)}`));
+      const novo = await S.salvarArquivo(dir, new File([arq], `${x.esperado}${extensao(x.nome)}`), { compactar: false }); // só o nome muda
       await dir.removeEntry(x.nome);
       await alterar((db) => R.renomearReferencias(db, x.contratoId, x.nome, novo, login()));
       n += 1;
@@ -832,7 +832,7 @@ export async function guardarGuiasSoltas(imovelId, anoNovo) {
   if (!arquivos.length) return 0;
   const destino = await pastaDoEscopo('iptuano', idGuiasDoAno(imovelId, anterior.ano));
   for (const a of arquivos) {
-    await S.salvarArquivo(destino, new File([await S.abrirArquivo(solta, a.nome)], a.nome));
+    await S.salvarArquivo(destino, new File([await S.abrirArquivo(solta, a.nome)], a.nome), { compactar: false }); // só muda de pasta
     await solta.removeEntry(a.nome);
   }
   return arquivos.length;

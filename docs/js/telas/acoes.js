@@ -6,6 +6,7 @@ import * as B from '../backup-seguro.js';
 import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
+import * as CP from '../compactar.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
@@ -1856,7 +1857,8 @@ export const ACOES = {
     if (escopo === 'seguro') return enviarArquivosSeguro(Number(id), el);
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
-    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
+    // documentos da ficha em análise ficam como chegaram (a conferência olha dentro do arquivo); os outros são compactados
+    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f, { compactar: escopo !== 'ficha' }));
     const vinc = vinculoDoEscopo(escopo, id);
     await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
     aviso(`${nomes.length} arquivo(s) anexado(s).`);
@@ -2103,6 +2105,34 @@ export const ACOES = {
     await conferirHerancas();
     const r = await conferirArquivos();
     aviso(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ''}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : ' Nenhum faltando.'}`, r.faltando.length ? 'aviso' : 'ok');
+  },
+
+  /**
+   * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
+   * no lugar com o mesmo nome. PDF assinado e documentos das fichas em análise ficam como estão.
+   */
+  async compactarAnexos() {
+    if (!podeUsuario('admin')) throw new Error('Só o administrador compacta os anexos que já estão no sistema.');
+    const caixa = document.getElementById('progresso-compactar');
+    const mostrarAndamento = (t) => { if (caixa) caixa.textContent = t; };
+    const MB = (b) => `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
+    mostrarAndamento('Procurando os anexos…');
+    let raiz;
+    try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { aviso('Não há anexos para compactar.', 'info'); mostrarAndamento(''); return; }
+    const r = await CP.compactarTodos(raiz, {
+      ler: (h) => S.lerConteudo(h),
+      gravar: (dir, nome, arq) => S.escreverTexto(dir, nome, arq),
+      aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`),
+    });
+    const texto = r.compactados
+      ? `${r.compactados} de ${r.vistos} arquivo(s) compactado(s): de ${MB(r.antes)} para ${MB(r.depois)} (${MB(r.antes - r.depois)} a menos).`
+      : `Nenhum dos ${r.vistos} arquivo(s) olhados ficaria bem menor: nada foi trocado.`;
+    mostrarAndamento(`${texto}${r.falhas ? ` ${r.falhas} não puderam ser lidos.` : ''}`);
+    if (r.compactados) {
+      await alterar((db) => R.registrar(db, login(), 'Alteração', 'arquivos', null, `Anexos compactados: ${texto}`, null, {}, false));
+      atualizarCopiaAberta().catch(() => {}); // a cópia aberta do PC recebe os arquivos novos (tamanho mudou)
+    }
+    aviso(texto, r.falhas ? 'aviso' : 'ok');
   },
 
   async excluirArquivo({ escopo, id, nome }) {
