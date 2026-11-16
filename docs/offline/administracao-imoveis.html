@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-L6CSQWMdgfOGwRwff+nXCFM161rJU52nKmO2bLE9Mg8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-fCAHFfNPwsTuPIB43TM5Ibfj19sxDe005RfpCf5JIW4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="149534e89271a844">
+<meta name="fontes" content="20f07ea95b9a43e4">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1565,7 +1565,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           rotulo: "Compactar anexos (fotos e PDFs escaneados)",
           tipo: "simnao",
           padrao: true,
-          explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos da ficha em análise ficam como chegaram (a conferência de montagem olha dentro do arquivo). Os que já estavam no sistema: botão "Compactar os anexos" em Dados e backup.',
+          explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos que a pessoa manda pelo link da ficha são compactados depois que chegam: quando a ficha é aberta, o sistema primeiro faz a conferência de montagem (que olha dentro do arquivo como ele chegou), guarda o resultado na ficha e só então compacta. Os que já estavam no sistema: botão "Compactar os anexos" em Dados e backup.',
           consequencia: "Não: os arquivos são guardados como chegaram (ocupam mais espaço e demoram mais para abrir no celular). Os que já foram compactados não voltam ao tamanho de antes.",
           lei: "Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020)."
         },
@@ -10744,11 +10744,16 @@ ${xref}
     const V = await Promise.resolve().then(() => (init_visualizador(), visualizador_exports));
     return V.carregarPdfJs();
   }
+  function avisarAndamento(texto3, fim = false) {
+    if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
+    window.dispatchEvent(new CustomEvent("compactar-andamento", { detail: { texto: texto3, fim } }));
+  }
   async function compactarPdf(blob, aoAndar = () => {
   }) {
     const bytes2 = new Uint8Array(await blob.arrayBuffer());
     if (await pdfTemAssinatura(bytes2)) return null;
     if (typeof location !== "undefined" && location.protocol === "file:") return null;
+    const nome = blob.name || "PDF";
     const lib = await pdfJs();
     const doc = await lib.getDocument({ data: bytes2.slice(), isEvalSupported: false }).promise;
     try {
@@ -10757,20 +10762,21 @@ ${xref}
       if (doc.numPages < 1 || doc.numPages > MAX_PAGINAS) return null;
       const OPS = lib.OPS;
       const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== void 0));
+      avisarAndamento(`Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
       for (let i = 1; i <= doc.numPages; i += 1) {
         const p2 = await doc.getPage(i);
         const t = await p2.getTextContent();
         if (t.items.some((x) => x.str && x.str.trim())) return null;
         if ((await p2.getAnnotations()).length) return null;
-        const ops = await p2.getOperatorList({ intent: "print" });
-        if (!ops.fnArray.some((f) => imagens.has(f))) return null;
-        p2.cleanup();
       }
       const paginas = [];
       let total = 0;
       for (let i = 1; i <= doc.numPages; i += 1) {
         aoAndar(i, doc.numPages);
+        avisarAndamento(`Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`);
         const p2 = await doc.getPage(i);
+        const ops = await p2.getOperatorList({ intent: "print" });
+        if (!ops.fnArray.some((f) => imagens.has(f))) return null;
         const um = p2.getViewport({ scale: 1 });
         const escala = Math.min(LADO_MAXIMO / Math.max(um.width, um.height), DPI_MAXIMO / 72);
         const vista = p2.getViewport({ scale: escala });
@@ -10789,23 +10795,25 @@ ${xref}
       const novo = new Blob([montarPdfDeImagens(paginas)], { type: "application/pdf" });
       return compensa(blob.size, novo.size) ? novo : null;
     } finally {
+      avisarAndamento("", true);
       doc.destroy();
     }
   }
-  async function compactarTodos(raiz, { ler: ler2, gravar: gravar2, compactar = compactarAnexo, aoAndar = () => {
+  async function compactarTodos(raiz, { ler: ler2, gravar: gravar2, compactar = compactarAnexo, conferido = () => false, aoAndar = () => {
   } }) {
     const lista3 = [];
-    const juntar2 = async (dir, nivel) => {
+    const juntar2 = async (dir, partes) => {
       for await (const [nome, h] of dir.entries()) {
         if (h.kind === "directory") {
-          if (!(nivel === 0 && nome === PASTA_FICHAS)) await juntar2(h, nivel + 1);
+          await juntar2(h, [...partes, nome]);
           continue;
         }
+        if (partes[0] === PASTA_FICHAS && ehDoLink(nome) && !conferido(partes[1], nome)) continue;
         const tamanho2 = h.tamanho ?? (await h.getFile()).size;
         if (candidato(nome, tamanho2)) lista3.push({ dir, nome, h });
       }
     };
-    await juntar2(raiz, 0);
+    await juntar2(raiz, []);
     const r = { vistos: lista3.length, compactados: 0, antes: 0, depois: 0, falhas: 0 };
     for (let i = 0; i < lista3.length; i += 1) {
       const { dir, nome, h } = lista3[i];
@@ -10850,7 +10858,7 @@ ${xref}
       return igual2;
     }
   }
-  var LADO_MAXIMO, QUALIDADE_FOTO, QUALIDADE_PDF, DPI_MAXIMO, GANHO_MINIMO, MINIMO_FOTO, MINIMO_PDF, MAX_PAGINAS, compensa, MIME, num, temCanvas, PASTA_FICHAS, CANDIDATO, candidato;
+  var LADO_MAXIMO, QUALIDADE_FOTO, QUALIDADE_PDF, DPI_MAXIMO, GANHO_MINIMO, MINIMO_FOTO, MINIMO_PDF, MAX_PAGINAS, compensa, MIME, num, temCanvas, PASTA_FICHAS, CANDIDATO, candidato, ehDoLink;
   var init_compactar = __esm({
     "docs/js/compactar.js"() {
       init_conferir_pdf();
@@ -10869,6 +10877,7 @@ ${xref}
       PASTA_FICHAS = "Fichas em analise";
       CANDIDATO = /\.(jpe?g|png|webp|heic|pdf)$/i;
       candidato = (nome, tamanho2) => CANDIDATO.test(nome) && tamanho2 >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
+      ehDoLink = (nome) => /^link-/.test(nome);
     }
   });
 
@@ -22584,6 +22593,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   // docs/js/telas/fichas.js
   init_armazenamento();
   init_conferir_pdf();
+  init_compactar();
 
   // docs/js/ficha-online.js
   init_calculos();
@@ -23068,31 +23078,74 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     return `<div class="cartao" style="margin:8px 0"><h3>${esc(nome)}${p2 === "interessado" ? "" : " (fiador)"}</h3>${partes.join("")}</div>`;
   }
   var conferidos = /* @__PURE__ */ new Map();
-  async function conferirArquivosDoLink(area, f) {
+  var filaConferencia = Promise.resolve();
+  function conferirArquivosDoLink(area, f) {
+    const vez = filaConferencia.then(() => conferirEGuardar(area, f));
+    filaConferencia = vez.catch(() => {
+    });
+    return vez;
+  }
+  async function conferirEGuardar(area, f) {
     const itens = [...area.querySelectorAll("[data-conferir]")];
     if (!itens.length) return;
     const pasta = await pastaDoEscopo("ficha", f.id, false);
+    const guardadas = (buscar2("fichas", f.id) || f).conferencias_link || {};
+    const novas = {};
     for (const li of itens) {
       const nome = li.dataset.conferir;
       const chave = `${f.id}|${nome}`;
+      if (!conferidos.has(chave) && guardadas[nome]) conferidos.set(chave, guardadas[nome]);
       if (!conferidos.has(chave)) {
-        let html;
         try {
           const blob = await abrirArquivo(pasta, nome);
-          const r = await conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
-          html = sinaisHtml(r, li.dataset.nomePessoa);
+          const r2 = await conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
+          conferidos.set(chave, r2);
+          novas[nome] = { ...r2, conferido_em: (/* @__PURE__ */ new Date()).toISOString() };
         } catch {
-          html = '<span class="suave">não foi possível conferir o arquivo</span>';
+          conferidos.set(chave, null);
         }
-        conferidos.set(chave, html);
       }
       const alvo = li.querySelector("[data-sinais]");
+      const r = conferidos.get(chave);
       if (alvo) {
         alvo.className = "";
-        alvo.innerHTML = conferidos.get(chave);
+        alvo.innerHTML = r ? sinaisHtml(r, li.dataset.nomePessoa) : '<span class="suave">não foi possível conferir o arquivo</span>';
       }
     }
+    if (!Object.keys(novas).length || !opera()) return;
+    await alterar((db) => {
+      const atual = buscar(db, "fichas", f.id);
+      if (!atual) return;
+      atualizar(
+        db,
+        "fichas",
+        f.id,
+        { conferencias_link: { ...atual.conferencias_link || {}, ...novas } },
+        login(),
+        `Conferência guardada de ${Object.keys(novas).length} documento(s) mandado(s) pelo link`
+      );
+    });
+    if (regra("compactar_anexos")) await compactarDoLink(pasta, Object.keys(novas));
   }
+  async function compactarDoLink(pasta, nomes) {
+    let antes = 0;
+    let depois = 0;
+    let n = 0;
+    for (const nome of nomes) {
+      try {
+        const c = await compactarAnexo(await lerConteudo(await pasta.getFileHandle(nome)), { manterNome: true });
+        if (!c.mudou) continue;
+        await escreverTexto(pasta, nome, c.arquivo);
+        antes += c.antes;
+        depois += c.depois;
+        n += 1;
+      } catch (e) {
+        console.warn(`Compactar "${nome}" da ficha: ${e.message}`);
+      }
+    }
+    if (n) aviso(`${n} documento(s) do link compactado(s) depois da conferência: de ${tamanhoMb(antes)} para ${tamanhoMb(depois)}.`, "info");
+  }
+  var tamanhoMb = (b) => `${(b / 1048576).toFixed(1).replace(".", ",")} MB`;
   function sinaisHtml(r, nomePessoa) {
     const cor = { alerta: "perigo", atencao: "aviso", info: "neutra" };
     const titulo2 = { alerta: "⚠ possível montagem", atencao: "atenção", info: "impresso de página" };
@@ -24152,12 +24205,11 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
   }
   var nomeComprovante2 = (tipo, data2, arq) => `comprovante-${tipo}-${data2 || hojeIso()}${extensao(arq.name)}`;
-  var SEM_COMPACTAR = { compactar: false };
-  async function guardarComprovantes(lista3, dados, form, pasta, opcoes2 = {}) {
+  async function guardarComprovantes(lista3, dados, form, pasta) {
     for (const k of lista3) {
       const arq = arquivoEscolhido(form, k.campo);
       if (!arq || !k.vale(dados) || !(dados[k.valor] > 0)) continue;
-      dados[k.campo] = await salvarArquivo(await pasta(), new File([arq], nomeComprovante2(k.nome, dados[k.data], arq)), opcoes2);
+      dados[k.campo] = await salvarArquivo(await pasta(), new File([arq], nomeComprovante2(k.nome, dados[k.data], arq)));
     }
   }
   var xAnexo = (acao, dados, confirmar) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
@@ -24594,9 +24646,9 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       },
       async ajustarAsync(dados, erros, r, form) {
         const pasta = r ? () => pastaDoEscopo("ficha", r.id) : async () => subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS2, dados.pasta]);
-        await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta, SEM_COMPACTAR);
+        await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta);
         const serasa = arquivoEscolhido(form, "analise_serasa");
-        if (serasa) dados.analise_serasa = await salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${hojeIso()}${extensao(serasa.name)}`), SEM_COMPACTAR);
+        if (serasa) dados.analise_serasa = await salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${hojeIso()}${extensao(serasa.name)}`));
       }
     },
     correcoes: {
@@ -25552,7 +25604,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       O que estiver em outra pasta volta sozinho para o lugar; o que sumiu aparece como alerta no Painel e na página do inquilino, para anexar de novo.</p>
       ${botao("conferirArquivos", "Conferir arquivos agora")}</div>` : ""}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link("#/regras", "Regras do sistema")} → "Compactar anexos"${regra("compactar_anexos") ? "" : ", hoje desligada"}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
-      Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco), PDF com texto e os documentos das fichas em análise ficam como estão.</p>
+      Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco) e PDF com texto ficam como estão; documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha).</p>
       ${botao("compactarAnexos", "Compactar os anexos que já estão no sistema", {}, "secundario", "Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.")}<div id="progresso-compactar" aria-live="polite" class="suave"></div></div>` : ""}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
@@ -28776,7 +28828,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (escopo === "seguro") return enviarArquivosSeguro(Number(id), el);
       const dir = await pastaDoEscopo(escopo, Number(id));
       const nomes = [];
-      for (const f of el.files) nomes.push(await salvarArquivo(dir, escopo === "matricula" && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f, { compactar: escopo !== "ficha" }));
+      for (const f of el.files) nomes.push(await salvarArquivo(dir, escopo === "matricula" && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
       const vinc = vinculoDoEscopo(escopo, id);
       await alterar((db) => registrar(db, login(), "Inclusão", "arquivos", null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(", ") }, vinc));
       aviso(`${nomes.length} arquivo(s) anexado(s).`);
@@ -29016,7 +29068,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     /**
      * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
-     * no lugar com o mesmo nome. PDF assinado e documentos das fichas em análise ficam como estão.
+     * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
      */
     async compactarAnexos() {
       if (!podeUsuario("admin")) throw new Error("Só o administrador compacta os anexos que já estão no sistema.");
@@ -29034,7 +29086,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         mostrarAndamento("");
         return;
       }
+      const conferidos2 = new Set((d().fichas || []).flatMap((f) => Object.keys(f.conferencias_link || {}).map((n) => `${limparNome(f.pasta || nomePastaFicha(f))}|${n}`)));
       const r = await compactarTodos(raiz, {
+        conferido: (pastaFicha, nome) => conferidos2.has(`${pastaFicha}|${nome}`),
         ler: (h) => lerConteudo(h),
         gravar: (dir, nome, arq) => escreverTexto(dir, nome, arq),
         aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`)
@@ -30507,6 +30561,23 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const el = document.getElementById("mensagens");
     if (!el) return;
     el.innerHTML = mensagens.map((m) => `<div class="alerta ${m.tipo} mensagem" data-msg="${m.id}">${esc(m.texto)}<button type="button" class="fechar" title="Fechar" data-fechar-msg="${m.id}">×</button></div>`).join("");
+  }
+  var msgCompactar = null;
+  if (typeof window !== "undefined" && window.addEventListener) {
+    window.addEventListener("compactar-andamento", (ev) => {
+      const { texto: texto3, fim } = ev.detail || {};
+      if (fim || !texto3) {
+        if (msgCompactar) fecharMensagem(msgCompactar.id);
+        msgCompactar = null;
+        return;
+      }
+      if (!msgCompactar || !mensagens.includes(msgCompactar)) {
+        msgCompactar = { id: proximaMensagem++, texto: texto3, tipo: "info" };
+        mensagens.push(msgCompactar);
+      }
+      msgCompactar.texto = texto3;
+      desenharMensagens();
+    });
   }
   document.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-fechar-msg]");
