@@ -101,12 +101,12 @@ function pasta(nome, filhos) {
   };
 }
 
-test('compactar os que já estão no sistema: mesmo nome, mesmo lugar; ficha em análise, pequenos e outros tipos ficam', async () => {
+test('compactar os que já estão no sistema: mesmo nome, mesmo lugar; documento do link da ficha só depois de conferido; pequenos e outros tipos ficam', async () => {
   const MB = 1024 * 1024;
   const inquilino = pasta('Ana Teste', { 'rg.jpg': 4 * MB, 'contrato-assinado.pdf': 2 * MB, 'escaneado.pdf': 12 * MB, 'pequena.jpg': 50_000, 'planilha.xlsx': 3 * MB, 'ja-pequena.png': 1 * MB });
   const raiz = pasta('arquivos', {
     'Imovel 1': pasta('Imovel 1', { Inquilinos: pasta('Inquilinos', { 'Ana Teste': inquilino }) }),
-    [CP.PASTA_FICHAS]: pasta(CP.PASTA_FICHAS, { 'Bruno Teste': pasta('Bruno Teste', { 'holerite.jpg': 5 * MB }) }),
+    [CP.PASTA_FICHAS]: pasta(CP.PASTA_FICHAS, { 'Bruno Teste': pasta('Bruno Teste', { 'link-holerite-2026-11-16-ab12cd.jpg': 5 * MB, 'link-rg-2026-11-16-ef34ab.jpg': 5 * MB, 'serasa-da-equipe.jpg': 5 * MB }) }),
   });
   const olhados = [];
   const gravados = [];
@@ -115,22 +115,24 @@ test('compactar os que já estão no sistema: mesmo nome, mesmo lugar; ficha em 
   const compactar = async (f, op) => {
     assert.deepEqual(op, { manterNome: true });
     olhados.push(f.name);
-    const novo = { 'rg.jpg': 400_000, 'escaneado.pdf': 1_500_000 }[f.name];
+    const novo = { 'rg.jpg': 400_000, 'escaneado.pdf': 1_500_000, 'link-rg-2026-11-16-ef34ab.jpg': 500_000, 'serasa-da-equipe.jpg': 600_000 }[f.name];
     return novo ? { arquivo: new File([new Uint8Array(novo)], f.name), antes: f.size, depois: novo, mudou: true } : { arquivo: f, antes: f.size, depois: f.size, mudou: false };
   };
   const r = await CP.compactarTodos(raiz, {
     ler: async (h) => { if (h.name === 'ja-pequena.png') throw new Error('arquivo mudou no meio da leitura'); return h.getFile(); },
     gravar: async (dir, nome, arq) => { gravados.push([dir.name, nome, arq.size]); },
     compactar,
+    conferido: (pastaFicha, nome) => pastaFicha === 'Bruno Teste' && nome === 'link-rg-2026-11-16-ef34ab.jpg',
     aoAndar: (x) => andamento.push(x),
   });
-  assert.deepEqual(olhados.sort(), ['contrato-assinado.pdf', 'escaneado.pdf', 'rg.jpg']);
-  assert.deepEqual(gravados.sort(), [['Ana Teste', 'escaneado.pdf', 1_500_000], ['Ana Teste', 'rg.jpg', 400_000]]);
-  assert.equal(r.vistos, 4);
-  assert.equal(r.compactados, 2);
+  assert.deepEqual(olhados.sort(), ['contrato-assinado.pdf', 'escaneado.pdf', 'link-rg-2026-11-16-ef34ab.jpg', 'rg.jpg', 'serasa-da-equipe.jpg']);
+  assert.deepEqual(gravados.sort(), [['Ana Teste', 'escaneado.pdf', 1_500_000], ['Ana Teste', 'rg.jpg', 400_000], ['Bruno Teste', 'link-rg-2026-11-16-ef34ab.jpg', 500_000], ['Bruno Teste', 'serasa-da-equipe.jpg', 600_000]]);
+  assert.equal(r.vistos, 6);
+  assert.equal(r.compactados, 4);
   assert.equal(r.falhas, 1);
-  assert.equal(r.antes, 16 * MB);
-  assert.equal(r.depois, 1_900_000);
-  assert.equal(andamento.at(-1).feitos, 4);
-  assert.ok(!gravados.some(([, n]) => n === 'holerite.jpg'), 'ficha em análise não é mexida');
+  assert.equal(r.antes, 26 * MB);
+  assert.equal(r.depois, 3_000_000);
+  assert.equal(andamento.at(-1).feitos, 6);
+  assert.ok(!olhados.includes('link-holerite-2026-11-16-ab12cd.jpg'), 'documento do link ainda não conferido não é mexido');
+  assert.ok(CP.ehDoLink('link-rg-2026-11-16-ef34ab.jpg') && !CP.ehDoLink('rg.jpg'));
 });

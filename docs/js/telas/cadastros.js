@@ -75,15 +75,12 @@ function conferirComprovantes(lista, dados, r, form) {
 /** Nome do arquivo do comprovante (ex.: comprovante-caucao-2026-10-05.pdf). */
 export const nomeComprovante = (tipo, data, arq) => `comprovante-${tipo}-${data || C.hojeIso()}${extensao(arq.name)}`;
 
-/** Documentos da ficha em análise ficam como chegaram (a conferência olha dentro do arquivo; compactar.js). */
-const SEM_COMPACTAR = { compactar: false };
-
 /** Grava na pasta os comprovantes escolhidos e guarda o nome do arquivo no registro. */
-async function guardarComprovantes(lista, dados, form, pasta, opcoes = {}) {
+async function guardarComprovantes(lista, dados, form, pasta) {
   for (const k of lista) {
     const arq = arquivoEscolhido(form, k.campo);
     if (!arq || !k.vale(dados) || !(dados[k.valor] > 0)) continue;
-    dados[k.campo] = await S.salvarArquivo(await pasta(), new File([arq], nomeComprovante(k.nome, dados[k.data], arq)), opcoes);
+    dados[k.campo] = await S.salvarArquivo(await pasta(), new File([arq], nomeComprovante(k.nome, dados[k.data], arq)));
   }
 }
 
@@ -541,10 +538,10 @@ export const CADASTROS = {
     async ajustarAsync(dados, erros, r, form) {
       const pasta = r ? () => pastaDoEscopo('ficha', r.id)
         : async () => S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), [PASTA_FICHAS, dados.pasta]);
-      await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta, SEM_COMPACTAR);
+      await guardarComprovantes(COMPROVANTES_FICHA, dados, form, pasta);
       // análise do Serasa (não é de dinheiro: grava sem valor)
       const serasa = arquivoEscolhido(form, 'analise_serasa');
-      if (serasa) dados.analise_serasa = await S.salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${C.hojeIso()}${extensao(serasa.name)}`), SEM_COMPACTAR);
+      if (serasa) dados.analise_serasa = await S.salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${C.hojeIso()}${extensao(serasa.name)}`));
     },
   },
   correcoes: {

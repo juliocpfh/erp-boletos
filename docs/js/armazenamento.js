@@ -183,8 +183,8 @@ export function tipoParaAbrir(nome) {
 /**
  * Grava o anexo na pasta com um nome livre (acrescenta " (2)" se já existir) e devolve o nome gravado.
  * Foto e PDF escaneado são compactados antes (compactar.js, regra "Compactar anexos"; a foto pode virar .jpg, por isso use o
- * nome devolvido). `compactar: false`: arquivo que só muda de lugar ou de nome, e os documentos da ficha em análise
- * (a conferência de conferir-pdf.js olha dentro do arquivo como ele chegou).
+ * nome devolvido). `compactar: false`: arquivo que só muda de lugar ou de nome. Os documentos que chegam pelo link da ficha não passam por aqui
+ * (a nuvem grava direto): são compactados depois da conferência, em telas/fichas.js.
  */
 export async function salvarArquivo(dir, arquivo, { compactar = true } = {}) {
   if (!nomeAnexavel(arquivo.name)) throw new ErroUsuario(ERRO_TIPO_ARQUIVO); // o usuário escolheu o arquivo errado: só na tela

@@ -2,6 +2,7 @@
 import { alterar, aviso, E, ir, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as CP from '../conferir-pdf.js';
+import * as CPT from '../compactar.js';
 import * as FO from '../ficha-online.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
@@ -306,28 +307,66 @@ function blocoDoLink(f, l) {
   return `<div class="cartao" style="margin:8px 0"><h3>${esc(nome)}${p === 'interessado' ? '' : ' (fiador)'}</h3>${partes.join('')}</div>`;
 }
 
-/** Conferência dos documentos que chegaram pelo link (programa que fez o PDF, assinatura); guardada nesta abertura. */
-const conferidos = new Map(); // "ficha|arquivo" → html dos sinais
-async function conferirArquivosDoLink(area, f) {
+/**
+ * Conferência dos documentos que chegaram pelo link (programa que fez o PDF, assinatura). Na primeira vez, olha o arquivo
+ * como chegou, guarda o resultado na ficha (`conferencias_link`, por nome do arquivo) e só então compacta o arquivo no lugar,
+ * com o mesmo nome (compactar.js; decisão do dono em 2026-11-16: compactar depois do envio da pessoa). Das outras vezes,
+ * mostra o resultado guardado (o arquivo compactado não tem mais o que a conferência olha).
+ */
+const conferidos = new Map(); // "ficha|arquivo" → resultado da conferência (nesta abertura)
+// uma de cada vez: a ficha é desenhada duas vezes seguidas (lista guardada e a da nuvem) e a conferência não pode correr dobrada
+let filaConferencia = Promise.resolve();
+function conferirArquivosDoLink(area, f) {
+  const vez = filaConferencia.then(() => conferirEGuardar(area, f));
+  filaConferencia = vez.catch(() => {});
+  return vez;
+}
+async function conferirEGuardar(area, f) {
   const itens = [...area.querySelectorAll('[data-conferir]')];
   if (!itens.length) return;
   const pasta = await pastaDoEscopo('ficha', f.id, false);
+  const guardadas = (buscar('fichas', f.id) || f).conferencias_link || {}; // a de agora (a da tela pode ser de antes)
+  const novas = {};
   for (const li of itens) {
     const nome = li.dataset.conferir;
     const chave = `${f.id}|${nome}`;
+    if (!conferidos.has(chave) && guardadas[nome]) conferidos.set(chave, guardadas[nome]);
     if (!conferidos.has(chave)) {
-      let html;
       try {
         const blob = await S.abrirArquivo(pasta, nome);
         const r = await CP.conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
-        html = sinaisHtml(r, li.dataset.nomePessoa);
-      } catch { html = '<span class="suave">não foi possível conferir o arquivo</span>'; }
-      conferidos.set(chave, html);
+        conferidos.set(chave, r);
+        novas[nome] = { ...r, conferido_em: new Date().toISOString() };
+      } catch { conferidos.set(chave, null); }
     }
     const alvo = li.querySelector('[data-sinais]');
-    if (alvo) { alvo.className = ''; alvo.innerHTML = conferidos.get(chave); }
+    const r = conferidos.get(chave);
+    if (alvo) { alvo.className = ''; alvo.innerHTML = r ? sinaisHtml(r, li.dataset.nomePessoa) : '<span class="suave">não foi possível conferir o arquivo</span>'; }
   }
+  if (!Object.keys(novas).length || !opera()) return;
+  await alterar((db) => {
+    const atual = R.buscar(db, 'fichas', f.id);
+    if (!atual) return;
+    R.atualizar(db, 'fichas', f.id, { conferencias_link: { ...(atual.conferencias_link || {}), ...novas } }, login(),
+      `Conferência guardada de ${Object.keys(novas).length} documento(s) mandado(s) pelo link`);
+  });
+  if (R.regra('compactar_anexos')) await compactarDoLink(pasta, Object.keys(novas));
 }
+
+/** Compacta no lugar (mesmo nome) os documentos do link já conferidos. Ex.: foto do RG de 4 MB → ~400 KB. */
+async function compactarDoLink(pasta, nomes) {
+  let antes = 0; let depois = 0; let n = 0;
+  for (const nome of nomes) {
+    try {
+      const c = await CPT.compactarAnexo(await S.lerConteudo(await pasta.getFileHandle(nome)), { manterNome: true });
+      if (!c.mudou) continue;
+      await S.escreverTexto(pasta, nome, c.arquivo);
+      antes += c.antes; depois += c.depois; n += 1;
+    } catch (e) { console.warn(`Compactar "${nome}" da ficha: ${e.message}`); }
+  }
+  if (n) aviso(`${n} documento(s) do link compactado(s) depois da conferência: de ${tamanhoMb(antes)} para ${tamanhoMb(depois)}.`, 'info');
+}
+const tamanhoMb = (b) => `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
 
 /** Sinais da conferência de um arquivo: alertas (editor), atenção, informação e as assinaturas (com o nome da ficha). */
 function sinaisHtml(r, nomePessoa) {
