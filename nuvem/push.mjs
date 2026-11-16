@@ -14,15 +14,32 @@ const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart
 /** Serviços de aviso aceitos (o endereço da inscrição vem do navegador; outro endereço é recusado). */
 const SERVICOS = /^https:\/\/([a-z0-9-]+\.)*(fcm\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.apple\.com)\//i;
 
-export const pushLigado = (env) => !!(env.VAPID_PUBLICA && env.VAPID_PRIVADA);
+/**
+ * Chave como foi colada no Cloudflare, limpa: sem espaços, quebras de linha, caracteres invisíveis nem o "NOME=" da linha
+ * do arquivo (ex.: "VAPID_PUBLICA=BAbc…" → "BAbc…"). Só ficam as letras do base64url.
+ */
+export const limparChave = (v) => String(v || '').replace(/^\s*VAPID_[A-Z]+\s*=/, '').replace(/[^A-Za-z0-9_-]/g, '');
+export const publica = (env) => limparChave(env.VAPID_PUBLICA);
+export const pushLigado = (env) => !!(publica(env) && limparChave(env.VAPID_PRIVADA));
 /** Contato do VAPID: "mailto:" + e-mail (a Apple recusa outro formato); fora disso, o padrão. */
 const contato = (env) => (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(env.VAPID_CONTATO || '').trim()) ? String(env.VAPID_CONTATO).trim() : 'mailto:administracao@ankjck.com.br');
 
 /** Chave privada VAPID (d) com a pública (x, y) como JWK, para assinar com ES256. */
 async function chaveVapid(env) {
-  const pub = deB64url(env.VAPID_PUBLICA);
-  if (pub.length !== 65 || pub[0] !== 4) throw new Error('VAPID_PUBLICA inválida.');
-  return crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', d: String(env.VAPID_PRIVADA), x: b64url(pub.slice(1, 33)), y: b64url(pub.slice(33)), ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const pub = deB64url(publica(env));
+  if (pub.length !== 65 || pub[0] !== 4) throw new Error('A chave VAPID_PUBLICA cadastrada no Cloudflare está incompleta ou errada.');
+  const d = limparChave(env.VAPID_PRIVADA);
+  if (deB64url(d).length !== 32) throw new Error('A chave VAPID_PRIVADA cadastrada no Cloudflare está incompleta ou errada.');
+  const jwk = { kty: 'EC', crv: 'P-256', d, x: b64url(pub.slice(1, 33)), y: b64url(pub.slice(33)), ext: true };
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+}
+
+/** As duas chaves formam um par? (assina com a privada e confere com a pública) */
+export async function chavesFormamPar(env) {
+  const teste = enc.encode('teste');
+  const assinatura = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, await chaveVapid(env), teste);
+  const pub = await crypto.subtle.importKey('raw', deB64url(publica(env)), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+  return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, assinatura, teste);
 }
 
 /** Cabeçalho Authorization (VAPID) para o serviço do endereço. */
@@ -31,7 +48,7 @@ export async function autorizacaoVapid(env, endpoint, agora = Date.now()) {
   const cab = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
   const corpo = b64url(enc.encode(JSON.stringify({ aud, exp: Math.floor(agora / 1000) + 12 * 3600, sub: contato(env) })));
   const assinatura = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, await chaveVapid(env), enc.encode(`${cab}.${corpo}`));
-  return `vapid t=${cab}.${corpo}.${b64url(assinatura)}, k=${env.VAPID_PUBLICA}`;
+  return `vapid t=${cab}.${corpo}.${b64url(assinatura)}, k=${publica(env)}`;
 }
 
 async function hkdf(salt, ikm, info, bytes) {
@@ -102,14 +119,47 @@ export async function avisarAparelhos(env, mensagem, { buscar = fetch } = {}) {
       const s = JSON.parse(await obj.text());
       // quem saiu da equipe deixa de receber (os avisos têm nome e imóvel do interessado)
       if (!(await aindaNaEquipe(env, s.email))) { await env.DADOS.delete(o.key); continue; }
-      const corpo = await cifrar(JSON.stringify(mensagem), s.p256dh, s.auth);
-      const r = await buscar(s.endpoint, {
-        method: 'POST', body: corpo,
-        headers: { Authorization: await autorizacaoVapid(env, s.endpoint), TTL: '86400', 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', Urgency: 'normal' },
-      });
+      const r = await mandarUm(env, s, mensagem, buscar);
       if (r.status === 404 || r.status === 410) await env.DADOS.delete(o.key);
       else if (r.ok) ok += 1;
+      else console.warn('aviso no celular recusado', r.status, (await r.text().catch(() => '')).slice(0, 300));
     } catch (e) { console.warn('aviso no celular', e.message); }
   }
   return ok;
+}
+
+/** Manda a mensagem para uma inscrição; devolve a resposta do serviço do navegador. */
+async function mandarUm(env, s, mensagem, buscar) {
+  const corpo = await cifrar(JSON.stringify(mensagem), s.p256dh, s.auth);
+  return buscar(s.endpoint, {
+    method: 'POST', body: corpo,
+    headers: { Authorization: await autorizacaoVapid(env, s.endpoint), TTL: '86400', 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', Urgency: 'high' },
+  });
+}
+
+/**
+ * Teste pelo botão "Testar o aviso" (o aparelho manda o próprio endereço): confere as chaves, se o aparelho está inscrito
+ * na nuvem e o que o serviço do navegador respondeu. Devolve { ok, etapa, mensagem } em português, para mostrar na tela.
+ */
+export async function testarAparelho(env, endpoint, { buscar = fetch } = {}) {
+  if (!pushLigado(env)) return { ok: false, etapa: 'chaves', mensagem: 'As chaves VAPID_PUBLICA e VAPID_PRIVADA não estão cadastradas no Cloudflare (ou o Deploy não foi feito).' };
+  const semPar = { ok: false, etapa: 'chaves', mensagem: 'As duas chaves do Cloudflare não formam um par: cadastre de novo as duas, copiadas do mesmo arquivo gerado.' };
+  try {
+    if (!(await chavesFormamPar(env))) return semPar;
+  } catch (e) {
+    // a privada que não é da pública: o WebCrypto recusa ao abrir a chave (DataError)
+    return e && e.name === 'DataError' ? semPar : { ok: false, etapa: 'chaves', mensagem: e.message };
+  }
+  const obj = await env.DADOS.get(await chaveInscricao(String(endpoint || '')));
+  if (!obj) return { ok: false, etapa: 'inscricao', mensagem: 'Este aparelho não está guardado na nuvem: toque em "Desligar neste aparelho" e depois em "Ligar" de novo.' };
+  const s = JSON.parse(await obj.text());
+  let r;
+  try { r = await mandarUm(env, s, { titulo: 'Teste do aviso', texto: 'Se você está lendo isto, o aviso no celular está funcionando.', url: './', tag: 'teste' }, buscar); } catch (e) {
+    return { ok: false, etapa: 'servico', mensagem: `Não consegui falar com o serviço de avisos do navegador: ${e.message}` };
+  }
+  if (r.ok) return { ok: true, etapa: 'enviado', mensagem: 'O serviço de avisos aceitou: o aviso deve aparecer neste aparelho em alguns segundos.' };
+  const detalhe = (await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+  if (r.status === 404 || r.status === 410) { await env.DADOS.delete(await chaveInscricao(s.endpoint)); return { ok: false, etapa: 'servico', mensagem: 'O serviço de avisos diz que esta inscrição acabou: toque em "Ligar" de novo.' }; }
+  if (r.status === 401 || r.status === 403) return { ok: false, etapa: 'servico', mensagem: `O serviço de avisos recusou a assinatura (${r.status}): o aparelho foi ligado com outra chave. Toque em "Desligar neste aparelho" e em "Ligar" de novo. ${detalhe}` };
+  return { ok: false, etapa: 'servico', mensagem: `O serviço de avisos respondeu ${r.status}. ${detalhe}` };
 }
