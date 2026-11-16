@@ -24,6 +24,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - O inquilino fica inativo só pela saída, quando a data passou e o boleto do último mês já existe. Mudar a data de saída para mais tarde volta o inquilino a ativo (ex.: saída 15/10 mudada para 15/11: sai o boleto de 01 a 15/11).
 - Boleto em aberto de um mês sem nenhum dia ocupado (ex.: dezembro já gerado e saída em 15/11) é excluído ao salvar a saída; se já foi emitido no C6, fica e aparece nos alertas para cancelar no banco.
 - Leitura dos relógios (água e energia) é obrigatória na vistoria de entrada e na de saída.
+- Arquivo impresso (pasta de papel de cada inquilino, regra que se liga e desliga): última etapa da entrada "Montar a pasta física" e, na saída, depois da devolução da garantia; durante o contrato, aviso de documento novo (termo aditivo, carta de reajuste, termo de acordo assinado, notificação) e de arquivo trocado depois de impresso. Não vão para a pasta: NF, comprovantes, boletos, WhatsApp, documentos de renda e Serasa, fotos da vistoria, apólices e e-mails. Recibos do sistema saem como "cópia da locadora". Na troca de titular, a pasta do anterior vai dentro da nova. Guardar 10 anos depois da saída.
 - A vistoria de saída é comparada com a vistoria de entrada do contrato (pendência = item pior que na entrada). Quem continua o contrato de outro (troca de titular) é comparado com a vistoria de entrada do titular anterior; se fez a própria vistoria de entrada na troca, vale a dele.
 
 4. REAJUSTE DO ALUGUEL

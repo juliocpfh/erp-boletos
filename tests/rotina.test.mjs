@@ -56,7 +56,8 @@ test('rotina de entrada: etapas pelo que já está registrado, marca à mão com
   const hoje = '2026-07-01';
   let rot = R.rotinaEntrada(d, c, hoje);
   assert.deepEqual(rot.map((e) => e.chave), ['reserva', 'contrato_gerado', 'contrato_assinado', 'garantia', 'vistoria_gerada', 'chaves_gerado',
-    'vistoria_assinada', 'chaves_assinado', 'agua', 'energia', 'seguro'], 'sem gás e condomínio; sem aditivo');
+    'vistoria_assinada', 'chaves_assinado', 'agua', 'energia', 'seguro', 'pasta_fisica'], 'sem gás e condomínio; sem aditivo; a pasta física por último');
+  assert.equal(rot.find((e) => e.chave === 'pasta_fisica').texto, 'aguardando as outras etapas');
   assert.equal(rot.find((e) => e.chave === 'agua').titulo, 'Transferência da água (Sanepar)');
   assert.equal(rot.find((e) => e.chave === 'garantia').titulo, 'Assinatura do fiador');
   assert.equal(rot.find((e) => e.chave === 'reserva').situacao, 'andamento', 'reserva sem comprovante');

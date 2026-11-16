@@ -1,6 +1,7 @@
 // Anexos na nuvem: uma "pasta virtual" com a mesma interface da pasta do computador (FileSystemDirectoryHandle), guardada no R2
 // pelo Worker (nuvem/worker.mjs: lista/, arquivos/, mover, apagar). Assim armazenamento.js e as telas funcionam sem mudar.
-// Sem internet: anexo novo fica guardado no aparelho e sobe quando a internet voltar; abrir, apagar e mover pedem internet.
+// Sem internet: anexo novo fica guardado no aparelho e sobe quando a internet voltar; apagar e mover pedem internet; abrir
+// também, salvo no computador com a cópia aberta dos arquivos (copia-aberta.js): lá o arquivo sai da cópia (`daCopiaLocal`).
 // A raiz tem as pastas "arquivos", "modelos" e "backups" (só leitura), como a pasta dos dados de hoje.
 
 import { erroDeRede, limiteDeTempo, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO } from './nuvem.js';
@@ -202,7 +203,11 @@ export class AnexosNuvem {
     try {
       return await (await this.pedir('GET', codificar(partes))).blob();
     } catch (e) {
-      if (passageiro(e)) throw semInternet('abrir o arquivo');
+      if (passageiro(e)) {
+        const local = this.daCopiaLocal ? await Promise.resolve().then(() => this.daCopiaLocal(partes)).catch(() => null) : null;
+        if (local) return local; // sem internet, no computador com a cópia aberta: abre a cópia
+        throw semInternet('abrir o arquivo');
+      }
       throw e;
     }
   }
