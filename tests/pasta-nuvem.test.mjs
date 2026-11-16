@@ -205,3 +205,17 @@ test('várias caixas pedindo a mesma pasta ao mesmo tempo: um pedido só à nuve
   assert.ok(resultados.every((r) => r.map((a) => a.nome).join() === 'contrato.pdf'));
   assert.equal(listas, 1, 'as 4 caixas esperam o mesmo pedido');
 });
+
+test('sem internet: abrir usa a cópia do computador (daCopiaLocal) e, sem ela, avisa "sem internet"', async () => {
+  const semRede = async () => { throw new TypeError('Failed to fetch'); };
+  const guardado = new Map();
+  const guardar = { ler: async (k) => guardado.get(k), gravar: async (k, v) => { guardado.set(k, v); }, apagar: async (k) => { guardado.delete(k); } };
+  const cliente = new AnexosNuvem({ base: BASE, buscar: semRede, guardar });
+  const pedidos = [];
+  cliente.daCopiaLocal = async (partes) => { pedidos.push(partes.join('/')); if (partes.at(-1) === 'a.pdf') return new Blob(['local']); throw new Error('não está na cópia'); };
+  assert.equal(await (await cliente.ler(['arquivos', 'Casa 1', 'a.pdf'])).text(), 'local');
+  await assert.rejects(cliente.ler(['arquivos', 'b.pdf']), /Sem internet/);
+  assert.deepEqual(pedidos, ['arquivos/Casa 1/a.pdf', 'arquivos/b.pdf']);
+  cliente.daCopiaLocal = () => null; // computador sem a cópia (ou celular)
+  await assert.rejects(cliente.ler(['arquivos', 'a.pdf']), /Sem internet/);
+});
