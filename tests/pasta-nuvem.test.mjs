@@ -136,9 +136,13 @@ test('pedido que não responde: tempo limite vira "sem internet" (passageiro), n
   const guardado = new Map();
   const guardar = { ler: async (k) => guardado.get(k), gravar: async (k, v) => { guardado.set(k, v); }, apagar: async (k) => { guardado.delete(k); } };
   const cliente = new AnexosNuvem({ base: BASE, buscar: pendurado, guardar, limite: 30, limiteAnexo: 30 });
-  await assert.rejects(cliente.ler(['arquivos', 'a.pdf']), /Sem internet/);
-  await cliente.gravar(['arquivos', 'b.pdf'], new Blob(['B'])); // PUT pendurado: vai para a fila, como sem internet
-  assert.equal(await cliente.pendentes(), 1);
+  // AbortSignal.timeout não segura o Node aberto (no Node 22 o teste era cancelado antes do limite): um relógio mantém vivo
+  const vivo = setInterval(() => {}, 1000);
+  try {
+    await assert.rejects(cliente.ler(['arquivos', 'a.pdf']), /Sem internet/);
+    await cliente.gravar(['arquivos', 'b.pdf'], new Blob(['B'])); // PUT pendurado: vai para a fila, como sem internet
+    assert.equal(await cliente.pendentes(), 1);
+  } finally { clearInterval(vivo); }
 });
 
 test('raiz: só as pastas do sistema; backups não se apagam', async () => {

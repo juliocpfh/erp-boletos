@@ -190,6 +190,25 @@ export const passageiro = (e) => !e.status || e.status === 401 || e.status === 4
 /** Tempo máximo de cada pedido à nuvem (ms): pedido pendurado travaria a fila e a numeração da NF. Anexo (PUT) tem mais. */
 export const TEMPO_LIMITE = 30000;
 export const TEMPO_LIMITE_ANEXO = 120000;
+/** O banco inteiro (baixar tudo, carga inicial/voltar a um backup) é grande: 4 vezes o limite comum (120 s)… */
+const FATOR_BANCO_INTEIRO = 4;
+/** …e, na carga, mais 1 s a cada 25 KB enviados (internet de ~200 kbit/s), até 10 minutos. */
+const BYTES_POR_SEGUNDO_LENTO = 25000;
+export const TEMPO_LIMITE_MAXIMO = 600000;
+/** Limite (ms) de um pedido a /api/dados/: `GET tudo` e `POST importar` têm mais tempo que os outros (`limite`). */
+export function limiteDoPedido(metodo, rota, bytes = 0, limite = TEMPO_LIMITE) {
+  const r = String(rota).split('?')[0];
+  if (metodo === 'GET' && r === 'tudo') return limite * FATOR_BANCO_INTEIRO;
+  if (metodo === 'POST' && r === 'importar') {
+    return Math.max(limite, Math.min(TEMPO_LIMITE_MAXIMO, limite * FATOR_BANCO_INTEIRO + Math.ceil(bytes / BYTES_POR_SEGUNDO_LENTO) * 1000));
+  }
+  return limite;
+}
+/** Falha em que a nuvem pode ter gravado sem a resposta chegar: sem internet no meio, tempo esgotado, 408 ou erro 5xx. */
+const respostaPerdida = (e) => !e.status || e.status === 408 || e.status >= 500;
+/** Quantas vezes a gravação que numera a NF é reenviada (o mesmo lote) quando a resposta se perde, e a espera entre elas (ms). */
+export const REENVIOS_CONTADOR = 2;
+export const ESPERA_REENVIO = 1500;
 /** Sinal que cancela o pedido depois de `ms` (navegador sem suporte: sem limite). */
 export const limiteDeTempo = (ms) => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
 /** Erro de rede ou tempo esgotado → ErroNuvem com status 0 (passageiro). */
@@ -231,6 +250,7 @@ export class Sincronia {
     this.normalizarMexeuNoHistorico = false;
     this.puxando = Promise.resolve(); // um puxar de cada vez (dois aplicariam as mesmas mudanças duas vezes)
     this.aba = aleatorio().slice(0, 6);
+    this.esperaReenvio = ESPERA_REENVIO;
   }
 
   async iniciar() {
@@ -392,9 +412,14 @@ export class Sincronia {
   /**
    * Gravação que dá número de NF: só com internet. Envia a fila, pega o que mudou, refaz `fn` sobre o mais novo e espera a
    * resposta; se outro aparelho usou o número no meio do caminho (409), refaz com o seguinte (até 3 vezes).
+   * Resposta perdida (tempo esgotado, queda no meio, 408, 5xx): a nuvem pode ter gravado. Reenvia o MESMO lote (mesmo código: o
+   * cofre responde "repetido" sem aplicar de novo) até REENVIOS_CONTADOR vezes; se ainda assim não souber, busca o que mudou e
+   * confere se um registro novo deste lote está lá (código da faixa deste aparelho: só este lote o cria). Está: a NF saiu, segue
+   * normal. Não dá para saber: erro pedindo para conferir antes de repetir (repetir sem conferir poderia emitir duas NFs).
+   * Gravada mas sem conseguir buscar a base nova: o lote fica na fila (a tela mostra a NF; reenviar é "repetido") e sai no próximo puxar.
    */
   async alterarComContador(fn) {
-    for (let tentativa = 1; ; tentativa += 1) {
+    tentativas: for (let tentativa = 1; ; tentativa += 1) {
       try { await this.sincronizar({ exigirInternet: true }); } catch (e) {
         throw passageiro(e) ? new ErroNuvem('A NF só é numerada com internet. Conecte e tente de novo.') : e;
       }
@@ -412,23 +437,44 @@ export class Sincronia {
         return { resultado: r, lote: l };
       });
       const [primeira, ...resto] = dividirLote(lote); // o número da NF vai na 1ª parte
-      try {
-        await this.api('POST', 'lote', primeira);
-      } catch (e) {
-        if (e.status === 409 && e.extra?.contador && tentativa < 3) continue;
-        if (e.status === 0) throw new ErroNuvem('A NF só é numerada com internet. Conecte e tente de novo.');
-        throw e;
+      const meus = chavesDosLotes([lote]);
+      let gravou = false; let puxou = false; let duvida = null;
+      for (let envio = 0; !gravou && envio <= REENVIOS_CONTADOR; envio += 1) {
+        if (envio) await new Promise((ok) => { setTimeout(ok, this.esperaReenvio); });
+        try {
+          await this.api('POST', 'lote', primeira);
+          gravou = true;
+        } catch (e) {
+          // outro aparelho usou o número (o lote não foi aplicado, nem neste envio nem no anterior): refaz com o seguinte
+          if (e.status === 409 && e.extra?.contador && tentativa < 3) continue tentativas;
+          if (!respostaPerdida(e)) throw e; // recusa de verdade (sem permissão, login vencido…): nada foi gravado
+          duvida = e;
+        }
       }
-      if (resto.length) { // número já dado: o resto da gravação (muito grande) vai pela fila, como uma gravação comum
+      if (!gravou) {
+        // nem reenviando veio resposta: o que está na nuvem decide
+        try { await this.puxar(meus); puxou = true; } catch { /* sem internet: não dá para saber */ }
+        gravou = puxou && primeira.ops.some((o) => o.op === 'inserir' && (this.base[o.tabela] || []).some((r) => r.id === o.id));
+        if (!gravou) {
+          this.aoMudar(false);
+          throw new ErroNuvem(`A internet falhou no meio da gravação e a nuvem não confirmou se a NF foi numerada (${duvida?.message || 'sem resposta'}) Antes de repetir, confira na lista de NFs se ela já saiu: se saiu, não emita de novo.`, 0, { incerto: true });
+        }
+      }
+      if (!puxou) {
+        try { await this.puxar(meus); puxou = true; } catch (e) { if (!passageiro(e)) throw e; }
+      }
+      // base nova já tem a 1ª parte: só o resto (gravação muito grande) vai pela fila, como uma gravação comum. Sem a base nova
+      // (a internet caiu depois da resposta), o lote inteiro fica na fila para a tela mostrar a NF: a nuvem o reconhece como repetido
+      const paraFila = puxou ? resto : [lote];
+      if (paraFila.length) {
         await this.trava(async () => {
           await this.releFila();
-          this.pendentes.push(...resto);
+          this.pendentes.push(...paraFila);
           await this.gravarFila();
         });
         this.invalidar();
         this.enviarDepois();
       }
-      await this.puxar(chavesDosLotes([lote]));
       this.aoMudar(false);
       return resultado;
     }
@@ -714,10 +760,11 @@ export function apiDoSite(base = 'api/dados/', { limite = TEMPO_LIMITE, buscar =
   return async (metodo, rota, corpo) => {
     let r;
     try {
+      const body = corpo === undefined ? undefined : JSON.stringify(corpo);
       r = await buscar(`${base}${rota}`, {
-        method: metodo, cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(limite),
+        method: metodo, cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(limiteDoPedido(metodo, rota, body?.length || 0, limite)),
         headers: metodo === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Sistema': 'imoveis' },
-        body: corpo === undefined ? undefined : JSON.stringify(corpo),
+        body,
       });
     } catch (e) {
       throw erroDeRede(e);

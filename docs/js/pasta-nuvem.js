@@ -4,7 +4,7 @@
 // também, salvo no computador com a cópia aberta dos arquivos (copia-aberta.js): lá o arquivo sai da cópia (`daCopiaLocal`).
 // A raiz tem as pastas "arquivos", "modelos" e "backups" (só leitura), como a pasta dos dados de hoje.
 
-import { erroDeRede, limiteDeTempo, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO } from './nuvem.js';
+import { erroDeRede, limiteDeTempo, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, travaDoNavegador } from './nuvem.js';
 
 const RAIZES = ['arquivos', 'modelos', 'backups'];
 const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por pouco tempo (o painel percorre muitas pastas;
@@ -21,8 +21,9 @@ export const codificar = (partes) => partes.map(encodeURIComponent).join('/');
  * Anexo da fila que a nuvem recusa (não é falta de internet) fica em `naoEnviados`, com o arquivo, para baixar pela tela de conflitos.
  */
 export class AnexosNuvem {
-  constructor({ base = 'api/', buscar = (...a) => fetch(...a), guardar, limite = TEMPO_LIMITE, limiteAnexo = TEMPO_LIMITE_ANEXO }) {
-    this.base = base; this.buscar = buscar; this.guardar = guardar; this.limite = limite; this.limiteAnexo = limiteAnexo;
+  /** `trava(fn)`: uma aba de cada vez mexe na fila guardada no aparelho (a mesma trava da Sincronia; sem suporte, roda direto). */
+  constructor({ base = 'api/', buscar = (...a) => fetch(...a), guardar, limite = TEMPO_LIMITE, limiteAnexo = TEMPO_LIMITE_ANEXO, trava = travaDoNavegador }) {
+    this.base = base; this.buscar = buscar; this.guardar = guardar; this.limite = limite; this.limiteAnexo = limiteAnexo; this.trava = trava;
     this.listas = new Map(); // caminho → { em, pastas: Set, arquivos: Map(nome → tamanho) }
     this.buscando = new Map(); // caminho → pedido em andamento (várias caixas da tela pedindo a mesma pasta: um pedido só)
     this.criadas = new Set(); // pastas criadas vazias (o R2 não tem pasta sem arquivo)
@@ -32,12 +33,12 @@ export class AnexosNuvem {
     this.aoMudar = null; // chamado depois de gravar, apagar ou mover na nuvem (a cópia aberta do PC se atualiza: copia-aberta.js)
   }
 
-  async pedir(metodo, rota, { corpo, cabecalhos = {} } = {}) {
+  async pedir(metodo, rota, { corpo, cabecalhos = {}, limite = metodo === 'PUT' ? this.limiteAnexo : this.limite } = {}) {
     let r;
     try {
       r = await this.buscar(`${this.base}${rota}`, {
         method: metodo, cache: 'no-store', credentials: 'same-origin', body: corpo,
-        signal: limiteDeTempo(metodo === 'PUT' ? this.limiteAnexo : this.limite),
+        signal: limiteDeTempo(limite),
         headers: metodo === 'GET' ? cabecalhos : { 'X-Sistema': 'imoveis', ...cabecalhos },
       });
     } catch (e) {
@@ -59,12 +60,33 @@ export class AnexosNuvem {
     return this.fila;
   }
 
-  async gravarFila() { await this.guardar?.gravar('fila-anexos', this.fila); }
+  /**
+   * Muda a fila guardada no aparelho. As abas do mesmo navegador dividem essa fila: dentro da trava (a mesma da Sincronia), relê
+   * o que está guardado (outra aba pode ter posto ou tirado anexos), aplica `fn(fila)` e grava. `fn` devolve a fila nova, ou
+   * nada se não mudou (não grava). A trava vale só para ler e gravar no aparelho: nenhum pedido à nuvem passa por dentro dela.
+   */
+  async mudarFila(fn) {
+    return this.trava(async () => {
+      if (this.guardar) this.fila = (await this.guardar.ler('fila-anexos')) || [];
+      else this.fila ||= [];
+      const nova = await fn(this.fila);
+      if (nova) { this.fila = nova; await this.guardar?.gravar('fila-anexos', nova); }
+      return this.fila;
+    });
+  }
+
+  /** O mesmo para a lista dos anexos recusados (`fn` devolve a lista nova). */
+  async mudarNaoEnviados(fn) {
+    await this.trava(async () => {
+      if (this.guardar) this.naoEnviados = (await this.guardar.ler('anexos-nao-enviados')) || [];
+      this.naoEnviados = fn(this.naoEnviados);
+      await this.guardar?.gravar('anexos-nao-enviados', this.naoEnviados);
+    });
+  }
 
   /** Anexo que a nuvem recusou: sai da fila mas o arquivo fica no aparelho até o usuário baixar ou esquecer. */
   async guardarNaoEnviado(f, erro) {
-    this.naoEnviados.push({ ...f, erro });
-    await this.guardar?.gravar('anexos-nao-enviados', this.naoEnviados);
+    await this.mudarNaoEnviados((lista) => (lista.some((x) => x.id === f.id) ? lista : [...lista, { ...f, erro }]));
   }
 
   async lerNaoEnviado(id) {
@@ -74,9 +96,18 @@ export class AnexosNuvem {
   }
 
   async esquecerNaoEnviado(id) {
-    this.naoEnviados = this.naoEnviados.filter((x) => x.id !== id);
+    await this.mudarNaoEnviados((lista) => lista.filter((x) => x.id !== id));
     await this.guardar?.apagar?.(`anexo:${id}`);
-    await this.guardar?.gravar('anexos-nao-enviados', this.naoEnviados);
+  }
+
+  /** O arquivo que está na nuvem nesse caminho é este mesmo (mesmo tamanho e mesmo conteúdo)? */
+  async mesmoNaNuvem(partes, blob) {
+    const r = await this.pedir('GET', codificar(partes), { limite: this.limiteAnexo });
+    const la = new Uint8Array(await r.arrayBuffer());
+    if (la.length !== blob.size) return false;
+    const meu = new Uint8Array(await blob.arrayBuffer());
+    for (let i = 0; i < la.length; i += 1) if (la[i] !== meu[i]) return false;
+    return true;
   }
 
   /** Lista de uma pasta: { pastas: Set, arquivos: Map(nome → tamanho) }, juntando o que está na fila deste aparelho. */
@@ -220,20 +251,18 @@ export class AnexosNuvem {
       this.aoMudar?.();
     } catch (e) {
       if (!passageiro(e) || !this.guardar) throw e;
-      const fila = await this.carregarFila();
       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
       await this.guardar.gravar(`anexo:${id}`, blob);
-      fila.push({ id, partes, tamanho: blob.size, em: new Date().toISOString() });
-      await this.gravarFila();
+      await this.mudarFila((fila) => [...fila, { id, partes, tamanho: blob.size, em: new Date().toISOString() }]);
     }
   }
 
   async apagar(partes, { pasta = false } = {}) {
-    const fila = await this.carregarFila();
     const chave = partes.join('/');
-    const naFila = fila.filter((f) => f.partes.join('/') === chave || (pasta && f.partes.join('/').startsWith(`${chave}/`)));
+    const daqui = (f) => f.partes.join('/') === chave || (pasta && f.partes.join('/').startsWith(`${chave}/`));
+    let naFila = [];
+    await this.mudarFila((fila) => { naFila = fila.filter(daqui); return naFila.length ? fila.filter((f) => !daqui(f)) : null; });
     for (const f of naFila) await this.guardar?.apagar?.(`anexo:${f.id}`);
-    if (naFila.length) { this.fila = fila.filter((f) => !naFila.includes(f)); await this.gravarFila(); }
     for (const c of [...this.criadas]) if (c === chave || c.startsWith(`${chave}/`)) this.criadas.delete(c);
     try {
       if (pasta) {
@@ -261,10 +290,9 @@ export class AnexosNuvem {
       if (e.status !== 404) throw e; // pasta só criada (vazia) ou só na fila deste aparelho: nada na nuvem para mover
     }
     // a fila deste aparelho acompanha a pasta movida
-    const fila = await this.carregarFila();
     const k = de.join('/');
-    for (const f of fila) if (f.partes.join('/').startsWith(`${k}/`)) f.partes = [...para, ...f.partes.slice(de.length)];
-    if (fila.length) await this.gravarFila();
+    const dentro = (f) => f.partes.join('/').startsWith(`${k}/`);
+    await this.mudarFila((fila) => (fila.some(dentro) ? fila.map((f) => (dentro(f) ? { ...f, partes: [...para, ...f.partes.slice(de.length)] } : f)) : null));
     for (const c of [...this.criadas]) if (c === k || c.startsWith(`${k}/`)) { this.criadas.delete(c); this.criadas.add(para.join('/') + c.slice(k.length)); }
     this.esquecerLista(de); this.esquecerLista(para);
     this.aoMudar?.();
@@ -273,11 +301,14 @@ export class AnexosNuvem {
   /**
    * Sobe os anexos guardados sem internet. Se outro aparelho gravou um arquivo com o mesmo nome no meio tempo,
    * este sobe com "(deste aparelho)" no nome e vira aviso (o lançamento continua apontando para o nome antigo: conferir).
+   * Mas se o que está na nuvem com esse nome é o MESMO arquivo (este envio já tinha chegado e a resposta se perdeu, ou outra aba
+   * deste navegador o enviou), está enviado: nada de cópia nem de aviso.
+   * A fila é relida do aparelho (dentro da trava) antes de começar e a cada mudança: outra aba pode ter posto ou enviado anexos.
    */
   async enviarFila() {
     if (this.enviando) return this.enviando;
     this.enviando = (async () => {
-      const fila = await this.carregarFila();
+      const fila = await this.mudarFila(() => null);
       for (const f of [...fila]) {
         const blob = await this.guardar.ler(`anexo:${f.id}`);
         let recusado = false;
@@ -285,21 +316,28 @@ export class AnexosNuvem {
           if (blob) await this.pedir('PUT', codificar(f.partes), { corpo: blob, cabecalhos: { 'If-None-Match': '*' } });
         } catch (e) {
           if (passageiro(e)) break;
-          if (e.status === 412 && blob) {
-            const nome = f.partes.at(-1); const ponto = nome.lastIndexOf('.');
-            const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
-            await this.pedir('PUT', codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
-            this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
-          } else {
-            // recusado de vez (sem permissão, nome barrado…): o arquivo não se perde, fica para baixar em Conflitos
-            recusado = true;
-            await this.guardarNaoEnviado(f, e.message);
-            this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado (${e.message}). Ele ficou guardado neste aparelho: veja em Conflitos da nuvem.`);
+          try {
+            if (e.status === 412 && blob) {
+              if (!(await this.mesmoNaNuvem(f.partes, blob))) {
+                const nome = f.partes.at(-1); const ponto = nome.lastIndexOf('.');
+                const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
+                await this.pedir('PUT', codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
+                this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
+              }
+            } else {
+              // recusado de vez (sem permissão, nome barrado…): o arquivo não se perde, fica para baixar em Conflitos
+              recusado = true;
+              await this.guardarNaoEnviado(f, e.message);
+              this.avisos.push(`O anexo "${f.partes.at(-1)}" não pôde ser enviado (${e.message}). Ele ficou guardado neste aparelho: veja em Conflitos da nuvem.`);
+            }
+          } catch (e2) {
+            if (passageiro(e2)) break; // a internet caiu na conferência: o anexo continua na fila
+            throw e2;
           }
         }
+        // sai da fila antes de o arquivo sair do aparelho (se parar no meio, sobra um arquivo solto, nunca um item sem arquivo)
+        await this.mudarFila((atual) => (atual.some((x) => x.id === f.id) ? atual.filter((x) => x.id !== f.id) : null));
         if (!recusado) await this.guardar.apagar?.(`anexo:${f.id}`);
-        this.fila = this.fila.filter((x) => x.id !== f.id);
-        await this.gravarFila();
         this.esquecerLista(f.partes.slice(0, -1));
         if (!recusado) this.aoMudar?.();
       }

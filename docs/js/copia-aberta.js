@@ -7,6 +7,7 @@
 
 export const PASTA_COPIA = 'Arquivos dos imoveis';
 export const ARQUIVO_COPIA = 'copia-aberta.json';
+const EM_PARALELO = 5; // arquivos baixados ao mesmo tempo
 
 const PROIBIDOS = /[<>:"|?*]/g; // caracteres que o Windows não aceita em nomes
 const RESERVADOS = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
@@ -93,7 +94,10 @@ export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por
     delete arquivos[c];
     aoAndar({ feitos: (feitos += 1), total });
   }
-  for (const c of baixar) {
+  // baixa alguns de cada vez (pasta nova com centenas de arquivos: um a um levava muitos minutos); cada arquivo continua
+  // entrando no registro só depois de gravado, e o registro é salvo a cada 50 (um salvar de cada vez)
+  let proximo = 0; let salvando = Promise.resolve();
+  const baixarUm = async (c) => {
     const p = caminhoLocal(c);
     try {
       const blob = await ler(c);
@@ -104,8 +108,11 @@ export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por
     } catch { falhas += 1; } // fica para a próxima vez (não entra no registro)
     feitos += 1;
     aoAndar({ feitos, total });
-    if (feitos % 50 === 0) await salvar(falhas);
-  }
+    if (feitos % 50 === 0) { salvando = salvando.then(() => salvar(falhas)).catch(() => {}); await salvando; }
+  };
+  const emFila = async () => { while (proximo < baixar.length) { const c = baixar[proximo]; proximo += 1; await baixarUm(c); } };
+  await Promise.all(Array.from({ length: Math.min(EM_PARALELO, baixar.length) }, emFila));
+  await salvando;
   await salvar(falhas);
   return { baixados: baixar.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
 }
