@@ -130,7 +130,7 @@ export class Aparelhos {
 
   /** Crachá → { email, papel, aparelho }. Desligado, parado há 90 dias ou de usuário desativado: recusa. Marca o último uso. */
   async conferir(cracha) {
-    const naoVale = new ErroAparelho(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha (ligar-computador.cmd).');
+    const naoVale = new ErroAparelho(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha (abra o programa do computador com --ligar, ou ligar-computador.cmd).');
     if (!crachaValido(cracha)) throw naoVale;
     const a = this.c.q('SELECT * FROM aparelhos WHERE hash = ? AND desligado_em IS NULL', await hashDoCracha(cracha))[0];
     if (!a) throw naoVale;

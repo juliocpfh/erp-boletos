@@ -1,0 +1,63 @@
+# Programa do PC (Instalar-Administracao-de-Imoveis.exe): o atualizador-pc/ num arquivo só para Windows, com o Node dentro
+# (não precisa instalar o Node). Gerado SOZINHO pelo GitHub a cada mudança do atualizador que entra na main, por
+# tools/gerar-exe.mjs. O arquivo não fica no repositório: sai como artefato desta execução e na "release" fixa "programa-pc"
+# (https://github.com/<dono>/<repositório>/releases/tag/programa-pc), sempre com a versão mais nova.
+# Sem assinatura de código por enquanto (decisão do dono, documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md, item 11).
+name: Programa do PC
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'atualizador-pc/*.mjs'
+      - 'tools/gerar-exe.mjs'
+      - '.github/workflows/programa-pc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: programa-pc
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Testar o programa
+        run: node --test tests/programa-pc.test.mjs tests/atualizador-pc.test.mjs
+      - name: Gerar o .exe
+        run: node tools/gerar-exe.mjs
+      - name: Conferir que abre (ajuda e computador não ligado)
+        shell: bash
+        run: |
+          exe="atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe"
+          "$exe" --ajuda
+          export IMOVEIS_CONFIG="$RUNNER_TEMP/sem-ligacao"
+          if "$exe" --arquivos > saida.txt 2>&1; then echo "devia ter falhado: computador não ligado"; exit 1; fi
+          cat saida.txt
+          grep -q "ainda não está ligado ao sistema" saida.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Instalar-Administracao-de-Imoveis
+          path: atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe
+          if-no-files-found: error
+      - name: Publicar na release "programa-pc"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          exe="atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe"
+          versao="$("$exe" --versao)"
+          notas="Programa do computador (Windows), versão ${versao}. Sem assinatura: no aviso azul do Windows, Mais informações → Executar assim mesmo. Passo a passo em atualizador-pc/README.md."
+          if gh release view programa-pc > /dev/null 2>&1; then
+            gh release upload programa-pc "$exe" --clobber
+            gh release edit programa-pc --notes "$notas"
+          else
+            gh release create programa-pc "$exe" --title "Programa do PC" --notes "$notas" --target "$GITHUB_SHA"
+          fi

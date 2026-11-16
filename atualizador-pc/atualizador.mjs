@@ -6,13 +6,18 @@
 // Uso: node atualizador.mjs (dados, versão PC e arquivos) ou node atualizador.mjs --arquivos (só a cópia aberta, de hora em hora);
 // node atualizador.mjs --ligar (ligar-computador.cmd) abre a página para entrar com e-mail e senha (ligar.mjs): o computador
 // recebe o crachá do aparelho, guardado cifrado pelo Windows. Sem crachá, ainda vale o .env antigo com a chave de serviço do Access
-// (transição; README.md). Não precisa de nada além do Node 20+.
+// (transição; README.md). Não precisa de nada além do Node 20+. No programa .exe (programa.mjs, gerado por tools/gerar-exe.mjs,
+// que traz o Node dentro) a mesma rotina é chamada por `principal`.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ErroNaoLigado, SITE_PADRAO, janelaDeLigar, lerLigacao } from './ligar.mjs';
 
-const PASTA = path.dirname(fileURLToPath(import.meta.url));
+/** No .exe (tools/gerar-exe.mjs põe esta marca antes de tudo): { versao }. Rodando pelo Node, não existe. */
+export const EXE = globalThis.PROGRAMA_EXE || null;
+const PASTA = EXE ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
+/** Como a pessoa liga o computador de novo (texto dos avisos). */
+export const COMO_LIGAR = EXE ? 'abra o programa Administracao-de-Imoveis.exe (dois cliques)' : 'dê dois cliques em ligar-computador.cmd';
 export const PASTA_DIARIO = 'copias-diarias';
 export const PASTA_PROGRAMA = 'programa';
 export const ARQUIVO_CHAVE = 'chave-do-backup.json';
@@ -76,7 +81,7 @@ export function diariosParaApagar(nomes) {
  */
 export function carregarConfig(env = lerEnv(path.join(PASTA, '.env')), ligacao = lerLigacao(env)) {
   if (ligacao?.cracha) return { site: String(ligacao.site || SITE_PADRAO).replace(/\/+$/, ''), pasta: ligacao.pasta, cracha: ligacao.cracha, computador: ligacao.computador };
-  if (!env.ACCESS_CLIENT_ID && !env.ACCESS_CLIENT_SECRET) throw new ErroNaoLigado('Este computador ainda não está ligado ao sistema: dê dois cliques em ligar-computador.cmd e entre com o e-mail e a senha do sistema.');
+  if (!env.ACCESS_CLIENT_ID && !env.ACCESS_CLIENT_SECRET) throw new ErroNaoLigado(`Este computador ainda não está ligado ao sistema: ${COMO_LIGAR} e entre com o e-mail e a senha do sistema.`);
   const cfg = {
     site: String(env.SITE || SITE_PADRAO).replace(/\/+$/, ''),
     clientId: String(env.ACCESS_CLIENT_ID || '').trim(),
@@ -95,7 +100,7 @@ export function carregarConfig(env = lerEnv(path.join(PASTA, '.env')), ligacao =
 export function acesso(cfg) {
   if (cfg.cracha) {
     return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}` },
-      recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo com ligar-computador.cmd; se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
+      recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo (${COMO_LIGAR}); se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
   }
   return { api: `${cfg.site}/api/`, programa: `${cfg.site}/${CAMINHO_PROGRAMA}`, cabecalhos: { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret },
     recusou: (status) => `A nuvem não aceitou a chave de serviço (resposta ${status}). Confira ACCESS_CLIENT_ID/SECRET, a política "Service Auth" do Access e a variável SERVICOS do Worker.` };
@@ -241,11 +246,12 @@ export async function atualizarCopia(cfg, { buscar = fetch } = {}) {
 /** Texto da cópia aberta para o registro (ultima-atualizacao.txt). */
 const resumoCopia = (c) => `arquivos=${c.total} (baixados ${c.baixados}, tirados ${c.apagados}${c.falhas ? `, ${c.falhas} falharam` : ''})`;
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+/** A rotina inteira (o que `node atualizador.mjs` e o .exe fazem): liga se for preciso, atualiza e registra. `true` se deu certo. */
+export async function principal(args = []) {
   try {
-    const soArquivos = process.argv.includes('--arquivos');
+    const soArquivos = args.includes('--arquivos');
     let cfg;
-    try { cfg = process.argv.includes('--ligar') ? null : carregarConfig(); } catch (e) {
+    try { cfg = args.includes('--ligar') ? null : carregarConfig(); } catch (e) {
       // sem crachá: só abre a página quando há alguém olhando (a tarefa de hora em hora roda escondida)
       if (!(e instanceof ErroNaoLigado) || soArquivos || !process.stdout.isTTY) throw e;
     }
@@ -262,9 +268,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const linha = r ? `ok dados=${r.dados} programa=${r.programa} ${copia}` : `ok ${copia}`;
     fs.writeFileSync(path.join(cfg.pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} ${linha}\n`);
     console.log(r ? `Atualizado: ${r.dados} em ${path.join(cfg.pasta, PASTA_DIARIO)}; versão PC ${r.programa}; ${copia}.` : `Cópia aberta: ${copia}.`);
+    return true;
   } catch (e) {
     console.error(`Falhou: ${e.message}`);
     try { fs.writeFileSync(path.join(carregarConfig().pasta, ARQUIVO_REGISTRO), `${new Date().toISOString()} FALHOU ${e.message}\n`); } catch { /* sem pasta */ }
     process.exitCode = 1;
+    return false;
   }
 }
+
+if (!EXE && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) principal(process.argv.slice(2));

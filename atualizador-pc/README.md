@@ -21,13 +21,38 @@ Não precisa mais de chave de serviço do Cloudflare, de `.env` nem do segredo `
 
 **Por que uma página no navegador?** É o jeito mais simples sem instalar nada além do Node: o programa abre no navegador uma página que só existe neste computador (`http://127.0.0.1:<porta>/<código sorteado>`; outro site ou outro computador não chega nela), com os campos e-mail, senha, nome do computador e a pasta (botão **Escolher…** abre a janela de pastas do Windows). Quando liga, a página diz "Pronto" e pode ser fechada.
 
-## O que precisa ter
+## O programa num arquivo só: `Instalar-Administracao-de-Imoveis.exe` (desde 15/11/2026, etapa 2)
+
+Não precisa mais instalar o Node nem copiar esta pasta: o `.exe` traz tudo dentro (uns 90 MB) e faz o que os `.cmd` e o `.vbs` faziam.
+
+**Passo a passo do dono (uns 5 minutos):**
+
+1. Baixe `Instalar-Administracao-de-Imoveis.exe` em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc (o GitHub gera um novo a cada mudança do programa).
+2. Dois cliques. O Windows mostra o aviso azul **"O Windows protegeu o computador"** (o programa ainda não tem assinatura): **Mais informações → Executar assim mesmo**.
+3. A janela preta mostra os 3 passos: cria as tarefas (se o Windows perguntar "Deseja permitir?", responda **Sim**), liga o computador (se ainda não está ligado, abre a página do navegador: e-mail, senha e a pasta do backup seguro → **Ligar**) e faz a primeira atualização. No fim aparece **Pronto** e "Aperte Enter para fechar".
+4. Confira: `ultima-atualizacao.txt` na pasta do backup seguro com `ok`, e no sistema **Usuários → Aparelhos ligados**.
+
+O que ele faz ao instalar: copia a si mesmo para `%LOCALAPPDATA%\Administracao de Imoveis\programa\Administracao-de-Imoveis.exe` (ao lado do crachá; o arquivo baixado pode ser apagado) e cria as **mesmas três tarefas** de antes, com os mesmos nomes: quem já tinha o jeito do Node tem as tarefas trocadas sozinho, e o computador já ligado continua ligado (não pede a senha de novo). Depois disso a pasta `atualizador-pc` antiga e o Node podem sair do computador.
+
+| Para | Rode (na pasta `programa` acima, ou o arquivo baixado) |
+|---|---|
+| Ligar de novo (depois de Desligar ou de 90 dias parado) | `Administracao-de-Imoveis.exe --ligar` (ou dois cliques de novo) |
+| Atualizar agora | `Administracao-de-Imoveis.exe --atualizar` (só os arquivos: `--arquivos`) |
+| Parar as atualizações automáticas | `Administracao-de-Imoveis.exe --desinstalar` |
+| Ver a versão / a ajuda | `--versao` / `--ajuda` |
+| Ver o que a instalação faria, sem mexer em nada | `--instalar --simular` |
+
+Programa novo publicado: baixe e dê dois cliques de novo (ele se copia por cima). Ele ainda **não se atualiza sozinho**.
+
+Para gerar o `.exe` na mão (Windows, com Node 24): `node tools/gerar-exe.mjs` → `atualizador-pc/dist/` (fora do repositório). É o próprio `node.exe` com `programa.mjs` dentro (Node "single executable application": esbuild + `--experimental-sea-config` + postject). No GitHub: `.github/workflows/programa-pc.yml`. Testes: `tests/programa-pc.test.mjs`.
+
+## O que precisa ter (jeito antigo, com o Node)
 
 - [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais.
 - O backup seguro já ligado neste computador (Dados e backup → Backup seguro): a pasta escolhida tem o arquivo `chave-do-backup.json`.
 - Na nuvem, a regra **Bypass** do caminho `/api/aparelho` no Cloudflare Access (uma vez só, feita pelo dono: passo a passo em `nuvem/README.md`, "Programa do PC"). Sem ela a página avisa: *"falta a regra Bypass"*.
 
-## Passo a passo (computador novo)
+## Passo a passo com o Node (computador novo; com o `.exe`, veja acima)
 
 1. Copie a pasta `atualizador-pc` para o computador (ex.: `C:\Imoveis\atualizador-pc`).
 2. Clique com o botão direito em `instalar-tarefa.cmd` → **Executar como administrador**: cria as tarefas no Windows e roda a primeira atualização. Como o computador ainda não está ligado, abre a página de ligar no navegador: e-mail e senha do sistema, a pasta do backup seguro → **Ligar**. Em seguida aparece `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
@@ -68,5 +93,5 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 
 ## Falta (etapa 2 da proposta)
 
-- **Instalador `.exe` assinado** (sem instalar o Node, "Avançar, Avançar, Concluir", cria as tarefas sozinho, ícone na Área de Trabalho e atualização do próprio programa). Até lá: Node + esta pasta + `instalar-tarefa.cmd`. Assinatura do instalador (certificado de assinatura de código): sem assinatura no computador do dono; comprar antes do primeiro cliente de fora (proposta, seção 8, item 11).
+- O `.exe` sem o Node está feito (acima). Falta dele: **assinatura** (certificado de assinatura de código: sem assinatura no computador do dono; comprar antes do primeiro cliente de fora, proposta, seção 8, item 11), **atualização do próprio programa** sozinha, ícone na Área de Trabalho e o link para baixar dentro do sistema (Dados e backup).
 - Com o login próprio (etapa 4), a página de ligar pede também o código de confirmação.
