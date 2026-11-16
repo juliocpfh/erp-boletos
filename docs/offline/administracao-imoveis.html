@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-OMiD1Xzr9sezzDbsFsvQTVelVhSoN86+p/2PByTzepU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-LLFPfbmZyXYkQs66yIBveQ155gNFYlfYCoF7ZGwNb/g=' 'sha256-km9ogLGI+76uBYKU0WJIaWP6FUlFqfxQi4E1B2TY0kA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="f08153bbd893c07c">
+<meta name="fontes" content="0878f2108e6fa163">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3294,7 +3294,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       representacao: representacaoDoContrato(d2, c, imovel).length > 0,
       testemunhas: !!(extra.testemunhas && extra.testemunhas.some((t) => t.nome))
     };
-    const assinaturas2 = [
+    const assinaturas3 = [
       ...locadoras.map((e) => ({
         nome: (e.razao_social || e.nome).toLocaleUpperCase("pt-BR"),
         doc: e.cnpj ? `CNPJ ${e.cnpj}` : "",
@@ -3322,7 +3322,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       campos,
       condicoes,
       quantidades: { locatarios: 1, locadoras: locadoras.length, fiadores: fiadores.length },
-      assinaturas: assinaturas2,
+      assinaturas: assinaturas3,
       locadoras,
       rodape: locadoras.map((e) => `${(e.razao_social || e.nome).toLocaleUpperCase("pt-BR")} – CNPJ ${e.cnpj || ""}`)
     };
@@ -10289,6 +10289,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     PASTA_MODELOS: () => PASTA_MODELOS,
     abrirArquivo: () => abrirArquivo,
     apagarPastaVazia: () => apagarPastaVazia,
+    assinaturaDoBanco: () => assinaturaDoBanco,
+    assinaturaLida: () => assinaturaLida,
     backupDiario: () => backupDiario,
     copiasEmConflito: () => copiasEmConflito,
     escolherPasta: () => escolherPasta,
@@ -10355,6 +10357,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return false;
     }
   }
+  async function assinaturaDoBanco(pasta) {
+    try {
+      return assinaturaDoArquivo(await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile());
+    } catch {
+      return null;
+    }
+  }
   async function lerBanco(pasta) {
     if (!await arquivoExiste(pasta, ARQUIVO_BANCO)) return null;
     const arq = await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile();
@@ -10366,7 +10375,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       throw new Error(`O arquivo ${ARQUIVO_BANCO} está danificado. Restaure uma cópia da pasta ${PASTA_BACKUPS}.`);
     }
     if (dados.formato !== "imoveis-v1") throw new Error(`${ARQUIVO_BANCO} não é um banco deste sistema.`);
-    return normalizar(dados);
+    const banco = normalizar(dados);
+    if (banco && typeof banco === "object" && Number.isFinite(arq.lastModified)) assinaturas.set(banco, assinaturaDoArquivo(arq));
+    return banco;
   }
   async function escreverTexto(dir, nome, conteudo) {
     const fh = await dir.getFileHandle(nome, { create: true });
@@ -10696,7 +10707,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for await (const [nome, h] of dir.entries()) if (h.kind === "directory") nomes.push(nome);
     return nomes;
   }
-  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR;
+  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR;
   var init_armazenamento = __esm({
     "docs/js/armazenamento.js"() {
       init_calculos();
@@ -10716,6 +10727,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       lembrarPonte = (dados) => idbOp("readwrite", (s) => s.put(dados, "ponte"));
       ponteLembrada = () => idbOp("readonly", (s) => s.get("ponte")).catch(() => null);
       esquecerPonte = () => idbOp("readwrite", (s) => s.delete("ponte"));
+      assinaturaDoArquivo = (arq) => `${arq.lastModified}:${arq.size}`;
+      assinaturas = /* @__PURE__ */ new WeakMap();
+      assinaturaLida = (dados) => assinaturas.get(dados) || null;
       EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
       ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.";
       TIPOS_ABRIR = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
@@ -13206,11 +13220,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (location.protocol === "file:") return false;
     return !!window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
   }
-  function fechar(janela2, urls2) {
+  function fechar(janela2, urls2, voltar = true) {
+    if (janela2.fechada) return;
+    janela2.fechada = true;
     janela2.remove();
     urls2.forEach((u) => URL.revokeObjectURL(u));
     document.body.classList.remove("com-visualizador");
     document.removeEventListener("keydown", janela2.teclado);
+    window.removeEventListener("popstate", janela2.aoVoltar);
+    if (voltar && janela2.marca && history.state && history.state.visualizador === janela2.marca) history.back();
   }
   async function visualizar(blob, nome, tipo, baixar2) {
     const urls2 = [];
@@ -13232,6 +13250,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (ev.key === "Escape") fechar(janela2, urls2);
     };
     document.addEventListener("keydown", janela2.teclado);
+    document.querySelector(".visualizador")?.fecharSemVoltar?.();
+    janela2.aoVoltar = () => fechar(janela2, urls2, false);
+    janela2.fecharSemVoltar = janela2.aoVoltar;
+    try {
+      const marca2 = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (history.state && history.state.visualizador) history.replaceState({ visualizador: marca2 }, "");
+      else history.pushState({ visualizador: marca2 }, "");
+      janela2.marca = marca2;
+      window.addEventListener("popstate", janela2.aoVoltar);
+    } catch {
+    }
     document.body.appendChild(janela2);
     document.body.classList.add("com-visualizador");
     const corpo = janela2.querySelector(".vis-corpo");
@@ -14996,7 +15025,24 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     aviso(`${c.inquilino_nome}: ${trazidos.length ? `${trazidos.join(", ")} trazido(s) do contrato de ${r.anterior.inquilino_nome}.` : "troca de titular conferida."}${pagamento}`, "info");
     return r;
   }
-  var formularioAberto = () => !!document.querySelector("main form[data-form]");
+  var SELETOR_FORMULARIO = 'main form[data-form]:not([data-form="ir"])';
+  var formularioAberto = () => !!document.querySelector(SELETOR_FORMULARIO);
+  var TEMPO_DE_RESPOSTA = 8e3;
+  async function buscarComLimite(url, opcoes2 = {}, ms = TEMPO_DE_RESPOSTA) {
+    const controle = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const relogio = controle ? setTimeout(() => controle.abort(), ms) : null;
+    try {
+      return await fetch(url, controle ? { ...opcoes2, signal: controle.signal } : opcoes2);
+    } catch (e) {
+      clearTimeout(relogio);
+      if (controle && controle.signal.aborted) {
+        const erro = new ErroUsuario("Sem resposta, tente de novo.");
+        erro.semResposta = true;
+        throw erro;
+      }
+      throw e;
+    }
+  }
   function redesenharSeLivre(endereco2) {
     if (location.hash !== endereco2 || formularioAberto()) return null;
     return mostrar();
@@ -18364,7 +18410,7 @@ Salvar assim mesmo?`)) {
     if (n.length !== 8) return;
     mensagemAuto(el, "Consultando o CEP…");
     try {
-      const r = await (await fetch(`https://viacep.com.br/ws/${n}/json/`)).json();
+      const r = await (await buscarComLimite(`https://viacep.com.br/ws/${n}/json/`)).json();
       if (r.erro) return mensagemAuto(el, "CEP não encontrado.");
       if (cfg4.linha) return enderecoNaLinha(el, cfg4, r);
       const feitos = preencherVazios(el.form, { [cfg4.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg4.bairro]: r.bairro, [cfg4.cidade]: r.localidade });
@@ -18376,10 +18422,10 @@ Salvar assim mesmo?`)) {
       mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(", "))}. Complete o número.` : "CEP conferido.");
       const end = el.form.querySelector(`[name="${cfg4.endereco}"]`);
       if (feitos.length && end) end.focus();
-    } catch {
+    } catch (e) {
       const uf = cfg4.uf && el.form.querySelector(`[name="${cfg4.uf}"]`);
       if (uf && ufDoCep(n)) uf.value = ufDoCep(n);
-      mensagemAuto(el, "Não deu para consultar o CEP agora (sem internet?). Preencha à mão.");
+      mensagemAuto(el, e && e.semResposta ? "A consulta do CEP ficou sem resposta, tente de novo (ou preencha à mão)." : "Não deu para consultar o CEP agora (sem internet?). Preencha à mão.");
     }
   }
   function enderecoNaLinha(el, cfg4, r) {
@@ -18398,7 +18444,7 @@ Salvar assim mesmo?`)) {
     if (n.length !== 14 || !cnpjValido(n)) return;
     mensagemAuto(el, "Consultando o CNPJ…");
     try {
-      const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${n}`);
+      const resp = await buscarComLimite(`https://brasilapi.com.br/api/cnpj/v1/${n}`);
       if (!resp.ok) return mensagemAuto(el, "CNPJ não encontrado na Receita.");
       const r = await resp.json();
       const endereco2 = [[r.descricao_tipo_de_logradouro, r.logradouro].filter(Boolean).join(" "), r.numero, r.complemento, r.bairro].filter(Boolean).map(titulo).join(", ") + (r.municipio ? `, ${titulo(r.municipio)}/${r.uf || ""}` : "");
@@ -18417,8 +18463,8 @@ Salvar assim mesmo?`)) {
         [cfg4.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
       });
       mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}`);
-    } catch {
-      mensagemAuto(el, "Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.");
+    } catch (e) {
+      mensagemAuto(el, e && e.semResposta ? "A consulta do CNPJ ficou sem resposta, tente de novo (ou preencha à mão)." : "Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.");
     }
   }
   function pessoasComDocumento(doc) {
@@ -18778,7 +18824,7 @@ Salvar assim mesmo?`)) {
     if (acumuladosTrazidos.has(chave)) return acumuladosTrazidos.get(chave);
     const de = somarMeses(mesRef, -11);
     const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
-    const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(mesRef)}`);
+    const resp = await buscarComLimite(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(mesRef)}`);
     const lista3 = resp.ok ? await resp.json() : [];
     const meses = new Map((Array.isArray(lista3) ? lista3 : []).map((x) => [`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`, Number(x.valor)]));
     const todos = Array.from({ length: 12 }, (_, k) => somarMeses(de, k));
@@ -18796,7 +18842,7 @@ Salvar assim mesmo?`)) {
     let lista3 = null;
     for (let n = 1; n <= 3 && !lista3; n += 1) {
       try {
-        const resp = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`);
+        const resp = await buscarComLimite(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados?formato=json&dataInicial=${br(de)}&dataFinal=${br(ate)}`);
         if (resp.ok) lista3 = await resp.json();
       } catch {
       }
@@ -18804,7 +18850,7 @@ Salvar assim mesmo?`)) {
         setTimeout(ok, 2e3 * n);
       });
     }
-    if (!lista3) throw new Error("Não deu para consultar o Banco Central agora (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.");
+    if (!lista3) throw new Error("O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.");
     const out = {};
     for (const x of Array.isArray(lista3) ? lista3 : []) if (Number.isFinite(Number(x.valor))) out[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`] = Number(x.valor);
     return out;
@@ -20477,7 +20523,8 @@ ${m.texto}
       <form data-form="desfazerNumeracao" class="acoes" style="margin-top:8px"><label for="desfazer_n" style="margin:0">A partir do nº</label><input id="desfazer_n" type="number" name="numero" min="1" value="${ciclo ? ciclo.de : (ultimaFatura(d()) || {}).numero || 1}" style="width:120px"><button class="perigo secundario">Desfazer a partir deste número</button></form></details></div>`;
   }
   function caixaAvulsas() {
-    const pend = d().avulsas.filter((a) => !faturasDe(d(), "avulsa", a.id).length);
+    const nfs = indiceFaturas(d());
+    const pend = d().avulsas.filter((a) => !nfs.nfs("avulsa", a.id).length);
     return `<div class="cartao"><div class="cabecalho"><h2>NFs avulsas</h2>${opera() ? `<div class="acoes">${link("#/novo/avulsas", "Nova NF avulsa", "botao")}</div>` : ""}</div>
     <p class="suave">Para recebimentos fora do boleto: uma nota com cliente e imóvel que você escolher. A do Airbnb não se cria aqui: lance os ganhos em cada imóvel (Financeiro) e use "Gerar a NF do Airbnb", que soma o mês numa NF só; depois de gerada, ela aparece nesta lista e pode ser editada (os dados do cliente ficam guardados como padrão se você marcar). Entram na mesma sequência de números dos boletos pagos, pela data do pagamento. Sem imóvel, o valor é dividido igualmente entre as empresas ativas.</p>
     ${pend.length ? `<table><tr><th>Pagamento em</th><th>Cliente</th><th>Descrição</th><th class="n">Valor</th><th></th></tr>
@@ -20547,16 +20594,22 @@ ${m.texto}
     const hoje3 = hojeIso();
     const url = (q) => `#/cobrancas?${new URLSearchParams({ comp, ordem, ...filtro !== "todos" ? { filtro } : {}, ...busca ? { busca: String(buscaPedida).trim() } : {}, ...q })}`;
     const nfs = indiceFaturas(d());
+    const semContrato = [];
     const montar = (cb) => {
       const c = buscar2("contratos", cb.contrato_id);
+      if (!c) {
+        semContrato.push(cb);
+        return null;
+      }
       return { cb, c, i: buscar2("imoveis", c.imovel_id), t: totais(cb), fs: nfs.nfs("cobranca", cb.id) };
     };
-    const todasMontadas = d().cobrancas.map(montar);
+    const todasMontadas = d().cobrancas.map(montar).filter(Boolean);
+    const avisoSemContrato = semContrato.length ? `<div class="alerta aviso">${semContrato.length} boleto(s) com contrato não encontrado no cadastro não aparecem na lista (${semContrato.slice(0, 8).map((cb) => `${compBr(cb.competencia)}, código ${Number(cb.id)}`).join("; ")}${semContrato.length > 8 ? "…" : ""}). Avise o suporte.</div>` : "";
     const doMes = todasMontadas.filter((x) => x.cb.competencia === comp);
     const todas = F_.todosMeses ? todasMontadas : doMes;
     const lista3 = todas.filter((x) => F_.f(x, hoje3) && (!busca || [x.c.inquilino_nome, x.c.inquilino_apelido, x.i && x.i.nome].some((t) => textoDeBusca(t).includes(busca)))).sort(ORDENS_BOLETO[ordem] || ORDENS_BOLETO.vencimento);
     const conta = (k) => (FILTROS_BOLETO[k].todosMeses ? todasMontadas : doMes).filter((x) => FILTROS_BOLETO[k].f(x, hoje3)).length;
-    const filtros = `<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? "" : "secundario"} pequeno" href="${url({ filtro: k })}">${k === "todos" ? `Todos de ${compBr(comp)}` : `${x.titulo.replace("Boletos ", "").replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(" ")}
+    const filtros = `${avisoSemContrato}<div class="acoes barra-nf" style="margin-bottom:8px">${Object.entries(FILTROS_BOLETO).map(([k, x]) => `<a class="botao ${filtro === k ? "" : "secundario"} pequeno" href="${url({ filtro: k })}">${k === "todos" ? `Todos de ${compBr(comp)}` : `${x.titulo.replace("Boletos ", "").replace(/^./, (m) => m.toUpperCase())}`} (${conta(k)})</a>`).join(" ")}
     <form data-form="ir" data-ir="cobrancas" class="acoes" style="flex-wrap:nowrap"><input type="hidden" name="comp" value="${esc(comp)}"><input type="hidden" name="ordem" value="${esc(ordem)}">${filtro !== "todos" ? `<input type="hidden" name="filtro" value="${esc(filtro)}">` : ""}<input name="busca" value="${esc(String(buscaPedida || ""))}" placeholder="Inquilino ou imóvel" style="width:200px"><button class="secundario pequeno">Buscar</button>${busca ? `<a class="botao secundario pequeno" href="${url({ busca: "" }).replace(/&busca=[^&]*/, "")}">Limpar</a>` : ""}</form></div>`;
     if (filtro !== "todos") {
       const soma2 = (f) => lista3.filter((x) => geraNf(x.c)).reduce((s, x) => s + f(x), 0);
@@ -21029,7 +21082,13 @@ ${m.texto}
     const largura = Math.min(140, 200 / prop);
     return { png: canvas.toDataURL("image/png"), largura, altura: largura * prop };
   }
-  async function pdfDoDocumento(el, rodape = [], { margemLado = 0 } = {}) {
+  var ESCALA_PDF = 2;
+  function alturaQueCabe(el) {
+    const toque = /iP(hone|ad|od)/.test(navigator.userAgent) || !!window.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
+    const larguraPx = Math.max(1, Math.ceil(el.offsetWidth) * ESCALA_PDF);
+    return Math.floor(Math.min(32e3, (toque ? 16e6 : 2e8) / larguraPx) / ESCALA_PDF);
+  }
+  async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
     const { html2canvas, jsPDF } = await bibliotecasPdf();
     const caixa = el.getBoundingClientRect();
     const topo = caixa.top;
@@ -21039,20 +21098,19 @@ ${m.texto}
     });
     const cortes = cortesDoDocumento(el, topo);
     const marca2 = await marcaDaguaPdf(el.querySelector(".ct-marca"));
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", onclone: (doc) => {
+    const opcoes2 = { scale: ESCALA_PDF, backgroundColor: "#ffffff", onclone: (doc) => {
       doc.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
       doc.querySelectorAll(".contrato").forEach((x) => {
         x.style.border = "0";
         x.style.boxShadow = "none";
       });
-    } });
-    const escala = canvas.width / el.offsetWidth;
+    } };
     const largura = 210 - 2 * margemLado;
     const pxMm = el.offsetWidth / largura;
     const [margemTopo, margemPe] = [12, 24];
     const capa = el.querySelector(".ct-capa");
     const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo) : 0;
-    const topoDa = (n) => n || !capa ? margemTopo : LOGO.topoCm * 10;
+    const topoDa = (n2) => n2 || !capa ? margemTopo : LOGO.topoCm * 10;
     const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
     const total = el.offsetHeight;
     const fatias = [];
@@ -21064,26 +21122,48 @@ ${m.texto}
       fatias.push([ini, fim]);
       ini = fim;
     }
+    const limite = alturaMaxima || alturaQueCabe(el);
+    const lotes = [];
+    if (total <= limite) lotes.push({ inteiro: true, ini: 0, fim: total, fatias });
+    else {
+      for (const f of fatias) {
+        const ultimo = lotes.at(-1);
+        if (ultimo && f[1] - ultimo.ini <= limite) {
+          ultimo.fim = f[1];
+          ultimo.fatias.push(f);
+        } else lotes.push({ ini: f[0], fim: f[1], fatias: [f] });
+      }
+    }
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    fatias.forEach(([ini, fim], n) => {
-      if (n) pdf.addPage();
-      const pedaco = document.createElement("canvas");
-      pedaco.width = canvas.width;
-      pedaco.height = Math.round((fim - ini) * escala);
-      const g = pedaco.getContext("2d");
-      g.fillStyle = "#ffffff";
-      g.fillRect(0, 0, pedaco.width, pedaco.height);
-      const y = Math.round(ini * escala);
-      const h = Math.min(pedaco.height, canvas.height - y);
-      if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-      pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, topoDa(n), largura, (fim - ini) / pxMm);
-      if (marca2) pdf.addImage(marca2.png, "PNG", 105 - marca2.largura / 2, 148.5 - marca2.altura / 2, marca2.largura, marca2.altura, "marca-dagua");
-      for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
-      pdf.setFontSize(8).setTextColor(102);
-      pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: "right" });
-      pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
-      rodape.forEach((linha, k) => pdf.text(linha, 105, 297 - margemPe + 12 + k * 3.5, { align: "center" }));
-    });
+    let n = 0;
+    for (const lote of lotes) {
+      const canvas = await html2canvas(el, lote.inteiro ? opcoes2 : { ...opcoes2, y: lote.ini, height: Math.ceil(lote.fim - lote.ini) });
+      const escala = canvas.width / el.offsetWidth;
+      for (const [ini, fim] of lote.fatias) {
+        if (n) pdf.addPage();
+        const pedaco = document.createElement("canvas");
+        pedaco.width = canvas.width;
+        pedaco.height = Math.round((fim - ini) * escala);
+        const g = pedaco.getContext("2d");
+        g.fillStyle = "#ffffff";
+        g.fillRect(0, 0, pedaco.width, pedaco.height);
+        const y = Math.round((ini - lote.ini) * escala);
+        const h = Math.min(pedaco.height, canvas.height - y);
+        if (h > 0) g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        pdf.addImage(pedaco.toDataURL("image/jpeg", 0.92), "JPEG", margemLado, topoDa(n), largura, (fim - ini) / pxMm);
+        if (marca2) pdf.addImage(marca2.png, "PNG", 105 - marca2.largura / 2, 148.5 - marca2.altura / 2, marca2.largura, marca2.altura, "marca-dagua");
+        for (const l of links.filter((x) => x.y >= ini && x.y < fim)) pdf.link(margemLado + l.x / pxMm, topoDa(n) + (l.y - ini) / pxMm, l.w / pxMm, l.h / pxMm, { url: l.url });
+        pdf.setFontSize(8).setTextColor(102);
+        pdf.text(`Página ${n + 1} de ${fatias.length}`, 190, 297 - margemPe + 6, { align: "right" });
+        pdf.setDrawColor(153).line(20, 297 - margemPe + 8, 190, 297 - margemPe + 8);
+        rodape.forEach((linha, k) => pdf.text(linha, 105, 297 - margemPe + 12 + k * 3.5, { align: "center" }));
+        pedaco.width = 0;
+        pedaco.height = 0;
+        n += 1;
+      }
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     return pdf.output("blob");
   }
   async function guardarCartaNaPasta(c, comp) {
@@ -21393,15 +21473,23 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     } catch {
       return out;
     }
-    for (const [k, nome] of Object.entries(v.fotos)) {
+    const lidas = await Promise.all(Object.entries(v.fotos).map(async ([k, nome]) => {
       try {
         const arq = await (await dir.getFileHandle(nome)).getFile();
-        const img = await createImageBitmap(arq);
-        const src = URL.createObjectURL(arq);
-        urls.push(src);
-        out[k] = { src, bytes: new Uint8Array(await arq.arrayBuffer()), largura: img.width, altura: img.height };
+        const [img, conteudo] = await Promise.all([createImageBitmap(arq), arq.arrayBuffer()]);
+        const [largura, altura] = [img.width, img.height];
+        img.close?.();
+        return [k, arq, { bytes: new Uint8Array(conteudo), largura, altura }];
       } catch {
+        return null;
       }
+    }));
+    for (const lida of lidas) {
+      if (!lida) continue;
+      const [k, arq, foto] = lida;
+      const src = URL.createObjectURL(arq);
+      urls.push(src);
+      out[k] = { src, ...foto };
     }
     return out;
   }
@@ -21833,18 +21921,43 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${escolhidos.map((i) => documentoHtml(i, c)).join("")}
   </div>`;
   }
+  var impressaoAberta = null;
+  var afterprintLigado = false;
+  function soltarImpressao() {
+    if (!impressaoAberta || impressaoAberta.pagina.isConnected) return;
+    impressaoAberta.urls.forEach((u) => URL.revokeObjectURL(u));
+    impressaoAberta = null;
+  }
   async function ligarPastaImpressao(raiz) {
+    soltarImpressao();
     const pagina = raiz.querySelector("[data-pasta-impressao]");
     if (!pagina) return;
-    window.addEventListener("afterprint", () => {
-      const x = document.getElementById("pasta-confirmar");
-      if (x) {
-        x.classList.add("destaque");
-        x.scrollIntoView({ block: "center" });
-      }
-    }, { once: true });
+    if (!afterprintLigado) {
+      afterprintLigado = true;
+      window.addEventListener("afterprint", () => {
+        const x = document.getElementById("pasta-confirmar");
+        if (x) {
+          x.classList.add("destaque");
+          x.scrollIntoView({ block: "center" });
+        }
+      });
+    }
+    const urls2 = [];
+    if (impressaoAberta && impressaoAberta.pagina !== pagina) {
+      impressaoAberta.urls.forEach((u) => URL.revokeObjectURL(u));
+      impressaoAberta = null;
+    }
+    impressaoAberta = impressaoAberta || { pagina, urls: urls2 };
+    const guardar = (u) => {
+      (impressaoAberta && impressaoAberta.pagina === pagina ? impressaoAberta.urls : urls2).push(u);
+      return u;
+    };
     let pdfjs = null;
     for (const caixa of pagina.querySelectorAll("[data-pasta-arquivo]")) {
+      if (!pagina.isConnected) {
+        soltarImpressao();
+        return;
+      }
       const { escopo, id, nome, vaga } = caixa.dataset;
       const conta = (n) => {
         const td = pagina.querySelector(`[data-paginas="${CSS.escape(vaga)}"]`);
@@ -21857,7 +21970,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           const img = document.createElement("img");
           img.className = "pasta-pagina";
           img.alt = nome;
-          img.src = URL.createObjectURL(new Blob([arq], { type: tipo }));
+          img.src = guardar(URL.createObjectURL(new Blob([arq], { type: tipo })));
           caixa.replaceChildren(img);
           conta(1);
           continue;
@@ -21866,6 +21979,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         const pdf = await pdfjs.getDocument({ data: new Uint8Array(await arq.arrayBuffer()), isEvalSupported: false }).promise;
         const telas = [];
         for (let n = 1; n <= pdf.numPages; n += 1) {
+          if (!pagina.isConnected) {
+            pdf.destroy?.();
+            soltarImpressao();
+            return;
+          }
           const p2 = await pdf.getPage(n);
           const vista = p2.getViewport({ scale: 1240 / p2.getViewport({ scale: 1 }).width });
           const tela = document.createElement("canvas");
@@ -21951,8 +22069,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (typeof DecompressionStream === "undefined") return "";
     const out = [];
     let total = 0;
-    const re = /(?<!end)stream\r?\n/g;
+    const re = /stream\r?\n/g;
     for (let m = re.exec(texto3); m && total < limite; m = re.exec(texto3)) {
+      if (m.index >= 3 && texto3.slice(m.index - 3, m.index) === "end") continue;
       const ini = m.index + m[0].length;
       let fim = texto3.indexOf("endstream", ini);
       if (fim < 0) break;
@@ -21994,7 +22113,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return nomes;
   }
   var ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
-  async function assinaturas(texto3) {
+  async function assinaturas2(texto3) {
     const out = [];
     const re = /\/Type\s*\/Sig\b|\/ByteRange\s*\[/g;
     const vistos = /* @__PURE__ */ new Set();
@@ -22048,7 +22167,7 @@ ${dentro}`;
     if (editor) sinais.push({ nivel: "alerta", texto: `Feito ou alterado no programa "${editor}" (editor de PDF ou de imagem). Extrato e holerite saem do aplicativo do banco ou do sistema do empregador: peça o arquivo original e confira com a fonte.` });
     else if (escritorio) sinais.push({ nivel: "atencao", texto: `Feito no programa "${escritorio}" (editor de texto ou planilha). Holerite de empresa pequena pode sair assim; extrato de banco, não. Confira com a fonte.` });
     else if (impressao) sinais.push({ nivel: "info", texto: `PDF "impresso" de uma página (${impressao}). Comum no extrato tirado do site do banco; confira o valor com a fonte.` });
-    const sig = await assinaturas(texto3 + (dentro ? `
+    const sig = await assinaturas2(texto3 + (dentro ? `
 ${dentro}` : ""));
     if (criado && alterado && !sig.length && Date.parse(alterado) - Date.parse(criado) > 864e5) {
       sinais.push({ nivel: "info", texto: `Alterado em ${alterado.slice(8, 10)}/${alterado.slice(5, 7)}/${alterado.slice(0, 4)}, depois de criado em ${criado.slice(8, 10)}/${criado.slice(5, 7)}/${criado.slice(0, 4)}.` });
@@ -22206,10 +22325,31 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     if (!r.ok) throw new ErroUsuario(dados.erro || "A nuvem recusou o pedido.");
     return dados;
   }
-  var criarLinkNaNuvem = (corpo) => pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
-  var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob });
-  var linksNaNuvem = (fichaId = null) => pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => r.links || []);
-  var atualizarLinkNaNuvem = (corpo) => pedir("atualizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  var VALIDADE_LINKS = 9e4;
+  var linksGuardadosPorFicha = /* @__PURE__ */ new Map();
+  var geracaoDosLinks = 0;
+  var chaveDosLinks = (fichaId) => fichaId ? String(Number(fichaId)) : "";
+  function esquecerLinks() {
+    geracaoDosLinks += 1;
+    linksGuardadosPorFicha.clear();
+  }
+  var esquecendo = (promessa) => promessa.finally(esquecerLinks);
+  var criarLinkNaNuvem = (corpo) => esquecendo(pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
+  var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => esquecendo(pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob }));
+  var linksNaNuvem = (fichaId = null) => {
+    const geracao = geracaoDosLinks;
+    return pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => {
+      const links = r.links || [];
+      if (geracao === geracaoDosLinks) linksGuardadosPorFicha.set(chaveDosLinks(fichaId), { em: Date.now(), links });
+      return links;
+    });
+  };
+  var linksGuardados = (fichaId = null) => (linksGuardadosPorFicha.get(chaveDosLinks(fichaId)) || {}).links || null;
+  async function linksRecentes(fichaId = null, agora = Date.now()) {
+    const g = linksGuardadosPorFicha.get(chaveDosLinks(fichaId));
+    return g && agora - g.em < VALIDADE_LINKS ? g.links : linksNaNuvem(fichaId);
+  }
+  var atualizarLinkNaNuvem = (corpo) => esquecendo(pedir("atualizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
   var chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(t).length / 4) * 4, "=")), (c) => c.charCodeAt(0));
   var temPush = () => typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof PushManager !== "undefined" && typeof Notification !== "undefined";
   async function estadoDoAviso() {
@@ -22428,14 +22568,35 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     if (!caixa || !E.nuvem) return;
     linhaDoAvisoNoAparelho(caixa.querySelector("[data-aviso-aparelho]")).catch(() => {
     });
+    const guardada = linksGuardados(Number(caixa.dataset.fichaOnline));
+    if (guardada) desenharLinksDaFicha(caixa, guardada, false);
     let links;
     try {
-      links = await linksNaNuvem(Number(caixa.dataset.fichaOnline));
+      links = await linksRecentes(Number(caixa.dataset.fichaOnline));
     } catch (e) {
       const r = caixa.querySelector("[data-respostas-link]");
-      if (r) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`;
+      if (r && !guardada) r.innerHTML = `<p class="suave">Não foi possível ler as respostas da nuvem: ${esc(e.message)}</p>`;
       return;
     }
+    if (!caixa.isConnected) return;
+    if (links !== guardada) desenharLinksDaFicha(caixa, links, true);
+    else marcarLinksVistos(Number(caixa.dataset.fichaOnline), links);
+    const id = Number(caixa.dataset.fichaOnline);
+    const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
+    if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
+    const antes = arquivosDoLinkVistos.get(id);
+    arquivosDoLinkVistos.set(id, total);
+    const f = buscar2("fichas", id);
+    if (total && f && E.anexos?.esquecerLista) {
+      E.anexos.esquecerLista(["arquivos", PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
+      if (antes !== void 0 || total) await mostrar();
+    }
+  }
+  function marcarLinksVistos(fichaId, links) {
+    for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) atualizarLinkNaNuvem({ ficha_id: fichaId, pessoa: l.pessoa, visto: true }).catch(() => {
+    });
+  }
+  function desenharLinksDaFicha(caixa, links, marcar) {
     for (const l of links) {
       const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
       if (!el) continue;
@@ -22449,18 +22610,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     if (area && fichaAqui) {
       area.innerHTML = links.filter((l) => l.situacao !== "Encerrado" || (l.respostas || []).length).map((l) => blocoDoLink(fichaAqui, l)).join("");
       conferirArquivosDoLink(area, fichaAqui).catch((e) => console.warn("conferência dos arquivos do link", e));
-      for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) atualizarLinkNaNuvem({ ficha_id: fichaAqui.id, pessoa: l.pessoa, visto: true }).catch(() => {
-      });
-    }
-    const id = Number(caixa.dataset.fichaOnline);
-    const total = links.reduce((n, l) => n + (l.arquivos || []).length, 0);
-    if (arquivosDoLinkVistos.has(id) && arquivosDoLinkVistos.get(id) === total) return;
-    const antes = arquivosDoLinkVistos.get(id);
-    arquivosDoLinkVistos.set(id, total);
-    const f = buscar2("fichas", id);
-    if (total && f && E.anexos?.esquecerLista) {
-      E.anexos.esquecerLista(["arquivos", PASTA_FICHAS, f.pasta || nomePastaFicha(f)]);
-      if (antes !== void 0 || total) await mostrar();
+      if (marcar) marcarLinksVistos(fichaAqui.id, links);
     }
   }
   var arquivosDoLinkVistos = /* @__PURE__ */ new Map();
@@ -22560,7 +22710,12 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     return out.join("<br>");
   }
   async function avisosDoPainel(el) {
-    const links = await linksNaNuvem();
+    const guardada = linksGuardados();
+    if (guardada) desenharAvisosDoPainel(el, guardada);
+    const links = await linksRecentes();
+    if (links !== guardada && el.isConnected) desenharAvisosDoPainel(el, links);
+  }
+  function desenharAvisosDoPainel(el, links) {
     const agora = Date.now();
     const dias = regra("dias_ficha_parada");
     const linhas2 = [];
@@ -23233,8 +23388,9 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   }
   var BOLETOS_INQUILINO = 12;
   function caixaBoletosInquilino(c, cobs, hoje3) {
+    const nfs = indiceFaturas(d());
     const linha = (x) => {
-      const fs = faturasDe(d(), "cobranca", x.id);
+      const fs = nfs.nfs("cobranca", x.id);
       const atraso = x.dias_atraso ? `<br><span class="suave">${x.dias_atraso} dia(s) · multa ${reais(x.multa)} + juros ${reais(x.juros)}</span>` : "";
       return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta("carência", "aviso")}` : ""}${ehComplementoCaucao(x) ? ` ${etiqueta("caução", "info")}` : ""}${ehParcelaAcordo(x) ? ` ${etiqueta(`acordo ${x.acordo_parcela || ""}`.trim(), "info")}` : ""}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(totais(x).a_pagar_pontual)}</td>
@@ -24747,7 +24903,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     return new Promise((ok, falha) => cv.toBlob((b) => b ? ok(b) : falha(new Error("Não consegui gerar a imagem do ícone.")), "image/png"));
   }
   async function pedirNuvem(rota, metodo, corpo) {
-    const r = await fetch(`api/${rota}`, { method: metodo, body: corpo, headers: { "X-Sistema": "imoveis", ...corpo ? { "Content-Type": "image/png" } : {} } });
+    const r = await buscarComLimite(`api/${rota}`, { method: metodo, body: corpo, headers: { "X-Sistema": "imoveis", ...corpo ? { "Content-Type": "image/png" } : {} } }, corpo ? 2e4 : void 0);
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
       throw new Error(e.erro || `A nuvem recusou (erro ${r.status}).`);
@@ -24823,7 +24979,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao("reconectarSeguro", "Reconectar", {}, "pequeno")}</div>` : ""}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
         <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, no seu OneDrive pessoal ou num HD externo). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
-        <p>${botao("escolherPastaSegura", nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : "Escolher a pasta segura", {}, nova ? "secundario" : "")}</p></div>
+        <p>${!E.teste && !suportado() ? '<span class="alerta aviso" style="display:block">Faça isto no computador (Chrome ou Edge): este navegador não deixa o sistema gravar numa pasta.</span>' : botao("escolherPastaSegura", nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : "Escolher a pasta segura", {}, nova ? "secundario" : "")}</p></div>
       ${nova ? `<div class="cartao"><h2>2. ${chaveExistente ? "Digite a senha do backup" : "Crie a senha do backup"}</h2>
         ${chaveExistente ? `<p>Esta pasta já tem backups seguros (chave criada em ${new Date(chaveExistente.criada_em).toLocaleDateString("pt-BR")}). Digite a senha para ligar este computador a ela.</p>` : '<div class="alerta aviso"><b>Guarde esta senha em local seguro.</b> Ela é pedida só para restaurar. Sem ela, nenhum backup pode ser aberto, nem por você nem pelo suporte. Use pelo menos 12 caracteres (uma frase curta serve).</div>'}
         <form data-form="configurarSeguro" class="formulario">
@@ -24937,13 +25093,16 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     const emUso2 = new Date(document.lastModified);
     if (location.protocol === "file:" || Number.isNaN(emUso2.getTime())) return `versão PC${window.VERSAO_OFFLINE ? ` de ${dataBr(window.VERSAO_OFFLINE)}` : ""}`;
     let publicada = null;
+    let semResposta = false;
     try {
-      const r = await fetch("index.html", { method: "HEAD", cache: "no-store", credentials: "include" });
+      const r = await buscarComLimite("index.html", { method: "HEAD", cache: "no-store", credentials: "include" });
       const lm = r.ok && r.headers.get("last-modified");
       if (lm) publicada = new Date(lm);
-    } catch {
+    } catch (e) {
+      semResposta = !!(e && e.semResposta);
     }
     const nova = publicada && publicada.getTime() - emUso2.getTime() > 6e4;
+    if (semResposta) return `${fmt(emUso2)} <span class="suave">(a conferência da versão publicada ficou sem resposta, tente de novo)</span>`;
     return `${fmt(emUso2)}${nova ? ` <span class="etiqueta aviso">há versão nova de ${fmt(publicada)}</span> ${botao("atualizarSistema", "Atualizar agora")}` : publicada ? ' <span class="etiqueta ok">atualizada</span>' : ""}`;
   }
   function lembreteZipNuvem() {
@@ -26361,6 +26520,12 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       }
     };
   }
+  function abrirEmAbaNova(blob, opcoes2 = "") {
+    const url = URL.createObjectURL(blob);
+    if (opcoes2) window.open(url, "_blank", opcoes2);
+    else window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 6e4);
+  }
   async function noVisualizador(blob, nome, tipo, esperar = true) {
     let V;
     try {
@@ -26770,6 +26935,7 @@ Sair mesmo assim?`)) return;
     },
     async escolherPastaSegura() {
       if (!podeUsuario("admin")) throw new Error("Só o administrador configura o backup seguro.");
+      if (!E.teste && !suportado()) throw new ErroUsuario("Faça isto no computador (Chrome ou Edge).");
       try {
         E.pastaSeguraNova = E.teste ? await pastaSeguraDeTeste() : await window.showDirectoryPicker({ id: "backup-seguro", mode: "readwrite" });
       } catch (e) {
@@ -27839,15 +28005,19 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const pagos = ids.map((id) => buscar2("cobrancas", id)).filter((cb) => cb && cb.data_pagamento);
       if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(", ")}. Desmarque ou desfaça o pagamento antes.`);
       if (!confirm(`Excluir ${ids.length} boleto(s) de ${compBr(comp)}? Eles podem ser gerados de novo depois.`)) return;
+      let excluidos = 0;
       await alterar((db) => {
+        excluidos = 0;
         for (const id of ids) {
           const cb = buscar(db, "cobrancas", id);
+          if (!cb) continue;
           const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
           if (problema) throw new Error(`${nome(cb)}: ${problema}`);
           excluir(db, "cobrancas", id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
+          excluidos += 1;
         }
       });
-      aviso(`${ids.length} boleto(s) excluído(s).`);
+      aviso(`${excluidos} boleto(s) excluído(s).${excluidos < ids.length ? ` ${ids.length - excluidos} já não existia(m) mais.` : ""}`);
       await mostrar();
     },
     imprimirSelecionadas() {
@@ -28157,7 +28327,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await alterar((db) => registrar(db, login(), "Exportação", "banco", null, "Banco e arquivos exportados em ZIP", null, {}, false));
     },
     async exportarPlanilhaPdf() {
-      const [ExcelJS, { jsPDF }, { pdfDeTudo: pdfDeTudo2, planilhaDeTudo: planilhaDeTudo2 }] = await Promise.all([excelJs(), bibliotecasPdf(), carregarParte(() => Promise.resolve().then(() => (init_exportar(), exportar_exports)))]);
+      const [ExcelJS, jsPDF, { pdfDeTudo: pdfDeTudo2, planilhaDeTudo: planilhaDeTudo2 }] = await Promise.all([excelJs(), jsPdf(), carregarParte(() => Promise.resolve().then(() => (init_exportar(), exportar_exports)))]);
       const quando3 = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace(/[T:]/g, "-");
       baixar(await planilhaDeTudo2(ExcelJS, E.d), `imoveis-dados-${quando3}.xlsx`);
       baixar(pdfDeTudo2(jsPDF, E.d), `imoveis-dados-${quando3}.pdf`);
@@ -28218,7 +28388,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const tipo = tipoParaAbrir(nome);
       if (!tipo) return baixar(arq, nome);
       if (await noVisualizador(arq, nome, tipo)) return;
-      window.open(URL.createObjectURL(new Blob([arq], { type: tipo })), "_blank", "noopener");
+      abrirEmAbaNova(new Blob([arq], { type: tipo }), "noopener");
     },
     /**
      * Página Inquilinos: botão "Matrícula" ao lado do imóvel. Abre o arquivo da matrícula (pasta "Matrículas" do imóvel);
@@ -28432,7 +28602,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         const r = await fetch(url, o);
         if (!r.ok) return r;
         const blob = await r.blob();
-        if (!await noVisualizador(blob, "boleto.pdf", "application/pdf", false)) window.open(URL.createObjectURL(blob), "_blank");
+        if (!await noVisualizador(blob, "boleto.pdf", "application/pdf", false)) abrirEmAbaNova(blob);
         return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
       } });
     },
@@ -29801,12 +29971,23 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     });
     if (E.anexos) E.anexos.tudo = null;
     if (!E.usuario) return mostrar();
-    const editando = document.querySelector("main form[data-form]");
+    const editando = document.querySelector(SELETOR_FORMULARIO);
     if (editando) aviso("Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.", "info");
     else mostrar();
   }
+  var arquivoConferido = null;
+  var conferindo = false;
   async function verificarMudancasExternas() {
     tentarSeguroDeNovo();
+    if (conferindo) return;
+    conferindo = true;
+    try {
+      await conferirMudancasExternas();
+    } finally {
+      conferindo = false;
+    }
+  }
+  async function conferirMudancasExternas() {
     if (E.nuvem) {
       if (document.hidden) return;
       await E.nuvem.sincronizar().catch(() => {
@@ -29821,14 +30002,18 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
     if (!E.pasta || !E.d || document.hidden) return;
     try {
-      const disco = await lerBanco(E.pasta);
+      const pasta = E.pasta;
+      if (arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.assinatura === await assinaturaDoBanco(pasta)) return;
+      const disco = await lerBanco(pasta);
+      if (pasta !== E.pasta) return;
+      arquivoConferido = disco && assinaturaLida(disco) ? { pasta, assinatura: assinaturaLida(disco) } : null;
       if (disco && disco.revisao !== E.d.revisao) {
         const soSessao = soSessaoNoDisco(disco);
         E.d = disco;
         renovarUsuario();
         atualizarFaixa();
         if (soSessao) return;
-        const editando = document.querySelector("main form[data-form]");
+        const editando = document.querySelector(SELETOR_FORMULARIO);
         if (editando) aviso(`${disco.atualizado_por || "Outra pessoa"} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, "info");
         else await mostrar();
       }
@@ -29925,12 +30110,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   var excelJs = () => carregarScript("vendor/exceljs.min.js", "ExcelJS");
   var jsZip = () => carregarScript("vendor/jszip.min.js", "JSZip");
+  var jsPdf = async () => (await carregarScript("vendor/jspdf.umd.min.js", "jspdf")).jsPDF;
   async function bibliotecasPdf() {
-    const [h2c, jspdf] = await Promise.all([
-      carregarScript("vendor/html2canvas.min.js", "html2canvas"),
-      carregarScript("vendor/jspdf.umd.min.js", "jspdf")
-    ]);
-    return { html2canvas: h2c, jsPDF: jspdf.jsPDF };
+    const [h2c, jsPDF] = await Promise.all([carregarScript("vendor/html2canvas.min.js", "html2canvas"), jsPdf()]);
+    return { html2canvas: h2c, jsPDF };
   }
   async function pastaDeTeste() {
     const raiz = await navigator.storage.getDirectory();
@@ -30118,6 +30301,28 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const href = `api/icone-192.png${versaoIcone ? `?v=${versaoIcone}` : ""}`;
     for (const l of document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')) if (l.getAttribute("href") !== href) l.setAttribute("href", href);
   }
+  var logoDoTopo = { texto: null, url: "" };
+  function enderecoDaLogo() {
+    const logo = E.d.logo;
+    if (typeof logo !== "string" || !logo.startsWith("data:")) return logo || "";
+    if (logoDoTopo.texto === logo) return logoDoTopo.url;
+    if (logoDoTopo.url.startsWith("blob:")) URL.revokeObjectURL(logoDoTopo.url);
+    let url = logo;
+    try {
+      const m = /^data:([^;,]*)(;base64)?,/.exec(logo);
+      if (m && m[2]) {
+        const bin = atob(logo.slice(m[0].length));
+        const bytes2 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes2[i] = bin.charCodeAt(i);
+        url = URL.createObjectURL(new Blob([bytes2], { type: m[1] || "image/png" }));
+      }
+    } catch {
+      url = logo;
+    }
+    logoDoTopo.texto = logo;
+    logoDoTopo.url = url;
+    return url;
+  }
   function layout(conteudo, rota) {
     trocarIconeDaAba(false);
     const deInquilino = ["novo", "editar"].includes(rota.partes[0]) && ["contratos", "fiadores", "aplicacoes", "correcoes_garantia", "depositos_garantia", "devolucoes_garantia", "renovacoes", "encerramentos", "correcoes", "solicitacoes"].includes(rota.partes[1]);
@@ -30126,7 +30331,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const atual = deInquilino ? "inquilino" : deIptu ? "iptu" : form || rota.partes[0] || "";
     const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${m && new RegExp(m).test(atual) || !m && !atual ? "ativo" : ""}">${t}</a>`).join("") + (podeUsuario("admin") ? `<a href="#/usuarios" class="${atual === "usuarios" ? "ativo" : ""}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ""}</a>` : "");
     return `<header class="topo nao-imprimir">
-      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(E.d.logo)}" alt="Logo">` : ""}Administração de Imóveis</a>
+      <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(enderecoDaLogo())}" alt="Logo">` : ""}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
       <form data-form="ir" data-ir="buscar" class="busca-topo" role="search"><input name="q" type="search" maxlength="100" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === "buscar" ? esc(rota.q.q || "") : ""}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
@@ -30159,8 +30364,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   }
   var desenhos = 0;
+  var subirAoTopo = false;
   async function mostrar(estadoForm = null) {
     desenhos += 1;
+    const meu = desenhos;
     const app = document.getElementById("app");
     const rota = rotaAtual();
     try {
@@ -30176,18 +30383,25 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         const nome = rota.partes[0] || "painel";
         const tela = TELAS[nome];
         const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado("Página não encontrada");
+        if (meu !== desenhos) return;
         html = rota.partes[0] === "imprimir" ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
       }
+      if (meu !== desenhos) return;
       const endereco2 = location.hash.split("?")[0];
       const abertos = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id][open]")].map((el) => el.id) : [];
       const fechados = endereco2 === paginaDesenhada ? [...app.querySelectorAll("details[id]:not([open])")].map((el) => el.id) : [];
       const mesma = endereco2 === paginaDesenhada;
-      const rolagem = mesma ? window.scrollY : 0;
-      if (mesma) app.style.minHeight = `${app.offsetHeight}px`;
+      const subir = subirAoTopo && !rota.q.ir;
+      subirAoTopo = false;
+      const rolagem = mesma && !subir ? window.scrollY : 0;
+      if (mesma && !subir) app.style.minHeight = `${app.offsetHeight}px`;
+      else app.style.minHeight = "";
+      if (!mesma) document.querySelector(".visualizador")?.fecharSemVoltar?.();
       app.innerHTML = html;
+      if (subir) window.scrollTo(0, 0);
       if (E.usuario) carregarClipes();
       for (const el of app.querySelectorAll("[data-arquivos]")) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
-      if (mesma) window.scrollTo(0, rolagem);
+      if (mesma && !subir) window.scrollTo(0, rolagem);
       paginaDesenhada = endereco2;
       for (const id of abertos) {
         const el = document.getElementById(id);
@@ -30211,32 +30425,45 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       desenharMensagens();
       mensagens = [];
       try {
-        await montarExtras(app);
+        await montarExtras(app, () => meu === desenhos);
       } finally {
-        app.style.minHeight = "";
+        if (meu === desenhos) app.style.minHeight = "";
       }
+      if (meu !== desenhos) return;
       const alvo = rota.q.ir && document.getElementById(rota.q.ir);
       if (alvo?.tagName === "DETAILS") alvo.open = true;
       if (alvo) alvo.scrollIntoView({ block: "start" });
       if (rota.q.ir) history.replaceState(null, "", location.href.replace(/([?&])ir=[^&]*&?/, "$1").replace(/[?&]$/, ""));
     } catch (e) {
-      console.error(e);
+      logarErro(e);
+      if (meu !== desenhos) return;
+      app.style.minHeight = "";
+      paginaDesenhada = null;
       app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
     }
   }
-  async function montarExtras(raiz) {
+  async function montarExtras(raiz, vivo = () => true) {
     arrumarTabelas(raiz);
     let mudou = false;
     let clipesMudaram = false;
+    TELAS._ligarDesconto(raiz);
     const listas = [...raiz.querySelectorAll("[data-arquivos]")];
     if (E.nuvem && E.anexos?.carregarSeVelho && listas.filter((el) => !el.dataset.arquivos.startsWith("anuncio")).length >= 6) {
       await E.anexos.carregarSeVelho([PASTA_ARQUIVOS]).catch(() => {
       });
+      if (!vivo()) return;
     }
     await Promise.all(listas.map(async (el) => {
       const chave = el.dataset.arquivos;
       const [escopo, id, modo] = chave.split(":");
-      const html = await TELAS._listaArquivos(escopo, Number(id), modo);
+      let html;
+      try {
+        html = await TELAS._listaArquivos(escopo, Number(id), modo);
+      } catch (e) {
+        logarErro(e);
+        if (el.isConnected && vivo()) el.innerHTML = `<span class="suave">Não consegui ler os arquivos desta lista (${esc(e.message)}).</span>`;
+        return;
+      }
       if (escopo !== "anuncio") {
         if (ehClipe(chave) && anexosVistos.get(chave) !== html) clipesMudaram = true;
         anexosVistos.set(chave, html);
@@ -30247,7 +30474,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       }
     }));
     if (clipesMudaram) guardarClipes();
-    TELAS._ligarDesconto(raiz);
+    if (!vivo()) return;
     if (mudou) arrumarTabelas(raiz);
   }
   function arrumarTabelas(raiz) {
@@ -30263,7 +30490,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         }
       }
     }
-    for (const caixa of raiz.querySelectorAll(".rolagem")) caixa.classList.toggle("tem-rolagem", caixa.scrollWidth > caixa.clientWidth + 2);
+    const caixas = [...raiz.querySelectorAll(".rolagem")].map((caixa) => [caixa, caixa.scrollWidth > caixa.clientWidth + 2]);
+    for (const [caixa, tem] of caixas) caixa.classList.toggle("tem-rolagem", tem);
   }
   var SEM_CARTOES = ".fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria, .boleto-banco, .carta-tabela, .mapa-iptu, table.responsiva";
   function cartoesNoCelular(raiz) {
@@ -30395,12 +30623,19 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       return;
     }
     const arquivo = ev.target.closest("input[data-acao-arquivo]");
-    if (!arquivo || !arquivo.files.length) return;
+    if (!arquivo || !arquivo.files.length || arquivo.dataset.ocupado) return;
+    arquivo.dataset.ocupado = "1";
     try {
-      await ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
+      const feito = ACOES[arquivo.dataset.acaoArquivo](arquivo.dataset, arquivo);
+      arquivo.disabled = true;
+      await feito;
     } catch (e) {
       logarErro(e);
       aviso(e.message, "erro");
+    } finally {
+      delete arquivo.dataset.ocupado;
+      arquivo.disabled = false;
+      if (arquivo.isConnected) arquivo.value = "";
     }
   });
   document.addEventListener("focusout", (ev) => {
@@ -30418,9 +30653,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     el.parentElement.querySelector("[data-acao=incluirNaLista]").click();
   });
   window.addEventListener("hashchange", async () => {
-    const ir2 = rotaAtual().q.ir;
+    subirAoTopo = true;
     await mostrar();
-    if (!ir2) scrollTo(0, 0);
   });
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest('a[href^="#/"]');
