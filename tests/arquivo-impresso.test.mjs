@@ -146,3 +146,20 @@ test('saída: a pasta espera a devolução da garantia', () => {
   assert.ok(!AI.contratosDaRotina(d, '2027-03-21').includes(c));
   assert.equal(R.roteiroSaida(d, c, '2027-03-21').find((x) => x.chave === 'arquivo').feito, true);
 });
+
+test('acordo de dívida: o termo assinado é uma etapa, anexado pelo sistema; sem ele, alerta; com ele, vai para a pasta', () => {
+  const { d, c } = base('2026-01-07');
+  const a = R.inserir(d, 'acordos', { contrato_id: c.id, data: '2027-03-10', referente: 'fev/2027', valor_original: 200000, divida_na_data: 210000, valor_total: 210000, parcelas: 2, primeiro_vencimento: '2027-04-10', desfeito_em: null }, 'julio');
+  assert.deepEqual(R.etapasDoAcordo(d, a).map((x) => [x.chave, x.feito]), [['registrado', true], ['termo', false], ['parcelas', false]]);
+  assert.ok(R.alertasContrato(d, c, '2027-03-11').some((x) => x.tipo === 'Termo do acordo' && /10\/03\/2027/.test(x.texto)));
+  assert.ok(!AI.itensDaPasta(d, c).some((i) => i.vaga === `acordo:${a.id}`));
+  R.anexarComprovante(d, 'acordos', a.id, 'termo_assinado', 'comprovante-termo-acordo-assinado-2027-03-10.pdf', 'julio');
+  assert.equal(R.etapasDoAcordo(d, a)[1].feito, true);
+  assert.ok(!R.alertasContrato(d, c, '2027-03-11').some((x) => x.tipo === 'Termo do acordo'));
+  assert.ok(R.arquivosReferenciados(d).some((x) => x.nome === 'comprovante-termo-acordo-assinado-2027-03-10.pdf' && x.escopo === 'contrato'));
+  const item = AI.itensDaPasta(d, c).find((i) => i.vaga === `acordo:${a.id}`);
+  assert.equal(item.rotulo, 'Termo do acordo de 10/03/2027 assinado (fev/2027)');
+  assert.ok(item.marcado);
+  R.removerAnexo(d, 'acordos', a.id, 'termo_assinado', 'julio');
+  assert.equal(R.etapasDoAcordo(d, a)[1].feito, false);
+});

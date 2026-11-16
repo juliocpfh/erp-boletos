@@ -2554,7 +2554,7 @@ export function comprovantesPendentes(d, c) {
 
 /** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
 export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
-  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
   if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
   const r = buscar(d, tabela, id);
@@ -2632,7 +2632,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
  * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
  */
 export function removerAnexo(d, tabela, id, campo, usuario) {
-  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'] };
+  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
   const r = buscar(d, tabela, id);
   if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
@@ -2739,7 +2739,32 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaAditivoHerdeiro(d, contrato),
     alertaAditivoAguardando(d, contrato),
     alertaCondominio(contrato, hoje),
+    alertaTermoAcordo(d, contrato),
   ].filter(Boolean);
+}
+
+/**
+ * Etapas do acordo de dívida (pedido do dono em 2026-11-15: o termo assinado é uma etapa e se anexa pelo sistema):
+ * acordo registrado → termo do acordo assinado (arquivo) → parcelas pagas. Ex.: acordo de 10/11/2026 em 3 boletos, 1 pago,
+ * sem termo → [✓ registrado, ⬜ termo, ⬜ 1 de 3 pagos].
+ */
+export function etapasDoAcordo(d, a) {
+  const p = parcelasDoAcordo(d, a);
+  const pagas = p.filter((cb) => cb.data_pagamento).length;
+  return [
+    { chave: 'registrado', titulo: 'Acordo registrado', feito: true, detalhe: `${C.dataBr(a.data)}: ${a.referente} em ${a.parcelas} boleto(s), total ${C.reais(a.valor_total)}` },
+    { chave: 'termo', titulo: 'Termo do acordo assinado', feito: !!a.termo_assinado, detalhe: a.termo_assinado ? 'anexado (vai para a pasta física do inquilino)' : 'anexe o termo assinado pelo inquilino (PDF ou foto)' },
+    { chave: 'parcelas', titulo: 'Parcelas pagas', feito: p.length > 0 && pagas === p.length, detalhe: `${pagas} de ${p.length} paga(s)` },
+  ];
+}
+
+/** Acordo (não desfeito) ainda sem o termo assinado anexado: alerta até anexar. */
+function alertaTermoAcordo(d, c) {
+  const l = (d.acordos || []).filter((a) => a.contrato_id === c.id && !a.desfeito_em && !a.termo_assinado);
+  if (!l.length) return null;
+  const p = parcelasDoAcordo(d, l[0])[0];
+  return { nivel: 'aviso', tipo: 'Termo do acordo', link: p ? `#/cobranca/${p.id}` : null,
+    texto: `falta anexar o termo assinado do acordo de ${l.map((a) => C.dataBr(a.data)).join(', ')} (no boleto do acordo, "Etapas do acordo").` };
 }
 
 /** Termo aditivo registrado como perdido por quem não é administrador: aguarda o administrador confirmar ou recusar. */
@@ -3867,6 +3892,7 @@ export function arquivosReferenciados(d) {
   }
   for (const t of TABELAS_COMPROVANTE) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
+  for (const a of d.acordos || []) usa('contrato', a.contrato_id, a.termo_assinado); // termo do acordo assinado (2026-11-15)
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
@@ -3932,6 +3958,7 @@ export function rotulosDosArquivos(d) {
     }
   }
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
+  for (const a of d.acordos || []) poe('contrato', a.contrato_id, a.termo_assinado, `termo do acordo de ${C.dataBr(a.data)} assinado`);
   for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const f of d.fichas || []) {
@@ -4237,7 +4264,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
   'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
-  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Banco', 'Pasta física', 'A verificar'];
+  'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Termo do acordo', 'Banco', 'Pasta física', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
 export const ENFASES_ALERTA = ['Normal', 'Forte', 'Discreta'];
