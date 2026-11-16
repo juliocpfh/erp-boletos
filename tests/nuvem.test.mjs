@@ -1,7 +1,11 @@
 // Worker da nuvem (nuvem/worker.mjs) com um R2 de mentira em memória: repasse ao cofre (testes do cofre em cofre.test.mjs),
 // anexos, listagem, mover/juntar pastas, caminhos perigosos e login do Access (JWT assinado aqui mesmo). Dados fictícios.
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { resumoSenha } from '../docs/js/auth.js';
+import * as A from '../nuvem/aparelhos.mjs';
+import { CofreDO } from '../nuvem/cofre.mjs';
 import * as W from '../nuvem/worker.mjs';
 import { r2Falso } from './r2-falso.mjs';
 
@@ -265,4 +269,157 @@ test('ícone do aplicativo: padrão até o administrador gravar; só PNG do tama
   assert.deepEqual(await (await pedir(env, 'DELETE', '/api/icone')).json(), { ok: true });
   for (const t of ['192', '512']) assert.equal((await pedir(env, 'GET', `/api/icone-${t}.png`)).status, 302);
   assert.equal(env.DADOS.m.size, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Crachá do aparelho (programa do PC, nuvem/aparelhos.mjs): entra com e-mail e senha, só lê, desliga, para com o usuário
+// ---------------------------------------------------------------------------
+async function nuvemComCofre() {
+  const db = new DatabaseSync(':memory:');
+  const sql = { exec(q, ...p) { if (!p.length && q.trim().split(';').filter((x) => x.trim()).length > 1) { db.exec(q); return { toArray: () => [] }; } const l = db.prepare(q).all(...p).map((x) => ({ ...x })); return { toArray: () => l }; } };
+  const tx = (fn) => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
+  const r2 = r2Falso();
+  const dobj = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: r2 });
+  const usuario = async (id, login, papel, senha, extra = {}) => ({ id, login, email: login, nome: `Pessoa ${id}`, papel, ativo: true, senha_sal: `sal${id}`, senha_hash: await resumoSenha(senha, `sal${id}`, 1000), senha_iteracoes: 1000, ...extra });
+  dobj.cofre.importar({ formato: 'imoveis-v1', imoveis: [], usuarios: [
+    await usuario(1, 'dono@exemplo.com.br', 'admin', 'senha do dono 2026'),
+    await usuario(2, 'leitor@exemplo.com.br', 'consulta', 'senha do leitor 2026'),
+    await usuario(3, 'antigo@exemplo.com.br', 'admin', 'senha antiga 2026', { senha_iteracoes: undefined, senha_hash: await resumoSenha('senha antiga 2026', 'sal3', 150000) }),
+  ] }, 'dono@exemplo.com.br');
+  await r2.put('arquivos/Sala 101/contrato.pdf', 'pdf');
+  await r2.put('backups/imoveis-dados-2026-11-08.json', '{}');
+  W.esquecerPapeis(); W.esquecerCrachas();
+  // sem MODO_TESTE e com o Access configurado: só o caminho do aparelho entra sem o token do Access
+  const env = { ACCESS_EQUIPE: EQUIPE, ACCESS_AUD: AUD, ORIGEM: 'https://erp.ankjck.com.br', DADOS: r2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => dobj.fetch(req) }) } };
+  const github = [];
+  const buscar = async (url, op = {}) => {
+    if (String(url).includes('cloudflareaccess')) return buscarCerts(url);
+    github.push({ url, metodo: op.method, se: op.headers?.['If-None-Match'] });
+    if (op.headers?.['If-None-Match'] === '"v1"') return new Response(null, { status: 304, headers: { ETag: '"v1"' } });
+    return new Response(op.method === 'HEAD' ? null : '<html>programa</html>', { headers: { ETag: '"v1"' } });
+  };
+  const pedir = (metodo, caminho, { corpo, cracha, ip = '203.0.113.5', cab = {} } = {}) => W.atender(new Request(`https://erp.ankjck.com.br/api/${caminho}`, {
+    method: metodo, body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    headers: { 'CF-Connecting-IP': ip, ...(cracha ? { Authorization: `Bearer ${cracha}` } : {}), ...cab },
+  }), env, buscar);
+  const entrar = (email, senha, extra = {}) => pedir('POST', 'aparelho/entrar', { corpo: { email, senha, computador: 'ESCRITORIO-01' }, ...extra });
+  return { dobj, env, pedir, entrar, github };
+}
+
+test('crachá do aparelho: entra com e-mail e senha conferidos no servidor e só lê; nada fora de /api/aparelho/ passa sem o Access', async () => {
+  const { dobj, pedir, entrar, github } = await nuvemComCofre();
+  const r = await entrar('Dono@Exemplo.com.br', 'senha do dono 2026');
+  assert.equal(r.status, 200);
+  const { cracha, computador, papel } = await r.json();
+  assert.match(cracha, /^ap1_[A-Za-z0-9_-]{43}$/);
+  assert.deepEqual([computador, papel], ['ESCRITORIO-01', 'admin']);
+  const guardado = dobj.cofre.q('SELECT * FROM aparelhos')[0];
+  assert.equal(guardado.hash, await A.hashDoCracha(cracha), 'o cofre guarda só o hash');
+  assert.ok(!JSON.stringify(dobj.cofre.q('SELECT * FROM aparelhos')).includes(cracha));
+  assert.ok(!JSON.stringify(dobj.cofre.tudo()).includes(guardado.hash), 'os aparelhos não vão para o banco (JSON)');
+  assert.equal(guardado.ligado_por, 'dono@exemplo.com.br');
+
+  // lê: dados, lista, arquivos, backups (o dono é administrador) e a versão PC
+  assert.equal((await (await pedir('GET', 'aparelho/saude', { cracha })).json()).email, 'dono@exemplo.com.br');
+  const tudo = await (await pedir('GET', 'aparelho/dados/tudo', { cracha })).json();
+  assert.equal(tudo.formato, 'imoveis-v1');
+  assert.equal((await pedir('GET', 'aparelho/dados/mudancas?desde=0', { cracha })).status, 200);
+  assert.equal((await (await pedir('GET', 'aparelho/lista-tudo/arquivos/', { cracha })).json()).arquivos[0].caminho, 'Sala 101/contrato.pdf');
+  assert.equal(await (await pedir('GET', 'aparelho/arquivos/Sala%20101/contrato.pdf', { cracha })).text(), 'pdf');
+  assert.equal((await pedir('GET', 'aparelho/backups/imoveis-dados-2026-11-08.json', { cracha })).status, 200);
+  const prog = await pedir('GET', 'aparelho/programa', { cracha });
+  assert.equal(await prog.text(), '<html>programa</html>');
+  assert.equal(prog.headers.get('ETag'), '"v1"');
+  assert.equal((await pedir('GET', 'aparelho/programa', { cracha, cab: { 'If-None-Match': '"v1"' } })).status, 304, 'versão igual: não baixa de novo');
+  assert.equal((await pedir('HEAD', 'aparelho/programa', { cracha })).status, 200);
+  assert.equal(github[0].url, W.URL_PROGRAMA);
+
+  // não grava nada, nem pelo caminho do aparelho
+  for (const [m, c] of [['POST', 'aparelho/dados/lote'], ['PUT', 'aparelho/arquivos/x.pdf'], ['DELETE', 'aparelho/arquivos/Sala%20101/contrato.pdf'], ['POST', 'aparelho/mover'], ['POST', 'aparelho/apagar']]) {
+    assert.equal((await pedir(m, c, { cracha, corpo: {} })).status, 405, `${m} ${c}`);
+  }
+  assert.equal((await pedir('GET', 'aparelho/dados/conflitos', { cracha })).status, 404, 'só tudo e mudancas');
+  assert.equal((await pedir('GET', 'aparelho/dados/aparelhos', { cracha })).status, 404);
+  assert.equal((await pedir('GET', 'aparelho/email/estado', { cracha })).status, 404);
+  // sem crachá (ou inventado), nada; e o crachá não abre as rotas normais (elas pedem o Access)
+  assert.equal((await pedir('GET', 'aparelho/dados/tudo')).status, 401);
+  assert.equal((await pedir('GET', 'aparelho/dados/tudo', { cracha: `ap1_${'A'.repeat(43)}` })).status, 401);
+  assert.equal((await pedir('GET', 'dados/tudo', { cracha })).status, 401, 'fora de /api/aparelho/ vale só o Access');
+  assert.equal((await pedir('GET', 'aparelho/%2e%2e/dados/tudo', { cracha })).status, 401, '"../" sai do caminho do aparelho e cai no Access');
+});
+
+test('crachá do aparelho: senha errada e limite de tentativas (por e-mail, por endereço e no total); usuário antigo e pendente', async () => {
+  const { dobj, entrar } = await nuvemComCofre();
+  const r = await entrar('dono@exemplo.com.br', 'senha errada');
+  assert.equal(r.status, 401);
+  assert.equal((await r.json()).erro, 'E-mail ou senha errados.');
+  assert.equal((await entrar('ninguem@exemplo.com.br', 'qualquer coisa')).status, 401, 'e-mail desconhecido: mesma resposta');
+  assert.equal((await entrar('', '')).status, 400);
+  assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '198.51.100.1' })).status, 200, 'acertou: entra e zera o e-mail');
+  for (let i = 0; i < 5; i += 1) assert.equal((await entrar('leitor@exemplo.com.br', `errada ${i}`, { ip: `198.51.100.${10 + i}` })).status, 401);
+  const barrado = await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.99' });
+  assert.equal(barrado.status, 429, '5 erros no mesmo e-mail: espera, mesmo com a senha certa');
+  assert.match((await barrado.json()).erro, /Espere 15 minutos/);
+  dobj.cofre.relogio = () => new Date(Date.now() + 16 * 60000);
+  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.99' })).status, 200, 'passados 15 minutos, entra');
+  // por endereço: 10 erros com e-mails diferentes do mesmo lugar
+  for (let i = 0; i < 10; i += 1) await entrar(`x${i}@exemplo.com.br`, 'errada', { ip: '192.0.2.7' });
+  assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '192.0.2.7' })).status, 429);
+  // no total: 50 erros por hora param todo mundo (sem o Access na frente, é a trava contra quem tenta de muitos lugares)
+  dobj.cofre.relogio = () => new Date(Date.now() + 2 * 3600000);
+  for (let i = 0; i < 50; i += 1) await entrar(`y${i}@exemplo.com.br`, 'errada', { ip: `10.0.${i}.1` });
+  assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '10.9.9.9' })).status, 429);
+  dobj.cofre.relogio = () => new Date(Date.now() + 4 * 3600000);
+  assert.equal((await entrar('antigo@exemplo.com.br', 'senha antiga 2026', { ip: '10.9.9.9' })).status, 200, 'senha gravada com as voltas antigas (sem senha_iteracoes)');
+  // pedido de acesso ainda não aprovado não liga computador
+  const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 2").map((x) => JSON.parse(x.dados))[0];
+  dobj.cofre.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'usuarios' AND id = 2", JSON.stringify({ ...u, pendente: true }));
+  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '10.9.9.8' })).status, 401);
+});
+
+test('crachá do aparelho: papel do usuário, desligar em Usuários, usuário desativado e 90 dias parado', async () => {
+  const { dobj, env, pedir, entrar } = await nuvemComCofre();
+  const leitor = (await (await entrar('leitor@exemplo.com.br', 'senha do leitor 2026')).json()).cracha;
+  const dono = (await (await entrar('dono@exemplo.com.br', 'senha do dono 2026')).json()).cracha;
+  assert.equal((await pedir('GET', 'aparelho/backups/imoveis-dados-2026-11-08.json', { cracha: leitor })).status, 403, 'consulta não baixa backup');
+  const tudo = await (await pedir('GET', 'aparelho/dados/tudo', { cracha: leitor })).json();
+  assert.equal(tudo.usuarios.find((u) => u.id === 1).senha_hash, undefined, 'consulta não recebe a senha dos outros');
+
+  // a lista e o Desligar, pelo site (com o login do Access)
+  const site = async (email, metodo, rota, corpo) => {
+    const agora = Math.floor(Date.now() / 1000);
+    const jwt = await token({ aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, email });
+    return W.atender(new Request(`https://erp.ankjck.com.br/api/dados/${rota}`, {
+      method: metodo, body: corpo && JSON.stringify(corpo),
+      headers: { 'Cf-Access-Jwt-Assertion': jwt, ...(metodo === 'POST' ? { 'X-Sistema': 'imoveis', Origin: 'https://erp.ankjck.com.br' } : {}) },
+    }), env, buscarCerts);
+  };
+  const lista = (await (await site('dono@exemplo.com.br', 'GET', 'aparelhos')).json()).aparelhos;
+  assert.deepEqual(lista.map((a) => [a.computador, a.ligado_por, a.nome]), [['ESCRITORIO-01', 'leitor@exemplo.com.br', 'Pessoa 2'], ['ESCRITORIO-01', 'dono@exemplo.com.br', 'Pessoa 1']]);
+  assert.ok(lista.every((a) => a.ligado_em && a.ultimo_uso && !('hash' in a)));
+  const doLeitor = (await (await site('leitor@exemplo.com.br', 'GET', 'aparelhos')).json()).aparelhos;
+  assert.deepEqual(doLeitor.map((a) => a.ligado_por), ['leitor@exemplo.com.br'], 'quem não é administrador vê só os seus');
+  assert.equal((await site('leitor@exemplo.com.br', 'POST', 'desligar-aparelho', { id: lista[1].id })).status, 403, 'não desliga o do outro');
+  assert.equal((await site('dono@exemplo.com.br', 'POST', 'desligar-aparelho', { id: lista[0].id })).status, 200);
+  W.esquecerCrachas(); W.esquecerPapeis(); // o Worker guarda o "vale" por 1 minuto
+  assert.equal((await pedir('GET', 'aparelho/dados/tudo', { cracha: leitor })).status, 401, 'desligado: para');
+  assert.equal((await site('dono@exemplo.com.br', 'POST', 'desligar-aparelho', { id: lista[0].id })).status, 404);
+  assert.equal((await (await site('dono@exemplo.com.br', 'GET', 'aparelhos')).json()).aparelhos.length, 1);
+
+  // usuário desativado: o crachá que ele ligou para
+  const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 1").map((x) => JSON.parse(x.dados))[0];
+  dobj.cofre.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'usuarios' AND id = 1", JSON.stringify({ ...u, ativo: false }));
+  W.esquecerCrachas();
+  const r = await pedir('GET', 'aparelho/dados/tudo', { cracha: dono });
+  assert.equal(r.status, 403);
+  assert.match((await r.json()).erro, /desativado/);
+  dobj.cofre.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'usuarios' AND id = 1", JSON.stringify(u));
+  W.esquecerCrachas(); W.esquecerPapeis();
+  assert.equal((await pedir('GET', 'aparelho/dados/tudo', { cracha: dono })).status, 200, 'reativado: volta');
+
+  // 90 dias sem usar: vence
+  W.esquecerCrachas();
+  dobj.cofre.relogio = () => new Date(Date.now() + 91 * 86400000);
+  assert.equal((await pedir('GET', 'aparelho/saude', { cracha: dono })).status, 401);
+  assert.equal(dobj.cofre.q('SELECT desligado_por FROM aparelhos WHERE id = 2')[0].desligado_por, 'parado 90 dias');
 });

@@ -4,10 +4,15 @@
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
 // · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE)
 // · email/estado (GET) e email/enviar (POST): e-mail pela conta Gmail da empresa (gmail.mjs; documentacao/LIGAR_GMAIL.md).
+// · aparelho/… (sem o login do Access: política Bypass só neste caminho): o programa do PC entra com e-mail e senha
+//   (aparelho/entrar) e depois só LÊ com o crachá do aparelho (Authorization: Bearer ap1_…): saude, dados/tudo, dados/mudancas,
+//   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
+// · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access).
 // · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
+import { crachaValido, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { atenderEquipe, atenderFicha } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
@@ -76,7 +81,6 @@ export async function conferirLogin(request, env, buscar = fetch) {
   if (env.MODO_TESTE === '1' && ['localhost', '127.0.0.1'].includes(new URL(request.url).hostname)) return env.EMAIL_TESTE || 'teste@exemplo.com.br';
   const equipe = String(env.ACCESS_EQUIPE || '').trim(); // ex.: ankjck.cloudflareaccess.com
   const aud = String(env.ACCESS_AUD || '').trim();
-  const emails = String(env.EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   if (!equipe || !aud) throw new ErroHttp(503, 'Worker sem configuração de login (ACCESS_EQUIPE, ACCESS_AUD).');
   const token = request.headers.get('Cf-Access-Jwt-Assertion') || '';
   const partes = token.split('.');
@@ -95,8 +99,14 @@ export async function conferirLogin(request, env, buscar = fetch) {
   // SERVICOS (segredo do Worker: "<client id>=<e-mail>,…") diz com qual usuário do sistema ela entra (os papéis valem iguais)
   const email = String(dados.email || (!dados.email && dados.common_name ? emailDoServico(env, dados.common_name) : '')).toLowerCase();
   // EMAILS é opcional (trava extra): quem manda é a lista do Access e o cadastro de usuários do sistema
-  if (!email || (emails.length && !emails.includes(email))) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
+  if (!email || !naListaDeEmails(env, email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   return email;
+}
+
+/** EMAILS (opcional) é uma trava extra; vazia, vale só o cadastro de usuários. */
+function naListaDeEmails(env, email) {
+  const emails = String(env.EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return !emails.length || emails.includes(String(email || '').trim().toLowerCase());
 }
 
 /** E-mail ligado a uma chave de serviço do Access (variável SERVICOS), ou '' se a chave não está cadastrada. */
@@ -127,7 +137,8 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST' };
+const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
 async function repassarAoCofre(request, env, rota, email, url) {
   if (ROTAS_COFRE[rota] !== request.method) throw new ErroHttp(404, 'Não encontrado.');
@@ -137,8 +148,7 @@ async function repassarAoCofre(request, env, rota, email, url) {
     conferirGravacao(request, env);
     corpo = await lerCorpo(request, rota === 'importar' ? MAX_DADOS : 8 * 1024 * 1024);
   }
-  const cofre = env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
-  return cofre.fetch(new Request(`https://cofre/${rota}${url.search}`, {
+  return cofreDe(env).fetch(new Request(`https://cofre/${rota}${url.search}`, {
     method: request.method, body: corpo, headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email },
   }));
 }
@@ -264,7 +274,7 @@ async function exigirPapel(env, email, nivel) {
   if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
   const chave = `${email}|${nivel}`;
   if ((papeisConferidos.get(chave) || 0) > Date.now()) return;
-  const r = await env.COFRE.get(env.COFRE.idFromName('principal')).fetch(new Request(`https://cofre/papel?nivel=${nivel}`, { headers: { 'X-Email-Conferido': email } }));
+  const r = await cofreDe(env).fetch(new Request(`https://cofre/papel?nivel=${nivel}`, { headers: { 'X-Email-Conferido': email } }));
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new ErroHttp(r.status, e.erro || 'Sem permissão.'); }
   papeisConferidos.set(chave, Date.now() + VALIDADE_PAPEL);
 }
@@ -281,6 +291,82 @@ async function apagarPasta(request, env) {
   const chaves = r.objects.map((o) => o.key);
   if (chaves.length) await env.DADOS.delete(chaves);
   return json(200, { ok: true, apagados: chaves.length, mais: !!r.truncated });
+}
+
+/** Leituras que o site e o crachá do aparelho fazem igual (só GET); null = não é uma delas. */
+async function lerRecurso(env, rota, email, url) {
+  if (rota.startsWith('lista/')) { await exigirPapel(env, email, 'consulta'); return listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
+  if (rota.startsWith('lista-tudo/')) {
+    const chave = caminhoSeguro(rota.slice(11), { pasta: true });
+    await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta');
+    return listarPastaInteira(env, chave, url.searchParams.get('cursor'));
+  }
+  if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
+    const chave = caminhoSeguro(rota);
+    await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta'); // backups têm o banco inteiro (com as senhas de todos)
+    return lerArquivo(env, chave);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Programa do PC (crachá do aparelho, aparelhos.mjs). O Access deixa passar /api/aparelho/ sem login (política Bypass só nesse
+// caminho, nuvem/README.md); aqui nada passa sem crachá, exceto a entrada com e-mail e senha (limite de tentativas no cofre).
+// O crachá só lê. As outras rotas continuam exigindo o login do Access mesmo que o Bypass fique largo demais por engano.
+// ---------------------------------------------------------------------------
+/** A versão PC que o GitHub gera a cada merge na main (repositório público): o Worker busca lá, o atualizador não passa pelo Access. */
+export const URL_PROGRAMA = 'https://raw.githubusercontent.com/juliocpfh/erp-boletos/main/docs/offline/administracao-imoveis.html';
+const ROTAS_DADOS_APARELHO = ['tudo', 'mudancas'];
+const crachasConferidos = new Map(); // hash do crachá → { email, ate }: 1 minuto, como o papel (desligar vale em até 1 min)
+export const esquecerCrachas = () => crachasConferidos.clear();
+
+async function conferirCracha(request, env) {
+  const m = /^Bearer (\S+)$/.exec(request.headers.get('Authorization') || '');
+  if (!m || !crachaValido(m[1])) throw new ErroHttp(401, 'Este computador não está ligado ao sistema (falta o crachá do aparelho).');
+  const hash = await hashDoCracha(m[1]);
+  const guardado = crachasConferidos.get(hash);
+  if (guardado && guardado.ate > Date.now()) return guardado.email;
+  const r = await cofreDe(env).fetch(new Request('https://cofre/aparelho/conferir', { method: 'POST', body: JSON.stringify({ cracha: m[1] }), headers: { 'Content-Type': 'application/json' } }));
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ErroHttp(r.status, d.erro || 'Crachá do aparelho recusado.');
+  if (!naListaDeEmails(env, d.email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
+  if (crachasConferidos.size > 200) crachasConferidos.clear();
+  crachasConferidos.set(hash, { email: d.email, ate: Date.now() + VALIDADE_PAPEL });
+  return d.email;
+}
+
+/** A versão PC, buscada no GitHub; com If-None-Match igual, 304 (o atualizador só baixa quando muda). */
+async function versaoPc(request, env, buscar) {
+  const se = request.headers.get('If-None-Match');
+  const r = await buscar(env.URL_PROGRAMA || URL_PROGRAMA, { method: request.method, headers: se ? { 'If-None-Match': se } : {} });
+  const etag = r.headers.get('ETag') || '';
+  if (r.status === 304) return new Response(null, { status: 304, headers: { ETag: etag || se } });
+  if (!r.ok) throw new ErroHttp(502, `A versão PC não está disponível agora (GitHub respondeu ${r.status}).`);
+  return new Response(request.method === 'HEAD' ? null : r.body, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': 'attachment; filename="administracao-imoveis.html"', ETag: etag, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
+  });
+}
+
+async function atenderAparelho(request, env, rota, url, buscar) {
+  if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
+  const m = request.method;
+  if (rota === 'entrar') {
+    if (m !== 'POST') throw new ErroHttp(405, 'Método não aceito.');
+    let pedido;
+    try { pedido = JSON.parse(new TextDecoder().decode(await lerCorpo(request, 4096))); } catch (e) { throw e instanceof ErroHttp ? e : new ErroHttp(400, 'Pedido inválido.'); }
+    if (!pedido || typeof pedido !== 'object' || !naListaDeEmails(env, pedido.email)) throw new ErroHttp(401, 'E-mail ou senha errados.');
+    return cofreDe(env).fetch(new Request('https://cofre/aparelho/entrar', {
+      method: 'POST', body: JSON.stringify({ email: pedido.email, senha: pedido.senha, computador: pedido.computador }),
+      headers: { 'Content-Type': 'application/json', 'X-Ip': request.headers.get('CF-Connecting-IP') || '' },
+    }));
+  }
+  if (m !== 'GET' && m !== 'HEAD') throw new ErroHttp(405, 'O crachá do aparelho só lê: para gravar, use o site.');
+  const email = await conferirCracha(request, env);
+  if (rota === 'programa') return versaoPc(request, env, buscar);
+  if (m !== 'GET') throw new ErroHttp(405, 'Método não aceito.');
+  if (rota === 'saude') return json(200, { ok: true, email });
+  if (rota.startsWith('dados/') && ROTAS_DADOS_APARELHO.includes(rota.slice(6))) return repassarAoCofre(request, env, rota.slice(6), email, url);
+  return (await lerRecurso(env, rota, email, url)) || json(404, { erro: 'Não encontrado.' });
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +440,7 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
   try {
     if (!env.DADOS) throw new ErroHttp(503, 'Worker sem o R2 ligado (binding DADOS).');
     if (request.method === 'OPTIONS') throw new ErroHttp(405, 'Método não aceito.'); // sem CORS: só o próprio site chama
+    if (rota.startsWith('aparelho/')) return await atenderAparelho(request, env, rota.slice(9), url, buscar); // programa do PC: crachá, sem Access
     const email = await conferirLogin(request, env, buscar);
     const m = request.method;
     if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
@@ -372,17 +459,10 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
     }
     if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
-    if (rota.startsWith('lista/') && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
-    if (rota.startsWith('lista-tudo/') && m === 'GET') {
-      const chave = caminhoSeguro(rota.slice(11), { pasta: true });
-      await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta');
-      return await listarPastaInteira(env, chave, url.searchParams.get('cursor'));
-    }
+    if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url); if (lido) return lido; }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
-      // backups têm o banco inteiro (com as senhas de todos): só o administrador lê
-      await exigirPapel(env, email, m !== 'GET' ? 'operador' : rota.startsWith('backups/') ? 'admin' : 'consulta');
-      if (m === 'GET') return await lerArquivo(env, chave);
+      await exigirPapel(env, email, 'operador');
       if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
       if (m === 'DELETE') return await apagarArquivo(request, env, chave);
     }

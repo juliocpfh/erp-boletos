@@ -18,7 +18,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
+| 9 | Programa no PC: ícone (você), cópia aberta dos arquivos (feita; falta copiar o atualizador novo), entrar com e-mail e senha em vez da chave de serviço (feito; falta a regra Bypass no Cloudflare, item 9d) e rotina de impressão da pasta física (próxima) | você + Claude | 5 min |
 
 ---
 
@@ -146,7 +146,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ## 8. Lembretes com data
 
-- **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
+- **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`) — só se o computador ainda não foi ligado com o crachá (item 9d; depois dele, a chave é apagada). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
 - **15/12/2026**: prazo do Senado para a alíquota final da CBS. **Em 16/12/2026** retomar o item CBS 2027 (item 6): conferir a alíquota aprovada e falar com o contador antes de mudar a aba Impostos.
 
 ---
@@ -164,6 +164,11 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - [ ] **9a. Ícone que abre o sistema** (aceito em 15/11; você faz, não precisa programar): no Chrome, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria e funciona mesmo com o site, o Cloudflare ou a internet fora do ar, com os dados da última vez que o sistema foi aberto naquele aparelho.
 - [x] **9b. Cópia aberta dos arquivos no computador** (feito em 15/11): subpasta **`Arquivos dos imoveis`** dentro de `C:\Users\Julio\Imoveis` (a pasta do backup seguro), sem cifrar, como no sistema (imóvel → Inquilinos → pessoa). Abrir, imprimir e copiar à vontade; o que for posto ou mudado lá não vai para o sistema. Atualiza sozinha: (A) logo depois de anexar, apagar ou mover neste computador; (B) de hora em hora pelo atualizador do PC; (C) botão **Atualizar a pasta agora** em Dados e backup → Backup seguro. Decisões do dono: sem BitLocker (só ele usa o computador, com senha, e antivírus sempre atualizado); risco de exposição e LGPD aceitos.
   - **Falta você (depois do merge, 5 min):** copiar os arquivos novos do atualizador para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` (`atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd`, `rodar-escondido.vbs`; o `.env` fica) e rodar `instalar-tarefa.cmd` **como administrador**. Posso fazer a cópia para você. Depois, conferir: aparece a pasta `Arquivos dos imoveis` e o `ultima-atualizacao.txt` termina com `arquivos=…`.
+- [ ] **9d. Programa do PC sem chave de serviço** (feito em 15/11, etapa 1 da proposta de licença; falta você, depois do merge, ~15 min): o computador entra com o **seu e-mail e senha do sistema** e recebe um "crachá" que só lê, guardado cifrado pelo Windows; aparece em **Usuários → Aparelhos ligados** com o botão **Desligar**.
+  1. No Cloudflare, criar a regra **Bypass** do caminho `erp.ankjck.com.br/api/aparelho` (passo a passo em `nuvem/README.md`, "Programa do PC: regra Bypass no Access"). Teste: abrir `https://erp.ankjck.com.br/api/aparelho/saude` sem login mostra "Este computador não está ligado ao sistema".
+  2. Copiar para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`) e dar dois cliques em `ligar-computador.cmd`: abre uma página no navegador; e-mail, senha e a pasta (já vem preenchida) → **Ligar**.
+  3. No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker (o lembrete de 08/11/2027 deixa de valer).
+  - Fica para a etapa 2: instalador `.exe` (sem instalar o Node); a assinatura dele ainda espera sua decisão (proposta, item 11).
 - [ ] **9c. Rotina "Arquivo impresso" (pasta física do inquilino)** (próxima a fazer; decisões do dono em 15/11):
   - Liga e desliga em Dados e backup.
   - **Última etapa da entrada do inquilino: "Montar a pasta física".** Só aparece depois de toda a entrada (contrato assinado, entrega das chaves, troca de titular etc.). Ali se **escolhe** o que imprimir entre tudo o que foi anexado e gerado até então, com um botão para imprimir de uma vez, e uma **capa / folha-resumo** com a lista do que está na pasta (para conferir que tem tudo).
