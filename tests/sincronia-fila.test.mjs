@@ -252,7 +252,7 @@ test('item 6: internet ruim (pedido pendurado): a gravação seguinte entra na f
   const segunda = s.alterar((d) => R.inserir(d, 'imoveis', { nome: '2ª gravação' }, DONO)).then(() => { gravou = true; });
   for (let i = 0; i < 20 && !gravou; i += 1) await new Promise((ok) => { setImmediate(ok); });
   assert.equal(gravou, true, 'a 2ª gravação terminou com o pedido ainda pendurado');
-  assert.equal((await guardar.ler('pendentes')).length, 2, 'e já está guardada no aparelho');
+  assert.equal((await guardar.ler('fila')).length, 2, 'e já está guardada no aparelho');
   soltar(); await passada; await segunda;
   estado.antes = null;
   await s.sincronizar();
@@ -276,7 +276,7 @@ test('item 6: duas abas enviando ao mesmo tempo (fora da trava): nada aplica dua
   assert.deepEqual(tudo.imoveis.map((i) => i.nome), ['Três', 'Sala da aba B']);
   assert.equal(tudo.historico.filter((h) => h.detalhes?.nome?.para === 'Dois').length, 1, 'lote reenviado pela outra aba não repete');
   for (const s of [a, b]) { assert.equal(s.pendentes.length, 0); assert.deepEqual(s.atual().imoveis.map((i) => i.nome), ['Três', 'Sala da aba B']); }
-  assert.equal((await guardar.ler('pendentes')).length, 0);
+  assert.equal((await guardar.ler('fila')).length, 0);
 });
 
 test('item 6: a base desta aba trocada no meio do puxar pela mais nova que outra aba gravou: nada se aplica duas vezes', async () => {
@@ -330,7 +330,7 @@ test('item 7: chegou mudança de outro aparelho no meio da gravação: a tela re
   await s.iniciar(); await s.sincronizar();
   await outro.alterar((d) => R.inserir(d, 'imoveis', { nome: 'Da sócia' }, SOCIA)); await outro.sincronizar();
   const gravar = guardar.gravar;
-  guardar.gravar = async (k, v) => { if (k === 'pendentes') { guardar.gravar = gravar; await s.puxar(); } return gravar(k, v); };
+  guardar.gravar = async (k, v) => { if (k === 'fila') { guardar.gravar = gravar; await s.puxar(); } return gravar(k, v); };
   await s.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Do dono' }, DONO));
   assert.deepEqual(s.atual().imoveis.map((i) => i.nome), ['Do dono', 'Da sócia']);
 });

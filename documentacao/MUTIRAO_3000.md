@@ -22,6 +22,8 @@ Revisão em 8 frentes, só erros confirmados (cada linha diz como foi provado): 
 - #282 Mutirão: desempenho e uso sem internet (parte 2)
 - #283 Mutirão 3000: decisões do dono de 17/11 (mês de 30 dias, NF 16/30, dados da ficha reprovada)
 
+2ª rodada (17/11): PRs #285–#298 (a #298 é a parte 3 de dados: fila entre aparelho e nuvem e rapidez da gravação; desempenho 14 e 15 ficaram de fora, ver `PENDENCIAS_DO_DONO.md`).
+
 O que ficou de fora de cada frente e por quê está no corpo de cada PR. Decisões do dono e conferências: `PENDENCIAS_DO_DONO.md`, item 13. A 2ª rodada (17/11) cuida dos itens pendentes e de parte dos aprimoramentos.
 
 ---

@@ -31,6 +31,8 @@ export function canon(v) {
  */
 const igual = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b) || canon(a) === canon(b);
 const ehTabela = (v) => Array.isArray(v) && v.every((r) => r && typeof r === 'object' && Number.isSafeInteger(r.id));
+/** Quantas recusas guardadas são olhadas para achar a causa de uma recusa "não existe" (item 44). */
+const RECUSAS_PARA_CAUSA = 20;
 /** Intervalo (ms) em que várias gravações seguidas (duplo clique, arrumações do Painel) vão numa sincronia só. */
 export const AGRUPAR_ENVIO = 300;
 /**
@@ -53,6 +55,43 @@ export function copiar(d) {
   const copia = structuredClone(resto);
   const c = {};
   for (const k of Object.keys(d)) c[k] = k === 'historico' ? historico.slice() : copia[k];
+  return c;
+}
+
+const SOB_DEMANDA = Symbol('copia-sob-demanda');
+const valorFixo = (c, k, v) => Object.defineProperty(c, k, { value: v, writable: true, configurable: true, enumerable: true });
+
+/**
+ * Cópia para uma gravação que copia cada tabela só quando a gravação a usa (desempenho, item 11 do mutirão 3000): editar um
+ * imóvel não copia mais as 17 mil NFs e os 8 mil boletos (no banco grande, ~120 ms por gravação). Cada campo de cima é uma
+ * "porta": ao ler ou trocar, vira a cópia (ou o valor novo). O histórico é copiado como em `copiar` (a lista, não as entradas).
+ * Depois da gravação, `fecharCopia` deixa os campos que ela não usou apontando para os de `d` (os mesmos objetos: ninguém
+ * os mexe no lugar, a próxima gravação copia de novo o que usar) e `diferencas` nem olha para eles (`va === vb`).
+ */
+export function copiarSobDemanda(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return structuredClone(d);
+  const c = {}; const fechados = new Set();
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    if (k === 'historico' && Array.isArray(v)) { c[k] = v.slice(); continue; }
+    if (v === null || typeof v !== 'object') { c[k] = v; continue; }
+    fechados.add(k);
+    Object.defineProperty(c, k, {
+      configurable: true, enumerable: true,
+      get() { fechados.delete(k); const x = structuredClone(v); valorFixo(c, k, x); return x; },
+      set(x) { fechados.delete(k); valorFixo(c, k, x); },
+    });
+  }
+  Object.defineProperty(c, SOB_DEMANDA, { value: { d, fechados }, configurable: true });
+  return c;
+}
+
+/** Fim da gravação sobre `copiarSobDemanda`: o que ela não usou passa a ser o mesmo objeto de antes. Devolve a cópia. */
+export function fecharCopia(c) {
+  const info = c && c[SOB_DEMANDA];
+  if (!info) return c;
+  for (const k of info.fechados) if (Object.getOwnPropertyDescriptor(c, k)?.get) valorFixo(c, k, info.d[k]);
+  delete c[SOB_DEMANDA];
   return c;
 }
 
@@ -137,6 +176,14 @@ export function aplicarMudanca(d, m, tabelas = null) {
     const t = (d[m.tabela] ||= []);
     const i = t.findIndex((r) => r.id === m.id);
     if (i >= 0) t[i] = m.dados; else t.push(m.dados);
+  } else if (m.tipo === 'campos') {
+    // só os campos que mudaram (item 33): o registro é trocado por um novo com eles (o de antes não é mexido no lugar)
+    const t = d[m.tabela] || [];
+    const i = t.findIndex((r) => r.id === m.id);
+    if (i < 0) return d; // (quem chama confere antes: sem o registro, baixa tudo de novo)
+    const novo = { ...t[i], ...(m.dados?.campos || {}) };
+    for (const k of m.dados?.apagados || []) delete novo[k];
+    t[i] = novo;
   } else if (m.tipo === 'exclusao') d[m.tabela] = (d[m.tabela] || []).filter((r) => r.id !== m.id);
   else if (m.tipo === 'raiz') {
     const campo = m.dados?.campo;
@@ -155,19 +202,48 @@ const ehContador = (o) => o.op === 'raiz' && CONTADORES.includes(o.campo);
  * do lote (o histórico continua na ordem), e as partes vão uma depois da outra. O corte depende só do lote, então reenviar dá
  * as mesmas partes com os mesmos códigos (`<lote>-p1`, `-p2`…) e a nuvem reconhece as que já recebeu. O número da NF
  * (contador) vai sempre na 1ª parte: se ele for recusado (outro aparelho usou o número), nada do resto foi aplicado.
+ * Histórico (item 30 do mutirão 3000): cada linha vai na mesma parte do registro de que ela fala (se a parte for recusada,
+ * a linha não entra sem o registro, nem o registro sem a linha); a linha que não é de um registro (ex.: "Importados 1100
+ * lançamentos") vai na última, e cada parte sem nenhuma linha leva uma curta ("… (parte 1 de 3: 1000 mudanças)", sem
+ * detalhes, que o Desfazer não usa): se a última for recusada, o que entrou continua explicado no Histórico.
  */
 export function dividirLote(l, { maximo = PARTE_MAXIMA, bytes = PARTE_BYTES } = {}) {
   const pesos = l.ops.map((o) => JSON.stringify(o).length);
   if (l.ops.length <= maximo && pesos.reduce((s, p) => s + p, 0) <= bytes) return [l];
-  const ordem = [...l.ops.keys()].sort((a, b) => Number(ehContador(l.ops[b])) - Number(ehContador(l.ops[a])) || a - b);
+  // grupos: cada mudança de registro com as linhas do histórico dele; as linhas soltas, num grupo no fim
+  const grupos = []; const doRegistro = new Map(); const soltas = [];
+  for (const [i, o] of l.ops.entries()) {
+    if (o.op === 'historico') continue;
+    const g = { ops: [i], contador: ehContador(o), ordem: i };
+    grupos.push(g);
+    if (o.op !== 'raiz') doRegistro.set(`${o.tabela}:${o.id}`, g);
+  }
+  for (const [i, o] of l.ops.entries()) {
+    if (o.op !== 'historico') continue;
+    const g = doRegistro.get(`${o.entrada?.tabela}:${o.entrada?.registro_id}`);
+    if (g) g.ops.push(i); else soltas.push(i);
+  }
+  grupos.sort((a, b) => Number(b.contador) - Number(a.contador) || a.ordem - b.ordem);
+  for (const i of soltas) grupos.push({ ops: [i] }); // cada linha solta cabe em qualquer parte (no fim, na ordem)
   const partes = []; let atual = []; let peso = 0;
-  for (const i of ordem) {
-    if (atual.length && (atual.length >= maximo || peso + pesos[i] > bytes)) { partes.push(atual); atual = []; peso = 0; }
-    atual.push(l.ops[i]); peso += pesos[i];
+  for (const g of grupos) {
+    const pg = g.ops.reduce((s, i) => s + pesos[i], 0);
+    if (atual.length && (atual.length + g.ops.length > maximo || peso + pg > bytes)) { partes.push(atual); atual = []; peso = 0; }
+    atual.push(...g.ops); peso += pg;
   }
   if (atual.length) partes.push(atual);
-  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) }));
+  const n = partes.length;
+  const ultima = l.ops.filter((o) => o.op === 'historico').at(-1)?.entrada;
+  return partes.map((idx, k) => {
+    const ops = idx.map((i) => l.ops[i]);
+    // parte sem nenhuma linha do histórico (ex.: importação gravada sem linha por registro): uma linha curta
+    if (ultima && n > 1 && !ops.some((o) => o.op === 'historico')) {
+      ops.push({ op: 'historico', entrada: { quando: ultima.quando, usuario: ultima.usuario, acao: 'Gravação em partes', descricao: `${ultima.descricao || ultima.acao || 'Gravação'} (parte ${k + 1} de ${n}: ${ops.length} mudança(s))` } });
+    }
+    return { id: `${l.id}-p${k + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) };
+  });
 }
+
 
 /** Faixas de códigos de duas cópias (memória e aparelho): por tabela vale a mais nova (fim maior) e, na mesma, a mais adiantada. */
 export function juntarFaixas(a = {}, b = {}) {
@@ -219,7 +295,8 @@ export const erroDeRede = (e) => new ErroNuvem(e?.name === 'TimeoutError' ? 'A n
 /** Registros e campos que os lotes deste aparelho mexem (para separar o que volta da nuvem do que é de outro). */
 function chavesDosLotes(lotes) {
   const chaves = new Set(); let historico = 0;
-  for (const l of lotes) for (const o of l.ops) {
+  // como vão à nuvem (lote grande em partes ganha uma linha do histórico por parte)
+  for (const l of lotes.flatMap((x) => dividirLote(x))) for (const o of l.ops) {
     if (o.op === 'historico') historico += 1;
     else if (o.op === 'raiz') chaves.add(`raiz:${o.campo}`);
     else chaves.add(`${o.tabela}:${o.id}`);
@@ -248,6 +325,8 @@ export class Sincronia {
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
     this.envioMarcado = null; this.semFaixas = false; this.ultimoLote = null;
+    // fila no aparelho (item 41): as mudanças de cada lote ficam em 'lote:<código>', gravadas uma vez; 'fila' só tem a lista
+    this.opsDe = new Map(); this.noAparelho = new Set(); this.legado = false;
     this.geracao = 0; // anda toda vez que a vista deixa de valer (base, fila ou faixas mudaram)
     this.normalizarMexeuNoHistorico = false;
     this.puxando = Promise.resolve(); // um puxar de cada vez (dois aplicariam as mesmas mudanças duas vezes)
@@ -264,7 +343,7 @@ export class Sincronia {
     // em vez de baixar o banco inteiro de novo
     const baixada = this.base;
     if (guardada && !(baixada && seqDe(baixada) > seqDe(guardada))) this.base = guardada;
-    this.pendentes = (await this.guardar.ler('pendentes')) || [];
+    this.pendentes = (await this.lerPendentes()).lotes;
     this.faixas = juntarFaixas({}, (await this.guardar.ler('faixas')) || {});
     this.recusas = (await this.guardar.ler('recusas')) || [];
     this.conflitos = this.base?._nuvem?.conflitos || [];
@@ -387,7 +466,9 @@ export class Sincronia {
    */
   async enviarAjustes() {
     if (!this.base) return 0;
-    const ops = diferencas(this.montar(), this.atual()).filter((o) => !ehContador(o));
+    // fila vazia: o "como está na nuvem" é a própria base (diferencas só lê), sem copiar o banco inteiro (desempenho, item 13)
+    const naNuvem = this.pendentes.length ? this.montar() : { ...this.base, seq: this.seqDaVista() };
+    const ops = diferencas(naNuvem, this.atual()).filter((o) => !ehContador(o));
     if (!ops.length) return 0;
     await this.enfileirar(ops);
     this.enviarDepois();
@@ -448,8 +529,9 @@ export class Sincronia {
       await this.releFila();
       const geracao = this.geracao;
       const antes = this.atual();
-      const depois = copiar(antes);
-      const r = fn(depois);
+      const depois = copiarSobDemanda(antes); // só as tabelas que a gravação usa (item 11)
+      let r;
+      try { r = fn(depois); } finally { fecharCopia(depois); }
       const ops = diferencas(antes, depois);
       if (ops.some(ehContador)) { comContador = true; return undefined; }
       falta = this.faltaDeFaixa(ops);
@@ -488,8 +570,9 @@ export class Sincronia {
         await this.releFila();
         if (this.pendentes.length) throw new ErroNuvem('Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.');
         const antes = this.atual();
-        const depois = copiar(antes);
-        const r = fn(depois);
+        const depois = copiarSobDemanda(antes);
+        let r;
+        try { r = fn(depois); } finally { fecharCopia(depois); }
         const ops = diferencas(antes, depois);
         const falta = this.faltaDeFaixa(ops);
         if (falta) return { falta };
@@ -561,11 +644,11 @@ export class Sincronia {
    * foi confirmado por outra aba, que gravou antes uma base com ele: se essa base é mais nova que a desta aba, vale ela.
    */
   async releFila() {
-    const p = await this.guardar.ler('pendentes');
+    const { lotes: p, existe } = await this.lerPendentes();
     const f = await this.guardar.ler('faixas');
     this.n = Math.max(this.n, Number(await this.guardar.ler('n')) || 0);
     let mudou = false;
-    if (Array.isArray(p) && idsDaFila(p) !== idsDaFila(this.pendentes)) {
+    if (existe && idsDaFila(p) !== idsDaFila(this.pendentes)) {
       const sumiu = this.pendentes.some((l) => !p.some((x) => x.id === l.id));
       this.pendentes = p; mudou = true;
       if (sumiu) await this.releBase();
@@ -587,14 +670,66 @@ export class Sincronia {
     if (b && seqDe(b) > seqDe(this.base)) { this.base = b; this.conflitos = b._nuvem?.conflitos || []; }
   }
 
+  /**
+   * A fila guardada no aparelho (item 41 do mutirão 3000): 'fila' é só a lista (código, data, quantas mudanças) e as mudanças de
+   * cada lote ficam em 'lote:<código>', gravadas uma vez; antes a fila inteira (com uma importação grande, ~100 KB) era cifrada e
+   * regravada a cada clique. A fila do formato antigo ('pendentes': aparelho que acabou de atualizar, ou uma aba ainda na versão
+   * anterior) entra junto e sai na próxima gravação. `existe`: há fila guardada (num formato ou no outro).
+   */
+  async lerPendentes() {
+    const fila = await this.guardar.ler('fila');
+    const antiga = await this.guardar.ler('pendentes');
+    const lotes = []; const vistos = new Set();
+    for (const { mudancas, ...m } of Array.isArray(fila) ? fila : []) {
+      let ops = this.opsDe.get(m.id);
+      if (!ops) {
+        ops = await this.guardar.ler(`lote:${m.id}`);
+        if (!Array.isArray(ops)) continue; // (não acontece: o lote é gravado junto com a lista)
+        this.opsDe.set(m.id, ops);
+      }
+      this.noAparelho.add(m.id);
+      lotes.push({ ...m, ops }); vistos.add(m.id);
+    }
+    if (Array.isArray(antiga)) {
+      for (const l of antiga) if (l && !vistos.has(l.id)) { lotes.push(l); this.opsDe.set(l.id, l.ops); }
+      this.legado = true;
+    }
+    return { lotes, existe: Array.isArray(fila) || Array.isArray(antiga) };
+  }
+
+  /** O que gravar no aparelho para a fila: a lista curta e as mudanças dos lotes que ainda não estão lá. */
+  objetoDaFila() {
+    const obj = {};
+    for (const l of this.pendentes) if (!this.noAparelho.has(l.id)) { obj[`lote:${l.id}`] = l.ops; this.opsDe.set(l.id, l.ops); }
+    obj.fila = this.pendentes.map(({ ops, ...m }) => ({ ...m, mudancas: ops.length }));
+    return obj;
+  }
+
+  /** Depois de gravar a fila: marca os lotes guardados e apaga do aparelho os que saíram dela (e a fila do formato antigo). */
+  async arrumarFilaGravada(gravados) {
+    for (const k of Object.keys(gravados)) if (k.startsWith('lote:')) this.noAparelho.add(k.slice(5));
+    const naFila = new Set(this.pendentes.map((l) => l.id));
+    for (const id of [...this.noAparelho]) {
+      if (naFila.has(id)) continue;
+      this.noAparelho.delete(id); this.opsDe.delete(id);
+      await this.guardar.apagar?.(`lote:${id}`);
+    }
+    if (this.legado) { this.legado = false; await this.guardar.apagar?.('pendentes'); }
+  }
+
+  /** Grava só a fila (lista e lotes novos), dentro da trava. `mais`: outras chaves na mesma gravação (contador, faixas). */
+  async gravarListaFila(mais = {}) {
+    const obj = { ...this.objetoDaFila(), ...mais };
+    if (this.guardar.gravarVarios) await this.guardar.gravarVarios(obj);
+    else for (const [k, v] of Object.entries(obj)) await this.guardar.gravar(k, v); // lotes antes da lista
+    await this.arrumarFilaGravada(obj);
+  }
+
   /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
   async gravarFila() {
     // numa gravação só quando o aparelho deixa (IndexedDB): se a de faixas falhasse depois da fila, a próxima inclusão
     // repetiria um código da fila e o aparelho não conseguiria mais incluir naquela tabela (item 40)
-    if (this.guardar.gravarVarios) { await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas }); return; }
-    await this.guardar.gravar('n', this.n);
-    await this.guardar.gravar('pendentes', this.pendentes);
-    await this.guardar.gravar('faixas', this.faixas);
+    await this.gravarListaFila({ n: this.n, faixas: this.faixas });
   }
 
   async enfileirar(ops) {
@@ -683,7 +818,7 @@ export class Sincronia {
       const antes = this.pendentes.length;
       this.pendentes = this.pendentes.filter((x) => !ids.has(x.id));
       if (this.pendentes.length === antes) return;
-      await this.guardar.gravar('pendentes', this.pendentes);
+      await this.gravarListaFila();
       this.invalidar();
     });
   }
@@ -696,11 +831,19 @@ export class Sincronia {
     await this.trava(async () => {
       const lista = (await this.guardar.ler('recusas')) || this.recusas;
       const ja = new Set(lista.map((r) => r.id || r.lote));
+      // registros criados por partes recusadas (agora ou nas últimas recusas guardadas): a mudança seguinte num deles é recusada
+      // com "não existe" por causa daquela, e a tela mostra as duas juntas (item 44 do mutirão 3000)
+      const criadosPor = new Map();
+      const anotar = (id, ops) => { for (const o of ops || []) if (o.op === 'inserir') criadosPor.set(`${o.tabela}:${o.id}`, id); };
+      for (const r of lista.slice(-RECUSAS_PARA_CAUSA)) anotar(r.id || r.lote, await this.guardar.ler(`recusa:${r.id || r.lote}`));
       for (const { lote, parte, erro } of recusadas) {
+        const naoExiste = String(erro).match(/^Registro (\S+) (\d+) não existe/);
+        const causa = naoExiste ? criadosPor.get(`${naoExiste[1]}:${naoExiste[2]}`) : undefined;
+        anotar(parte.id, parte.ops);
         if (ja.has(parte.id)) continue;
         ja.add(parte.id);
         await this.guardar.gravar(`recusa:${parte.id}`, parte.ops);
-        lista.push({ id: parte.id, lote: lote.id, em: lote.em, erro, mudancas: parte.ops.length });
+        lista.push({ id: parte.id, lote: lote.id, em: lote.em, erro, mudancas: parte.ops.length, ...(causa && causa !== parte.id ? { causa } : {}) });
       }
       this.recusas = lista;
       await this.guardar.gravar('recusas', lista);
@@ -709,7 +852,7 @@ export class Sincronia {
       for (const id of inteiros) enviados.delete(id);
       const antes = this.pendentes.length;
       this.pendentes = this.pendentes.filter((x) => !inteiros.has(x.id));
-      if (this.pendentes.length !== antes) { await this.guardar.gravar('pendentes', this.pendentes); this.invalidar(); }
+      if (this.pendentes.length !== antes) { await this.gravarListaFila(); this.invalidar(); }
     });
   }
 
@@ -784,17 +927,20 @@ export class Sincronia {
     const tabelas = this.tabelasConhecidas({ comTela: false });
     for (let volta = 0; volta < 1000; volta += 1) {
       const desde = seqDe(this.base);
-      const r = await this.api('GET', `mudancas?desde=${desde}`);
+      // formato 2: alteração vem só com os campos que mudaram (item 33); a nuvem manda o registro inteiro a quem não pede
+      const r = await this.api('GET', `mudancas?desde=${desde}&formato=2`);
       // no meio do pedido, a base desta aba foi trocada pela mais nova que outra aba gravou (releBase): o que veio já está nela
       // (aplicar de novo repetiria o histórico); pede outra vez a partir dela
       if (seqDe(this.base) !== desde) continue;
       if (r.refazer) { await this.baixarTudoAgora(); externo = true; mudou = false; break; } // baixarTudo já gravou a cópia
       // a base muda aqui: a vista deixa de valer já (uma gravação no meio deste puxar não pode virar a vista)
       if (r.mudancas.length || Number(r.seq) !== desde) { mudou = true; this.invalidar(); }
+      // alteração de um registro que esta cópia não tem (não deveria acontecer: a fila vem em ordem): baixa tudo de novo
+      if (r.mudancas.some((m) => m.tipo === 'campos' && !(this.base[m.tabela] || []).some((x) => x.id === m.id))) { await this.baixarTudoAgora(); externo = true; mudou = false; break; }
       for (const m of r.mudancas) {
         aplicarMudanca(this.base, m, tabelas);
         if (m.tipo === 'historico') { if (historicoMeu > 0) historicoMeu -= 1; else externo = true; }
-        else if (m.tipo === 'registro' || m.tipo === 'exclusao') { if (!meus.chaves.has(`${m.tabela}:${m.id}`)) externo = true; }
+        else if (m.tipo === 'registro' || m.tipo === 'campos' || m.tipo === 'exclusao') { if (!meus.chaves.has(`${m.tabela}:${m.id}`)) externo = true; }
         else if (m.tipo === 'raiz') { if (!meus.chaves.has(`raiz:${m.dados?.campo}`)) externo = true; }
         else externo = true; // conflito, escolha, nova carga
       }
@@ -849,7 +995,7 @@ export class Sincronia {
   /** Primeira carga (nuvem vazia): o banco inteiro vai de uma vez. */
   async importar(d, { substituir = false, manterUsuarios = false } = {}) {
     await this.api('POST', 'importar', { dados: d, substituir, ...(manterUsuarios ? { manterUsuarios: true } : {}) });
-    await this.trava(async () => { this.pendentes = []; await this.guardar.gravar('pendentes', []); });
+    await this.trava(async () => { await this.lerPendentes(); this.pendentes = []; await this.gravarListaFila(); });
     await this.baixarTudo();
     await this.garantirFaixas();
     return this.atual();
