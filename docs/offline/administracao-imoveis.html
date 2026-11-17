@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-fC3TtmtQSexyL2ONaMjq2nie84bfVSF+ZssO4RcBv/I='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-6j0+3xPTgsOANeH+zRVERsWdXIOT8xWjdCWsZ+Gywgk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="9192e6641501945d">
+<meta name="fontes" content="a357736ca11f7bd3">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -502,6 +502,8 @@ button.clipe-apagar:hover { background: #991b1b; }
 /* Lista de arquivos (pasta do inquilino, documentos assinados): o nome fica com a largura; tamanho e botões só o necessário */
 table.lista-arquivos { width: 100%; }
 table.lista-arquivos td.nome-arquivo { width: 100%; word-break: break-word; }
+.abrir-pasta { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--borda, #e2e2e2); }
+.abrir-pasta b { overflow-wrap: anywhere; } /* caminho comprido da pasta no Windows */
 .suave.mini { font-size: 11px; }
 .abas { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
 @media (max-width: 760px) { .abas a { padding: 6px 10px; font-size: 14px; } }
@@ -14319,7 +14321,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   }
   async function situacaoCopia(dir) {
     const r = await lerRegistro(dir);
-    return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0 } : null;
+    return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0, caminho: caminhoNoPc(r) } : null;
   }
   async function pastaDe(dir, partes, criar) {
     let p2 = dir;
@@ -14337,7 +14339,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const arquivos = { ...reg.arquivos || {} };
     const { baixar: baixar2, apagar, atual } = planoCopia(await listar2(), arquivos);
     const raiz = await dir.getDirectoryHandle(PASTA_COPIA, { create: true });
-    const salvar = (falhas2) => gravarRegistro(dir, { atualizado_em: (/* @__PURE__ */ new Date()).toISOString(), por, falhas: falhas2, dias_apagados: diasApagados, arquivos });
+    const caminho = caminhoNoPc(reg);
+    const salvar = (falhas2) => gravarRegistro(dir, { atualizado_em: (/* @__PURE__ */ new Date()).toISOString(), por, falhas: falhas2, dias_apagados: diasApagados, ...caminho ? { caminho_no_pc: caminho } : {}, arquivos });
     let falhas = 0;
     let feitos = 0;
     const total = baixar2.length + apagar.length;
@@ -14398,7 +14401,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     await faxinaApagados(dir, diasApagados, agora);
     return { baixados: baixar2.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
   }
-  var PASTA_COPIA, ARQUIVO_COPIA, PASTA_APAGADOS, DIAS_APAGADOS, diaDeHoje, diasVencidos, EM_PARALELO, PROIBIDOS, RESERVADOS, caminhoLocal, NAO_COPIAR, copiavel;
+  var PASTA_COPIA, ARQUIVO_COPIA, PASTA_APAGADOS, DIAS_APAGADOS, diaDeHoje, diasVencidos, EM_PARALELO, PROIBIDOS, RESERVADOS, caminhoLocal, NAO_COPIAR, copiavel, caminhoNoPc;
   var init_copia_aberta = __esm({
     "docs/js/copia-aberta.js"() {
       PASTA_COPIA = "Arquivos dos imoveis";
@@ -14416,6 +14419,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       caminhoLocal = (caminho) => caminho.split("/").map(nomeWindows);
       NAO_COPIAR = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i;
       copiavel = (caminho) => !NAO_COPIAR.test(String(caminho || "").replace(/[. ]+$/, ""));
+      caminhoNoPc = (reg) => {
+        const c = String(reg?.caminho_no_pc || "");
+        return c.length < 400 && /^([A-Za-z]:\\|\\\\[^\\])/.test(c) && !/[\0-\x1f<>"|?*]/.test(c.slice(2)) ? c : "";
+      };
     }
   });
 
@@ -29294,10 +29301,21 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${copia2 && copia2.falhas ? item("Ficaram para a próxima", `${copia2.falhas} arquivo(s) não baixaram`) : ""}</div>
       <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
       <div class="acoes">${botao("atualizarCopiaAberta", "Atualizar a pasta agora", {}, "secundario")}</div>
-      <div id="progresso-copia" aria-live="polite"></div>` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
+      <div id="progresso-copia" aria-live="polite"></div>
+      ${caixaAbrirPasta(copia2)}` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista3.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
+  }
+  function caixaAbrirPasta(copia2) {
+    if (!noComputador()) return "";
+    const caminho = copia2?.caminho || "";
+    const windows = /Windows/.test(navigator.userAgent);
+    return `<div class="abrir-pasta">
+    <div class="acoes">${windows ? '<a class="botao" href="imoveis-pasta:abrir">Abrir a pasta no Explorer</a>' : ""}
+      ${caminho ? botao("copiar", "Copiar o caminho", { texto: caminho }, "secundario") : ""}</div>
+    ${windows ? '<p class="suave">Na primeira vez o Chrome pergunta se pode abrir o programa: marque "Sempre permitir" e clique em Abrir. Precisa do programa do PC atualizado.</p>' : ""}
+    <p class="suave">Onde fica: ${caminho ? `<b>${esc(caminho)}</b>` : `pasta do backup seguro (<b>${esc(E.seguro.dir.name)}</b>) → <b>${PASTA_COPIA}</b> (o caminho completo aparece aqui depois que o programa do PC atualizar a pasta)`}</p></div>`;
   }
   function avisoBackupSeguro() {
     if (!podeUsuario("admin") || E.seguro || !suportado() || window.VERSAO_OFFLINE) return "";
@@ -29512,7 +29530,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       URL.revokeObjectURL(url);
     }
   }
-  var tamanho, FORM_RESTAURAR, AVISO_SEGURO_DISPENSADO, dispensarAvisoSeguro, HISTORICO_POR_PAGINA, textosHistorico, textoDaEntrada, LEMBRETE_ZIP_DIAS, LOGO_MAX;
+  var tamanho, FORM_RESTAURAR, noComputador, AVISO_SEGURO_DISPENSADO, dispensarAvisoSeguro, HISTORICO_POR_PAGINA, textosHistorico, textoDaEntrada, LEMBRETE_ZIP_DIAS, LOGO_MAX;
   var init_admin = __esm({
     "docs/js/telas/admin.js"() {
       init_app();
@@ -29538,6 +29556,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="check"><button>Abrir o backup</button></div></form>
   <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
     <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
+      noComputador = () => !window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
       AVISO_SEGURO_DISPENSADO = "imoveis-aviso-backup-seguro";
       dispensarAvisoSeguro = () => {
         try {
@@ -33381,7 +33400,17 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async copiar({ texto: texto3 }, el) {
-          await navigator.clipboard.writeText(texto3);
+          try {
+            await navigator.clipboard.writeText(texto3);
+          } catch {
+            const t = Object.assign(document.createElement("textarea"), { value: texto3 });
+            t.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+            document.body.append(t);
+            t.select();
+            const ok = document.execCommand("copy");
+            t.remove();
+            if (!ok) throw new ErroUsuario(`Não deu para copiar sozinho. Selecione e copie (Ctrl+C): ${texto3}`);
+          }
           const antes = el.textContent;
           el.textContent = "Copiado ✓";
           setTimeout(() => {
