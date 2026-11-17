@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-RrdYxiNzDB+x+dg722lJpFXsg+JYCschhZpEtrmSUS4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-qgMDLGCl7qhaPyNla1MG9dms4gyFE3322FqPV8sJj+Q='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="9d241da47896b934">
+<meta name="fontes" content="a2a9f177bb3d6927">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -311,6 +311,17 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .agenda-dia h3 { margin-top: 0; }
 .evento-cal { margin-bottom: 6px; }
 @media (max-width: 700px) { .cal-grade { grid-template-columns: repeat(7, minmax(0, 1fr)); } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
+/* no celular, a grade (só tracinhos, sem texto) dá lugar à lista por semana, com o texto e os links */
+.cal-lista { display: none; }
+.cal-semana { border: 1px solid var(--borda); border-radius: 8px; margin-top: 8px; background: #fff; }
+.cal-semana > summary { padding: 10px 12px; font-weight: 600; cursor: pointer; min-height: 24px; }
+.cal-semana[open] > summary { border-bottom: 1px solid var(--borda); }
+.cal-semana > p { margin: 10px 12px; }
+.cal-semana-dia { padding: 8px 12px; }
+.cal-semana-dia + .cal-semana-dia { border-top: 1px dashed var(--borda); }
+.cal-semana-dia.hoje { background: #eff6ff; }
+.cal-semana-dia h4 { margin: 0 0 6px; font-size: 14px; }
+@media (max-width: 760px) { .cal-grade, .cal-agendas { display: none; } .cal-lista { display: block; } }
 
 /* Carta de reajuste */
 .carta { position: relative; overflow: hidden; background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
@@ -700,7 +711,15 @@ form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:
   main table button.x-excluir { min-width: 40px; }
   .alca-caixa { display: none !important; }
   .barra-nf.lote-topo { display: none; } /* Boletos: imprimir/excluir selecionados só embaixo, depois da lista */
+  /* ... e só depois de marcar um boleto, numa barra presa no pé da tela ("2 boletos marcados") */
+  .barra-lote { display: none; }
+  .barra-lote.com-marcados { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; background: #fff;
+    border-top: 1px solid var(--borda); box-shadow: 0 -4px 12px rgba(15, 23, 42, .12); padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); }
+  .barra-lote.com-marcados .contagem-lote { flex-basis: 100%; font-weight: 600; }
+  main:has(.barra-lote.com-marcados) { padding-bottom: 150px; }
 }
+.contagem-lote:empty { display: none; }
+.contagem-lote { align-self: center; }
 </style>
 </head>
 <body>
@@ -3299,7 +3318,8 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     return `o ${DESC[n] || n || "índice previsto neste contrato"}`;
   }
   function camposAntigosDaEmpresa(e) {
-    if (!e || e.assina_documentos !== void 0) return {};
+    if (!e) return {};
+    if (e.assina_documentos !== void 0) return e.uf_sede === void 0 ? { uf_sede: "PR" } : {};
     const assina = LOCADORA_ANTIGA.test(`${e.nome || ""} ${e.razao_social || ""}`);
     const out = { assina_documentos: assina };
     for (const [k, v] of Object.entries({ ...DADOS_ANTIGOS_EMPRESA, ...assina ? DADOS_ANTIGOS_LOCADORA : {} })) if (e[k] === void 0) out[k] = v;
@@ -3317,6 +3337,11 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       if (v) return v;
     }
     return "";
+  }
+  function cidadeUfDoImovel(d2, imovel, c = null) {
+    if (!imovel || !imovel.cidade) return "";
+    const uf = imovel.uf || ufDoCep(imovel.cep) || String(dadoDaEmpresa(d2, c || { imovel_id: imovel.id }, "uf_sede") || "").toUpperCase();
+    return uf ? `${imovel.cidade}/${uf}` : imovel.cidade;
   }
   function nomeCurtoCompanhia(nome) {
     const m = /\(([^)]+)\)\s*$/.exec(String(nome || ""));
@@ -3354,7 +3379,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     const inquilinoPaga = ENCARGOS.filter(([k]) => (c[k] || (k === "conta_iptu" ? c.cobrar_iptu ? "Por conta do inquilino" : "" : "")) === "Por conta do inquilino").map(([, t]) => t);
     const inclusos = ENCARGOS.filter(([k]) => c[k] === "Incluso no aluguel").map(([, t]) => t);
     const endereco2 = [imovel.endereco, imovel.complemento].filter(Boolean).join(", ");
-    const situado = [endereco2, imovel.bairro, imovel.cidade ? `${imovel.cidade}/${imovel.uf || "PR"}` : ""].filter(Boolean).join(", ");
+    const situado = [endereco2, imovel.bairro, cidadeUfDoImovel(d2, imovel, c)].filter(Boolean).join(", ");
     const caucaoValor = c.caucao_valor > 0 ? c.caucao_valor : c.caucao_meses > 0 ? c.caucao_meses * bonificado : 0;
     const caucaoMeses = c.caucao_meses || (caucaoValor && bonificado ? Math.round(caucaoValor / bonificado) : 0);
     const campos = {
@@ -3971,7 +3996,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       ];
       lista = (itens) => itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`;
       LOCADORA_ANTIGA = /\bANK\b/i;
-      DADOS_ANTIGOS_EMPRESA = { cidade_documentos: "Curitiba", energia_concessionaria: "Companhia Paranaense de Energia (COPEL)", agua_concessionaria: "Companhia de Saneamento do Paraná (SANEPAR)" };
+      DADOS_ANTIGOS_EMPRESA = { cidade_documentos: "Curitiba", uf_sede: "PR", energia_concessionaria: "Companhia Paranaense de Energia (COPEL)", agua_concessionaria: "Companhia de Saneamento do Paraná (SANEPAR)" };
       DADOS_ANTIGOS_LOCADORA = {
         email_contato: "administracao@ankjck.com.br",
         assinatura_email: "Administradora",
@@ -3979,7 +4004,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
         conta_deposito: `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
 Pix (CNPJ): 58.492.818/0001-59`
       };
-      comCamposNovos = (e) => e.assina_documentos === void 0 ? { ...e, ...camposAntigosDaEmpresa(e) } : e;
+      comCamposNovos = (e) => e.assina_documentos === void 0 || e.uf_sede === void 0 ? { ...e, ...camposAntigosDaEmpresa(e) } : e;
       comArtigo = (nome) => /^(a|o|as|os)\s/i.test(nome) ? nome : `a ${nome}`;
       companhiaDoImovel = (d2, c, imovel, qual) => imovel && imovel[`${qual}_concessionaria`] || dadoDaEmpresa(d2, c, `${qual}_concessionaria`);
       fiadoresNaData = (d2, contratoId, data2) => d2.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data2 || hojeIso())));
@@ -12824,7 +12849,7 @@ ${naoIncluidos.join("\r\n")}\r
       EMITENTE = [
         campo("nome", "Nome no topo da NF", "texto", { obrig: true, ajuda: "Ex.: IMOBILIÁRIA EXEMPLO" }),
         campo("razao_social", "Razão social", "texto", { obrig: true, largo: true }),
-        campo("cnpj", "CNPJ", "cnpj", PREENCHE_CNPJ({ razao: "razao_social", nome: "nome", endereco: "endereco", sede: "endereco_sede" })),
+        campo("cnpj", "CNPJ", "cnpj", PREENCHE_CNPJ({ razao: "razao_social", nome: "nome", endereco: "endereco", sede: "endereco_sede", uf: "uf_sede" })),
         campo("endereco", "Endereço (como aparece na NF)", "texto", { largo: true }),
         campo("municipio", "Município do serviço", "texto", { ajuda: "Como sai na NF. Ex.: CURITIBA" }),
         campo("aba_modelo", "Aba no modelo Excel", "texto", { ajuda: "Só para quem usa um modelo de NF em Excel próprio: o nome da aba desta empresa. Pode deixar em branco" }),
@@ -12833,6 +12858,7 @@ ${naoIncluidos.join("\r\n")}\r
         campo("assina_documentos", "Assina os documentos do inquilino", "simnao", { ajuda: "Contrato, vistoria, recibos, cartas e e-mails saem em nome desta empresa, mesmo quando o imóvel é dividido com outra. Marque só uma. Sem nenhuma marcada, saem em nome das empresas do imóvel" }),
         campo("endereco_sede", "Endereço da sede (por extenso)", "texto", { largo: true, ajuda: "Ex.: Rua das Flores, nº 100, Centro, Curitiba, Paraná" }),
         campo("cidade_documentos", "Cidade dos documentos", "texto", { ajuda: 'Vai no "local e data" do contrato, dos recibos e das cartas quando o imóvel não tem cidade. Ex.: Curitiba' }),
+        campo("uf_sede", "Estado da sede (UF)", "texto", { max: 2, ajuda: 'Duas letras. Vai depois da cidade do imóvel ("Curitiba/PR") no contrato, nos recibos e nos e-mails quando o imóvel não tem Estado nem CEP. Ex.: PR' }),
         campo("energia_concessionaria", "Companhia de energia (nome por extenso)", "texto", { largo: true, ajuda: "Sai no contrato e nos e-mails; a sigla vai entre parênteses. Ex.: Companhia Paranaense de Energia (COPEL). Imóvel atendido por outra: informe no cadastro do imóvel" }),
         campo("agua_concessionaria", "Companhia de água (nome por extenso)", "texto", { largo: true, ajuda: "Ex.: Companhia de Saneamento do Paraná (SANEPAR)" }),
         campo("representante_nome", "Representante que assina", "texto", { largo: true, ajuda: "Ex.: MARIA DA SILVA" }),
@@ -19912,7 +19938,7 @@ ${xref}
       const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
       if (!marcados.length) throw new ErroUsuario("Marque pelo menos um boleto.");
       const total = marcados.reduce((t, s) => t + s.valor, 0);
-      if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
+      if (!await confirmar(`${marcados.length} boleto(s), ${reais(total)} no total, ficam pagos com as datas em que o dinheiro entrou na conta.`, { titulo: "Registrar os pagamentos?", sim: "Registrar os pagamentos" })) return;
       let n = 0;
       const divergentes = [];
       const repetidos = [];
@@ -20022,13 +20048,11 @@ ${xref}
   init_calculos();
   init_formularios();
   init_regras();
-  function confirmarAvisos(avisos) {
-    if (avisos.length && !confirm(`Confira antes de salvar:
+  async function confirmarAvisos(avisos) {
+    if (avisos.length && !await confirmar(`• ${avisos.join("\n• ")}
 
-• ${avisos.join("\n• ")}
-
-Salvar assim mesmo?`)) {
-      throw new Error("Nada foi salvo. Corrija o que precisar e salve de novo.");
+Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim mesmo", nao: "Voltar e corrigir" })) {
+      throw new ErroUsuario("Nada foi salvo. Corrija o que precisar e salve de novo.");
     }
   }
   var diasFuturo = () => regra("dias_futuro");
@@ -20324,6 +20348,7 @@ Salvar assim mesmo?`)) {
         [cfg4.fantasia]: r.nome_fantasia,
         [cfg4.endereco]: endereco2,
         [cfg4.sede]: endereco2,
+        [cfg4.uf]: r.uf,
         [cfg4.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
         [cfg4.email]: String(r.email || "").toLowerCase(),
         [cfg4.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
@@ -20891,9 +20916,9 @@ Salvar assim mesmo?`)) {
     if (alvo.contrato) return buscar(d2, "imoveis", alvo.contrato.imovel_id) || null;
     return (alvo.ficha.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).find(Boolean) || null;
   }
-  function enderecoDe(i) {
+  function enderecoDe(d2, i) {
     if (!i) return "";
-    return [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", ");
+    return [enderecoCompleto(i), i.bairro, cidadeUfDoImovel(d2, i)].filter(Boolean).join(", ");
   }
   function emitenteDe(d2, alvo, i) {
     const base = alvo.contrato || { imovel_id: i ? i.id : null };
@@ -20973,7 +20998,7 @@ Salvar assim mesmo?`)) {
     const i = imovelDe(d2, alvo);
     const e = emitenteDe(d2, alvo, i);
     const empresa = e.razao_social || e.nome || "LOCADORA";
-    const endereco2 = enderecoDe(i) || "imóvel não informado";
+    const endereco2 = enderecoDe(d2, i) || "imóvel não informado";
     const quem = pessoa(p2.inquilino_nome, documentoDe(p2));
     const assinaEmpresa = { nome: empresa, linha: [e.cnpj ? `CNPJ ${e.cnpj}` : "", "LOCADORA"].filter(Boolean).join(" · ") };
     const assinaPessoa = (papel) => ({ nome: p2.inquilino_nome, linha: [documentoDe(p2), papel].filter(Boolean).join(" · ") });
@@ -21172,7 +21197,7 @@ Salvar assim mesmo?`)) {
     const pj = f.inquilino_tipo === PJ3;
     const proposta = itensDaProposta(f);
     const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean);
-    const tabela = [["IMÓVEL DE INTERESSE", null], ...imoveis.length ? imoveis.map((x) => ["Endereço", enderecoDe(x)]) : [["Endereço", EM_BRANCO]]];
+    const tabela = [["IMÓVEL DE INTERESSE", null], ...imoveis.length ? imoveis.map((x) => ["Endereço", enderecoDe(d2, x)]) : [["Endereço", EM_BRANCO]]];
     if (proposta.length) tabela.push(["CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)", null], ...proposta);
     if (pj) {
       tabela.push(
@@ -21253,7 +21278,7 @@ Salvar assim mesmo?`)) {
   function fichaDoFiador(d2, f, n, i, base, nomeArq) {
     const x = fiadorDaFicha(f, n);
     const conjuge = casadoOuUniao2(x.estado_civil) && !separacaoTotal(x) || !x.estado_civil;
-    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map(enderecoDe).join(" ou ") || enderecoDe(i);
+    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((x2) => enderecoDe(d2, x2)).join(" ou ") || enderecoDe(d2, i);
     const tabela = [
       ["FIADOR DA LOCAÇÃO", null],
       ["Interessado (locatário)", ou(f.inquilino_nome)],
@@ -21300,6 +21325,7 @@ Salvar assim mesmo?`)) {
 
   // docs/js/ficha-online.js
   init_calculos();
+  init_contratos();
   init_formularios();
   init_regras();
   var PJ4 = "Pessoa jurídica (empresa)";
@@ -21362,7 +21388,7 @@ Salvar assim mesmo?`)) {
   function contextoDaFicha(d2, f, pessoa2) {
     const r = montarRecibo(d2, "ficha", { ficha: f });
     const e = r.emitente || {};
-    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((i) => [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", "));
+    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((i) => [enderecoCompleto(i), i.bairro, cidadeUfDoImovel(d2, i)].filter(Boolean).join(", "));
     const fiador = pessoa2 !== "interessado";
     return {
       empresa: e.razao_social || e.nome || "",
@@ -22000,7 +22026,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const pj = p2.inquilino_tipo === PJ5;
     const imoveis = c ? [buscar(d2, "imoveis", c.imovel_id)].filter(Boolean) : (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean);
     const curto2 = (i) => [i.endereco, i.complemento].filter(Boolean).join(" – ");
-    const completo = (i) => [curto2(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", ");
+    const completo = (i) => [curto2(i), i.bairro, cidadeUfDoImovel(d2, i, c)].filter(Boolean).join(", ");
     const aluguel = p2.aluguel_inicial || 0;
     const pct2 = p2.bonificacao === false ? 0 : p2.desconto_pontualidade_percentual || 0;
     const desconto = aluguel ? descontoPorPercentual(aluguel, pct2) : 0;
@@ -22383,7 +22409,7 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
         aviso(`Não consegui preparar os anexos: ${erro.message}`, "erro");
         return;
       }
-      if (!confirm(`Enviar agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}?`)) return;
+      if (!await confirmar(`O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, { titulo: "Enviar o e-mail?", sim: "Enviar agora" })) return;
       enviar.disabled = true;
       try {
         const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
@@ -22744,9 +22770,10 @@ ${m.texto}
   function tabelaBoletos(lista3, hoje3, ordem, url, opcoes2 = {}) {
     const { reajustes = /* @__PURE__ */ new Map(), totalLinha = "" } = opcoes2;
     const comp = opcoes2.mes || (lista3.length ? lista3[0].cb.competencia : competenciaDe(hoje3));
-    const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
-      ${opcoes2.comp ? "" : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
+    const todos = opcoes2.comp ? "" : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`;
+    const selecionados = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
       ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
+    const impressao = `${selecionados} ${todos}`;
     return `${lista3.length ? `<div class="acoes barra-nf lote-topo">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: "" }).replace(/&ordem=&?/, "&").replace(/[?&]$/, ""))}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${ordem === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
@@ -22772,7 +22799,8 @@ ${m.texto}
           ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ""}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao("estornar", "Desfazer pagamento", { id: cb.id }, "secundario pequeno", "Desfazer este pagamento?")}` : ""}` : ""}</td></tr>`).join("") || `<tr><td colspan="9" class="suave">${opcoes2.comp ? "Nenhum boleto nesta situação." : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`}
       ${totalLinha}
     </table></div>
-    ${lista3.length ? `<div class="acoes">${impressao}</div>` : ""}`;
+    ${lista3.length ? `<div class="acoes barra-lote" data-barra-lote><span class="contagem-lote" data-contagem-lote></span>${selecionados}</div>
+      ${todos ? `<div class="acoes">${todos}</div>` : ""}` : ""}`;
   }
   var prazoNaoUtil = (cb) => {
     const limite = limitePagamento(cb.vencimento);
@@ -26077,12 +26105,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${r && r.arquivo_apolice ? arquivoGuardado("arquivo_apolice", r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
-      ajustar(dados, erros, r, form) {
-        const arq = form.querySelector("[name=arquivo_apolice]").files[0];
+      ajustar(dados, erros) {
         if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = "O fim da vigência precisa ser depois do início";
-        if (!arq && !(r && r.arquivo_apolice) && !Object.keys(erros).length) confirmarAvisos(['Sem o arquivo da apólice. O seguro fica salvo, com o alerta "Falta o arquivo da apólice" na página do inquilino e no Painel até você anexar (em "Editar" da apólice).']);
       },
       async ajustarAsync(dados, erros, r, form, q) {
+        if (!form.querySelector("[name=arquivo_apolice]").files[0] && !(r && r.arquivo_apolice)) await confirmarAvisos(['Sem o arquivo da apólice. O seguro fica salvo, com o alerta "Falta o arquivo da apólice" na página do inquilino e no Painel até você anexar (em "Editar" da apólice).']);
         const pasta = await pastaDoEscopo("seguro", r ? r.contrato_id : Number(q.contrato));
         const vig = `${dados.vigencia_inicio}-a-${dados.vigencia_fim}`;
         const arq = form.querySelector("[name=arquivo_apolice]").files[0];
@@ -26465,7 +26492,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       titulo: () => "Empresa emitente",
       campos: () => EMITENTE,
       voltar: () => "#/empresas",
-      descricao: (dados) => dados.nome
+      descricao: (dados) => dados.nome,
+      ajustar(dados, erros) {
+        if (dados.uf_sede) dados.uf_sede = String(dados.uf_sede).trim().toUpperCase();
+        if (dados.uf_sede && !/^[A-Z]{2}$/.test(dados.uf_sede)) erros.uf_sede = "Use as duas letras do Estado. Ex.: PR";
+      }
     },
     usuarios: {
       admin: true,
@@ -27320,14 +27351,36 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
     const colunas = maisCheio.map((q) => `minmax(0, ${q ? 2 + Math.min(q, 7) : 1}fr)`).join(" ");
     const semana = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+    const itemDaAgenda = (e) => `<div class="evento-cal">${etiqueta(e.tipo, "info")} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`;
     const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje3 ? "" : "hidden"}>
       <h3>${dataBr(dia)} · ${semana[paraData(dia).getUTCDay()]}${dia === hoje3 ? " · hoje" : ""}</h3>
-      ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, "info")} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join("")}</div>`).join("");
+      ${evs.map(itemDaAgenda).join("")}</div>`).join("");
     return `<div class="cartao" id="calendario"><div class="cabecalho"><h2 style="margin:0">Calendário de ${compBr(mes)}</h2>
       <div class="acoes">${link(`#/?mes=${somarMeses(mes, -1)}`, `← ${compBr(somarMeses(mes, -1))}`)} ${link("#/", "Mês atual")} ${link(`#/?mes=${somarMeses(mes, 1)}`, `${compBr(somarMeses(mes, 1))} →`)}</div></div>
     <div class="cal-grade" style="--cal-colunas:${colunas}">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join("")}${celulas.join("")}</div>
-    ${agendas || ""}
-    <p class="suave"><span class="so-pc">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links.</span><span class="so-celular"><b>Toque no dia</b> (cada tracinho colorido é um item) para ver a agenda dele logo abaixo do calendário, com os links.</span> Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+    <div class="cal-agendas">${agendas || ""}</div>
+    ${listaDasSemanas(mes, hoje3, porDia, itemDaAgenda)}
+    <p class="suave"><span class="so-pc">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links.</span><span class="so-celular"><b>Toque na semana</b> para abrir ou fechar a lista dela; toque num item para abrir a página dele.</span> Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+  }
+  function listaDasSemanas(mes, hoje3, porDia, itemDaAgenda) {
+    const nomes = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+    const semanas = [];
+    for (let n = 1; n <= diasNoMes(mes); n += 1) {
+      const dia = `${mes}-${String(n).padStart(2, "0")}`;
+      if (n === 1 || paraData(dia).getUTCDay() === 0) semanas.push([]);
+      semanas.at(-1).push(dia);
+    }
+    const quantos = (dias) => dias.reduce((t, dia) => t + (porDia.get(dia) || []).length, 0);
+    const aberta = semanas.find((dias) => dias.includes(hoje3)) || semanas.find((dias) => quantos(dias)) || semanas[0];
+    return `<div class="cal-lista">${semanas.map((dias) => {
+      const total = quantos(dias);
+      const curta = (dia) => dataBr(dia).slice(0, 5);
+      const comItens = dias.filter((dia) => porDia.has(dia));
+      return `<details class="cal-semana"${dias === aberta ? " open" : ""}><summary>Semana de ${curta(dias[0])} a ${curta(dias.at(-1))}${dias.includes(hoje3) ? " · esta semana" : ""}
+        <span class="suave">· ${total ? `${total} ${total === 1 ? "item" : "itens"}` : "nada"}</span></summary>
+      ${comItens.map((dia) => `<div class="cal-semana-dia${dia === hoje3 ? " hoje" : ""}"><h4>${nomes[paraData(dia).getUTCDay()]}, ${curta(dia)}${dia === hoje3 ? " · hoje" : ""}</h4>
+        ${porDia.get(dia).map(itemDaAgenda).join("")}</div>`).join("") || '<p class="suave">Nada nesta semana.</p>'}</details>`;
+    }).join("")}</div>`;
   }
 
   // docs/js/telas/fechamento.js
@@ -28349,7 +28402,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       input.value = "";
       if (!arquivo) return;
       const valores = lerArquivoDasRegras(await arquivo.text());
-      if (!confirm("Trocar as regras de agora pelas do arquivo? (Salve uma versão antes, se quiser guardar as de agora.)")) return;
+      if (!await confirmar("As regras de agora são trocadas pelas do arquivo. Se quiser guardar as de agora, cancele e salve uma versão antes.", { titulo: "Trocar as regras pelas do arquivo?", sim: "Trocar as regras" })) return;
       const n = await alterar((db) => salvarRegrasSistema(db, valores, login(), "Regras do sistema (arquivo carregado)"));
       aviso(`Regras do arquivo carregadas (${n} mudança(s)).`, "ok");
       await mostrar();
@@ -29030,11 +29083,11 @@ ${MODELO_COMODOS[comodo].join("\n")}
       t.focus();
       t.scrollTop = t.scrollHeight;
     },
-    copiarModeloVistoria() {
+    async copiarModeloVistoria() {
       const sel = document.querySelector("select[name=copiar_de]");
       const t = document.querySelector("textarea[name=modelo]");
       const outro = buscar2("imoveis", sel.value);
-      if (t.value.trim() && !confirm("Substituir o texto atual pelo modelo do outro imóvel?")) return;
+      if (t.value.trim() && !await confirmar(`O texto que está no campo será trocado pelo modelo de vistoria de "${outro ? outro.nome : "outro imóvel"}".`, { titulo: "Trocar o texto do modelo?", sim: "Trocar o texto" })) return;
       t.value = outro.modelo_vistoria || "";
     },
     /** Financeiro: cria ou acerta a NF do Airbnb do mês (uma só, sem imóvel, com a soma dos ganhos). */
@@ -29123,7 +29176,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
     async desfazerMarcados() {
       const itens = [...document.querySelectorAll("input[data-desfazer]:checked")].map((x) => x.value);
       if (!itens.length) throw new Error("Marque as alterações que quer desfazer.");
-      if (!confirm(`Desfazer ${itens.length} alteração(ões) marcada(s)? Cada campo volta ao valor anterior.`)) return;
+      if (!await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: "Desfazer as alterações marcadas?", sim: "Desfazer", forte: true })) return;
       await desfazerItens(itens);
     },
     /**
@@ -29244,7 +29297,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const assunto = form.querySelector("[name=assunto]").value;
       if (!data2) throw new Error("Informe a data do termo aditivo.");
       if (!String(assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
-      if (!confirm(`Registrar o termo aditivo de ${dataBr(data2)} como perdido (assinado, mas sem o arquivo)? Passa a valer como assinado.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`)) return;
+      if (!await confirmar(`O termo aditivo de ${dataBr(data2)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`, { titulo: "Registrar o termo aditivo como perdido?", sim: "Registrar como perdido" })) return;
       await alterar((db) => registrarAditivo(db, Number(contrato), { data: data2, assunto, perdido: true }, login(), podeUsuario("admin")));
       aviso("Termo aditivo registrado como perdido.");
       await mostrar();
@@ -29865,13 +29918,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso(`"${valor}" incluído na lista.`);
     },
     async removerDaLista({ lista: lista3, valor }, el) {
-      if (!confirm(`Remover "${valor}" da lista?`)) return;
-      try {
-        await alterar((db) => removerDaLista(db, lista3, valor, login()));
-      } catch (e) {
-        window.alert(e.message);
-        return;
-      }
+      if (!await confirmar(`"${valor}" sai da lista de opções. O que já foi gravado com ele continua igual.`, { titulo: "Remover da lista?", sim: "Remover", forte: true })) return;
+      await alterar((db) => removerDaLista(db, lista3, valor, login()));
       acertarListaNaTela(el, lista3, { removido: valor });
     },
     async desfazerUltimaNumeracao() {
@@ -30104,15 +30152,15 @@ ${MODELO_COMODOS[comodo].join("\n")}
         ...abertos.length ? [`Há pagamento(s) de ${abertos.map(compBr).join(", ")}, mês ainda em andamento: o normal é numerar depois da virada do mês.`] : [],
         ...lembretesAirbnb(E.d, meses)
       ];
-      if (avisos.length && !confirm(`${avisos.map((t) => `• ${t}`).join("\n")}
+      if (avisos.length && !await confirmar(`${avisos.map((t) => `• ${t}`).join("\n")}
 
-Numerar mesmo assim?`)) return;
+Numerar mesmo assim?`, { titulo: "Confira antes de numerar", sim: "Numerar mesmo assim" })) return;
       let r = await alterar((db) => numerarFaturas(db, login(), { apenas }));
       if (r.foraDeOrdem.length) {
         const lista3 = r.foraDeOrdem.map((p2) => `${dataBr(p2.data)}`).join(", ");
-        if (!confirm(`A última NF (nº ${numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista3}.
+        if (!await confirmar(`A última NF (nº ${numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista3}.
 
-Numerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
+Numerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`, { titulo: "Pagamentos com data anterior à última NF", sim: "Numerar mesmo assim" })) return;
         r = await alterar((db) => numerarFaturas(db, login(), { forcar: true, apenas }));
       }
       if (r.numeradas.length) aviso(`NFs numeradas: ${r.numeradas.map((n) => numeroFatura(n.numero)).join(", ")}.`);
@@ -30779,7 +30827,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (atrasado && dataPagou > data2) throw new Error("O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.");
       if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
       pagamentoNaoFuturo(data2, dataPagou);
-      confirmarAvisos([dataMuitoAntiga(data2)].filter(Boolean));
+      await confirmarAvisos([dataMuitoAntiga(data2)].filter(Boolean));
       let r;
       await alterar((db) => {
         r = baixarEmLote(db, ids, data2, login(), { pagouEmDia: !atrasado, dataPagou });
@@ -31119,7 +31167,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
       if (cfg4.ajustarAsync && !Object.keys(erros).length) await cfg4.ajustarAsync(dados, erros, registro, form, rota.q);
       if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
-      confirmarAvisos(cfg4.conferir ? cfg4.conferir(dados, registro, rota.q) : []);
+      await confirmarAvisos(cfg4.conferir ? cfg4.conferir(dados, registro, rota.q) : []);
       Object.assign(dados, cfg4.fixos ? cfg4.fixos(registro, rota.q) : {});
       const descricao = cfg4.descricao ? cfg4.descricao(dados, registro, rota.q) : null;
       let recalculados = 0;
@@ -31233,7 +31281,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       else if (pctIndice === null || temPct && pctDigitado !== pctIndice) manual = temPct ? { percentual: pctDigitado } : { valor_novo: valor };
       const bon = String(f.get("bonificado") || "").trim();
       const texto3 = manual === null ? `${pct(pctIndice)} (índice cadastrado)` : manual.valor_novo ? `o novo aluguel de ${reais(manual.valor_novo)}` : pct(manual.percentual);
-      if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${texto3}?${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ""}.` : ""} Os boletos em aberto são recalculados.`)) return;
+      if (!await confirmar(`Correção do aluguel de ${compBr(form.dataset.comp)} com ${texto3}.${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ""}.` : ""} Os boletos em aberto são recalculados.`, { titulo: "Registrar a correção do aluguel?", sim: "Aplicar correção" })) return;
       await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
     },
     /** Valor da guia calculado pelo contador (vazio apaga). */
@@ -31267,7 +31315,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     async desligarAlerta(form) {
       const tipo = String(new FormData(form).get("tipo") || "");
       const c = buscar2("contratos", form.dataset.contrato);
-      if (!c || !confirm(`Desligar o alerta "${tipo}" de ${c.inquilino_nome}? O sistema deixa de avisar sobre isso para este inquilino até alguém religar.`)) return;
+      if (!c || !await confirmar(`O sistema deixa de avisar "${tipo}" para ${c.inquilino_nome} até alguém religar.`, { titulo: "Desligar o alerta?", sim: "Desligar o alerta" })) return;
       await alterar((db) => desligarAlerta(db, tipo, { contrato_id: c.id }, login(), { quem: E.usuario.nome }));
       aviso(`Alerta "${tipo}" desligado para ${c.inquilino_nome}. Para voltar a avisar, use "Religar" aqui ou no Painel.`);
       await mostrar();
@@ -31286,7 +31334,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const n = Number(new FormData(form).get("numero"));
       if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
       const ultima = ultimaFatura(E.d);
-      if (ultima && n <= ultima.numero && !confirm(`Já existe a NF nº ${numeroFatura(ultima.numero)}. Usar ${numeroFatura(n)} mesmo assim vai repetir números. Continuar?`)) return;
+      if (ultima && n <= ultima.numero && !await confirmar(`Já existe a NF nº ${numeroFatura(ultima.numero)}. Usar ${numeroFatura(n)} vai repetir números de NF.`, { titulo: "Repetir número de NF?", sim: "Usar mesmo assim", forte: true })) return;
       await alterar((db) => {
         registrar(db, login(), "Alteração", "faturas", null, "Próximo número de NF", { proxima_fatura: { de: db.proxima_fatura, para: n } });
         db.proxima_fatura = n;
@@ -31363,7 +31411,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const dataPagou = String(f.get("pagou") || "") || null;
     const cb = buscar2("cobrancas", id);
     pagamentoNaoFuturo(data2, dataPagou);
-    confirmarAvisos([
+    await confirmarAvisos([
       dataMuitoAntiga(data2, "A data do pagamento"),
       cb && data2 < somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data2)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : ""
     ].filter(Boolean));
@@ -32931,6 +32979,14 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (el.tagName === "BUTTON") el.disabled = false;
     }
   });
+  function atualizarBarraLote() {
+    const n = document.querySelectorAll("input[data-boleto]:checked").length;
+    for (const barra of document.querySelectorAll("[data-barra-lote]")) {
+      barra.classList.toggle("com-marcados", n > 0);
+      const t = barra.querySelector("[data-contagem-lote]");
+      if (t) t.textContent = n ? `${n} ${n === 1 ? "boleto marcado" : "boletos marcados"}` : "";
+    }
+  }
   document.addEventListener("change", async (ev) => {
     if (ev.target.matches("select[data-ordem-boletos]")) {
       ir(`${ev.target.dataset.ordemBoletos}&ordem=${ev.target.value}`);
@@ -32952,6 +33008,11 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       document.querySelectorAll(`input[data-${ev.target.dataset.marcarTodas || "nf"}]`).forEach((x) => {
         x.checked = ev.target.checked;
       });
+      atualizarBarraLote();
+      return;
+    }
+    if (ev.target.matches("input[data-boleto]")) {
+      atualizarBarraLote();
       return;
     }
     if (ev.target.matches("input[data-trocar-mes]") && ev.target.value) {
