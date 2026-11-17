@@ -29,6 +29,7 @@ import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPas
 import { telaImovel } from './telas/imovel.js';
 import { aparelhosLigadosHtml, telaAcessos, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
+import { telaPessoa, telaPessoasAntigas } from './telas/pessoa.js';
 import { alertasDaTela, carregarParte } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { alertaRegua, ligarRegua, telaRegua } from './telas/regua.js';
@@ -52,6 +53,8 @@ export const TELAS = {
   'backup-seguro': () => telaBackupSeguro(),
   'backups-nuvem': () => telaBackupsNuvem(),
   acessos: (rota) => telaAcessos(rota.q),
+  pessoa: () => telaPessoa(),
+  'pessoas-antigas': () => telaPessoasAntigas(),
 
   _ligarDesconto(raiz) {
     AJ.ligarAjuda(raiz);

@@ -65,7 +65,7 @@ test('ficha reprovada com os dados apagados nos aparelhos: a faxina do servidor 
   assert.equal(h.detalhes.inquilino_nome, 'Interessado Teste');
   assert.equal(h.descricao, 'Ficha de Interessado Teste ((apagado))');
   // a marca vai para os aparelhos pela fila; rodar de novo não refaz
-  assert.ok(c.mudancas(seq).mudancas.some((m) => m.tabela === 'fichas' && m.dados?.historico_limpo_em));
+  assert.equal(c.mudancas(seq).refazer, true, 'os aparelhos baixam tudo de novo (a cópia velha do histórico deles sai)');
   assert.deepEqual(c.esquecerFichasApagadas(), []);
 });
 
@@ -150,4 +150,24 @@ test('backup diário da nuvem cifrado com a chave do backup seguro: só abre com
   // desligar volta ao JSON
   assert.deepEqual(await c.ligarChaveDoBackup({ chave: null }, DONO), { ligada: false });
   assert.equal(c.chaveDoBackup(), null);
+});
+
+test('"Apagar tudo desta pessoa" do administrador: o cofre apaga o histórico guardado desses registros e os aparelhos baixam tudo de novo', async () => {
+  const { ACAO_APAGAR } = await import('../docs/js/pessoa.js');
+  const { ACAO_APAGAR_PESSOA } = await import('../nuvem/cofre.mjs');
+  assert.equal(ACAO_APAGAR, ACAO_APAGAR_PESSOA);
+  const c = novo();
+  c.aplicar(lote([{ op: 'historico', entrada: { tabela: 'contratos', registro_id: 5, contrato_id: 5, acao: 'Alteração', descricao: 'Inquilino Teste: telefone', detalhes: { telefone: { de: 'a', para: 'b' } } } },
+    { op: 'historico', entrada: { tabela: 'cobrancas', registro_id: 6, contrato_id: 5, acao: 'Alteração', descricao: 'Boleto de Inquilino Teste' } }]), OPERADOR);
+  const seq = c.ultimoSeq();
+  const det = { registros: [{ tabela: 'contratos', id: 5 }, { tabela: 'cobrancas', id: 6 }], limpos: [], contratos: [5] };
+  const ops = [{ op: 'excluir', tabela: 'cobrancas', id: 6 }, { op: 'excluir', tabela: 'contratos', id: 5 },
+    { op: 'historico', entrada: { tabela: null, registro_id: null, acao: ACAO_APAGAR, descricao: 'Dados de uma pessoa apagados', detalhes: det } }];
+  // só o administrador (o operador nem exclui o contrato)
+  assert.throws(() => c.aplicar(lote(ops), OPERADOR), /Só o administrador exclui/);
+  c.aplicar(lote(ops), DONO);
+  assert.ok(!tudoEmTexto(c).includes('Inquilino Teste'), 'o nome saiu do histórico, da fila e dos excluídos');
+  assert.equal(c.q("SELECT COUNT(*) AS n FROM log WHERE tipo = 'exclusao'")[0].n, 2, 'o aviso de exclusão fica para os aparelhos atrasados');
+  assert.equal(c.mudancas(seq).refazer, true, 'os aparelhos baixam tudo de novo');
+  assert.ok(c.tudo().historico.some((h) => h.acao === ACAO_APAGAR));
 });
