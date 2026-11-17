@@ -189,14 +189,19 @@ test('pedidoBoletoC6 com FCI: multa e juros em valor (não incidem sobre o FCI)'
   assert.equal(p.fees.interest_value, 1.21);
 });
 
-test('pedidoBoletoC6: endereço do imóvel completa o do inquilino; exige CPF/CNPJ e cidade/CEP', () => {
+test('pedidoBoletoC6: endereço inteiro de uma fonte só (inquilino completo, senão o imóvel); exige CPF/CNPJ, cidade/CEP e bairro', () => {
   const { d, ank, jck, c } = base();
   comContas(d, ank, jck);
   R.gerarCobrancas(d, '2026-02', 'teste');
   const cb = d.cobrancas[0];
+  // item 41: endereço do inquilino incompleto → o do imóvel inteiro (nunca a rua de um com a cidade e o CEP do outro)
   c.inquilino_endereco = 'Rua Qualquer, 10';
   const p = R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'ank'));
-  assert.deepEqual(p.payer.address, { address: 'Rua Qualquer, 10', neighborhood: 'São Lourenço', city: 'Curitiba', state: 'PR', zip_code: '82200100' });
+  assert.deepEqual(p.payer.address, { address: 'Rua Professor Nilo Brandão, 117, Loja 1', neighborhood: 'São Lourenço', city: 'Curitiba', state: 'PR', zip_code: '82200100' });
+  // completo mas sem bairro: não inventa "Centro", avisa
+  c.inquilino_endereco = 'Rua Qualquer, 10, Curitiba/PR, CEP 80010-000';
+  assert.throws(() => R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'ank')), /falta o bairro/);
+  c.inquilino_endereco = 'Rua Qualquer, 10';
   c.inquilino_cpf = '';
   assert.throws(() => R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'ank')), /CPF\/CNPJ/);
   c.inquilino_cpf = '11.222.333/0001-81';
@@ -249,7 +254,7 @@ test('registrarBoletoBancario grava linha digitável, código de barras, Pix e Q
   assert.equal(b, cb.banco);
   assert.equal(R.emitidoNoBanco(cb), true);
   assert.equal(R.divergenciaBancaria(cb), null);
-  assert.equal(R.boletosParaEmitir(d, '2026-02').length, 0);
+  assert.equal(R.boletosParaEmitir(d, '2026-02', '2026-03-01').length, 0);
   const h = d.historico.at(-1);
   assert.equal(h.tabela, 'cobrancas');
   assert.match(h.descricao, /emitido no C6 .*sandbox/);
@@ -294,16 +299,33 @@ test('erro na emissão, cancelamento e reemissão; boleto alterado depois de emi
   assert.equal(cb.banco.situacao, 'erro');
   assert.match(cb.banco.erro, /zip_code/);
   assert.equal(R.emitidoNoBanco(cb), false);
-  assert.equal(R.boletosParaEmitir(d, '2026-02').length, 1);
+  assert.equal(R.boletosParaEmitir(d, '2026-02', '2026-03-01').length, 1);
+  // item 20: vencido (10/03) não entra no "Emitir todos" em 11/03: o banco não aceita vencimento no passado
+  assert.equal(R.boletosParaEmitir(d, '2026-02', '2026-03-11').length, 0);
+  assert.equal(R.vencidosSemEmissao(d, '2026-02', '2026-03-11').length, 1);
   R.registrarBoletoBancario(d, cb.id, RESPOSTA_EMISSAO, 'teste', { conta_id: 'ank', ambiente: 'sandbox' });
   assert.equal(cb.banco.erro, null);
   // ajuste do mês depois de emitido: o banco cobra o valor antigo
   R.atualizar(d, 'cobrancas', cb.id, { outros: 10000 }, 'teste', 'ajuste');
   const div = R.divergenciaBancaria(cb);
   assert.deepEqual([div.no_banco, div.no_sistema], [364445, 374445]);
-  assert.deepEqual(R.alteracaoBoletoC6(d, cb), { amount: 3744.45, due_date: '2026-03-10', description: 'ALUGUEL RS3.644,45 COM BONF. RS3.280,00 COBRANÇA ADICIONAL RS100,00' });
-  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste');
+  // item 12: a alteração leva também os encargos recalculados (desconto, multa e juros), não só valor, vencimento e descrição
+  const alt = R.alteracaoBoletoC6(d, cb);
+  assert.deepEqual({ ...alt, fees: undefined }, { amount: 3744.45, due_date: '2026-03-10', description: 'ALUGUEL RS3.644,45 COM BONF. RS3.280,00 COBRANÇA ADICIONAL RS100,00', fees: undefined });
+  assert.deepEqual(alt.fees, R.encargosDoBoletoC6(d, cb, R.contaBanco(d, cb.banco.conta_id)));
+  assert.equal(alt.fees.fine_type, 'PERCENTAGE');
+  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste', { alterado: true });
   assert.equal(R.divergenciaBancaria(cb), null);
+  // item 13: bonificação reduzida depois da emissão (valor cheio igual): avisa; a alteração no banco guarda a nova
+  const descontoAntes = cb.desconto;
+  R.atualizar(d, 'cobrancas', cb.id, { desconto: Math.round(descontoAntes / 2) }, 'teste', 'bonificação menor');
+  assert.equal(R.divergenciaBancaria(cb).encargos_mudaram, true);
+  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste');
+  assert.equal(R.divergenciaBancaria(cb).encargos_mudaram, true, 'só consultar não resolve');
+  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste', { alterado: true });
+  assert.equal(R.divergenciaBancaria(cb), null);
+  R.atualizar(d, 'cobrancas', cb.id, { desconto: descontoAntes }, 'teste', 'volta');
+  R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste', { alterado: true });
   R.registrarCancelamentoBancario(d, cb.id, 'teste', { status: 'CANCELED' });
   assert.equal(cb.banco.situacao, 'cancelado');
   assert.equal(cb.banco.linha_digitavel, RESPOSTA_EMISSAO.payment_method.bank_slip.digitable_line); // fica para consulta

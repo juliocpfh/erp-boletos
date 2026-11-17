@@ -282,9 +282,24 @@ async function escolherContaC6(cb, lote = '') {
 const avisoSemPix = (conta, banco) => (conta && conta.chave_pix && !banco.pix_copia_cola && banco.situacao !== 'erro'
   ? `O boleto saiu sem o Pix: a ponte não tem a chave Pix desta conta (C6_${String(conta.id).toUpperCase()}_CHAVE_PIX). O inquilino paga só pela linha digitável.` : '');
 
+/**
+ * Antes de cancelar ou negativar: pergunta ao banco como o boleto está agora (a situação guardada pode ser velha). Pago ou "pago,
+ * aguardando crédito": não faz nada e avisa.
+ */
+async function conferirAntesDeAgirNoBanco(id, acao) {
+  const cb = buscar('cobrancas', id);
+  const resposta = await BANCO.consultarBoleto(d(), cb);
+  const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login()));
+  if (banco.situacao === 'pago' || R.aguardandoCredito({ banco })) {
+    throw new C.ErroUsuario(`O banco informa que este boleto já foi pago${R.aguardandoCredito({ banco }) ? ' (o crédito ainda está sendo confirmado)' : ''}: não dá para ${acao}. Registre o pagamento na página do boleto.`);
+  }
+  if (banco.situacao !== 'emitido') throw new C.ErroUsuario(`O banco informa que este boleto não está em aberto (${banco.situacao_banco || banco.situacao}): nada foi feito.`);
+}
+
 /** Chama a ponte e grava a resposta no boleto; em falha do banco, grava o erro no boleto e repassa a mensagem. */
 async function emitirNoC6(cb, conta) {
   // confere o pedido antes de marcar a emissão (erro do cadastro não deixa nada pendente)
+  if (cb.vencimento < C.hojeIso()) throw new C.ErroUsuario(`O boleto de ${compBr(cb.competencia)} venceu em ${dataBr(cb.vencimento)}: o banco não aceita vencimento no passado. Mude o vencimento do boleto para hoje ou depois e emita de novo.`);
   R.pedidoBoletoC6(d(), cb, conta);
   // grava a emissão pendente ANTES de chamar a ponte: outra aba/pessoa não emite o mesmo boleto, e a nova tentativa usa a mesma referência
   const { referencia, repetir } = await alterar((db) => R.iniciarEmissaoBancaria(db, cb.id, conta, login()));
@@ -2138,7 +2153,8 @@ export const ACOES = {
     if (String((resp.confirmo || [])[0] || '').trim().toUpperCase() !== 'NEGATIVAR') throw new Error('Digite NEGATIVAR para confirmar. Nada foi feito.');
     const dias = Number((resp.dias || [])[0]);
     if (!Number.isInteger(dias) || dias < 1) throw new Error('Informe os dias de atraso.');
-    const resposta = await BANCO.negativarBoleto(d(), cb, dias);
+    await conferirAntesDeAgirNoBanco(cb.id, 'negativar');
+    const resposta = await BANCO.negativarBoleto(d(), buscar('cobrancas', cb.id), dias);
     await alterar((db) => R.registrarNegativacao(db, cb.id, resposta, login(), dias));
     aviso(`Negativação agendada no C6${resposta && resposta.denial_date ? ` para ${dataBr(resposta.denial_date)}` : ''}.`, 'aviso');
     await mostrar();
@@ -2163,13 +2179,14 @@ export const ACOES = {
     } catch (e) {
       throw new Error(`${e.message} Alternativa: "Cancelar no banco" e depois "Emitir no C6" de novo.`);
     }
-    await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login()));
-    aviso('Boleto atualizado no C6 com os valores do sistema.');
+    await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login(), { alterado: true }));
+    aviso('Boleto atualizado no C6 com os valores do sistema (valor, vencimento, bonificação, multa e juros).');
     await mostrar();
   },
 
   async cancelarBoletoC6({ id }) {
     if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    await conferirAntesDeAgirNoBanco(id, 'cancelar');
     const cb = buscar('cobrancas', id);
     const resposta = await BANCO.cancelarBoleto(d(), cb);
     await alterar((db) => R.registrarCancelamentoBancario(db, cb.id, login(), resposta));

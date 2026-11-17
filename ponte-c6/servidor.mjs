@@ -40,6 +40,7 @@ import { c6SimuladoDaConta } from './c6-simulado.mjs';
 import { listarPaginas } from './c6-boletos-listar.mjs';
 import { rotasFase2 } from './rotas-fase2.mjs';
 import { comNovasTentativas } from './c6-tentativas.mjs';
+import { explicarRecusa } from './c6-extrato.mjs';
 
 export const VERSAO = '0.1.0';
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
@@ -404,8 +405,9 @@ export async function chamarC6(cfg, conta, metodo, caminho, corpo = null, { bina
     throw e;
   });
   if (r.status === 401 && tentativa === 0) return chamarC6(cfg, conta, metodo, caminho, corpo, { binario, tentativa: 1 });
-  if (r.status === 403) throw new ErroHttp(502, `O banco recusou (403): o usuário da API não tem o escopo necessário (${ESCOPOS_BOLEPIX.join(', ')}). Peça ao C6 para liberar. ${resumo(r.dados)}`, r.dados);
-  if (r.status >= 300) throw new ErroHttp(r.status === 404 ? 404 : 502, `O banco respondeu ${r.status}: ${resumo(r.dados)}`, r.dados);
+  // o texto do banco (em inglês, com JSON) fica só em detalhes; para a pessoa, o que a recusa quer dizer
+  if (r.status === 403) throw new ErroHttp(502, `O banco recusou (403): a chave da API não tem a permissão do boleto (${ESCOPOS_BOLEPIX.join(', ')}). Peça ao C6 para liberar.`, r.dados);
+  if (r.status >= 300) throw new ErroHttp(r.status === 404 ? 404 : 502, `O banco respondeu ${r.status}: ${explicarRecusa(r.status, r.dados)}`, r.dados);
   return r;
 }
 
@@ -495,6 +497,30 @@ const numero2 = (v) => { const n = Number(v); if (!Number.isFinite(n)) return nu
 const inteiro = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 ? n : null; };
 const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/** Dia de hoje em Brasília ('AAAA-MM-DD'). */
+const hojeBrasilia = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+/**
+ * Multa, juros e desconto (``fees``) nos limites: só os campos conhecidos, tipos permitidos, valores ≥ 0; o desconto menor que o
+ * valor do boleto e o prazo do desconto (dias antes do vencimento) que ainda caiba até o vencimento. A mesma conferência na emissão
+ * e na alteração. Devolve os encargos limpos ou null.
+ */
+export function encargosSeguros(fIn, valor = null, vencimento = null) {
+  if (!fIn || typeof fIn !== 'object') return null;
+  const K = M.CAMPOS;
+  const fees = {};
+  const tipos = { [K.multa_tipo]: Object.values(M.TIPOS_ENCARGO.multa), [K.juros_tipo]: Object.values(M.TIPOS_ENCARGO.juros), [K.desconto_tipo]: Object.values(M.TIPOS_ENCARGO.desconto) };
+  for (const [k, permitidos] of Object.entries(tipos)) if (fIn[k] !== undefined) { if (!permitidos.includes(fIn[k])) throw new ErroHttp(400, `${k} inválido.`); fees[k] = fIn[k]; }
+  for (const k of [K.multa_valor, K.juros_valor, K.desconto_valor]) if (fIn[k] !== undefined) { const n = numero2(fIn[k]); if (!(n >= 0)) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
+  for (const k of [K.multa_prazo, K.juros_prazo, K.desconto_prazo]) if (fIn[k] !== undefined) { const n = inteiro(fIn[k]); if (n === null) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
+  if (valor !== null && fees[K.desconto_valor] !== undefined && fees[K.desconto_valor] >= valor) throw new ErroHttp(400, `O desconto (R$ ${fees[K.desconto_valor].toFixed(2)}) não pode ser igual ou maior que o valor do boleto (R$ ${Number(valor).toFixed(2)}).`);
+  if (vencimento && fees[K.desconto_prazo] > 0) {
+    const dias = Math.round((Date.parse(`${vencimento}T00:00:00Z`) - Date.parse(`${hojeBrasilia()}T00:00:00Z`)) / 86400000);
+    if (fees[K.desconto_prazo] > dias) throw new ErroHttp(400, `O desconto vale até ${fees[K.desconto_prazo]} dia(s) antes do vencimento, mas faltam só ${Math.max(dias, 0)} dia(s) até ele: o inquilino não teria como ganhar o desconto. Diminua os dias na conta (Dados e backup → Banco C6).`);
+  }
+  return Object.keys(fees).length ? fees : null;
+}
+
 /**
  * Corpo final para POST /v2/bank_slips a partir do pedido do site: allowlist estrita (o resto é descartado) + validações.
  * Lança ErroHttp 400 com a explicação. ``conta`` dá a carteira, a chave Pix e o valor máximo.
@@ -539,16 +565,7 @@ export function montarPedidoSeguro(pedido, conta) {
   const forma = { [K.boleto]: boleto };
   if (pmIn[K.pix] && conta.chave_pix) forma[K.pix] = { [K.pix_chave]: conta.chave_pix, [K.pix_tipo]: 'EVP' };
   // encargos: só os campos conhecidos, com os tipos permitidos
-  const fIn = pedido[K.encargos] && typeof pedido[K.encargos] === 'object' ? pedido[K.encargos] : null;
-  let fees = null;
-  if (fIn) {
-    fees = {};
-    const tipos = { [K.multa_tipo]: Object.values(M.TIPOS_ENCARGO.multa), [K.juros_tipo]: Object.values(M.TIPOS_ENCARGO.juros), [K.desconto_tipo]: Object.values(M.TIPOS_ENCARGO.desconto) };
-    for (const [k, permitidos] of Object.entries(tipos)) if (fIn[k] !== undefined) { if (!permitidos.includes(fIn[k])) throw new ErroHttp(400, `${k} inválido.`); fees[k] = fIn[k]; }
-    for (const k of [K.multa_valor, K.juros_valor, K.desconto_valor]) if (fIn[k] !== undefined) { const n = numero2(fIn[k]); if (!(n >= 0)) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
-    for (const k of [K.multa_prazo, K.juros_prazo, K.desconto_prazo]) if (fIn[k] !== undefined) { const n = inteiro(fIn[k]); if (n === null) throw new ErroHttp(400, `${k} inválido.`); fees[k] = n; }
-    if (!Object.keys(fees).length) fees = null;
-  }
+  const fees = encargosSeguros(pedido[K.encargos], valor, vencimento);
   // avisos ao pagador: só EMAIL para o e-mail do pagador e SMS para o telefone do pagador; momentos conhecidos
   const N = M.NOTIFICACAO;
   const nIn = Array.isArray(pedido[N.campo]) ? pedido[N.campo] : [];
@@ -671,13 +688,29 @@ export const SERVICOS = {
       } },
       // BP_02 atualizar (parcial): amount, due_date, description, days_after_due_date, payer{email,address}, payer_notification, fees, bank_slip{your_number, instructions}
       { metodo: 'POST', padrao: /^\/boletos\/([A-Za-z0-9_-]+)\/alterar\/?$/, async executar({ cfg, conta, params, corpo }) {
+        // a alteração passa pelas mesmas regras da emissão (a ponte é o lugar de confiança): só valor, vencimento, descrição, prazo
+        // depois do vencimento e encargos; pagador, avisos, forma de pagamento e origem não mudam por aqui (o resto é descartado)
         const K = M.CAMPOS;
+        const L = M.LIMITES;
+        const c = corpo && typeof corpo === 'object' ? corpo : {};
         const mudancas = {};
-        const aceitos = [K.valor, K.vencimento, K.descricao, K.dias_baixa, K.pagador, M.NOTIFICACAO.campo, K.encargos, K.forma, K.origem];
-        for (const k of aceitos) if (corpo && corpo[k] !== undefined) mudancas[k] = corpo[k];
-        if (mudancas[K.vencimento] !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(mudancas[K.vencimento]))) throw new ErroHttp(400, `${K.vencimento} precisa ser AAAA-MM-DD.`);
-        if (mudancas[K.valor] !== undefined && !(Number(mudancas[K.valor]) > 0)) throw new ErroHttp(400, `${K.valor} precisa ser maior que zero.`);
-        if (mudancas[K.descricao] !== undefined) mudancas[K.descricao] = String(mudancas[K.descricao]).slice(0, M.LIMITES.descricao);
+        const aceitos = [K.valor, K.vencimento, K.descricao, K.dias_baixa, K.encargos];
+        if (c[K.valor] !== undefined) {
+          const v = numero2(c[K.valor]);
+          if (!(v > 0)) throw new ErroHttp(400, `O valor (${K.valor}) precisa ser maior que zero.`);
+          if (v > conta.valor_maximo) throw new ErroHttp(400, `O valor R$ ${v.toFixed(2)} passa do máximo da conta ${conta.id} (R$ ${Number(conta.valor_maximo).toFixed(2)}, C6_${conta.id.toUpperCase()}_VALOR_MAXIMO).`);
+          if (v > L.valor_maximo_reais) throw new ErroHttp(400, 'Valor acima do máximo da API.');
+          mudancas[K.valor] = v;
+        }
+        if (c[K.vencimento] !== undefined) {
+          const venc = texto(c[K.vencimento], 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || Number.isNaN(Date.parse(venc))) throw new ErroHttp(400, `${K.vencimento} precisa ser AAAA-MM-DD.`);
+          if (venc < hojeBrasilia()) throw new ErroHttp(400, `O novo vencimento (${venc}) já passou: o banco só aceita hoje ou depois.`);
+          mudancas[K.vencimento] = venc;
+        }
+        if (c[K.descricao] !== undefined) { const t = texto(c[K.descricao], L.descricao); if (!t) throw new ErroHttp(400, 'A descrição não pode ficar vazia.'); mudancas[K.descricao] = t; }
+        if (c[K.dias_baixa] !== undefined) { const n = inteiro(c[K.dias_baixa]); if (!(n >= 1)) throw new ErroHttp(400, `${K.dias_baixa} precisa ser um número inteiro de dias (pelo menos 1).`); mudancas[K.dias_baixa] = n; }
+        if (c[K.encargos] !== undefined) { const f = encargosSeguros(c[K.encargos], mudancas[K.valor] ?? null, mudancas[K.vencimento] ?? null); if (f) mudancas[K.encargos] = f; }
         if (!Object.keys(mudancas).length) throw new ErroHttp(400, `Informe o que alterar (${aceitos.join(', ')}).`);
         if (cfg.simulado) {
           const r = simuladoOuErro(conta, params[0]);
@@ -826,8 +859,14 @@ export async function saudeDaConta(cfg, conta, testarToken = true) {
     r.token = 'ok';
     const escopos = (tokens.get(conta.id) || {}).escopos || [];
     r.escopos = escopos;
-    const faltamEscopos = ESCOPOS_BOLEPIX.filter((e) => escopos.length && !escopos.includes(e));
-    if (faltamEscopos.length) r.avisos.push(`Faltam escopos na credencial: ${faltamEscopos.join(', ')} (as chamadas do boleto voltariam 403; peça ao C6).`);
+    // cada serviço com as permissões dele (boleto, extrato e, com PAGAMENTOS=1, pagamentos): o que falta aparece aqui, não na hora de usar
+    const NOMES = { boleto: 'boleto', extrato: 'extrato e saldo', pagamentos: 'pagamentos' };
+    r.faltam_escopos = {};
+    for (const [servico, lista] of Object.entries(M.ESCOPOS_SERVICOS)) {
+      if (servico === 'pagamentos' && !cfg.pagamentos) continue;
+      const faltam = lista.filter((e) => escopos.length && !escopos.includes(e));
+      if (faltam.length) { r.faltam_escopos[servico] = faltam; r.avisos.push(`${NOMES[servico] || servico}: falta permissão na chave da API (${faltam.join(', ')}); as chamadas voltariam 403. Peça ao C6.`); }
+    }
   } catch (e) {
     r.token = 'falhou';
     r.erro_token = e.message;
@@ -972,12 +1011,16 @@ function c6RealDaConta(cfg, conta) {
       exigirConfigurada(conta);
       const q = new URLSearchParams(Object.entries(query || {}).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]));
       const binario = /pdf/i.test(aceitar);
-      const token = await obterToken(conta, false, cfg);
-      const cabecalhos = { Authorization: `Bearer ${token}`, Accept: aceitar, 'partner-software-name': cfg.software.nome, 'partner-software-version': cfg.software.versao };
-      if (corpo !== null) cabecalhos['Content-Type'] = 'application/json';
-      const r = await pedir(`${conta.url_base}${caminho}${q.toString() ? `?${q}` : ''}`, { metodo, cabecalhos, corpo: corpo !== null ? JSON.stringify(corpo) : null, conta, binario });
-      registrarChamada(cfg, conta, metodo, caminho, r.status, binario ? `(${r.corpo ? r.corpo.length : 0} bytes)` : r.dados);
-      return { status: r.status, corpo: binario ? r.corpo : r.dados };
+      // token recusado (401): pede outro e tenta de novo uma vez, como chamarC6 faz no boleto
+      for (let tentativa = 0; ; tentativa += 1) {
+        const token = await obterToken(conta, tentativa > 0, cfg);
+        const cabecalhos = { Authorization: `Bearer ${token}`, Accept: aceitar, 'partner-software-name': cfg.software.nome, 'partner-software-version': cfg.software.versao };
+        if (corpo !== null) cabecalhos['Content-Type'] = 'application/json';
+        const r = await pedir(`${conta.url_base}${caminho}${q.toString() ? `?${q}` : ''}`, { metodo, cabecalhos, corpo: corpo !== null ? JSON.stringify(corpo) : null, conta, binario });
+        registrarChamada(cfg, conta, metodo, caminho, r.status, binario ? `(${r.corpo ? r.corpo.length : 0} bytes)` : r.dados);
+        if (r.status === 401 && tentativa === 0) continue;
+        return { status: r.status, corpo: binario ? r.corpo : r.dados };
+      }
     },
   };
   clientesC6.set(chave, cliente);

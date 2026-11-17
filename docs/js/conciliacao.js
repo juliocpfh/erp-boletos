@@ -21,6 +21,7 @@ export const CLASSIFICACOES = {
   imposto: 'Imposto da empresa (PIS/COFINS, IRPJ, CSLL)',
   tarifa: 'Tarifa do banco',
   transferencia: 'Transferência entre as nossas contas',
+  devolucao: 'Devolução de Pix ou estorno (dinheiro que voltou ou que devolvemos)',
   outro: 'Outro (só comprovante, sem imóvel)',
   ignorar: 'Não é nosso / ignorar',
 };
@@ -135,7 +136,10 @@ function mesmoLancamento(indice, m, usadas) {
   const porRef = a && b ? (a.pos <= b.pos ? a : b) : a || b;
   if (porRef) return porRef.x;
   const fonte = fonteDe(m);
-  const it = (indice.porDia.get(`${m.data}|${m.valor}|${m.tipo}`) || []).find(({ x }) => livre(x) && fonteDe(x) !== fonte && fonteDe(x) !== 'ofx+api' && mesmaDescricao(x.descricao, m.descricao));
+  const daOutraFonte = (indice.porDia.get(`${m.data}|${m.valor}|${m.tipo}`) || []).filter(({ x }) => livre(x) && fonteDe(x) !== fonte && fonteDe(x) !== 'ofx+api');
+  const it = daOutraFonte.find(({ x }) => mesmaDescricao(x.descricao, m.descricao))
+    // descrições diferentes ("PIX RECEBIDO" × "Transferencia recebida de ANA TESTE"): com um só candidato da outra fonte no dia, é ele
+    || (daOutraFonte.length === 1 ? daOutraFonte[0] : null);
   return it ? it.x : null;
 }
 
@@ -182,9 +186,18 @@ const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null,
  * raiz e não em config_banco (o operador também importa, e config_banco só o administrador muda na nuvem). Período que chega até
  * hoje grava ontem: o dia ainda não acabou e o que entrar à tarde precisa ser buscado de novo (ex.: busca em 30/11 às 10h → 29/11).
  */
-export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, ate = null, hoje: dia = hoje() } = {}) {
+export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, ate = null, hoje: dia = hoje(), contaDoArquivo = '' } = {}) {
   const conta = exigirConta(d, contaId);
   const daConta = (d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId);
+  // arquivo OFX: o número da conta do arquivo (ACCTID) fica em cada lançamento; arquivo de outra conta (ex.: o da ANK na aba da
+  // JCK) é recusado. Na primeira importação de uma conta, o número dela fica lembrado assim.
+  const numeroOfx = String(contaDoArquivo || '').replace(/\D/g, '');
+  if (numeroOfx) {
+    const deOutra = (d.movimentacoes_banco || []).find((m) => m.conta_ofx === numeroOfx && m.conta_id !== contaId);
+    if (deOutra) throw new C.ErroUsuario(`Este arquivo é da conta nº ${numeroOfx}, que é a conta ${apelidoDaConta(d, deOutra.conta_id)} (já importada antes). Abra a aba da conta ${apelidoDaConta(d, deOutra.conta_id)} e importe lá. Nada foi importado.`);
+    const lembrada = daConta.find((m) => m.conta_ofx && m.conta_ofx !== numeroOfx);
+    if (lembrada) throw new C.ErroUsuario(`A conta ${apelidoDaConta(d, contaId)} é a de nº ${lembrada.conta_ofx}, e este arquivo é da conta nº ${numeroOfx}. Confira se escolheu o arquivo certo e a aba certa. Nada foi importado.`);
+  }
   const existentes = new Set(daConta.flatMap((m) => [m.id_externo, m.id_ofx].filter(Boolean)));
   const usadas = new Set();
   const novas = [];
@@ -202,7 +215,7 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
     if (igual) { usadas.add(igual.id); juntarIdentificadores(d, igual, m, usuario); repetidas += 1; continue; }
     if (!maior || m.data > maior) maior = m.data;
     // sem linha de histórico por lançamento (o lançamento É o registro do banco): fica uma linha só da importação, abaixo, e quem importou no registro
-    novas.push(inserir(d, 'movimentacoes_banco', { ...m, importada_em: new Date().toISOString(), importada_por: usuario || '', ...CAMPOS_DESTINO }, usuario, '', { historico: false }));
+    novas.push(inserir(d, 'movimentacoes_banco', { ...m, ...(numeroOfx ? { conta_ofx: numeroOfx } : {}), importada_em: new Date().toISOString(), importada_por: usuario || '', ...CAMPOS_DESTINO }, usuario, '', { historico: false }));
   }
   const ultimo = ate || maior;
   let fim = ultimo && ultimo >= dia ? C.somarDias(dia, -1) : ultimo;
@@ -220,7 +233,18 @@ export function importarExtrato(d, contaId, lancamentos, usuario, { de = null, a
 // Arquivo OFX exportado pelo app do C6 (D5): enquanto a ponte não tem as chaves, o extrato entra por aqui
 // --------------------------------------------------------------------------
 /** Data do OFX ("20260930205632[-3:BRT]") → 'AAAA-MM-DD'. */
-const dataOfx = (t) => { const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(t || '').trim()); return m ? `${m[1]}-${m[2]}-${m[3]}` : ''; };
+/**
+ * Data do OFX → 'AAAA-MM-DD' no horário de Brasília: com hora e fuso ("20261011023000[0:GMT]" = 23:30 de 10/10 em Brasília) converte;
+ * sem fuso, fica o dia escrito. Antes o mesmo Pix pela API (10/10) entrava de novo por ter virado 11/10.
+ */
+const dataOfx = (t) => {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?)?[^[]*(?:\[([+-]?\d+(?:\.\d+)?)(?::[^\]]*)?\])?/.exec(String(t || '').trim());
+  if (!m) return '';
+  const dia = `${m[1]}-${m[2]}-${m[3]}`;
+  if (m[4] === undefined || m[7] === undefined) return dia;
+  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] || 0)) - Number(m[7]) * 3600000;
+  return new Date(utc - 3 * 3600000).toISOString().slice(0, 10);
+};
 /** Valor do OFX ("-215.00", "3298.53", ou "1.234,56" em arquivos antigos) → centavos com sinal (o mesmo leitor do C6, em c6-comum; vazio = 0). */
 export function centavosDoOfx(t) {
   if (String(t ?? '').trim() === '') return 0;
@@ -411,7 +435,7 @@ export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {})
   const tol = dias ?? regra('tolerancia_boleto_dias'); // regra do sistema (antes, config_banco.tolerancia_dias)
   const planos = [];
   for (const x of pagamentosC6 || []) {
-    if (Array.isArray(x.payments)) for (const p of x.payments) planos.push({ ...p, external_reference_id: x.external_reference_id || null, status: x.status || null });
+    if (Array.isArray(x.payments)) x.payments.forEach((p, i) => planos.push({ ...p, external_reference_id: x.external_reference_id || null, status: x.status || null, vezes: x.payments.length, ordem: i }));
     else planos.push(x);
   }
   const out = [];
@@ -422,6 +446,13 @@ export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {})
     // pago e ainda não creditado (WAITING_CONFIRMATION, sem credit_date): a data contábil ainda não existe
     const aguardandoCredito = !p.credit_date || /WAIT/.test(String(p.status || '').toUpperCase());
     const conhecido = p.external_reference_id ? d.cobrancas.find((x) => x.banco && x.banco.id_externo === p.external_reference_id) : null;
+    // o mesmo boleto pago mais de uma vez (Pix e código de barras): o 2º pagamento nunca some calado; fica um alerta (devolver)
+    if (conhecido && p.vezes > 1 && p.ordem > 0) {
+      out.push({ cobranca_id: conhecido.id, conta_id: contaId, data_credito: credito, data_pagamento: pagou, valor, certeza: 'exata', previsto: valor, pagouEmDia: false, external_reference_id: p.external_reference_id,
+        external_payment_id: p.external_payment_id || null, payment_type: p.payment_type || null, jaPago: !!conhecido.data_pagamento, alternativas: 1, pagamento: n, aguardandoCredito,
+        alerta: `este boleto foi pago ${p.vezes} vezes no banco: registre só um pagamento e devolva ${C.reais(valor)} ao inquilino` });
+      return;
+    }
     if (conhecido && conhecido.data_pagamento) return; // boleto já confirmado: nada a sugerir
     // referência de um boleto nosso que não está em aberto (em acordo ou em carência): o pagamento é DESTE boleto e nunca cai na
     // busca por valor (iria para o boleto de outro inquilino); fica um alerta, sem marcar
@@ -453,8 +484,16 @@ export function prontoParaRegistrar(d, s) {
 }
 
 /** A entrada do extrato (ainda sem destino) de um recebimento: mesma conta, valor e data de crédito; null se não foi importada. */
-export const entradaDoRecebimento = (d, { conta_id = null, valor, data }) => (d.movimentacoes_banco || []).find((x) => (!conta_id || x.conta_id === conta_id)
-  && x.tipo === 'entrada' && x.valor === valor && x.data === data && !x.classificacao) || null;
+export function entradaDoRecebimento(d, { conta_id = null, valor, data, nome = '' }) {
+  const lista = (d.movimentacoes_banco || []).filter((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && x.valor === valor && x.data === data && !x.classificacao);
+  if (lista.length <= 1) return lista[0] || null;
+  // mais de uma entrada igual no dia (Pix de dois inquilinos): só a que cita o pagador; sem como saber, nenhuma (o usuário liga na tela Banco)
+  const n = maiusculaSemAcento(nome).trim();
+  const doPagador = n ? lista.filter((x) => textoDaMov(x).includes(n) || textoDaMov(x).includes(n.split(/\s+/)[0])) : [];
+  return doPagador.length === 1 ? doPagador[0] : null;
+}
+/** Nome do inquilino do boleto (para escolher entre entradas iguais no mesmo dia). */
+const nomeDoPagador = (d, cb) => { const c = cb && buscar(d, 'contratos', cb.contrato_id); return c ? c.inquilino_nome : ''; };
 
 /**
  * Depois de o boleto ficar pago (ex.: confirmado na janela da tela Boletos), liga a ele a entrada do extrato desse dinheiro, se já
@@ -463,7 +502,7 @@ export const entradaDoRecebimento = (d, { conta_id = null, valor, data }) => (d.
 export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (!cb || !cb.data_pagamento || cb.movimentacao_id) return null;
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d, cb) });
   if (mov) ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario);
   return mov;
 }
@@ -478,7 +517,7 @@ export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
 export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, valorNf = null, justificativa = '' } = {}) {
   const cb = buscar(d, 'cobrancas', p.cobranca_id);
   if (!cb) throw new Error('Boleto não encontrado.');
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, data: p.data_credito });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, data: p.data_credito, nome: nomeDoPagador(d, cb) });
   if (cb.data_pagamento) {
     if (mov && ligavel(cb, mov.id) && cb.valor_pago === mov.valor) { ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario); return { divergente: false, ligada: true, cobranca: cb }; }
     throw new Error(`Este boleto já está pago (${C.dataBr(cb.data_pagamento)}). Nada foi alterado.`);
@@ -492,7 +531,7 @@ export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } =
   const tol = dias ?? regra('tolerancia_boleto_dias');
   const out = [];
   for (const m of movs || []) {
-    if (m.tipo !== 'entrada' || m.classificacao) continue;
+    if (m.tipo !== 'entrada' || m.classificacao || ehDevolucao(m)) continue;
     for (const a of casarBoletos(d, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m) })) {
       out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago });
     }
@@ -653,7 +692,7 @@ function indiceDeBoletos(d) {
 const despesasLigadasAoExtrato = (d) => new Set((d.movimentacoes_banco || []).filter((m) => m.despesa_id).map((m) => m.despesa_id));
 
 /** Movimentação que pode ser a outra ponta de uma transferência entre as nossas contas (falta conferir conta, tipo, valor e data). */
-const podeSerPonta = (m) => !m.par_movimentacao_id && (!m.classificacao || m.classificacao === 'transferencia') && /TRANSFER|PIX|TED/.test(`${m.categoria_banco || ''} ${textoDaMov(m)}`);
+const podeSerPonta = (m) => !m.par_movimentacao_id && !ehDevolucao(m) && (!m.classificacao || m.classificacao === 'transferencia') && /TRANSFER|PIX|TED/.test(`${m.categoria_banco || ''} ${textoDaMov(m)}`);
 /** As possíveis pontas de transferência, por valor, na ordem do extrato. */
 function pontasDeTransferencia(d) {
   const porValor = new Map();
@@ -683,6 +722,8 @@ export function indiceDaTela(d) {
  */
 export function sugerirDestino(d, mov, indice = null) {
   const texto = textoDaMov(mov);
+  // 0) devolução de Pix ou estorno: nunca é aluguel nem transferência entre as nossas contas
+  if (ehDevolucao(mov)) return { classificacao: 'devolucao', motivo: mov.tipo === 'entrada' ? 'devolução de Pix recebida (ou estorno): dinheiro que voltou' : 'devolução de Pix enviada: dinheiro devolvido (confira o boleto de quem recebeu)', confianca: 'alta' };
   // 1) saída que é um pagamento feito pelo sistema
   if (mov.tipo === 'saida') {
     const pag = (d.pagamentos_banco || []).find((p) => ['agendado', 'pago'].includes(p.situacao) && !p.movimentacao_id && p.conta_id === mov.conta_id && p.valor === mov.valor
@@ -778,6 +819,9 @@ function comContaLancada(d, mov, s, indice = null) {
 
 const classificacaoDaOrigem = (origem) => ({ despesa: 'conta_imovel', avulso: 'conta_imovel', iptu: 'iptu', guia_imposto: 'imposto' }[(origem || {}).tipo] || 'outro');
 
+/** Devolução de Pix (recebida ou enviada) ou estorno, pela categoria do extrato ou pela descrição. */
+export const ehDevolucao = (m) => /DEVOLUTION|REVERSAL|REFUND|ESTORNO|DEVOLUCAO|DEVOLVID/.test(maiusculaSemAcento(`${m.categoria_banco || ''} ${m.descricao || ''} ${m.titulo || ''}`));
+
 /** O texto cita a empresa dona da conta ``contaId`` (CNPJ, nome ou apelido da conta). */
 function citaEmpresaDaConta(d, texto, contaId) {
   const c = contaBancaria(d, contaId);
@@ -842,6 +886,7 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     let criada = false;
     if (destino.despesa_id && !de) throw new Error('Conta do imóvel não encontrada.');
     if (de && de.movimentacao_id && de.movimentacao_id !== mov.id) throw new Error('Esta conta já está ligada a outra movimentação do extrato.');
+    if (de && de.valor !== mov.valor) throw new C.ErroUsuario(`A conta escolhida (${de.tipo} de ${C.compBr(de.competencia)}) é de ${C.reais(de.valor)} e esta saída é de ${C.reais(mov.valor)}. Escolha a conta do mesmo valor, ou corrija o valor da conta em Contas pagas por nós antes de ligar.`);
     if (!de) {
       if (!destino.imovel_id) throw new Error('Escolha o imóvel.');
       if (!TIPOS_DESPESA.includes(destino.tipo_despesa)) throw new Error('Escolha a conta (água, luz, gás, condomínio, internet ou outra).');
@@ -878,6 +923,7 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, imovel_id: i.id, reforma_id: r.id }, usuario, `Destino: ${i.nome} · reforma (${descricao})`);
     return mov;
   }
+  if ((cl === 'iptu' || cl === 'imposto') && mov.tipo !== 'saida') throw new C.ErroUsuario(`Uma entrada no extrato não pode ser ${cl === 'iptu' ? 'IPTU pago' : 'imposto pago'}.`);
   if (cl === 'iptu') {
     const p = destino.iptu_id ? buscar(d, 'iptus', destino.iptu_id) : null;
     if (!p) throw new Error('Escolha o IPTU (imóvel e ano).');
@@ -902,6 +948,8 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     const par = destino.par_movimentacao_id ? buscar(d, 'movimentacoes_banco', destino.par_movimentacao_id) : parDaTransferencia(d, mov);
     if (destino.par_movimentacao_id && !par) throw new Error('A outra movimentação da transferência não foi encontrada.');
     if (par && par.classificacao && par.classificacao !== 'transferencia') throw new Error('A outra ponta da transferência já tem outro destino.');
+    if (par && par.par_movimentacao_id && par.par_movimentacao_id !== mov.id) throw new C.ErroUsuario('A outra ponta já está ligada a outra transferência. Desfaça aquele destino antes.');
+    if (par && (par.id === mov.id || par.conta_id === mov.conta_id || par.tipo === mov.tipo || par.valor !== mov.valor)) throw new C.ErroUsuario('A outra ponta da transferência precisa ser da outra conta, no sentido contrário e com o mesmo valor.');
     atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, par_movimentacao_id: par ? par.id : null }, usuario, `Destino: transferência entre as contas${par ? ` (${apelidoDaConta(d, mov.conta_id)} ↔ ${apelidoDaConta(d, par.conta_id)})` : ''}`);
     if (par) atualizar(d, 'movimentacoes_banco', par.id, { classificacao: cl, par_movimentacao_id: mov.id, ...carimbo(usuario) }, usuario, 'Destino: transferência entre as contas (outra ponta)');
     return mov;
@@ -1014,6 +1062,10 @@ export function validarCodigoBarras(texto) {
 /** Código de barras de 44 dígitos a partir da linha digitável (47 boleto / 48 arrecadação); 44 volta como está (c6-comum, igual à ponte). */
 export const codigoDeBarras = (texto) => K.codigoDeBarrasDaLinha(validarCodigoBarras(texto));
 
+/** Código do pagamento para comparar: código de barras só com os dígitos; chave Pix e copia e cola sem espaços nas pontas e em minúsculas. */
+const conteudoComparavel = (t) => { const s = String(t || '').trim(); return /^[\d .\-]+$/.test(s) ? s.replace(/\D/g, '') : s.toLowerCase(); };
+const mesmoConteudo = (a, b) => conteudoComparavel(a) === conteudoComparavel(b);
+
 const pagamentosAtivos = (d) => (d.pagamentos_banco || []).filter((p) => !['cancelado', 'erro'].includes(p.situacao));
 
 /** O que vai no ``content`` do C6: código de barras (44), Pix copia e cola ou chave Pix. */
@@ -1040,9 +1092,12 @@ function validarPagamento(d, dados) {
   if (dados.imovel_id && !buscar(d, 'imoveis', dados.imovel_id)) throw new Error('Imóvel não encontrado.');
   if (!['boleto', 'pix'].includes(dados.forma)) throw new Error('Escolha a forma: boleto (código de barras) ou Pix.');
   const content = conteudoDoPagamento(dados);
-  if (pagamentosAtivos(d).some((p) => p.conta_id === dados.conta_id && p.valor === dados.valor && p.content === content && p.situacao !== 'rascunho')) {
-    throw new Error('Já existe um pagamento igual (mesma conta, mesmo código e mesmo valor) preparado, enviado ou pago.');
-  }
+  // repetido: mesma conta, código e valor ainda por pagar (rascunho incluído) ou já pago no MESMO mês; o pago de outro mês é o
+  // recorrente (ex.: R$ 200 todo mês para a mesma chave Pix), que vale
+  const comp = dados.competencia || String(dados.data_pagamento || hoje()).slice(0, 7);
+  const igual = pagamentosAtivos(d).find((p) => p.conta_id === dados.conta_id && p.valor === dados.valor && mesmoConteudo(p.content, content)
+    && (p.situacao !== 'pago' || p.competencia === comp));
+  if (igual) throw new C.ErroUsuario(`Já existe um pagamento igual (mesma conta, mesmo código e mesmo valor) ${igual.situacao === 'pago' ? `pago em ${C.dataBr(igual.pago_em)}` : igual.situacao === 'rascunho' ? 'preparado' : 'enviado'} (${C.compBr(igual.competencia)}). Se for outro pagamento, mude o mês de referência.`);
   if (dados.origem && dados.origem.tipo === 'despesa') { const de = buscar(d, 'despesas', dados.origem.id); if (!de) throw new Error('Conta do imóvel não encontrada.'); if (de.pagamento_banco_id && pagamentosAtivos(d).some((p) => p.id === de.pagamento_banco_id)) throw new Error('Esta conta já tem um pagamento pelo banco.'); }
   if (dados.origem && dados.origem.tipo === 'iptu') {
     const p = buscar(d, 'iptus', dados.origem.id);
@@ -1069,6 +1124,8 @@ export function prepararPagamentos(d, itens, usuario) {
     const content = validarPagamento(d, dados);
     return { dados, content };
   });
+  // o mesmo pagamento duas vezes no mesmo pedido também é repetido
+  prontos.forEach((a, i) => { if (prontos.some((b, j) => j < i && b.dados.conta_id === a.dados.conta_id && b.dados.valor === a.dados.valor && mesmoConteudo(b.content, a.content))) throw new C.ErroUsuario(`O pagamento de ${C.reais(a.dados.valor)} aparece duas vezes (mesmo código e valor). Tire um deles.`); });
   if (!prontos.length) throw new Error('Nenhum pagamento para preparar.');
   return prontos.map(({ dados, content }) => {
     const i = dados.imovel_id ? buscar(d, 'imoveis', dados.imovel_id) : null;
@@ -1163,8 +1220,10 @@ export function casarItensDoGrupo(pags, itensC6) {
   const valorDe = (it) => { try { return centavosDoC6(it.amount); } catch { return null; } };
   return pags.map((p, k) => {
     let idx = p.id_externo ? itens.findIndex((it, j) => !usados.has(j) && String(it.id) === String(p.id_externo)) : -1;
-    if (idx < 0) idx = itens.findIndex((it, j) => !usados.has(j) && it.content === p.content && (it.amount === undefined || valorDe(it) === p.valor));
-    if (idx < 0 && itens[k] && !usados.has(k) && !pags.some((q) => q.content === itens[k].content)) idx = k;
+    // o banco pode devolver o código em outro formato (chave Pix em maiúsculas, linha digitável com pontos): compara normalizado
+    if (idx < 0) idx = itens.findIndex((it, j) => !usados.has(j) && mesmoConteudo(it.content, p.content) && (it.amount === undefined || valorDe(it) === p.valor));
+    // pela ordem só se nenhum pagamento tem aquele código e o valor bate (nunca troca o item de R$ 200 com o de R$ 100)
+    if (idx < 0 && itens[k] && !usados.has(k) && !pags.some((q) => mesmoConteudo(q.content, itens[k].content)) && (itens[k].amount === undefined || valorDe(itens[k]) === p.valor)) idx = k;
     if (idx < 0) return null;
     usados.add(idx);
     return itens[idx];
@@ -1184,7 +1243,7 @@ export function registrarGrupoEnviado(d, ids, grupoId, itensC6, usuario) {
     const item = casados[k];
     const situacao = item ? SITUACAO_C6[item.status] || 'agendado' : 'agendado';
     atualizarPagamento(d, p.id, { situacao, erro: item && item.error_message ? item.error_message : null, id_externo: item ? item.id : p.id_externo, grupo_id: grupoId,
-      beneficiario: item && item.beneficiary_name ? { nome: item.beneficiary_name } : undefined, vencimento: item ? item.due_date : undefined, pago_em: situacao === 'pago' ? hoje() : null }, usuario);
+      beneficiario: item && item.beneficiary_name ? { nome: item.beneficiary_name } : undefined, vencimento: item ? item.due_date : undefined, pago_em: situacao === 'pago' ? (item.transaction_date || hoje()) : null }, usuario);
     out.push(p);
   });
   return out;
@@ -1278,7 +1337,7 @@ export function salvarConfigBanco2(d, campos, usuario) {
 // Texto do destino de uma movimentação (planilha do contador, D10)
 // --------------------------------------------------------------------------
 /** Nome curto de cada destino, para planilhas e textos (a tela usa o seu). */
-export const DESTINO_CURTO = { boleto: 'Aluguel recebido', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto da empresa', tarifa: 'Tarifa do banco', transferencia: 'Transferência entre contas', outro: 'Outro', ignorar: 'Não é nosso' };
+export const DESTINO_CURTO = { boleto: 'Aluguel recebido', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto da empresa', tarifa: 'Tarifa do banco', transferencia: 'Transferência entre contas', devolucao: 'Devolução / estorno', outro: 'Outro', ignorar: 'Não é nosso' };
 
 /**
  * Descreve o destino dado a uma movimentação em texto puro. Ex.: "Conta do imóvel · Loja 1 · Água de 09/2026",

@@ -27,7 +27,7 @@ const pastaContador = () => config().pasta_contador || PASTA_CONTADOR;
 /** Rótulo de um objeto { id: rotulo } (CLASSIFICACOES, SITUACOES_PAGAMENTO). */
 const rotuloDe = (lista, id) => lista[id] || id;
 /** Nome curto da classificação para as etiquetas da tabela (o nome completo fica na janela "Dar destino"). */
-const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', outro: 'Outro', ignorar: 'Ignorada' };
+const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', devolucao: 'Devolução', outro: 'Outro', ignorar: 'Ignorada' };
 /** Destinos que não precisam de comprovante (igual a conciliacao.js: só a ignorada; a transferência entre as nossas contas tem um PDF só, na pasta do contador da conta de origem). */
 const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
@@ -46,7 +46,7 @@ const botaoPonte = (acao, texto, dados = {}, cls = 'secundario pequeno') => (ban
   : `<button type="button" class="${cls}" disabled title="${TITULO_AGUARDANDO}">${texto}</button>`);
 
 /** Estado só da tela (não vai para o banco de dados): saldos consultados e a conferência de boletos pagos. */
-const estado = { saldos: {}, conferencia: null };
+const estado = { saldos: {}, conferencia: null, avisos: null };
 
 const avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves da API do C6 são configuradas em <a href="#/dados">Dados e backup</a> (caixa "Banco (C6)").
   Até lá, os botões que falam com o banco ficam desligados; o que já foi importado continua aqui.</div>`;
@@ -278,6 +278,19 @@ function linhaMovimentacao(m) {
     <td class="n nw">${valorHtml(m)}</td><td>${destinoHtml(m, sugestao)}</td><td>${comprovanteHtml(m)}</td><td class="n nw">${acoes.join(' ')}</td></tr>`;
 }
 
+/**
+ * Avisos do banco (webhook guardado pela ponte): os boletos nossos que o banco avisou e que aqui ainda não estão pagos, cada um com
+ * "Consultar situação no banco" (o aviso não tem assinatura: nada é registrado sem consultar e sem a confirmação de quem opera).
+ */
+function htmlAvisosDoBanco(conta) {
+  const a = estado.avisos && estado.avisos.conta === conta ? estado.avisos : null;
+  if (!a) return '';
+  const boletos = a.ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && !cb.data_pagamento);
+  if (!boletos.length) return `<p class="suave">Avisos do banco desde ${dataBr(a.desde)}: ${a.total} aviso(s), nenhum de boleto em aberto aqui.</p>`;
+  return `<div class="alerta info"><b>${boletos.length} boleto(s) avisado(s) pelo banco</b> desde ${dataBr(a.desde)} (pagamento, crédito ou mudança): consulte cada um para ver a situação e registrar.
+    <ul style="margin:6px 0 0">${boletos.map((cb) => { const c = buscar('contratos', cb.contrato_id); return `<li><a href="#/cobranca/${cb.id}">${esc(c ? c.inquilino_nome : '')} · boleto ${compBr(cb.competencia)}</a> ${botaoPonte('consultarBoletoC6', 'Consultar situação no banco', { id: cb.id })}</li>`; }).join('')}</ul></div>`;
+}
+
 /** Caixa "Conferir boletos pagos no banco": o C6 lista os boletos que recebeu; o sistema casa com os em aberto e dá baixa só nos marcados. */
 function caixaConferirBoletos(conta, mes) {
   const conf = estado.conferencia && estado.conferencia.conta === conta && estado.conferencia.mes === mes ? estado.conferencia : null;
@@ -294,7 +307,8 @@ function caixaConferirBoletos(conta, mes) {
   };
   return `<div class="cartao" id="conferir-boletos" data-caixa="conferir-boletos"><h2>Conferir boletos pagos no banco</h2>
     <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou (a linha do extrato desse dinheiro, se já foi buscada, fica ligada ao boleto). Um pagamento que casa com mais de um boleto (mesmo valor) não vem marcado: marque só o certo. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
-    ${opera() ? `<p class="acoes">${botaoPonte('conferirBoletosBanco', `Buscar boletos pagos em ${compBr(mes)}`, { conta, mes })}</p>` : ''}
+    ${opera() ? `<p class="acoes">${botaoPonte('conferirBoletosBanco', `Buscar boletos pagos em ${compBr(mes)}`, { conta, mes })} ${botaoPonte('avisosDoBanco', 'Ver avisos do banco (últimos 30 dias)', { conta })}</p>` : ''}
+    ${htmlAvisosDoBanco(conta)}
     ${conf ? (conf.sugestoes.length ? `<form data-form="registrarPagamentosBanco"><input type="hidden" name="conta" value="${esc(conta)}"><input type="hidden" name="mes" value="${mes}">
       <div class="rolagem"><table class="responsiva"><tr><th></th><th>Boleto</th><th>Crédito em</th><th class="n">Valor recebido</th><th>Conferência</th></tr>${conf.sugestoes.map(linha).join('')}</table></div>
       ${opera() ? '<div class="acoes"><button>Registrar os pagamentos marcados</button></div>' : ''}</form>`
@@ -755,7 +769,7 @@ export const ACOES_BANCO = {
           <p><b>${r.lancamentos.length}</b> lançamento(s) de ${dataBr(r.de)} a ${dataBr(r.ate)}: entradas ${reais(entradas)}, saídas ${reais(saidas)}.</p>
           <p class="suave">Confira se o arquivo é mesmo da conta <b>${esc(nomeConta(conta))}</b> (aba aberta). O que já foi importado não entra em dobro.</p>` });
       if (!ok) return;
-      const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate }));
+      const res = await alterar((db) => Z.importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate, contaDoArquivo: r.conta }));
       aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s) do arquivo OFX, ${res.repetidas} já estava(m).`);
       ir(`#/banco?conta=${encodeURIComponent(conta)}&mes=${r.ate.slice(0, 7)}`);
     } finally {
@@ -766,7 +780,9 @@ export const ACOES_BANCO = {
   async saldoBanco({ conta }) {
     if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
     const s = await P.saldoDaConta(conta);
-    estado.saldos[conta] = { valor: centavosDoBanco(s.total_available ?? s.available ?? 0), quando: `consultado ${C.agoraBr()}${s.available !== undefined && s.total_available !== undefined && s.available !== s.total_available ? ` · disponível sem limite ${reais(centavosDoBanco(s.available))}` : ''}` };
+    // em destaque o saldo de verdade (available); total_available soma o limite de crédito do banco
+    const comLimite = s.total_available !== undefined && s.available !== undefined && s.available !== s.total_available ? centavosDoBanco(s.total_available) : null;
+    estado.saldos[conta] = { valor: centavosDoBanco(s.available ?? s.total_available ?? 0), quando: `consultado ${C.agoraBr()}${comLimite !== null ? ` · com o limite do banco: ${reais(comLimite)} (o limite não é dinheiro da conta)` : ''}` };
     await mostrar();
   },
 
@@ -877,6 +893,18 @@ export const ACOES_BANCO = {
     await mostrar();
   },
 
+  /** Lê os avisos que o banco mandou à ponte (webhook) e mostra os boletos a reconsultar. Nada é registrado aqui. */
+  async avisosDoBanco({ conta }) {
+    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    const desde = C.somarDias(C.hojeIso(), -30);
+    const r = await P.avisosDoBanco(conta, desde);
+    const refs = [...new Set(((r && r.notificacoes) || []).map((n) => n.external_reference_id).filter(Boolean))];
+    const ids = refs.map((ref) => d().cobrancas.find((cb) => cb.banco && cb.banco.id_externo === ref)).filter(Boolean).map((cb) => cb.id);
+    estado.avisos = { conta, desde, total: ((r && r.notificacoes) || []).length, ids };
+    aviso(refs.length ? `${refs.length} boleto(s) com aviso do banco desde ${dataBr(desde)}.` : `Nenhum aviso do banco desde ${dataBr(desde)} (o aviso só chega se a ponte tiver um endereço público e o webhook cadastrado).`, 'info');
+    await mostrar();
+  },
+
   async conferirBoletosBanco({ conta, mes }) {
     if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
     const [de, fim] = C.limitesCompetencia(mes);
@@ -917,6 +945,9 @@ export const ACOES_BANCO = {
       if (!prontos.length) return mostrar();
     }
     if (!prontos.length) throw new Error('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
+    // aprovado dias depois de preparado: a data de pagamento não pode ter passado
+    const passados = prontos.filter((p) => p.data_pagamento && p.data_pagamento < C.hojeIso());
+    if (passados.length) throw new C.ErroUsuario(`${passados.length} pagamento(s) deste lote está(ão) com a data de pagamento já passada (${passados.map((p) => `${esc(p.tipo_conta || '')} ${reais(p.valor)} em ${dataBr(p.data_pagamento)}`).join('; ')}). Descarte e prepare de novo com a data de hoje ou depois. Nada foi enviado ao banco.`);
     const total = prontos.reduce((t, p) => t + p.valor, 0);
     // uma janela só: o resumo completo e o valor total digitado (qualquer diferença cancela)
     const r2 = await janela({ titulo: 'Aprovar e enviar ao banco', sim: 'Aprovar e enviar', forte: true,
@@ -992,9 +1023,12 @@ export const ACOES_BANCO = {
 
   async confirmarPagamentoPeloExtrato({ id }) {
     const p = pag(id);
-    const candidatas = movs().filter((m) => m.conta_id === p.conta_id && m.tipo === 'saida' && m.valor === p.valor && !m.classificacao)
-      .sort((a, b) => String(b.data).localeCompare(String(a.data)));
-    if (!candidatas.length) throw new Error(`Nenhuma saída de ${reais(p.valor)} sem destino na conta ${nomeConta(p.conta_id)}. Busque o extrato do mês na tela Banco e tente de novo.`);
+    // só saídas até 5 dias antes ou depois da data do pagamento, a mais perto primeiro (a água do mês seguinte não entra)
+    const alvo = p.pago_em || p.data_pagamento || p.vencimento;
+    const dist = (m) => (alvo ? Math.abs(C.diasEntre(alvo, m.data)) : 0);
+    const candidatas = movs().filter((m) => m.conta_id === p.conta_id && m.tipo === 'saida' && m.valor === p.valor && !m.classificacao && dist(m) <= 5)
+      .sort((a, b) => dist(a) - dist(b) || String(b.data).localeCompare(String(a.data)));
+    if (!candidatas.length) throw new Error(`Nenhuma saída de ${reais(p.valor)} sem destino na conta ${nomeConta(p.conta_id)} entre ${dataBr(C.somarDias(alvo, -5))} e ${dataBr(C.somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
     const r = await janela({ titulo: 'Qual saída do extrato é este pagamento?', sim: 'Confirmar pagamento',
       html: `<p>${esc(p.tipo_conta || '')} ${compBr(p.competencia)} · <b>${reais(p.valor)}</b> · pagar em ${dataBr(p.data_pagamento)}</p>
         ${candidatas.map((m, n) => `<p><label><input type="radio" name="mov" value="${m.id}" ${n === 0 ? 'checked' : ''}> ${dataBr(m.data)} · ${esc(m.titulo || '')} ${esc(m.descricao || '')} · ${reais(m.valor)}</label></p>`).join('')}
@@ -1017,6 +1051,7 @@ export const FORMULARIOS_BANCO = {
     let n = 0;
     const divergentes = [];
     const repetidos = [];
+    const paraJustificar = [];
     await alterar((db) => {
       const usados = new Set();
       for (const s of marcados) {
@@ -1026,11 +1061,20 @@ export const FORMULARIOS_BANCO = {
         if (s.pagamento !== undefined && usados.has(s.pagamento)) { const c = R.buscar(db, 'contratos', cb.contrato_id); repetidos.push(`${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}`); continue; }
         // a entrada desse dinheiro no extrato, se já importada, fica ligada ao boleto (Z.registrarPagamentoDoBanco, o mesmo da tela Boletos)
         const r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login());
-        if (r.divergente) divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`);
+        if (r.divergente) { divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`); paraJustificar.push({ s, r }); }
         else { n += 1; usados.add(s.pagamento); }
       }
     });
     estado.conferencia = null;
+    // valor diferente do previsto, mesmo sem o extrato importado: abre direto a janela da justificativa (um de cada vez)
+    if (paraJustificar.length) {
+      const { s, r } = paraJustificar[0];
+      const entrada = Z.entradaDoRecebimento(d(), { conta_id: conf.conta, valor: s.valor, data: s.data_credito });
+      memoria.pagamentoDivergente = { id: s.cobranca_id, data: s.data_credito, valor: s.valor, pagouEmDia: !!r.pagouEmDia, dataPagou: !r.pagouEmDia && s.data_pagamento && s.data_pagamento < s.data_credito ? s.data_pagamento : null,
+        justificativa: `Valor informado pelo banco (C6): ${reais(s.valor)}`, movimentacao_id: entrada ? entrada.id : null };
+      aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''} ${divergentes.length} com valor diferente do previsto: ${divergentes.join('; ')}. Informe a justificativa e o valor da NF do primeiro${divergentes.length > 1 ? '; depois, busque os boletos pagos de novo para os outros' : ''}.`, 'aviso');
+      return ir(`#/cobranca/${s.cobranca_id}?ir=pagamento`);
+    }
     aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length || repetidos.length ? 'aviso' : 'ok');
     await mostrar();
   },

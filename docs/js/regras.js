@@ -4923,12 +4923,18 @@ export function partesDoEndereco(linha) {
     city: cidadeUf ? cidadeUf[1].trim() : '', state: cidadeUf ? cidadeUf[2] : '', zip_code: cep.replace(/\D/g, '') };
 }
 
-/** Endereço do pagador para a API: o do inquilino quando está completo; faltando algo, completa com o do imóvel. */
+/**
+ * Endereço do pagador para a API, inteiro de UMA fonte (antes misturava a rua do inquilino com a cidade e o CEP do imóvel): o do
+ * cadastro do inquilino quando tem rua, cidade/UF e CEP; senão, o do imóvel. ``fonte``: 'inquilino' ou 'imovel'. Bairro que falta
+ * não é inventado (o pedido avisa).
+ */
 export function enderecoDoPagador(c, imovel) {
   const doImovel = imovel ? { address: enderecoCompleto(imovel), neighborhood: imovel.bairro || '', city: imovel.cidade || '', state: imovel.uf || '', zip_code: String(imovel.cep || '').replace(/\D/g, '') } : {};
   const doInquilino = partesDoEndereco(c.inquilino_endereco) || {};
-  const r = {};
-  for (const k of ['address', 'neighborhood', 'city', 'state', 'zip_code']) r[k] = doInquilino[k] || doImovel[k] || '';
+  const completo = ['address', 'city', 'state', 'zip_code'].every((k) => doInquilino[k]);
+  const origem = completo ? doInquilino : doImovel;
+  const r = { fonte: completo ? 'inquilino' : 'imovel' };
+  for (const k of ['address', 'neighborhood', 'city', 'state', 'zip_code']) r[k] = origem[k] || '';
   return r;
 }
 
@@ -4989,32 +4995,16 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   // fixo até o vencimento (ou até X dias antes, conforme a conta); multa em % e juros em % ao mês sobre o valor cheio, como o sistema
   // calcula. Quem paga atrasado perde o desconto (não é multa). Com FCI, multa e juros não incidem sobre o FCI: vão em valor (R$) e por dia.
   if (centavosParaReais(b.valor) > L.valor_maximo_reais) throw new Error(`O banco não emite boleto acima de R$ ${L.valor_maximo_reais.toLocaleString('pt-BR')}.`);
-  const fees = {};
-  // base da multa diferente do valor do boleto (FCI, ou regra `base_multa` = só o aluguel): multa e juros em reais
-  if (cb.fci || b.multa_valor !== null) {
-    if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
-    if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
-  } else {
-    if (b.multa_percentual > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.percentual, [K.multa_valor]: Number(b.multa_percentual), [K.multa_prazo]: 0 });
-    if (cb.juros_mensal_percentual > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.percentual_mes, [K.juros_valor]: Number(cb.juros_mensal_percentual), [K.juros_prazo]: 0 });
-  }
-  // desconto em reais até o vencimento (first_discount_deadline = dias antes; 0 = até o dia do vencimento, como na v1 "dead_line").
-  // discount_type é parametrizável por conta (padrão: primeiro valor do enum da API; confirmar no sandbox no 1º boleto de teste)
-  if (b.desconto > 0) {
-    // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
-    // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
-    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco C6).`);
-    Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
-  }
+  const fees = encargosDoBoletoC6(d, cb, conta, b);
   void t;
   // instruções: as fixas da conta e depois a descrição do boleto, até 4 linhas de 80
   // dados do pagador nos limites da API (decisão de 2026-10-16): nome, rua e número, bairro e cidade até 40, e-mail até 70, sem "/"
   // no endereço. Nada é cortado: o campo que passa barra a emissão com o nome do campo e quantas letras tem, para abreviar no cadastro.
-  const doInquilino = partesDoEndereco(c.inquilino_endereco) || {};
-  const ondeEndereco = (k) => (doInquilino[k] ? 'no endereço do cadastro do inquilino' : `no cadastro do imóvel${imovel ? ` ${imovel.nome}` : ''}`);
+  const ondeEndereco = () => (endereco.fonte === 'inquilino' ? 'no endereço do cadastro do inquilino' : `no cadastro do imóvel${imovel ? ` ${imovel.nome}` : ''}`);
   const pagador = { nome: String(c.inquilino_nome || '').trim(), rua: String(endereco.address || '').trim(), cidade: String(endereco.city || '').trim(), email: String(c.inquilino_email || '').trim(),
-    bairro: String(endereco.neighborhood || '').trim() || String((imovel && imovel.bairro) || '').trim() || 'Centro' };
+    bairro: String(endereco.neighborhood || '').trim() };
   const problemas = [];
+  if (!pagador.bairro) problemas.push(`falta o bairro do pagador: complete ${ondeEndereco()}${endereco.fonte === 'inquilino' ? ' (ex.: "Rua das Flores, 45, Centro, Curitiba/PR, CEP 80010-000")' : ''}`);
   for (const [k, rotulo, verbo, max, onde, semBarra] of [['nome', 'O nome do pagador', 'tem', L.nome, 'no cadastro do inquilino', false], ['rua', 'A rua e o número', 'têm', L.endereco, ondeEndereco('address'), true],
     ['bairro', 'O bairro', 'tem', L.bairro, ondeEndereco('neighborhood'), true], ['cidade', 'A cidade', 'tem', L.cidade, ondeEndereco('city'), true], ['email', 'O e-mail', 'tem', L.email, 'no cadastro do inquilino', false]]) {
     const v = pagador[k];
@@ -5050,6 +5040,37 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
 }
 
 /**
+ * Multa, juros e desconto (``fees``) do boleto no formato do C6, os mesmos na emissão e na alteração. Com FCI (ou base da multa
+ * diferente do valor do boleto) multa e juros vão em reais; senão em %. Desconto da bonificação em reais até o vencimento.
+ */
+export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
+  const K = M.CAMPOS;
+  const fees = {};
+  // base da multa diferente do valor do boleto (FCI, ou regra `base_multa` = só o aluguel): multa e juros em reais
+  if (cb.fci || b.multa_valor !== null) {
+    if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
+    if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
+  } else {
+    if (b.multa_percentual > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.percentual, [K.multa_valor]: Number(b.multa_percentual), [K.multa_prazo]: 0 });
+    if (cb.juros_mensal_percentual > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.percentual_mes, [K.juros_valor]: Number(cb.juros_mensal_percentual), [K.juros_prazo]: 0 });
+  }
+  // desconto em reais até o vencimento (first_discount_deadline = dias antes; 0 = até o dia do vencimento, como na v1 "dead_line").
+  // discount_type é parametrizável por conta (padrão: primeiro valor do enum da API; confirmar no sandbox no 1º boleto de teste)
+  if (b.desconto > 0) {
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    if (b.desconto >= b.valor) throw new C.ErroUsuario(`O desconto do boleto de ${c.inquilino_nome} (${C.reais(b.desconto)}) não pode ser igual ou maior que o valor do boleto (${C.reais(b.valor)}).`);
+    // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
+    // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
+    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco C6).`);
+    Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
+  }
+  return fees;
+}
+
+/** O que o banco cobra além do valor (guardado na emissão e na alteração, para avisar quando o sistema mudar): desconto, multa e juros. */
+const encargosParaComparar = (cb) => ({ desconto: totais(cb).a_pagar_sem_desconto - totais(cb).a_pagar_pontual, multa_percentual: Number(cb.multa_percentual) || 0, juros_mensal_percentual: Number(cb.juros_mensal_percentual) || 0 });
+
+/**
  * O desconto de pontualidade pode ir ao banco por esta conta: no sandbox sempre (é o teste); em produção só depois de o
  * administrador conferir, num boleto de teste, que o desconto do tipo escolhido sai certo (``desconto_conferido.tipo``).
  */
@@ -5062,10 +5083,16 @@ export const diasBaixaDaConta = (conta) => { const n = Number(conta && conta.dia
 /** Valor que o boleto leva ao banco: o total sem desconto (o desconto vai à parte, em ``fees``). */
 export const valorNoBanco = (d, cb) => totais(cb).a_pagar_sem_desconto;
 
-/** Alteração a mandar ao banco (PATCH parcial) para o boleto no C6 ficar igual ao do sistema: valor, vencimento e descrição. */
+/**
+ * Alteração a mandar ao banco (PATCH parcial) para o boleto no C6 ficar igual ao do sistema: valor, vencimento, descrição e os
+ * encargos recalculados (desconto, multa e juros: antes iam os antigos).
+ */
 export function alteracaoBoletoC6(d, cb) {
   const b = dadosBoleto(d, cb);
-  return { [M.CAMPOS.valor]: centavosParaReais(valorNoBanco(d, cb)), [M.CAMPOS.vencimento]: b.vencimento, [M.CAMPOS.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, M.LIMITES.descricao) };
+  const conta = cb.banco && cb.banco.conta_id ? contaBanco(d, cb.banco.conta_id) : null;
+  const fees = conta ? encargosDoBoletoC6(d, cb, conta, b) : {};
+  return { [M.CAMPOS.valor]: centavosParaReais(valorNoBanco(d, cb)), [M.CAMPOS.vencimento]: b.vencimento, [M.CAMPOS.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, M.LIMITES.descricao),
+    ...(Object.keys(fees).length ? { [M.CAMPOS.encargos]: fees } : {}) };
 }
 
 /** Corpo do pedido de negativação do pagador (POST …/denial): ``{ deadline }`` = dias de atraso a partir dos quais negativar. */
@@ -5100,7 +5127,9 @@ export function normalizarRespostaC6(resposta) {
   const pagoEm = r.payment_date || r.paid_at || (pg && pg[Q.pagamento_data]) || null;
   const creditoEm = r.credit_date || (pg && pg[Q.pagamento_credito]) || null;
   const N = M.NOTIFICACAO;
-  const notificacoes = Array.isArray(r[Q.notificacoes]) ? r[Q.notificacoes].map((n) => ({ canal: n[N.canal] || n.canal || '', destino: n[N.destino] || n.destino || '', momento: n[N.momento] || n.momento || '', situacao: n[N.situacao] || n.situacao || '', enviada_em: n[N.enviada_em] || n.enviada_em || null }))
+  // na consulta, notification_date vem como a DATA calculada do aviso (ex.: 2026-08-01); no pedido, é o momento (ISSUE_DATE…)
+  const ehData = (x) => /^\d{4}-\d{2}-\d{2}/.test(String(x || ''));
+  const notificacoes = Array.isArray(r[Q.notificacoes]) ? r[Q.notificacoes].map((n) => { const m = n[N.momento] || n.momento || ''; return { canal: n[N.canal] || n.canal || '', destino: n[N.destino] || n.destino || '', momento: ehData(m) ? '' : m, ...(ehData(m) ? { data: String(m).slice(0, 10) } : n.data ? { data: n.data } : {}), situacao: n[N.situacao] || n.situacao || '', enviada_em: n[N.enviada_em] || n.enviada_em || null }; })
     : (Array.isArray(r.notificacoes) ? r.notificacoes : null);
   const neg = r[Q.negativacao] || r.negativacao || null;
   return {
@@ -5120,7 +5149,12 @@ export function normalizarRespostaC6(resposta) {
     credito_em: creditoEm ? String(creditoEm).slice(0, 10) : null,
     valor_pago: r.paid_amount !== undefined ? reaisParaCentavos(r.paid_amount) : (pg && pg[Q.pagamento_valor] !== undefined ? reaisParaCentavos(pg[Q.pagamento_valor]) : (r.valor_pago ?? null)),
     notificacoes,
-    negativacao: neg && typeof neg === 'object' ? { situacao: neg[Q.negativacao_situacao] || neg.situacao || null, data: neg[Q.negativacao_data] || neg.data || null, pode_cancelar: neg[Q.negativacao_pode_cancelar] ?? neg.pode_cancelar ?? null } : null,
+    // consulta: denial_info { status, date, errors[] }; agendamento: { status, denial_date }
+    negativacao: neg && typeof neg === 'object' ? { situacao: neg[Q.negativacao_situacao] || neg.situacao || null, data: neg[Q.negativacao_data_consulta] || neg[Q.negativacao_data] || neg.data || null, pode_cancelar: neg[Q.negativacao_pode_cancelar] ?? neg.pode_cancelar ?? null,
+      erro: Array.isArray(neg[Q.negativacao_erros]) && neg[Q.negativacao_erros].length ? neg[Q.negativacao_erros].map((x) => x && (x.message || x.details || x.type)).filter(Boolean).join('; ').slice(0, 300) : (neg.erro || null) } : null,
+    // pago mais de uma vez (Pix e código de barras do mesmo boleto): soma e quantos pagamentos
+    pagamentos: Array.isArray(pgs) ? pgs.length : null,
+    valor_pago_total: Array.isArray(pgs) && pgs.length > 1 ? pgs.reduce((s, x) => s + (x[Q.pagamento_valor] !== undefined ? reaisParaCentavos(x[Q.pagamento_valor]) : 0), 0) : null,
   };
 }
 
@@ -5147,8 +5181,12 @@ export function registrarBoletoBancario(d, cbId, resposta, usuario, extra = {}) 
     emitido_em: antes.emitido_em && !reemissao ? antes.emitido_em : new Date().toISOString(), consultado_em: antes.emitido_em && !reemissao ? new Date().toISOString() : null,
     ...(emissoesAnteriores ? { emissoes_anteriores: emissoesAnteriores } : {}),
     pago_em: n.pago_em || antes.pago_em || null, credito_em: n.credito_em || antes.credito_em || null, valor_pago: n.valor_pago ?? antes.valor_pago ?? null, erro: null,
-    notificacoes: n.notificacoes || antes.notificacoes || null, negativacao: n.negativacao ? { ...(antes.negativacao || {}), ...n.negativacao } : (antes.negativacao || null),
+    // o que a consulta não traz (null) não apaga o que estava guardado (ex.: a data prevista da negativação)
+    notificacoes: n.notificacoes || antes.notificacoes || null, negativacao: n.negativacao ? { ...(antes.negativacao || {}), ...Object.fromEntries(Object.entries(n.negativacao).filter(([, v]) => v !== null && v !== undefined)) } : (antes.negativacao || null),
+    pagamentos_no_banco: n.pagamentos ?? antes.pagamentos_no_banco ?? null, valor_pago_total: n.valor_pago_total ?? antes.valor_pago_total ?? null,
     simulado: !!((resposta && resposta.simulado) || antes.simulado),
+    // o que foi ao banco além do valor (bonificação, multa e juros): guardado na emissão e na alteração; a consulta não muda
+    encargos: !antes.emitido_em || reemissao || extra.alterado ? encargosParaComparar(cb) : (antes.encargos || null),
   };
   const texto = { emitido: 'Boleto emitido no C6', pago: 'Banco informou o pagamento do boleto', cancelado: 'Boleto cancelado no C6' }[banco.situacao] || 'Situação do boleto no banco atualizada';
   // a emissão pendente acabou: o banco respondeu (a mesma referência ou a resposta de uma consulta)
@@ -5192,6 +5230,7 @@ export function registrarCancelamentoBancario(d, cbId, usuario, resposta = null)
 export function registrarNegativacao(d, cbId, resposta, usuario, dias) {
   const cb = buscar(d, 'cobrancas', cbId);
   if (!cb.banco || cb.banco.situacao !== 'emitido') throw new Error('Só um boleto emitido e em aberto no banco pode ser negativado.');
+  if (aguardandoCredito(cb) || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago (o banco ainda confirma o crédito, ou o pagamento já está registrado aqui): não pode ser negativado.');
   const conta = contaBanco(d, cb.banco.conta_id);
   if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
   const r = resposta || {};
@@ -5242,12 +5281,22 @@ export const emitidoNoBanco = (cb) => !!(cb.banco && ['emitido', 'pago'].include
 export function divergenciaBancaria(cb) {
   if (!cb.banco || cb.banco.situacao !== 'emitido' || cb.banco.valor === null || cb.banco.valor === undefined) return null;
   const atual = totais(cb).a_pagar_sem_desconto;
-  if (atual === cb.banco.valor && (!cb.banco.vencimento || cb.banco.vencimento === cb.vencimento)) return null;
-  return { no_banco: cb.banco.valor, no_sistema: atual, vencimento_banco: cb.banco.vencimento, vencimento_sistema: cb.vencimento };
+  // bonificação, multa ou juros mudaram depois da emissão (ex.: bonificação de 10% para 5%): o banco segue dando o desconto antigo
+  const e = cb.banco.encargos;
+  const agora = encargosParaComparar(cb);
+  const encargosMudaram = !!e && (e.desconto !== agora.desconto || e.multa_percentual !== agora.multa_percentual || e.juros_mensal_percentual !== agora.juros_mensal_percentual);
+  if (atual === cb.banco.valor && (!cb.banco.vencimento || cb.banco.vencimento === cb.vencimento) && !encargosMudaram) return null;
+  return { no_banco: cb.banco.valor, no_sistema: atual, vencimento_banco: cb.banco.vencimento, vencimento_sistema: cb.vencimento, encargos_mudaram: encargosMudaram,
+    desconto_banco: e ? e.desconto : null, desconto_sistema: agora.desconto };
 }
 
 /** Boletos do mês que podem ser emitidos no banco: em aberto, com valor, sem carência e ainda não emitidos (ou com erro/cancelados). */
-export const boletosParaEmitir = (d, comp) => d.cobrancas.filter((cb) => cb.competencia === comp && aCobrar(cb)
+export const boletosParaEmitir = (d, comp, hoje = C.hojeIso()) => boletosDoMesSemEmissao(d, comp).filter((cb) => cb.vencimento >= hoje);
+
+/** Boletos do mês em aberto sem emissão que já venceram: o banco não aceita vencimento no passado (ficam de fora do "Emitir todos"). */
+export const vencidosSemEmissao = (d, comp, hoje = C.hojeIso()) => boletosDoMesSemEmissao(d, comp).filter((cb) => cb.vencimento < hoje);
+
+const boletosDoMesSemEmissao = (d, comp) => d.cobrancas.filter((cb) => cb.competencia === comp && aCobrar(cb)
   && totais(cb).a_pagar_sem_desconto > 0 && !emitidoNoBanco(cb)).sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.id - b.id);
 
 // --------------------------------------------------------------------------
