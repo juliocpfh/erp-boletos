@@ -1,13 +1,14 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). **Em aceite:** #309 (Pix devolvido e baixa só pelo identificador), a PR da limpeza técnica e a PR do programa do PC desinstalável.
+Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). **Em aceite:** #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11) e a PR do programa do PC desinstalável.
 
 Marque com `[x]` o que for concluindo.
 
 ## Para confirmar na sequência (dono)
 
 1. [ ] Abrir o sistema no computador e no celular depois da troca da publicação (17/11) e ver se abre normal. Na 1ª vez ele baixa tudo de novo (pode demorar um pouco mais).
-2. [ ] Aceitar as PRs em aceite: #309, a da limpeza técnica e a do programa do PC desinstalável.
+2. [ ] Aceitar as PRs em aceite: #309, #310 (limpeza técnica) e a do programa do PC desinstalável.
+   - Depois do merge da #310: **sair e entrar de novo no site com a senha, uma vez** (e de novo sempre que trocar a senha). Sem isso, ligar um computador **novo** ao programa do PC dá "E-mail ou senha errados…". Os computadores já ligados continuam funcionando.
 3. [ ] Depois do merge do desinstalar: baixar o `.exe` novo, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9).
 4. [ ] Ligar o Gmail com o Claude (item 1).
 5. [ ] Ficha pela internet com um conhecido (item 3).
@@ -32,7 +33,7 @@ Marque com `[x]` o que for concluindo.
 | ~~7~~ | ~~Aceitar a PR #231~~ aceita em 14/11 | — | — |
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: concluído; "Abrir a pasta no Explorer" funciona (17/11); falta só o `.exe` novo depois do merge do desinstalar | você | 5 min |
-| 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; a 2ª rodada entrou no mutirão 3000 (item 13) | Claude | — |
+| ~~11~~ | ~~Mutirão de 16/11~~ **concluído em 17/11** (2ª rodada na PR #310, em aceite; compactação do código na #308) | — | — |
 | 13 | Mutirão 3000 (16–17/11): 366 erros confirmados; 314 corrigidos no inventário de 17/11 (até #303) e mais correções em #304–#309 e nas PRs em aceite; faltam NF 16/30 e troca de senha (quando acontecerem) | você + Claude | — |
 
 **Próximos passos (atualizado em 17/11, fim do dia):** siga a lista **"Para confirmar na sequência"** acima. O próximo trabalho com o Claude é **ligar o Gmail** (item 1, passo a passo em `LIGAR_GMAIL.md`; faço junto com você no navegador) e, depois, o teste da ficha com um conhecido (item 3). Em 16/12: CBS 2027.
@@ -166,7 +167,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 | ~~**Devolução de Pix ao inquilino**~~ | **Decidido em 17/11:** a devolução fica ligada ao boleto e o recebido volta ao devido; a NF não muda (boleto de R$ 2.000,00 pago duas vezes, devolução de R$ 2.000,00 → R$ 2.000,00 recebidos, NF de R$ 2.000,00). PR #309. | feito |
 | ~~**Internet no contrato novo**~~ | **Decidido em 17/11:** vem "Não tem/Não se aplica" e pode ser mudada (só a Internet). PR #307. | feito |
 | ~~**Retomada do imóvel abandonado**~~ | **Decidido em 17/11:** a cláusula fica no modelo; a retomada é feita com ata notarial e inventário do que foi abandonado. | feito |
-| ~~**`restaurarGarantiaHerdada`**~~ | **Decidido em 17/11:** pode sair se não for mais usada (PR da limpeza técnica, em aceite). | feito |
+| ~~**`restaurarGarantiaHerdada`**~~ | **Decidido em 17/11:** pode sair se não for mais usada removida na PR #310 (limpeza técnica, em aceite). | feito |
 | ~~**Publicar pelo GitHub Actions**~~ | **Decidido e feito em 17/11** (PR #308; fonte do Pages trocada às 13:41 UTC), só pela rapidez. Para voltar, o comando está em `DECISOES.md`. | feito |
 | ~~**Pasta do OneDrive**~~ | **Decidido em 14/11:** aposentada (não é mais usada; backup seguro no disco C, copiado todo dia para o HD externo). Guardar uma última cópia no HD externo e apagar do OneDrive (e da lixeira do OneDrive). | feito |
 | **CBS 2027** (aguardando desde 14/11; **retomar em 16/12/2026**) | O imposto novo substitui o PIS/COFINS em 2027. Exemplo: aluguel residencial de R$ 3.000,00 paga cerca de R$ 81,00 (hoje R$ 109,50). Antes de mudar a aba Impostos: alíquota final do Senado (até 15/12/2026); com o contador, se algum contrato antigo fica nos 3,65%; e se o aluguel passa a ser "valor + CBS". | depois de **15/12/2026** |
@@ -236,7 +237,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - **Falta você (depois do merge):** nos inquilinos que mandaram contra-vistoria, anexe na etapa (página do inquilino → Rotina de entrada); nos outros, clique em **Não houve**.
 - **Troca de titular:** vale a contra-vistoria do contrato anterior.
 
-## 11. Mutirão de correções de 15–16/11 (onde paramos)  `[ ]`
+## 11. Mutirão de correções de 15–16/11 (onde paramos)  `[x]` (concluído em 17/11)
 
 Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 16/11 pelas PRs #250 (ponte C6), #251 (servidor da nuvem), #252 (regras), #253 (`.exe` + programa do PC), #254 (telas) e #255 (sincronia e aplicativo sem internet). Cloudflare publicou sem erro. Lista completa em `ROTINA_DE_MELHORIA.md` ("Mutirão de 2026-11-16").
 
@@ -250,7 +251,7 @@ Revisão em 4 frentes achou 58 problemas; as correções entraram na `main` em 1
 - [x] **Cloudflare (feito em 16/11):** limite de pedidos na ficha pública, regra `Ficha publica - limite` (host `ficha.ankjck.com.br`, caminho começando por `/api/publico/`). No plano grátis a janela é fixa: ficou **20 pedidos em 10 segundos por IP, bloqueio de 10 segundos** (a regra grátis única está usada; a trava opcional de `/api/aparelho/entrar` do `nuvem/README.md` fica sem regra própria, o cofre já limita as senhas).
 - [x] **Programa do PC (16/11):** regra Bypass criada e `.exe` instalado (ver item 9e).
 
-**2ª rodada (Claude, quando o dono pedir; sempre a partir da `main`, sem empilhar):** carregar as telas raras só quando usadas (nº 23), compactar o código no GitHub (nº 24), faixas de código do primeiro acesso numa ida só (nº 37), a tela de ressarcimento barrar mês com boleto em acordo, verificador separado da senha para o crachá do PC (hoje quem tem o banco aberto consegue um crachá só de leitura), Voltar do celular nas janelas de confirmação. Ficou de fora por segurança: adiar a regravação do banco no aparelho (nº 29).
+**2ª rodada: feita em 17/11** na PR #310 (em aceite): telas raras carregadas só quando usadas, faixas de código numa ida só, ressarcimento barra mês com boleto em acordo, verificador separado da senha para o crachá do PC e Voltar do celular fecha a confirmação; a compactação do código no GitHub saiu na #308 (publicação pelo GitHub Actions). Pedido original, para registro: carregar as telas raras só quando usadas (nº 23), compactar o código no GitHub (nº 24), faixas de código do primeiro acesso numa ida só (nº 37), a tela de ressarcimento barrar mês com boleto em acordo, verificador separado da senha para o crachá do PC (hoje quem tem o banco aberto consegue um crachá só de leitura), Voltar do celular nas janelas de confirmação. Ficou de fora por segurança: adiar a regravação do banco no aparelho (nº 29).
 
 **Ideia do dono em 16/11:** compactar os anexos. Feita no mesmo dia (item 12).
 
