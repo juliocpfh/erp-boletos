@@ -339,7 +339,23 @@ async function rotinaSegura() {
   if (!(await conectarSeguro(false)) || !E.d) return;
   espelharSeguro();
   atualizarProgramaSeguro();
+  ligarChaveNaNuvem();
   if (await B.completoPendente(E.seguro.dir)) backupCompletoSeguro();
+}
+
+/**
+ * Na nuvem, o administrador com o backup seguro ligado neste computador manda a chave pública dele (uma vez por abertura): os
+ * backups diários do servidor passam a sair cifrados com ela (nuvem/cifrar-backup.mjs) e só abrem com a senha do backup.
+ */
+let chaveNaNuvem = '';
+export async function ligarChaveNaNuvem() {
+  if (!E.nuvem || !E.seguro?.chave || !podeUsuario('admin') || chaveNaNuvem === E.seguro.chave.publica) return null;
+  const { formato, criada_em, iteracoes, publica, privada_cifrada, sal, iv } = E.seguro.chave; // nada além do que já vai em cada arquivo
+  try {
+    const r = await N.apiDoSite('api/dados/')('POST', 'chave-backup', { chave: { formato, criada_em, iteracoes, publica, privada_cifrada, sal, iv } });
+    chaveNaNuvem = publica;
+    return r;
+  } catch (e) { logarErro(e); return null; }
 }
 
 /** Nuvem: terminou uma sincronia; `externo` = chegou mudança de outro aparelho (redesenha a tela). */

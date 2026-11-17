@@ -7,6 +7,7 @@
 import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 import { faxinaDosLinks } from './ficha-publica.mjs';
 import { faxinaDaLixeira } from './lixeira.mjs';
+import { chaveDoBackupValida, cifrarBackup, resumoDaChave } from './cifrar-backup.mjs';
 
 export const FORMATO = 'imoveis-v1';
 export const MAX_OPS = 2000;
@@ -43,6 +44,45 @@ export const SO_ADMIN = {
   excluir: ['imoveis', 'contratos', 'encerramentos', 'vistorias', 'modelos_contrato', 'faturas'],
   tabela: ['emitentes', 'config_regras', 'versoes_regras'],
 };
+/**
+ * Ações "só do administrador" que ficam dentro de tabelas que o operador também muda (item 13 da lista de segurança): o cofre
+ * confere o registro antes e depois da mudança e recusa o lote inteiro se quem não é administrador fez uma delas. Cada regra
+ * devolve true quando a mudança é do administrador. `antes` é null num registro novo.
+ * - contratos: confirmar a perda de um documento de entrada (o operador registra a perda, que fica "aguardando o administrador")
+ *   e aceitar o documento com assinatura faltante (campos <doc>_perdido_em/_perdido_pendente e <doc>_parcial de regras.js);
+ * - aditivos: confirmar a perda do termo aditivo (perdido_em sem perdido_pendente);
+ * - pagamentos_banco: aprovar o pagamento (aprovado_por/aprovado_em, sair de "rascunho" para a fila do banco);
+ * - cobrancas: agendar ou cancelar a negativação do pagador (banco.negativacao.agendada_em/cancelada_em).
+ */
+const valorDe = (r, k) => (r && r[k] !== undefined ? r[k] : null);
+const vazioDe = (v) => v === null || v === undefined || v === '';
+const DOC_PERDIDO = /^(doc_[a-z]+)_perdido_em$/; // DOCUMENTOS_ENTRADA de regras.js: doc_contrato_em → doc_contrato_perdido_em
+export const REGRAS_DO_ADMIN = [
+  { tabela: 'contratos', nome: 'confirmar a perda de um documento', viola: (antes, depois) => Object.keys(depois || {}).some((k) => {
+    const m = DOC_PERDIDO.exec(k); if (!m || vazioDe(depois[k])) return false;
+    const pend = `${m[1]}_perdido_pendente`;
+    // perda que passa a valer sem ficar aguardando o administrador
+    return vazioDe(depois[pend]) && (vazioDe(valorDe(antes, k)) || !vazioDe(valorDe(antes, pend)));
+  }) },
+  { tabela: 'contratos', nome: 'aceitar um documento sem todas as assinaturas', viola: (antes, depois) => Object.keys(depois || {}).some((k) => {
+    if (!/^doc_[a-z]+_parcial$/.test(k)) return false;
+    const p = depois[k]; const a = valorDe(antes, k);
+    return !!p && typeof p === 'object' && !p.pendente && !(a && typeof a === 'object' && !a.pendente);
+  }) },
+  { tabela: 'aditivos', nome: 'confirmar a perda do termo aditivo', viola: (antes, depois) => !vazioDe(valorDe(depois, 'perdido_em')) && vazioDe(valorDe(depois, 'perdido_pendente'))
+    && (vazioDe(valorDe(antes, 'perdido_em')) || !vazioDe(valorDe(antes, 'perdido_pendente'))) },
+  { tabela: 'pagamentos_banco', nome: 'aprovar pagamentos', viola: (antes, depois) => ['aprovado_por', 'aprovado_em'].some((k) => !igual(valorDe(antes, k), valorDe(depois, k)) && !vazioDe(valorDe(depois, k)))
+    || (valorDe(antes, 'situacao') !== 'aguardando_aprovacao' && valorDe(depois, 'situacao') === 'aguardando_aprovacao') },
+  { tabela: 'cobrancas', nome: 'negativar ou cancelar a negativação', viola: (antes, depois) => ['agendada_em', 'cancelada_em'].some((k) => {
+    const n = (r) => (r && r.banco && typeof r.banco === 'object' && r.banco.negativacao && typeof r.banco.negativacao === 'object' ? r.banco.negativacao[k] ?? null : null);
+    return !igual(n(antes), n(depois)) && !vazioDe(n(depois));
+  }) },
+];
+/** Lança 403 se a mudança (registro antes → depois) é uma das ações só do administrador. */
+export function conferirRegrasDoAdmin(tabela, antes, depois) {
+  const r = REGRAS_DO_ADMIN.find((x) => x.tabela === tabela && x.viola(antes, depois));
+  if (r) throw new ErroCofre(403, `Só o administrador pode ${r.nome}. Peça a ele (nada desta gravação entrou).`);
+}
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
 /**
  * As tabelas do sistema (as de TABELAS em docs/js/regras.js; tests/seguranca-nuvem.test.mjs confere): mudança numa tabela que
@@ -511,6 +551,7 @@ export class Cofre {
       const dados = semSegredos(op.dados);
       if (!dados || typeof dados !== 'object' || Array.isArray(dados) || dados.id !== id) throw new ErroCofre(400, 'Registro novo inválido.');
       for (const c of Object.keys(dados)) nomeCampo(c);
+      if (quem.papel !== 'admin') conferirRegrasDoAdmin(tabela, null, dados);
       if (atual) {
         if (igual(JSON.parse(atual.dados), dados)) return { ok: true, repetido: true };
         throw new ErroCofre(409, `Código ${id} já usado em ${tabela} (aparelho sem faixa de códigos?).`);
@@ -592,6 +633,7 @@ export class Cofre {
         dados[c] = antes; meta[c] = { por: email, em: this.agora(), disputa: true };
         mudou = true; conflito = true;
       }
+      if (mudou && quem.papel !== 'admin') conferirRegrasDoAdmin(tabela, JSON.parse(atual.dados), dados);
       if (mudou) {
         if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, dados);
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);
@@ -769,9 +811,133 @@ export class Cofre {
     return { ok: true, registro: Number(this.q('SELECT MAX(n) AS n FROM emails_enviados')[0].n) };
   }
 
+  /** Chave pública do backup seguro do administrador (cifrar-backup.mjs), ou null: os backups diários saem abertos. */
+  chaveDoBackup() {
+    const t = this.controle('chave_backup');
+    try { return t ? JSON.parse(t) : null; } catch { return null; }
+  }
+
+  /**
+   * O administrador liga (ou troca) a chave dos backups da nuvem: { chave } = o conteúdo de chave-do-backup.json da pasta do
+   * backup seguro (só a parte pública e a privada já cifrada pela senha do backup). { chave: null } desliga. Devolve o estado.
+   */
+  async ligarChaveDoBackup({ chave } = {}, email) {
+    this.exigir(email, 'admin');
+    if (chave === null) { this.sql.exec("DELETE FROM controle WHERE chave = 'chave_backup'"); return { ligada: false }; }
+    let valida;
+    try { valida = await chaveDoBackupValida(chave); } catch (e) { throw new ErroCofre(400, e.message); }
+    const atual = this.chaveDoBackup();
+    if (!atual || atual.publica !== valida.publica) this.controle('chave_backup', JSON.stringify({ ...valida, ligada_em: this.agora(), ligada_por: String(email).toLowerCase() }));
+    return { ligada: true, resumo: await resumoDaChave(valida), ligada_em: this.chaveDoBackup().ligada_em };
+  }
+
+  /**
+   * Rastros dos dados pessoais que saíram de um registro (LGPD): os aparelhos limpam o registro e o histórico deles
+   * (R.apagarDadosPessoaisDaFicha), mas o servidor guarda também as linhas do histórico, a fila (cópia do registro a cada
+   * mudança), a cópia de registro excluído e os valores dos conflitos. Aqui saem deles os campos que o registro já não tem
+   * (vazios agora) e os textos que eles tinham (CPF, e-mail, telefone…), também nos e-mails registrados para ele
+   * (`ligacao`: o campo de envios_email que aponta para o registro). Os backups diários antigos saem sozinhos em MANTER_BACKUPS dias.
+   * Devolve quantas linhas mudaram.
+   */
+  limparRastros(tabela, id, ligacao = null) {
+    const r = this.q('SELECT dados FROM registros WHERE tabela = ? AND id = ?', tabela, id)[0];
+    if (!r) return 0;
+    const atual = JSON.parse(r.dados);
+    const fica = (k) => !vazioDe(atual[k]);
+    const sairam = new Set(); // textos que estavam nos campos que saíram (para tirar também das descrições)
+    const anotar = (v) => { // só textos: número (renda em centavos…) trocado dentro de outro número estragaria o valor
+      if (v === null || v === undefined) return;
+      if (typeof v === 'object') { for (const x of Object.values(v)) anotar(x); return; }
+      const t = typeof v === 'string' ? v.trim() : '';
+      if (t.length >= 5 && sairam.size < 2000) sairam.add(t);
+    };
+    const anotarSaiu = (reg) => { if (objetoSimples(reg)) for (const [k, v] of Object.entries(reg)) if (!fica(k)) anotar(v); };
+    const limparDet = (det) => {
+      if (!objetoSimples(det)) return det ?? null;
+      const out = {};
+      for (const [k, v] of Object.entries(det)) { if (fica(k)) out[k] = v; else anotar(v); }
+      return out;
+    };
+    const chaveH = (h) => objetoSimples(h) && h.tabela === tabela && Number(h.registro_id) === id;
+    let n = 0;
+    // 1) as cópias do registro na fila (log) e nos excluídos: os textos que saíram, e a cópia vira a de agora
+    for (const l of this.q("SELECT seq, dados FROM log WHERE tipo = 'registro' AND tabela = ? AND id = ?", tabela, id)) {
+      anotarSaiu(JSON.parse(l.dados || 'null'));
+      this.sql.exec('UPDATE log SET dados = ? WHERE seq = ?', r.dados, l.seq); n += 1;
+    }
+    for (const x of this.q('SELECT rowid AS rid, dados FROM excluidos WHERE tabela = ? AND id = ?', tabela, id)) { anotarSaiu(JSON.parse(x.dados)); this.sql.exec('DELETE FROM excluidos WHERE rowid = ?', x.rid); n += 1; }
+    // 2) as linhas do histórico do registro (na tabela e na fila): saem os campos que o registro não tem mais
+    const linhasH = this.q("SELECT n, dados FROM historico WHERE json_extract(dados, '$.tabela') = ? AND CAST(json_extract(dados, '$.registro_id') AS INTEGER) = ?", tabela, id);
+    const filaH = this.q("SELECT seq, dados FROM log WHERE tipo = 'historico' AND json_extract(dados, '$.tabela') = ? AND CAST(json_extract(dados, '$.registro_id') AS INTEGER) = ?", tabela, id);
+    const semCampos = (h) => (chaveH(h) ? { ...h, detalhes: limparDet(h.detalhes) } : h);
+    const novasH = linhasH.map((l) => [l.n, semCampos(JSON.parse(l.dados))]);
+    const novasF = filaH.map((l) => [l.seq, semCampos(JSON.parse(l.dados))]);
+    // 3) e-mails registrados para ele: o endereço sai do registro (os aparelhos já tiraram) e de tudo que o guardava
+    const emails = ligacao ? this.q(`SELECT id, dados FROM registros WHERE tabela = 'envios_email' AND json_extract(dados, '$.${ligacao}') = ?`, id) : [];
+    for (const e of emails) {
+      for (const l of this.q("SELECT dados FROM log WHERE tipo = 'registro' AND tabela = 'envios_email' AND id = ?", e.id)) anotar(JSON.parse(l.dados || 'null')?.para);
+      for (const x of this.q("SELECT dados FROM excluidos WHERE tabela = 'envios_email' AND id = ?", e.id)) anotar(JSON.parse(x.dados)?.para);
+      const reg = JSON.parse(e.dados); anotar(reg.para);
+      if (!vazioDe(reg.para)) { reg.para = null; this.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'envios_email' AND id = ?", texto(reg), e.id); }
+      this.sql.exec("UPDATE log SET dados = ? WHERE tipo = 'registro' AND tabela = 'envios_email' AND id = ?", texto(reg), e.id);
+    }
+    const idsEmail = new Set(emails.map((e) => e.id));
+    // textos que saíram: tirados das descrições e detalhes das linhas do histórico do registro e dos e-mails dele
+    // (menos o que continua no registro: o apelido igual ao nome não apaga o nome das descrições)
+    const ficaram = Object.values(atual).filter((v) => typeof v === 'string' && v.trim()).map((v) => v.toLocaleLowerCase('pt-BR'));
+    const textos = [...sairam].filter((x) => !ficaram.some((v) => v.includes(x.toLocaleLowerCase('pt-BR')))).sort((a, b) => b.length - a.length);
+    const tirarTextos = (h) => {
+      if (typeof h === 'string') return textos.reduce((t, x) => t.split(x).join('(apagado)'), h);
+      if (Array.isArray(h)) return h.map(tirarTextos);
+      if (objetoSimples(h)) return Object.fromEntries(Object.entries(h).map(([k, v]) => [k, tirarTextos(v)]));
+      return h;
+    };
+    const tocar = (h) => chaveH(h) || (objetoSimples(h) && h.tabela === 'envios_email' && idsEmail.has(Number(h.registro_id)));
+    const deEmails = idsEmail.size ? this.q("SELECT n, dados FROM historico WHERE json_extract(dados, '$.tabela') = 'envios_email'").map((l) => [l.n, JSON.parse(l.dados)]).filter(([, h]) => tocar(h)) : [];
+    const filaEmails = idsEmail.size ? this.q("SELECT seq, dados FROM log WHERE tipo = 'historico' AND json_extract(dados, '$.tabela') = 'envios_email'").map((l) => [l.seq, JSON.parse(l.dados)]).filter(([, h]) => tocar(h)) : [];
+    for (const [k, h] of [...novasH, ...deEmails]) { this.sql.exec('UPDATE historico SET dados = ? WHERE n = ?', texto(tirarTextos(h)), k); n += 1; }
+    for (const [k, h] of [...novasF, ...filaEmails]) { this.sql.exec('UPDATE log SET dados = ? WHERE seq = ?', texto(tirarTextos(h)), k); n += 1; }
+    // 4) conflitos do registro: os valores que saíram
+    for (const c of this.q('SELECT id, campo, atual, proposto FROM conflitos WHERE tabela = ? AND reg_id = ?', tabela, String(id))) {
+      const limpar = (v) => {
+        if (v === null) return null;
+        const x = JSON.parse(v);
+        if (c.campo !== '*') return fica(c.campo) ? v : texto(null);
+        return texto(objetoSimples(x) ? limparDet(x) : x);
+      };
+      this.sql.exec('UPDATE conflitos SET atual = ?, proposto = ? WHERE id = ?', limpar(c.atual), limpar(c.proposto), c.id); n += 1;
+    }
+    return n;
+  }
+
+  /**
+   * Fichas reprovadas ou com desistência que já tiveram os dados pessoais apagados nos aparelhos (dados_apagados_em) e ainda
+   * não na nuvem: limpa os rastros (limparRastros) e marca a ficha com `historico_limpo_em` (vai para os aparelhos pela fila).
+   * Roda na faxina diária. Devolve os códigos das fichas limpas.
+   */
+  esquecerFichasApagadas(por = 'servidor (faxina LGPD)') {
+    const fichas = this.q(`SELECT id, dados FROM registros WHERE tabela = 'fichas' AND json_extract(dados, '$.situacao') IN ('Reprovada', 'Desistiu')
+      AND json_extract(dados, '$.dados_apagados_em') IS NOT NULL AND json_extract(dados, '$.historico_limpo_em') IS NULL`);
+    const feitas = [];
+    for (const f of fichas) {
+      this.transacao(() => {
+        this.limparRastros('fichas', f.id, 'ficha_id');
+        const dados = { ...JSON.parse(f.dados), historico_limpo_em: hojeBrasilia(this.relogio()) };
+        const meta = JSON.parse(this.q("SELECT meta FROM registros WHERE tabela = 'fichas' AND id = ?", f.id)[0]?.meta || '{}');
+        meta.historico_limpo_em = { por, em: this.agora() };
+        this.sql.exec("UPDATE registros SET dados = ?, meta = ? WHERE tabela = 'fichas' AND id = ?", texto(dados), JSON.stringify(meta), f.id);
+        this.registrarLog('registro', 'fichas', f.id, dados, por);
+        this.controle('revisao', Number(this.controle('revisao') || 0) + 1);
+      });
+      feitas.push(f.id);
+    }
+    return feitas;
+  }
+
   /**
    * Limpa o que já não precisa: fila com mais de DIAS_LOG dias, lotes repetidos antigos, registros excluídos (DIAS_EXCLUIDOS) e
-   * conflitos resolvidos (DIAS_CONFLITOS_RESOLVIDOS), cotas e registro de e-mails com mais de um ano.
+   * conflitos resolvidos (DIAS_CONFLITOS_RESOLVIDOS), cotas e registro de e-mails com mais de um ano, e os rastros das
+   * fichas reprovadas com os dados pessoais apagados (esquecerFichasApagadas).
    */
   limpar() {
     const antes = (dias) => new Date(this.relogio().getTime() - dias * 86400000).toISOString();
@@ -784,6 +950,8 @@ export class Cofre {
     this.sql.exec('DELETE FROM conflitos WHERE resolvido_em IS NOT NULL AND resolvido_em < ?', antes(DIAS_CONFLITOS_RESOLVIDOS)); // item 32
     this.sql.exec('DELETE FROM cotas WHERE chave < ?', hojeBrasilia(new Date(this.relogio().getTime() - 3 * 86400000)));
     this.sql.exec('DELETE FROM emails_enviados WHERE em < ?', antes(365));
+    // fichas reprovadas com os dados pessoais já apagados nos aparelhos: saem também do histórico guardado aqui (LGPD)
+    try { this.esquecerFichasApagadas(); } catch (e) { console.error('limpeza das fichas reprovadas', e); }
   }
 }
 
@@ -823,14 +991,24 @@ export async function backupDoDia(cofre, r2, agora = new Date(), forcarNome = ''
   const dia = hojeBrasilia(agora);
   if (!forcarNome && cofre.controle('ultimo_backup') === dia) return false;
   if (cofre.vazio()) return false;
-  const nome = `backups/imoveis-dados-${forcarNome ? `${dia}-${forcarNome}` : dia}.json`;
-  await r2.put(nome, JSON.stringify(cofre.tudo()), { httpMetadata: { contentType: 'application/json' } });
+  // com a chave do backup seguro ligada (o administrador manda: ligarChaveDoBackup), o arquivo sai cifrado (.bkp): o banco inteiro,
+  // com CPFs e os resumos das senhas, nunca fica aberto no R2. Sem chave, o JSON aberto de antes.
+  const chave = cofre.chaveDoBackup();
+  const base = `backups/imoveis-dados-${forcarNome ? `${dia}-${forcarNome}` : dia}`;
+  const d = cofre.tudo();
+  if (chave) {
+    const bytes = await cifrarBackup(chave, new TextEncoder().encode(JSON.stringify(d)), { tipo: 'diario', origem: 'nuvem', arquivo: 'imoveis-dados.json', revisao: d.revisao });
+    await r2.put(`${base}.bkp`, bytes, { httpMetadata: { contentType: 'application/octet-stream' } });
+    await r2.delete(`${base}.json`); // a cópia aberta do mesmo dia (feita antes de ligar a chave) não fica
+  } else {
+    await r2.put(`${base}.json`, JSON.stringify(d), { httpMetadata: { contentType: 'application/json' } });
+  }
   if (forcarNome) {
-    await faxinaDeBackups(r2, new RegExp(`^backups/imoveis-dados-\\d{4}-\\d{2}-\\d{2}-${forcarNome}\\.json$`), MANTER_SUBSTITUICOES);
+    await faxinaDeBackups(r2, new RegExp(`^backups/imoveis-dados-\\d{4}-\\d{2}-\\d{2}-${forcarNome}\\.(json|bkp)$`), MANTER_SUBSTITUICOES);
     return true;
   }
   cofre.controle('ultimo_backup', dia);
-  await faxinaDeBackups(r2, /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.json$/, MANTER_BACKUPS);
+  await faxinaDeBackups(r2, /^backups\/imoveis-dados-\d{4}-\d{2}-\d{2}\.(json|bkp)$/, MANTER_BACKUPS);
   return true;
 }
 
@@ -915,6 +1093,7 @@ export class CofreDO {
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
       else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
+      else if (rota === '/chave-backup' && request.method === 'POST') r = await c.ligarChaveDoBackup(await corpo(), email);
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);
       else if (rota === '/faixa' && request.method === 'POST') r = c.faixa(await corpo(), email);
