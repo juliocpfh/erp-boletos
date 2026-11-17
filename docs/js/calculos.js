@@ -181,16 +181,22 @@ export function feriados(ano) {
   const mes = Math.floor((h + l - 7 * m + 114) / 31);
   const dia = ((h + l - 7 * m + 114) % 31) + 1;
   const pascoa = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-  const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map((x) => `${ano}-${x}`);
+  // 20/11 (Consciência Negra) é feriado nacional só desde 2024 (Lei 14.759/2023)
+  const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', ...(ano >= 2024 ? ['11-20'] : []), '12-25'].map((x) => `${ano}-${x}`);
   const lista = new Set([...fixos, ...[-48, -47, -2, 60].map((n) => somarDias(pascoa, n))]);
   FERIADOS.set(ano, lista);
   return lista;
 }
 
-/** Dia útil para o banco: nem sábado, nem domingo, nem feriado nacional. */
+/**
+ * Dia útil para o banco: nem sábado, nem domingo, nem feriado nacional, nem feriado da cidade cadastrado nas regras do sistema
+ * (um calendário só para vencimentos e prazos: vistoria, contestação da saída). Ex.: 08/09 feriado local → 06/09/2027 + 2 dias úteis = 10/09.
+ */
 export function diaUtil(isoData) {
   const dia = paraData(isoData).getUTCDay();
-  return dia !== 0 && dia !== 6 && !feriados(Number(isoData.slice(0, 4))).has(isoData.slice(0, 10));
+  const ano = Number(isoData.slice(0, 4));
+  const x = isoData.slice(0, 10);
+  return dia !== 0 && dia !== 6 && !feriados(ano).has(x) && !feriadosLocais(ano).includes(x);
 }
 
 /** Soma dias úteis (sem sábado, domingo e feriado nacional). Ex.: sexta 13/11/2026 + 5 → segunda 23/11/2026 (20/11 é feriado nacional). */
@@ -373,7 +379,8 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
     total_sem_desconto: totalSemDesconto,
     total_pontual: totalPontual,
     reserva_utilizada: reserva,
-    a_pagar_pontual: totalPontual - reserva,
+    // nunca negativo (ex.: ressarcimento maior que o boleto): igual ao "sem desconto", para quem atrasa não pagar mais que quem paga em dia
+    a_pagar_pontual: Math.max(totalPontual - reserva, 0),
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
     // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel); regra `base_multa`: boleto inteiro
     // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)

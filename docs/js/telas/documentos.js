@@ -52,7 +52,8 @@ export async function telaImprimir(rota) {
     const r = R.declaracaoAnual(d(), c.id, ano);
     const anos = [...new Set(d().faturas.map((f) => Number(String(f.emissao).slice(0, 4))))].sort((a, b) => b - a);
     const abas = `<div class="acoes nao-imprimir" style="margin-bottom:12px"><span class="suave">Ano-calendário:</span> ${(anos.length ? anos : [ano]).map((a) => link(`#/imprimir/declaracao?contrato=${c.id}&ano=${a}`, String(a), `botao ${a === ano ? '' : 'secundario '}pequeno`)).join(' ')} · ${botaoEmail('informe_ir', { contrato: c.id })}</div>`;
-    return `<div class="impressao">${voltar(r.empresas.length ? { seletor: '.impressao .declaracoes', nome: nomeArquivoDoc('Declaracao anual aluguel', c, String(ano)) } : null)}${abas}
+    const semNf = r.semNf && r.semNf.length ? `<div class="alerta aviso nao-imprimir">${r.semNf.length} aluguel(is) pago(s) em ${ano} sem NF (boleto de controle), somando ${C.reais(r.totalSemNf)}: não entram nesta declaração, que é feita pelas NFs. Confira com o contador como declarar esses valores.</div>` : '';
+    return `<div class="impressao">${voltar(r.empresas.length ? { seletor: '.impressao .declaracoes', nome: nomeArquivoDoc('Declaracao anual aluguel', c, String(ano)) } : null)}${abas}${semNf}
       ${r.empresas.length ? `<div class="declaracoes">${r.empresas.map((g) => declaracaoHtml(r, g)).join('')}</div>` : `<div class="alerta info">Nenhuma NF de aluguel emitida para ${esc(c.inquilino_nome)} em ${ano}.</div>`}</div>`;
   }
   if (tipo === 'recibo') {

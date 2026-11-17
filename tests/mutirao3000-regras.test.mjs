@@ -123,3 +123,109 @@ test('[50] data inexistente não é válida', () => {
   assert.equal(C.dataValida('2028-02-29'), '2028-02-29');
   CR.usarRegras(null);
 });
+
+test('[48] pagar de novo um boleto já pago é recusado', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-07', 'j');
+  const cb = d.cobrancas[0];
+  R.registrarPagamento(d, cb.id, '2026-08-10', null, 'j', { pagouEmDia: true });
+  assert.throws(() => R.registrarPagamento(d, cb.id, '2026-09-30', null, 'j'), C.ErroUsuario);
+  assert.equal(cb.data_pagamento, '2026-08-10');
+});
+
+test('[49][43] inadimplência: vermelho a partir de 5 dias; complemento da caução fica de fora', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-10', 'j');
+  const cb = d.cobrancas[0];
+  const a = R.todosAlertas(d, C.somarDias(cb.vencimento, 5)).find((x) => x.tipo === 'Inadimplência');
+  assert.equal(a.nivel, 'perigo');
+  const b = base({ garantia_tipo: 'Caução', caucao_valor: 540000, caucao_meses: 3, comprovante_caucao: 'c.pdf', caucao_data: '2025-06-07', caucao_pago_em: '2025-06-07', data_entrada: '2025-06-07', vigencia_inicio: '2025-06-07' });
+  R.inserir(b.d, 'correcoes', { contrato_id: b.c.id, data_vigencia: '2026-06-01', indice: 'IPCA', percentual: 4.5, valor_anterior: 200000, valor_novo: 209000 }, 'j');
+  R.gerarBoletosCaucao(b.d, b.c.id, 'j', null, { vencimento: '2026-07-10' });
+  assert.equal(R.inadimplencia(b.d, '2026-11-16').devedores.length, 0);
+});
+
+test('[13][14] ressarcimento maior que o boleto: em dia nunca negativo e aviso da sobra', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'j');
+  const cb = d.cobrancas[0];
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, descricao: 'Fundo de obras', valor: 250000, competencia_condominio: '2026-06', competencia_abatimento: '2026-07' }, 'j');
+  R.aplicarRessarcimentos(d, c, '2026-07', 'j');
+  assert.equal(R.totais(cb).a_pagar_pontual, 0);
+  assert.equal(R.totais(cb).a_pagar_sem_desconto, 0);
+  assert.match(R.alertaRessarcimentoEmAcordo(d, c).texto, /sobram R\$ 700,00/);
+});
+
+test('[15] boleto quitado em dia pela reserva não vai ao C6', () => {
+  const { d } = base({ reserva_valor: 180000, data_entrada: '2026-07-01', vigencia_inicio: '2026-07-01' });
+  R.gerarCobrancas(d, '2026-07', 'j');
+  assert.throws(() => R.pedidoBoletoC6(d, d.cobrancas[0], { id: 1 }), /quitado em dia/);
+});
+
+test('[17] FCI do mês incompleto pelos dias reais também com o mês de 30 dias', () => {
+  const { d, c } = base({ data_entrada: '2027-02-15', vigencia_inicio: '2027-02-15', fci_percentual: 5 });
+  d.config_regras = [{ chave: 'proporcional', valor: 'mes_30' }];
+  CR.usarRegras(d);
+  try {
+    const cb = R.montarCobranca(d, c, '2027-02');
+    const real = C.aluguelProporcional(200000, 14, 28);
+    assert.equal(cb.fci, C.arred(((real - C.descontoPorPercentual(real, 10)) * 5) / 100));
+  } finally { CR.usarRegras(null); }
+});
+
+test('[19] devolução pela conta: reparte a garantia menos os débitos', () => {
+  assert.equal(R.garantiaADevolverNaSaida({ garantia_corrigida: 594000, debitos: 100000 }), 494000);
+  assert.equal(R.garantiaADevolverNaSaida({ garantia_corrigida: 500000, debitos: 0, fci_danos: 150000, fci_usado: 120000 }), 470000);
+});
+
+test('[20][21][22] calendário: acordo e carência neutros, parcelas do acordo aparecem', () => {
+  const { d, c } = base({ carencia_meses: 1 });
+  R.gerarCobrancas(d, '2026-06', 'j'); R.gerarCobrancas(d, '2026-07', 'j');
+  const jul = R.boletoDoMes(d, c.id, '2026-07');
+  R.fazerAcordo(d, { contrato_id: c.id, ids: [jul.id], total: 200000, parcelas: 2, primeiro_vencimento: '2026-11-20' }, 'j', '2026-11-16');
+  const boletos = (m) => R.eventosDoMes(d, m, '2026-11-16').filter((e) => e.tipo === 'Boleto');
+  assert.ok(boletos('2026-08').every((e) => e.situacao !== 'perigo'));
+  assert.ok(boletos('2026-08').some((e) => e.estado === 'em acordo'));
+  assert.ok(boletos('2026-11').some((e) => /acordo 1\/2/.test(e.texto)));
+  assert.ok(boletos('2026-12').some((e) => /acordo 2\/2/.test(e.texto)));
+  assert.deepEqual(R.situacaoNoCalendario({ situacao: 'Carência', vencimento: '2026-07-10' }, '2026-11-16'), ['neutra', 'carência']);
+});
+
+test('[25] com a saída informada não há alerta de renovação', () => {
+  const { d, c } = base({ vigencia_fim: '2026-12-31', data_saida: '2026-12-15' });
+  assert.ok(!R.alertasContrato(d, c, '2026-11-16').some((a) => /renovação/.test(a.texto)));
+});
+
+test('[35][36][37] feriados locais nos prazos, 20/11 só desde 2024 e valor em formato americano recusado', () => {
+  const d = R.bancoVazio();
+  d.config_regras = [{ chave: 'feriados_locais', valor: ['09-08'] }];
+  CR.usarRegras(d);
+  try { assert.equal(C.somarDiasUteis('2027-09-06', 2), '2027-09-10'); } finally { CR.usarRegras(null); }
+  assert.equal(C.feriados(2023).has('2023-11-20'), false);
+  assert.equal(C.feriados(2024).has('2024-11-20'), true);
+  assert.throws(() => C.centavos('1,350.00'), /Use 2\.300,00/);
+  assert.equal(C.centavos('1.350,00'), 135000);
+});
+
+test('[39] declaração anual avisa os aluguéis pagos sem NF (boleto de controle)', () => {
+  const { d, c } = base({ gerar_nf: false, data_entrada: '2026-01-01' });
+  for (const m of ['2026-01', '2026-02']) { R.gerarCobrancas(d, m, 'j'); const cb = R.boletoDoMes(d, c.id, m); R.registrarPagamento(d, cb.id, cb.vencimento, null, 'j', { pagouEmDia: true }); }
+  const r = R.declaracaoAnual(d, c.id, 2026);
+  assert.equal(r.total, 0);
+  assert.equal(r.semNf.length, 2);
+});
+
+test('[41] IPTU à vista: o resultado do mês não desconta o que o inquilino ainda vai devolver', () => {
+  const { d, loja } = base({ data_entrada: '2025-01-01', cobrar_iptu: true });
+  R.inserir(d, 'iptus', { imovel_id: loja.id, ano: 2026, valor_total: 100000, num_parcelas: 10, primeiro_vencimento_boleto: '2026-03', pago_avista: true, valor_avista: 90000, data_quitacao: '2026-02-10', cobranca_inquilino: 'Parcelas normais nos meses em que ocupar' }, 'j');
+  const r = R.resultadosFinanceiros(d, '2026-02-01', '2026-02-28').find((x) => x.imovel.id === loja.id);
+  assert.ok(r.iptu >= 0);
+});
+
+test('[27][28] fechamento confere os boletos pelo vencimento, com as parcelas do acordo', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'j');
+  R.fazerAcordo(d, { contrato_id: c.id, ids: [d.cobrancas[0].id], total: 200000, parcelas: 1, primeiro_vencimento: '2026-11-20' }, 'j', '2026-11-16');
+  const e = R.etapasFechamento(d, '2026-11', '2026-11-25').find((x) => x.chave === 'pagamentos');
+  assert.equal(e.pendentes, 1);
+});

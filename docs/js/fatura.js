@@ -41,7 +41,7 @@ function linhas(f, emitente) {
     8: [[1, '', 'be bt'], [9, 'TOMADOR DE SERVIÇO', 'bt bd f-11'], [1, '', 'be bd bt'], [2, '', 'bt bd']],
     9: [[1, '', 'be'], [9, '', 'bd'], [1, '', 'be bd'], [2, '', 'bd']],
     10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, 60)))}</b>`, 'bd f-12 f-light duas-linhas'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
-    11: [[1, '', 'be'], [3, '<b>CPF</b>', 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
+    11: [[1, '', 'be'], [3, `<b>${String(f.tomador_documento || '').replace(/\D/g, '').length > 11 ? 'CNPJ' : 'CPF'}</b>`, 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
     12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, 70)))}</b>`, 'bd bb f-12 f-light duas-linhas'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
     13: [vazio(13, 'be bd bt bb')],
     14: [vazio(13, 'be bd bt bb')],
