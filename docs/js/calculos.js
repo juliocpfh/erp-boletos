@@ -507,9 +507,10 @@ export function competenciaValida(texto, padrao) {
   return COMPETENCIA_RE.test(String(texto || '')) ? String(texto) : padrao;
 }
 
-/** 'AAAA-MM-DD' válido, senão o padrão. */
+/** 'AAAA-MM-DD' válido (dia que existe no mês: 31/02 não), senão o padrão. */
 export function dataValida(texto, padrao = '') {
-  return DATA_RE.test(String(texto || '')) ? String(texto) : padrao;
+  const t = String(texto || '');
+  return DATA_RE.test(t) && Number(t.slice(8, 10)) <= diasNoMes(t.slice(0, 7)) ? t : padrao;
 }
 
 /** Formato aceito de cada parâmetro conhecido do endereço; os demais passam como estão (as telas escapam o texto). */

@@ -539,6 +539,8 @@ export const RENOVACAO = [
   campo('novo_valor', 'Novo aluguel negociado (valor cheio)', 'dinheiro', { base: true, ajuda: 'Em branco: o aluguel continua o mesmo' }),
   campo('novo_bonificado', 'Novo aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'O valor que o inquilino paga em dia. Preencha dois dos três (cheio, bonificado, %): o terceiro é calculado' }),
   campo('novo_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Vem a bonificação atual do contrato' }),
+  // decisão do dono (16/11/2026): o operador diz de qual aluguel em diante vale; os boletos em aberto desse mês em diante são refeitos
+  campo('vale_desde', 'O novo valor vale a partir do aluguel de', 'mes', { ajuda: 'Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 

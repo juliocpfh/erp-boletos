@@ -147,11 +147,16 @@ export function cartaReajuste(c, comp) {
   // vencimento do boleto corrigido: o do boleto já gerado ou o do contrato naquele mês (vale o termo de troca do dia), o mesmo da tela Reajustes
   const vencNovo = R.vencimentoDoReajuste(d(), c, comp);
   if (k.percentual === null) {
-    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>`;
+    const velhos = (k.usados || []).filter((u) => !u.registro && u.ultimo).map((u) => `${u.indice} só até ${compBr(u.ultimo.mes_ref)}`);
+    return `<div class="alerta perigo nao-imprimir">Falta informar o índice acumulado de ${esc(k.faltando.join(' e ') || 'o índice do contrato')} até ${compBr(anterior)}${velhos.length ? ` (cadastrado: ${esc(velhos.join('; '))})` : ''}, ou aplicar a correção com o % ou o novo valor digitado. ${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>`;
   }
   // texto do índice: digitado à mão (arredondado ou outro %) mostra também o acumulado do índice, quando cadastrado
-  const indiceTexto = x && x.digitado
-    ? `o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ''}`
+  // índice negativo: o aluguel fica igual, como diz o contrato
+  const negativo = x ? (x.percentual_indice < 0 ? x.percentual_indice : null) : k.indiceNegativo;
+  const indiceTexto = negativo !== null && negativo !== undefined && !(x && x.digitado)
+    ? `o <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses ficou negativo (<b>${pct(negativo)}</b>): como diz o contrato, o aluguel continua o mesmo`
+    : x && x.digitado
+    ?`o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ''}`
     : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
   // caução: acompanha o aluguel corrigido (aluguéis × aluguel com bonificação, ou cheio: regras `caucao_acompanha` e `caucao_base`); só aparece quando falta depositar
   const baseCaucao = R.aluguelDaCaucao(k.novo, c);

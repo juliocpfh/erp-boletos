@@ -548,6 +548,17 @@ export function contratoAtivo(contrato, dataRef = C.hojeIso()) {
 /** Desconto de pontualidade do contrato (0 quando não tem bonificação). */
 export const percentualBonificacao = (c) => (c.bonificacao === false ? 0 : (c.desconto_pontualidade_percentual || 0));
 
+/**
+ * Bonificação do aluguel de uma competência: a do contrato, salvo antes de um novo valor negociado que mudou o % (a correção
+ * guarda o % anterior): ali vale o de antes. Ex.: 10% até 11/2026 e 5% a partir de 12/2026 → o boleto de 11/2026 fica com 10%.
+ */
+export function bonificacaoNaCompetencia(d, c, comp) {
+  const ref = `${comp}-01`;
+  const depois = correcoesDo(d, c.id).filter((x) => x.bonificacao_anterior !== undefined && x.bonificacao_anterior !== null && x.data_vigencia > ref)
+    .sort((a, b) => a.data_vigencia.localeCompare(b.data_vigencia));
+  return depois.length ? depois[0].bonificacao_anterior : percentualBonificacao(c);
+}
+
 /** Data-base da correção anual: a informada ou, se vazia, o início da vigência. */
 export const dataBaseCorrecao = (c) => c.data_base_correcao || c.vigencia_inicio || c.data_entrada;
 
@@ -766,7 +777,8 @@ export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencim
   if (!(x.complemento > 0)) throw new Error('A caução depositada já cobre o valor necessário.');
   const n = plano && plano.length ? plano.length : Math.trunc(Number(parcelas) || 1);
   if (n < 1 || n > 12) throw new Error('Parcelas da caução: de 1 a 12.');
-  const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+  if (x.complemento < n) throw new C.ErroUsuario(`O complemento (${C.reais(x.complemento)}) é pequeno demais para ${n} boletos: nenhum pode ficar com R$ 0,00. Use menos parcelas.`);
+  const dataOk = (v) => !!C.dataValida(v);
   if (vencimento && !dataOk(vencimento)) throw new Error('Informe o vencimento do boleto da caução.');
   if (plano && plano.length) {
     if (plano.some((p) => !dataOk(p.vencimento))) throw new Error('Informe o vencimento de cada boleto da caução.');
@@ -1452,7 +1464,7 @@ export function montarCobranca(d, contrato, comp) {
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
     entrada: contrato.data_entrada, saida: contrato.data_saida,
-    descontoPercentual: percentualBonificacao(contrato), iptu, seguro,
+    descontoPercentual: bonificacaoNaCompetencia(d, contrato, comp), iptu, seguro,
     taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0,
   });
   return {
@@ -1514,7 +1526,19 @@ function boletoSemOcupacao(d, cb, c = buscar(d, 'contratos', cb.contrato_id)) {
 export function alertasBoletosSemOcupacao(d) {
   const lista = [];
   for (const cb of d.cobrancas) {
-    if (cb.data_pagamento || emAcordo(cb) || ehBoletoAvulso(cb)) continue;
+    // boleto já pago de mês depois da saída (saída informada para antes de um mês pago): o valor volta ao inquilino ou é abatido
+    // no cálculo final. Ex.: boleto de 11/2026 pago (R$ 1.800,00) e saída em 15/10/2026. Some quando o cálculo final é feito.
+    if (cb.data_pagamento && !ehBoletoAvulso(cb)) {
+      const c = buscar(d, 'contratos', cb.contrato_id);
+      if (c && c.data_saida && c.data_saida < `${cb.competencia}-01` && !continuadoPor(d, c) && !encerramentoDo(d, c.id)) {
+        const i = buscar(d, 'imoveis', c.imovel_id);
+        lista.push({ nivel: 'aviso', tipo: 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
+          link: `#/cobranca/${cb.id}`, ancora: `boleto-${cb.id}`,
+          texto: `Boleto de ${C.compBr(cb.competencia)} foi pago (${C.reais(cb.valor_pago || 0)}), mas não tem nenhum dia ocupado (saída em ${C.dataBr(c.data_saida)}): devolva ao inquilino ou abata no cálculo final da saída.` });
+      }
+      continue;
+    }
+    if (emAcordo(cb) || ehBoletoAvulso(cb)) continue;
     const c = buscar(d, 'contratos', cb.contrato_id);
     if (!boletoSemOcupacao(d, cb, c)) continue;
     const i = buscar(d, 'imoveis', c.imovel_id);
@@ -1962,28 +1986,49 @@ export function registrarRenovacao(d, contratoId, dados, usuario) {
   }
   if (Object.keys(mud).length) atualizar(d, 'contratos', c.id, mud, usuario, dados.tipo);
   if (dados.novo_valor > 0) {
-    const anterior = aluguelAtual(d, c, C.somarDias(dados.data, -1));
-    inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: dados.data, indice: 'Negociado', renovacao_id: r.id,
-      percentual: anterior ? C.percentualPorDesconto(anterior, dados.novo_valor - anterior) : 0,
-      valor_anterior: anterior, valor_novo: dados.novo_valor, observacoes: dados.tipo }, usuario, `Novo valor negociado: ${C.reais(dados.novo_valor)}`);
-    // bonificação combinada junto com o novo valor (cheio, bonificado e %, como no contrato): vale para o contrato
+    // o operador diz a partir de qual aluguel vale o novo valor (decisão do dono, 16/11/2026); sem o mês, vale o da data
+    // (dia 1º) ou o seguinte. Ex.: data 01/12/2026 → aluguel de 12/2026; data 15/12/2026 → 01/2027
+    const desde = valeDesdeDaRenovacao(dados);
+    const vigencia = C.competenciaValida(dados.vale_desde, '') ? `${desde}-01` : dados.data;
+    const anterior = aluguelAtual(d, c, C.somarDias(vigencia, -1));
+    const pctAntes = percentualBonificacao(c);
     const pctNovo = dados.novo_percentual;
-    if (pctNovo !== null && pctNovo !== undefined && pctNovo !== percentualBonificacao(c)) {
-      atualizar(d, 'contratos', c.id, { desconto_pontualidade_percentual: pctNovo, bonificacao: pctNovo > 0 }, usuario, `Bonificação passa a ${String(pctNovo).replace('.', ',')}% (novo valor negociado)`);
+    const mudaPct = pctNovo !== null && pctNovo !== undefined && pctNovo !== pctAntes;
+    inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: vigencia, indice: 'Negociado', renovacao_id: r.id,
+      percentual: anterior ? C.percentualPorDesconto(anterior, dados.novo_valor - anterior) : 0,
+      valor_anterior: anterior, valor_novo: dados.novo_valor, observacoes: dados.tipo,
+      // a bonificação nova também só vale deste aluguel em diante: os boletos de antes continuam com a anterior
+      ...(mudaPct ? { bonificacao_anterior: pctAntes, bonificacao_percentual: pctNovo } : {}) }, usuario, `Novo valor negociado: ${C.reais(dados.novo_valor)} a partir do aluguel de ${C.compBr(desde)}`);
+    // bonificação combinada junto com o novo valor (cheio, bonificado e %, como no contrato): vale para o contrato
+    if (mudaPct) {
+      atualizar(d, 'contratos', c.id, { desconto_pontualidade_percentual: pctNovo, bonificacao: pctNovo > 0 }, usuario, `Bonificação passa a ${String(pctNovo).replace('.', ',')}% a partir do aluguel de ${C.compBr(desde)} (novo valor negociado)`);
     }
+    // os boletos em aberto desse mês em diante passam ao novo valor (os de antes e os pagos ficam como estão)
+    recalcularCobrancas(d, (cb) => cb.contrato_id === c.id && cb.competencia >= desde, usuario);
     // termo aditivo do novo valor (pedido do dono, 2026-11-13): fica aguardando a assinatura (o aceite), anexada depois em
     // "Termos aditivos"; o e-mail da etapa manda o termo para assinar
     const modelo = modelosDe(d, 'aditivo_valor')[0];
     const pctFinal = pctNovo !== null && pctNovo !== undefined ? pctNovo : percentualBonificacao(c);
     if (modelo) {
       inserir(d, 'aditivos', { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: TIPO_ADITIVO_VALOR, data: C.hojeIso() < dados.data ? C.hojeIso() : dados.data,
-        data_vigencia: dados.data, valor_anterior: anterior, valor_novo: dados.novo_valor, percentual: pctFinal, renovacao_id: r.id, numero: proximoNumeroAditivo(d, c),
+        data_vigencia: vigencia, valor_anterior: anterior, valor_novo: dados.novo_valor, percentual: pctFinal, renovacao_id: r.id, numero: proximoNumeroAditivo(d, c),
         testemunhas: [], modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto, arquivo: null,
-        assunto: `Novo valor do aluguel: ${C.reais(anterior)} → ${C.reais(dados.novo_valor)}, a partir de ${C.dataBr(dados.data)}` },
+        assunto: `Novo valor do aluguel: ${C.reais(anterior)} → ${C.reais(dados.novo_valor)}, a partir de ${C.dataBr(vigencia)}` },
       usuario, `${c.inquilino_nome}: termo aditivo do novo valor gerado (aguardando o aceite assinado)`);
     }
   }
   return r;
+}
+
+/**
+ * Mês do primeiro aluguel com o novo valor negociado: o informado (``vale_desde``) ou, sem ele, o da data quando ela é dia 1º
+ * e o seguinte nos outros dias (o aluguel de um mês usa o valor vigente no dia 1º). Ex.: 15/12/2026 → 2027-01.
+ */
+export function valeDesdeDaRenovacao(dados) {
+  const informado = C.competenciaValida(dados.vale_desde, '');
+  if (informado) return informado;
+  const data = String(dados.data || C.hojeIso());
+  return data.slice(8, 10) === '01' ? data.slice(0, 7) : C.somarMeses(data.slice(0, 7), 1);
 }
 
 /** Termo aditivo do novo valor criado com a renovação (o aceite), ou null. */
@@ -1997,7 +2042,14 @@ export function excluirRenovacao(d, renovacaoId, usuario) {
   const termo = aditivoDaRenovacao(d, r.id);
   if (termo && (termo.arquivo || termo.assinado_em || termo.perdido_em)) throw new Error('O termo aditivo do novo valor já foi assinado: exclua o termo em "Termos aditivos" antes.');
   if (termo) excluir(d, 'aditivos', termo.id, usuario, 'Termo aditivo do novo valor excluído com a renovação');
-  for (const x of d.correcoes.filter((y) => y.renovacao_id === r.id)) excluir(d, 'correcoes', x.id, usuario, 'Novo valor negociado excluído com a renovação');
+  for (const x of d.correcoes.filter((y) => y.renovacao_id === r.id)) {
+    // a bonificação que mudou com o novo valor volta a ser a de antes (se ninguém a mudou depois)
+    const c = buscar(d, 'contratos', x.contrato_id);
+    if (c && x.bonificacao_anterior !== undefined && x.bonificacao_anterior !== null && percentualBonificacao(c) === x.bonificacao_percentual) {
+      atualizar(d, 'contratos', c.id, { desconto_pontualidade_percentual: x.bonificacao_anterior, bonificacao: x.bonificacao_anterior > 0 }, usuario, `Bonificação volta a ${String(x.bonificacao_anterior).replace('.', ',')}% (novo valor negociado excluído)`);
+    }
+    excluir(d, 'correcoes', x.id, usuario, 'Novo valor negociado excluído com a renovação');
+  }
   excluir(d, 'renovacoes', r.id, usuario, `${r.tipo} excluído`);
 }
 
@@ -2089,7 +2141,30 @@ export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
   return cb;
 }
 
-export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && !cb.data_pagamento);
+/**
+ * Boletos ainda a cobrar do contrato (``aCobrar``): os que estão em acordo ficam de fora (valem as parcelas do acordo, que
+ * entram), a carência também, e o complemento da caução, que é garantia e nunca entrou nela (não se desconta da caução).
+ */
+export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && aCobrar(cb) && !ehComplementoCaucao(cb));
+
+/**
+ * Débitos de aluguel da saída (cálculo final e devolução da garantia na troca de titular), na ``data``: cada boleto a cobrar
+ * (``cobrancasEmAberto``) pelo valor do dia: vencido = cheio + multa + juros até a data (``C.liquidar``); ainda não vencido = o
+ * valor em dia (com a bonificação). Ex.: aluguel de R$ 2.000,00 (R$ 1.800,00 em dia) que vence 10/12 e saída em 15/11 → R$ 1.800,00;
+ * dois aluguéis em acordo de R$ 4.200,00 → só as parcelas do acordo (R$ 4.200,00), nunca os dois boletos de novo.
+ * Devolve { itens: [{ cobranca, valor, texto }], total }.
+ */
+export function debitosDaSaida(d, c, data = C.hojeIso()) {
+  const itens = cobrancasEmAberto(d, c.id).sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || '')).map((cb) => {
+    const venceu = C.vencido(cb.vencimento, data);
+    const l = venceu ? C.liquidar(cb, data) : null;
+    const valor = venceu ? l.valor_devido : totais(cb).a_pagar_pontual;
+    const nome = ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`;
+    const conta = venceu && (l.multa || l.juros) ? ` (com multa de ${C.reais(l.multa)} e juros de ${C.reais(l.juros)} até ${C.dataBr(data)})` : !venceu ? ' (ainda não venceu: valor em dia)' : '';
+    return { cobranca: cb, valor, texto: `${nome} em aberto: ${C.reais(valor)}${conta}` };
+  }).filter((x) => x.valor > 0);
+  return { itens, total: itens.reduce((s, x) => s + x.valor, 0) };
+}
 
 /**
  * Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. O FCI corrigido paga só
@@ -5694,7 +5769,9 @@ export function calcularReajuste(d, c, comp) {
   const nome = c.indice_correcao || '';
   const partes = nome.replace(/\(.*\)/, '').split('/').map((x) => x.trim()).filter(Boolean);
   const ref = C.somarMeses(comp, -1);
-  const usados = partes.map((p) => ({ indice: p, registro: indiceAcumulado(d, p, ref) }));
+  // só vale o acumulado até o mês anterior ao corrigido: um mais velho (ex.: só até 05/2025 para o reajuste de 06/2026) conta
+  // como faltando (fica em `ultimo`, para a tela dizer até quando está cadastrado)
+  const usados = partes.map((p) => { const x = indiceAcumulado(d, p, ref); return { indice: p, registro: x && x.mes_ref === ref ? x : null, ultimo: x }; });
   const faltando = usados.filter((u) => !u.registro).map((u) => u.indice);
   let escolhido = null;
   if (!faltando.length && usados.length) {
@@ -5704,9 +5781,11 @@ export function calcularReajuste(d, c, comp) {
   const atual = aluguelAtual(d, c, C.somarDias(`${comp}-01`, -1));
   const pctBonif = percentualBonificacao(c);
   const bonif = (v) => v - C.descontoPorPercentual(v, pctBonif);
-  const pct = escolhido ? escolhido.registro.percentual : null;
+  // índice negativo: o aluguel fica igual, como diz o contrato (decisão do dono, 16/11/2026). Ex.: IGP-M -1,5% → 0%
+  const doIndice = escolhido ? escolhido.registro.percentual : null;
+  const pct = doIndice === null ? null : Math.max(doIndice, 0);
   const novo = pct === null ? null : C.aplicarCorrecao(atual, pct);
-  return { indiceContrato: nome, usados, faltando, escolhido, percentual: pct, atual, novo, atualBonificado: bonif(atual),
+  return { indiceContrato: nome, usados, faltando, escolhido, percentual: pct, percentualDoIndice: doIndice, indiceNegativo: doIndice !== null && doIndice < 0 ? doIndice : null, atual, novo, atualBonificado: bonif(atual),
     novoBonificado: novo === null ? null : bonif(novo), bonificacao: pctBonif > 0, competencia: comp };
 }
 
@@ -5736,7 +5815,7 @@ export function aplicarReajuste(d, contratoId, comp, usuario, manual = null) {
   // digitado com o índice cadastrado (ex.: IGP-M 4,37% arredondado para 4,5%): guarda também o % do índice, para a carta
   const indice = r.escolhido ? r.escolhido.indice : (r.indiceContrato || 'Informado');
   return inserir(d, 'correcoes', { contrato_id: c.id, data_vigencia: `${comp}-01`, indice, indice_contrato: r.indiceContrato,
-    data_indice: r.escolhido ? r.escolhido.registro.mes_ref : null, percentual_indice: digitado && r.escolhido ? r.percentual : null,
+    data_indice: r.escolhido ? r.escolhido.registro.mes_ref : null, percentual_indice: r.escolhido && (digitado || r.indiceNegativo !== null) ? r.percentualDoIndice : null,
     digitado: digitado || null, percentual, valor_anterior: r.atual, valor_novo: novo,
     observacoes: `Reajuste do 13º mês (${C.compBr(comp)})${digitado ? ', % ou valor digitado' : ''}` }, usuario, `Reajuste ${C.compBr(comp)}: ${C.reais(r.atual)} → ${C.reais(novo)} (${indice} ${C.pct(percentual)})`);
 }
@@ -5889,13 +5968,21 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   // o que separa o pago da NF no pagamento atrasado normal (``C.liquidar``): IPTU, seguro, tarifa e FCI ficam fora; a reserva
   // já abatida e o ressarcimento que não sai da NF entram (NF com o aluguel cheio): pode dar negativo (NF maior que o pago)
   const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0), 0));
+  if (total < n) throw new C.ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${C.reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
   const valores = C.parcelas(total, n);
   const fora = C.parcelas(foraDaNf, n);
+  // o FCI dos boletos de origem continua sendo FCI nas parcelas (entra no fundo quando a parcela é paga e fica fora da multa):
+  // sai da parte "fora da NF" de cada parcela. Ex.: aluguel R$ 2.000,00 + FCI R$ 90,00 → parcela com fci R$ 90,00
+  const fciOrigem = Math.max(0, Math.min(lista.reduce((s, cb) => s + (cb.fci || 0), 0), foraDaNf, total));
+  const fciPorParcela = C.parcelas(fciOrigem, n);
+  let fciPendente = 0;
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
   const boletos = valores.map((valor, k) => {
     const vencimento = C.somarMesesData(primeiro_vencimento, k);
     const outros = Math.min(fora[k], valor);
-    return { valor, vencimento, competencia: mesSeguinte ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7), nf: valor - outros, outros, parcela: n > 1 ? `${k + 1}/${n}` : '' };
+    const fci = Math.max(0, Math.min(fciPorParcela[k] + fciPendente, outros));
+    fciPendente += fciPorParcela[k] - fci;
+    return { valor, vencimento, competencia: mesSeguinte ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7), nf: valor - outros, outros: outros - fci, fci, parcela: n > 1 ? `${k + 1}/${n}` : '' };
   });
   const periodos = lista.map((cb) => (ehParcelaAcordo(cb) && cb.acordo_periodo) || C.periodoServico(cb.competencia, c.data_entrada, c.data_saida));
   const periodo = [periodos.map((x) => x[0]).sort()[0], periodos.map((x) => x[1]).sort().pop()];
@@ -5913,7 +6000,7 @@ export function fazerAcordo(d, dados, usuario, hoje = C.hojeIso()) {
   const parcelas = p.boletos.map((b) => inserir(d, 'cobrancas', {
     contrato_id: c.id, competencia: b.competencia, vencimento: b.vencimento,
     dias_cobrados: C.diasNoMes(b.competencia), dias_mes: C.diasNoMes(b.competencia), aluguel_mensal: 0, aluguel: b.nf, desconto: 0,
-    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: 0, outros: b.outros,
+    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: b.fci || 0, outros: b.outros,
     outros_descricao: b.outros > 0 ? 'Encargos do acordo' : b.outros < 0 ? 'Reserva ou ressarcimento já abatido (entra na NF)' : '',
     reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
     multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0,
