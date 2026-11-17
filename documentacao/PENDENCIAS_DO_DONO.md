@@ -45,6 +45,10 @@ Leva uns 30 minutos, uma vez só, no computador. Precisa da conta Gmail da empre
 
 Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você entra na conta; eu não digito senhas).
 
+**Ainda não visto (conferir na ligação de verdade, Claude junto):**
+- [ ] **Volta do Google pelo Access:** no passo 7, ao tocar em **Permitir**, o sistema deve voltar direto com "Gmail conectado", sem pedir de novo o código de login do Cloudflare. Se pedir o código ou der erro, me mande um print: aí acerto a regra do Access para o endereço `/api/email/google/retorno` (`LIGAR_GMAIL.md` explica).
+- [ ] **Erros no console na volta:** no teste do Claude (17/11, nuvem de teste) apareceram 3 erros "An unknown error occurred when fetching the script" na volta entre os endereços, provavelmente do service worker (cópia do sistema no aparelho). A tela funcionou; falta o Claude investigar e, se for do `sw.js`, corrigir.
+
 ---
 
 ## 2. Ligar o aviso no celular  `[x]` (conferido pelo dono em 17/11)
