@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #283, mutirão 3000).
+Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #296, mutirão 3000).
 
 Marque com `[x]` o que for concluindo.
 
@@ -251,7 +251,14 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 - Publicar o site pelo GitHub Actions (permite o aplicativo baixar só os arquivos que mudaram).
 - Impedimentos de venda que são projetos grandes (vários clientes no mesmo sistema, login próprio, proprietário de terceiros com repasse, DIMOB, importar planilha, outros bancos, portal do inquilino, assinatura eletrônica): ver `MUTIRAO_3000.md`, frente "mercado".
 
-**2ª rodada do mutirão 3000 (17/11, em andamento):** dados e nuvem pendentes, mensagens de erro em português simples, primeiros passos e ajuda nas telas, painel de gestão com PDF, banco automático (aviso do C6, conciliação pelo Pix, saldo do extrato), régua de cobrança (prepara os e-mails; **só envia com a sua autorização**), LGPD e registro de acessos.
+**2ª rodada do mutirão 3000 (17/11), na `main` pelas PRs #285–#296:** tela **Gestão** (Financeiro, com PDF); **régua de cobrança** (Financeiro → E-mails da régua: prepara 3 dias antes, no dia, 3 e 10 dias depois; só envia os que o administrador marcar e autorizar, com a regra `regua_envio` ligada); **banco automático** (avisos do C6, ligação pelo código do Pix, extrato CSV com conferência do saldo, Saúde do banco); **primeiros passos** e botão "?" nas telas; 192 mensagens de erro em português simples; **LGPD**: backups da nuvem cifrados, tela **Acessos**, "Dados de uma pessoa" (ZIP pelo CPF) e "Apagar tudo desta pessoa" só 10 anos depois do fim do contrato; lixeira de anexos (30 dias) e cópia de cada hora do backup seguro (2 dias). Decisões de 17/11 aplicadas: conflito fica com o valor já gravado na nuvem; troca de titular esperando o termo não apaga mais a saída; caução R$ 0,00 de propósito fica; Desfazer volta a alteração inteira, com prévia dos boletos que mudam. **Em andamento:** fila entre aparelho e nuvem e rapidez da gravação (parte 3 de dados).
+
+**Conferir no uso (2ª rodada):**
+- [ ] Abrir o sistema uma vez no computador do administrador com o backup seguro ligado (o backup da nuvem passa a sair cifrado; "Voltar para este dia" pede a senha do backup).
+- [ ] Financeiro → Gestão: números do mês e o PDF.
+- [ ] Financeiro → E-mails da régua: a lista do dia, tudo desmarcado.
+
+**Relatório do trabalho para o contratante:** https://claude.ai/artifact/FNTqKJrMNp8sZGYywrmyHt
 
 ## Ficou de fora de propósito (não é defeito)
 
