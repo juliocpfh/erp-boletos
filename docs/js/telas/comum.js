@@ -89,7 +89,12 @@ export function tabelaHistorico(lista, desfazer = null) {
   return `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr>${linhas || '<tr><td colspan="4" class="suave">Nada registrado ainda.</td></tr>'}</table></div>`;
 }
 
-export const ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n).reverse();
+/** As `n` entradas mais recentes do histórico que passam no filtro, da mais nova para a mais velha (anda de trás para a frente e para em `n`). */
+export const ultimos = (filtro, n = 40) => {
+  const h = d().historico; const out = [];
+  for (let i = h.length - 1; i >= 0 && out.length < n; i -= 1) if (filtro(h[i], i, h)) out.push(h[i]);
+  return out;
+};
 
 // --------------------------------------------------------------------------
 // Pastas de arquivos
@@ -908,6 +913,13 @@ export const gruposDeAlertas = (alertas) => {
   for (const a of alertas) grupos.set(a.tipo, [...(grupos.get(a.tipo) || []), a]);
   return [...grupos];
 };
+
+/**
+ * Painel: cada tipo de alerta mostra só os primeiros MOSTRAR_ALERTAS ("Ver todos" abre o resto). Com 150 contratos eram 472
+ * alertas, cada um com 3 botões: 500 KB de tela e 236 ms de desenho. Os tipos abertos ficam em `alertasAbertos` até recarregar.
+ */
+export const MOSTRAR_ALERTAS = 5;
+export const alertasAbertos = new Set();
 
 /** Caixa de últimas alterações: começa recolhida e só abre quando o usuário clica nela. */
 export const caixaHistorico = (titulo, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;

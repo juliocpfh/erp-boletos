@@ -31,6 +31,7 @@ import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/n
 import { telaReajustes } from './telas/reajustes.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
+import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
 
 // --------------------------------------------------------------------------
 // Telas de abertura
@@ -295,8 +296,9 @@ export const TELAS = {
       ${avisoBackupSeguro()}
       ${calendarioDoPainel(C.competenciaValida(rota.q.mes, C.competenciaDe(hoje)), hoje)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario('admin') ? link('#/alertas-config', 'Editar', 'botao secundario pequeno') : ''}</div>
-        ${gruposDeAlertas(alertas).map(([tipo, lista]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
-          ${lista.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}</div>`).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${gruposDeAlertas(alertas).map(([tipo, lista]) => { const todos = alertasAbertos.has(tipo); return `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
+          ${(todos ? lista : lista.slice(0, MOSTRAR_ALERTAS)).map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}
+          ${lista.length > MOSTRAR_ALERTAS ? `<p class="mais-alertas">${botao('verTodosAlertas', todos ? `Mostrar só os ${MOSTRAR_ALERTAS} primeiros` : `Ver todos os ${lista.length} alertas de "${esc(tipo)}" (mais ${lista.length - MOSTRAR_ALERTAS})`, { tipo }, 'secundario mini')}</p>` : ''}</div>`; }).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
         ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
           ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}</details>` : ''}
         ${desligados.length ? `<details id="alertas-desligados"><summary class="suave">${desligados.length} alerta(s) desligado(s) (clique para ver ou religar)</summary>

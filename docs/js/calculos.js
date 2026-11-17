@@ -540,6 +540,7 @@ const FORMATOS_PARAMETRO = {
   ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,
   q: /^[^\r\n<>]{1,100}$/, // texto da busca global (a tela ainda passa por esc())
   situacao: /^(Reprovada|Desistiu)$/, // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
+  pagina: /^\d{1,5}$/, // página de uma lista longa (Histórico)
 };
 
 /** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */

@@ -30,7 +30,8 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
   // erro: o site responde com página de erro (ex.: 502 do Cloudflare)
   // lento: o site não responde (sinal fraco) até `site.soltar()`; os prazos do service worker vencem antes
   // caiu: caminhos que não respondem mais (a internet caiu no meio da abertura, depois da conferência)
-  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), caiu: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {} };
+  // arquivos: caminho → conteúdo de verdade (ex.: o index.html e os módulos de docs/), para a instalação ler os import
+  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), caiu: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {}, arquivos: new Map() };
   const chave = (k) => (k instanceof Request ? k.url : new URL(k, `${origem}/`).href);
   const cacheFalso = (nome) => {
     if (!armazem.has(nome)) armazem.set(nome, new Map());
@@ -64,7 +65,7 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
     const data = site.noCaminho.get(url.pathname + url.search) || site.naOrigem.get(url.pathname) || site.publicada;
     const r = site.erro ? new Response('Bad gateway', { status: site.erro })
       : site.fora.has(url.pathname) ? new Response('Not found', { status: 404 })
-        : new Response(`conteudo de ${url.pathname} @ ${data}`, { status: 200, headers: { 'last-modified': data } });
+        : new Response(site.arquivos.has(url.pathname) ? site.arquivos.get(url.pathname) : `conteudo de ${url.pathname} @ ${data}`, { status: 200, headers: { 'last-modified': data } });
     Object.defineProperty(r, 'type', { value: 'basic' });
     Object.defineProperty(r, 'url', { value: url.href });
     return r;
@@ -93,17 +94,24 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
     return textos;
   };
   const guardados = () => [...(armazem.get('imoveis-telas-v3') || new Map()).keys()].map((u) => new URL(u).pathname);
-  return { site, pedidos, abrir, pedir, armazem, terminarFundo, guardados };
+  /** A instalação do service worker (1ª visita: a página abriu sem ele). */
+  const instalar = async () => {
+    let p = Promise.resolve();
+    ouvintes.install({ waitUntil: (x) => { p = x; } });
+    await p;
+  };
+  return { site, pedidos, abrir, pedir, armazem, terminarFundo, guardados, instalar };
 }
 
 test('primeira abertura baixa tudo; a seguinte, na mesma versão, faz uma conferência só e usa a cópia', async () => {
   const m = mundo();
   await m.abrir();
-  assert.ok(m.pedidos.includes('HEAD /index.html (no-cache)'), 'conferiu a data de publicação');
+  assert.ok(m.pedidos.includes('GET / (no-cache)'), 'a página vem do site, sem a cópia de 10 min do navegador');
+  assert.ok(!m.pedidos.some((p) => p.startsWith('HEAD')), 'a data de publicação vem da própria página, sem um pedido à parte');
   assert.ok(m.pedidos.includes('GET /js/app.js (no-cache)'));
   m.pedidos.length = 0;
   const textos = await m.abrir();
-  assert.deepEqual(m.pedidos.sort(), ['GET /', 'HEAD /index.html (no-cache)'], 'só a página e a conferência foram ao site');
+  assert.deepEqual(m.pedidos, ['GET / (no-cache)'], 'só a página foi ao site');
   assert.match(textos[0], /js\/app\.js/);
 });
 
@@ -118,15 +126,21 @@ test('partes carregadas só quando usadas (planilha, regras em texto, visualizad
     assert.ok(m.guardados().includes(a), `guardou ${a}`);
     assert.ok(fs.existsSync(new URL(`../docs${a}`, import.meta.url)), `${a} existe em docs/vendor`);
   }
-  for (const a of ['/vendor/exceljs.min.js', '/vendor/pdf.min.js', '/vendor/pdf.worker.min.js']) assert.ok(!m.guardados().includes(a), `${a} fica para o 1º uso`);
+  // o pdf.js também (compactar o PDF escaneado e o visualizador do celular sem internet); a planilha só depois do 1º uso
+  for (const a of ['/vendor/pdf.min.js', '/vendor/pdf.worker.min.js']) assert.ok(m.guardados().includes(a), `guardou ${a}`);
+  assert.ok(!m.guardados().includes('/vendor/exceljs.min.js'), 'a planilha fica para o 1º uso');
+  // o manifest e os ícones do aplicativo (o navegador pede por fora dos módulos)
+  for (const a of ['/manifest.webmanifest', '/icones/erp-192.png', '/icones/aviso-96.png']) assert.ok(m.guardados().includes(a), `guardou ${a}`);
   m.site.internet = false;
   await m.abrir();
   assert.match(await m.pedir('js/exportar.js'), /exportar\.js/, 'sem internet, a planilha de tudo ainda carrega');
   assert.match(await m.pedir('vendor/jspdf.umd.min.js'), /jspdf/, 'e o PDF também');
-  // em localhost não baixa nada em segundo plano (lá cada arquivo é conferido quando a página pede)
+  // em localhost também (lá cada arquivo é conferido quando a página pede, mas o teste sem internet tem de mostrar a falta de um)
   const local = mundo({ hostname: 'localhost' });
   await local.abrir();
-  assert.ok(!local.guardados().includes('/js/exportar.js'));
+  for (const a of ['/js/exportar.js', '/vendor/jspdf.umd.min.js', '/manifest.webmanifest']) assert.ok(local.guardados().includes(a), `localhost guardou ${a}`);
+  local.site.internet = false;
+  assert.match(await local.pedir('js/migracao.js'), /migracao\.js/);
 });
 
 test('versão nova publicada: a cópia é refeita com os arquivos novos', async () => {
@@ -228,11 +242,17 @@ test('sinal fraco (o site demora a responder): a página e os arquivos abrem da 
   assert.match(pagina, /conteudo de \/ @ Sat, 07/, 'a página da cópia (versão A), sem esperar o site');
   const textos = await Promise.all(['js/app.js', 'css/estilo.css'].map((a) => m.pedir(a)));
   assert.match(textos[0], /js\/app\.js @ Sat, 07/, 'arquivos da cópia');
-  // o site responde depois: a página nova fica guardada para a próxima abertura
+  // o site responde depois: a página nova NÃO entra na cópia da versão A (seria a página de uma versão com os módulos de outra)
   m.site.lento = false;
   m.site.soltar();
   await m.terminarFundo();
-  assert.match(await (await m.armazem.get('imoveis-telas-v3').get('https://erp.exemplo.com.br/')).clone().text(), /@ Sun, 08/);
+  const emUso = m.armazem.get('imoveis-telas-v3');
+  assert.match(await (await emUso.get('https://erp.exemplo.com.br/')).clone().text(), /@ Sat, 07/);
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), A);
+  // na abertura seguinte, com sinal bom, chega a versão B inteira
+  for (const t of await m.abrir()) assert.match(t, /@ Sun, 08/);
+  assert.match(await (await emUso.get('https://erp.exemplo.com.br/')).clone().text(), /@ Sun, 08/);
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), B);
   // sem cópia guardada (primeira vez), espera o site
   const novo = mundo(); novo.site.lento = true;
   const primeira = novo.pedir('', 'navigate');
@@ -284,7 +304,7 @@ test('versão nova com as mesmas bibliotecas: os modelos voltam em segundo plano
   m.site.internet = true; m.pedidos.length = 0;
   await m.abrir();
   assert.match(await m.pedir('vendor/exceljs.min.js'), /07 Nov 2026/);
-  assert.deepEqual(m.pedidos.sort(), ['GET /', 'HEAD /index.html (no-cache)']);
+  assert.deepEqual(m.pedidos, ['GET / (no-cache)']);
 });
 
 test('bibliotecas trocadas (VERSAO_VENDOR mudou): voltam em segundo plano, a que saiu do site sai da cópia, e isso vale mesmo se a versão do site já estava conferida', async () => {
@@ -379,6 +399,62 @@ test('nem passando por cima dos caches veio o novo: guarda o que veio (para sem 
   m.pedidos.length = 0;
   await m.abrir();
   assert.equal(m.pedidos.filter((p) => p.includes('regras')).length, 0);
+});
+
+/** Os arquivos de verdade de docs/ (index.html e módulos), para a instalação ler os import como no site. */
+function comArquivosDeVerdade(m) {
+  const raiz = new URL('../docs/', import.meta.url);
+  m.site.arquivos.set('/', fs.readFileSync(new URL('index.html', raiz), 'utf8'));
+  const andar = (dir, prefixo) => {
+    for (const e of fs.readdirSync(new URL(dir, raiz), { withFileTypes: true })) {
+      if (e.isDirectory()) andar(`${dir}${e.name}/`, `${prefixo}${e.name}/`);
+      else if (e.name.endsWith('.js')) m.site.arquivos.set(`/${prefixo}${e.name}`, fs.readFileSync(new URL(`${dir}${e.name}`, raiz), 'utf8'));
+    }
+  };
+  andar('js/', 'js/');
+  return m;
+}
+
+test('1ª visita (a página abriu antes do service worker) e sem internet logo depois: o aplicativo abre da cópia', async () => {
+  const m = comArquivosDeVerdade(mundo());
+  await m.instalar(); // a instalação guarda a página e os módulos que ela usa
+  const guardados = new Set(m.guardados());
+  // todo módulo de docs/js vai para a cópia, menos os carregados só com import() (que estão em ADIADOS) e os de fora do sistema
+  const fora = ['/js/simulado-banco.js', '/js/ficha-online.js'];
+  const faltam = [...m.site.arquivos.keys()].filter((k) => k.startsWith('/js/') && !guardados.has(k) && !fora.includes(k));
+  assert.deepEqual(faltam, [], 'módulo novo carregado só com import()? Ponha-o em ADIADOS (docs/sw.js)');
+  for (const a of ['/', '/css/estilo.css', '/manifest.webmanifest', '/icones/erp-192.png', '/js/telas/acoes.js', '/js/exportar.js', '/vendor/jspdf.umd.min.js']) {
+    assert.ok(guardados.has(a), `guardou ${a}`);
+  }
+  assert.equal(await m.armazem.get('imoveis-telas-v3').get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), A, 'marca da versão da página');
+  m.site.internet = false;
+  assert.match(await m.pedir('', 'navigate'), /<script type="module" src="js\/app\.js">/, 'a página abre sem internet');
+  assert.match(await m.pedir('js/app.js'), /export function alterar/);
+  assert.match(await m.pedir('js/telas/acoes.js'), /ACOES/);
+  // com internet de novo, mesma versão: nada é baixado outra vez
+  m.site.internet = true; m.pedidos.length = 0;
+  await m.abrir();
+  assert.deepEqual(m.pedidos, ['GET / (no-cache)']);
+  // service worker novo num aparelho que já tem cópia: a instalação não baixa nada
+  const outro = mundo({ armazem: m.armazem });
+  await outro.instalar();
+  assert.deepEqual(outro.pedidos, []);
+});
+
+test('página velha de um cache no caminho, mais velha que a versão guardada: abre a guardada e não baixa tudo de novo', async () => {
+  const m = mundo();
+  await m.abrir();
+  m.site.publicada = B;
+  await m.abrir(); // versão B guardada
+  m.site.noCaminho.set('/', A); // o cache do caminho ainda tem a página da A
+  m.pedidos.length = 0;
+  assert.match(await m.pedir('', 'navigate'), /conteudo de \/ @ Sun, 08/, 'a página da versão em uso (B)');
+  for (const t of await Promise.all(['js/app.js', 'js/regras.js'].map((a) => m.pedir(a)))) assert.match(t, /@ Sun, 08/);
+  await m.terminarFundo();
+  assert.deepEqual(m.pedidos, ['GET / (no-cache)'], 'nada baixado de novo');
+  const emUso = m.armazem.get('imoveis-telas-v3');
+  assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), B);
+  assert.match(await (await emUso.get('https://erp.exemplo.com.br/')).clone().text(), /@ Sun, 08/);
 });
 
 /** carregarScript de docs/js/app.js (que não roda no Node) com uma página falsa: cada <script> pedido carrega ou falha. */

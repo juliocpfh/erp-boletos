@@ -132,6 +132,16 @@ export async function desfazerItens(itens) {
   await mostrar();
 }
 
+/** Registros por página no Histórico (eram 500 numa página só: 19 mil elementos, 1,3 s no celular para virar cartões). */
+export const HISTORICO_POR_PAGINA = 100;
+/** Texto de busca de cada entrada (descrição e detalhes, como antes): montado uma vez por entrada, não a cada filtro. */
+const textosHistorico = new WeakMap();
+const textoDaEntrada = (h) => {
+  let t = textosHistorico.get(h);
+  if (t === undefined) { t = `${h.descricao || ''} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase('pt-BR'); textosHistorico.set(h, t); }
+  return t;
+};
+
 export function telaHistorico(q) {
   // "De" depois de "Até": as datas são trocadas sozinhas (antes aparecia só "0 registro(s)", sem dizer por quê)
   const trocadas = q.de && q.ate && q.de > q.ate;
@@ -143,12 +153,30 @@ export function telaHistorico(q) {
   if (q.ate) lista = lista.filter((h) => h.quando.slice(0, 10) <= q.ate);
   if (q.texto) {
     const t = q.texto.toLocaleLowerCase('pt-BR');
-    lista = lista.filter((h) => `${h.descricao || ''} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase('pt-BR').includes(t));
+    lista = lista.filter((h) => textoDaEntrada(h).includes(t));
   }
   const usuarios = [...new Set(d().historico.map((h) => h.usuario))].sort();
-  const filtrando = Object.values(q).some(Boolean);
-  // administrador: desfaz alterações de cadastro, sempre da mais recente para a mais antiga de cada campo
-  const desfazer = podeUsuario('admin') ? { pode: R.alteracoesDesfaziveis(d()), indice: new Map(d().historico.map((h, i) => [h, i])) } : null;
+  const { pagina: _pagina, ...filtros } = q;
+  const filtrando = Object.values(filtros).some(Boolean);
+  // páginas de HISTORICO_POR_PAGINA, a 1 é a mais recente
+  const paginas = Math.max(1, Math.ceil(lista.length / HISTORICO_POR_PAGINA));
+  const pagina = Math.min(paginas, Math.max(1, Number(q.pagina) || 1));
+  const fim = lista.length - (pagina - 1) * HISTORICO_POR_PAGINA;
+  const mostrados = lista.slice(Math.max(0, fim - HISTORICO_POR_PAGINA), fim).reverse();
+  // administrador: desfaz alterações de cadastro, sempre da mais recente para a mais antiga de cada campo; só a parte do
+  // histórico desde o registro mais antigo da página é olhada (o que pode ser desfeito nele depende só do que veio depois)
+  let desfazer = null;
+  if (podeUsuario('admin')) {
+    const naPagina = new Set(mostrados);
+    const indice = new Map();
+    d().historico.forEach((h, i) => { if (naPagina.has(h)) indice.set(h, i); });
+    const desde = indice.size ? Math.min(...indice.values()) : d().historico.length;
+    desfazer = { pode: R.alteracoesDesfaziveis(d(), desde), indice };
+  }
+  const irPara = (n, texto) => link(`#/historico?${new URLSearchParams({ ...filtros, pagina: String(n) })}`, texto);
+  const navegar = paginas > 1 ? `<p class="acoes">${pagina > 1 ? `${irPara(1, '« Mais recentes')} ${irPara(pagina - 1, '‹ Anteriores')}` : ''}
+    <span class="suave">Página ${pagina} de ${paginas} (registros ${lista.length - fim + 1} a ${lista.length - fim + mostrados.length} de ${lista.length}, do mais recente para o mais antigo)</span>
+    ${pagina < paginas ? `${irPara(pagina + 1, 'Mais antigos ›')} ${irPara(paginas, 'Os primeiros »')}` : ''}</p>` : '';
   // só os tipos de registro que aparecem no histórico (tabela sem uso, como a antiga "recebimentos", não entra no filtro)
   const usadas = new Set(d().historico.map((h) => h.tabela));
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
@@ -162,7 +190,7 @@ export function telaHistorico(q) {
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
     ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta o campo ao valor anterior. Cada campo volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
       <p>${botao('desfazerMarcados', '↶ Desfazer os marcados', {}, 'secundario pequeno')}</p>` : ''}
-    ${tabelaHistorico(lista.slice(-500).reverse(), desfazer)}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
+    ${navegar}${tabelaHistorico(mostrados, desfazer)}${navegar}</details>`;
 }
 
 /**
