@@ -8,6 +8,7 @@
 //   (aparelho/entrar) e depois só LÊ com o crachá do aparelho (Authorization: Bearer ap1_…): saude, dados/tudo, dados/mudancas,
 //   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
 // · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access).
+// · dados/chave-backup (POST, administrador): a chave pública do backup seguro, para os backups diários saírem cifrados (cifrar-backup.mjs).
 // · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
@@ -147,7 +148,7 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'chave-backup': 'POST' };
 const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
 async function repassarAoCofre(request, env, rota, email, url) {

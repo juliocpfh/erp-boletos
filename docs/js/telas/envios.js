@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
+import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, ligarChaveNaNuvem, login, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -69,6 +69,7 @@ export const FORMULARIOS = {
     await conectarSeguro(false);
     await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, 'Backup seguro ligado neste computador', null, {}, false));
     await backupCompletoSeguro();
+    await ligarChaveNaNuvem(); // na nuvem: os backups diários do servidor passam a sair cifrados com esta chave
     aviso('Backup seguro ligado. Primeiro backup completo gravado.');
     await mostrar();
   },

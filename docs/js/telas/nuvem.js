@@ -1,6 +1,7 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
 import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
+import * as B from '../backup-seguro.js';
 import { dataBr, dataHoraBr, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
@@ -93,8 +94,12 @@ export async function telaConflitos() {
 
 const mb = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
 
-/** Dia de um backup da nuvem pelo nome (`imoveis-dados-AAAA-MM-DD[-antes-da-substituicao].json`). */
-const diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+))?\.json$/) || []).slice(1);
+/**
+ * Dia de um backup da nuvem pelo nome (`imoveis-dados-AAAA-MM-DD[-antes-da-substituicao].json`, ou `.bkp` quando o servidor já
+ * tem a chave do backup seguro: cifrado, abre só com a senha do backup).
+ */
+const diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+?))?\.(json|bkp)$/) || []).slice(1, 4);
+const cifrado = (nome) => nome.endsWith(B.EXTENSAO);
 const pastaBackups = () => E.pasta.getDirectoryHandle(S.PASTA_BACKUPS);
 /** O momento que o backup guarda: o do dia é feito às 3h (horário de Brasília) e leva a data desse dia (o de 09/11 = como estava às 3h de 09/11). */
 const momentoDoBackup = (dia, motivo) => (motivo ? `logo antes da substituição feita em ${dataBr(dia)}` : `às 3h de ${dataBr(dia)}`);
@@ -110,13 +115,14 @@ export async function telaBackupsNuvem() {
   lista.sort((a, b) => b.nome.localeCompare(a.nome));
   const linhas = lista.map((a) => {
     const [dia, , motivo] = diaDoBackup(a.nome);
-    return `<tr><td>${dataBr(dia)}</td><td>${motivo ? 'cópia feita logo antes de substituir os dados' : 'como os dados estavam às 3h desse dia'}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
+    return `<tr><td>${dataBr(dia)}</td><td>${motivo ? 'cópia feita logo antes de substituir os dados' : 'como os dados estavam às 3h desse dia'}${cifrado(a.nome) ? ' · 🔒 cifrado' : ''}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
       <td>${botao('baixarBackupNuvem', 'Baixar', { nome: a.nome }, 'secundario pequeno')} ${botao('restaurarBackupNuvem', 'Voltar para este dia', { nome: a.nome }, 'perigo pequeno')}</td></tr>`;
   }).join('');
   // exemplo com o backup do dia mais recente (ou hoje): "o de 09/11 é como os dados estavam às 3h de 09/11"
   const exemplo = dataBr(lista.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
     <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso ao servidor não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
 }
@@ -226,7 +232,14 @@ export const ACOES_NUVEM = {
     const ok = await janela({ titulo: `Voltar os dados para ${dataBr(dia)}?`, forte: true, sim: 'Voltar para este dia',
       html: `<p>Os dados da nuvem voltam a ser como estavam <b>${esc(momento)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois ${motivo ? 'dessa substituição' : `das 3h de ${dataBr(dia)}`} se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita logo antes de substituir").</p>` });
     if (!ok) return;
-    const dados = JSON.parse(await (await S.abrirArquivo(await pastaBackups(), nome)).text());
+    const arquivo = await S.abrirArquivo(await pastaBackups(), nome);
+    let dados;
+    if (cifrado(nome)) {
+      const resp = await janela({ titulo: 'Senha do backup seguro', html: '<p>Este backup está cifrado. Digite a senha do backup seguro (a mesma da pasta segura do administrador).</p><p><input type="password" name="senha" autocomplete="off" required></p>', sim: 'Abrir', nao: 'Cancelar' });
+      if (!resp) return;
+      const aberto = await B.decifrar(await arquivo.arrayBuffer(), String((resp.senha || [])[0] || ''));
+      dados = JSON.parse(new TextDecoder().decode(aberto.dados));
+    } else dados = JSON.parse(await arquivo.text());
     if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
     // os usuários ficam como estão hoje (quem foi desativado não volta ativo, senha trocada não volta à antiga): item 10
     E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });

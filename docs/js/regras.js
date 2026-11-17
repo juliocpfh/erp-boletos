@@ -2544,7 +2544,7 @@ export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisa
  * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
  */
 const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
-  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
   ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
 const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
 
@@ -2552,7 +2552,8 @@ const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) ||
  * Apaga os dados pessoais da ficha reprovada (ou com desistência), no mesmo prazo dos documentos (regra `meses_documentos_ficha`):
  * CPF, RG, renda, endereço, contatos, fiadores e o que mais a pessoa informou saem da ficha, das linhas do histórico dela e dos
  * e-mails registrados para ela (o endereço de e-mail). Ficam o nome, as datas, a situação e o motivo e a reserva com os comprovantes.
- * O histórico guardado na nuvem fica como está (só o deste aparelho é limpo). Devolve a ficha.
+ * Na nuvem, a faxina diária do servidor limpa depois o histórico guardado lá (esquecerFichasApagadas em nuvem/cofre.mjs, que
+ * marca `historico_limpo_em`). Devolve a ficha.
  */
 export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso()) {
   const f = buscar(d, 'fichas', fichaId);
