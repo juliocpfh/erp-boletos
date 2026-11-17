@@ -168,16 +168,40 @@ async function confirmarExclusaoGrande(tabela, r) {
   return true;
 }
 
+/**
+ * Por que o imóvel não pode ser excluído (texto) ou null. Além dos inquilinos, o que não sai junto com ele: ganhos do Airbnb,
+ * NFs avulsas e o que está ligado ao extrato ou ao C6 (a movimentação ficaria apontando para um registro apagado). Item 18.
+ */
+function motivoNaoExcluirImovel(db, r) {
+  if (db.contratos.some((c) => c.imovel_id === r.id)) return 'Este imóvel tem inquilinos. Exclua os contratos antes.';
+  if ((db.ganhos_airbnb || []).some((g) => g.imovel_id === r.id)) return 'Este imóvel tem ganhos do Airbnb lançados. Exclua os ganhos antes.';
+  if ((db.avulsas || []).some((a) => a.imovel_id === r.id)) return 'Este imóvel tem NFs avulsas. Exclua as NFs avulsas antes.';
+  const doImovel = (t) => (db[t] || []).filter((x) => x.imovel_id === r.id);
+  const despesas = new Set(doImovel('despesas').map((x) => x.id)); const iptus = new Set(doImovel('iptus').map((x) => x.id));
+  const reformas = new Set(doImovel('reformas').map((x) => x.id));
+  const ligadas = (db.movimentacoes_banco || []).some((m) => m.imovel_id === r.id || despesas.has(m.despesa_id) || iptus.has(m.iptu_id) || reformas.has(m.reforma_id))
+    || doImovel('despesas').some((x) => x.movimentacao_id || x.pagamento_banco_id)
+    || (db.pagamentos_banco || []).some((p) => p.origem && ((p.origem.tipo === 'iptu' && iptus.has(Number(p.origem.id))) || (p.origem.tipo === 'despesa' && despesas.has(Number(p.origem.id)))) && !['cancelado', 'erro'].includes(p.situacao));
+  return ligadas ? 'Este imóvel tem lançamentos ligados ao extrato ou a pagamentos do banco: desfaça o destino das movimentações na tela Banco antes.' : null;
+}
+
 const TABELAS_EXCLUSAO = {
-  imoveis: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.imovel_id === r.id) ? 'Este imóvel tem inquilinos. Exclua os contratos antes.' : null), voltar: () => '#/imoveis' },
+  imoveis: { admin: true, checar: (db, r) => motivoNaoExcluirImovel(db, r), voltar: () => '#/imoveis' },
   contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
   cobrancas: { checar: (db, r) => (R.emAcordo(r) || R.ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
-  iptus: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
+  iptus: {
+    // parcela paga pelo extrato ou pelo C6: a movimentação ficaria apontando para um IPTU apagado (mutirão 3000, item 19)
+    checar: (db, r) => ((db.movimentacoes_banco || []).some((m) => m.iptu_id === r.id) || [0, ...Object.keys(r.pagas || {})].some((n) => R.iptuPagoPeloBanco(db, r.id, n))
+      ? 'Este IPTU tem parcela paga pelo banco: desfaça o destino da movimentação na tela Banco antes.' : null),
+    recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id,
+  },
   seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
-  // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados
-  encerramentos: { admin: true, depois: (db, reg) => R.liberarBoletosDaSaida(db, reg.id, login()) },
+  // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados; com a devolução do saldo e da
+  // caução já registrada, é barrado (desfazer apagaria o registro e o comprovante: item 46)
+  encerramentos: { admin: true, checar: (db, r) => (r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes de desfazer o cálculo final.` : null),
+    depois: (db, reg) => R.liberarBoletosDaSaida(db, reg.id, login()) },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },

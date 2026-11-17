@@ -166,7 +166,7 @@ export function dividirLote(l, { maximo = PARTE_MAXIMA, bytes = PARTE_BYTES } = 
     atual.push(l.ops[i]); peso += pesos[i];
   }
   if (atual.length) partes.push(atual);
-  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em }));
+  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) }));
 }
 
 /** Faixas de códigos de duas cópias (memória e aparelho): por tabela vale a mais nova (fim maior) e, na mesma, a mais adiantada. */
@@ -551,7 +551,8 @@ export class Sincronia {
   novoLote(ops) {
     this.n += 1;
     // a aba entra no código do lote: duas abas do mesmo aparelho nunca geram o mesmo (a nuvem trataria o 2º como repetido)
-    return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString() };
+    // `base`: até onde este aparelho tinha visto a nuvem; lote feito antes de uma volta a backup é recusado (item 9 do mutirão 3000)
+    return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString(), base: seqDe(this.base) };
   }
 
   /**
@@ -843,8 +844,8 @@ export class Sincronia {
   }
 
   /** Primeira carga (nuvem vazia): o banco inteiro vai de uma vez. */
-  async importar(d, { substituir = false } = {}) {
-    await this.api('POST', 'importar', { dados: d, substituir });
+  async importar(d, { substituir = false, manterUsuarios = false } = {}) {
+    await this.api('POST', 'importar', { dados: d, substituir, ...(manterUsuarios ? { manterUsuarios: true } : {}) });
     await this.trava(async () => { this.pendentes = []; await this.guardar.gravar('pendentes', []); });
     await this.baixarTudo();
     await this.garantirFaixas();

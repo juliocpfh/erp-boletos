@@ -12,6 +12,8 @@ export const MAX_REGISTRO = 1024 * 1024; // um registro (a logo tem ~270 KB)
 export const MAX_FAIXA = 20000; // uma importação grande pede a faixa do tamanho dela antes de gravar (nuvem.js reservarFaixas)
 export const DIAS_LOG = 60; // aparelho parado há mais tempo baixa tudo de novo
 export const MANTER_BACKUPS = 30;
+export const DIAS_EXCLUIDOS = 180; // cópia de registro apagado (para conflito "excluído") guardada por até 180 dias
+export const DIAS_CONFLITOS_RESOLVIDOS = 90;
 export const MANTER_SUBSTITUICOES = 5; // cópias "antes-da-substituicao" guardadas
 const INTERVALO_FAXINA_MS = 3600000; // sem alarme (testes, nuvem local): a faxina roda no máximo 1× por hora, dentro de um POST
 /** Campos da raiz que só o servidor controla (o aparelho não manda; mudam a cada gravação e dariam conflito à toa). */
@@ -80,6 +82,26 @@ export function canon(v) {
   return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
 }
 const igual = (a, b) => canon(a) === canon(b);
+/** Registro igual a não ser por campos nulos que um tem e o outro nem tem (normalizar completa `banco: null` só na tela): item 43. */
+const semNulos = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined)) : o);
+const igualSemNulos = (a, b) => igual(semNulos(a), semNulos(b));
+const objetoSimples = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/**
+ * Campo que é objeto (parcelas pagas do IPTU, "extrato importado até" de cada conta…) mudado em dois aparelhos em subchaves
+ * diferentes: junta as duas mudanças em vez de abrir conflito (itens 12 e 13). Mesma subchave com valores diferentes: undefined
+ * (aí é conflito de verdade).
+ */
+export function juntarSubchaves(antes, depois, atual) {
+  const a = antes === undefined || antes === null ? {} : antes;
+  if (![a, depois, atual].every(objetoSimples)) return undefined;
+  const r = { ...atual };
+  for (const k of new Set([...Object.keys(a), ...Object.keys(depois)])) {
+    if (igual(a[k], depois[k])) continue; // este aparelho não mexeu nesta subchave
+    if (!igual(a[k], atual[k]) && !igual(atual[k], depois[k])) return undefined; // os dois mexeram nela
+    if (depois[k] === undefined) delete r[k]; else r[k] = depois[k];
+  }
+  return r;
+}
 
 function semSegredos(v) {
   if (!v || typeof v !== 'object') return v;
@@ -214,20 +236,27 @@ export class Cofre {
   // -------------------------------------------------------------------------
   // Carga inicial e cópia completa
   // -------------------------------------------------------------------------
-  importar(d, email, { substituir = false } = {}) {
+  importar(d, email, { substituir = false, manterUsuarios = false } = {}) {
     if (!d || typeof d !== 'object' || d.formato !== FORMATO) throw new ErroCofre(400, 'Não é um banco deste sistema.');
     if (!this.vazio()) {
       if (!substituir) throw new ErroCofre(409, 'A nuvem já tem dados. Para trocar tudo, confirme a substituição.');
       this.exigir(email, 'admin');
     }
+    this.conferirRepetidos(d);
     return this.transacao(() => {
+      // "Voltar para este dia": os usuários ficam como estão hoje (desativado não volta ativo, senha trocada não volta)
+      const usuariosDeHoje = manterUsuarios && !this.vazio() ? this.q("SELECT id, dados FROM registros WHERE tabela = 'usuarios' ORDER BY ordem") : null;
       // `tabelas` (o próximo código de cada uma) fica: as faixas já entregues aos aparelhos continuam valendo depois de
       // "Voltar para este dia" ou "Substituir…", senão dois aparelhos ganhariam os mesmos códigos (o próximo nunca volta)
       if (!this.vazio()) {
         for (const t of ['registros', 'raiz', 'historico', 'conflitos', 'excluidos']) this.sql.exec(`DELETE FROM ${t}`);
       }
       let n = 0;
+      if (usuariosDeHoje) {
+        for (const u of usuariosDeHoje) this.sql.exec('INSERT INTO registros (tabela, id, dados, ordem) VALUES (?, ?, ?, ?)', 'usuarios', u.id, u.dados, n += 1);
+      }
       for (const [chave, valor] of Object.entries(d)) {
+        if (usuariosDeHoje && chave === 'usuarios') continue;
         if (chave === 'historico') {
           for (const h of Array.isArray(valor) ? valor : []) this.sql.exec('INSERT INTO historico (dados) VALUES (?)', texto(semSegredos(h)));
         } else if (Array.isArray(valor) && valor.every((r) => r && typeof r === 'object' && Number.isSafeInteger(r.id))) {
@@ -245,8 +274,23 @@ export class Cofre {
       this.controle('revisao', Number(d.revisao || 0));
       for (const k of ['atualizado_em', 'atualizado_por']) if (typeof d[k] === 'string') this.controle(k, d[k]);
       this.registrarLog('importacao', null, null, undefined, email);
+      // lote feito por quem ainda não tinha visto esta carga (celular sem internet) é recusado: entraria por cima do backup
+      this.controle('epoca', this.ultimoSeq());
       return { ok: true, seq: this.ultimoSeq() };
     });
+  }
+
+  /** Código repetido numa tabela do banco a importar: recusa antes de mexer em qualquer coisa, dizendo onde (item 34). */
+  conferirRepetidos(d) {
+    if (!d || typeof d !== 'object') return;
+    for (const [chave, valor] of Object.entries(d)) {
+      if (chave === 'historico' || !Array.isArray(valor) || !valor.every((r) => r && typeof r === 'object' && Number.isSafeInteger(r.id))) continue;
+      const vistos = new Set();
+      for (const r of valor) {
+        if (vistos.has(r.id)) throw new ErroCofre(400, `O banco tem dois registros com o código ${r.id} em ${String(chave).slice(0, 40)}: nada foi trocado. Corrija o arquivo (ou peça ajuda) antes de importar.`);
+        vistos.add(r.id);
+      }
+    }
   }
 
   /**
@@ -321,6 +365,14 @@ export class Cofre {
     if (!Array.isArray(lote.ops) || lote.ops.length > MAX_OPS) throw new ErroCofre(400, `Lote inválido (até ${MAX_OPS} mudanças).`);
     if (this.vazio()) throw new ErroCofre(409, 'A nuvem ainda não tem dados: faça a carga inicial.');
     const quem = this.exigir(email, 'consulta');
+    const epoca = Number(this.controle('epoca') || 0);
+    if (Number.isSafeInteger(lote.base) && lote.base < epoca) {
+      throw new ErroCofre(409, 'Os dados da nuvem foram trocados (volta a um backup ou substituição) depois que esta mudança foi feita neste aparelho: ela não entrou. Confira e faça de novo o que ainda precisar.');
+    }
+    if (typeof lote.em === 'string' && Date.parse(lote.em) < this.relogio().getTime() - DIAS_LOG * 86400000) {
+      // a nuvem só se lembra dos lotes recebidos nos últimos DIAS_LOG dias: um lote mais velho poderia entrar de novo (item 49)
+      throw new ErroCofre(409, `Esta mudança ficou mais de ${DIAS_LOG} dias esperando neste aparelho: ela não entrou. Confira e faça de novo o que ainda precisar.`);
+    }
     if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
     const emGrupo = lote.ops.filter((o) => o?.op !== 'historico').length > 1 && lote.ops.some((o) => o?.op === 'excluir');
     try {
@@ -432,7 +484,7 @@ export class Cofre {
     if (op.op === 'excluir') {
       if (!atual) return { ok: true, ja_excluido: true };
       const dados = JSON.parse(atual.dados);
-      if (op.base !== undefined && !igual(dados, semSegredos(op.base))) {
+      if (op.base !== undefined && !igualSemNulos(dados, semSegredos(op.base))) {
         // outro aparelho mudou o registro depois que este o viu: não exclui até alguém escolher
         novosConflitos.push(this.abrirConflito('exclusao', tabela, id, '*', dados, this.ultimoAutor(atual.meta), null, email));
         return { ok: false, conflito: true };
@@ -476,6 +528,8 @@ export class Cofre {
           meta[c] = { por: email, em: this.agora() };
           mudou = true; continue;
         }
+        const junto = juntarSubchaves(antes, depois, dados[c]);
+        if (junto !== undefined) { dados[c] = junto; meta[c] = { por: email, em: this.agora() }; mudou = true; continue; }
         // mudado aqui e lá: o campo volta ao valor que este aparelho viu e espera a escolha
         novosConflitos.push(this.abrirConflito('campo', tabela, id, c, dados[c], meta[c]?.por || null, depois, email));
         dados[c] = antes; meta[c] = { por: email, em: this.agora(), disputa: true };
@@ -507,6 +561,8 @@ export class Cofre {
     const antes = semSegredos(op.antes); const depois = semSegredos(op.depois);
     if (igual(atual, depois)) return { ok: true };
     const aberto = this.q("SELECT id FROM conflitos WHERE resolvido_em IS NULL AND tabela = '_raiz' AND campo = ?", campo)[0];
+    const junto = !aberto && !igual(atual, antes) ? juntarSubchaves(antes, depois, atual) : undefined;
+    if (junto !== undefined) { this.gravarRaiz(campo, junto, email); return { ok: true }; }
     if (aberto || !igual(atual, antes)) {
       novosConflitos.push(this.abrirConflito('campo', '_raiz', 0, campo, atual, linha ? JSON.parse(linha.meta || '{}').por || null : null, depois, email));
       if (!aberto && linha) this.gravarRaiz(campo, antes, email);
@@ -522,7 +578,9 @@ export class Cofre {
   }
 
   excluirRegistro(tabela, id, dados, email) {
-    this.sql.exec('INSERT INTO excluidos (tabela, id, dados, por, em) VALUES (?, ?, ?, ?, ?)', tabela, id, texto(dados), email, this.agora());
+    // usuário apagado: a cópia guardada vai sem senha nem sessões (item 31)
+    const guardar = tabela === 'usuarios' ? Object.fromEntries(Object.entries(dados).filter(([k]) => !USUARIO_PROPRIO.includes(k))) : dados;
+    this.sql.exec('INSERT INTO excluidos (tabela, id, dados, por, em) VALUES (?, ?, ?, ?, ?)', tabela, id, texto(guardar), email, this.agora());
     this.sql.exec('DELETE FROM registros WHERE tabela = ? AND id = ?', tabela, id);
     if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, null);
     this.registrarLog('exclusao', tabela, id, undefined, email);
@@ -628,9 +686,14 @@ export class Cofre {
 
   /** Limpa o que já não precisa: fila com mais de DIAS_LOG dias e lotes repetidos antigos. */
   limpar() {
-    const limite = new Date(this.relogio().getTime() - DIAS_LOG * 86400000).toISOString();
+    const antes = (dias) => new Date(this.relogio().getTime() - dias * 86400000).toISOString();
+    const limite = antes(DIAS_LOG);
     this.sql.exec('DELETE FROM log WHERE em < ? AND seq < (SELECT MAX(seq) FROM log)', limite);
     this.sql.exec('DELETE FROM lotes WHERE em < ?', limite);
+    // registros apagados guardados (dados pessoais, LGPD): saem depois de DIAS_EXCLUIDOS, salvo os de um conflito aberto (item 31)
+    this.sql.exec(`DELETE FROM excluidos WHERE em < ? AND NOT EXISTS (SELECT 1 FROM conflitos c WHERE c.resolvido_em IS NULL
+      AND c.tabela = excluidos.tabela AND c.reg_id = CAST(excluidos.id AS TEXT))`, antes(DIAS_EXCLUIDOS));
+    this.sql.exec('DELETE FROM conflitos WHERE resolvido_em IS NOT NULL AND resolvido_em < ?', antes(DIAS_CONFLITOS_RESOLVIDOS)); // item 32
   }
 }
 
@@ -763,9 +826,10 @@ export class CofreDO {
           // só o administrador substitui, e a cópia de antes só é feita para quem pode (senão qualquer login encheria o R2)
           if (pedido.substituir !== true) throw new ErroCofre(409, 'A nuvem já tem dados. Para trocar tudo, confirme a substituição.');
           c.exigir(email, 'admin');
+          c.conferirRepetidos(pedido.dados); // antes da cópia "antes da substituição": banco com código repetido nem começa
           if (this.env.DADOS) await backupDoDia(c, this.env.DADOS, new Date(), 'antes-da-substituicao');
         }
-        r = c.importar(pedido.dados, email, { substituir: pedido.substituir === true });
+        r = c.importar(pedido.dados, email, { substituir: pedido.substituir === true, manterUsuarios: pedido.manterUsuarios === true });
       } else throw new ErroCofre(404, 'Não encontrado.');
       if (request.method === 'POST') await this.depoisDeGravar();
       return resposta(200, r);

@@ -1,5 +1,5 @@
 // Tela da nuvem: conflitos para escolher (mesmo campo mudado em dois aparelhos sem internet) e mudanças recusadas.
-import { aviso, baixar, E, ir, janela, mostrar, podeUsuario, reabrirSessao } from '../app.js';
+import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { dataBr, dataHoraBr, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
@@ -228,8 +228,11 @@ export const ACOES_NUVEM = {
     if (!ok) return;
     const dados = JSON.parse(await (await S.abrirArquivo(await pastaBackups(), nome)).text());
     if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
-    E.d = await E.nuvem.importar(dados, { substituir: true });
+    // os usuários ficam como estão hoje (quem foi desativado não volta ativo, senha trocada não volta à antiga): item 10
+    E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });
     await reabrirSessao();
+    // a volta fica no histórico (o log do servidor some em 60 dias): item 11
+    await alterar((db) => R.registrar(db, login(), 'Alteração', null, null, `Dados voltaram a ser como estavam ${momento} (backup restaurado por ${login()})`));
     aviso(`Dados voltaram a ser como estavam ${momento}. Os outros aparelhos recebem a versão nova sozinhos.`);
     ir('#/');
   },
