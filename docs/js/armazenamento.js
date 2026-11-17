@@ -108,8 +108,17 @@ export async function escreverTexto(dir, nome, conteudo) {
   await w.close();
 }
 
+/**
+ * Grava o banco sem recuo (23% menor e mais rápido de gravar, também no OneDrive; o backup do dia já era assim).
+ * Devolve a data e o tamanho do arquivo gravado (``assinaturaDoBanco``), ou null se o arquivo não tem o tamanho do que foi
+ * escrito (outro computador gravou por cima no mesmo instante): com a assinatura, a próxima gravação e a conferência de 30 s
+ * sabem que a memória é igual ao disco e não leem o banco inteiro de novo.
+ */
 export async function gravarBanco(pasta, dados) {
-  await escreverTexto(pasta, ARQUIVO_BANCO, JSON.stringify(dados, null, 1));
+  const conteudo = new Blob([JSON.stringify(dados)], { type: 'application/json' });
+  await escreverTexto(pasta, ARQUIVO_BANCO, conteudo);
+  const assinatura = await assinaturaDoBanco(pasta);
+  return assinatura && assinatura.endsWith(`:${conteudo.size}`) ? assinatura : null;
 }
 
 /** Cópia do banco uma vez por dia em backups/, guardando as 30 mais recentes. */

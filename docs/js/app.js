@@ -162,20 +162,26 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
 const travaDaPasta = (fn) => (globalThis.navigator?.locks ? navigator.locks.request('imoveis-pasta', fn) : fn());
 
 async function alterarNaPasta(fn, soSessao) {
-  const disco = await S.lerBanco(E.pasta);
+  // o arquivo continua com a data e o tamanho de quando a memória ficou igual a ele: ninguém gravou por fora (nem a outra aba),
+  // não precisa ler e interpretar o banco inteiro (no banco grande, ~110 ms por gravação)
+  const pasta = E.pasta;
+  const igualAoDisco = memoriaIgualAoDisco(pasta) && arquivoConferido.assinatura === await S.assinaturaDoBanco(pasta);
+  const disco = igualAoDisco ? E.d : await S.lerBanco(pasta);
   if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
     const avisar = !soSessaoNoDisco(disco);
     E.d = disco;
     if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
+  if (!igualAoDisco && disco) anotarConferido(pasta, E.d, S.assinaturaLida(disco));
   const antes = E.d || disco;
   const copia = N.copiar(antes); // o histórico (só cresce) não é copiado entrada por entrada
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
   copia.revisao_so_sessao = soSessao ? copia.revisao : null;
-  await S.gravarBanco(E.pasta, copia);
+  const assinatura = await S.gravarBanco(pasta, copia);
   E.d = copia;
+  anotarConferido(pasta, copia, assinatura); // a conferência de 30 s não relê o que acabou de ser gravado
   espelharSeguro();
   backupDoDia(antes); // o backup do dia é de como estava antes da 1ª gravação do dia (se ela foi a errada, o backup serve): item 42
   atualizarFaixa();
@@ -353,7 +359,13 @@ function aoMudarNuvem(externo) {
 // Pasta: data e tamanho do arquivo do banco na última conferência que deixou a memória igual ao disco. Enquanto o arquivo
 // continuar com a mesma data e o mesmo tamanho, a conferência (a cada 30 s e a cada volta à janela) não lê nem interpreta
 // o banco inteiro de novo. A gravação do próprio sistema muda a data: a conferência seguinte lê uma vez e guarda a nova.
-let arquivoConferido = null; // { pasta, assinatura }
+// A gravação do próprio sistema também guarda a assinatura (gravarBanco a devolve): nem a conferência seguinte nem a próxima
+// gravação releem o que acabou de ser gravado. `dados`: a memória (E.d) que ficou igual ao arquivo; trocada por outra, lê de novo.
+let arquivoConferido = null; // { pasta, assinatura, dados }
+function anotarConferido(pasta, dados, assinatura) {
+  arquivoConferido = assinatura && dados ? { pasta, assinatura, dados } : null;
+}
+const memoriaIgualAoDisco = (pasta) => !!(E.d && arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.dados === E.d);
 let conferindo = false; // uma conferência por vez (foco + relógio + volta da internet chegam juntos)
 async function verificarMudancasExternas() {
   tentarSeguroDeNovo(); // chave do backup seguro que não deu para ler: tenta de novo (no máximo uma vez por minuto)
@@ -375,12 +387,13 @@ async function conferirMudancasExternas() {
   if (!E.pasta || !E.d || document.hidden) return;
   try {
     const pasta = E.pasta;
-    if (arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.assinatura === await S.assinaturaDoBanco(pasta)) return;
+    if (memoriaIgualAoDisco(pasta) && arquivoConferido.assinatura === await S.assinaturaDoBanco(pasta)) return;
     const disco = await S.lerBanco(pasta);
     if (pasta !== E.pasta) return; // trocou de pasta no meio da leitura
+    const mudou = disco && disco.revisao !== E.d.revisao;
     // a memória fica igual a este arquivo (já estava, ou passa a ser logo abaixo): guarda a data e o tamanho dele
-    arquivoConferido = disco && S.assinaturaLida(disco) ? { pasta, assinatura: S.assinaturaLida(disco) } : null;
-    if (disco && disco.revisao !== E.d.revisao) {
+    anotarConferido(pasta, mudou ? disco : E.d, disco && S.assinaturaLida(disco));
+    if (mudou) {
       const soSessao = soSessaoNoDisco(disco);
       E.d = disco;
       renovarUsuario();
@@ -553,6 +566,7 @@ async function pastaDeTeste() {
 export async function abrirPasta(handle) {
   E.pasta = handle;
   E.d = await S.lerBanco(handle);
+  anotarConferido(handle, E.d, S.assinaturaLida(E.d)); // a 1ª conferência e a 1ª gravação não leem de novo o que acabou de ser lido
   E.backupFeito = false;
   E.usuario = usuarioDaSessao();
   rotinaDeAbertura(); // login lembrado: as regras de abertura passam pelo histórico com esse usuário
