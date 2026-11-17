@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 16/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #261).
+Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #283, mutirão 3000).
 
 Marque com `[x]` o que for concluindo.
 
@@ -19,7 +19,8 @@ Marque com `[x]` o que for concluindo.
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: instalado em 16/11; falta só a limpeza da chave antiga a partir de 17/11 (item 9e, passo 3) | você | 5 min |
-| 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; falta só a 2ª rodada (Claude, quando pedir) | Claude | — |
+| 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; a 2ª rodada entrou no mutirão 3000 (item 13) | Claude | — |
+| 13 | Mutirão 3000 (16–17/11): 366 erros confirmados, correções nas PRs #267–#283; conferências e decisões suas no item 13 | você + Claude | 20 min |
 
 **Próximos passos (combinado em 16/11, fim do dia):** (1) aceitar a PR #264 e fazer o **Testar o aviso** no celular (item 2); (2) **Claude:** fazer o botão **Conectar o Gmail** ("Entrar com o Google", item 1) e depois ligar o Gmail com o dono; (3) **17/11 ou depois:** item 9e, passo 3 (apagar a chave antiga, se `ultima-atualizacao.txt` estiver com `ok`); (4) item 3, teste da ficha com um conhecido. Em 16/12: CBS 2027.
 
@@ -125,6 +126,8 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 2. **Não** escolha um "Parceiro" de outra empresa na tela "Integrações via API" do Web Banking: daria acesso a um terceiro.
 3. Quando o C6 mandar o ClientId, o ClientSecret e a pasta do certificado, me chame. A instalação segue `documentacao/LIGAR_C6.md`. **Nunca cole essas chaves no chat.**
 
+**Ao instalar a ponte (desde o mutirão 3000, PR #280):** no `.env` da ponte, `ORIGENS=https://erp.ankjck.com.br`; se usar o Tunnel do Cloudflare, também `HOSTS=banco.ankjck.com.br` (sem isso a ponte recusa o Tunnel e o webhook). A ponte não sobe com a senha do exemplo: escolha uma frase própria com 20+ caracteres. Numa conta de produção, boleto com desconto só sai depois de marcar "Conferi o desconto no boleto de teste (sandbox)" (o C6 tem o tipo de desconto "por dia", que daria desconto demais).
+
 **Decisão que fica para esse dia:** a descrição do boleto no C6 corta em 100 caracteres e as instruções em 4 linhas de 80. Diga se o corte automático serve.
 
 ---
@@ -229,8 +232,29 @@ O sistema agora diminui sozinho, ao anexar, as fotos e os PDFs escaneados, sem g
   - **Resultado (16/11): 167 olhados, 0 compactados, e está certo.** Antes: 298 arquivos, 161 MB (71 PDFs assinados, 48 MB; 27 PDFs com texto, 29 MB; 136 pequenos, 20 MB; 60 PDFs escaneados, 60 MB). Os escaneados já vieram com uns 300 KB por página, o mesmo que a compactação daria, e o sistema só troca se ficar 15% menor. Apertar mais os escaneados (letra menos nítida) ganharia no máximo 20 a 30 MB: o dono não pediu.
 - [x] **B. Anexo novo:** (16/11: a foto abriu na mesma posição da galeria; o sistema respeita a posição gravada pelo celular e não gira o papel sozinho. Ideia, se o dono pedir: botão "Girar" antes de anexar.) anexe uma foto grande (3 a 4 MB, tirada no celular) em qualquer inquilino. Certo: na lista de arquivos ela aparece com algumas centenas de KB (ex.: 400 KB) e abre de pé, sem estar virada.
 
+## 13. Mutirão 3000 (16–17/11)  `[ ]`
+
+Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de ponta a ponta, desempenho, venda): **366 erros confirmados**, cada um com a prova, em `MUTIRAO_3000.md`. Correções nas PRs #267 a #283, todas na `main` e publicadas.
+
+**Decisões suas (16–17/11), já aplicadas:** Pix pago depois do vencimento com o valor de desconto perde o desconto e a diferença (mais multa e juros) vai ao boleto seguinte; boleto pago pelo código de barras e creditado em até 3 dias úteis não é atraso; pagamento a menos fica "Paga em parte" e a diferença vai ao boleto seguinte; índice negativo mantém o aluguel; renovação negociada pergunta o mês a partir do qual vale; todo mês conta 30 dias (entrada em 15/02 = 16/30); NF do mês incompleto com quantidade "16/30"; ficha reprovada ou desistência tem os dados pessoais apagados no prazo dos documentos; exclusão grande com dupla confirmação digitando APAGAR; formulário alterado pergunta "Sair sem salvar?"; link da ficha aparece uma vez só (reenviar gera outro).
+
+**Conferir no uso (5 min cada):**
+- [ ] Uma NF de aluguel proporcional: quantidade "16/30", unitário do mês inteiro, total proporcional.
+- [ ] Sair e entrar de novo: pede o código do login da internet de novo (normal agora).
+- [ ] Trocar a senha de um usuário: os computadores ligados pelo programa do PC desse usuário precisam ser ligados de novo.
+- [ ] Painel: alertas mostram 5 de cada tipo e "Ver todos".
+
+**Falta você (Cloudflare, opcional):** pôr `DONO_EMAIL` nas variáveis do Worker (com a nuvem vazia, só esse e-mail faz a primeira carga); criar o aplicativo do Access para `vendas.ankjck.com.br`.
+
+**Decisões que ficaram com você:**
+- Devolução de Pix ao inquilino: o valor pago do boleto diminui (e a NF?) ou fica como está e a devolução só aparece no extrato?
+- Publicar o site pelo GitHub Actions (permite o aplicativo baixar só os arquivos que mudaram).
+- Impedimentos de venda que são projetos grandes (vários clientes no mesmo sistema, login próprio, proprietário de terceiros com repasse, DIMOB, importar planilha, outros bancos, portal do inquilino, assinatura eletrônica): ver `MUTIRAO_3000.md`, frente "mercado".
+
+**2ª rodada do mutirão 3000 (17/11, em andamento):** dados e nuvem pendentes, mensagens de erro em português simples, primeiros passos e ajuda nas telas, painel de gestão com PDF, banco automático (aviso do C6, conciliação pelo Pix, saldo do extrato), régua de cobrança (prepara os e-mails; **só envia com a sua autorização**), LGPD e registro de acessos.
+
 ## Ficou de fora de propósito (não é defeito)
 
 - "Movimentações sem destino" em Financeiro e Banco: fica como está até o C6 entrar em uso.
 - Fechar o mês travando alterações, foto pela câmera e canal do inquilino: descartados ou adiados por você em 07/11.
-- Régua de cobrança personalizada e contato automático: pedido para o futuro.
+- Régua de cobrança: em 17/11 o dono pediu que ela prepare os e-mails, mas **nada é enviado sem a autorização dele** (2ª rodada do mutirão 3000).
