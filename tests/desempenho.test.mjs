@@ -43,3 +43,22 @@ test('outro computador grava por cima no mesmo instante (tamanho diferente do es
   const pasta = pastaFalsa({ porCima: (t) => `${t} ` });
   assert.equal(await S.gravarBanco(pasta, R.bancoVazio()), null);
 });
+
+test('Histórico: o que pode ser desfeito olhando só a página é o mesmo que olhando o histórico inteiro', () => {
+  const d = R.bancoVazio();
+  const a = R.inserir(d, 'imoveis', { nome: 'Sala 1', valor_imovel: 100000 }, 'teste');
+  const b = R.inserir(d, 'imoveis', { nome: 'Sala 2', valor_imovel: 200000 }, 'teste');
+  for (let n = 1; n <= 6; n += 1) {
+    R.atualizar(d, 'imoveis', a.id, { valor_imovel: 100000 + n, nome: `Sala 1-${n % 3}` }, 'teste');
+    if (n % 2) R.atualizar(d, 'imoveis', b.id, { valor_imovel: 200000 + n }, 'teste');
+  }
+  const todos = R.alteracoesDesfaziveis(d);
+  const ultimo = [...todos].map((x) => Number(x.split(':')[0])).sort((x, y) => y - x)[0];
+  R.desfazerAlteracoes(d, [`${ultimo}:valor_imovel`], 'teste'); // desfeita a última: a anterior passa a poder
+  const cheio = R.alteracoesDesfaziveis(d);
+  assert.ok(cheio.size >= 2);
+  for (let desde = 0; desde <= d.historico.length; desde += 1) {
+    const parte = R.alteracoesDesfaziveis(d, desde);
+    assert.deepEqual([...parte].sort(), [...cheio].filter((x) => Number(x.split(':')[0]) >= desde).sort(), `desde ${desde}`);
+  }
+});

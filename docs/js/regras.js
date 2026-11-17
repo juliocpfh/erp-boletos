@@ -469,16 +469,23 @@ export function motivoNaoDesfazer(d, tabela, r, campo, anterior = undefined) {
  * alteração mais recente ainda não desfeita, e só se o valor atual ainda é o que ela gravou. Desfeita a última,
  * a anterior passa a poder ser desfeita (até voltar ao valor original).
  */
-export function alteracoesDesfaziveis(d) {
+export function alteracoesDesfaziveis(d, desde = 0) {
+  // `desde`: só as entradas a partir deste índice (a página do Histórico): o que pode ser desfeito numa entrada só depende das
+  // que vieram depois dela, então o resultado para elas é o mesmo de olhar o histórico inteiro (36 mil entradas: 119 ms)
   const desfeitos = new Set();
-  d.historico.forEach((h) => { if (h.desfaz !== undefined && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`); });
+  const hist = d.historico;
+  for (let i = Math.max(0, desde); i < hist.length; i += 1) {
+    const h = hist[i];
+    if (h.desfaz !== undefined && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`);
+  }
   const topo = new Map();
-  d.historico.forEach((h, i) => {
-    if (h.acao !== 'Alteração' || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== undefined) return;
+  for (let i = Math.max(0, desde); i < hist.length; i += 1) {
+    const h = hist[i];
+    if (h.acao !== 'Alteração' || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== undefined) continue;
     for (const [k, m] of Object.entries(h.detalhes)) {
       if (m && typeof m === 'object' && 'de' in m && !desfeitos.has(`${i}:${k}`)) topo.set(`${h.tabela}:${h.registro_id}:${k}`, i);
     }
-  });
+  }
   const out = new Set();
   for (const [chave, i] of topo) {
     const h = d.historico[i];

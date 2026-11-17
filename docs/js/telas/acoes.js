@@ -24,6 +24,7 @@ import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
 import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
+import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
@@ -1274,6 +1275,12 @@ export const ACOES = {
     await alterar((db) => R.desligarAlerta(db, tipo, { contrato_id: contrato || null, imovel_id: imovel || null }, login(), { quem: E.usuario.nome }));
     aviso(`Alerta "${tipo}" desligado. Para voltar a avisar, use "Religar" em "Alertas desligados", no fim dos alertas do Painel.`);
     await mostrar();
+  },
+
+  /** Painel: mostra todos os alertas de um tipo (começam só os primeiros, MOSTRAR_ALERTAS) ou volta a recolher. */
+  verTodosAlertas({ tipo }) {
+    if (alertasAbertos.has(tipo)) alertasAbertos.delete(tipo); else alertasAbertos.add(tipo);
+    return mostrar();
   },
 
   async religarAlerta({ id }) {
