@@ -3,16 +3,14 @@
 // Os textos podem ser editados em Dados e backup → Modelos de e-mail (tabela modelos_email; sem registro, vale o padrão).
 // Revisão jurídica dos textos: documentacao/REVISAO_JURIDICA_CONTRATO.md (seção E).
 
-/** Fecho de todo e-mail (pedido do dono: agradecer e ficar à disposição antes de "Atenciosamente"). */
-export const FECHO = `Agradecemos e ficamos à disposição em caso de dúvidas.
-
-Atenciosamente,
-Administradora
-administracao@ankjck.com.br`;
-
-/** Conta da ANK para a caução (informada pelo dono em 2026-11-12). */
-const CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
-Pix (CNPJ): 58.492.818/0001-59`;
+/**
+ * Fecho de todo e-mail (pedido do dono: agradecer e ficar à disposição antes de "Atenciosamente"), com quem assina e o e-mail
+ * da empresa (Empresas: "Nome que assina os e-mails" e "E-mail da administração"; dadosDoEmail → ``remetente``).
+ * Ex.: { assinatura: 'Administradora', email: 'contato@exemplo.com.br' } → "…Atenciosamente,\nAdministradora\ncontato@exemplo.com.br".
+ */
+export function fechoEmail({ assinatura = '', email = '' } = {}) {
+  return ['Agradecemos e ficamos à disposição em caso de dúvidas.', '', 'Atenciosamente,', assinatura || 'Administradora', email].filter((x, i) => i < 4 || x).join('\n');
+}
 
 const CONDICOES = `CONDIÇÕES DA LOCAÇÃO
 [se aluguel]- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
@@ -135,7 +133,7 @@ Segue anexo o contrato de locação do imóvel da {imovel}. Leia com atenção a
 PASSO A PASSO
 1. Assine o contrato e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
 [se dinheiro]2. Deposite a {tipo_deposito} de {valor_deposito} e envie o comprovante:
-${CONTA_CAUCAO}
+{conta_deposito}
 [se caucao]A caução fica aplicada em poupança e é devolvida corrigida no fim do contrato, descontados eventuais débitos (Lei 8.245/91, art. 38).
 [fim]3. Com tudo recebido, assinamos em até 2 dias úteis e enviamos a via assinada por todos
 4. Em seguida combinamos a entrega das chaves[senão]2. Com o contrato assinado, assinamos em até 2 dias úteis e enviamos a via assinada por todos
@@ -367,5 +365,5 @@ export function preencherEmail(texto, dados) {
 
 /** E-mail pronto: assunto e texto preenchidos, com o fecho. */
 export function montarEmail(modelo, dados) {
-  return { assunto: preencherEmail(modelo.assunto, dados).replace(/\s+/g, ' '), texto: `${preencherEmail(modelo.texto, dados)}\n\n${FECHO}` };
+  return { assunto: preencherEmail(modelo.assunto, dados).replace(/\s+/g, ' '), texto: `${preencherEmail(modelo.texto, dados)}\n\n${fechoEmail(dados.remetente)}` };
 }

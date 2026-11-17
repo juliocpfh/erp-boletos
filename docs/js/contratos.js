@@ -178,17 +178,61 @@ export function textoIndice(nome) {
 }
 
 /**
- * Empresa locadora dos documentos do inquilino (contrato, vistoria, recibo das chaves, carta): por enquanto só a ANK,
- * mesmo quando o imóvel é dividido com a JCK (pedido do usuário, 2026-10-20; numa versão futura voltam as duas).
- * Sem ANK cadastrada: as empresas do imóvel (ou as ativas), como antes.
+ * Dados da empresa que até 2026-11-16 ficavam fixos no código (eram os da ANK) e passaram ao cadastro (Empresas): quem assina
+ * os documentos do inquilino, a cidade dos documentos, as companhias de energia e água do contrato, o e-mail e as assinaturas
+ * dos e-mails e lembretes e a conta da caução. Empresa gravada antes recebe uma vez o que valia (normalizar, regras.js; aqui
+ * também, para o registro que ainda não passou por lá): a que tinha "ANK" no nome assina os documentos e fica com o e-mail, as
+ * assinaturas e a conta; todas ficam com Curitiba, Copel e Sanepar. Empresa nova começa em branco (o formulário grava os campos).
  */
-export const LOCADORA_UNICA = /\bANK\b/i;
+const LOCADORA_ANTIGA = /\bANK\b/i;
+const DADOS_ANTIGOS_EMPRESA = { cidade_documentos: 'Curitiba', energia_concessionaria: 'Companhia Paranaense de Energia (COPEL)', agua_concessionaria: 'Companhia de Saneamento do Paraná (SANEPAR)' };
+const DADOS_ANTIGOS_LOCADORA = { email_contato: 'administracao@ankjck.com.br', assinatura_email: 'Administradora', assinatura_mensagens: 'ANK Administradora',
+  conta_deposito: `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
+Pix (CNPJ): 58.492.818/0001-59` };
+/** Campos novos para uma empresa gravada antes deles ({} quando ela já os tem). */
+export function camposAntigosDaEmpresa(e) {
+  if (!e || e.assina_documentos !== undefined) return {};
+  const assina = LOCADORA_ANTIGA.test(`${e.nome || ''} ${e.razao_social || ''}`);
+  const out = { assina_documentos: assina };
+  for (const [k, v] of Object.entries({ ...DADOS_ANTIGOS_EMPRESA, ...(assina ? DADOS_ANTIGOS_LOCADORA : {}) })) if (e[k] === undefined) out[k] = v;
+  return out;
+}
+const comCamposNovos = (e) => (e.assina_documentos === undefined ? { ...e, ...camposAntigosDaEmpresa(e) } : e);
+
+/**
+ * Empresa locadora dos documentos do inquilino (contrato, vistoria, recibos, carta, e-mails): a marcada em Empresas
+ * ("Assina os documentos do inquilino"), mesmo quando o imóvel é dividido com outra (pedido do usuário, 2026-10-20: só a ANK).
+ * Mais de uma marcada: a primeira. Nenhuma marcada: as empresas do imóvel (ou as ativas).
+ */
 export function locadorasDoContrato(d, c) {
-  const ank = d.emitentes.filter((e) => e.ativo !== false && LOCADORA_UNICA.test(`${e.nome || ''} ${e.razao_social || ''}`));
-  if (ank.length) return ank.slice(0, 1);
+  const marcada = d.emitentes.filter((e) => e.ativo !== false && comCamposNovos(e).assina_documentos);
+  if (marcada.length) return marcada.slice(0, 1);
   const partes = d.participacoes.filter((p) => p.imovel_id === c.imovel_id).map((p) => d.emitentes.find((e) => e.id === p.emitente_id)).filter(Boolean);
   return partes.length ? partes : d.emitentes.filter((e) => e.ativo);
 }
+
+/**
+ * Um dado do cadastro da empresa para os documentos e e-mails do contrato (ou da ficha, com ``{ imovel_id }``): o da locadora
+ * e, se ela não tiver, o da primeira empresa ativa que tiver. Ex.: dadoDaEmpresa(d, c, 'email_contato') → "contato@exemplo.com.br" ('' sem nenhum).
+ */
+export function dadoDaEmpresa(d, c, campo) {
+  for (const e of [...locadorasDoContrato(d, c || {}), ...d.emitentes.filter((x) => x.ativo !== false)]) {
+    const v = comCamposNovos(e)[campo];
+    if (v) return v;
+  }
+  return '';
+}
+
+/** Companhia com artigo, como entra no contrato: "Companhia X (CX)" → "a Companhia X (CX)"; "o Departamento…" fica como está. */
+const comArtigo = (nome) => (/^(a|o|as|os)\s/i.test(nome) ? nome : `a ${nome}`);
+/** Nome curto da companhia: a sigla entre parênteses no fim, sem as maiúsculas. Ex.: "Companhia de Saneamento do Paraná (SANEPAR)" → "Sanepar". */
+export function nomeCurtoCompanhia(nome) {
+  const m = /\(([^)]+)\)\s*$/.exec(String(nome || ''));
+  const s = (m ? m[1] : String(nome || '')).trim();
+  return m && s && s === s.toUpperCase() ? s[0] + s.slice(1).toLowerCase() : s;
+}
+/** Companhia de energia ou de água do imóvel (``qual``: 'energia' | 'agua'): a do cadastro do imóvel ou, em branco, a da empresa. */
+export const companhiaDoImovel = (d, c, imovel, qual) => (imovel && imovel[`${qual}_concessionaria`]) || dadoDaEmpresa(d, c, `${qual}_concessionaria`);
 
 /**
  * Companhias e prestadores perante os quais a locadora representa o inquilino (cláusula de representação): água e energia
@@ -203,8 +247,10 @@ export function representacaoDoContrato(d, c, imovel = {}) {
   const gas = (d.titularidades || []).filter((x) => x.imovel_id === c.imovel_id && /g[áa]s|ultragaz|liquig|supergas/i.test(x.concessionaria || '')).map((x) => x.concessionaria)[0]
     || (((d.listas || {}).concessionarias) || ['Supergasbras']).find((x) => /g[áa]s|ultragaz|liquig|supergas/i.test(x)) || '';
   const out = [];
-  if (!fora('conta_energia')) out.push(`a Companhia Paranaense de Energia (COPEL)${nums(['unidade consumidora', imovel.copel_uc], ['medidor', imovel.copel_medidor])}`);
-  if (!fora('conta_agua')) out.push(`a Companhia de Saneamento do Paraná (SANEPAR)${nums(['matrícula', imovel.sanepar_matricula], ['hidrômetro', imovel.sanepar_hidrometro])}`);
+  const energia = companhiaDoImovel(d, c, imovel, 'energia');
+  const agua = companhiaDoImovel(d, c, imovel, 'agua');
+  if (!fora('conta_energia')) out.push(`${energia ? comArtigo(energia) : 'a companhia de energia elétrica'}${nums(['unidade consumidora', imovel.copel_uc], ['medidor', imovel.copel_medidor])}`);
+  if (!fora('conta_agua')) out.push(`${agua ? comArtigo(agua) : 'a companhia de água e esgoto'}${nums(['matrícula', imovel.sanepar_matricula], ['hidrômetro', imovel.sanepar_hidrometro])}`);
   if (doInquilino('conta_gas')) out.push(`a fornecedora de gás${gas ? ` ${gas}` : ''}${nums(['relógio', imovel.gas_relogio])}`);
   if (doInquilino('conta_internet')) out.push(`o provedor de internet e TV${imovel.internet ? ` (contrato ou telefone ${imovel.internet})` : ''}`);
   if (doInquilino('conta_condominio')) out.push(`a administradora do condomínio${imovel.administradora_nome ? ` ${imovel.administradora_nome}` : ''}`);
@@ -272,7 +318,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     caucao_meses: numeroComExtenso(caucaoMeses || 0),
     deposito_valor: valorComExtenso(c.deposito_valor || 0),
     deposito_uso: c.deposito_uso || '',
-    cidade: imovel.cidade || 'Curitiba',
+    cidade: imovel.cidade || dadoDaEmpresa(d, c, 'cidade_documentos'),
     data_assinatura: dataPorExtenso(extra.data || C.hojeIso()),
   };
   const condicoes = {
