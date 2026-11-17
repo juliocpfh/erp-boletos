@@ -31,6 +31,7 @@ import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/n
 import { telaReajustes } from './telas/reajustes.js';
 import { alertasDaTela, carregarParte } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
+import { alertaRegua, ligarRegua, telaRegua } from './telas/regua.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
 import * as AJ from './ajuda.js';
@@ -57,6 +58,7 @@ export const TELAS = {
     ligarEditorIcone(raiz);
     ligarGarantiasCorrigidas(raiz);
     ligarFichaOnline(raiz);
+    ligarRegua(raiz);
     ligarIndiceBancoCentral(raiz);
     ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, 'erro'));
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
@@ -283,6 +285,7 @@ export const TELAS = {
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${alertaFichas()}
       ${alertaInformeIr()}
+      ${alertaRegua()}
       ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
         ${link('#/conflitos', podeUsuario('admin') ? 'Escolher agora' : 'Ver (o administrador escolhe)', 'botao pequeno')}</div>` : ''}
       ${avisoBackupSeguro()}
@@ -365,6 +368,7 @@ export const TELAS = {
   contas: (rota) => telaContas(rota),
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
+  regua: () => telaRegua(),
   garantias: () => telaGarantias(),
   // painel de Gestão (números do mês para o dono): carregado só quando aberto (ADIADOS do sw.js)
   gestao: async (rota) => (await carregarParte(() => import('./telas/gestao.js'))).telaGestao(rota.q),

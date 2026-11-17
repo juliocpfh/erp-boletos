@@ -54,6 +54,7 @@ export function textosGerados() {
     out[`cidade:${cc.inquilino_nome}`] = K.dadosDoContrato(d, cc).campos.cidade;
   }
   for (const m of MODELOS_EMAIL) {
+    if (m.boleto) continue; // régua de cobrança (2026-11-16, depois do resumo): tests/regua-email.test.mjs
     const alvo = m.chave.startsWith('ficha') ? { ficha: f } : { contrato: c };
     out[`email:${m.chave}`] = montarEmail(modeloEmail(d, m.chave), dadosDoEmail(d, alvo, {}, '2026-11-12'));
   }

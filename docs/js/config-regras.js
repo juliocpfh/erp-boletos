@@ -14,7 +14,7 @@ export const GRUPOS_REGRAS = [
 const LI = 'Lei do Inquilinato (Lei 8.245/91)';
 
 /**
- * Cada regra: chave, grupo, rótulo, tipo (opcao, simnao, inteiro, pct, dinheiro, indice, feriados, regua), padrão do sistema,
+ * Cada regra: chave, grupo, rótulo, tipo (opcao, simnao, inteiro, pct, dinheiro, indice, feriados, regua, dias), padrão do sistema,
  * `explica` (o que faz, com exemplo), `consequencia` (o que muda ao trocar), `lei` (fundamento) e, nas de opção, cada opção com
  * [valor, rótulo, explicação e se é legal]. Dinheiro em centavos; percentual como número (2 = 2%).
  */
@@ -141,6 +141,15 @@ export const DEFINICOES_REGRAS = [
     explica: 'O que fazer pelo atraso do boleto vencido mais antigo (só aviso, nada é enviado sozinho). Um passo por linha: "dias: o que fazer". Ex.: "10: Ligar para o inquilino".',
     consequencia: 'Muda o passo mostrado no alerta e na tela Inadimplência. Cobrar sem ameaçar nem expor o devedor; para negativar, o órgão avisa a pessoa antes.',
     lei: 'CDC, art. 42 e art. 43, §2º; Súmula 359 do STJ; LGPD, art. 7º, X (dados para proteção do crédito).' },
+  // régua por e-mail (pedido do dono em 2026-11-16): o sistema prepara, o administrador autoriza um a um (regua-email.js, #/regua)
+  { chave: 'regua_email_dias', grupo: 'rotina', rotulo: 'Régua de cobrança: quando preparar o e-mail ao inquilino', tipo: 'dias', padrao: [-3, 0, 3, 10], min: -30, max: 60,
+    explica: 'Dias em relação ao vencimento do boleto, separados por vírgula: número negativo é antes, 0 é no dia, positivo é depois. Ex.: "-3, 0, 3, 10" → boleto que vence em 10/12: lembrete em 07/12, "vence hoje" em 10/12 e cobrança de atraso em 13/12 e 20/12. O e-mail fica em "E-mails da régua" (Financeiro) esperando a sua autorização: nada é enviado sozinho. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar, o prazo que o banco leva para creditar o boleto (quem pagou no dia não recebe cobrança). Em branco: nenhum e-mail é preparado.',
+    consequencia: 'Só muda quando o e-mail aparece na lista. Boleto pago, em acordo ou de contrato encerrado sai da lista sozinho; e-mail já enviado ou marcado "Não enviar" não volta.',
+    lei: 'CDC, art. 42 (cobrança sem constranger nem ameaçar); LGPD, art. 7º, V (dados usados para cumprir o contrato).' },
+  { chave: 'regua_envio', grupo: 'rotina', rotulo: 'Régua de cobrança: botão "Autorizar e enviar" pelo Gmail da empresa', tipo: 'simnao', padrao: false,
+    explica: 'Não (padrão): os e-mails da régua ficam prontos na lista e você abre cada um no Gmail (ou copia o texto) para mandar por lá. Sim: aparece também o botão "Autorizar e enviar", que manda pelo Gmail da empresa (só na nuvem, com o Gmail ligado). Mesmo ligado, nada sai sem o clique do administrador.',
+    consequencia: 'Sim: o e-mail sai na hora do clique, com o boleto e o QR Code do Pix anexados, e fica em "Enviados" no Gmail. Não: o envio é sempre feito à mão pelo Gmail.',
+    lei: 'CDC, art. 42; LGPD, art. 7º, V.' },
   { chave: 'meses_documentos_ficha', grupo: 'rotina', rotulo: 'Ficha reprovada: apagar os documentos depois de (meses)', tipo: 'inteiro', padrao: 3, min: 1, max: 24,
     explica: 'Os documentos pessoais da ficha reprovada são apagados este número de meses depois da decisão.',
     consequencia: 'Prazo maior guarda dados sem necessidade, o que a LGPD manda evitar; prazo curto pode apagar o que ainda seria útil numa reclamação.',
@@ -255,6 +264,11 @@ export function limparValorRegra(chave, valor) {
       }
       if (new Set(passos.map((p) => p.dias)).size !== passos.length) throw new ErroRegra('Régua de cobrança: dois passos com o mesmo número de dias.');
       return passos.sort((a, b) => a.dias - b.dias);
+    }
+    case 'dias': {
+      const lista = (Array.isArray(valor) ? valor : []).map(Number);
+      for (const n of lista) if (!Number.isInteger(n)) throw new ErroRegra(`${def.rotulo}: use só números inteiros (ex.: -3, 0, 3, 10).`);
+      return [...new Set(lista.map(faixa))].sort((a, b) => a - b);
     }
     default: return valor;
   }

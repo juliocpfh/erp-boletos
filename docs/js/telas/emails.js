@@ -219,6 +219,7 @@ const AJUDA = `<div class="cartao"><h2>Como escrever</h2>
   <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
   {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
   {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel} (condições nao_util, bonificacao_boleto, pix, linha_digitavel).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
   bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>
