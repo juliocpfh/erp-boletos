@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(RAIZ, 'atualizador-pc', 'dist');
-export const NOME_BAIXAR = 'Instalar-Administracao-de-Imoveis.exe';
+export const NOME_BAIXAR = 'Instalar-Administracao-de-Imoveis.exe'; // iguais a atualizador-pc/se-atualizar.mjs
+export const NOME_MANIFESTO = 'programa-pc.json';
 const FUSIVEL = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2'; // marca fixa do Node para o pacote (documentação do SEA)
 
 if (process.platform !== 'win32') { console.error('O .exe só é gerado no Windows (ele é feito do node.exe desta máquina).'); process.exit(1); }
@@ -50,4 +51,7 @@ const saida = path.join(DIST, NOME_BAIXAR);
 const r = spawnSync(saida, ['--versao'], { encoding: 'utf8' });
 if (r.status !== 0 || r.stdout.trim() !== versao) { console.error(`O .exe gerado não respondeu a --versao (saiu ${r.status}): ${r.stdout}${r.stderr}`); process.exit(1); }
 const bytes = fs.readFileSync(saida);
-console.log(`Pronto: ${saida}\n  versão ${versao} (Node ${process.version}) · ${(bytes.length / 1024 / 1024).toFixed(1)} MB · sha256 ${crypto.createHash('sha256').update(bytes).digest('hex')}`);
+const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+// o aviso de versão nova que o programa instalado confere para se atualizar sozinho (atualizador-pc/se-atualizar.mjs)
+fs.writeFileSync(path.join(DIST, NOME_MANIFESTO), `${JSON.stringify({ versao, sha256, tamanho: bytes.length })}\n`);
+console.log(`Pronto: ${saida}\n  versão ${versao} (Node ${process.version}) · ${(bytes.length / 1024 / 1024).toFixed(1)} MB · sha256 ${sha256}\n  e ${NOME_MANIFESTO} (aviso de versão nova)`);

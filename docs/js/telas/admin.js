@@ -101,7 +101,7 @@ const noWindows = () => /Windows/.test(navigator.userAgent);
 function caixaDesinstalarPrograma() {
   if (!noComputador() || !noWindows()) return '';
   return `<div class="cartao" id="programa-do-pc"><h2>Programa deste computador</h2>
-    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho. Para tirá-lo deste computador:</p>
+    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho e também <b>se atualiza sozinho</b> quando sai uma versão nova (todo dia às 20h e ao entrar no Windows). A versão de cada computador aparece em ${link('#/usuarios', 'Usuários → Aparelhos ligados', '')}. Para tirá-lo deste computador:</p>
     <div class="acoes"><a class="botao perigo pequeno" href="imoveis-desinstalar:confirmar">Desinstalar o programa deste computador</a></div>
     <p class="suave">Pede confirmação no Windows. Depois, se quiser cortar o acesso deste computador, use ${link('#/usuarios', 'Usuários → Aparelhos ligados → Desligar', '')}.
       A pasta segura e a pasta <b>${CA.PASTA_COPIA}</b> continuam no computador. Também dá para desinstalar em Configurações do Windows → Aplicativos → Aplicativos instalados.</p></div>`;

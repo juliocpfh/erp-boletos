@@ -7,9 +7,9 @@ Marque com `[x]` o que for concluindo.
 ## Para confirmar na sequência (dono)
 
 1. [ ] Abrir o sistema no computador e no celular depois da troca da publicação (17/11) e ver se abre normal. **Celular conferido em 17/11** (desinstalou, instalou de novo, entrou rápido, tudo funcionando); falta o computador. Na 1ª vez ele baixa tudo de novo (pode demorar um pouco mais).
-2. [ ] Aceitar as PRs em aceite: #309 e #310 aceitas em 17/11; falta a #312 (programa do PC desinstalável). Sair e entrar com a senha: feito no celular em 17/11.
+2. [x] Aceitar as PRs em aceite: #309, #310 e #312 aceitas em 17/11. Sair e entrar com a senha: feito no celular em 17/11.
    - Depois do merge da #310: **sair e entrar de novo no site com a senha, uma vez** (e de novo sempre que trocar a senha). Sem isso, ligar um computador **novo** ao programa do PC dá "E-mail ou senha errados…". Os computadores já ligados continuam funcionando.
-3. [ ] Depois do merge da #312 (uns 10 min): baixar o `.exe` novo, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9).
+3. [ ] Depois do merge da PR do programa que se atualiza sozinho (item 11; uns 10 min): baixar o `.exe` novo **pela última vez**, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9) e, no sistema, em Usuários → Aparelhos ligados, a coluna **Programa** com a data da versão (depois da próxima rodada das 20h). Daqui em diante ele se troca sozinho.
 4. [ ] Ligar o Gmail com o Claude (item 1).
 5. [ ] Ficha pela internet com um conhecido (item 3).
 6. [ ] Contador: informe do IR (D5), DIMOB e numeração da NF por empresa (item 6).
@@ -17,7 +17,7 @@ Marque com `[x]` o que for concluindo.
 8. [ ] Depois do C6 no ar: rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
 9. [ ] Quando acontecer: NF 16/30 (próximo inquilino com entrada no meio do mês) e troca de senha → religar o PC (item 13).
 10. [ ] 16/12/2026: CBS 2027 (item 6).
-11. [ ] **Claude, próxima sessão (pedido do dono em 17/11):** o programa do PC **se atualizar sozinho**. Hoje só os dados e os arquivos se atualizam sozinhos (tarefas das 20h, ao entrar e de hora em hora); o próprio programa (`.exe`) precisa ser baixado de novo a cada versão nova. Fazer: a tarefa confere a versão na release `programa-pc` e troca o programa sozinha (com conferência do arquivo baixado), e o sistema mostra a versão do programa em Dados e backup.
+11. [x] **Feito em 17/11 (PR "Programa do PC se atualiza sozinho"):** todo dia às 20h e ao entrar no Windows o programa confere se saiu versão nova no GitHub, baixa, confere o arquivo (tamanho e SHA-256) e se abre, e só então se troca; a nova vale na rodada seguinte. Testado no Windows de verdade com dois `.exe` (o antigo, rodando, se trocou pelo novo). Em Usuários → Aparelhos ligados, a coluna **Programa** mostra a versão de cada computador. Assim, dados, arquivos, versão PC e o próprio programa se atualizam sozinhos. Pedido original: Hoje só os dados e os arquivos se atualizam sozinhos (tarefas das 20h, ao entrar e de hora em hora); o próprio programa (`.exe`) precisa ser baixado de novo a cada versão nova. Fazer: a tarefa confere a versão na release `programa-pc` e troca o programa sozinha (com conferência do arquivo baixado), e o sistema mostra a versão do programa em Dados e backup.
 
 **Como usar (para o Claude, depois de um /clear):** o dono vai responder item por item, na ordem da tabela. A cada resposta: anote aqui o que ele decidiu (com a data), marque `[x]` no que foi concluído, leve a decisão de regra de negócio para `DECISOES.md` e, se virar mudança no sistema, confirme antes com um exemplo em reais e datas.
 

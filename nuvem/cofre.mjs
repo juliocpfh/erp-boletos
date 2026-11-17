@@ -1245,7 +1245,7 @@ export class CofreDO {
         try { const feito = await this.aparelhos.entrar(pedido, ip); anotar(200); return resposta(200, feito); } catch (e) { anotar(e?.status || 500); throw e; }
       }
       if (rota === '/registrar-acessos' && request.method === 'POST') return resposta(200, this.cofre.registrarAcessos(await corpo()));
-      if (rota === '/aparelho/conferir' && request.method === 'POST') return resposta(200, await this.aparelhos.conferir((await corpo())?.cracha));
+      if (rota === '/aparelho/conferir' && request.method === 'POST') { const c = await corpo(); return resposta(200, await this.aparelhos.conferir(c?.cracha, c?.versao)); }
       // a conta do Gmail (refresh token cifrado): só o Worker chega aqui (gmail.mjs, contaGuardada), também nos avisos da ficha
       if (rota === '/gmail/conta' && request.method === 'GET') return resposta(200, { conta: this.gmail.conta() });
       if (!email) throw new ErroCofre(401, 'Sem login.');

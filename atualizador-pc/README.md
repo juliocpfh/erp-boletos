@@ -43,9 +43,11 @@ O que ele faz ao instalar: copia a si mesmo para `%LOCALAPPDATA%\Administracao d
 | Ver a versão / a ajuda | `--versao` / `--ajuda` |
 | Ver o que a instalação (ou a desinstalação) faria, sem mexer em nada | `--instalar --simular` (`--desinstalar --simular`) |
 
-Programa novo publicado: baixe e dê dois cliques de novo (ele se copia por cima). Ele ainda **não se atualiza sozinho**.
+**Ele se atualiza sozinho** (desde 17/11/2026): todo dia às 20h e ao entrar no Windows, depois dos dados, o programa confere na release `programa-pc` do GitHub o aviso `programa-pc.json` (versão, tamanho e SHA-256). Se saiu versão nova, baixa o `.exe` para `Administracao-de-Imoveis.novo.exe`, confere tamanho, SHA-256 e que abre (`--versao` responde a versão anunciada) e só então troca: o atual vira `Administracao-de-Imoveis.velho.exe` (o Windows deixa renomear o programa em uso) e o novo toma o lugar. A versão nova vale a partir da rodada seguinte, que apaga o `.velho.exe`. Nunca volta para uma versão mais velha; arquivo que não confere é apagado e o programa continua o mesmo. O resultado fica na linha `programa do PC: …` de `ultima-atualizacao.txt`, e a versão de cada computador aparece no sistema em **Usuários → Aparelhos ligados** (coluna Programa; "antiga" = programa de antes de 17/11, que precisa ser baixado uma última vez). Código: `se-atualizar.mjs`; testes: `tests/programa-pc-se-atualizar.test.mjs`. Para testar a troca de verdade no Windows, `IMOVEIS_URL_RELEASE=http://127.0.0.1:<porta>/` aponta a release para um servidor deste computador (outro endereço é ignorado).
 
-Para gerar o `.exe` na mão (Windows, com Node 24): `node tools/gerar-exe.mjs` → `atualizador-pc/dist/` (fora do repositório). É o próprio `node.exe` com `programa.mjs` dentro (Node "single executable application": esbuild + `--experimental-sea-config` + postject). No GitHub: `.github/workflows/programa-pc.yml`. Testes: `tests/programa-pc.test.mjs`.
+Para trocar à mão (ou num computador com o programa de antes de 17/11): baixe e dê dois cliques de novo (ele se copia por cima).
+
+Para gerar o `.exe` na mão (Windows, com Node 24): `node tools/gerar-exe.mjs` → `atualizador-pc/dist/` (fora do repositório). É o próprio `node.exe` com `programa.mjs` dentro (Node "single executable application": esbuild + `--experimental-sea-config` + postject). No GitHub: `.github/workflows/programa-pc.yml`. Gera também `programa-pc.json` (o aviso de versão nova que os computadores conferem). Testes: `tests/programa-pc.test.mjs` e `tests/programa-pc-se-atualizar.test.mjs`.
 
 ## O que precisa ter (jeito antigo, com o Node)
 
@@ -114,5 +116,5 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 
 ## Falta (etapa 2 da proposta)
 
-- O `.exe` sem o Node está feito (acima). Falta dele: **assinatura** (certificado de assinatura de código: sem assinatura no computador do dono; comprar antes do primeiro cliente de fora, proposta, seção 8, item 11), **atualização do próprio programa** sozinha, ícone na Área de Trabalho e o link para baixar dentro do sistema (Dados e backup).
+- O `.exe` sem o Node está feito (acima). Falta dele: **assinatura** (certificado de assinatura de código: sem assinatura no computador do dono; comprar antes do primeiro cliente de fora, proposta, seção 8, item 11), ícone na Área de Trabalho e o link para baixar dentro do sistema (Dados e backup).
 - Com o login próprio (etapa 4), a página de ligar pede também o código de confirmação.
