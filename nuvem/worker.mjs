@@ -9,6 +9,9 @@
 //   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
 // · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access).
 // · dados/chave-backup (POST, administrador): a chave pública do backup seguro, para os backups diários saírem cifrados (cifrar-backup.mjs).
+// · dados/acessos (GET, administrador): o registro de acessos (tela Acessos). O Worker anota no cofre quem abriu, anexou,
+//   apagou ou moveu arquivos, baixou backups, mandou e-mail e usou a ficha pela internet (anotarAcesso); o cofre anota
+//   sozinho dados/tudo, a carga/substituição e a entrada do programa do PC.
 // · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
@@ -148,10 +151,10 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'chave-backup': 'POST' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'chave-backup': 'POST', acessos: 'GET' };
 const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
-async function repassarAoCofre(request, env, rota, email, url) {
+async function repassarAoCofre(request, env, rota, email, url, origem = 'site') {
   if (ROTAS_COFRE[rota] !== request.method) throw new ErroHttp(404, 'Não encontrado.');
   if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
   let corpo;
@@ -160,9 +163,50 @@ async function repassarAoCofre(request, env, rota, email, url) {
     corpo = await lerCorpo(request, rota === 'importar' ? MAX_DADOS : 8 * 1024 * 1024);
   }
   return cofreDe(env).fetch(new Request(`https://cofre/${rota}${url.search}`, {
-    method: request.method, body: corpo, headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email },
+    method: request.method, body: corpo, headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email, 'X-Ip': ipDe(request), 'X-Origem': origem },
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Registro de acessos: juntados aqui e mandados ao cofre em grupos (uma ida ao cofre a cada ACESSOS_POR_ENVIO, ou depois de
+// ESPERA_ACESSOS, ou na hora quando é importante), sem segurar a resposta (waitUntil). Sem ctx (testes, nuvem local), na hora.
+// ---------------------------------------------------------------------------
+const ipDe = (request) => request.headers.get('CF-Connecting-IP') || '';
+export const ACESSOS_POR_ENVIO = 25;
+const ESPERA_ACESSOS = 15000;
+let acessosJuntos = []; let juntosDesde = 0;
+export const esquecerAcessos = () => { acessosJuntos = []; juntosDesde = 0; };
+
+/**
+ * O que entra no registro: arquivos (abrir, anexar, apagar), backups (lista e baixar), mover, apagar pasta, e-mail e ficha pela
+ * internet. Devolve [rota anotada, importante] ou null. Abrir modelos e ícones e as listas de anexos (pedidas a cada tela) não entram.
+ */
+export function rotaDoRegistro(rota, metodo) {
+  if (rota.startsWith('arquivos/')) return [`${metodo === 'GET' || metodo === 'HEAD' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
+  if (rota.startsWith('backups/')) return [rota, true];
+  if (/^lista(-tudo)?\/backups(\/|$)/.test(rota)) return [rota, false];
+  if (rota === 'mover' || rota === 'apagar') return [rota, true];
+  if (rota === 'email/enviar') return [rota, true];
+  if (rota.startsWith('ficha-online/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
+  return null;
+}
+
+/** Anota o acesso (se a rota é das registradas) com o tamanho da resposta ou do envio. */
+export function anotarAcesso(env, ctx, request, rota, email, resposta, origem = 'site', bytesEnviados = null) {
+  if (!env.COFRE || !email || !resposta) return undefined;
+  const r = rotaDoRegistro(rota, request.method);
+  if (!r) return undefined;
+  const tamanho = bytesEnviados ?? (Number(resposta.headers.get('Content-Length')) || (resposta.status === 304 ? 0 : null));
+  acessosJuntos.push({ em: new Date().toISOString(), email, rota: decodeURIComponentSeguro(r[0]), bytes: tamanho, ip: ipDe(request), origem, resultado: resposta.status });
+  if (!juntosDesde) juntosDesde = Date.now();
+  if (ctx?.waitUntil && !r[1] && acessosJuntos.length < ACESSOS_POR_ENVIO && Date.now() - juntosDesde < ESPERA_ACESSOS) return undefined;
+  const lote = acessosJuntos.splice(0); juntosDesde = 0;
+  const p = cofreDe(env).fetch(new Request('https://cofre/registrar-acessos', { method: 'POST', body: JSON.stringify({ acessos: lote }), headers: { 'Content-Type': 'application/json' } }))
+    .then((x) => { if (!x.ok) console.error('registro de acessos', x.status); }).catch((e) => console.error('registro de acessos', e));
+  if (ctx?.waitUntil) { ctx.waitUntil(p); return undefined; }
+  return p;
+}
+const decodeURIComponentSeguro = (t) => { try { return decodeURIComponent(t); } catch { return t; } };
 
 // ---------------------------------------------------------------------------
 // Arquivos (anexos, modelo da NF, backups)
@@ -407,7 +451,7 @@ function limitarIp(request, tipo) {
 }
 const crachasRecusados = new Map(); // hash do crachá → até quando (crachá inventado não volta ao cofre por 1 minuto)
 
-async function atenderAparelho(request, env, rota, url, buscar) {
+async function atenderAparelho(request, env, rota, url, buscar, ctx = null) {
   if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
   const m = request.method;
   if (rota === 'entrar') {
@@ -426,8 +470,11 @@ async function atenderAparelho(request, env, rota, url, buscar) {
   if (rota === 'programa') return versaoPc(request, env, buscar);
   if (m !== 'GET') throw new ErroHttp(405, 'Método não aceito.');
   if (rota === 'saude') return json(200, { ok: true, email });
-  if (rota.startsWith('dados/') && ROTAS_DADOS_APARELHO.includes(rota.slice(6))) return repassarAoCofre(request, env, rota.slice(6), email, url);
-  return (await lerRecurso(env, rota, email, url, request)) || json(404, { erro: 'Não encontrado.' });
+  if (rota.startsWith('dados/') && ROTAS_DADOS_APARELHO.includes(rota.slice(6))) return repassarAoCofre(request, env, rota.slice(6), email, url, 'pc');
+  let lido;
+  try { lido = (await lerRecurso(env, rota, email, url, request)) || json(404, { erro: 'Não encontrado.' }); } catch (e) { lido = respostaDoErro(e); }
+  await anotarAcesso(env, ctx, request, rota, email, lido, 'pc');
+  return lido;
 }
 
 // ---------------------------------------------------------------------------
@@ -505,39 +552,54 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
   try {
     if (!env.DADOS) throw new ErroHttp(503, 'Worker sem o R2 ligado (binding DADOS).');
     if (request.method === 'OPTIONS') throw new ErroHttp(405, 'Método não aceito.'); // sem CORS: só o próprio site chama
-    if (rota.startsWith('aparelho/')) return await atenderAparelho(request, env, rota.slice(9), url, buscar); // programa do PC: crachá, sem Access
+    if (rota.startsWith('aparelho/')) return await atenderAparelho(request, env, rota.slice(9), url, buscar, ctx); // programa do PC: crachá, sem Access
     const email = await conferirLogin(request, env, buscar);
-    const m = request.method;
-    if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
-    const icone = rota.match(/^icone-(192|512)\.png$/);
-    if (icone && m === 'GET') return await lerIcone(env, icone[1]);
-    const novoIcone = rota.match(/^icone\/(192|512)$/);
-    if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
-    if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
-    if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
-    if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaEnviarEmail(request, env, email, url, buscar); }
-    if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
-    if (rota.startsWith('ficha-online/')) {
-      if (m !== 'GET') conferirGravacao(request, env);
-      await exigirPapel(env, email, 'operador');
-      return await atenderEquipe(request, env, rota.slice(13), email, { avisar: avisador(ctx, buscar) });
-    }
-    if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env, email); }
-    if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
-    if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url, request); if (lido) return lido; }
-    if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
-      const chave = caminhoSeguro(rota);
-      await exigirPapel(env, email, 'operador');
-      if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
-      if (m === 'DELETE') return await apagarArquivo(request, env, chave, email);
-    }
-    return json(404, { erro: 'Não encontrado.' });
+    // as rotas do registro de acessos (rotaDoRegistro) ficam anotadas com o resultado, também quando recusadas
+    let resposta;
+    try { resposta = await atenderComLogin(request, env, rota, email, url, buscar, ctx); } catch (e) { resposta = respostaDoErro(e); }
+    // tamanho: o que foi enviado (anexo, e-mail) ou o que foi baixado (Content-Length da resposta)
+    await anotarAcesso(env, ctx, request, rota, email, resposta, 'site', request.method === 'GET' ? null : Number(request.headers.get('Content-Length')) || null);
+    return resposta;
   } catch (e) {
-    if (e instanceof ErroHttp) return json(e.status, { erro: e.message, ...e.extra });
-    if (e instanceof ErroEmail) return json(e.status, { erro: e.message });
-    console.error(e);
-    return json(500, { erro: 'Erro no servidor da nuvem.' });
+    return respostaDoErro(e);
   }
+}
+
+/** Erro → resposta JSON (ErroHttp, ErroEmail; o resto vira 500 sem detalhes). */
+function respostaDoErro(e) {
+  if (e instanceof ErroHttp) return json(e.status, { erro: e.message, ...e.extra });
+  if (e instanceof ErroEmail) return json(e.status, { erro: e.message });
+  console.error(e);
+  return json(500, { erro: 'Erro no servidor da nuvem.' });
+}
+
+/** As rotas do site depois do login do Access conferido. */
+async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
+  const m = request.method;
+  if (rota === 'saude' && m === 'GET') return json(200, { ok: true, email, teste: env.MODO_TESTE === '1' });
+  const icone = rota.match(/^icone-(192|512)\.png$/);
+  if (icone && m === 'GET') return await lerIcone(env, icone[1]);
+  const novoIcone = rota.match(/^icone\/(192|512)$/);
+  if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
+  if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
+  if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
+  if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaEnviarEmail(request, env, email, url, buscar); }
+  if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
+  if (rota.startsWith('ficha-online/')) {
+    if (m !== 'GET') conferirGravacao(request, env);
+    await exigirPapel(env, email, 'operador');
+    return await atenderEquipe(request, env, rota.slice(13), email, { avisar: avisador(ctx, buscar) });
+  }
+  if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env, email); }
+  if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
+  if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url, request); if (lido) return lido; }
+  if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
+    const chave = caminhoSeguro(rota);
+    await exigirPapel(env, email, 'operador');
+    if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
+    if (m === 'DELETE') return await apagarArquivo(request, env, chave, email);
+  }
+  return json(404, { erro: 'Não encontrado.' });
 }
 
 /** O endereço da ficha (ficha.ankjck.com.br) é outro aplicativo: sem login, só a ficha. */

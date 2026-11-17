@@ -124,7 +124,8 @@ test('papel conferido no cofre fica guardado 1 minuto (o Painel pede muitos anex
   W.esquecerPapeis();
   let consultas = 0; let papel = 'consulta';
   const NIVEL = { consulta: 1, operador: 2, admin: 3 };
-  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { consultas += 1; return NIVEL[papel] < NIVEL[new URL(req.url).searchParams.get('nivel')] ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response(`{"papel":"${papel}"}`); } }) };
+  // o registro de acessos (anexo gravado) também vai ao cofre: aqui só contam as conferências do papel
+  const COFRE = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { if (new URL(req.url).pathname === '/registrar-acessos') return new Response('{"ok":true}'); consultas += 1; return NIVEL[papel] < NIVEL[new URL(req.url).searchParams.get('nivel')] ? new Response('{"erro":"Seu usuário não pode fazer isso."}', { status: 403 }) : new Response(`{"papel":"${papel}"}`); } }) };
   const env = { MODO_TESTE: '1', DADOS: r2Falso(), COFRE };
   await env.DADOS.put('arquivos/a.pdf', 'x');
   for (let i = 0; i < 5; i += 1) assert.equal((await pedir(env, 'GET', '/api/lista/arquivos/')).status, 200);

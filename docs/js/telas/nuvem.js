@@ -6,7 +6,7 @@ import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';
-import { botao, carregarParte } from './comum.js';
+import { botao, carregarParte, etiqueta, link } from './comum.js';
 
 const valorTexto = (v) => {
   if (v === null || v === undefined || v === '') return '(vazio)';
@@ -125,6 +125,62 @@ export async function telaBackupsNuvem() {
       <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso ao servidor não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
+}
+
+/** Um acesso em palavras (ex.: "Abriu Apto 1/Inquilinos/Ana/rg.pdf"). */
+export function descreverAcesso(rota) {
+  const m = /^(PUT|DELETE|POST) (.*)$/.exec(String(rota || ''));
+  const metodo = m ? m[1] : 'GET'; const r = m ? m[2] : String(rota || '');
+  if (r === 'dados/tudo') return 'Baixou o banco de dados inteiro';
+  if (r.startsWith('dados/importar')) return r.includes('voltar') ? 'Voltou os dados da nuvem para um backup' : r.includes('substituir') ? 'Substituiu os dados da nuvem' : 'Carga inicial dos dados na nuvem';
+  if (r.startsWith('aparelho/entrar')) { const pc = (/\((.+)\)$/.exec(r) || [])[1]; return `Programa do PC: entrar${pc ? ` (computador ${pc})` : ''}`; }
+  if (r.startsWith('arquivos/')) return `${{ PUT: 'Anexou', DELETE: 'Apagou' }[metodo] || 'Abriu'} ${r.slice(9)}`;
+  if (r.startsWith('backups/')) return `Baixou o backup ${r.slice(8)}`;
+  if (/^lista(-tudo)?\/backups/.test(r)) return 'Viu a lista dos backups';
+  if (r === 'mover') return 'Moveu ou renomeou uma pasta de arquivos';
+  if (r === 'apagar') return 'Apagou uma pasta de arquivos (vai para a lixeira por 30 dias)';
+  if (r === 'email/enviar') return 'Mandou um e-mail pela conta da empresa';
+  if (r.startsWith('ficha-online/')) return `Ficha pela internet: ${metodo === 'GET' ? 'consultou' : 'mexeu em'} ${r.slice(13)}`;
+  return r;
+}
+const tamanho = (b) => (b === null || b === undefined ? '' : b >= 1048576 ? mb(b) : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`);
+const resultadoDoAcesso = (x) => (x >= 400 ? etiqueta(x === 401 ? 'Recusado (senha ou login)' : x === 403 ? 'Recusado (sem permissão)' : x === 429 ? 'Recusado (muitos pedidos)' : `Recusado (${x})`, 'perigo') : x === 304 ? '<span class="suave">já estava no aparelho</span>' : '');
+/** Baixou mais que isto no período: aparece em destaque (pode ser alguém copiando os dados). */
+const MUITO = 200 * 1048576;
+
+/**
+ * Registro de acessos da nuvem (só administrador): quem baixou o banco, abriu, anexou ou apagou arquivos, baixou backups, mandou
+ * e-mail, mexeu na ficha pela internet e ligou o programa do PC. Filtros: período e pessoa (`de`, `ate`, `quem`); `antes` = mais velhos.
+ */
+export async function telaAcessos(q = {}) {
+  const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
+  if (!E.nuvem) return `${topo}<p class="suave">Só existe com os dados na nuvem.</p>`;
+  if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
+  const filtro = { de: q.de && /^\d{4}-\d{2}-\d{2}$/.test(q.de) ? q.de : '', ate: q.ate || '', email: q.quem || '', antes: q.antes || '' };
+  let r;
+  try {
+    const busca = new URLSearchParams(Object.entries(filtro).filter(([, v]) => v));
+    r = await apiDados()('GET', `acessos${String(busca) ? `?${busca}` : ''}`);
+  } catch (e) {
+    return `${topo}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
+  }
+  const form = `<form class="cartao acoes" data-form="ir" data-ir="acessos"><label style="margin:0">De</label><input type="date" name="de" value="${esc(filtro.de)}" style="width:160px">
+    <label style="margin:0">até</label><input type="date" name="ate" value="${esc(filtro.ate)}" style="width:160px">
+    <label style="margin:0">Pessoa</label><select name="quem" style="width:auto"><option value="">Todas</option>${(r.emails || []).map((e) => `<option${e === filtro.email ? ' selected' : ''}>${esc(e)}</option>`).join('')}</select>
+    <button class="secundario">Ver</button>${filtro.de || filtro.ate || filtro.email ? ` ${link('#/acessos', 'Limpar')}` : ''}</form>`;
+  const resumo = (r.resumo || []).map((x) => `<tr><td>${esc(x.email)}</td><td class="n">${x.acessos}</td><td class="n">${tamanho(x.bytes)}${x.bytes > MUITO ? ` ${etiqueta('muito', 'aviso')}` : ''}</td><td class="n">${x.recusados ? etiqueta(String(x.recusados), 'perigo') : '0'}</td></tr>`).join('');
+  const linhas = (r.acessos || []).map((a) => `<tr><td class="nw">${esc(dataHoraBr(a.em))}</td><td>${esc(a.email)}</td><td>${esc(descreverAcesso(a.rota))} ${resultadoDoAcesso(a.resultado)}</td>
+    <td class="n">${tamanho(a.bytes)}</td><td>${a.origem === 'pc' ? 'Programa do PC' : 'Site'}${a.ip ? `<br><span class="suave">${esc(a.ip)}</span>` : ''}</td></tr>`).join('');
+  const ultimo = (r.acessos || []).at(-1);
+  const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, 'Ver os mais antigos')}</p>` : '';
+  return `${topo}
+    <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou o banco inteiro</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
+      <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
+    ${form}
+    <div class="cartao"><h2>Por pessoa${filtro.de || filtro.ate ? ' no período' : ''}</h2>
+      ${resumo ? `<table><tr><th>Pessoa</th><th class="n">Acessos</th><th class="n">Baixou ou enviou</th><th class="n">Recusados</th></tr>${resumo}</table>` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>
+    <div class="cartao"><h2>Acessos${filtro.antes ? ' (mais antigos)' : ''}</h2>
+      ${linhas ? `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th class="n">Tamanho</th><th>De onde</th></tr>${linhas}</table></div>${mais}` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>`;
 }
 
 /** Relatório da passagem da pasta para a nuvem (etapa 4). */
