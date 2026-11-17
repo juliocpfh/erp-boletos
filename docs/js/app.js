@@ -14,7 +14,7 @@ import { AnexosNuvem } from './pasta-nuvem.js';
 import { Cofrinho, guardarCifrado } from './cofrinho.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
-import { SELETOR_FORMULARIO } from './telas/comum.js';
+import { apagarAnexosConfirmados, SELETOR_FORMULARIO } from './telas/comum.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
@@ -331,6 +331,7 @@ function aoMudarNuvem(externo) {
   E.d = E.nuvem.atual();
   renovarUsuario();
   atualizarFaixa();
+  apagarAnexosConfirmados().catch((e) => console.error(e)); // anexos que esperavam a nuvem confirmar a exclusão (alterarApagandoAnexos, telas/comum.js)
   if (!externo) return;
   espelharSeguro(); // o que os outros aparelhos mudaram também entra na cópia segura deste computador
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
