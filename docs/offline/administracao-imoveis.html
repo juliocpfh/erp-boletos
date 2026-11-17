@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-qgMDLGCl7qhaPyNla1MG9dms4gyFE3322FqPV8sJj+Q='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-a1ywEPl6wTZpajzo2GjYfpPc4gQKa0OnwT/SC+enhH8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a2a9f177bb3d6927">
+<meta name="fontes" content="bdcce7bd50ffef9c">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -10698,6 +10698,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "pasta",
         "documentos_apagados_em",
         "dados_apagados_em",
+        "historico_limpo_em",
         "documentos_no_contrato",
         "criado_em",
         "criado_por",
@@ -28049,7 +28050,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${botao("baixarNaoEnviado", "Baixar", { id: f.id }, "secundario pequeno")} ${botao("esquecerNaoEnviado", "Esquecer", { id: f.id }, "secundario pequeno")}</li>`).join("")}</ul></div>` : ""}`;
   }
   var mb = (b) => `${(b / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
-  var diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+))?\.json$/) || []).slice(1);
+  var diaDoBackup = (nome) => (nome.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})(-(.+?))?\.(json|bkp)$/) || []).slice(1, 4);
+  var cifrado = (nome) => nome.endsWith(EXTENSAO);
   var pastaBackups = () => E.pasta.getDirectoryHandle(PASTA_BACKUPS);
   var momentoDoBackup = (dia, motivo) => motivo ? `logo antes da substituição feita em ${dataBr(dia)}` : `às 3h de ${dataBr(dia)}`;
   async function telaBackupsNuvem() {
@@ -28064,12 +28066,13 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     lista3.sort((a, b) => b.nome.localeCompare(a.nome));
     const linhas2 = lista3.map((a) => {
       const [dia, , motivo] = diaDoBackup(a.nome);
-      return `<tr><td>${dataBr(dia)}</td><td>${motivo ? "cópia feita logo antes de substituir os dados" : "como os dados estavam às 3h desse dia"}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
+      return `<tr><td>${dataBr(dia)}</td><td>${motivo ? "cópia feita logo antes de substituir os dados" : "como os dados estavam às 3h desse dia"}${cifrado(a.nome) ? " · 🔒 cifrado" : ""}</td><td class="n">${a.tamanho >= 1048576 ? mb(a.tamanho) : `${Math.max(1, Math.round(a.tamanho / 1024))} KB`}</td>
       <td>${botao("baixarBackupNuvem", "Baixar", { nome: a.nome }, "secundario pequeno")} ${botao("restaurarBackupNuvem", "Voltar para este dia", { nome: a.nome }, "perigo pequeno")}</td></tr>`;
     }).join("");
     const exemplo = dataBr(lista3.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
     <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p>${lista3.some((a) => cifrado(a.nome)) ? "🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso ao servidor não consegue ler os dados." : "Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup."}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
   }
@@ -28180,7 +28183,19 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         html: `<p>Os dados da nuvem voltam a ser como estavam <b>${esc(momento)}</b>, em todos os aparelhos. <b>Tudo o que foi lançado depois ${motivo ? "dessa substituição" : `das 3h de ${dataBr(dia)}`} se perde</b> (os anexos ficam).</p><p>Antes, o servidor guarda uma cópia de como está agora (aparece na lista como "cópia feita logo antes de substituir").</p>`
       });
       if (!ok) return;
-      const dados = JSON.parse(await (await abrirArquivo(await pastaBackups(), nome)).text());
+      const arquivo = await abrirArquivo(await pastaBackups(), nome);
+      let dados;
+      if (cifrado(nome)) {
+        const resp = await janela({ titulo: "Senha do backup seguro", html: '<p>Este backup está cifrado. Digite a senha do backup seguro (a mesma da pasta segura do administrador).</p><p><input type="password" name="senha" autocomplete="off" required></p>', sim: "Abrir", nao: "Cancelar" });
+        if (!resp) return;
+        let aberto;
+        try {
+          aberto = await decifrar(await arquivo.arrayBuffer(), String((resp.senha || [])[0] || ""));
+        } catch (e) {
+          throw Object.assign(new Error(`${e.message} Nada foi trocado.`), { esperado: true });
+        }
+        dados = JSON.parse(new TextDecoder().decode(aberto.dados));
+      } else dados = JSON.parse(await arquivo.text());
       if (!dados || dados.formato !== "imoveis-v1" || !Array.isArray(dados.usuarios)) throw new Error("Este backup não está no formato esperado.");
       E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });
       await reabrirSessao();
@@ -30771,6 +30786,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       await conectarSeguro(false);
       await alterar((db) => registrar(db, login(), "Alteração", "banco", null, "Backup seguro ligado neste computador", null, {}, false));
       await backupCompletoSeguro();
+      await ligarChaveNaNuvem();
       aviso("Backup seguro ligado. Primeiro backup completo gravado.");
       await mostrar();
     },
@@ -32107,7 +32123,21 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (!await conectarSeguro(false) || !E.d) return;
     espelharSeguro();
     atualizarProgramaSeguro();
+    ligarChaveNaNuvem();
     if (await completoPendente(E.seguro.dir)) backupCompletoSeguro();
+  }
+  var chaveNaNuvem = "";
+  async function ligarChaveNaNuvem() {
+    if (!E.nuvem || !E.seguro?.chave || !podeUsuario("admin") || chaveNaNuvem === E.seguro.chave.publica) return null;
+    const { formato, criada_em, iteracoes, publica, privada_cifrada, sal, iv } = E.seguro.chave;
+    try {
+      const r = await apiDoSite("api/dados/")("POST", "chave-backup", { chave: { formato, criada_em, iteracoes, publica, privada_cifrada, sal, iv } });
+      chaveNaNuvem = publica;
+      return r;
+    } catch (e) {
+      logarErro(e);
+      return null;
+    }
   }
   function aoMudarNuvem(externo) {
     if (!E.nuvem || !E.nuvem.atual()) return;
