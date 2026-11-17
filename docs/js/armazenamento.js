@@ -391,12 +391,16 @@ export async function exportarZip(JSZip, pasta, dados, aoAndar = () => {}) {
   }
   const totalBytes = lista.reduce((t, x) => t + x.tamanho, 0);
   let bytes = 0;
+  const naoIncluidos = [];
   for (const [i, x] of lista.entries()) {
     aoAndar({ fase: 'arquivos', feitos: i, total: lista.length, bytes, totalBytes, nome: x.caminho });
-    const arquivo = await x.h.getFile();
+    // um anexo que sumiu no meio (ou a internet falhou nele) não derruba o ZIP inteiro: fica na lista "não incluídos" (item 27)
+    let arquivo;
+    try { arquivo = await x.h.getFile(); } catch (e) { naoIncluidos.push(`${x.caminho}: ${e?.message || e}`); continue; }
     zip.file(x.caminho, arquivo);
     bytes += x.tamanho || arquivo.size || 0;
   }
+  if (naoIncluidos.length) zip.file('NAO-INCLUIDOS.txt', `Arquivos que não entraram neste ZIP (não deu para ler):\r\n${naoIncluidos.join('\r\n')}\r\n`);
   aoAndar({ fase: 'compactando', pct: 0 });
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }, (m) => aoAndar({ fase: 'compactando', pct: m.percent }));
 }
@@ -427,17 +431,37 @@ export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
     novos.usuarios = dadosAtuais.usuarios;
     novos.seq.usuarios = dadosAtuais.seq.usuarios;
   }
+  let guarda = null; // pasta com a cópia dos anexos que o ZIP vai trocar (item 26)
   if (dadosAtuais) {
     const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
     const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
     await escreverTexto(dir, `antes-da-importacao-${carimbo}.json`, JSON.stringify(dadosAtuais));
+    guarda = { dir, nome: `antes-da-importacao-${carimbo}` };
   }
   for (const { entrada, pastas, nome } of entradas) {
     const dir = await subpasta(pasta, pastas);
+    if (guarda && await arquivoExiste(dir, nome)) {
+      // anexo de mesmo nome já na pasta: a versão de antes vai para backups/antes-da-importacao-…/ (sem desfazer, ficava perdida)
+      await escreverTexto(await subpasta(guarda.dir, [guarda.nome, ...pastas]), nome, await lerConteudo(await dir.getFileHandle(nome)));
+    }
     await escreverTexto(dir, nome, await entrada.async('blob'));
   }
   await gravarBanco(pasta, novos);
+  if (guarda) await faxinaAntesDaImportacao(guarda.dir);
   return novos;
+}
+
+/** Cópias "antes da importação" (o .json e a pasta dos anexos trocados): ficam as MANTER_ANTES_IMPORTACAO mais recentes (item 51). */
+export const MANTER_ANTES_IMPORTACAO = 5;
+async function faxinaAntesDaImportacao(dir) {
+  const nomes = new Set();
+  for await (const [n] of dir.entries()) { const m = n.match(/^(antes-da-importacao-[0-9TZ-]+?)(\.json)?$/); if (m) nomes.add(m[1]); }
+  const velhos = [...nomes].sort().slice(0, Math.max(0, nomes.size - MANTER_ANTES_IMPORTACAO));
+  for (const v of velhos) {
+    for (const [nome, recursive] of [[`${v}.json`, false], [v, true]]) {
+      try { await dir.removeEntry(nome, { recursive }); } catch { /* um dos dois pode não existir */ }
+    }
+  }
 }
 
 /** A pasta (e as subpastas) não tem nenhum arquivo? */

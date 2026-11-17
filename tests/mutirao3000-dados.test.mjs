@@ -283,3 +283,34 @@ test('itens 38, 45 e 47: códigos novos nunca repetem, tabela enorme não quebra
   assert.equal(C.dataValida('2026-02-31'), '');
   assert.equal(C.dataValida('2028-02-29'), '2028-02-29');
 });
+
+test('itens 26, 27 e 51: importar ZIP guarda o anexo trocado; ZIP sai mesmo com anexo ilegível; só 5 cópias "antes"', async () => {
+  const fs = await import('node:fs'); const path = await import('node:path'); const os = await import('node:os');
+  const S = await import('../docs/js/armazenamento.js');
+  const { PastaDisco } = await import('./pasta-disco.mjs');
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'zip26-'));
+  try {
+    fs.mkdirSync(path.join(raiz, 'arquivos', 'Apto 1'), { recursive: true });
+    fs.writeFileSync(path.join(raiz, 'arquivos', 'Apto 1', 'contrato assinado.pdf'), 'VERSAO NOVA ASSINADA');
+    const d = R.bancoVazio(); R.inserir(d, 'usuarios', { login: 'dono', papel: 'admin', ativo: true }, 't');
+    const backups = path.join(raiz, 'backups'); fs.mkdirSync(backups);
+    for (let i = 0; i < 6; i += 1) fs.writeFileSync(path.join(backups, `antes-da-importacao-2026-01-0${i + 1}T10-00-00-000Z.json`), '{}');
+    const ent = (t) => ({ dir: false, async: async (k) => (k === 'string' ? t : new Blob([t])) });
+    const JSZip = { loadAsync: async (m) => ({ files: m, file: (n) => m[n] }) };
+    await S.importarZip(JSZip, new PastaDisco(raiz), { 'imoveis-dados.json': ent(JSON.stringify(d)), 'arquivos/Apto 1/contrato assinado.pdf': ent('VERSAO VELHA') }, d);
+    const guardadas = fs.readdirSync(backups).filter((n) => n.startsWith('antes-da-importacao-'));
+    const pastaGuarda = guardadas.find((n) => !n.endsWith('.json'));
+    assert.equal(fs.readFileSync(path.join(backups, pastaGuarda, 'arquivos', 'Apto 1', 'contrato assinado.pdf'), 'utf8'), 'VERSAO NOVA ASSINADA');
+    assert.equal(guardadas.filter((n) => n.endsWith('.json')).length, S.MANTER_ANTES_IMPORTACAO);
+  } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
+  // 27: um anexo que some no meio fica na lista "não incluídos"
+  const nomes = [];
+  class Zip { file(n) { nomes.push(n); } async generateAsync() { return new Blob(['zip']); } }
+  const ruim = { kind: 'directory', async *entries() {
+    yield ['bom.pdf', { kind: 'file', getFile: async () => new File(['x'], 'bom.pdf') }];
+    yield ['sumiu.pdf', { kind: 'file', getFile: async () => { throw new DOMException('não encontrado', 'NotFoundError'); } }];
+  } };
+  const pastaFalsa = { getDirectoryHandle: async (n) => { if (n === 'arquivos') return ruim; throw new DOMException('', 'NotFoundError'); } };
+  await S.exportarZip(Zip, pastaFalsa, { formato: 'imoveis-v1' });
+  assert.ok(nomes.includes('NAO-INCLUIDOS.txt'));
+});
