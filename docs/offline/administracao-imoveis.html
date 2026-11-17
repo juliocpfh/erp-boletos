@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-AL/jQCrUJWMkBcOruQXlN2kGtCodTkrtOm9AH1isceg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-lqeXFUuvYLVam+fjHKFxuGw/EhuYOv4enPHx2rJLdYc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="8732daacca11a290">
+<meta name="fontes" content="7d7b4cfcd7741640">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -12419,7 +12419,7 @@ ${xref}
       apagar: (k) => op("readwrite", (s) => s.delete(k))
     };
   }
-  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, ErroNuvem, igual, ehTabela, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, travaDoNavegador;
+  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, MAX_FAIXA, ErroNuvem, igual, ehTabela, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, travaDoNavegador;
   var init_nuvem = __esm({
     "docs/js/nuvem.js"() {
       RAIZ_DO_SERVIDOR = ["formato", "revisao", "atualizado_em", "atualizado_por", "seq", "revisao_so_sessao", "historico", "_nuvem"];
@@ -12427,6 +12427,7 @@ ${xref}
       MAX_SESSOES = 10;
       FAIXA = 1e3;
       RESERVA_MINIMA = 200;
+      MAX_FAIXA = 2e4;
       ErroNuvem = class extends Error {
         constructor(mensagem, status = 0, extra = {}) {
           super(mensagem);
@@ -12481,6 +12482,7 @@ ${xref}
           this.externo = false;
           this.envioMarcado = null;
           this.semFaixas = false;
+          this.ultimoLote = null;
           this.geracao = 0;
           this.normalizarMexeuNoHistorico = false;
           this.puxando = Promise.resolve();
@@ -12538,8 +12540,49 @@ ${xref}
         /** `seq` da tela: o da nuvem, com o próximo código de cada faixa deste aparelho. */
         seqDaVista() {
           const seq = { ...this.base?.seq || {} };
-          for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) seq[t] = f.proximo - 1;
+          for (const [t, f] of Object.entries(this.faixas)) seq[t] = f.proximo <= f.fim ? f.proximo - 1 : Math.max(Number(seq[t]) || 0, f.fim);
           return seq;
+        }
+        /**
+         * Tabelas em que a gravação criou registros com código além da faixa deste aparelho (ex.: importar 1.100 lançamentos com
+         * 1.000 códigos reservados): { tabela: quantos registros novos a gravação tem nela }. null = tudo dentro das faixas.
+         * Sem esta conferência, os códigos a mais seriam os da faixa de outro aparelho e a nuvem recusaria a parte com eles.
+         */
+        faltaDeFaixa(ops) {
+          const novos = {};
+          const fora = /* @__PURE__ */ new Set();
+          for (const o of ops) {
+            if (o.op !== "inserir") continue;
+            novos[o.tabela] = (novos[o.tabela] || 0) + 1;
+            const f = this.faixas[o.tabela];
+            if (f && o.id > f.fim) fora.add(o.tabela);
+          }
+          return fora.size ? Object.fromEntries([...fora].map((t) => [t, novos[t]])) : null;
+        }
+        /**
+         * Pede à nuvem, antes de gravar, uma faixa do tamanho da gravação grande (`falta` de faltaDeFaixa). Sem internet não dá:
+         * a gravação é recusada com o aviso (nada foi gravado), em vez de usar os códigos de outro aparelho.
+         */
+        async reservarFaixas(falta) {
+          const novas = {};
+          for (const [t, n] of Object.entries(falta)) {
+            const quantidade = Math.max(FAIXA, n + RESERVA_MINIMA);
+            if (quantidade > MAX_FAIXA) throw new ErroNuvem(`Esta gravação cria ${n} registros de uma vez, mais do que a nuvem reserva (${MAX_FAIXA - RESERVA_MINIMA}). Divida em partes menores. Nada foi gravado.`);
+            let r;
+            try {
+              r = await this.api("POST", "faixa", { tabela: t, quantidade });
+            } catch (e) {
+              if (passageiro(e)) throw new ErroNuvem(`Esta gravação cria ${n} registros novos e os códigos reservados para este aparelho não bastam. Conecte à internet e faça de novo (o sistema reserva mais códigos sozinho). Nada foi gravado.`, 0);
+              throw e;
+            }
+            novas[t] = { proximo: r.inicio, fim: r.fim };
+          }
+          await this.trava(async () => {
+            await this.releFila();
+            this.faixas = juntarFaixas(this.faixas, novas);
+            await this.guardar.gravar("faixas", this.faixas);
+          });
+          this.invalidar();
         }
         /**
          * Depois de pôr o lote na fila, o `depois` da gravação já é o que `montar` + `normalizar` dariam: vira a vista, sem copiar e
@@ -12617,7 +12660,21 @@ ${xref}
         /** Grava uma mudança feita na tela: `fn(copia)` como em alterar (app.js). Sem internet, entra na fila. */
         async alterar(fn) {
           if (!this.base) throw new ErroNuvem("Os dados ainda não foram carregados.");
+          for (let tentativa = 0; ; tentativa += 1) {
+            const { resultado, comContador, falta } = await this.alterarUmaVez(fn);
+            if (falta) {
+              if (tentativa) throw new ErroNuvem("Não deu para reservar códigos para esta gravação. Tente de novo. Nada foi gravado.");
+              await this.reservarFaixas(falta);
+              continue;
+            }
+            if (comContador) return this.alterarComContador(fn);
+            this.enviarDepois();
+            return resultado;
+          }
+        }
+        async alterarUmaVez(fn) {
           let comContador = false;
+          let falta = null;
           const resultado = await this.trava(async () => {
             await this.releFila();
             const geracao = this.geracao;
@@ -12629,6 +12686,8 @@ ${xref}
               comContador = true;
               return void 0;
             }
+            falta = this.faltaDeFaixa(ops);
+            if (falta) return void 0;
             const faixas = canon(this.faixas);
             this.avancarFaixas(depois.seq || {});
             if (!ops.length) {
@@ -12638,14 +12697,14 @@ ${xref}
               }
               return r;
             }
-            this.pendentes.push(this.novoLote(ops));
+            const lote2 = this.novoLote(ops);
+            this.pendentes.push(lote2);
             await this.gravarFila();
+            this.ultimoLote = lote2.id;
             this.trocarVista(depois, geracao);
             return r;
           });
-          if (comContador) return this.alterarComContador(fn);
-          this.enviarDepois();
-          return resultado;
+          return { resultado, comContador, falta };
         }
         /**
          * Gravação que dá número de NF: só com internet. Envia a fila, pega o que mudou, refaz `fn` sobre o mais novo e espera a
@@ -12663,19 +12722,26 @@ ${xref}
             } catch (e) {
               throw passageiro(e) ? new ErroNuvem("A NF só é numerada com internet. Conecte e tente de novo.") : e;
             }
-            const { resultado, lote: lote2 } = await this.trava(async () => {
+            const { resultado, lote: lote2, falta } = await this.trava(async () => {
               await this.releFila();
               if (this.pendentes.length) throw new ErroNuvem("Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.");
               const antes = this.atual();
               const depois = copiar(antes);
               const r = fn(depois);
               const ops = diferencas(antes, depois);
+              const falta2 = this.faltaDeFaixa(ops);
+              if (falta2) return { falta: falta2 };
               this.avancarFaixas(depois.seq || {});
               const l = this.novoLote(ops);
               await this.guardar.gravar("n", this.n);
               await this.guardar.gravar("faixas", this.faixas);
               return { resultado: r, lote: l };
             });
+            if (falta) {
+              if (tentativa >= 3) throw new ErroNuvem("Não deu para reservar códigos para esta gravação. Tente de novo. Nada foi gravado.");
+              await this.reservarFaixas(falta);
+              continue tentativas;
+            }
             const [primeira, ...resto] = dividirLote(lote2);
             const meus = chavesDosLotes([lote2]);
             let gravou = false;
@@ -12897,6 +12963,36 @@ ${xref}
               await this.guardar.gravar("pendentes", this.pendentes);
               this.invalidar();
             }
+          });
+        }
+        /**
+         * Algo para fazer só depois que a nuvem confirmar um lote (ex.: apagar do R2 os anexos que ficaram sem uso: se o lote for
+         * recusado ou virar conflito, o registro continua e o arquivo não pode ter sumido). `dados` vai guardado no aparelho.
+         */
+        async guardarAposConfirmar(lote2, dados) {
+          await this.trava(async () => {
+            const lista3 = await this.guardar.ler("apos-confirmar") || [];
+            lista3.push({ lote: lote2, dados });
+            await this.guardar.gravar("apos-confirmar", lista3);
+          });
+        }
+        /** O que foi guardado para depois da confirmação e já pode sair: { confirmados, recusados } (os dados de cada um). */
+        async prontosAposConfirmar() {
+          const vazio = { confirmados: [], recusados: [] };
+          if (!(await this.guardar.ler("apos-confirmar") || []).length) return vazio;
+          return this.trava(async () => {
+            await this.releFila();
+            const lista3 = await this.guardar.ler("apos-confirmar") || [];
+            const naFila = new Set(this.pendentes.map((l) => l.id));
+            const recusados = new Set((await this.guardar.ler("recusas") || this.recusas).map((r2) => r2.lote));
+            const ficam = [];
+            const r = { confirmados: [], recusados: [] };
+            for (const x of lista3) {
+              if (naFila.has(x.lote)) ficam.push(x);
+              else (recusados.has(x.lote) ? r.recusados : r.confirmados).push(x.dados);
+            }
+            if (ficam.length !== lista3.length) await this.guardar.gravar("apos-confirmar", ficam);
+            return r;
           });
         }
         /** As mudanças de uma recusa (null se não estão mais no aparelho, ou se foi recusada antes de esta versão guardá-las). */
@@ -15826,11 +15922,25 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   async function alterarApagandoAnexos(fn) {
     const antes = arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
     const contratos = new Map(d().contratos.map((c) => [c.id, c]));
+    const loteAntes = E.nuvem?.ultimoLote;
     const r = await alterar(fn);
     const emUso2 = anexosEmUso();
     const soltos = antes.filter((a) => a.pasta && !emUso2.has(`${a.pasta}|${a.nome}`)).filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n).map((a) => escopoDoContrato(a.escopo) && !buscar2("contratos", a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a);
+    const lote2 = E.nuvem?.ultimoLote;
+    if (soltos.length && lote2 && lote2 !== loteAntes && E.nuvem.pendentes.some((l) => l.id === lote2)) {
+      await E.nuvem.guardarAposConfirmar(lote2, { soltos });
+      return r;
+    }
     await apagarAnexos(soltos, "Arquivo apagado junto com o lançamento");
     return r;
+  }
+  async function apagarAnexosConfirmados() {
+    if (!E.nuvem) return 0;
+    const { confirmados } = await E.nuvem.prontosAposConfirmar();
+    if (!confirmados.length) return 0;
+    const emUso2 = anexosEmUso();
+    const lista3 = confirmados.flatMap((x) => x.soltos || []).filter((a) => !emUso2.has(`${a.pasta}|${a.nome}`));
+    return lista3.length ? apagarAnexos(lista3, "Arquivo apagado junto com o lançamento") : 0;
   }
   async function pastaDoEscopo(escopo, id, criar = true, contrato = null) {
     const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
@@ -26651,6 +26761,12 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
         <td>${esc(valorTexto(c.proposto))}<br><span class="suave">${esc(c.por_proposto || "")} · ${esc(quando2(c.em))}</span></td>
         <td>${pode2 ? `${botao("resolverConflito", "Fica o 1º", { conflito: c.id, escolha: "atual" }, "secundario pequeno")} ${botao("resolverConflito", "Fica o 2º", { conflito: c.id, escolha: "proposto" }, "secundario pequeno")}` : ""}</td></tr>`;
       }
+      if (c.tipo === "lote") {
+        const mudados = (Array.isArray(c.atual) ? c.atual : []).map((x) => nomeDoRegistro({ tabela: x.tabela, reg_id: String(x.id) })).join("; ");
+        const n = Number(c.proposto?.excluidos) || 0;
+        return `<tr><td>${esc(nomeDoRegistro(c))}</td><td colspan="3">${esc(`${c.por_proposto || "Alguém"} excluiu este registro junto com ${Math.max(0, n - 1)} outro(s), mas ${c.por_atual || "outra pessoa"} tinha mudado antes: ${mudados}. Nada da exclusão valeu ainda (${quando2(c.em)}).`)}</td>
+        <td>${pode2 ? `${botao("resolverConflito", "Excluir tudo", { conflito: c.id, escolha: "excluir" }, "secundario pequeno", "Excluir o registro e todos os que iam junto, apesar da mudança feita no outro aparelho?")} ${botao("resolverConflito", "Manter tudo", { conflito: c.id, escolha: "manter" }, "secundario pequeno")}` : ""}</td></tr>`;
+      }
       const [a, b, txt] = c.tipo === "exclusao" ? ["excluir", "manter", `${c.por_proposto || "Alguém"} excluiu, mas ${c.por_atual || "outra pessoa"} tinha mudado antes`] : ["manter_excluido", "recriar", `${c.por_proposto || "Alguém"} mudou, mas ${c.por_atual || "outra pessoa"} tinha excluído antes`];
       return `<tr><td>${esc(nomeDoRegistro(c))}</td><td colspan="3">${esc(txt)} (${esc(quando2(c.em))})</td>
       <td>${pode2 ? `${botao("resolverConflito", a === "excluir" ? "Excluir" : "Deixar excluído", { conflito: c.id, escolha: a }, "secundario pequeno")} ${botao("resolverConflito", b === "manter" ? "Manter" : "Recriar com a mudança", { conflito: c.id, escolha: b }, "secundario pequeno")}` : ""}</td></tr>`;
@@ -30575,6 +30691,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.d = E.nuvem.atual();
     renovarUsuario();
     atualizarFaixa();
+    apagarAnexosConfirmados().catch((e) => console.error(e));
     if (!externo) return;
     espelharSeguro();
     E.anexos?.listas?.forEach((l) => {
