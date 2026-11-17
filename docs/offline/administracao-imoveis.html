@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-TpnbLQRF6DFKBtKab7bu1568tPcIeWhiHCbR+OLVoLM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-eM5ZdNtkqETpUraCEcGQas1QZrHJQVoOhdsTdrGQfUo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="159a7c3009d0652b">
+<meta name="fontes" content="86176e6f6fc43d35">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3211,11 +3211,30 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     }
     return `o ${DESC[n] || n || "índice previsto neste contrato"}`;
   }
+  function camposAntigosDaEmpresa(e) {
+    if (!e || e.assina_documentos !== void 0) return {};
+    const assina = LOCADORA_ANTIGA.test(`${e.nome || ""} ${e.razao_social || ""}`);
+    const out = { assina_documentos: assina };
+    for (const [k, v] of Object.entries({ ...DADOS_ANTIGOS_EMPRESA, ...assina ? DADOS_ANTIGOS_LOCADORA : {} })) if (e[k] === void 0) out[k] = v;
+    return out;
+  }
   function locadorasDoContrato(d2, c) {
-    const ank = d2.emitentes.filter((e) => e.ativo !== false && LOCADORA_UNICA.test(`${e.nome || ""} ${e.razao_social || ""}`));
-    if (ank.length) return ank.slice(0, 1);
+    const marcada = d2.emitentes.filter((e) => e.ativo !== false && comCamposNovos(e).assina_documentos);
+    if (marcada.length) return marcada.slice(0, 1);
     const partes = d2.participacoes.filter((p2) => p2.imovel_id === c.imovel_id).map((p2) => d2.emitentes.find((e) => e.id === p2.emitente_id)).filter(Boolean);
     return partes.length ? partes : d2.emitentes.filter((e) => e.ativo);
+  }
+  function dadoDaEmpresa(d2, c, campo2) {
+    for (const e of [...locadorasDoContrato(d2, c || {}), ...d2.emitentes.filter((x) => x.ativo !== false)]) {
+      const v = comCamposNovos(e)[campo2];
+      if (v) return v;
+    }
+    return "";
+  }
+  function nomeCurtoCompanhia(nome) {
+    const m = /\(([^)]+)\)\s*$/.exec(String(nome || ""));
+    const s = (m ? m[1] : String(nome || "")).trim();
+    return m && s && s === s.toUpperCase() ? s[0] + s.slice(1).toLowerCase() : s;
   }
   function representacaoDoContrato(d2, c, imovel = {}) {
     const fora = (k) => ["Incluso no aluguel", "Não tem"].includes(c[k]);
@@ -3223,8 +3242,10 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     const nums = (...pares) => pares.filter(([, v]) => v).map(([r, v]) => `, ${r} nº ${v}`).join("");
     const gas = (d2.titularidades || []).filter((x) => x.imovel_id === c.imovel_id && /g[áa]s|ultragaz|liquig|supergas/i.test(x.concessionaria || "")).map((x) => x.concessionaria)[0] || ((d2.listas || {}).concessionarias || ["Supergasbras"]).find((x) => /g[áa]s|ultragaz|liquig|supergas/i.test(x)) || "";
     const out = [];
-    if (!fora("conta_energia")) out.push(`a Companhia Paranaense de Energia (COPEL)${nums(["unidade consumidora", imovel.copel_uc], ["medidor", imovel.copel_medidor])}`);
-    if (!fora("conta_agua")) out.push(`a Companhia de Saneamento do Paraná (SANEPAR)${nums(["matrícula", imovel.sanepar_matricula], ["hidrômetro", imovel.sanepar_hidrometro])}`);
+    const energia = companhiaDoImovel(d2, c, imovel, "energia");
+    const agua = companhiaDoImovel(d2, c, imovel, "agua");
+    if (!fora("conta_energia")) out.push(`${energia ? comArtigo(energia) : "a companhia de energia elétrica"}${nums(["unidade consumidora", imovel.copel_uc], ["medidor", imovel.copel_medidor])}`);
+    if (!fora("conta_agua")) out.push(`${agua ? comArtigo(agua) : "a companhia de água e esgoto"}${nums(["matrícula", imovel.sanepar_matricula], ["hidrômetro", imovel.sanepar_hidrometro])}`);
     if (doInquilino("conta_gas")) out.push(`a fornecedora de gás${gas ? ` ${gas}` : ""}${nums(["relógio", imovel.gas_relogio])}`);
     if (doInquilino("conta_internet")) out.push(`o provedor de internet e TV${imovel.internet ? ` (contrato ou telefone ${imovel.internet})` : ""}`);
     if (doInquilino("conta_condominio")) out.push(`a administradora do condomínio${imovel.administradora_nome ? ` ${imovel.administradora_nome}` : ""}`);
@@ -3283,7 +3304,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       caucao_meses: numeroComExtenso(caucaoMeses || 0),
       deposito_valor: valorComExtenso(c.deposito_valor || 0),
       deposito_uso: c.deposito_uso || "",
-      cidade: imovel.cidade || "Curitiba",
+      cidade: imovel.cidade || dadoDaEmpresa(d2, c, "cidade_documentos"),
       data_assinatura: dataPorExtenso(extra.data || hojeIso())
     };
     const condicoes = {
@@ -3786,7 +3807,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_UNICA, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
@@ -3862,7 +3883,18 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
         ["conta_seguro", "seguro incêndio"]
       ];
       lista = (itens) => itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`;
-      LOCADORA_UNICA = /\bANK\b/i;
+      LOCADORA_ANTIGA = /\bANK\b/i;
+      DADOS_ANTIGOS_EMPRESA = { cidade_documentos: "Curitiba", energia_concessionaria: "Companhia Paranaense de Energia (COPEL)", agua_concessionaria: "Companhia de Saneamento do Paraná (SANEPAR)" };
+      DADOS_ANTIGOS_LOCADORA = {
+        email_contato: "administracao@ankjck.com.br",
+        assinatura_email: "Administradora",
+        assinatura_mensagens: "ANK Administradora",
+        conta_deposito: `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
+Pix (CNPJ): 58.492.818/0001-59`
+      };
+      comCamposNovos = (e) => e.assina_documentos === void 0 ? { ...e, ...camposAntigosDaEmpresa(e) } : e;
+      comArtigo = (nome) => /^(a|o|as|os)\s/i.test(nome) ? nome : `a ${nome}`;
+      companhiaDoImovel = (d2, c, imovel, qual) => imovel && imovel[`${qual}_concessionaria`] || dadoDaEmpresa(d2, c, `${qual}_concessionaria`);
       fiadoresNaData = (d2, contratoId, data2) => d2.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data2 || hojeIso())));
       escDoc = (v) => String(v ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
       runsHtml = (runs) => runs.map((r) => r.b ? `<b>${escDoc(r.t)}</b>` : escDoc(r.t)).join("");
@@ -4020,7 +4052,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   var regras_exports = {};
   __export(regras_exports, {
     ANTECEDENCIA_ALERTA: () => ANTECEDENCIA_ALERTA,
-    ASSINATURA_LEMBRETE: () => ASSINATURA_LEMBRETE,
     CAMPOS_ARQUIVO_FICHA: () => CAMPOS_ARQUIVO_FICHA,
     CAMPOS_MODELO_AIRBNB: () => CAMPOS_MODELO_AIRBNB,
     CAMPOS_PESSOA: () => CAMPOS_PESSOA,
@@ -4126,6 +4157,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     arquivoDocumento: () => arquivoDocumento,
     arquivosReferenciados: () => arquivosReferenciados,
     assinarAditivo: () => assinarAditivo,
+    assinaturaLembrete: () => assinaturaLembrete,
     atualizar: () => atualizar,
     avisosLegaisDoContrato: () => avisosLegaisDoContrato,
     baixarEmLote: () => baixarEmLote,
@@ -4535,6 +4567,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...x && x.negativacao || {} }
     }));
     for (const cb of d2.cobrancas) if (cb.banco === void 0) cb.banco = null;
+    if (!d2.config_banco.conta_padrao_id && d2.config_banco.contas.some((x) => x.id === "ank")) d2.config_banco.conta_padrao_id = "ank";
+    for (const e of d2.emitentes) Object.assign(e, camposAntigosDaEmpresa(e));
     const contratoPorId = new Map(d2.contratos.map((c) => [c.id, c]));
     for (const c of d2.contratos) if (c.garantia_transferida_para && !contratoPorId.has(c.garantia_transferida_para)) c.garantia_transferida_para = null;
     if (d2.estilos_alertas && d2.estilos_alertas["Documentos de entrada"]) {
@@ -7996,7 +8030,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       negativacao: { ativa: dados.negativacao_ativa === void 0 ? antes ? !!antes.negativacao.ativa : false : marcado2(dados.negativacao_ativa), dias_atraso: diasNeg }
     };
     cfg4.contas = antes ? cfg4.contas.map((x) => x.id === id ? conta : x) : [...cfg4.contas, conta];
-    if (!cfg4.conta_padrao_id || id === "ank" && !cfg4.contas.some((x) => x.id === cfg4.conta_padrao_id && x.id !== "ank" && antes)) cfg4.conta_padrao_id = id;
+    if (!cfg4.conta_padrao_id) cfg4.conta_padrao_id = id;
     d2.config_banco = cfg4;
     registrar(d2, usuario, antes ? "Alteração" : "Inclusão", "banco", null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? "alterada" : "incluída"} na integração C6`, { conta: { de: antes, para: conta } });
     return conta;
@@ -8014,7 +8048,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function contaEmissora(d2) {
     const cfg4 = configBanco(d2);
-    return cfg4.contas.find((x) => x.id === cfg4.conta_padrao_id) || cfg4.contas.find((x) => x.id === "ank") || cfg4.contas[0] || null;
+    return cfg4.contas.find((x) => x.id === cfg4.conta_padrao_id) || cfg4.contas[0] || null;
   }
   function contasDoImovel(d2, cb) {
     const c = buscar(d2, "contratos", cb.contrato_id);
@@ -9488,7 +9522,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const b = cb.banco || null;
     if (b && b.pix_copia_cola) linhas2.push("", "Pix copia e cola:", b.pix_copia_cola);
     if (b && b.linha_digitavel) linhas2.push("", `Linha digitável do boleto: ${b.linha_digitavel}`);
-    linhas2.push("", "Qualquer dúvida, estamos à disposição.", "", ASSINATURA_LEMBRETE);
+    const assinatura = assinaturaLembrete(d2, c);
+    linhas2.push("", "Qualquer dúvida, estamos à disposição.", ...assinatura ? ["", assinatura] : []);
     const assunto = fase === "atrasado" ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${dataBr(cb.vencimento)}`;
     return { fase, assunto, texto: linhas2.join("\n"), email: c && c.inquilino_email || "", telefone: (c && c.inquilino_telefone || "").replace(/\D/g, "") };
   }
@@ -9802,7 +9837,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, ASSINATURA_LEMBRETE, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -10350,7 +10385,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       };
       competenciaDoComprovante = (x, d2 = null) => mesDoDinheiro(d2, x);
       textoDeBusca = (t) => semAcento(t).toLocaleLowerCase("pt-BR").trim();
-      ASSINATURA_LEMBRETE = "ANK Administradora";
+      assinaturaLembrete = (d2, c) => dadoDaEmpresa(d2, c, "assinatura_mensagens") || (locadorasDoContrato(d2, c || {})[0] || {}).nome || "";
       DIAS_ADIAR_ALERTA = 7;
       DIAS_CUIDANDO_ALERTA = 1;
       chaveAlerta = (a) => [a.tipo, a.contrato_id || "", a.imovel_id || "", a.ancora || ""].join("|");
@@ -11735,10 +11770,12 @@ ${xref}
         campo("matricula", "Matrícula"),
         campo("sublote", "Identificação do sublote", "texto", { ajuda: "Para imóveis que são sublotes internos. Ex.: Sublote 3" }),
         campo("inscricao_iptu", "Inscrição imobiliária (IPTU)"),
-        campo("copel_uc", "Unidade consumidora Copel"),
-        campo("copel_medidor", "Nº do medidor Copel"),
-        campo("sanepar_matricula", "Matrícula Sanepar"),
-        campo("sanepar_hidrometro", "Código do hidrômetro Sanepar"),
+        campo("copel_uc", "Unidade consumidora da energia (UC)", "texto", { ajuda: "Número da UC na conta de luz" }),
+        campo("copel_medidor", "Nº do medidor de energia"),
+        campo("sanepar_matricula", "Matrícula da água", "texto", { ajuda: "Número da matrícula na conta de água" }),
+        campo("sanepar_hidrometro", "Código do hidrômetro"),
+        campo("energia_concessionaria", "Companhia de energia (se for outra)", "texto", { largo: true, ajuda: "Em branco: a do cadastro da empresa (Empresas). Ex.: Companhia Paranaense de Energia (COPEL)" }),
+        campo("agua_concessionaria", "Companhia de água (se for outra)", "texto", { largo: true, ajuda: "Em branco: a do cadastro da empresa (Empresas). Ex.: Companhia de Saneamento do Paraná (SANEPAR)" }),
         campo("administradora_nome", "Administradora do condomínio"),
         campo("area_comum", "Pátio e portão eletrônico de uso comum", "simnao", { ajuda: "Marcado: o contrato inclui as cláusulas de frente desobstruída, pátio comum e portão eletrônico" }),
         campo("sem_chaves", "Chaves e controles: não se aplica", "simnao", { ajuda: "Marque quando o imóvel não tem chave nem controle (ex.: terreno vazio). Deixa de aparecer como pendência" }),
@@ -11818,7 +11855,7 @@ ${xref}
         campo("nome_conjuge", "Cônjuge ou companheiro(a): nome", "texto", { largo: true, ajuda: "Casado ou em união estável: assina o contrato junto. Sem a assinatura do cônjuge a fiança pode ser anulada inteira (Súmula 332 do STJ)" }),
         campo("cpf_conjuge", "CPF do cônjuge ou companheiro(a)", "cpf"),
         campo("rg_conjuge", "RG do cônjuge ou companheiro(a)"),
-        campo("imovel_garantia", "Imóvel do fiador (endereço, matrícula e registro)", "area", { largo: true, ajuda: "Ex.: Rua Abílio Peixoto, 359, Curitiba/PR, matrícula 53.271 da 9ª Circunscrição. Aparece no contrato" }),
+        campo("imovel_garantia", "Imóvel do fiador (endereço, matrícula e registro)", "area", { largo: true, ajuda: "Ex.: Rua das Acácias, 50, Curitiba/PR, matrícula 12.345 da 1ª Circunscrição. Aparece no contrato" }),
         campo("data_entrada", "Início do vínculo", "data", { ajuda: "Em branco: desde o início do contrato" }),
         campo("data_saida", "Fim do vínculo", "data", { ajuda: 'Em branco: até o fim do contrato. Depois desta data vai para "Fiadores anteriores"' }),
         campo("observacoes", "Observações", "area")
@@ -12152,20 +12189,29 @@ ${xref}
         campo("observacoes", "Observações internas", "area")
       ];
       EMITENTE = [
-        campo("nome", "Nome no topo da NF", "texto", { obrig: true, ajuda: "Ex.: ANK ADMINISTRADORA" }),
+        campo("nome", "Nome no topo da NF", "texto", { obrig: true, ajuda: "Ex.: IMOBILIÁRIA EXEMPLO" }),
         campo("razao_social", "Razão social", "texto", { obrig: true, largo: true }),
         campo("cnpj", "CNPJ", "cnpj", PREENCHE_CNPJ({ razao: "razao_social", nome: "nome", endereco: "endereco", sede: "endereco_sede" })),
         campo("endereco", "Endereço (como aparece na NF)", "texto", { largo: true }),
-        campo("municipio", "Município do serviço", "texto", { padrao: "CURITIBA" }),
-        campo("aba_modelo", "Aba no modelo Excel", "texto", { ajuda: "Nome da aba do modelo para esta empresa (ex.: ANK)" }),
+        campo("municipio", "Município do serviço", "texto", { ajuda: "Como sai na NF. Ex.: CURITIBA" }),
+        campo("aba_modelo", "Aba no modelo Excel", "texto", { ajuda: "Só para quem usa um modelo de NF em Excel próprio: o nome da aba desta empresa. Pode deixar em branco" }),
         campo("ativo", "Ativa", "simnao", { padrao: true }),
         secao("Para o contrato de locação"),
-        campo("endereco_sede", "Endereço da sede (por extenso)", "texto", { largo: true, ajuda: "Ex.: Rua Professor Nilo Brandão, nº 117, São Lourenço, Curitiba, Paraná" }),
-        campo("representante_nome", "Representante que assina", "texto", { largo: true, ajuda: "Ex.: AIDA APARECIDA NUNES KRASINSKI" }),
+        campo("assina_documentos", "Assina os documentos do inquilino", "simnao", { ajuda: "Contrato, vistoria, recibos, cartas e e-mails saem em nome desta empresa, mesmo quando o imóvel é dividido com outra. Marque só uma. Sem nenhuma marcada, saem em nome das empresas do imóvel" }),
+        campo("endereco_sede", "Endereço da sede (por extenso)", "texto", { largo: true, ajuda: "Ex.: Rua das Flores, nº 100, Centro, Curitiba, Paraná" }),
+        campo("cidade_documentos", "Cidade dos documentos", "texto", { ajuda: 'Vai no "local e data" do contrato, dos recibos e das cartas quando o imóvel não tem cidade. Ex.: Curitiba' }),
+        campo("energia_concessionaria", "Companhia de energia (nome por extenso)", "texto", { largo: true, ajuda: "Sai no contrato e nos e-mails; a sigla vai entre parênteses. Ex.: Companhia Paranaense de Energia (COPEL). Imóvel atendido por outra: informe no cadastro do imóvel" }),
+        campo("agua_concessionaria", "Companhia de água (nome por extenso)", "texto", { largo: true, ajuda: "Ex.: Companhia de Saneamento do Paraná (SANEPAR)" }),
+        campo("representante_nome", "Representante que assina", "texto", { largo: true, ajuda: "Ex.: MARIA DA SILVA" }),
         campo("representante_cargo", "Cargo do representante", "texto", { padrao: "sócia administradora" }),
         campo("representante_rg", "RG do representante"),
         campo("representante_cpf", "CPF do representante", "cpf"),
-        ...qualificacao("representante_", {}, false)
+        ...qualificacao("representante_", {}, false),
+        secao("E-mails e mensagens ao inquilino"),
+        campo("assinatura_email", "Nome que assina os e-mails", "texto", { ajuda: 'Vai depois de "Atenciosamente," no fim de todo e-mail. Ex.: Administradora' }),
+        campo("email_contato", "E-mail da administração", "email", { ajuda: "Vai embaixo do nome, no fim de todo e-mail. Ex.: contato@imobiliariaexemplo.com.br" }),
+        campo("assinatura_mensagens", "Assinatura dos lembretes de boleto", "texto", { ajuda: "Vai no fim do lembrete por e-mail ou WhatsApp. Ex.: Imobiliária Exemplo" }),
+        campo("conta_deposito", "Conta para depósito da caução", "area", { largo: true, ajuda: 'Titular, banco, agência, conta e Pix, como devem sair no e-mail do contrato para assinar. Sem ela, o e-mail mostra "[preencher: conta_deposito]"' })
       ];
       USUARIO = [
         campo("login", "Login", "texto", { obrig: true }),
@@ -19909,7 +19955,7 @@ Salvar assim mesmo?`)) {
     const assinaEmpresa = { nome: empresa, linha: [e.cnpj ? `CNPJ ${e.cnpj}` : "", "LOCADORA"].filter(Boolean).join(" · ") };
     const assinaPessoa = (papel) => ({ nome: p2.inquilino_nome, linha: [documentoDe(p2), papel].filter(Boolean).join(" · ") });
     const nomeArq = (doc, data2) => `${doc} ${i ? i.nome : "sem imovel"} - ${p2.inquilino_nome} - ${data2 || hoje3}`;
-    const base = { emitente: e, cidade: i && i.cidade || e.municipio || "Curitiba", data: hoje3, tabela: [], depois: [] };
+    const base = { emitente: e, cidade: i && i.cidade || e.municipio || dadoDaEmpresa(d2, alvo.contrato || { imovel_id: i ? i.id : null }, "cidade_documentos"), data: hoje3, tabela: [], depois: [] };
     if (tipo === "ficha") return fichaCadastral(d2, f, base, nomeArq);
     if (tipo === "ficha_fiador") return fichaDoFiador(d2, f, Number(alvo.fiador) || 1, i, base, nomeArq);
     if (tipo === "reserva") {
@@ -20228,13 +20274,9 @@ Salvar assim mesmo?`)) {
   init_contratos();
 
   // docs/js/modelos-email.js
-  var FECHO = `Agradecemos e ficamos à disposição em caso de dúvidas.
-
-Atenciosamente,
-Administradora
-administracao@ankjck.com.br`;
-  var CONTA_CAUCAO = `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
-Pix (CNPJ): 58.492.818/0001-59`;
+  function fechoEmail({ assinatura = "", email = "" } = {}) {
+    return ["Agradecemos e ficamos à disposição em caso de dúvidas.", "", "Atenciosamente,", assinatura || "Administradora", email].filter((x, i) => i < 4 || x).join("\n");
+  }
   var CONDICOES = `CONDIÇÕES DA LOCAÇÃO
 [se aluguel]- Aluguel: {aluguel} por mês[se bonificacao], com bonificação de {bonificacao} para pagamento até o vencimento ({aluguel_bonificado})[fim]
 [fim][se vencimento]- Vencimento: todo dia {vencimento}
@@ -20361,7 +20403,7 @@ Segue anexo o contrato de locação do imóvel da {imovel}. Leia com atenção a
 PASSO A PASSO
 1. Assine o contrato e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
 [se dinheiro]2. Deposite a {tipo_deposito} de {valor_deposito} e envie o comprovante:
-${CONTA_CAUCAO}
+{conta_deposito}
 [se caucao]A caução fica aplicada em poupança e é devolvida corrigida no fim do contrato, descontados eventuais débitos (Lei 8.245/91, art. 38).
 [fim]3. Com tudo recebido, assinamos em até 2 dias úteis e enviamos a via assinada por todos
 4. Em seguida combinamos a entrega das chaves[senão]2. Com o contrato assinado, assinamos em até 2 dias úteis e enviamos a via assinada por todos
@@ -20609,7 +20651,7 @@ O aluguel de moradia não reduz o imposto; a informação serve para o cruzament
   function montarEmail(modelo, dados) {
     return { assunto: preencherEmail(modelo.assunto, dados).replace(/\s+/g, " "), texto: `${preencherEmail(modelo.texto, dados)}
 
-${FECHO}` };
+${fechoEmail(dados.remetente)}` };
   }
 
   // docs/js/email-dados.js
@@ -20619,11 +20661,15 @@ ${FECHO}` };
   var CONTAS_FICHA = Object.keys(NOMES_CONTA);
   var primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
   var juntar = (itens) => itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`;
-  function contasDoInquilino(c) {
+  function contasDoInquilino(d2, c, alvo, imovel) {
     const fora = (k) => ["Incluso no aluguel", "Não tem"].includes(c[k]);
+    const comCompanhia = (conta, qual) => {
+      const n = nomeCurtoCompanhia(companhiaDoImovel(d2, alvo, imovel, qual));
+      return n ? `${conta} (${n})` : conta;
+    };
     const out = [];
-    if (!fora("conta_agua")) out.push(["água", "água (Sanepar)"]);
-    if (!fora("conta_energia")) out.push(["energia", "energia (Copel)"]);
+    if (!fora("conta_agua")) out.push(["água", comCompanhia("água", "agua")]);
+    if (!fora("conta_energia")) out.push(["energia", comCompanhia("energia", "energia")]);
     if (c.conta_gas === "Por conta do inquilino") out.push(["gás", "gás"]);
     return out;
   }
@@ -20718,7 +20764,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const fichaDiz = f && CONTAS_FICHA.some((k) => f[k]);
     const base = c || (fichaDiz ? f : d2.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a2, b) => String(b.data_entrada || "").localeCompare(String(a2.data_entrada || "")))[0] || {});
     const inclusos = CONTAS_FICHA.filter((k) => base[k] === "Incluso no aluguel").map((k) => NOMES_CONTA[k]);
-    const contas2 = contasDoInquilino(base);
+    const doImovel = c || { imovel_id: imoveis[0] ? imoveis[0].id : null };
+    const contas2 = contasDoInquilino(d2, base, doImovel, imoveis[0]);
     const e = c ? encerramentoDo(d2, c.id) : null;
     const fim = c ? fimDoContrato(d2, c) : null;
     const inicio = c ? c.data_entrada || c.vigencia_inicio : null;
@@ -20769,7 +20816,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
       documentos_ficha: f ? documentosDoEmail(f) : "",
       link: linkDaFicha(f, "interessado", hoje3).url,
       link_validade: linkDaFicha(f, "interessado", hoje3).validade,
-      link_fiador: linkDaFicha(f, "fiador1", hoje3).url
+      link_fiador: linkDaFicha(f, "fiador1", hoje3).url,
+      conta_deposito: dadoDaEmpresa(d2, doImovel, "conta_deposito")
     };
     const condicoes = {
       ...g,
@@ -20800,7 +20848,11 @@ ${DICA_DOCUMENTOS}`].join("\n");
       });
       condicoes.novo_bonificacao = (a.percentual || 0) > 0;
     }
-    return { campos, condicoes, para: p2.inquilino_email || "", perguntas: r };
+    const remetente = {
+      assinatura: dadoDaEmpresa(d2, doImovel, "assinatura_email") || (locadorasDoContrato(d2, doImovel)[0] || {}).nome || "",
+      email: dadoDaEmpresa(d2, doImovel, "email_contato")
+    };
+    return { campos, condicoes, para: p2.inquilino_email || "", perguntas: r, remetente };
   }
   function anexosProntos(d2, modelo, alvo) {
     const f = alvo.ficha || null;
@@ -21004,7 +21056,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     dlg.className = "janela-erro janela-pergunta janela-email";
     dlg.innerHTML = `<form method="dialog"><h3>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || "")}</h3><div class="corpo">
     ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ""}
-    <p class="suave">De: Administradora &lt;administracao@ankjck.com.br&gt;${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ""}</p>
+    <p class="suave">De: ${esc(inicio.remetente.assinatura || "Administradora")}${inicio.remetente.email ? ` &lt;${esc(inicio.remetente.email)}&gt;` : ""}${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ""}</p>
     ${listaProntos(prontos, ligado2)}
     <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
     ${inicio.para ? "" : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
@@ -21153,7 +21205,7 @@ ${m.texto}
   var AJUDA = `<div class="cartao"><h2>Como escrever</h2>
   <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
   {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
-  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano} e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
   bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>
@@ -21753,7 +21805,7 @@ ${m.texto}
     if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
     return `${x ? "" : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
-    <p class="carta-data">${esc(i && i.cidade || "Curitiba")}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
+    <p class="carta-data">${esc(i && i.cidade || dadoDaEmpresa(d(), c, "cidade_documentos"))}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${enderecoCompleto(i)}` : "")}</b></p>
     <p>Com o aluguel de <b>${mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ""} ano${r && r.anos > 1 ? "s" : ""}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
     <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
@@ -22019,7 +22071,7 @@ ${m.texto}
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
     ${pj ? "" : `<p><b>Como declarar:</b> na ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), com o CNPJ ${esc(e.cnpj || "da empresa")} e o total acima.</p>`}
     <p>Não houve retenção de imposto de renda na fonte.</p>
-    <p class="carta-data">${esc(i && i.cidade || e.municipio || "Curitiba")}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
+    <p class="carta-data">${esc(i && i.cidade || e.municipio || e.cidade_documentos || dadoDaEmpresa(d(), c, "cidade_documentos"))}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ""}</p></div>`;
   }
   function alvoDoRecibo(q) {
@@ -26679,7 +26731,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       ${item("Área útil", i.area_util ? `${pctTexto(i.area_util)} m²` : "-")}${item("Área total", i.area_total ? `${pctTexto(i.area_total)} m²` : "-")}
       ${item("Energia", esc([i.energia_ligada ? i.energia_ligada === "Sim" ? "ligada" : "desligada" : "", i.energia_tipo].filter(Boolean).join(" · ") || "-"))}
       ${item("Matrícula", esc(i.matricula || "-"))}${item("Inscrição IPTU", esc(i.inscricao_iptu || "-"))}
-      ${item("UC Copel / Nº medidor", esc(`${i.copel_uc || "-"} / ${i.copel_medidor || "-"}`))}${item("Matrícula Sanepar / Código hidrômetro", esc(`${i.sanepar_matricula || "-"} / ${i.sanepar_hidrometro || "-"}`))}
+      ${item("Energia: UC / Nº medidor", esc(`${i.copel_uc || "-"} / ${i.copel_medidor || "-"}`))}${item("Água: matrícula / hidrômetro", esc(`${i.sanepar_matricula || "-"} / ${i.sanepar_hidrometro || "-"}`))}
       ${item("Administradora do condomínio", esc(i.administradora_nome || "-"))}${item("Relógio de gás", esc(i.gas_relogio || "-"))}
       ${item("Internet / telefone", esc(i.internet || "-"))}
       ${item("Pasta de arquivos", esc(i.pasta || "-"))}${item("Modelo de vistoria", `${lerModeloVistoria(i.modelo_vistoria).length ? `${lerModeloVistoria(i.modelo_vistoria).length} cômodo(s)` : '<span class="suave">não montado</span>'} ${opera() ? link(`#/modelo-vistoria/${i.id}`, i.modelo_vistoria ? "Editar" : "Montar") : ""}`)}${item("Chaves e controles", i.sem_chaves ? "não se aplica" : i.chaves ? esc(i.chaves).replace(/\n/g, "<br>") : '<span class="suave">não informado (use Editar)</span>')}</div>
