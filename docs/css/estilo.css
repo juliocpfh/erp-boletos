@@ -737,3 +737,17 @@ form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:
 }
 .contagem-lote:empty { display: none; }
 .contagem-lote { align-self: center; }
+
+/* Botões "Hoje" e "Ontem" ao lado das datas (F.atalhosData) */
+.atalhos-data { display: inline-flex; gap: 4px; margin: 0 4px; vertical-align: middle; white-space: nowrap; }
+.grade-lancar .atalhos-data, .formulario .atalhos-data, .janela-pergunta .atalhos-data { margin: 4px 0 0; }
+/* Andamento e resultado logo abaixo do botão que foi clicado (statusDoBotao, app.js) */
+.status-botao { margin: 6px 0 0; font-size: 14px; flex-basis: 100%; width: 100%; }
+.status-botao:empty { display: none; }
+.status-botao.ok { color: var(--ok); }
+.status-botao.aviso { color: var(--aviso); }
+.status-botao.erro { color: var(--perigo); }
+.status-botao.info { color: var(--suave); }
+/* Regras do sistema: busca */
+.busca-regras { position: sticky; top: 0; z-index: 5; }
+.busca-regras input { max-width: 420px; }

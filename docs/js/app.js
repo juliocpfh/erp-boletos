@@ -442,6 +442,41 @@ export function aviso(texto, tipo = 'ok') {
   // 10 s para "Salvo." (6 s era pouco para quem lê devagar) e 15 s para avisos; com o mouse em cima, espera sair
   if (tipo !== 'erro') agendarFechar(m.id, tipo === 'aviso' ? 15000 : 10000);
 }
+/**
+ * Espaço logo abaixo de um botão para o andamento e o resultado da ação (pedido do dono de 17/11, Dados e backup): o botão
+ * com ``data-status`` (ex.: ``botao('conferirArquivos', 'Conferir', { status: 'Conferindo os arquivos…' })``) mostra esse
+ * texto ali enquanto roda, e o erro sai ali também (em vez da janela de erro). A ação escreve o andamento e o resultado com
+ * ``statusDoBotao(el).mostrar(texto, tipo)`` (tipo: info, ok, aviso, erro). Tela desenhada de novo no meio (``mostrar()``):
+ * acha o botão novo pela mesma ação; sem ele, vira um aviso comum no topo.
+ */
+export function statusDoBotao(el) {
+  const caixa = () => {
+    let b = el;
+    if (b && !b.isConnected && b.dataset?.acao) b = document.querySelector(`[data-acao="${b.dataset.acao}"]`);
+    if (!b || !b.isConnected) return null;
+    // botão numa fila de botões (.acoes) ou num parágrafo: o espaço fica embaixo da fila, sem empurrar os outros botões
+    const ancora = b.parentElement && (b.parentElement.classList.contains('acoes') || b.parentElement.tagName === 'P') ? b.parentElement : b;
+    const de = b.dataset.acao || '';
+    let c = ancora.nextElementSibling;
+    if (c?.classList.contains('status-botao') && c.dataset.de === de) return c;
+    c = document.createElement('div');
+    c.className = 'status-botao';
+    c.dataset.de = de;
+    c.setAttribute('role', 'status');
+    c.setAttribute('aria-live', 'polite');
+    ancora.after(c);
+    return c;
+  };
+  return {
+    mostrar(texto, tipo = 'info') {
+      const c = caixa();
+      if (!c) { if (texto) aviso(texto, tipo === 'erro' ? 'aviso' : tipo); return; }
+      c.className = `status-botao ${tipo}`;
+      c.textContent = texto || '';
+    },
+  };
+}
+
 function agendarFechar(id, ms) {
   setTimeout(() => {
     const el = typeof document.querySelector === 'function' ? document.querySelector(`#mensagens [data-msg="${id}"]`) : null;
@@ -1194,6 +1229,20 @@ document.addEventListener('focusin', (ev) => {
   if (el.type === 'month' && !el.max) el.max = '9999-12';
 });
 
+// botões "Hoje" e "Ontem" (F.atalhosData): põem a data no campo de data logo antes deles, como se fosse digitada
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest?.('.atalhos-data [data-dia]');
+  if (!b) return;
+  ev.preventDefault();
+  const campo = b.parentElement.previousElementSibling;
+  if (!campo || campo.tagName !== 'INPUT' || campo.type !== 'date') return;
+  const valor = C.somarDias(C.hojeIso(), Number(b.dataset.dia) || 0);
+  if (campo.value === valor) return; // sem mudança: não dispara o "change" (redesenharia à toa)
+  campo.value = valor;
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  campo.dispatchEvent(new Event('change', { bubbles: true }));
+});
+
 // Lista que cresce (depósitos anteriores do FCI): preencher a última linha cria outra em branco; o × tira a linha.
 document.addEventListener('input', (ev) => {
   const corpo = ev.target.closest('[data-linhas-fci]');
@@ -1238,11 +1287,15 @@ document.addEventListener('click', async (ev) => {
   }
   el.dataset.ocupado = '1';
   if (el.tagName === 'BUTTON') el.disabled = true;
+  // botão com espaço de status embaixo (statusDoBotao): o andamento e o erro aparecem ali
+  const status = el.dataset.status ? statusDoBotao(el) : null;
+  if (status) status.mostrar(el.dataset.status, 'info');
   try {
     await ACOES[el.dataset.acao](el.dataset, el);
   } catch (e) {
     logarErro(e);
-    aviso(e.message, 'erro');
+    if (status) status.mostrar(e.message, 'erro');
+    else aviso(e.message, 'erro');
   } finally {
     delete el.dataset.ocupado;
     if (el.tagName === 'BUTTON') el.disabled = false;

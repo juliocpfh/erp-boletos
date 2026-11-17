@@ -5,6 +5,15 @@ import { centavos, ErroUsuario, numero } from './calculos.js';
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const campo = (nome, rotulo, tipo = 'texto', extra = {}) => ({ nome, rotulo, tipo, ...extra });
+
+/**
+ * Botões "Hoje" e "Ontem" logo depois de um campo de data (pedido do dono de 17/11): o clique põe a data no campo que vem
+ * antes deles (app.js, ``data-dia``). Use nos campos de data de pagamento, baixa, lançamento e envio.
+ * Ex.: ``<input type="date" name="data">${atalhosData()}``.
+ */
+export const atalhosData = () => '<span class="atalhos-data nao-imprimir"><button type="button" class="mini secundario" data-dia="0" title="Pôr a data de hoje">Hoje</button><button type="button" class="mini secundario" data-dia="-1" title="Pôr a data de ontem">Ontem</button></span>';
+/** Campos de data dos cadastros que ganham "Hoje" e "Ontem" (de algo que já aconteceu: pagamento, recebimento, pedido, leitura). */
+export const DATAS_COM_ATALHO = new Set(['data', 'data_pagamento', 'data_recebimento', 'data_conclusao', 'data_recebida', 'decisao_data', 'devolucao_data', 'data_envio']);
 const secao = (titulo) => ({ secao: titulo });
 /** Começa uma nova linha no formulário. */
 const QUEBRA = { quebra: true };
@@ -847,6 +856,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)
       const lista = c.sugestoes ? `list="${id}_sugestoes" autocomplete="off"` : '';
       entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${lista} ${max} ${c.tipo === 'mes' ? 'placeholder="AAAA-MM"' : ''}>`;
+      if (c.tipo === 'data' && (c.atalhos ?? DATAS_COM_ATALHO.has(c.nome))) entrada += atalhosData();
       if (c.sugestoes) entrada += `<datalist id="${id}_sugestoes">${c.sugestoes.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
     }
     return `<div class="${c.largo ? 'largo' : ''} ${erros[c.nome] ? 'com-erro' : ''} ${recolhido}"${grupo} ${se}>

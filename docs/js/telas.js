@@ -32,7 +32,7 @@ import { aparelhosLigadosHtml, telaAcessos, telaBackupsNuvem, telaConflitos } fr
 import { telaReajustes } from './telas/reajustes.js';
 import { telaPessoa, telaPessoasAntigas } from './telas/pessoa.js';
 import { alertasDaTela, carregarParte } from './telas/comum.js';
-import { telaRegras } from './telas/regras-sistema.js';
+import { ligarBuscaRegras, telaRegras } from './telas/regras-sistema.js';
 import { alertaRegua, ligarRegua, telaRegua } from './telas/regua.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
@@ -65,6 +65,7 @@ export const TELAS = {
     ligarFichaOnline(raiz);
     ligarRegua(raiz);
     ligarIndiceBancoCentral(raiz);
+    ligarBuscaRegras(raiz);
     ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, 'erro'));
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];
