@@ -492,6 +492,8 @@ button.clipe-apagar:hover { background: #991b1b; }
 /* Lista de arquivos (pasta do inquilino, documentos assinados): o nome fica com a largura; tamanho e botões só o necessário */
 table.lista-arquivos { width: 100%; }
 table.lista-arquivos td.nome-arquivo { width: 100%; word-break: break-word; }
+.abrir-pasta { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--borda, #e2e2e2); }
+.abrir-pasta b { overflow-wrap: anywhere; } /* caminho comprido da pasta no Windows */
 .suave.mini { font-size: 11px; }
 .abas { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid #e5e7eb; margin: 0 0 16px; }
 @media (max-width: 760px) { .abas a { padding: 6px 10px; font-size: 14px; } }

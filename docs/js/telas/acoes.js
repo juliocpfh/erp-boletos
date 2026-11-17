@@ -1271,7 +1271,15 @@ export const ACOES = {
   },
 
   async copiar({ texto }, el) {
-    await navigator.clipboard.writeText(texto);
+    try { await navigator.clipboard.writeText(texto); } catch {
+      // navegador sem permissão para a área de transferência: o jeito antigo (texto selecionado + copiar)
+      const t = Object.assign(document.createElement('textarea'), { value: texto });
+      t.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.append(t); t.select();
+      const ok = document.execCommand('copy');
+      t.remove();
+      if (!ok) throw new C.ErroUsuario(`Não deu para copiar sozinho. Selecione e copie (Ctrl+C): ${texto}`);
+    }
     const antes = el.textContent;
     el.textContent = 'Copiado ✓';
     setTimeout(() => { el.textContent = antes; }, 1500);

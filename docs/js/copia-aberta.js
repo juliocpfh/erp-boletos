@@ -75,10 +75,19 @@ async function faxinaApagados(dir, dias, agora) {
   for (const n of diasVencidos(nomes, dias, agora)) { try { await pasta.removeEntry(n, { recursive: true }); } catch { /* fica para a próxima */ } }
 }
 
-/** Como está a cópia (para a tela do Backup seguro): { total, atualizado_em, por } ou null se nunca foi feita. */
+/** Caminho do Windows gravado pelo atualizador do PC (`caminho_no_pc`), só se parecer um caminho inteiro (C:\… ou \\servidor\…). */
+export const caminhoNoPc = (reg) => {
+  const c = String(reg?.caminho_no_pc || '');
+  return c.length < 400 && /^([A-Za-z]:\\|\\\\[^\\])/.test(c) && !/[\0-\x1f<>"|?*]/.test(c.slice(2)) ? c : '';
+};
+
+/**
+ * Como está a cópia (para a tela do Backup seguro): { total, atualizado_em, por, falhas, caminho } ou null se nunca foi feita.
+ * `caminho`: o caminho inteiro no Windows, quando o atualizador do PC já rodou (o navegador só conhece o nome da pasta); senão ''.
+ */
 export async function situacaoCopia(dir) {
   const r = await lerRegistro(dir);
-  return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0 } : null;
+  return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0, caminho: caminhoNoPc(r) } : null;
 }
 
 async function pastaDe(dir, partes, criar) {
@@ -106,7 +115,9 @@ export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por
   const arquivos = { ...(reg.arquivos || {}) };
   const { baixar, apagar, atual } = planoCopia(await listar(), arquivos);
   const raiz = await dir.getDirectoryHandle(PASTA_COPIA, { create: true });
-  const salvar = (falhas) => gravarRegistro(dir, { atualizado_em: new Date().toISOString(), por, falhas, dias_apagados: diasApagados, arquivos });
+  // o caminho inteiro só o atualizador do PC sabe: fica o que ele gravou
+  const caminho = caminhoNoPc(reg);
+  const salvar = (falhas) => gravarRegistro(dir, { atualizado_em: new Date().toISOString(), por, falhas, dias_apagados: diasApagados, ...(caminho ? { caminho_no_pc: caminho } : {}), arquivos });
   let falhas = 0; let feitos = 0;
   const total = baixar.length + apagar.length;
   const hoje = diaDeHoje(agora);

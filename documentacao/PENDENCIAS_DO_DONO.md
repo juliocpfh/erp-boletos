@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #296, mutirão 3000).
+Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #303: mutirão 3000, Gmail por "Entrar com o Google", notificações ao inquilino, régua em Boletos e abrir a pasta no Explorer).
 
 Marque com `[x]` o que for concluindo.
 
@@ -163,7 +163,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ---
 
-## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11)
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11; novo em 17/11: ligar o botão "Abrir a pasta no Explorer", 9b)
 
 **Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
 
@@ -176,6 +176,10 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - [x] **9a. Ícone que abre o sistema** (instalado pelo dono em 15/11; você faz, não precisa programar): no Chrome, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria e funciona mesmo com o site, o Cloudflare ou a internet fora do ar, com os dados da última vez que o sistema foi aberto naquele aparelho.
 - [x] **9b. Cópia aberta dos arquivos no computador** (feito em 15/11): subpasta **`Arquivos dos imoveis`** dentro de `C:\Users\Julio\Imoveis` (a pasta do backup seguro), sem cifrar, como no sistema (imóvel → Inquilinos → pessoa). Abrir, imprimir e copiar à vontade; o que for posto ou mudado lá não vai para o sistema. Atualiza sozinha: (A) logo depois de anexar, apagar ou mover neste computador; (B) de hora em hora pelo atualizador do PC; (C) botão **Atualizar a pasta agora** em Dados e backup → Backup seguro. Decisões do dono: sem BitLocker (só ele usa o computador, com senha, e antivírus sempre atualizado); risco de exposição e LGPD aceitos.
   - **Feito em 15/11** (atualizador copiado, tarefa instalada; 1ª rodada: `arquivos=298`). Era: copiar os arquivos novos do atualizador para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` (`atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd`, `rodar-escondido.vbs`; o `.env` fica) e rodar `instalar-tarefa.cmd` **como administrador**. Posso fazer a cópia para você. Depois, conferir: aparece a pasta `Arquivos dos imoveis` e o `ultima-atualizacao.txt` termina com `arquivos=…`.
+  - [ ] **Abrir a pasta no Explorer** (pedido do dono em 17/11; feito pelo Claude na mesma data). Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no computador, não aparece no celular): botão **Abrir a pasta no Explorer**, que abre `C:\Users\Julio\Imoveis\Arquivos dos imoveis`, e **Copiar o caminho**, de reserva. O navegador não deixa um site abrir pastas do computador; por isso quem abre é o programa do PC, que passa a se registrar no Windows (só para o seu usuário, sem pedir administrador) e sempre abre essa pasta, nunca outra, seja quem for que chame. **Falta você, depois do merge (uns 5 minutos):**
+    1. Uns 10 minutos depois do merge, baixe o `Instalar-Administracao-de-Imoveis.exe` novo em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc e dê dois cliques (como em 16/11: aviso azul → **Mais informações → Executar assim mesmo**). Ele se copia por cima, liga o botão e termina com **Pronto**. Não pede a senha de novo.
+    2. No sistema, Dados e backup → Backup seguro → **Abrir a pasta no Explorer**. Na primeira vez o Chrome pergunta se pode abrir o programa: marque **Sempre permitir** e clique em **Abrir**. Abre a pasta `Arquivos dos imoveis`.
+    3. O caminho completo (e o botão **Copiar o caminho**) aparece na tela depois que o programa novo atualizar a pasta (ele já faz isso no passo 1; recarregue a página). Se o programa não achar a pasta, aparece uma janelinha dizendo o que fazer; sem o programa novo, o botão não faz nada.
 - [x] **9d. Anexo abre sem internet no computador** (15/11): sem internet, o sistema abre o arquivo da cópia aberta (pode ser a versão da última atualização da pasta). No celular continua precisando de internet.
 - [x] **9c. Rotina "Arquivo impresso" (pasta física do inquilino)** (feito em 15/11; proposta aprovada em `PROPOSTA_ARQUIVO_IMPRESSO.md`, com as suas 12 respostas):
   - Liga e desliga em **Dados e backup → Regras do sistema** ("Arquivo impresso"); começa **ligada**. Lista de todos em **Dados e backup → Arquivo impresso**.
