@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-wQyjR+7arJ7deYx1EFfFzDZXVPife0fpBPf0jsFEHkI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-gyTRExH6Q4WksG3hEmmuisgn/YbyTRKyMAK6C21UVdI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="4259a0344849ac67">
+<meta name="fontes" content="686f6a9d859b8ebd">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -677,6 +677,23 @@ body.com-visualizador { overflow: hidden; }
 .pular-conteudo:focus { left: 8px; top: 8px; }
 main:focus { outline: none; }
 .janela-pergunta ul { margin: 4px 0 8px 18px; padding: 0; }
+/* Regras do sistema (página longa): com mudança não salva, o botão Salvar fica preso no rodapé da tela */
+form[data-alterado] .barra-salvar { position: sticky; bottom: 0; z-index: 5; background: var(--destaque); border: 1px solid #f0c674; border-radius: 8px; padding: 8px 12px; align-items: center; }
+form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:"; font-weight: 600; margin-right: 8px; }
+/* textos de ajuda legíveis também no formulário compacto (11 px era pequeno demais) */
+.formulario.compacto .ajuda { font-size: 13px; }
+.ajuda { font-size: 13px; }
+/* Celular: campos com 16 px (o iPhone amplia a tela ao tocar em campo menor), alvos de toque de 40 px, faixa do topo
+   que quebra a linha em vez de cortar e o ☰ de arrastar caixas escondido (um toque sem querer mudava a ordem para todos) */
+@media (max-width: 760px) {
+  input:not([type=checkbox]):not([type=radio]), select, textarea, header.topo .busca-topo input { font-size: 16px; }
+  .faixa { white-space: normal; overflow: visible; text-overflow: clip; }
+  main button, main .botao, main .link-botao, main button.mini, main .botao.mini { min-height: 40px; }
+  main .link-botao { display: inline-flex; align-items: center; padding: 0 6px; }
+  main table button.x-excluir { min-width: 40px; }
+  .alca-caixa { display: none !important; }
+  .barra-nf.lote-topo { display: none; } /* Boletos: imprimir/excluir selecionados só embaixo, depois da lista */
+}
 </style>
 </head>
 <body>
@@ -12001,9 +12018,19 @@ ${naoIncluidos.join("\r\n")}\r
         continue;
       }
       try {
-        if (c.tipo === "dinheiro") dados[c.nome] = centavos(bruto);
-        else if (c.tipo === "pct") dados[c.nome] = numero(bruto);
-        else if (c.tipo === "inteiro") {
+        if (c.tipo === "dinheiro") {
+          dados[c.nome] = centavos(bruto);
+          if (dados[c.nome] < 0 && !c.negativo && !c.positivo) {
+            erros[c.nome] = "O valor não pode ser negativo";
+            continue;
+          }
+        } else if (c.tipo === "pct") {
+          dados[c.nome] = numero(bruto);
+          if (c.min !== void 0 && dados[c.nome] < c.min) {
+            erros[c.nome] = c.min === 0 ? "Não pode ser negativo" : `Não pode ser menor que ${c.min}`;
+            continue;
+          }
+        } else if (c.tipo === "inteiro") {
           const n = numero(bruto);
           if (!Number.isInteger(n)) throw new Error();
           dados[c.nome] = n;
@@ -12026,8 +12053,18 @@ ${naoIncluidos.join("\r\n")}\r
             continue;
           }
           dados[c.nome] = igualAntes ? antigo[c.nome] : mascarar(c.tipo, bruto);
-        } else if (c.tipo === "tel") dados[c.nome] = [10, 11].includes(soDigitos(bruto).length) ? mascarar("tel", bruto) : bruto;
-        else if (c.tipo === "opcao" && c.nome.endsWith("_id")) dados[c.nome] = Number(bruto);
+        } else if (c.tipo === "tel") {
+          const n = soDigitos(bruto).length;
+          if (![10, 11].includes(n) && !(antigo && antigo[c.nome] === bruto)) {
+            erros[c.nome] = "Telefone com DDD: 10 ou 11 números. Ex.: (41) 99999-8888";
+            dados[c.nome] = bruto;
+            continue;
+          }
+          dados[c.nome] = [10, 11].includes(n) ? mascarar("tel", bruto) : bruto;
+        } else if (c.tipo === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(bruto) && !(antigo && antigo[c.nome] === bruto)) {
+          erros[c.nome] = "E-mail incompleto. Ex.: nome@gmail.com";
+          dados[c.nome] = bruto;
+        } else if (c.tipo === "opcao" && c.nome.endsWith("_id")) dados[c.nome] = Number(bruto);
         else dados[c.nome] = c.max ? bruto.slice(0, c.max) : bruto;
       } catch (e) {
         erros[c.nome] = e instanceof ErroUsuario ? e.message : "Valor inválido";
@@ -12101,7 +12138,7 @@ ${naoIncluidos.join("\r\n")}\r
         if (c.lista) entrada += editorLista(c);
       } else {
         const tipo = { data: "date", mes: "month", email: "email", tel: "tel" }[c.tipo] || "text";
-        const extra = c.tipo === "dinheiro" ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ["pct", "inteiro"].includes(c.tipo) ? 'inputmode="decimal"' : [...DOCUMENTOS, "tel"].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ""}${c.buscarPessoa ? " data-buscar-pessoa" : ""}` : "";
+        const extra = c.tipo === "dinheiro" ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : c.tipo === "pct" ? 'inputmode="decimal"' : c.tipo === "inteiro" ? 'inputmode="numeric"' : [...DOCUMENTOS, "tel"].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ""}${c.buscarPessoa ? " data-buscar-pessoa" : ""}` : "";
         const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : c.base ? "data-vinculo-base" : "";
         const lista3 = c.sugestoes ? `list="${id}_sugestoes" autocomplete="off"` : "";
         entrada = `<input id="${id}" name="${c.nome}" type="${tipo}" value="${esc(v)}" ${extra} ${vinc} ${lista3} ${max} ${c.tipo === "mes" ? 'placeholder="AAAA-MM"' : ""}>`;
@@ -12165,8 +12202,8 @@ ${naoIncluidos.join("\r\n")}\r
         campo("gas_relogio", "Relógio de gás (nº / identificação)"),
         campo("internet", "Contrato de internet ou nº do telefone"),
         secao("Área e energia"),
-        campo("area_util", "Área útil (m²)", "pct"),
-        campo("area_total", "Área total (m²)", "pct"),
+        campo("area_util", "Área útil (m²)", "pct", { min: 0 }),
+        campo("area_total", "Área total (m²)", "pct", { min: 0 }),
         campo("energia_ligada", "Energia ligada", "opcao", { opcoes: ["Sim", "Não"] }),
         campo("energia_tipo", "Tipo de ligação da energia", "opcao", { opcoes: ["Monofásica", "Bifásica", "Trifásica"] }),
         secao("Valor do imóvel"),
@@ -12611,7 +12648,7 @@ ${naoIncluidos.join("\r\n")}\r
         campo("seguro", "Seguro", "dinheiro"),
         campo("taxa_boleto", "Taxa do boleto", "dinheiro"),
         campo("fci", "FCI (fundo de conservação do imóvel)", "dinheiro", { ajuda: "Fora da NF, da multa e dos juros" }),
-        campo("outros", "Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)", "dinheiro", { ajuda: "Valor negativo desconta do boleto. Ex.: -150,00" }),
+        campo("outros", "Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)", "dinheiro", { negativo: true, ajuda: "Valor negativo desconta do boleto. Ex.: -150,00" }),
         campo("outros_descricao", "Motivo do ajuste", "texto", { ajuda: "Ex.: reforma do banheiro, acerto do mês anterior" }),
         campo("reserva_utilizada", "Reserva utilizada", "dinheiro"),
         campo("multa_percentual", "Multa por atraso (%)", "pct"),
@@ -16830,7 +16867,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   var classeEstilo = (nivel, e) => `alerta ${nivel} ${e.cor === "Padrão" ? "" : `cor-${SEM_ACENTO(e.cor)}`} enfase-${SEM_ACENTO(e.enfase)}`;
   var classeAlerta = (a) => classeEstilo(a.nivel, estiloAlerta(d(), a.tipo));
   var linkAlerta = (a) => a.link ? a.link : a.tipo === "Reajuste do aluguel" ? `#/reajustes?contrato=${a.contrato_id}` : `${a.contrato_id ? `#/contrato/${a.contrato_id}` : `#/imovel/${a.imovel_id}`}${a.ancora ? `?ir=${a.ancora}` : ""}`;
-  var nomeAlerta = (a) => a.imovel || a.inquilino ? `<a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`;
+  var nomeAlerta = (a) => a.imovel || a.inquilino ? `<span class="texto-alerta"><a href="${linkAlerta(a)}">${esc(a.imovel)}${a.inquilino ? `${a.imovel ? " · " : ""}${esc(a.inquilino)}` : ""}</a>: ${esc(a.texto)}</span>` : `<a href="${linkAlerta(a)}">${esc(a.texto)}</a>`;
   var alertaAdiado = (a, hoje3) => `<div class="alerta cor-cinza com-adiar">${nomeAlerta(a)} <span class="suave nw">· ${a.adiamento.modo === "cuidando" ? `${esc(a.adiamento.quem)} está cuidando` : `adiado por ${esc(a.adiamento.quem)}`} ${a.adiamento.ate === hoje3 ? "hoje (volta amanhã)" : `até ${dataBr(a.adiamento.ate)}`}</span> ${opera() ? botao("voltarAlerta", "Voltar a mostrar", { chave: a.chave }, "secundario mini") : ""}</div>`;
   var botaoDesligarAlerta = (a) => alvoDoAlerta(a) ? botao(
     "desligarAlerta",
@@ -16934,7 +16971,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const texto3 = `Emitir no C6 todos em aberto do mês${n ? ` (${n})` : ""}`;
     const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && emitidoNoBanco(cb));
     const conferir2 = link("#/banco?ir=conferir-boletos", "Conferir pagamentos no banco (tela Banco)", "botao secundario");
-    if (!pontePronta(d())) return `${botaoInativo(texto3, motivoIndisponivel(d()), "secundario")} ${conferir2}`;
+    if (!pontePronta(d())) return `${botaoInativo(texto3, motivoIndisponivel(d()), "secundario")} ${conferir2}<br><span class="ajuda">Emitir no C6: ${esc(String(motivoIndisponivel(d())).replace(/\.$/, ""))}.</span>`;
     return `${n ? botao("emitirBoletosMesC6", texto3, { comp }, "secundario", `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto3, "Nenhum boleto em aberto sem emissão neste mês", "secundario")}
     ${emitidos ? conferir2 : botaoInativo("Conferir pagamentos no banco (tela Banco)", "Nenhum boleto deste mês foi emitido no C6", "secundario")}`;
   }
@@ -16949,7 +16986,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const partes = [etiquetaBanco(cb)];
     if (emitidoNoBanco(cb) && cb.banco.linha_digitavel) partes.push(botao("copiar", "Copiar linha digitável", { texto: cb.banco.linha_digitavel }));
     if (emitidoNoBanco(cb) && cb.banco.pix_copia_cola) partes.push(botao("copiar", "Copiar Pix", { texto: cb.banco.pix_copia_cola }));
-    partes.push(botaoEmitirC6(cb));
+    if (pontePronta(d())) partes.push(botaoEmitirC6(cb));
     return partes.filter(Boolean).join(" ");
   }
   var MOMENTO_TXT = { ISSUE_DATE: "na emissão", BEFORE_DUE_DATE: "um dia antes do vencimento", DUE_DATE: "no vencimento", AFTER_DUE_DATE: "um dia depois do vencimento" };
@@ -17051,12 +17088,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       return canais.length && quando3.length ? `${canais.join(" e ")}: ${quando3.join(", ")}` : "não avisa";
     };
     return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao2}</div></div>
-    <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que roda no computador de quem emite (pasta <code>ponte-c6</code> do programa, veja o README dela). As chaves do banco ficam só na ponte, nunca aqui.</p>
+    <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que o técnico instala no computador de quem emite. As chaves do banco ficam só na ponte, nunca aqui.</p>
     <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : "a padrão"}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
     <form data-form="configBanco" class="formulario">
-      <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
-      <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
-      <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
+      <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">O técnico informa este endereço ao instalar a ponte</div></div>
+      <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A senha combinada com o técnico ao instalar a ponte</div></div>
+      <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para a nuvem nem para o arquivo de dados): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
       <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg4.ativo)} ${cfg4.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}${ponteLocal().configurada ? ` ${botao("esquecerPonteC6", "Esquecer a ponte neste computador", {}, "perigo", "Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.")}` : ""}</div></form>
     <div id="saude-ponte"></div>
@@ -17064,7 +17101,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
       ${cfg4.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === "producao" ? `<br>${etiqueta("desconto não conferido: boleto com bonificação não sai", "perigo")}` : `<br><span class="suave">desconto: conferir no boleto de teste</span>`}</td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
-        <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador configurado na ponte (linha CONTAS do arquivo .env dela; ex.: CONTAS=loja1,loja2).</td></tr>'}</table></div>
+        <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador que o técnico usou na ponte (ex.: loja1).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
     <form data-form="contaBanco" class="formulario" style="margin-top:10px">
       <div><label>Identificador na ponte</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
@@ -17086,7 +17123,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       <div class="largo"><label>Negativação no birô de crédito</label><div class="acoes"><label class="check-mini"><input type="checkbox" name="negativacao_ativa" value="1"> Mostrar o botão "Negativar" na página do boleto (só administrador)</label>
         após <input name="negativacao_dias" type="number" min="1" value="${padrao.negativacao.dias_atraso}" style="width:80px"> dias de atraso</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar conta</button></div></form></details>
-    <p class="suave" style="margin-top:10px">Como ligar quando as chaves chegarem: <code>documentacao/GUIA_DE_MODIFICACAO.md</code> ("Ligar o boleto com Pix do C6") e <code>ponte-c6/README.md</code>.</p></div>`;
+    <p class="suave" style="margin-top:10px">Para ligar o banco quando as chaves chegarem, peça ao técnico (o passo a passo está na documentação do sistema: "Ligar o boleto com Pix do C6").</p></div>`;
   }
   function htmlSaude(s, contaId = null) {
     if (!s || !s.ponte) return '<div class="alerta perigo">A ponte respondeu algo inesperado.</div>';
@@ -19431,7 +19468,7 @@ ${xref}
       if (!opera()) throw new Error("Seu usuário não pode confirmar pagamentos.");
       const conf = estado.conferencia;
       const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
-      if (!marcados.length) throw new Error("Marque pelo menos um boleto.");
+      if (!marcados.length) throw new ErroUsuario("Marque pelo menos um boleto.");
       const total = marcados.reduce((t, s) => t + s.valor, 0);
       if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
       let n = 0;
@@ -19830,7 +19867,7 @@ Salvar assim mesmo?`)) {
         [cfg4.email]: String(r.email || "").toLowerCase(),
         [cfg4.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
       });
-      mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}`);
+      mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}${endereco2 && feitos.length ? '<br><b>Confira os acentos do endereço</b>: a Receita manda sem acento (ex.: "Sao Paulo" → "São Paulo"), e ele vai assim para a NF e o contrato.' : ""}`);
     } catch (e) {
       mensagemAuto(el, e && e.semResposta ? "A consulta do CNPJ ficou sem resposta, tente de novo (ou preencha à mão)." : "Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.");
     }
@@ -22049,7 +22086,7 @@ ${m.texto}
         ${porMes(pend).map(([mes2, ps]) => `<tr class="grupo-mes"><th><input type="checkbox" data-marcar-todas="nfp-${mes2}" ${mesFechado(mes2) ? "checked" : ""} title="Marcar o mês todo"></th>
           <th colspan="5">${compBr(mes2)} · ${ps.length} pagamento(s) · ${reais(ps.reduce((t, p2) => t + baseDaFatura(d(), p2.tipo, p2.registro).valor, 0))} ${mesFechado(mes2) ? etiqueta("mês fechado", "ok") : etiqueta("mês em andamento", "aviso")}</th></tr>
           ${ps.map((p2) => linhaPendente(p2, mes2, ultima)).join("")}`).join("")}</table>
-        <p class="suave">A numeração segue a data contábil dos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
+        <p class="suave">A numeração segue o dia em que o dinheiro entrou na conta, nos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
         ${opera() ? `<p>${botao("numerar", "Numerar as NFs marcadas", {}, "")}</p>` : ""}` : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
     <div class="cartao rolagem">
@@ -22090,6 +22127,7 @@ ${m.texto}
       ${formNfExterna(p2.tipo, p2.registro.id, p2.data)}` : ""}</td></tr>`;
   }
   function caixaAirbnb(pend) {
+    if (!d().imoveis.some((i) => i.tipo === "airbnb") && !(d().ganhos_airbnb || []).length) return "";
     const hoje3 = hojeIso();
     const meses = [somarMeses(competenciaDe(hoje3), -1), ...pend.map((p2) => p2.data.slice(0, 7))];
     const lembretes = lembretesAirbnb(d(), meses, hoje3);
@@ -22131,12 +22169,12 @@ ${m.texto}
   function formPagamento(cb, compacto) {
     const emDia = `<label class="check-mini" title="Pagou até o vencimento e o banco só compensou depois: sem multa e juros, com desconto"><input type="checkbox" name="em_dia" value="1"> pagou em dia</label>`;
     if (compacto) {
-      return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><input type="date" name="data" value="${hojeIso()}" title="Data contábil: dia em que o dinheiro entrou na conta (é a data da NF)"><input name="valor" placeholder="valor pago" title="Opcional: valor efetivamente recebido" inputmode="decimal" data-dinheiro>${emDia}<button class="pequeno">Confirmar</button></form>`;
+      return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><input type="date" name="data" value="${hojeIso()}" title="Dia em que o dinheiro entrou na conta (é a data da NF)" aria-label="Dia em que o dinheiro entrou na conta"><input name="valor" placeholder="valor pago" title="Opcional: valor efetivamente recebido" inputmode="decimal" data-dinheiro>${emDia}<button class="pequeno">Confirmar</button></form>`;
     }
-    return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hojeIso()}">
-    <label>Pagou em (se atrasou)</label><input type="date" name="pagou" title="Opcional: dia em que o inquilino pagou. Em branco: a data contábil">
+    return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hojeIso()}">
+    <label>Pagou em (se atrasou)</label><input type="date" name="pagou" title="Opcional: dia em que o inquilino pagou. Em branco: o dia em que o dinheiro entrou">
     <label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" data-dinheiro placeholder="0,00">${emDia}<button>Confirmar pagamento</button></form>
-    <p class="suave">A data contábil é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}${limitePagamento(cb.vencimento) !== cb.vencimento ? `, que não é dia útil: vale até ${dataBr(limitePagamento(cb.vencimento))}` : ""}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
+    <p class="suave">O dia em que o dinheiro entrou na conta é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}${limitePagamento(cb.vencimento) !== cb.vencimento ? `, que não é dia útil: vale até ${dataBr(limitePagamento(cb.vencimento))}` : ""}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
   }
   function formNfDivergente(cb, p2) {
     const r = previstoNoPagamento(cb, p2.data, p2);
@@ -22144,7 +22182,7 @@ ${m.texto}
     const ress = cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : "";
     const conta = r.pontual ? `aluguel ${reais(cb.aluguel)} − desconto ${reais(cb.desconto)}${ress}` : `aluguel ${reais(cb.aluguel)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}${ress} (${r.dias_atraso} dia(s) de atraso, sem desconto)`;
     return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> Confira o cálculo e informe o valor da NF (cálculo manual). Nada foi salvo ainda.</div>
-    <div class="grade">${item("Data contábil (data da NF)", dataBr(p2.data))}${item("Pagou em", dataBr(p2.pagouEmDia ? cb.vencimento : p2.dataPagou || p2.data))}
+    <div class="grade">${item("Dinheiro entrou na conta em (data da NF)", dataBr(p2.data))}${item("Pagou em", dataBr(p2.pagouEmDia ? cb.vencimento : p2.dataPagou || p2.data))}
       ${item("Previsto", reais(r.valor_devido))}${item("Recebido", `<b>${reais(p2.valor)}</b>`)}${item("Diferença", `<b>${dif > 0 ? "+" : "−"}${reais(Math.abs(dif))}</b>`)}</div>
     <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>
     <form data-form="pagamentoNf" data-id="${cb.id}" class="formulario">
@@ -22240,15 +22278,15 @@ ${m.texto}
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) de ${compBr(comp)} aguardando número de NF. ${link("#/faturas", "Numerar na tela NF", "botao pequeno")}</div>` : ""}
     ${opera() ? caixaBaixaLote(lista3, hoje3) : ""}
     ${lista3.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ""}
-    ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: false, reajustes, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
+    ${tabelaBoletos(lista3, hoje3, ordem, url, { comp: false, mes: comp, reajustes, totalLinha: lista3.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ""}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : "" })}`;
   }
   function tabelaBoletos(lista3, hoje3, ordem, url, opcoes2 = {}) {
     const { reajustes = /* @__PURE__ */ new Map(), totalLinha = "" } = opcoes2;
-    const comp = lista3.length ? lista3[0].cb.competencia : competenciaDe(hoje3);
+    const comp = opcoes2.mes || (lista3.length ? lista3[0].cb.competencia : competenciaDe(hoje3));
     const impressao = `${botao("imprimirDemonstrativos", "Imprimir demonstrativos selecionados", { comp }, "botao")}
       ${opcoes2.comp ? "" : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
       ${opera() ? botao("excluirBoletosSelecionados", "Excluir boletos selecionados", { comp }, "perigo") : ""}`;
-    return `${lista3.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
+    return `${lista3.length ? `<div class="acoes barra-nf lote-topo">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link("#/inadimplencia", "Inadimplência")} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: "" }).replace(/&ordem=&?/, "&").replace(/[?&]$/, ""))}" style="width:auto">${[["vencimento", "Data de vencimento"], ["imovel", "Nome do imóvel"], ["inquilino", "Nome do inquilino"], ["valor", "Valor (maior para menor)"]].map(([k, t]) => `<option value="${k}" ${ordem === k ? "selected" : ""}>${t}</option>`).join("")}</select></div>` : ""}
     <div class="cartao rolagem"><table class="cobrancas responsiva">
       <tr><th><input type="checkbox" data-marcar-todas="boleto" title="Selecionar todos"></th><th>Imóvel / inquilino</th><th>Vencimento</th><th class="n">Pontual</th><th class="n">Após vencimento</th><th>Situação</th><th>Multa e juros</th><th class="n">Valor NF</th><th>NF</th></tr>
@@ -25120,6 +25158,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const veio = ["os dados da pessoa", dados.aluguel_inicial || dados.dia_vencimento || dados.garantia_tipo ? "a proposta (aluguel, vencimento, bonificação e garantia)" : "", dados.fiador1_nome || dados.fiador2_nome ? "os fiadores" : "", dados.reserva_valor ? "a reserva" : ""].filter(Boolean);
     return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(", ").replace(/, ([^,]*)$/, " e $1")} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome || dados.fiador2_nome ? "" : "fiador, "}o que está incluso, datas).${f.documentos_no_contrato ? "" : " Ao salvar, os documentos da ficha vão para a pasta do inquilino."}`;
   }
+  function contasDoImovel2(i) {
+    if (!i) return {};
+    const nao = SITUACOES_CONTA[2];
+    return { ...String(i.gas_relogio || "").trim() ? {} : { conta_gas: nao }, ...String(i.administradora_nome || "").trim() ? {} : { conta_condominio: nao } };
+  }
   var CADASTROS = {
     imoveis: {
       titulo: (r) => r ? "Editar imóvel" : "Novo imóvel",
@@ -25245,7 +25288,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
       // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
       // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
-      padrao: (q) => ({ ...padroesNovoContrato(), ...q.pessoa ? dadosDaPessoa(buscar2("contratos", q.pessoa)) : {}, ...fichaDoNovoContrato(q) ? dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}, ...q.imovel ? { imovel_id: Number(q.imovel) } : {} }),
+      padrao: (q) => ({ ...padroesNovoContrato(), ...q.imovel ? contasDoImovel2(buscar2("imoveis", q.imovel)) : {}, ...q.pessoa ? dadosDaPessoa(buscar2("contratos", q.pessoa)) : {}, ...fichaDoNovoContrato(q) ? dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}, ...q.imovel ? { imovel_id: Number(q.imovel) } : {} }),
       compacto: true,
       valores: (r) => ({
         ...r,
@@ -25952,12 +25995,14 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       campos: () => USUARIO,
       voltar: () => "#/usuarios",
       descricao: (dados) => `Usuário ${dados.login}`,
-      extraHtml: (r) => `<div class="formulario" style="margin-top:12px"><div><label>${r ? "Nova senha (em branco para manter)" : "Senha inicial *"}</label><input type="password" name="senha" autocomplete="new-password"></div></div>`,
+      extraHtml: (r) => `<div class="formulario" style="margin-top:12px"><div><label>${r ? "Nova senha (em branco para manter)" : "Senha inicial *"}</label><input type="password" name="senha" autocomplete="new-password"></div>
+      <div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div></div>`,
       async ajustarAsync(dados, erros, r, form) {
         dados.login = String(dados.login || "").toLowerCase();
         const senha = String(new FormData(form).get("senha") || "");
         if (senha) {
           if (senhaCurta(senha)) erros.login = ERRO_SENHA_CURTA;
+          else if (senha !== String(new FormData(form).get("senha2") || "")) erros.login = 'As duas senhas precisam ser iguais (campos "Senha" e "Repita a senha", no fim do formulário)';
           Object.assign(dados, await camposDeSenha(senha));
         } else if (!r) erros.login = "Informe uma senha inicial";
         if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = "Já existe um usuário com este login";
@@ -26293,7 +26338,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao("reconectarSeguro", "Reconectar", {}, "pequeno")}</div>` : ""}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
-        <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, no seu OneDrive pessoal ou num HD externo). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
+        <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, num HD externo ou numa pasta só sua). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
         <p>${!E.teste && !suportado() ? '<span class="alerta aviso" style="display:block">Faça isto no computador (Chrome ou Edge): este navegador não deixa o sistema gravar numa pasta.</span>' : botao("escolherPastaSegura", nova ? `Pasta escolhida: ${esc(nova.name)} (trocar)` : "Escolher a pasta segura", {}, nova ? "secundario" : "")}</p></div>
       ${nova ? `<div class="cartao"><h2>2. ${chaveExistente ? "Digite a senha do backup" : "Crie a senha do backup"}</h2>
         ${chaveExistente ? `<p>Esta pasta já tem backups seguros (chave criada em ${new Date(chaveExistente.criada_em).toLocaleDateString("pt-BR")}). Digite a senha para ligar este computador a ela.</p>` : '<div class="alerta aviso"><b>Guarde esta senha em local seguro.</b> Ela é pedida só para restaurar. Sem ela, nenhum backup pode ser aberto, nem por você nem pelo suporte. Use pelo menos 12 caracteres (uma frase curta serve).</div>'}
@@ -26378,6 +26423,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     await mostrar();
   }
   function telaHistorico(q) {
+    const trocadas = q.de && q.ate && q.de > q.ate;
+    if (trocadas) q = { ...q, de: q.ate, ate: q.de };
     let lista3 = d().historico;
     if (q.usuario) lista3 = lista3.filter((h) => h.usuario === q.usuario);
     if (q.tabela) lista3 = lista3.filter((h) => h.tabela === q.tabela);
@@ -26393,6 +26440,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const usadas = new Set(d().historico.map((h) => h.tabela));
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista3.length} registro(s)${filtrando ? " com o filtro aplicado" : ""}</span></summary>
+    ${trocadas ? `<div class="alerta info">A data "De" estava depois da "Até": mostrando de ${dataBr(q.de)} até ${dataBr(q.ate)}.</div>` : ""}
     <form class="formulario" data-form="ir" data-ir="historico" style="margin-top:12px">
       <div><label>Usuário</label><select name="usuario"><option value=""></option>${usuarios.map((u) => `<option ${q.usuario === u ? "selected" : ""}>${esc(u)}</option>`).join("")}</select></div>
       <div><label>Tipo de registro</label><select name="tabela"><option value=""></option>${Object.entries(TABELAS).filter(([k]) => k === q.tabela || usadas.has(k)).map(([k, v]) => `<option value="${k}" ${q.tabela === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
@@ -26441,7 +26489,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="cartao"><div class="grade">
       ${item("Pasta dos dados", E.nuvem ? "na nuvem (Cloudflare)" : esc(E.pasta.name))}${item("Banco criado em", dataHoraBr(d().criado_em))}
       ${item("Última atualização", d().atualizado_em ? `${dataHoraBr(d().atualizado_em)} por ${esc(d().atualizado_por)}` : "-")}
-      ${item("Versão do arquivo", `revisão ${d().revisao}`)}
+      ${item("Alterações gravadas", `${d().revisao}`)}
       ${item("Versão do sistema", await versaoDoSistema())}</div>
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
@@ -26479,7 +26527,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
-      <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>
+      <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
       ${opera() ? `<form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao("removerModelo", "Voltar ao modelo padrão", {}, "perigo pequeno", "Voltar ao modelo padrão?") : ""}</form>` : ""}</div>`;
   }
   var LOGO_MAX = { largura: 1400, altura: 700 };
@@ -26757,7 +26805,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <div class="acoes">${link(`#/?mes=${somarMeses(mes, -1)}`, `← ${compBr(somarMeses(mes, -1))}`)} ${link("#/", "Mês atual")} ${link(`#/?mes=${somarMeses(mes, 1)}`, `${compBr(somarMeses(mes, 1))} →`)}</div></div>
     <div class="cal-grade" style="--cal-colunas:${colunas}">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join("")}${celulas.join("")}</div>
     ${agendas || ""}
-    <p class="suave">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links. Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+    <p class="suave"><span class="so-pc">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links.</span><span class="so-celular"><b>Toque no dia</b> (cada tracinho colorido é um item) para ver a agenda dele logo abaixo do calendário, com os links.</span> Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
   }
 
   // docs/js/telas/fechamento.js
@@ -26775,7 +26823,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${link(`#/fechamento?mes=${somarMeses(mes, 1)}`, `${compBr(somarMeses(mes, 1))} →`, "botao secundario")}</div></div>
     <div class="alerta ${faltam ? "aviso" : "ok"}">${faltam ? `Faltam <b>${faltam}</b> de ${etapas.length} etapas.` : etapas.some((e) => e.prevista) ? "O que já está liberado foi feito; falta o que é previsto para depois." : "Fechamento concluído."} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? "feito" : ""}">
-      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : "feito", "ok") : e.prevista ? etiqueta(`previsto a partir de ${dataBr(e.aPartirDe)}`, "neutra") : etiqueta(`${e.pendentes} pendente(s)`, "aviso")}
+      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : "feito", "ok") : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? "previsto" : `previsto a partir de ${dataBr(e.aPartirDe)}`, "neutra") : etiqueta(`${e.pendentes} pendente(s)`, "aviso")}
         <div class="suave">${esc(e.detalhe)}</div>
         ${e.chave === "contas" && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar2("imoveis", id).nome)}`, "botao secundario pequeno")).join(" ")}</div>` : ""}</div>
         <div class="acoes">${link(e.link, "Abrir", "botao pequeno")}
@@ -26908,6 +26956,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   function telaContas(rota) {
     const i = buscar2("imoveis", rota.partes[1]);
+    if (!i && !rota.partes[1]) {
+      return `<h1>Contas do imóvel</h1><div class="cartao"><p>Escolha o imóvel para lançar ou ver as contas:</p>
+      <ul>${ordenar(d().imoveis, "nome").map((x) => `<li><a href="#/contas/${x.id}">${esc(x.nome)}</a></li>`).join("") || '<li class="suave">Nenhum imóvel cadastrado.</li>'}</ul></div>`;
+    }
     if (!i) return naoEncontrado("Imóvel não encontrado", "#/imoveis", "Ver os imóveis");
     const comp = competenciaValida(rota.q.comp, mesComContas(i.id));
     const ultimos2 = ultimosValores(d(), i.id);
@@ -27677,7 +27729,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <form data-form="regrasSistema">
       ${GRUPOS_REGRAS.map(([g, titulo2]) => `<div class="cartao"><h2>${esc(titulo2)}</h2>
         ${DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join("")}</div>`).join("")}
-      ${admin ? '<p class="acoes"><button>Salvar as regras</button></p>' : ""}
+      ${admin ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ""}
     </form>`;
   }
   function feriadoDigitado(t) {
@@ -28061,7 +28113,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       html: `<p>Boleto de <b>${esc(buscar2("contratos", cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${pagoEm ? ` em <b>${esc(dataBr(pagoEm))}</b>` : ""}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ""}${creditoEm ? `, creditado em <b>${esc(dataBr(creditoEm))}</b>` : ""}.</p>
       ${pagamento && pagamento.certeza !== "exata" ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ""}
       <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
-      <p><label>Data contábil (entrada na conta: é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
+      <p><label>Dia em que o dinheiro entrou na conta (é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
       <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? " (em dia)" : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ""}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
@@ -28075,7 +28127,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const data2 = String((resp.data || [])[0] || "");
     const dataPagou = String((resp.pagou || [])[0] || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data2) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error("Informe as duas datas.");
-    if (dataPagou > data2) throw new Error("O dia em que pagou não pode ser depois da data contábil.");
+    if (dataPagou > data2) throw new ErroUsuario("O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.");
     const pagouEmDia = dataPagou <= limitePagamento(cb.vencimento) && data2 > cb.vencimento;
     if (difere && geraNf(buscar2("contratos", cb.contrato_id))) {
       const entrada = entradaDoRecebimento(d(), { conta_id: contaId, valor: valorBanco, data: data2 });
@@ -28094,7 +28146,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   var numerosSelecionados = () => {
     const ns = [...document.querySelectorAll("input[data-nf]:checked")].map((x) => Number(x.dataset.nf));
-    if (!ns.length) throw new Error("Marque pelo menos uma NF na lista.");
+    if (!ns.length) throw new ErroUsuario("Marque pelo menos uma NF na lista.");
     return ns;
   };
   async function pdfDaFatura(f) {
@@ -29162,8 +29214,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
       const resp = await janela({
         titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ""}`,
         html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ""}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim2.valor_devido)}</b>${sim2.pontual ? "" : ` (${sim2.dias_atraso} dia(s) de atraso)`}.</p>
-        <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje3}" required></p>
-        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
+        <p><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hoje3}" required></p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: o dia em que o dinheiro entrou</span></p>
         <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
         <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
         sim: "Confirmar pagamento"
@@ -29416,20 +29468,20 @@ ${MODELO_COMODOS[comodo].join("\n")}
     },
     imprimirDemonstrativos({ comp }) {
       const ids = [...document.querySelectorAll("input[data-boleto]:checked")].map((x) => x.dataset.boleto);
-      if (!ids.length) throw new Error('Marque pelo menos um imóvel na lista (ou "selecionar todos").');
+      if (!ids.length) throw new ErroUsuario('Marque pelo menos um boleto na lista (ou "selecionar todos").');
       ir(`#/imprimir/demonstrativos?comp=${comp}&ids=${ids.join(",")}`);
     },
     /** Exclui os boletos marcados na lista. Pagos não saem: desfaça o pagamento antes (com NF, cancele a NF antes). */
     async excluirBoletosSelecionados({ comp }) {
       const ids = [...document.querySelectorAll("input[data-boleto]:checked")].map((x) => Number(x.dataset.boleto));
-      if (!ids.length) throw new Error('Marque pelo menos um boleto na lista (ou "selecionar todos").');
+      if (!ids.length) throw new ErroUsuario('Marque pelo menos um boleto na lista (ou "selecionar todos").');
       const nome = (cb) => {
         const c = buscar2("contratos", cb.contrato_id);
         return c ? c.inquilino_nome : `boleto ${cb.id}`;
       };
       const pagos = ids.map((id) => buscar2("cobrancas", id)).filter((cb) => cb && cb.data_pagamento);
       if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(", ")}. Desmarque ou desfaça o pagamento antes.`);
-      if (!confirm(`Excluir ${ids.length} boleto(s) de ${compBr(comp)}? Eles podem ser gerados de novo depois.`)) return;
+      if (!await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) de ${compBr(comp)}?`, sim: "Excluir boletos", forte: true })) return;
       let excluidos = 0;
       await alterar((db) => {
         excluidos = 0;
@@ -30184,7 +30236,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error("Informe o dia em que pagaram.");
       if (atrasado && dataPagou > data2) throw new Error("O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.");
       if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
-      confirmarAvisos([dataNoFuturo(data2), dataMuitoAntiga(data2)].filter(Boolean));
+      pagamentoNaoFuturo(data2, dataPagou);
+      confirmarAvisos([dataMuitoAntiga(data2)].filter(Boolean));
       let r;
       await alterar((db) => {
         r = baixarEmLote(db, ids, data2, login(), { pagouEmDia: !atrasado, dataPagou });
@@ -30493,10 +30546,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     },
     async minhaSenha(form) {
       const f = new FormData(form);
-      if (!await conferirSenha(E.usuario, String(f.get("atual")))) throw new Error("Senha atual incorreta.");
+      if (!await conferirSenha(E.usuario, String(f.get("atual")))) throw new ErroUsuario("Senha atual incorreta.");
       const nova = String(f.get("nova"));
-      if (senhaCurta(nova)) throw new Error(ERRO_SENHA_CURTA);
-      if (nova !== f.get("nova2")) throw new Error("As duas senhas precisam ser iguais.");
+      if (senhaCurta(nova)) throw new ErroUsuario(ERRO_SENHA_CURTA);
+      if (nova !== f.get("nova2")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
       const campos = await camposDeSenha(nova);
       await alterar((db) => atualizar(db, "usuarios", E.usuario.id, campos, login(), "Trocou a própria senha"));
       E.usuario = buscar(E.d, "usuarios", E.usuario.id);
@@ -30512,6 +30565,14 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const campos = cfg4.campos(registro, rota.q);
       const { dados, erros } = ler(campos, form, registro && cfg4.valores ? cfg4.valores(registro) : registro);
       if (cfg4.ajustar && !Object.keys(erros).length) cfg4.ajustar(dados, erros, registro, form, rota.q);
+      else if (cfg4.ajustar) {
+        const mais = {};
+        try {
+          cfg4.ajustar({ ...dados }, mais, registro, form, rota.q);
+        } catch {
+        }
+        for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
+      }
       if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
       if (cfg4.ajustarAsync && !Object.keys(erros).length) await cfg4.ajustarAsync(dados, erros, registro, form, rota.q);
       if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
@@ -30543,7 +30604,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const imovelId = Number(form.dataset.imovel);
       const emitenteId = Number(f.get("emitente_id"));
       const percentual = numero(f.get("percentual"));
-      if (!(percentual > 0 && percentual <= 100)) throw new Error("Percentual inválido.");
+      if (!(percentual > 0 && percentual <= 100)) throw new ErroUsuario("Percentual inválido: use um número entre 0 e 100.");
       await alterar((db) => {
         const existente = db.participacoes.find((p2) => p2.imovel_id === imovelId && p2.emitente_id === emitenteId);
         if (existente) atualizar(db, "participacoes", existente.id, { percentual }, login());
@@ -30585,7 +30646,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     async desfazerNumeracao(form) {
       if (!podeUsuario("admin")) throw new ErroUsuario(SO_ADMIN_NUMERACAO);
       const n = Number(new FormData(form).get("numero"));
-      if (!confirm(`Desfazer a numeração a partir da NF nº ${numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${numeroFatura(n)}.`)) return;
+      if (!await confirmar(`Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${numeroFatura(n)}.`, { titulo: `Desfazer a numeração a partir da NF nº ${numeroFatura(n)}?`, sim: "Desfazer a numeração", forte: true })) return;
       const qtd = await alterar((db) => desfazerNumeracao(db, n, login()));
       aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
       await mostrar();
@@ -30692,7 +30753,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     async importar(form) {
       const f = new FormData(form);
       const arq = f.get("zip");
-      if (!arq || !arq.size) throw new Error("Escolha o arquivo ZIP.");
+      if (!arq || !arq.size) throw new ErroUsuario("Escolha o arquivo ZIP.");
       if (f.get("confirmo") !== "1") throw new Error("Marque a confirmação: a importação substitui os dados desta pasta.");
       const JSZip = await jsZip();
       const novos = await importarZip(JSZip, E.pasta, arq, E.d);
@@ -30746,6 +30807,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
   };
   Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS);
+  function pagamentoNaoFuturo(data2, dataPagou = null) {
+    const hoje3 = hojeIso();
+    for (const x of [data2, dataPagou]) if (x && x > hoje3) throw new ErroUsuario(`A data do pagamento (${dataBr(x)}) é depois de hoje (${dataBr(hoje3)}). Confira o dia em que o dinheiro entrou.`);
+  }
   async function confirmarPagamentoBoleto(id, f) {
     const data2 = String(f.get("data") || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
@@ -30753,14 +30818,14 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const pagouEmDia = f.get("em_dia") === "1";
     const dataPagou = String(f.get("pagou") || "") || null;
     const cb = buscar2("cobrancas", id);
+    pagamentoNaoFuturo(data2, dataPagou);
     confirmarAvisos([
-      dataNoFuturo(data2, "A data do pagamento"),
       dataMuitoAntiga(data2, "A data do pagamento"),
       cb && data2 < somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data2)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : ""
     ].filter(Boolean));
     const previsto = cb && previstoNoPagamento(cb, data2, { pagouEmDia, dataPagou });
     if (cb && valor !== null && valor !== previsto.valor_devido && !ehComplementoCaucao(cb) && geraNf(buscar2("contratos", cb.contrato_id))) {
-      if (dataPagou && dataPagou > data2) throw new Error("O dia em que pagou não pode ser depois da data contábil.");
+      if (dataPagou && dataPagou > data2) throw new ErroUsuario("O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.");
       const dif = valor - previsto.valor_devido;
       const resp = await janela({
         titulo: "Valor diferente do previsto",
@@ -30789,6 +30854,18 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
 
   // docs/js/telas.js
   var LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
+  function primeirosPassos() {
+    const db = d();
+    if (db.imoveis.length && db.contratos.length) return "";
+    const pode2 = opera();
+    const passos = [
+      [db.emitentes.length > 0, "Cadastre a empresa que emite as NFs", pode2 && podeUsuario("admin") ? "#/novo/emitentes" : ""],
+      [db.imoveis.length > 0, "Cadastre o primeiro imóvel", pode2 ? "#/novo/imoveis" : ""],
+      [db.contratos.length > 0, "Cadastre o contrato do inquilino", pode2 ? "#/novo/contratos" : ""],
+      [db.cobrancas.length > 0, "Gere os boletos do mês", "#/cobrancas"]
+    ];
+    return `<div class="alerta info primeiros-passos"><b>Primeiros passos</b><ol>${passos.map(([feito, texto3, href]) => `<li>${feito ? "✓ " : ""}${feito || !href ? esc(texto3) : `<a href="${href}">${esc(texto3)}</a>`}</li>`).join("")}</ol></div>`;
+  }
   var TELAS = {
     _previaAlerta: (el, cor, enfase) => {
       el.className = classeEstilo("aviso", { cor, enfase });
@@ -30943,10 +31020,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const lembrada = await pastaLembrada();
       return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:560px">
       <h1>Administração de Imóveis</h1>
-      <p>Os dados ficam numa pasta do seu computador, que pode estar dentro do <b>OneDrive</b> para sincronizar com outros computadores. Nada é guardado na internet.</p>
+      <p>Esta é a versão do sistema que guarda os dados numa pasta deste computador (para usar sem internet). No dia a dia, use o endereço do sistema na internet: os dados ficam na nuvem.</p>
       ${lembrada ? `<p><button data-acao="reabrir">Abrir a pasta "${esc(lembrada.name)}"</button></p><p class="suave">ou</p>` : ""}
       <p><button class="${lembrada ? "secundario" : ""}" data-acao="escolherPasta">Escolher a pasta dos dados</button></p>
-      <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>OneDrive\\Imoveis</b>, e escolha ela. Para usar os mesmos dados em outro computador, escolha lá a mesma pasta do OneDrive.</p>
+      <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>Documentos\\Imoveis</b>, e escolha ela.</p>
       ${LINK_RESTAURAR}
     </div></main>`;
     },
@@ -30961,26 +31038,26 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
       Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
     <form data-form="primeiroAcesso">
-      <p><label>Seu nome</label><input name="nome" autofocus></p>
-      <p><label>Login</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
-      <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
+      <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autocomplete="username"></p>
+      <p><label for="ent_senha">Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input id="ent_senha" type="password" name="senha" autocomplete="new-password"></p>
+      <p><label for="ent_senha2">Repita a senha</label><input id="ent_senha2" type="password" name="senha2" autocomplete="new-password"></p>
       <button>Criar e entrar</button> ${E.nuvem ? "" : botao("escolherPasta", "Escolher outra pasta")}
     </form>${LINK_RESTAURAR}</div></main>`,
     login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">${E.nuvem ? "Dados na nuvem" : `Pasta: <b>${esc(E.pasta.name)}</b>`}</p>
     <form data-form="login">
-      <p><label>Login</label><input name="login" autofocus autocomplete="username"></p>
-      <p><label>Senha</label><input type="password" name="senha" autocomplete="current-password"></p>
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autofocus autocomplete="username"></p>
+      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha" autocomplete="current-password"></p>
       <button>Entrar</button> ${E.nuvem ? "" : botao("escolherPasta", "Trocar de pasta")}
     </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
     pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Pedir acesso</h1><p class="suave">${E.nuvem ? "Dados na nuvem" : `Pasta: <b>${esc(E.pasta.name)}</b>`}. O administrador recebe o pedido em Usuários e libera o acesso.</p>
     <form data-form="pedirAcesso">
-      <p><label>Seu nome</label><input name="nome" autofocus></p>
-      <p><label>Login (sem espaços)</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
-      <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
+      <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
+      <p><label for="ent_login">Login (sem espaços)</label><input id="ent_login" name="login" autocomplete="username"></p>
+      <p><label for="ent_senha">Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input id="ent_senha" type="password" name="senha" autocomplete="new-password"></p>
+      <p><label for="ent_senha2">Repita a senha</label><input id="ent_senha2" type="password" name="senha2" autocomplete="new-password"></p>
       <button>Enviar pedido</button> <a class="botao secundario" href="#/">Voltar</a>
     </form></div></main>`,
     // ------------------------------------------------------------------------
@@ -31011,20 +31088,21 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         ${n(d().imoveis.length, "imóveis", "#/imoveis")}
         ${n(d().contratos.filter((c) => contratoAtivo(c, hoje3)).length, "contratos ativos", "#/inquilinos")}
         ${n(pend.length, "pagamentos aguardando NF", "#/faturas")}
-        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total${adiados.length ? `, ${adiados.length} adiado(s)` : ""}${desligados.length ? `, ${desligados.length} desligado(s)` : ""})</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(", ")}</span>` : ""}`}</a>
+        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${alertas.length}</div>${alertas.length === 1 ? "alerta ativo" : "alertas ativos"}<br><span class="suave">${Object.keys(porTipo).length > 1 ? `o maior grupo: ${esc(tipoMais)} (${qtdMais})` : esc(tipoMais)}${adiados.length ? `, ${adiados.length} adiado(s)` : ""}${desligados.length ? `, ${desligados.length} desligado(s)` : ""}</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(", ")}</span>` : ""}`}</a>
         ${(() => {
         const r = resumoSolicitacoes(d());
         return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
-          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join("")}</div>Solicitações de inquilinos</a>`;
+          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join("")}</div>Solicitações de inquilinos
+          <div class="suave legenda-simbolos">${SITUACOES_SOLICITACAO.map((s) => `${s.simbolo} ${s.texto}`).join(" · ")}</div></a>`;
       })()}
       </div>
       ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link("#/pendencias?ir=cadastros", "Ver os cadastros incompletos", "botao pequeno")}</div>` : ""}
       ${d().contratos.filter((c) => dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join("")}
       ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(", "))}. Confira e apague à mão se não precisar mais.</div>` : ""}
-      <div class="alerta ${faltamEtapas.length ? "aviso" : "ok"}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ""}`).join("; "))}.` : "as etapas liberadas estão feitas."}
+      ${primeirosPassos() || `<div class="alerta ${faltamEtapas.length ? "aviso" : "ok"}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ""}`).join("; "))}.` : "as etapas liberadas estão feitas."}
         ${previstas.length ? `<span class="suave">Próximas: ${esc(previstas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]} a partir de ${dataBr(e.aPartirDe)}`).join("; "))}.</span>` : ""}
-        ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, "Abrir o fechamento do mês", "botao pequeno")}</div>
+        ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, "Abrir o fechamento do mês", "botao pequeno")}</div>`}
       ${podeUsuario("admin") && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao("reconectarSeguro", "Reconectar o backup seguro", {}, "secundario pequeno")}</div>` : ""}
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
       ${alertaFichas()}
@@ -31167,9 +31245,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
     },
     "minha-senha": () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
-    <p><label>Senha atual</label><input type="password" name="atual"></p>
-    <p><label>Nova senha</label><input type="password" name="nova"></p>
-    <p><label>Repita a nova senha</label><input type="password" name="nova2"></p><button>Salvar</button></form></div>`
+    <p><label for="ent_atual">Senha atual</label><input id="ent_atual" type="password" name="atual" autocomplete="current-password"></p>
+    <p><label for="ent_nova">Nova senha</label><input id="ent_nova" type="password" name="nova" autocomplete="new-password"></p>
+    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`
   };
 
   // docs/js/app.js
@@ -31935,6 +32013,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       const h1 = typeof app.querySelector === "function" ? app.querySelector("h1") : null;
       const nomeTela = h1 ? h1.textContent.replace(/\s+/g, " ").trim() : "";
       document.title = nomeTela && nomeTela !== "Administração de Imóveis" ? `${nomeTela.slice(0, 60)} · Imóveis` : "Administração de Imóveis";
+      ligarRotulos(app);
       if (subir) window.scrollTo(0, 0);
       if (E.usuario) carregarClipes();
       for (const el of app.querySelectorAll("[data-arquivos]")) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
@@ -31977,6 +32056,44 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       app.style.minHeight = "";
       paginaDesenhada = null;
       app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
+    }
+  }
+  var NOMES_DOS_CAMPOS = {
+    de: "De (data)",
+    ate: "Até (data)",
+    usuario: "Usuário",
+    tabela: "Tabela",
+    texto: "Texto",
+    q: "Buscar",
+    comp: "Mês",
+    mes: "Mês",
+    numero: "Número",
+    data: "Data",
+    valor: "Valor",
+    ano: "Ano",
+    filtro: "Mostrar",
+    ordem: "Ordem",
+    senha_ponte: "Senha da ponte",
+    ambiente: "Ambiente"
+  };
+  var idsDeRotulo = 0;
+  function ligarRotulos(raiz) {
+    if (typeof raiz.querySelectorAll !== "function") return;
+    for (const lb of raiz.querySelectorAll("label:not([for])")) {
+      if (lb.querySelector("input, select, textarea")) continue;
+      const campo2 = lb.nextElementSibling;
+      if (!campo2 || !campo2.matches("input:not([type=hidden]), select, textarea")) continue;
+      if (!campo2.id) {
+        idsDeRotulo += 1;
+        campo2.id = `rotulo_${idsDeRotulo}`;
+      }
+      lb.htmlFor = campo2.id;
+    }
+    for (const el of raiz.querySelectorAll("input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea")) {
+      if (el.labels && el.labels.length || el.getAttribute("aria-label") || el.getAttribute("aria-labelledby")) continue;
+      const base = String(el.name || "").replace(/_\d+$/, "");
+      const nome = el.title || el.placeholder || NOMES_DOS_CAMPOS[el.name] || NOMES_DOS_CAMPOS[base] || (base ? base.replace(/_/g, " ").replace(/^r /, "Regra ") : "");
+      if (nome) el.setAttribute("aria-label", nome);
     }
   }
   async function montarExtras(raiz, vivo = () => true) {
@@ -32059,9 +32176,20 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     try {
       const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
       if (resposta && resposta.erros) {
+        const arquivos = typeof form.querySelectorAll === "function" ? [...form.querySelectorAll("input[type=file]")].filter((i) => i.files && i.files.length && !i.dataset.acaoArquivo).map((i) => [i.name, i.files]) : [];
         await mostrar(resposta);
         const novo = typeof document.querySelector === "function" ? document.querySelector(`main form[data-form="${form.dataset.form}"]`) : null;
         if (novo && novo.dataset) novo.dataset.alterado = "1";
+        for (const [nome, files] of arquivos) {
+          const el = novo && novo.querySelector(`input[type=file][name="${nome}"]`);
+          if (!el) continue;
+          try {
+            el.files = files;
+            el.insertAdjacentHTML("afterend", `<div class="ajuda">📎 Continua escolhido: ${esc(files[0].name)}</div>`);
+          } catch {
+            el.insertAdjacentHTML("afterend", '<div class="erro-campo">Escolha o arquivo de novo.</div>');
+          }
+        }
         aviso(marcarCamposComErro(), "erro");
       }
     } catch (e) {
