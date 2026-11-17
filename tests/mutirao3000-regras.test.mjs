@@ -124,6 +124,18 @@ test('[50] data inexistente não é válida', () => {
   CR.usarRegras(null);
 });
 
+test('[44][50] depósito para completar acima do que falta e datas que não existem são recusados', () => {
+  const b = base({ garantia_tipo: 'Caução', caucao_valor: 540000, caucao_meses: 3, comprovante_caucao: 'c.pdf', caucao_data: '2025-06-07', caucao_pago_em: '2025-06-07', data_entrada: '2025-06-07', vigencia_inicio: '2025-06-07' });
+  R.inserir(b.d, 'correcoes', { contrato_id: b.c.id, data_vigencia: '2026-06-01', indice: 'IPCA', percentual: 4.5, valor_anterior: 200000, valor_novo: 209000 }, 'j');
+  const falta = R.garantiaADepositar(b.d, b.c, 'caucao', '2026-07-01').falta;
+  assert.ok(falta > 0);
+  assert.throws(() => R.registrarDepositoGarantia(b.d, b.c.id, 'caucao', { data: '2026-07-01', valor: falta * 10 }, 'j'), C.ErroUsuario);
+  R.registrarDepositoGarantia(b.d, b.c.id, 'caucao', { data: '2026-07-01', valor: falta }, 'j');
+  assert.throws(() => R.validarFciPrevios([{ data: '2026-02-31', valor: 9000 }]));
+  const r = base({ reserva_valor: 50000 });
+  assert.throws(() => R.marcarReservaAbatida(r.d, r.c.id, { competencia: '2026-13', valor: 50000 }, 'j'));
+});
+
 test('[48] pagar de novo um boleto já pago é recusado', () => {
   const { d } = base();
   R.gerarCobrancas(d, '2026-07', 'j');

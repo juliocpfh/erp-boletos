@@ -984,7 +984,7 @@ export const reservaParaMarcarAbatida = (d, c) => Math.max((c.reserva_valor || 0
 export function marcarReservaAbatida(d, contratoId, { competencia, valor }, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   if (!(c.reserva_valor > 0)) throw new Error('Este contrato não tem reserva.');
-  if (!/^\d{4}-\d{2}$/.test(competencia || '')) throw new Error('Informe o mês em que a reserva foi abatida.');
+  if (!C.competenciaValida(competencia, '')) throw new Error('Informe o mês em que a reserva foi abatida.');
   const max = reservaParaMarcarAbatida(d, c);
   if (!(valor > 0)) throw new Error('Informe o valor abatido.');
   if (valor > max) throw new Error(`O valor abatido não pode passar de ${C.reais(max)} (reserva${max < c.reserva_valor ? ' menos o já usado em boletos pagos' : ''}).`);
@@ -1146,7 +1146,7 @@ export function validarFciPrevios(linhas) {
   const ok = [];
   for (const [i, x] of linhas.entries()) {
     if (!x.data && !x.valor) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(x.data || '') || !(x.valor > 0)) throw new Error(`Linha ${i + 1}: preencha a data e um valor maior que zero.`);
+    if (!C.dataValida(x.data) || !(x.valor > 0)) throw new Error(`Linha ${i + 1}: preencha uma data que existe e um valor maior que zero.`);
     ok.push({ data: x.data, valor: x.valor });
   }
   return ok.sort((a, b) => a.data.localeCompare(b.data));
@@ -2718,8 +2718,13 @@ export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, ar
   // já registrada (ex.: caução inicial depositada e o aluguel reajustado): depósito para completar o que falta
   const complementar = garantiaDepositada(c);
   if (complementar && !(garantiaADepositar(d, c, qual).falta > 0)) throw new Error(`${g.nome.charAt(0).toLocaleUpperCase('pt-BR')}${g.nome.slice(1)} já está completa.`);
-  if (!data) throw new Error('Informe a data do depósito.');
+  if (!C.dataValida(data)) throw new Error('Informe a data do depósito.');
   if (!(valor > 0)) throw new Error('Informe o valor depositado.');
+  // completar acima do que falta passaria do combinado (e pode passar do limite de 3 aluguéis da caução, Lei 8.245/91, art. 38, §2º)
+  if (complementar) {
+    const falta = garantiaADepositar(d, c, qual).falta;
+    if (valor > falta) throw new C.ErroUsuario(`Falta completar só ${C.reais(falta)}; o depósito de ${C.reais(valor)} passa disso. Registre ${C.reais(falta)} e devolva a diferença ao inquilino (a caução não pode passar de 3 aluguéis: Lei 8.245/91, art. 38, §2º).`);
+  }
   const x = inserir(d, 'depositos_garantia', { contrato_id: c.id, imovel_id: c.imovel_id || null, qual, troca_id: trocaAtual(d, c), data, valor, comprovante: arquivo || null,
     ...(complementar ? { complementar: true } : {}) }, usuario,
     `${c.inquilino_nome}: ${g.nome}, depósito ${complementar ? 'para completar ' : ''}de ${C.reais(valor)} em ${C.dataBr(data)}${arquivo ? '' : ' (sem comprovante)'}`);
