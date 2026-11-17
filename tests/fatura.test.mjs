@@ -1,6 +1,8 @@
 // Fatura de locação (docs/js/fatura.js): quebra das observações, HTML no desenho da planilha (texto do usuário escapado,
 // valores em reais) e Excel preenchido a partir do modelo (com um ExcelJS falso: aba por empresa, abas sobrando removidas).
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import * as F from '../docs/js/fatura.js';
 
@@ -82,6 +84,101 @@ test('faturaExcel: uma aba por empresa (pelo nome da aba do cadastro ou pela 1ª
   assert.equal(jck.celulas.K22, 1000);
   assert.equal(jck.celulas.B5, 'CNPJ 11.222.333/0001-81');
   assert.equal(wb.calcProperties.fullCalcOnLoad, true);
-  // mais empresas do que abas: erro claro
-  await assert.rejects(F.faturaExcel(excelFalso(['ANK']), new Uint8Array([1]), [fatura(), fatura({ emitente_id: 2 })], [ANK, JCK]), /menos abas do que empresas/);
+  // mais empresas do que abas: a que falta vira cópia da 1ª aba do modelo (teste com o ExcelJS de verdade, abaixo)
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Texto cortado na NF (Regras 31): avisa qual campo e como fica
+// ---------------------------------------------------------------------------------------------------------------
+test('cortesDaFatura: nome, endereço, município (só no Excel) e observações que não cabem; texto curto não avisa', () => {
+  assert.deepEqual(F.cortesDaFatura(fatura()), [], 'NF comum: nada cortado');
+  const nome = 'Maria Exemplo de Souza Albuquerque Pereira dos Santos Oliveira Lima';
+  assert.ok(nome.length > 60);
+  const [c] = F.cortesDaFatura(fatura({ tomador_nome: nome }));
+  assert.equal(c.campo, 'Nome do cliente');
+  assert.match(c.texto, /^Nome do cliente cortado: fica "MARIA EXEMPLO DE SOUZA/);
+  assert.match(c.texto, new RegExp(`cabe até 60 letras, tem ${nome.length}; sai "${nome.slice(60).trim().toLocaleUpperCase('pt-BR')}"`));
+  const end = 'Rua Professora Doutora Maria das Graças Albuquerque, 1234, apto 1201, bloco B, Água Verde';
+  const [e] = F.cortesDaFatura(fatura({ tomador_endereco: end }));
+  assert.equal(e.campo, 'Endereço');
+  assert.match(e.texto, /cabe até 70 letras/);
+  assert.match(e.texto, /sai "[^"]*ÁGUA VERDE"/);
+  assert.deepEqual(F.cortesDaFatura(fatura({ tomador_nome: `${'A'.repeat(60)}   ` })), [], 'só espaços sobrando: nada se perde');
+  const [m] = F.cortesDaFatura(fatura({ municipio: 'São José dos Pinhais do Norte Grande' }));
+  assert.match(m.texto, /^Município cortado no Excel/);
+  // observações: 7 linhas → as 2 últimas ficam de fora; palavra com mais de 90 letras é cortada
+  const [o] = F.cortesDaFatura(fatura({ observacoes: ['um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete'].join('\n') }));
+  assert.equal(o.campo, 'Observações');
+  assert.match(o.texto, /cabem 5 linhas de até 90 letras; ficam de fora 2 linha\(s\): "seis sete"/);
+  const [p] = F.cortesDaFatura(fatura({ observacoes: `Chave ${'x'.repeat(95)}` }));
+  assert.match(p.texto, /palavra com mais de 90 letras é cortada/);
+  assert.deepEqual(F.cortesDaFatura(fatura({ observacoes: 'a\n\n\n\n\n\n\n' })), [], 'linhas em branco no fim não contam');
+});
+
+test('avisosDeCorte: um aviso por número (as NFs de cada empresa têm o mesmo tomador), com o número da NF', () => {
+  const longo = { tomador_endereco: 'Rua Professora Doutora Maria das Graças Albuquerque, 1234, apto 1201, bloco B, Água Verde' };
+  const avisos = F.avisosDeCorte([fatura(longo), fatura({ ...longo, emitente_id: 2 }), fatura({ numero: 158 })]);
+  assert.equal(avisos.length, 1);
+  assert.match(avisos[0], /^NF nº 0157: Endereço cortado: fica "RUA PROFESSORA/);
+});
+
+test('faturaHtml: os limites da tela são os mesmos do aviso (LIMITES_NF) e a tabela continua com largura fixa', () => {
+  const html = F.faturaHtml(fatura({ tomador_endereco: 'R'.repeat(100) }), ANK);
+  assert.match(html, new RegExp(`<b>${'R'.repeat(F.LIMITES_NF.endereco)}</b>`));
+  assert.match(html, /<table style="width:\d+px">/, 'nunca width: auto');
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Excel com o ExcelJS de verdade e o modelo padrão (Venda 24): as abas vêm das empresas cadastradas
+// ---------------------------------------------------------------------------------------------------------------
+const ExcelJS = createRequire(import.meta.url)('../docs/vendor/exceljs.min.js');
+const MODELO = fs.readFileSync(new URL('../docs/modelos/fatura-modelo.xlsx', import.meta.url));
+const ALFA = { id: 3, nome: 'Alfa Imóveis', razao_social: 'ALFA IMOVEIS LTDA', cnpj: '11.222.333/0001-81', aba_modelo: '' };
+
+async function abrir(blob) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(Buffer.from(await blob.arrayBuffer()));
+  return wb;
+}
+
+test('nomeDaAba: aba do cadastro ou 1ª palavra do nome, em maiúsculas, sem os caracteres que o Excel recusa', () => {
+  assert.equal(F.nomeDaAba(ANK), 'ANK');
+  assert.equal(F.nomeDaAba(JCK), 'JCK');
+  assert.equal(F.nomeDaAba(ALFA), 'ALFA');
+  assert.equal(F.nomeDaAba({ nome: 'X', aba_modelo: 'Loja: Centro/Sul' }), 'LOJA  CENTRO SUL');
+  assert.equal(F.nomeDaAba({ nome: 'A'.repeat(40) }).length, 31);
+});
+
+test('faturaExcel (modelo padrão): ANK e JCK como hoje; empresa sem aba usa a que sobrou ou uma cópia, com o nome dela', async () => {
+  // ANK e JCK: as abas do modelo, como sempre
+  let wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura(), fatura({ emitente_id: 2, valor: 100000 })], [ANK, JCK]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['ANK', 'JCK']);
+  assert.equal(wb.getWorksheet('ANK').getCell('B3').value, 'ANK ADMINISTRADORA');
+  assert.equal(wb.getWorksheet('JCK').getCell('K22').value, 1000);
+  // só a ANK: a aba JCK sobra e sai
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura()], [ANK, JCK]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['ANK']);
+  // outra imobiliária (só a Alfa cadastrada): usa a 1ª aba do modelo, com o nome da empresa
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura({ emitente_id: 3 })], [ALFA]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['ALFA']);
+  assert.equal(wb.worksheets[0].getCell('B3').value, 'ALFA IMÓVEIS');
+  // Alfa e JCK, com a ANK cadastrada: a Alfa fica com a aba que sobrou (ANK), a JCK com a dela
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura({ emitente_id: 3 }), fatura({ emitente_id: 2 })], [ANK, JCK, ALFA]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name).sort(), ['ALFA', 'JCK']);
+  assert.equal(wb.getWorksheet('JCK').getCell('B3').value, 'JCK ADMINISTRADORA');
+  assert.equal(wb.getWorksheet('ALFA').getCell('B3').value, 'ALFA IMÓVEIS');
+  // três empresas na mesma NF e o modelo com duas abas: a 3ª é cópia da 1ª aba, com o mesmo desenho
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura(), fatura({ emitente_id: 2 }), fatura({ emitente_id: 3, valor: 50000 })], [ANK, JCK, ALFA]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['ANK', 'JCK', 'ALFA']);
+  const alfa = wb.getWorksheet('ALFA');
+  const ank = wb.getWorksheet('ANK');
+  assert.equal(alfa.getCell('B3').value, 'ALFA IMÓVEIS');
+  assert.equal(alfa.getCell('K22').value, 500);
+  assert.equal(alfa.getCell('L3').value, 'FATURA DE LOCAÇÃO', 'textos fixos do modelo vieram na cópia');
+  assert.deepEqual([...alfa.model.merges].sort(), [...ank.model.merges].sort(), 'células mescladas iguais às da 1ª aba');
+  assert.equal(alfa.getColumn(13).width, ank.getColumn(13).width);
+  // duas empresas com a mesma 1ª palavra: a 2ª aba ganha um número (o Excel não aceita nomes repetidos)
+  const ALFA2 = { ...ALFA, id: 4, nome: 'Alfa Locações' };
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura({ emitente_id: 3 }), fatura({ emitente_id: 4 })], [ALFA, ALFA2]));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['ALFA', 'ALFA 2']);
 });

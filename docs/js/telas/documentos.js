@@ -6,7 +6,7 @@ import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import * as K from '../contratos.js';
-import { faturaHtml } from '../fatura.js';
+import { avisosDeCorte, faturaHtml } from '../fatura.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
@@ -78,7 +78,10 @@ export async function telaImprimir(rota) {
   const numeros = rota.q.numeros ? new Set(rota.q.numeros.split(',').map(Number)) : null;
   fs = numeros ? fs.filter((f) => numeros.has(f.numero)) : rota.q.numero ? fs.filter((f) => f.numero === Number(rota.q.numero)) : fs.filter((f) => f.emissao.slice(0, 7) === rota.q.mes);
   fs.sort((a, b) => a.numero - b.numero || a.id - b.id);
-  return `<div class="impressao">${voltar()}${rota.q.numero && fs.length ? `<p class="nao-imprimir acoes">${fs.map((f) => botao('pdf', `Baixar PDF${fs.length > 1 ? ` (${esc(buscar('emitentes', f.emitente_id).nome)})` : ''}`, { id: f.id }, 'secundario pequeno')).join('')}${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
+  // texto que não cabe na NF é cortado (fatura.js, LIMITES_NF): avisa antes de imprimir ou baixar (o aviso não sai na impressão)
+  const cortes = avisosDeCorte(fs);
+  const avisoCortes = cortes.length ? `<div class="alerta aviso nao-imprimir aviso-corte-nf"><b>Texto cortado na NF</b> (a NF tem tamanho fixo; sai assim na impressão, no PDF e no Excel):<ul>${cortes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : '';
+  return `<div class="impressao">${voltar()}${avisoCortes}${rota.q.numero && fs.length ? `<p class="nao-imprimir acoes">${fs.map((f) => botao('pdf', `Baixar PDF${fs.length > 1 ? ` (${esc(buscar('emitentes', f.emitente_id).nome)})` : ''}`, { id: f.id }, 'secundario pequeno')).join('')}${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
     ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma NF.</p>'}</div>`;
 }
 

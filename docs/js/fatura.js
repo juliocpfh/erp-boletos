@@ -24,6 +24,58 @@ export function linhasObservacoes(texto, porLinha = 90, maxLinhas = 5) {
   return linhas.slice(0, maxLinhas);
 }
 
+/** Quanto cabe em cada campo da NF (as células da planilha): o resto é cortado na tela, no PDF e no Excel. */
+export const LIMITES_NF = { nome: 60, endereco: 70, municipio: 25, observacoes_por_linha: 90, observacoes_linhas: 5 };
+
+const resumo = (t, n = 50) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+
+/**
+ * O que a NF vai cortar deste texto (nome, endereço, observações; o município só no Excel). Cada item:
+ * ``{ campo, texto }``, com ``texto`` pronto para a tela. Ex.: nome com 75 letras →
+ * 'Nome do cliente cortado: fica "MARIA … SOUZA" (cabe até 60 letras, tem 75; sai "DA SILVA").'
+ * Aceita a NF gravada (``faturas``) ou os dados antes de numerar (``tomador_nome``, ``tomador_endereco``, ``observacoes``, ``municipio``).
+ */
+export function cortesDaFatura(f) {
+  const cortes = [];
+  const simples = (campo, chave, limite, onde = '') => {
+    const t = String(f[chave] || ''); // a NF corta o texto como está gravado (corta)
+    const sai = maiusc(t.slice(limite)).trim();
+    if (!sai) return; // só espaços sobrando no fim: nada se perde
+    const fica = maiusc(t.slice(0, limite)).trim();
+    cortes.push({ campo, texto: `${campo} cortado${onde}: fica "${resumo(fica, 70)}" (cabe até ${limite} letras, tem ${t.trim().length}; sai "${resumo(sai)}").` });
+  };
+  simples('Nome do cliente', 'tomador_nome', LIMITES_NF.nome);
+  simples('Endereço', 'tomador_endereco', LIMITES_NF.endereco);
+  simples('Município', 'municipio', LIMITES_NF.municipio, ' no Excel');
+  const obs = String(f.observacoes || '');
+  const { observacoes_por_linha: porLinha, observacoes_linhas: maxLinhas } = LIMITES_NF;
+  const todas = linhasObservacoes(obs, porLinha, Infinity);
+  const sobram = todas.slice(maxLinhas).filter(Boolean);
+  const grandes = obs.split(/\s+/).filter((p) => p.length > porLinha);
+  if (sobram.length || grandes.length) {
+    const partes = [];
+    if (sobram.length) partes.push(`ficam de fora ${sobram.length} linha(s): "${resumo(sobram.join(' '))}"`);
+    if (grandes.length) partes.push(`palavra com mais de ${porLinha} letras é cortada ("${resumo(grandes[0], 30)}")`);
+    cortes.push({ campo: 'Observações', texto: `Observações cortadas: cabem ${maxLinhas} linhas de até ${porLinha} letras; ${partes.join('; ')}.` });
+  }
+  return cortes;
+}
+
+/**
+ * Avisos de corte de várias NFs, um por número (as NFs de um número, uma por empresa, têm o mesmo tomador):
+ * ex.: 'NF nº 0157: Endereço cortado: fica "RUA …" (cabe até 70 letras, tem 84; sai "APTO 12").'
+ */
+export function avisosDeCorte(faturas) {
+  const vistos = new Set();
+  const avisos = [];
+  for (const f of faturas) {
+    if (vistos.has(f.numero)) continue;
+    vistos.add(f.numero);
+    for (const c of cortesDaFatura(f)) avisos.push(`NF nº ${numeroFatura(f.numero)}: ${c.texto}`);
+  }
+  return avisos;
+}
+
 /**
  * Quantidade e valor unitário da linha da locação. Mês inteiro: "1" e o valor da NF. Mês incompleto (entrada ou saída, NF
  * com ``dias``/``dias_mes``): a fração do mês comercial e o valor do mês inteiro; o total continua o valor da NF.
@@ -57,9 +109,9 @@ function linhas(f, emitente) {
     7: [vazio(13, 'be bd bt bb')],
     8: [[1, '', 'be bt'], [9, 'TOMADOR DE SERVIÇO', 'bt bd f-11'], [1, '', 'be bd bt'], [2, '', 'bt bd']],
     9: [[1, '', 'be'], [9, '', 'bd'], [1, '', 'be bd'], [2, '', 'bd']],
-    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, 60)))}</b>`, 'bd f-12 f-light duas-linhas'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
+    10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, LIMITES_NF.nome)))}</b>`, 'bd f-12 f-light duas-linhas'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
     11: [[1, '', 'be'], [3, `<b>${String(f.tomador_documento || '').replace(/\D/g, '').length > 11 ? 'CNPJ' : 'CPF'}</b>`, 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
-    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, 70)))}</b>`, 'bd bb f-12 f-light duas-linhas'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
+    12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, LIMITES_NF.endereco)))}</b>`, 'bd bb f-12 f-light duas-linhas'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
     13: [vazio(13, 'be bd bt bb')],
     14: [vazio(13, 'be bd bt bb')],
     15: [vazio(13, 'be bd bt preto')],
@@ -131,26 +183,70 @@ export function encaixarFaturas(raiz) {
 // --------------------------------------------------------------------------
 // Excel preenchido a partir do modelo (o próprio arquivo da planilha)
 // --------------------------------------------------------------------------
-function abaDaEmpresa(wb, emitente, usadas) {
+const mesmoNome = (a, b) => String(a || '').trim().toLocaleUpperCase('pt-BR') === String(b || '').trim().toLocaleUpperCase('pt-BR');
+
+/**
+ * Nome da aba de uma empresa no Excel da NF: o do cadastro ("Aba no modelo Excel") ou a 1ª palavra do nome
+ * (ex.: "ANK Administradora" → "ANK"). O Excel aceita até 31 letras e não aceita : \ / ? * [ ].
+ */
+export function nomeDaAba(emitente) {
+  const nome = String(emitente.aba_modelo || '').trim() || String(emitente.nome || '').trim().split(/\s+/)[0];
+  return nome.replace(/[:\\/?*[\]]/g, ' ').trim().slice(0, 31).trim().toLocaleUpperCase('pt-BR') || 'NF';
+}
+
+/** Nomes pelos quais uma aba do modelo é desta empresa: o do cadastro e a 1ª palavra do nome. */
+const nomesDaEmpresa = (e) => [e.aba_modelo, String(e.nome || '').trim().split(/\s+/)[0]].filter((n) => String(n || '').trim());
+
+/**
+ * Aba do modelo para a empresa: a que tem o nome dela; senão, uma que sobrou e não tem o nome de outra empresa desta NF
+ * (de preferência nem de outra empresa cadastrada), que passa a se chamar como a empresa. ``null``: não sobrou aba.
+ */
+function abaDaEmpresa(wb, emitente, usadas, outrasDaNf, outrasCadastradas) {
   const livres = wb.worksheets.filter((w) => !usadas.has(w.id));
-  const porNome = (nome) => livres.find((w) => w.name.trim().toLocaleUpperCase('pt-BR') === nome.trim().toLocaleUpperCase('pt-BR'));
-  return (emitente.aba_modelo && porNome(emitente.aba_modelo))
-    || porNome(emitente.nome.split(/\s+/)[0])
-    || livres[0];
+  const deQuem = (lista) => (w) => lista.some((e) => nomesDaEmpresa(e).some((n) => mesmoNome(w.name, n)));
+  for (const n of nomesDaEmpresa(emitente)) {
+    const ws = livres.find((w) => mesmoNome(w.name, n));
+    if (ws) return ws; // aba com o nome da empresa: fica como está (ANK e JCK no modelo padrão)
+  }
+  const daNf = deQuem(outrasDaNf);
+  const cadastradas = deQuem(outrasCadastradas);
+  return livres.find((w) => !daNf(w) && !cadastradas(w)) || livres.find((w) => !daNf(w)) || null;
+}
+
+/** Dá à aba o nome da empresa, sem repetir o de outra aba (o Excel não aceita duas iguais): "ALFA", "ALFA 2"… */
+function renomearAba(wb, ws, nome) {
+  if (mesmoNome(ws.name, nome)) return;
+  const ocupado = (n) => wb.worksheets.some((w) => w !== ws && mesmoNome(w.name, n));
+  let final = nome;
+  for (let k = 2; ocupado(final); k += 1) final = `${nome.slice(0, 31 - String(k).length - 1)} ${k}`;
+  ws.name = final;
 }
 
 /**
  * Preenche o modelo com as faturas de um mesmo número (uma aba por empresa) e devolve o arquivo .xlsx.
+ * As abas vêm das empresas cadastradas: a aba com o nome da empresa (no modelo padrão, ANK e JCK); empresa sem aba
+ * no modelo usa uma que sobrou, ou uma cópia da 1ª aba do modelo, com o nome dela (``nomeDaAba``).
  * Abas que sobrarem no modelo são removidas.
  */
 export async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(modeloBuffer);
   const usadas = new Set();
+  const daNf = faturas.map((f) => emitentes.find((x) => x.id === f.emitente_id)).filter(Boolean);
+  let molde = null; // o modelo sem nada preenchido, para copiar a aba quando faltar
   for (const f of faturas) {
     const e = emitentes.find((x) => x.id === f.emitente_id);
-    const ws = abaDaEmpresa(wb, e, usadas);
-    if (!ws) throw new Error('O modelo Excel tem menos abas do que empresas nesta fatura.');
+    if (!e) throw new Error('Empresa da NF não encontrada no cadastro de Empresas.');
+    let ws = abaDaEmpresa(wb, e, usadas, daNf.filter((x) => x !== e), emitentes.filter((x) => x !== e));
+    if (!ws) {
+      if (!molde) { molde = new ExcelJS.Workbook(); await molde.xlsx.load(modeloBuffer); }
+      const base = molde.worksheets[0];
+      if (!base) throw new Error('O modelo Excel da NF não tem nenhuma aba.');
+      ws = wb.addWorksheet(`NF ${wb.worksheets.length + 1}`);
+      // a cópia leva células, estilos, larguras, alturas e células mescladas (o ExcelJS lê as mescladas em "mergeCells")
+      ws.model = { ...base.model, mergeCells: base.model.merges, id: ws.id, name: ws.name };
+    }
+    renomearAba(wb, ws, nomeDaAba(e));
     usadas.add(ws.id);
     const num = `Nº ${numeroFatura(f.numero)}`;
     const valor = f.valor / 100;
@@ -161,13 +257,13 @@ export async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
     set('B6', e.endereco || '');
     set('L4', num);
     set('L5', `Emissão: ${dataBr(f.emissao)}`);
-    set('E10', maiusc(corta(f.tomador_nome, 60)));
+    set('E10', maiusc(corta(f.tomador_nome, LIMITES_NF.nome)));
     set('L10', f.tomador_telefone || '');
     set('E11', f.tomador_documento || '');
-    set('E12', maiusc(corta(f.tomador_endereco, 70)));
+    set('E12', maiusc(corta(f.tomador_endereco, LIMITES_NF.endereco)));
     linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
     set('G16', `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`);
-    set('F22', maiusc(corta(f.municipio, 25)));
+    set('F22', maiusc(corta(f.municipio, LIMITES_NF.municipio)));
     const q = quantidadeDaFatura(f);
     if (q.proporcional) {
       // mês incompleto: quantidade "16/30" e valor do mês inteiro; o total é o valor da NF
