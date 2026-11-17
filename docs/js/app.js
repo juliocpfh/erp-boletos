@@ -1,7 +1,7 @@
 // Aplicação: estado, gravação na pasta escolhida (ou na nuvem, nuvem.js), rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
 import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
-import { carregarPonteLocal } from './banco.js';
+import { carregarPonteLocal, esquecerSenhaDaPonte } from './banco.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
 import { montarIndice } from './indice.js';
@@ -68,7 +68,10 @@ function gravarSessao(loginTexto, token = null) {
   } catch { /* navegador sem armazenamento: pede login de novo */ }
 }
 
-const novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+/** Token da sessão deste navegador (ou null): trocar a senha mantém só ele em `sessoes` (as outras sessões caem). */
+export const tokenDaSessao = () => (lerSessao() || {}).token || null;
+
+const novoToken = () =>Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 /** O usuário é o dono deste e-mail do login da internet? (mesma regra de papelDe em nuvem/cofre.mjs: login ou e-mail, sem maiúsculas) */
 export const usuarioDoEmail = (u, email) => [u.login, u.email].some((v) => String(v || '').toLowerCase() === String(email || '').toLowerCase());
@@ -648,7 +651,30 @@ export async function criarBanco(nome, loginTexto, senha) {
   await abrirSessao(E.d.usuarios.find((x) => x.id === u.id) || u);
 }
 
+/**
+ * Senha errada no login: a partir da 3ª, espera crescente (2, 4, 8… até 30 segundos); na 10ª, esta aba para de aceitar
+ * tentativas por 15 minutos. Conta por aba (sessionStorage: recarregar a página não zera).
+ */
+const TENTATIVAS_LOGIN = 'imoveis-tentativas';
+export const LIMITE_TENTATIVAS_LOGIN = 10;
+function lerTentativas() { try { return JSON.parse(sessionStorage.getItem(TENTATIVAS_LOGIN) || 'null') || { erros: 0, ate: 0 }; } catch { return { erros: 0, ate: 0 }; } }
+function gravarTentativas(t) { try { if (t) sessionStorage.setItem(TENTATIVAS_LOGIN, JSON.stringify(t)); else sessionStorage.removeItem(TENTATIVAS_LOGIN); } catch { /* sem armazenamento */ } }
+/** Segundos a esperar antes de mais uma tentativa depois de `erros` erros (0 nas duas primeiras). */
+export const esperaDoLogin = (erros) => (erros < 3 ? 0 : Math.min(30, 2 ** (erros - 2)));
+function conferirTentativas() {
+  const t = lerTentativas();
+  const falta = Math.ceil((t.ate - Date.now()) / 1000);
+  if (falta > 0) throw new C.ErroUsuario(falta > 60 ? `Muitas senhas erradas: espere ${Math.ceil(falta / 60)} minuto(s) e tente de novo.` : `Senha errada várias vezes: espere ${falta} segundo(s) e tente de novo.`);
+}
+function contarErroDeLogin() {
+  const t = lerTentativas();
+  t.erros += 1;
+  if (t.erros >= LIMITE_TENTATIVAS_LOGIN) { t.ate = Date.now() + 15 * 60000; t.erros = 0; } else t.ate = Date.now() + esperaDoLogin(t.erros) * 1000;
+  gravarTentativas(t);
+}
+
 export async function entrar(loginTexto, senha) {
+  conferirTentativas();
   const disco = E.nuvem ? (E.nuvem.atual() || E.d) : await S.lerBanco(E.pasta); // nuvem trancada sem internet: só a lista de usuários
   if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
   E.d = disco;
@@ -656,7 +682,8 @@ export async function entrar(loginTexto, senha) {
   // nuvem: o usuário do sistema tem de ser o mesmo do login da internet (a nuvem decide o que ele pode pelo e-mail)
   if (E.nuvem && E.saudeNuvem) await E.saudeNuvem; // a resposta do site sobre quem está no login da internet (pedida na abertura)
   if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new C.ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
-  if (!(await conferirSenha(u, senha))) throw new C.ErroUsuario('Login ou senha incorretos.');
+  if (!(await conferirSenha(u, senha))) { contarErroDeLogin(); throw new C.ErroUsuario('Login ou senha incorretos.'); }
+  gravarTentativas(null);
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
   if (E.nuvem) await destrancarNuvem(u.login, senha);
@@ -691,6 +718,12 @@ export async function sair() {
     await E.cofrinho.sair();
     if (nada) { await E.cofrinho.cru.apagar('base'); await E.cofrinho.cru.apagar('base-seq'); }
   }
+  // o que fica neste navegador e não é para o próximo que entrar: a senha da ponte do banco (o endereço fica), as testemunhas
+  // do contrato (nome e CPF) e os nomes dos anexos vistos
+  await esquecerSenhaDaPonte().catch(() => {});
+  try { for (const k of ['testemunhas_contrato', CLIPES_GUARDADOS]) localStorage.removeItem(k); } catch { /* sem armazenamento */ }
+  // na nuvem, sair também encerra o login da internet (Cloudflare Access): senão, no mesmo navegador, o /api continuaria aberto
+  if (E.nuvem && typeof location !== 'undefined' && location.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) location.href = '/cdn-cgi/access/logout';
 }
 
 // --------------------------------------------------------------------------
