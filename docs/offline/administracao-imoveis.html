@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-DakiooPwXvTsSmjTr7KX2V26Y58v5wSlbEQvf9iHNFE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-RrdYxiNzDB+x+dg722lJpFXsg+JYCschhZpEtrmSUS4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3bbef8fea15b64a7">
+<meta name="fontes" content="9d241da47896b934">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -4120,7 +4120,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         pagamento_data: "payment_date",
         pagamento_credito: "credit_date",
         pagamento_tipo: "payment_type",
-        // payments[] vem na listagem; amount em texto "123.45"
+        pagamento_e2e: "end_to_end_id",
+        // payments[] vem na listagem; amount em texto "123.45"; end_to_end_id não está na OpenAPI 1.2.0 (lido só se vier)
         lista: "content",
         lista_total: "total_elements",
         lista_paginas: "total_pages",
@@ -8586,6 +8587,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       pix_copia_cola: pix[Q.pix_copia_cola] || r.pix_copia_cola || null,
       pix_qr_base64: pix[Q.pix_imagem] || r.pix_qr_base64 || null,
       pix_qr_mime: pix[Q.pix_imagem_tipo] || r.pix_qr_mime || (pix[Q.pix_imagem] ? "image/png" : null),
+      // identificadores para casar o extrato sem depender de valor e data: a referência do Pix (vem na emissão) e os ids dos pagamentos
+      pix_referencia: pix[Q.pix_referencia] || r.pix_referencia || null,
+      ids_pagamento: Array.isArray(pgs) ? [...new Set(pgs.flatMap((x) => [x && x[Q.pagamento_id], x && x[Q.pagamento_e2e]]).filter(Boolean).map(String))] : Array.isArray(r.ids_pagamento) ? r.ids_pagamento : null,
       situacao: r.situacao && SITUACOES_BANCO.includes(r.situacao) ? r.situacao : situacaoBancaria(r[Q.situacao]),
       situacao_banco: r[Q.situacao] || r.situacao_banco || null,
       valor: r[Q.valor] !== void 0 && r[Q.valor] !== null ? reaisParaCentavos(r[Q.valor]) : r.valor ?? null,
@@ -8626,6 +8630,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       pix_copia_cola: n.pix_copia_cola || antes.pix_copia_cola || null,
       pix_qr_base64: n.pix_qr_base64 || antes.pix_qr_base64 || null,
       pix_qr_mime: n.pix_qr_mime || antes.pix_qr_mime || null,
+      pix_referencia: n.pix_referencia || (reemissao ? null : antes.pix_referencia) || null,
+      ids_pagamento: [.../* @__PURE__ */ new Set([...reemissao ? [] : antes.ids_pagamento || [], ...n.ids_pagamento || []])],
       situacao: n.situacao,
       situacao_banco: n.situacao_banco,
       valor: n.valor ?? antes.valor ?? valorNoBanco(d2, cb),
@@ -17968,10 +17974,43 @@ ${xref}
     }
     return out;
   }
+  var idNormal = (t) => {
+    const x = String(t ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return /^\d+$/.test(x) ? x.replace(/^0+/, "") : x;
+  };
+  var idUtil = (x) => x.length >= 6 && /\d/.test(x);
+  function identificadoresDoBoleto(cb) {
+    const b = cb && cb.banco || {};
+    return [...new Set([b.id_externo, b.pix_referencia, b.nosso_numero, ...b.ids_pagamento || []].map(idNormal).filter(idUtil))];
+  }
+  function identificadoresDaMov(m) {
+    const citados = `${m && m.descricao || ""} ${m && m.titulo || ""}`.match(/[A-Za-z0-9][A-Za-z0-9-]{5,}/g) || [];
+    return [...new Set([m && m.end_to_end_id, m && m.local_reference, ...citados].map(idNormal).filter(idUtil))];
+  }
+  function boletosPorIdentificador(cobrancas) {
+    const mapa = /* @__PURE__ */ new Map();
+    for (const cb of cobrancas) if (cb.banco) {
+      for (const id of identificadoresDoBoleto(cb)) if (!mapa.has(id)) mapa.set(id, cb);
+    }
+    return mapa;
+  }
   var ultimoCreditoEmDia = (cb, pix, dias) => pix ? limitePagamento(cb.vencimento) : somarDiasUteis(limitePagamento(cb.vencimento), dias);
-  function casarBoletos(d2, valor, data2, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null, pix = false, pagouConhecido = false } = {}) {
+  function casarBoletos(d2, valor, data2, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null, pix = false, pagouConhecido = false, ids = null } = {}) {
     const ib = indice && indice.boletos ? indice.boletos() : null;
     const abertos = ib ? ib.abertos : d2.cobrancas.filter(emAberto);
+    if (ids && ids.length) {
+      const porId = ib ? ib.porIdentificador : boletosPorIdentificador(d2.cobrancas);
+      const cb = ids.map((i) => porId.get(i)).find(Boolean);
+      if (cb) {
+        if (emAberto(cb)) {
+          const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
+          const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+          return [{ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : previstoNoPagamento(cb, data2).valor_devido, pagouEmDia: noPrazo && data2 > cb.vencimento, peloId: true }];
+        }
+        if (cb.data_pagamento && ligavel(cb, movId) && cb.valor_pago === valor) return [{ cobranca: cb, certeza: "exata", previsto: cb.valor_pago, pagouEmDia: !!cb.pagou_em_dia, jaPago: true, peloId: true }];
+        return [];
+      }
+    }
     if (idExterno || nossoNumero) {
       const cb = abertos.find((x) => x.banco && (idExterno && x.banco.id_externo === idExterno || nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero)));
       if (cb) {
@@ -18092,7 +18131,12 @@ ${xref}
     const cb = s && buscar(d2, "cobrancas", s.cobranca_id);
     return !!cb && !cb.data_pagamento && !s.jaPago && !s.aguardandoCredito && !s.alerta && s.certeza === "exata" && (s.alternativas || 1) === 1;
   }
-  function entradaDoRecebimento(d2, { conta_id = null, valor, data: data2, nome = "" }) {
+  function entradaDoRecebimento(d2, { conta_id = null, valor, data: data2, nome = "", ids = [] }) {
+    const procurados = new Set((ids || []).map(idNormal).filter(idUtil));
+    if (procurados.size) {
+      const peloId = (d2.movimentacoes_banco || []).find((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === "entrada" && !x.classificacao && x.valor === valor && identificadoresDaMov(x).some((i) => procurados.has(i)));
+      if (peloId) return peloId;
+    }
     const lista3 = (d2.movimentacoes_banco || []).filter((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === "entrada" && x.valor === valor && x.data === data2 && !x.classificacao);
     if (lista3.length <= 1) return lista3[0] || null;
     const n = maiusculaSemAcento(nome).trim();
@@ -18106,14 +18150,14 @@ ${xref}
   function ligarEntradaDoBoleto(d2, cobrancaId, contaId, usuario) {
     const cb = buscar(d2, "cobrancas", cobrancaId);
     if (!cb || !cb.data_pagamento || cb.movimentacao_id) return null;
-    const mov2 = entradaDoRecebimento(d2, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d2, cb) });
+    const mov2 = entradaDoRecebimento(d2, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d2, cb), ids: identificadoresDoBoleto(cb) });
     if (mov2) ligarMovimentacaoAoBoleto(d2, mov2.id, cb.id, usuario);
     return mov2;
   }
   function registrarPagamentoDoBanco(d2, contaId, p2, usuario, { pagouEmDia, valorNf = null, justificativa = "" } = {}) {
     const cb = buscar(d2, "cobrancas", p2.cobranca_id);
     if (!cb) throw new Error("Boleto não encontrado.");
-    const mov2 = entradaDoRecebimento(d2, { conta_id: contaId, valor: p2.valor, data: p2.data_credito, nome: nomeDoPagador(d2, cb) });
+    const mov2 = entradaDoRecebimento(d2, { conta_id: contaId, valor: p2.valor, data: p2.data_credito, nome: nomeDoPagador(d2, cb), ids: [p2.external_payment_id, p2.end_to_end_id, ...identificadoresDoBoleto(cb)] });
     if (cb.data_pagamento) {
       if (mov2 && ligavel(cb, mov2.id) && cb.valor_pago === mov2.valor) {
         ligarMovimentacaoAoBoleto(d2, mov2.id, cb.id, usuario);
@@ -18129,8 +18173,8 @@ ${xref}
     const out = [];
     for (const m of movs2 || []) {
       if (m.tipo !== "entrada" || m.classificacao || ehDevolucao(m)) continue;
-      for (const a of casarBoletos(d2, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m) })) {
-        out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago });
+      for (const a of casarBoletos(d2, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m), ids: identificadoresDaMov(m) })) {
+        out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago, peloId: !!a.peloId });
       }
     }
     return out;
@@ -18278,7 +18322,7 @@ ${xref}
         else pagosPorValor.set(cb.valor_pago, [cb]);
       }
     }
-    return { abertos, pontual, pagosPorValor };
+    return { abertos, pontual, pagosPorValor, porIdentificador: boletosPorIdentificador(d2.cobrancas) };
   }
   var despesasLigadasAoExtrato = (d2) => new Set((d2.movimentacoes_banco || []).filter((m) => m.despesa_id).map((m) => m.despesa_id));
   var podeSerPonta = (m) => !m.par_movimentacao_id && !ehDevolucao(m) && (!m.classificacao || m.classificacao === "transferencia") && /TRANSFER|PIX|TED/.test(`${m.categoria_banco || ""} ${textoDaMov(m)}`);
@@ -18300,6 +18344,8 @@ ${xref}
   function sugerirDestino(d2, mov2, indice = null) {
     const texto3 = textoDaMov(mov2);
     if (ehDevolucao(mov2)) return { classificacao: "devolucao", motivo: mov2.tipo === "entrada" ? "devolução de Pix recebida (ou estorno): dinheiro que voltou" : "devolução de Pix enviada: dinheiro devolvido (confira o boleto de quem recebeu)", confianca: "alta" };
+    const casa = mov2.tipo === "entrada" && !mov2.classificacao ? conciliarMovimentacoes(d2, [mov2], { indice }) : [];
+    if (casa.length === 1 && casa[0].peloId) return sugestaoDeBoleto(d2, casa[0]);
     if (mov2.tipo === "saida") {
       const pag2 = (d2.pagamentos_banco || []).find((p2) => ["agendado", "pago"].includes(p2.situacao) && !p2.movimentacao_id && p2.conta_id === mov2.conta_id && p2.valor === mov2.valor && Math.abs(diasEntre(p2.data_pagamento || p2.vencimento || mov2.data, mov2.data)) <= 2);
       if (pag2) return { classificacao: classificacaoDaOrigem(pag2.origem), imovel_id: pag2.imovel_id, tipo_despesa: pag2.tipo_conta, pagamento_banco_id: pag2.id, motivo: `pagamento pelo banco nº ${pag2.id} (${pag2.beneficiario && pag2.beneficiario.nome ? pag2.beneficiario.nome : pag2.tipo_conta})`, confianca: "alta" };
@@ -18319,22 +18365,7 @@ ${xref}
     if (parIncerto && mov2.tipo !== "entrada") return parIncerto;
     if (mov2.tipo === "entrada" && /AIRBNB/.test(texto3)) return { classificacao: "airbnb", motivo: "descrição do Airbnb", confianca: "alta" };
     if (mov2.tipo === "entrada" && !mov2.classificacao) {
-      const casa = conciliarMovimentacoes(d2, [mov2], { indice });
-      if (casa.length === 1) {
-        const cb = buscar(d2, "cobrancas", casa[0].cobranca_id);
-        const c = buscar(d2, "contratos", cb.contrato_id);
-        if (casa[0].jaPago) {
-          return {
-            classificacao: "boleto",
-            cobranca_id: cb.id,
-            imovel_id: c ? c.imovel_id : null,
-            ligar: true,
-            confianca: "alta",
-            motivo: `o boleto de ${c ? c.inquilino_nome : ""} (${compBr(cb.competencia)}) já está pago desde ${dataBr(cb.data_pagamento)} com este valor: só ligar esta entrada a ele`
-          };
-        }
-        return { classificacao: "boleto", cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pagouEmDia: casa[0].pagouEmDia, motivo: `valor igual ao boleto de ${c ? c.inquilino_nome : ""} (${compBr(cb.competencia)})`, confianca: "alta" };
-      }
+      if (casa.length === 1) return sugestaoDeBoleto(d2, casa[0]);
       if (casa.length > 1) return { classificacao: "boleto", cobranca_id: null, candidatos: casa.map((x) => x.cobranca_id), motivo: `${casa.length} boletos com este valor`, confianca: "baixa" };
     }
     if (parIncerto) return parIncerto;
@@ -18373,6 +18404,29 @@ ${xref}
       }, indice);
     }
     return porPalavra;
+  }
+  function sugestaoDeBoleto(d2, x) {
+    const cb = buscar(d2, "cobrancas", x.cobranca_id);
+    const c = buscar(d2, "contratos", cb.contrato_id);
+    const quem = `${c ? c.inquilino_nome : ""} (${compBr(cb.competencia)})`;
+    if (x.jaPago) {
+      return {
+        classificacao: "boleto",
+        cobranca_id: cb.id,
+        imovel_id: c ? c.imovel_id : null,
+        ligar: true,
+        confianca: "alta",
+        motivo: `o boleto de ${quem} já está pago desde ${dataBr(cb.data_pagamento)} com este valor${x.peloId ? " (o código do banco é o mesmo)" : ""}: só ligar esta entrada a ele`
+      };
+    }
+    return {
+      classificacao: "boleto",
+      cobranca_id: cb.id,
+      imovel_id: c ? c.imovel_id : null,
+      pagouEmDia: x.pagouEmDia,
+      confianca: "alta",
+      motivo: x.peloId ? `o código do banco (Pix ou nosso número) é o do boleto de ${quem}` : `valor igual ao boleto de ${quem}`
+    };
   }
   function contaJaLancada(d2, imovelId, tipo, mov2, indice = null) {
     const ligadas = indice && indice.despesasLigadas ? indice.despesasLigadas() : despesasLigadasAoExtrato(d2);
