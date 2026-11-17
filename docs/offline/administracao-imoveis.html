@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-q04G4RGDf2oFJW1jxSyiPbKNZVmqU9n2RMh4PoUzmVg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-6Khvc9Qsocbj92wDOSIBy0jLpkRrEMc/4l8VuYvgzHc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="f2454c830ae41449">
+<meta name="fontes" content="49380618ade94f7f">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -11879,10 +11879,9 @@ ${xref}
   async function lerBanco(pasta) {
     if (!await arquivoExiste(pasta, ARQUIVO_BANCO)) return null;
     const arq = await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile();
-    const texto3 = await arq.text();
     let dados;
     try {
-      dados = JSON.parse(texto3);
+      dados = await lerJson(arq);
     } catch {
       throw new Error(`O arquivo ${ARQUIVO_BANCO} está danificado. Restaure uma cópia da pasta ${PASTA_BACKUPS}.`);
     }
@@ -12268,7 +12267,7 @@ ${naoIncluidos.join("\r\n")}\r
     for await (const [nome, h] of dir.entries()) if (h.kind === "directory") nomes.push(nome);
     return nomes;
   }
-  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, doDisco, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR, MANTER_ANTES_IMPORTACAO;
+  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, doDisco, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, lerJson, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR, MANTER_ANTES_IMPORTACAO;
   var init_armazenamento = __esm({
     "docs/js/armazenamento.js"() {
       init_calculos();
@@ -12294,6 +12293,7 @@ ${naoIncluidos.join("\r\n")}\r
       assinaturaDoArquivo = (arq) => `${arq.lastModified}:${arq.size}`;
       assinaturas2 = /* @__PURE__ */ new WeakMap();
       assinaturaLida = (dados) => assinaturas2.get(dados) || null;
+      lerJson = async (arq) => typeof Response === "function" && typeof Blob === "function" && arq instanceof Blob ? new Response(arq).json() : JSON.parse(await arq.text());
       EXTENSOES_PROIBIDAS = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i;
       ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página, script ou programa: .html, .svg, .xml, .js, .exe…). Salve como PDF ou imagem e anexe de novo.";
       TIPOS_ABRIR = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
@@ -14212,6 +14212,46 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     for (const k of Object.keys(d2)) c[k] = k === "historico" ? historico.slice() : copia2[k];
     return c;
   }
+  function copiarSobDemanda(d2) {
+    if (!d2 || typeof d2 !== "object" || Array.isArray(d2)) return structuredClone(d2);
+    const c = {};
+    const fechados = /* @__PURE__ */ new Set();
+    for (const k of Object.keys(d2)) {
+      const v = d2[k];
+      if (k === "historico" && Array.isArray(v)) {
+        c[k] = v.slice();
+        continue;
+      }
+      if (v === null || typeof v !== "object") {
+        c[k] = v;
+        continue;
+      }
+      fechados.add(k);
+      Object.defineProperty(c, k, {
+        configurable: true,
+        enumerable: true,
+        get() {
+          fechados.delete(k);
+          const x = structuredClone(v);
+          valorFixo(c, k, x);
+          return x;
+        },
+        set(x) {
+          fechados.delete(k);
+          valorFixo(c, k, x);
+        }
+      });
+    }
+    Object.defineProperty(c, SOB_DEMANDA, { value: { d: d2, fechados }, configurable: true });
+    return c;
+  }
+  function fecharCopia(c) {
+    const info = c && c[SOB_DEMANDA];
+    if (!info) return c;
+    for (const k of info.fechados) if (Object.getOwnPropertyDescriptor(c, k)?.get) valorFixo(c, k, info.d[k]);
+    delete c[SOB_DEMANDA];
+    return c;
+  }
   function diferencas(antes, depois) {
     const ops = [];
     const chaves = /* @__PURE__ */ new Set([...Object.keys(antes || {}), ...Object.keys(depois || {})]);
@@ -14287,6 +14327,13 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       const i = t.findIndex((r) => r.id === m.id);
       if (i >= 0) t[i] = m.dados;
       else t.push(m.dados);
+    } else if (m.tipo === "campos") {
+      const t = d2[m.tabela] || [];
+      const i = t.findIndex((r) => r.id === m.id);
+      if (i < 0) return d2;
+      const novo = { ...t[i], ...m.dados?.campos || {} };
+      for (const k of m.dados?.apagados || []) delete novo[k];
+      t[i] = novo;
     } else if (m.tipo === "exclusao") d2[m.tabela] = (d2[m.tabela] || []).filter((r) => r.id !== m.id);
     else if (m.tipo === "raiz") {
       const campo2 = m.dados?.campo;
@@ -14299,21 +14346,46 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   function dividirLote(l, { maximo = PARTE_MAXIMA, bytes: bytes2 = PARTE_BYTES } = {}) {
     const pesos = l.ops.map((o) => JSON.stringify(o).length);
     if (l.ops.length <= maximo && pesos.reduce((s, p2) => s + p2, 0) <= bytes2) return [l];
-    const ordem = [...l.ops.keys()].sort((a, b) => Number(ehContador(l.ops[b])) - Number(ehContador(l.ops[a])) || a - b);
+    const grupos = [];
+    const doRegistro = /* @__PURE__ */ new Map();
+    const soltas = [];
+    for (const [i, o] of l.ops.entries()) {
+      if (o.op === "historico") continue;
+      const g = { ops: [i], contador: ehContador(o), ordem: i };
+      grupos.push(g);
+      if (o.op !== "raiz") doRegistro.set(`${o.tabela}:${o.id}`, g);
+    }
+    for (const [i, o] of l.ops.entries()) {
+      if (o.op !== "historico") continue;
+      const g = doRegistro.get(`${o.entrada?.tabela}:${o.entrada?.registro_id}`);
+      if (g) g.ops.push(i);
+      else soltas.push(i);
+    }
+    grupos.sort((a, b) => Number(b.contador) - Number(a.contador) || a.ordem - b.ordem);
+    for (const i of soltas) grupos.push({ ops: [i] });
     const partes = [];
     let atual = [];
     let peso = 0;
-    for (const i of ordem) {
-      if (atual.length && (atual.length >= maximo || peso + pesos[i] > bytes2)) {
+    for (const g of grupos) {
+      const pg = g.ops.reduce((s, i) => s + pesos[i], 0);
+      if (atual.length && (atual.length + g.ops.length > maximo || peso + pg > bytes2)) {
         partes.push(atual);
         atual = [];
         peso = 0;
       }
-      atual.push(l.ops[i]);
-      peso += pesos[i];
+      atual.push(...g.ops);
+      peso += pg;
     }
     if (atual.length) partes.push(atual);
-    return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...l.base !== void 0 ? { base: l.base } : {} }));
+    const n = partes.length;
+    const ultima = l.ops.filter((o) => o.op === "historico").at(-1)?.entrada;
+    return partes.map((idx, k) => {
+      const ops = idx.map((i) => l.ops[i]);
+      if (ultima && n > 1 && !ops.some((o) => o.op === "historico")) {
+        ops.push({ op: "historico", entrada: { quando: ultima.quando, usuario: ultima.usuario, acao: "Gravação em partes", descricao: `${ultima.descricao || ultima.acao || "Gravação"} (parte ${k + 1} de ${n}: ${ops.length} mudança(s))` } });
+      }
+      return { id: `${l.id}-p${k + 1}`, ops, em: l.em, ...l.base !== void 0 ? { base: l.base } : {} };
+    });
   }
   function juntarFaixas(a = {}, b = {}) {
     const r = { ...a };
@@ -14336,7 +14408,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   function chavesDosLotes(lotes) {
     const chaves = /* @__PURE__ */ new Set();
     let historico = 0;
-    for (const l of lotes) for (const o of l.ops) {
+    for (const l of lotes.flatMap((x) => dividirLote(x))) for (const o of l.ops) {
       if (o.op === "historico") historico += 1;
       else if (o.op === "raiz") chaves.add(`raiz:${o.campo}`);
       else chaves.add(`${o.tabela}:${o.id}`);
@@ -14440,7 +14512,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       apagar: (k) => op("readwrite", (s) => s.delete(k))
     };
   }
-  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, MAX_FAIXA, ErroNuvem, igual, ehTabela, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, saudeDaAbertura, REAPROVEITAR_SAUDE, travaDoNavegador;
+  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, MAX_FAIXA, ErroNuvem, igual, ehTabela, RECUSAS_PARA_CAUSA, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, SOB_DEMANDA, valorFixo, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, saudeDaAbertura, REAPROVEITAR_SAUDE, travaDoNavegador;
   var init_nuvem = __esm({
     "docs/js/nuvem.js"() {
       RAIZ_DO_SERVIDOR = ["formato", "revisao", "atualizado_em", "atualizado_por", "seq", "revisao_so_sessao", "historico", "_nuvem"];
@@ -14459,11 +14531,14 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       };
       igual = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b) || canon(a) === canon(b);
       ehTabela = (v) => Array.isArray(v) && v.every((r) => r && typeof r === "object" && Number.isSafeInteger(r.id));
+      RECUSAS_PARA_CAUSA = 20;
       AGRUPAR_ENVIO = 300;
       PARTE_MAXIMA = 1e3;
       PARTE_BYTES = 4 * 1024 * 1024;
       NOMES_PROIBIDOS = ["__proto__", "constructor", "prototype"];
       seqDe = (d2) => Number(d2?._nuvem?.seq || 0);
+      SOB_DEMANDA = Symbol("copia-sob-demanda");
+      valorFixo = (c, k, v) => Object.defineProperty(c, k, { value: v, writable: true, configurable: true, enumerable: true });
       raizProibida = (d2, campo2, valor, tabelas) => typeof campo2 !== "string" || RAIZ_DO_SERVIDOR.includes(campo2) || NOMES_PROIBIDOS.includes(campo2) || !!tabelas?.has?.(campo2) || Array.isArray(d2[campo2]) && ehTabela(d2[campo2]) || Array.isArray(valor) && valor.length > 0 && ehTabela(valor);
       ehContador = (o) => o.op === "raiz" && CONTADORES.includes(o.campo);
       idsDaFila = (fila) => fila.map((l) => l.id).join(" ");
@@ -14504,6 +14579,9 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           this.envioMarcado = null;
           this.semFaixas = false;
           this.ultimoLote = null;
+          this.opsDe = /* @__PURE__ */ new Map();
+          this.noAparelho = /* @__PURE__ */ new Set();
+          this.legado = false;
           this.geracao = 0;
           this.normalizarMexeuNoHistorico = false;
           this.puxando = Promise.resolve();
@@ -14517,7 +14595,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           const guardada = await this.guardar.ler("base");
           const baixada = this.base;
           if (guardada && !(baixada && seqDe(baixada) > seqDe(guardada))) this.base = guardada;
-          this.pendentes = await this.guardar.ler("pendentes") || [];
+          this.pendentes = (await this.lerPendentes()).lotes;
           this.faixas = juntarFaixas({}, await this.guardar.ler("faixas") || {});
           this.recusas = await this.guardar.ler("recusas") || [];
           this.conflitos = this.base?._nuvem?.conflitos || [];
@@ -14642,7 +14720,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
          */
         async enviarAjustes() {
           if (!this.base) return 0;
-          const ops = diferencas(this.montar(), this.atual()).filter((o) => !ehContador(o));
+          const naNuvem2 = this.pendentes.length ? this.montar() : { ...this.base, seq: this.seqDaVista() };
+          const ops = diferencas(naNuvem2, this.atual()).filter((o) => !ehContador(o));
           if (!ops.length) return 0;
           await this.enfileirar(ops);
           this.enviarDepois();
@@ -14700,8 +14779,13 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
             await this.releFila();
             const geracao = this.geracao;
             const antes = this.atual();
-            const depois = copiar(antes);
-            const r = fn(depois);
+            const depois = copiarSobDemanda(antes);
+            let r;
+            try {
+              r = fn(depois);
+            } finally {
+              fecharCopia(depois);
+            }
             const ops = diferencas(antes, depois);
             if (ops.some(ehContador)) {
               comContador = true;
@@ -14747,8 +14831,13 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
               await this.releFila();
               if (this.pendentes.length) throw new ErroNuvem("Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.");
               const antes = this.atual();
-              const depois = copiar(antes);
-              const r = fn(depois);
+              const depois = copiarSobDemanda(antes);
+              let r;
+              try {
+                r = fn(depois);
+              } finally {
+                fecharCopia(depois);
+              }
               const ops = diferencas(antes, depois);
               const falta2 = this.faltaDeFaixa(ops);
               if (falta2) return { falta: falta2 };
@@ -14825,11 +14914,11 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
          * foi confirmado por outra aba, que gravou antes uma base com ele: se essa base é mais nova que a desta aba, vale ela.
          */
         async releFila() {
-          const p2 = await this.guardar.ler("pendentes");
+          const { lotes: p2, existe } = await this.lerPendentes();
           const f = await this.guardar.ler("faixas");
           this.n = Math.max(this.n, Number(await this.guardar.ler("n")) || 0);
           let mudou = false;
-          if (Array.isArray(p2) && idsDaFila(p2) !== idsDaFila(this.pendentes)) {
+          if (existe && idsDaFila(p2) !== idsDaFila(this.pendentes)) {
             const sumiu = this.pendentes.some((l) => !p2.some((x) => x.id === l.id));
             this.pendentes = p2;
             mudou = true;
@@ -14853,15 +14942,72 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
             this.conflitos = b._nuvem?.conflitos || [];
           }
         }
+        /**
+         * A fila guardada no aparelho (item 41 do mutirão 3000): 'fila' é só a lista (código, data, quantas mudanças) e as mudanças de
+         * cada lote ficam em 'lote:<código>', gravadas uma vez; antes a fila inteira (com uma importação grande, ~100 KB) era cifrada e
+         * regravada a cada clique. A fila do formato antigo ('pendentes': aparelho que acabou de atualizar, ou uma aba ainda na versão
+         * anterior) entra junto e sai na próxima gravação. `existe`: há fila guardada (num formato ou no outro).
+         */
+        async lerPendentes() {
+          const fila = await this.guardar.ler("fila");
+          const antiga = await this.guardar.ler("pendentes");
+          const lotes = [];
+          const vistos = /* @__PURE__ */ new Set();
+          for (const { mudancas, ...m } of Array.isArray(fila) ? fila : []) {
+            let ops = this.opsDe.get(m.id);
+            if (!ops) {
+              ops = await this.guardar.ler(`lote:${m.id}`);
+              if (!Array.isArray(ops)) continue;
+              this.opsDe.set(m.id, ops);
+            }
+            this.noAparelho.add(m.id);
+            lotes.push({ ...m, ops });
+            vistos.add(m.id);
+          }
+          if (Array.isArray(antiga)) {
+            for (const l of antiga) if (l && !vistos.has(l.id)) {
+              lotes.push(l);
+              this.opsDe.set(l.id, l.ops);
+            }
+            this.legado = true;
+          }
+          return { lotes, existe: Array.isArray(fila) || Array.isArray(antiga) };
+        }
+        /** O que gravar no aparelho para a fila: a lista curta e as mudanças dos lotes que ainda não estão lá. */
+        objetoDaFila() {
+          const obj = {};
+          for (const l of this.pendentes) if (!this.noAparelho.has(l.id)) {
+            obj[`lote:${l.id}`] = l.ops;
+            this.opsDe.set(l.id, l.ops);
+          }
+          obj.fila = this.pendentes.map(({ ops, ...m }) => ({ ...m, mudancas: ops.length }));
+          return obj;
+        }
+        /** Depois de gravar a fila: marca os lotes guardados e apaga do aparelho os que saíram dela (e a fila do formato antigo). */
+        async arrumarFilaGravada(gravados) {
+          for (const k of Object.keys(gravados)) if (k.startsWith("lote:")) this.noAparelho.add(k.slice(5));
+          const naFila = new Set(this.pendentes.map((l) => l.id));
+          for (const id of [...this.noAparelho]) {
+            if (naFila.has(id)) continue;
+            this.noAparelho.delete(id);
+            this.opsDe.delete(id);
+            await this.guardar.apagar?.(`lote:${id}`);
+          }
+          if (this.legado) {
+            this.legado = false;
+            await this.guardar.apagar?.("pendentes");
+          }
+        }
+        /** Grava só a fila (lista e lotes novos), dentro da trava. `mais`: outras chaves na mesma gravação (contador, faixas). */
+        async gravarListaFila(mais = {}) {
+          const obj = { ...this.objetoDaFila(), ...mais };
+          if (this.guardar.gravarVarios) await this.guardar.gravarVarios(obj);
+          else for (const [k, v] of Object.entries(obj)) await this.guardar.gravar(k, v);
+          await this.arrumarFilaGravada(obj);
+        }
         /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
         async gravarFila() {
-          if (this.guardar.gravarVarios) {
-            await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas });
-            return;
-          }
-          await this.guardar.gravar("n", this.n);
-          await this.guardar.gravar("pendentes", this.pendentes);
-          await this.guardar.gravar("faixas", this.faixas);
+          await this.gravarListaFila({ n: this.n, faixas: this.faixas });
         }
         async enfileirar(ops) {
           await this.trava(async () => {
@@ -14959,7 +15105,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
             const antes = this.pendentes.length;
             this.pendentes = this.pendentes.filter((x) => !ids.has(x.id));
             if (this.pendentes.length === antes) return;
-            await this.guardar.gravar("pendentes", this.pendentes);
+            await this.gravarListaFila();
             this.invalidar();
           });
         }
@@ -14971,11 +15117,19 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           await this.trava(async () => {
             const lista3 = await this.guardar.ler("recusas") || this.recusas;
             const ja = new Set(lista3.map((r) => r.id || r.lote));
+            const criadosPor = /* @__PURE__ */ new Map();
+            const anotar = (id, ops) => {
+              for (const o of ops || []) if (o.op === "inserir") criadosPor.set(`${o.tabela}:${o.id}`, id);
+            };
+            for (const r of lista3.slice(-RECUSAS_PARA_CAUSA)) anotar(r.id || r.lote, await this.guardar.ler(`recusa:${r.id || r.lote}`));
             for (const { lote: lote2, parte, erro } of recusadas) {
+              const naoExiste = String(erro).match(/^Registro (\S+) (\d+) não existe/);
+              const causa = naoExiste ? criadosPor.get(`${naoExiste[1]}:${naoExiste[2]}`) : void 0;
+              anotar(parte.id, parte.ops);
               if (ja.has(parte.id)) continue;
               ja.add(parte.id);
               await this.guardar.gravar(`recusa:${parte.id}`, parte.ops);
-              lista3.push({ id: parte.id, lote: lote2.id, em: lote2.em, erro, mudancas: parte.ops.length });
+              lista3.push({ id: parte.id, lote: lote2.id, em: lote2.em, erro, mudancas: parte.ops.length, ...causa && causa !== parte.id ? { causa } : {} });
             }
             this.recusas = lista3;
             await this.guardar.gravar("recusas", lista3);
@@ -14985,7 +15139,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
             const antes = this.pendentes.length;
             this.pendentes = this.pendentes.filter((x) => !inteiros.has(x.id));
             if (this.pendentes.length !== antes) {
-              await this.guardar.gravar("pendentes", this.pendentes);
+              await this.gravarListaFila();
               this.invalidar();
             }
           });
@@ -15059,7 +15213,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           const tabelas = this.tabelasConhecidas({ comTela: false });
           for (let volta = 0; volta < 1e3; volta += 1) {
             const desde = seqDe(this.base);
-            const r = await this.api("GET", `mudancas?desde=${desde}`);
+            const r = await this.api("GET", `mudancas?desde=${desde}&formato=2`);
             if (seqDe(this.base) !== desde) continue;
             if (r.refazer) {
               await this.baixarTudoAgora();
@@ -15071,12 +15225,18 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
               mudou = true;
               this.invalidar();
             }
+            if (r.mudancas.some((m) => m.tipo === "campos" && !(this.base[m.tabela] || []).some((x) => x.id === m.id))) {
+              await this.baixarTudoAgora();
+              externo = true;
+              mudou = false;
+              break;
+            }
             for (const m of r.mudancas) {
               aplicarMudanca(this.base, m, tabelas);
               if (m.tipo === "historico") {
                 if (historicoMeu > 0) historicoMeu -= 1;
                 else externo = true;
-              } else if (m.tipo === "registro" || m.tipo === "exclusao") {
+              } else if (m.tipo === "registro" || m.tipo === "campos" || m.tipo === "exclusao") {
                 if (!meus.chaves.has(`${m.tabela}:${m.id}`)) externo = true;
               } else if (m.tipo === "raiz") {
                 if (!meus.chaves.has(`raiz:${m.dados?.campo}`)) externo = true;
@@ -15135,8 +15295,9 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         async importar(d2, { substituir = false, manterUsuarios = false } = {}) {
           await this.api("POST", "importar", { dados: d2, substituir, ...manterUsuarios ? { manterUsuarios: true } : {} });
           await this.trava(async () => {
+            await this.lerPendentes();
             this.pendentes = [];
-            await this.guardar.gravar("pendentes", []);
+            await this.gravarListaFila();
           });
           await this.baixarTudo();
           await this.garantirFaixas();
@@ -15709,7 +15870,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       async gravar(k, v) {
         if (ABERTAS.includes(k)) return cru.gravar(k, v);
         if (k === "base" && v?.usuarios) await cru.gravar("acesso", usuariosParaAcesso(v.usuarios, Object.keys(await cru.ler("embrulhos") || {})));
-        if (k === "pendentes") await cru.gravar("aguardando-dados", (v || []).length);
+        if (k === "pendentes" || k === "fila") await cru.gravar("aguardando-dados", (v || []).length);
         if (k === "fila-anexos") await cru.gravar("aguardando-anexos", (v || []).length);
         const chave = obterChave();
         if (!chave) return void 0;
@@ -15721,6 +15882,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           const chave = obterChave();
           if (!chave) return void 0;
           if (obj.pendentes !== void 0) await cru.gravar("aguardando-dados", (obj.pendentes || []).length);
+          if (obj.fila !== void 0) await cru.gravar("aguardando-dados", (obj.fila || []).length);
           const cifrados = {};
           for (const [k, v] of Object.entries(obj)) cifrados[k] = ABERTAS.includes(k) ? v : await cifrar2(chave, v);
           return cru.gravarVarios(cifrados);
@@ -29326,7 +29488,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas gravações feitas neste aparelho não foram aceitas e não valem (a tela já voltou ao que vale). Veja o que eram e o motivo; refaça o que ainda precisar. "Baixar" guarda o detalhe num arquivo.</p>
-      ${recusas.map((r) => `<div class="cartao"><p><b>${esc(quando2(r.em))}</b> · ${Number(r.mudancas) || 0} mudança(s)<br>Motivo: <b>${esc(r.erro)}</b></p>
+      ${recusas.map((r) => `<div class="cartao"><p><b>${esc(quando2(r.em))}</b> · ${Number(r.mudancas) || 0} mudança(s)<br>Motivo: <b>${esc(r.erro)}</b>${r.causa ? `<br>Isto aconteceu porque a gravação de ${esc(quando2((recusas.find((x) => x.id === r.causa) || {}).em) || "antes")} também foi recusada: ela criava o registro que esta mudava. Refaça aquela primeiro.` : ""}</p>
         ${resumoDaRecusa(r.ops)}
         <div class="acoes">${r.ops ? botao("baixarRecusa", "Baixar", { id: r.id }, "secundario pequeno") : ""} ${botao("esquecerRecusa", "Esquecer", { id: r.id }, "secundario pequeno")}</div></div>`).join("")}
       ${recusas.length > 1 ? botao("esquecerRecusas", "Esquecer todas", {}, "secundario", "Esquecer todas as mudanças recusadas? Elas não estão na nuvem e somem deste aparelho.") : ""}</div>` : ""}
@@ -34540,8 +34702,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
     if (!igualAoDisco && disco) anotarConferido(pasta, E.d, assinaturaLida(disco));
     const antes = E.d || disco;
-    const copia2 = copiar(antes);
-    const resultado = fn(copia2);
+    const copia2 = copiarSobDemanda(antes);
+    let resultado;
+    try {
+      resultado = fn(copia2);
+    } finally {
+      fecharCopia(copia2);
+    }
     copia2.revisao = (copia2.revisao || 0) + 1;
     copia2.revisao_so_sessao = soSessao ? copia2.revisao : null;
     const assinatura = await gravarBanco(pasta, copia2);
