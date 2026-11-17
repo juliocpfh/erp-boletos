@@ -288,7 +288,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
     html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${pagoEm ? ` em <b>${esc(dataBr(pagoEm))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${creditoEm ? `, creditado em <b>${esc(dataBr(creditoEm))}</b>` : ''}.</p>
       ${pagamento && pagamento.certeza !== 'exata' ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ''}
       <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
-      <p><label>Data contábil (entrada na conta: é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
+      <p><label>Dia em que o dinheiro entrou na conta (é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
       <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
@@ -297,7 +297,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
   const data = String((resp.data || [])[0] || '');
   const dataPagou = String((resp.pagou || [])[0] || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
-  if (dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+  if (dataPagou > data) throw new C.ErroUsuario('O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.');
   // em dia até o vencimento ou, se ele não é dia útil, até o próximo dia útil
   const pagouEmDia = dataPagou <= C.limitePagamento(cb.vencimento) && data > cb.vencimento;
   if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
@@ -320,7 +320,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
 
 const numerosSelecionados = () => {
   const ns = [...document.querySelectorAll('input[data-nf]:checked')].map((x) => Number(x.dataset.nf));
-  if (!ns.length) throw new Error('Marque pelo menos uma NF na lista.');
+  if (!ns.length) throw new C.ErroUsuario('Marque pelo menos uma NF na lista.');
   return ns;
 };
 
@@ -1354,8 +1354,8 @@ export const ACOES = {
     const sim = C.liquidar(cb, hoje);
     const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
       html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
-        <p><label>Data contábil (entrada na conta)</label><input type="date" name="data" value="${hoje}" required></p>
-        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: a data contábil</span></p>
+        <p><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hoje}" required></p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: o dia em que o dinheiro entrou</span></p>
         <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
         <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
       sim: 'Confirmar pagamento' });
@@ -1612,14 +1612,14 @@ export const ACOES = {
 
   imprimirDemonstrativos({ comp }) {
     const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((x) => x.dataset.boleto);
-    if (!ids.length) throw new Error('Marque pelo menos um imóvel na lista (ou "selecionar todos").');
+    if (!ids.length) throw new C.ErroUsuario('Marque pelo menos um boleto na lista (ou "selecionar todos").');
     ir(`#/imprimir/demonstrativos?comp=${comp}&ids=${ids.join(',')}`);
   },
 
   /** Exclui os boletos marcados na lista. Pagos não saem: desfaça o pagamento antes (com NF, cancele a NF antes). */
   async excluirBoletosSelecionados({ comp }) {
     const ids = [...document.querySelectorAll('input[data-boleto]:checked')].map((x) => Number(x.dataset.boleto));
-    if (!ids.length) throw new Error('Marque pelo menos um boleto na lista (ou "selecionar todos").');
+    if (!ids.length) throw new C.ErroUsuario('Marque pelo menos um boleto na lista (ou "selecionar todos").');
     const nome = (cb) => { const c = buscar('contratos', cb.contrato_id); return c ? c.inquilino_nome : `boleto ${cb.id}`; };
     const pagos = ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && cb.data_pagamento);
     if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);

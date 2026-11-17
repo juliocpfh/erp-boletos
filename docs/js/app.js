@@ -843,6 +843,7 @@ export async function mostrar(estadoForm = null) {
     const h1 = typeof app.querySelector === 'function' ? app.querySelector('h1') : null;
     const nomeTela = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
     document.title = nomeTela && nomeTela !== 'Administração de Imóveis' ? `${nomeTela.slice(0, 60)} · Imóveis` : 'Administração de Imóveis';
+    ligarRotulos(app);
     if (subir) window.scrollTo(0, 0);
     // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
     if (E.usuario) carregarClipes();
@@ -876,6 +877,31 @@ export async function mostrar(estadoForm = null) {
     app.style.minHeight = '';
     paginaDesenhada = null; // a tela de erro não é a página: o próximo desenho não guarda rolagem nem caixas abertas dela
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
+  }
+}
+
+/**
+ * Rótulos ligados aos campos (clicar no texto põe o cursor no campo; o leitor de tela diz o nome): o <label> sem ``for``
+ * logo antes do campo ganha o ``for``; campo sem rótulo nenhum (filtros, mês, datas) ganha ``aria-label`` pelo texto de
+ * exemplo ou pelo nome.
+ */
+const NOMES_DOS_CAMPOS = { de: 'De (data)', ate: 'Até (data)', usuario: 'Usuário', tabela: 'Tabela', texto: 'Texto', q: 'Buscar', comp: 'Mês', mes: 'Mês',
+  numero: 'Número', data: 'Data', valor: 'Valor', ano: 'Ano', filtro: 'Mostrar', ordem: 'Ordem', senha_ponte: 'Senha da ponte', ambiente: 'Ambiente' };
+let idsDeRotulo = 0;
+function ligarRotulos(raiz) {
+  if (typeof raiz.querySelectorAll !== 'function') return;
+  for (const lb of raiz.querySelectorAll('label:not([for])')) {
+    if (lb.querySelector('input, select, textarea')) continue;
+    const campo = lb.nextElementSibling;
+    if (!campo || !campo.matches('input:not([type=hidden]), select, textarea')) continue;
+    if (!campo.id) { idsDeRotulo += 1; campo.id = `rotulo_${idsDeRotulo}`; }
+    lb.htmlFor = campo.id;
+  }
+  for (const el of raiz.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea')) {
+    if ((el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')) continue;
+    const base = String(el.name || '').replace(/_\d+$/, '');
+    const nome = el.title || el.placeholder || NOMES_DOS_CAMPOS[el.name] || NOMES_DOS_CAMPOS[base] || (base ? base.replace(/_/g, ' ').replace(/^r /, 'Regra ') : '');
+    if (nome) el.setAttribute('aria-label', nome);
   }
 }
 

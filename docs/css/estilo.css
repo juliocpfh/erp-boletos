@@ -667,3 +667,16 @@ body.com-visualizador { overflow: hidden; }
 .pular-conteudo:focus { left: 8px; top: 8px; }
 main:focus { outline: none; }
 .janela-pergunta ul { margin: 4px 0 8px 18px; padding: 0; }
+/* textos de ajuda legíveis também no formulário compacto (11 px era pequeno demais) */
+.formulario.compacto .ajuda { font-size: 13px; }
+.ajuda { font-size: 13px; }
+/* Celular: campos com 16 px (o iPhone amplia a tela ao tocar em campo menor), alvos de toque de 40 px, faixa do topo
+   que quebra a linha em vez de cortar e o ☰ de arrastar caixas escondido (um toque sem querer mudava a ordem para todos) */
+@media (max-width: 760px) {
+  input:not([type=checkbox]):not([type=radio]), select, textarea, header.topo .busca-topo input { font-size: 16px; }
+  .faixa { white-space: normal; overflow: visible; text-overflow: clip; }
+  main button, main .botao, main .link-botao, main button.mini, main .botao.mini { min-height: 40px; }
+  main .link-botao { display: inline-flex; align-items: center; padding: 0 6px; }
+  main table button.x-excluir { min-width: 40px; }
+  .alca-caixa { display: none !important; }
+}

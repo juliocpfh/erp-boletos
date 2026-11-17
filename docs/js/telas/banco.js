@@ -974,7 +974,7 @@ export const FORMULARIOS_BANCO = {
     if (!opera()) throw new Error('Seu usuário não pode confirmar pagamentos.');
     const conf = estado.conferencia;
     const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
-    if (!marcados.length) throw new Error('Marque pelo menos um boleto.');
+    if (!marcados.length) throw new C.ErroUsuario('Marque pelo menos um boleto.');
     const total = marcados.reduce((t, s) => t + s.valor, 0);
     if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
     let n = 0;

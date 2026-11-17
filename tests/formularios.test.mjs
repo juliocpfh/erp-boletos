@@ -79,3 +79,24 @@ test('contrato: sem comprovante da caução no cadastro (vai na página do inqui
   assert.ok(F.CONTRATO.some((c) => c.nome === 'representante_usar_endereco_imovel'));
   assert.deepEqual(F.CONTAS.map(([, t]) => t), ['Água', 'Energia', 'Gás', 'Internet / TV', 'Condomínio']);
 });
+
+test('mutirão 3000 (telas): telefone com DDD, e-mail completo, sem negativo e valor americano recusado', () => {
+  const campos = [{ nome: 'tel', tipo: 'tel' }, { nome: 'email', tipo: 'email' }, { nome: 'valor', tipo: 'dinheiro' },
+    { nome: 'ajuste', tipo: 'dinheiro', negativo: true }, { nome: 'area', tipo: 'pct', min: 0 }, { nome: 'outro', tipo: 'dinheiro' }];
+  const ler = (v, antigo = null) => { const fd = new FormData(); for (const [k, x] of Object.entries(v)) fd.set(k, x); return F.ler(campos, fd, antigo); };
+  const r = ler({ tel: '41999', email: 'fulano@exemplo', valor: '-100,00', ajuste: '-150,00', area: '-45', outro: '2,300.00' });
+  assert.match(r.erros.tel, /10 ou 11 números/);
+  assert.match(r.erros.email, /incompleto/);
+  assert.match(r.erros.valor, /negativo/);
+  assert.equal(r.erros.ajuste, undefined);
+  assert.equal(r.dados.ajuste, -15000);
+  assert.match(r.erros.area, /menor que 0/);
+  assert.match(r.erros.outro, /Use 2\.300,00/);
+  const ok = ler({ tel: '41999998888', email: 'contato@exemplo.com.br', valor: '2.300,00' });
+  assert.deepEqual(ok.erros, {});
+  assert.equal(ok.dados.tel, '(41) 99999-8888');
+  // telefone antigo já salvo e não mudou: passa (dados antigos)
+  assert.deepEqual(ler({ tel: '3333-4444' }, { tel: '3333-4444' }).erros, {});
+  // campo inteiro abre o teclado só de números no celular
+  assert.match(F.camposHtml([{ nome: 'dia', rotulo: 'Dia', tipo: 'inteiro' }]), /inputmode="numeric"/);
+});

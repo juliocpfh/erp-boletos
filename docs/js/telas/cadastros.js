@@ -958,12 +958,14 @@ export const CADASTROS = {
     campos: () => F.USUARIO,
     voltar: () => '#/usuarios',
     descricao: (dados) => `Usuário ${dados.login}`,
-    extraHtml: (r) => `<div class="formulario" style="margin-top:12px"><div><label>${r ? 'Nova senha (em branco para manter)' : 'Senha inicial *'}</label><input type="password" name="senha" autocomplete="new-password"></div></div>`,
+    extraHtml: (r) => `<div class="formulario" style="margin-top:12px"><div><label>${r ? 'Nova senha (em branco para manter)' : 'Senha inicial *'}</label><input type="password" name="senha" autocomplete="new-password"></div>
+      <div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div></div>`,
     async ajustarAsync(dados, erros, r, form) {
       dados.login = String(dados.login || '').toLowerCase();
       const senha = String(new FormData(form).get('senha') || '');
       if (senha) {
         if (senhaCurta(senha)) erros.login = ERRO_SENHA_CURTA;
+        else if (senha !== String(new FormData(form).get('senha2') || '')) erros.login = 'As duas senhas precisam ser iguais (campos "Senha" e "Repita a senha", no fim do formulário)';
         Object.assign(dados, await camposDeSenha(senha));
       } else if (!r) erros.login = 'Informe uma senha inicial';
       if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = 'Já existe um usuário com este login';
