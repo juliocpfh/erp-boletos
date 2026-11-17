@@ -85,7 +85,7 @@ function outraImobiliaria(dados = {}) {
   R.normalizar(d);
   const e = R.inserir(d, 'emitentes', { nome: 'IMOBILIÁRIA EXEMPLO', razao_social: 'IMOBILIÁRIA EXEMPLO LTDA', cnpj: '11.222.333/0001-81', ativo: true, assina_documentos: true,
     cidade_documentos: 'São Paulo', energia_concessionaria: 'Enel Distribuição São Paulo (ENEL)', agua_concessionaria: 'Companhia de Saneamento Básico do Estado de São Paulo (SABESP)',
-    email_contato: 'contato@exemplo.com.br', assinatura_email: 'Equipe Exemplo', assinatura_mensagens: 'Imobiliária Exemplo', conta_deposito: 'Banco 001 · Ag. 1234 · C/C 5678-9', ...dados }, 'j');
+    email_contato: 'contato@exemplo.com.br', assinatura_email: 'Equipe Exemplo', assinatura_mensagens: 'Imobiliária Exemplo', conta_deposito: 'Banco 001 · Ag. 1234 · C/C 5678-9', uf_sede: 'SP', ...dados }, 'j');
   const i = R.inserir(d, 'imoveis', { nome: 'Casa 1', endereco: 'Rua Teste, 1', copel_uc: '999' }, 'j');
   R.inserir(d, 'participacoes', { imovel_id: i.id, emitente_id: e.id, percentual: 100 }, 'j');
   const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Paula Teste', inquilino_cpf: '529.982.247-25', inquilino_tipo: 'Pessoa física', aluguel_inicial: 200000,
@@ -138,6 +138,27 @@ test('conta padrão dos boletos: a escolhida ou a primeira, sem procurar a de id
   R.salvarContaBanco(d, { id: 'loja', emitente_id: e.id }, 'j');
   R.salvarContaBanco(d, { id: 'ank', emitente_id: e2.id }, 'j');
   assert.equal(R.contaEmissora(d).id, 'loja', 'a conta "ank" cadastrada depois não vira a padrão');
+});
+
+test('"Cidade/UF" do imóvel: o Estado do imóvel, o do CEP ou o da sede da empresa (não mais "PR" fixo)', () => {
+  const { d, e, i, c } = outraImobiliaria();
+  Object.assign(i, { cidade: 'Campinas', bairro: 'Centro', uf: null, cep: null });
+  assert.equal(K.cidadeUfDoImovel(d, i, c), 'Campinas/SP', 'imóvel sem Estado nem CEP: o da sede da empresa');
+  assert.match(K.dadosDoContrato(d, c).campos.endereco_imovel, /Centro, Campinas\/SP$/);
+  assert.match(dadosDoEmail(d, { contrato: c }, {}, '2026-11-12').campos.endereco, /Campinas\/SP$/);
+  i.cep = '88010-000';
+  assert.equal(K.cidadeUfDoImovel(d, i, c), 'Campinas/SC', 'com CEP: o Estado do CEP');
+  i.uf = 'MG';
+  assert.equal(K.cidadeUfDoImovel(d, i, c), 'Campinas/MG', 'com Estado no imóvel: o dele');
+  Object.assign(i, { uf: null, cep: null });
+  e.uf_sede = null;
+  assert.equal(K.cidadeUfDoImovel(d, i, c), 'Campinas', 'nenhum Estado: só a cidade, sem inventar');
+  assert.equal(K.cidadeUfDoImovel(d, { ...i, cidade: '' }, c), '');
+  // empresa gravada antes do campo: fica com o que valia (PR); a gravada pelo formulário em branco não é preenchida
+  const antiga = R.inserir(d, 'emitentes', { nome: 'ANTIGA', ativo: true, assina_documentos: false }, 'j');
+  R.normalizar(d);
+  assert.equal(antiga.uf_sede, 'PR');
+  assert.equal(e.uf_sede, null);
 });
 
 test('nome curto da companhia (e-mails): a sigla entre parênteses', () => {

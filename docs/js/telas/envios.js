@@ -125,7 +125,7 @@ export const FORMULARIOS = {
     if (atrasado && dataPagou > data) throw new Error('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
     if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
     pagamentoNaoFuturo(data, dataPagou);
-    confirmarAvisos([dataMuitoAntiga(data)].filter(Boolean));
+    await confirmarAvisos([dataMuitoAntiga(data)].filter(Boolean));
     let r;
     await alterar((db) => { r = R.baixarEmLote(db, ids, data, login(), { pagouEmDia: !atrasado, dataPagou }); });
     aviso(`${r.feitos.length} pagamento(s) confirmado(s) ${atrasado ? `com atraso (pagaram em ${dataBr(dataPagou)}, com multa e juros)` : 'em dia'}, com entrada em ${dataBr(data)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ''}`, atrasado ? 'aviso' : 'ok');
@@ -450,7 +450,7 @@ export const FORMULARIOS = {
     if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new Error('Nada foi salvo.');
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
-    confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
+    await confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     let recalculados = 0;
@@ -576,7 +576,7 @@ export const FORMULARIOS = {
     else if (pctIndice === null || (temPct && pctDigitado !== pctIndice)) manual = temPct ? { percentual: pctDigitado } : { valor_novo: valor };
     const bon = String(f.get('bonificado') || '').trim();
     const texto = manual === null ? `${pct(pctIndice)} (índice cadastrado)` : manual.valor_novo ? `o novo aluguel de ${reais(manual.valor_novo)}` : pct(manual.percentual);
-    if (!confirm(`Registrar a correção do aluguel de ${compBr(form.dataset.comp)} com ${texto}?${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ''}.` : ''} Os boletos em aberto são recalculados.`)) return;
+    if (!(await confirmar(`Correção do aluguel de ${compBr(form.dataset.comp)} com ${texto}.${valor > 0 ? ` Aluguel cheio ${reais(valor)}${bon ? `, com bonificação R$ ${bon}` : ''}.` : ''} Os boletos em aberto são recalculados.`, { titulo: 'Registrar a correção do aluguel?', sim: 'Aplicar correção' }))) return;
     await aplicarReajusteNaTela(Number(form.dataset.contrato), form.dataset.comp, manual);
   },
 
@@ -614,7 +614,7 @@ export const FORMULARIOS = {
   async desligarAlerta(form) {
     const tipo = String(new FormData(form).get('tipo') || '');
     const c = buscar('contratos', form.dataset.contrato);
-    if (!c || !confirm(`Desligar o alerta "${tipo}" de ${c.inquilino_nome}? O sistema deixa de avisar sobre isso para este inquilino até alguém religar.`)) return;
+    if (!c || !(await confirmar(`O sistema deixa de avisar "${tipo}" para ${c.inquilino_nome} até alguém religar.`, { titulo: 'Desligar o alerta?', sim: 'Desligar o alerta' }))) return;
     await alterar((db) => R.desligarAlerta(db, tipo, { contrato_id: c.id }, login(), { quem: E.usuario.nome }));
     aviso(`Alerta "${tipo}" desligado para ${c.inquilino_nome}. Para voltar a avisar, use "Religar" aqui ou no Painel.`);
     await mostrar();
@@ -635,7 +635,7 @@ export const FORMULARIOS = {
     const n = Number(new FormData(form).get('numero'));
     if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
     const ultima = R.ultimaFatura(E.d);
-    if (ultima && n <= ultima.numero && !confirm(`Já existe a NF nº ${R.numeroFatura(ultima.numero)}. Usar ${R.numeroFatura(n)} mesmo assim vai repetir números. Continuar?`)) return;
+    if (ultima && n <= ultima.numero && !(await confirmar(`Já existe a NF nº ${R.numeroFatura(ultima.numero)}. Usar ${R.numeroFatura(n)} vai repetir números de NF.`, { titulo: 'Repetir número de NF?', sim: 'Usar mesmo assim', forte: true }))) return;
     await alterar((db) => {
       R.registrar(db, login(), 'Alteração', 'faturas', null, 'Próximo número de NF', { proxima_fatura: { de: db.proxima_fatura, para: n } });
       db.proxima_fatura = n;
@@ -728,7 +728,7 @@ export async function confirmarPagamentoBoleto(id, f) {
   const dataPagou = String(f.get('pagou') || '') || null;
   const cb = buscar('cobrancas', id);
   pagamentoNaoFuturo(data, dataPagou);
-  confirmarAvisos([
+  await confirmarAvisos([
     dataMuitoAntiga(data, 'A data do pagamento'),
     cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
   ].filter(Boolean));

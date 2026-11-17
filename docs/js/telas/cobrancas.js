@@ -158,10 +158,12 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
 function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
   const { reajustes = new Map(), totalLinha = '' } = opcoes;
   const comp = opcoes.mes || (lista.length ? lista[0].cb.competencia : C.competenciaDe(hoje)); // lista vazia: o mês da tela
-  // botões de impressão em cima e embaixo da lista
-  const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
-      ${opcoes.comp ? '' : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
+  // botões de impressão em cima e embaixo da lista; no celular, só embaixo, e os "selecionados" numa barra presa no pé
+  // da tela que aparece ao marcar um boleto (atualizarBarraLote, app.js)
+  const todos = opcoes.comp ? '' : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`;
+  const selecionados = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
       ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
+  const impressao = `${selecionados} ${todos}`;
   return `${lista.length ? `<div class="acoes barra-nf lote-topo">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: '' }).replace(/&ordem=&?/, '&').replace(/[?&]$/, ''))}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
@@ -189,7 +191,8 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
       || `<tr><td colspan="9" class="suave">${opcoes.comp ? 'Nenhum boleto nesta situação.' : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`}
       ${totalLinha}
     </table></div>
-    ${lista.length ? `<div class="acoes">${impressao}</div>` : ''}`;
+    ${lista.length ? `<div class="acoes barra-lote" data-barra-lote><span class="contagem-lote" data-contagem-lote></span>${selecionados}</div>
+      ${todos ? `<div class="acoes">${todos}</div>` : ''}` : ''}`;
 }
 
 /** Vencimento em sábado, domingo ou feriado: o valor em dia vale até o próximo dia útil (decisão do dono, 09/11/2026). */

@@ -1230,6 +1230,16 @@ document.addEventListener('click', async (ev) => {
   }
 });
 
+/** Boletos: quantos estão marcados; no celular, a barra "Imprimir/Excluir selecionados" fica presa no pé da tela enquanto houver algum. */
+function atualizarBarraLote() {
+  const n = document.querySelectorAll('input[data-boleto]:checked').length;
+  for (const barra of document.querySelectorAll('[data-barra-lote]')) {
+    barra.classList.toggle('com-marcados', n > 0);
+    const t = barra.querySelector('[data-contagem-lote]');
+    if (t) t.textContent = n ? `${n} ${n === 1 ? 'boleto marcado' : 'boletos marcados'}` : '';
+  }
+}
+
 document.addEventListener('change', async (ev) => {
   if (ev.target.matches('select[data-ordem-boletos]')) {
     // o atributo traz o endereço da lista atual (mês, filtro e busca) sem a ordem
@@ -1247,6 +1257,11 @@ document.addEventListener('change', async (ev) => {
   }
   if (ev.target.matches('input[data-marcar-todas]')) {
     document.querySelectorAll(`input[data-${ev.target.dataset.marcarTodas || 'nf'}]`).forEach((x) => { x.checked = ev.target.checked; });
+    atualizarBarraLote();
+    return;
+  }
+  if (ev.target.matches('input[data-boleto]')) {
+    atualizarBarraLote();
     return;
   }
   if (ev.target.matches('input[data-trocar-mes]') && ev.target.value) {

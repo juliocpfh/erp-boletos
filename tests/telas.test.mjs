@@ -35,11 +35,16 @@ test('envio de formulário: "Cancelar" numa confirmação devolve o botão; troc
     location.hash = '#/reajustes';
     assert.equal((await enviar('__redesenhou')).disabled, true, 'a tela foi desenhada de novo: o botão novo é outro');
     // o caso de verdade: Reajustes, 4,5%, "Aplicar correção" e Cancelar na pergunta para corrigir o %
-    globalThis.confirm = () => false;
-    const botao = await enviar('aplicarReajusteManual', [['percentual', '4,5']], { contrato: '1', comp: '2026-11', atual: '150000', pctIndice: '' });
+    // (a pergunta é a janela do sistema, não a caixa do navegador: Cancelar = fechar a janela)
+    const antes = janelas.length;
+    const enviando = enviar('aplicarReajusteManual', [['percentual', '4,5']], { contrato: '1', comp: '2026-11', atual: '150000', pctIndice: '' });
+    for (let i = 0; i < 50 && janelas.length === antes; i += 1) await new Promise((ok) => { setTimeout(ok, 5); });
+    assert.equal(janelas.length, antes + 1, 'a pergunta abriu na janela do sistema');
+    assert.match(janelas.at(-1).innerHTML, /Aplicar correção/);
+    janelas.at(-1).close();
+    const botao = await enviando;
     assert.equal(botao.disabled, false);
   } finally {
-    globalThis.confirm = () => true;
     for (const k of ['__cancelou', '__trocouDeTela', '__erro', '__redesenhou']) delete T.FORMULARIOS[k];
     janelas.splice(0).forEach((j) => j.remove());
     location.hash = '#/';
@@ -84,6 +89,30 @@ test('janelas com o nome do inquilino no título: o nome aparece uma vez escapad
   for (const arq of fs.readdirSync(pasta, { recursive: true }).filter((x) => x.endsWith('.js') && !x.startsWith('offline'))) {
     const texto = fs.readFileSync(path.join(pasta, arq), 'utf8');
     for (const m of texto.matchAll(/janela\(\{\s*titulo:\s*(`[^`]*`|'[^']*')/g)) assert.doesNotMatch(m[1], /esc\(/, `${arq}: ${m[1]}`);
+  }
+});
+
+test('calendário no celular: lista por semana (domingo a sábado, dentro do mês), aberta na semana de hoje, com o texto de cada item', async () => {
+  const { listaDasSemanas } = await import('../docs/js/telas/consultas.js');
+  const porDia = new Map([['2026-11-10', [{ texto: 'Boleto <Loja 1>' }]], ['2026-11-17', [{ texto: 'IPTU Casa 2' }, { texto: 'Seguro Casa 2' }]]]);
+  const item = (e) => `<div>${esc(e.texto)}</div>`;
+  const html = listaDasSemanas('2026-11', '2026-11-17', porDia, item);
+  const semanas = html.split('<details').slice(1);
+  assert.equal(semanas.length, 5, 'novembro/2026: 01–07, 08–14, 15–21, 22–28, 29–30');
+  assert.match(semanas[0], /Semana de 01\/11 a 07\/11[\s\S]*nada[\s\S]*Nada nesta semana/);
+  assert.match(semanas[1], /1 item[\s\S]*ter, 10\/11[\s\S]*Boleto &lt;Loja 1&gt;/);
+  assert.match(semanas[2], /^ class="cal-semana" open>[\s\S]*esta semana[\s\S]*2 itens[\s\S]*ter, 17\/11 · hoje/);
+  assert.equal((html.match(/ open>/g) || []).length, 1, 'só uma semana aberta');
+  assert.match(semanas[4], /Semana de 29\/11 a 30\/11/);
+  // outro mês: abre a primeira semana com algo
+  assert.match(listaDasSemanas('2026-11', '2026-12-05', porDia, item).split('<details')[2], /^ class="cal-semana" open>/);
+});
+
+test('nenhuma pergunta usa a caixa do navegador ("localhost diz…"): confirm, alert e prompt passam pela janela do sistema', () => {
+  const pasta = fileURLToPath(new URL('../docs/js/', import.meta.url));
+  for (const arq of fs.readdirSync(pasta, { recursive: true }).filter((x) => x.endsWith('.js') && !x.startsWith('offline') && !x.startsWith('vendor'))) {
+    const texto = fs.readFileSync(path.join(pasta, arq), 'utf8').replace(/^\s*(\/\/|\*).*$/gm, '');
+    assert.doesNotMatch(texto, /(?<![\w.$])(window\.)?(confirm|alert|prompt)\(/, `${arq}: use confirmar()/janela() de app.js`);
   }
 });
 

@@ -121,7 +121,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const pj = p.inquilino_tipo === PJ;
   const imoveis = c ? [R.buscar(d, 'imoveis', c.imovel_id)].filter(Boolean) : (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean);
   const curto = (i) => [i.endereco, i.complemento].filter(Boolean).join(' – ');
-  const completo = (i) => [curto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || 'PR'}` : ''].filter(Boolean).join(', ');
+  const completo = (i) => [curto(i), i.bairro, K.cidadeUfDoImovel(d, i, c)].filter(Boolean).join(', ');
   const aluguel = p.aluguel_inicial || 0;
   const pct = p.bonificacao === false ? 0 : (p.desconto_pontualidade_percentual || 0);
   const desconto = aluguel ? C.descontoPorPercentual(aluguel, pct) : 0;

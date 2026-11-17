@@ -3,6 +3,7 @@
 // com a nuvem (rotas /api/ficha-online/… do Worker, nuvem/ficha-publica.mjs). Só existe na nuvem (E.nuvem).
 // As funções de montar são puras (tests/ficha-online.test.mjs). Não importe nada de telas/.
 import * as C from './calculos.js';
+import * as K from './contratos.js';
 import * as F from './formularios.js';
 import * as REC from './recibos.js';
 import * as R from './regras.js';
@@ -81,7 +82,7 @@ export function contextoDaFicha(d, f, pessoa) {
   const r = REC.montarRecibo(d, 'ficha', { ficha: f });
   const e = r.emitente || {};
   const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean)
-    .map((i) => [R.enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || 'PR'}` : ''].filter(Boolean).join(', '));
+    .map((i) => [R.enderecoCompleto(i), i.bairro, K.cidadeUfDoImovel(d, i)].filter(Boolean).join(', '));
   const fiador = pessoa !== 'interessado';
   return {
     empresa: e.razao_social || e.nome || '', nome: nomeDaPessoa(f, pessoa), imovel: imoveis.join(' ou '), tipo: f.inquilino_tipo || 'Pessoa física',

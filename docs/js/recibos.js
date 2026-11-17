@@ -40,9 +40,9 @@ function imovelDe(d, alvo) {
 }
 
 /** Endereço por extenso. Ex.: "Rua Professor Nilo Brandão, 117, Apto 02, São Lourenço, Curitiba/PR". */
-function enderecoDe(i) {
+function enderecoDe(d, i) {
   if (!i) return '';
-  return [R.enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || 'PR'}` : ''].filter(Boolean).join(', ');
+  return [R.enderecoCompleto(i), i.bairro, K.cidadeUfDoImovel(d, i)].filter(Boolean).join(', ');
 }
 
 /** Empresa que recebe e assina (a mesma dos contratos: a ANK, ou as empresas do imóvel). */
@@ -140,7 +140,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   const i = imovelDe(d, alvo);
   const e = emitenteDe(d, alvo, i);
   const empresa = e.razao_social || e.nome || 'LOCADORA';
-  const endereco = enderecoDe(i) || 'imóvel não informado';
+  const endereco = enderecoDe(d, i) || 'imóvel não informado';
   const quem = pessoa(p.inquilino_nome, documentoDe(p));
   const assinaEmpresa = { nome: empresa, linha: [e.cnpj ? `CNPJ ${e.cnpj}` : '', 'LOCADORA'].filter(Boolean).join(' · ') };
   const assinaPessoa = (papel) => ({ nome: p.inquilino_nome, linha: [documentoDe(p), papel].filter(Boolean).join(' · ') });
@@ -369,7 +369,7 @@ function fichaCadastral(d, f, base, nomeArq) {
   const pj = f.inquilino_tipo === PJ;
   const proposta = itensDaProposta(f);
   const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean);
-  const tabela = [['IMÓVEL DE INTERESSE', null], ...(imoveis.length ? imoveis.map((x) => ['Endereço', enderecoDe(x)]) : [['Endereço', EM_BRANCO]])];
+  const tabela = [['IMÓVEL DE INTERESSE', null], ...(imoveis.length ? imoveis.map((x) => ['Endereço', enderecoDe(d, x)]) : [['Endereço', EM_BRANCO]])];
   if (proposta.length) tabela.push(['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta);
   if (pj) {
     tabela.push(['DADOS DA EMPRESA', null], ['Razão social', ou(f.inquilino_nome)], ['Nome fantasia', ou(f.inquilino_apelido)], ['CNPJ', ou(f.inquilino_cpf)],
@@ -420,7 +420,7 @@ function fichaDoFiador(d, f, n, i, base, nomeArq) {
   const x = R.fiadorDaFicha(f, n);
   // casado com separação total de bens (pacto antenupcial): o cônjuge não assina a fiança (CC art. 1.647)
   const conjuge = (casadoOuUniao(x.estado_civil) && !R.separacaoTotal(x)) || !x.estado_civil;
-  const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean).map(enderecoDe).join(' ou ') || enderecoDe(i);
+  const imoveis = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean).map((x) => enderecoDe(d, x)).join(' ou ') || enderecoDe(d, i);
   const tabela = [['FIADOR DA LOCAÇÃO', null], ['Interessado (locatário)', ou(f.inquilino_nome)], ['Imóvel', ou(imoveis)],
     ['DADOS DO FIADOR', null], ['Nome completo', ou(x.nome)], ['CPF', ou(x.cpf)], ['RG', ou(x.rg)], ...qualificacaoDe(x, ''), ['Regime de bens (se casado)', ou(x.regime_bens)],
     ['Endereço', ou(x.endereco)], ['Telefone', ou(x.telefone)], ['E-mail', ou(x.email)]];

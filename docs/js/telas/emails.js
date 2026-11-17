@@ -1,7 +1,7 @@
 // E-mails por etapa: botão "E-mail" nas etapas da ficha, da entrada e da saída (e no informe anual do IR), a janela com o
 // texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Dados e backup).
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
-import { alterar, aviso, baixar, ir, login, mostrar } from '../app.js';
+import { alterar, aviso, baixar, confirmar, ir, login, mostrar } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
@@ -160,7 +160,7 @@ async function janelaEmail(chave, alvo) {
     try {
       arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }))];
     } catch (erro) { aviso(`Não consegui preparar os anexos: ${erro.message}`, 'erro'); return; }
-    if (!confirm(`Enviar agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}?`)) return;
+    if (!(await confirmar(`O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: 'Enviar o e-mail?', sim: 'Enviar agora' }))) return;
     enviar.disabled = true;
     try {
       const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });

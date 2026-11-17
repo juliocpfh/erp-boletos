@@ -301,6 +301,17 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .agenda-dia h3 { margin-top: 0; }
 .evento-cal { margin-bottom: 6px; }
 @media (max-width: 700px) { .cal-grade { grid-template-columns: repeat(7, minmax(0, 1fr)); } .cal-ev { font-size: 0; height: 6px; padding: 0; } }
+/* no celular, a grade (só tracinhos, sem texto) dá lugar à lista por semana, com o texto e os links */
+.cal-lista { display: none; }
+.cal-semana { border: 1px solid var(--borda); border-radius: 8px; margin-top: 8px; background: #fff; }
+.cal-semana > summary { padding: 10px 12px; font-weight: 600; cursor: pointer; min-height: 24px; }
+.cal-semana[open] > summary { border-bottom: 1px solid var(--borda); }
+.cal-semana > p { margin: 10px 12px; }
+.cal-semana-dia { padding: 8px 12px; }
+.cal-semana-dia + .cal-semana-dia { border-top: 1px dashed var(--borda); }
+.cal-semana-dia.hoje { background: #eff6ff; }
+.cal-semana-dia h4 { margin: 0 0 6px; font-size: 14px; }
+@media (max-width: 760px) { .cal-grade, .cal-agendas { display: none; } .cal-lista { display: block; } }
 
 /* Carta de reajuste */
 .carta { position: relative; overflow: hidden; background: #fff; max-width: 760px; margin: 0 auto 24px; padding: 40px 48px; border: 1px solid var(--borda); font-size: 15px; line-height: 1.6; }
@@ -690,4 +701,12 @@ form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:
   main table button.x-excluir { min-width: 40px; }
   .alca-caixa { display: none !important; }
   .barra-nf.lote-topo { display: none; } /* Boletos: imprimir/excluir selecionados só embaixo, depois da lista */
+  /* ... e só depois de marcar um boleto, numa barra presa no pé da tela ("2 boletos marcados") */
+  .barra-lote { display: none; }
+  .barra-lote.com-marcados { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; background: #fff;
+    border-top: 1px solid var(--borda); box-shadow: 0 -4px 12px rgba(15, 23, 42, .12); padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); }
+  .barra-lote.com-marcados .contagem-lote { flex-basis: 100%; font-weight: 600; }
+  main:has(.barra-lote.com-marcados) { padding-bottom: 150px; }
 }
+.contagem-lote:empty { display: none; }
+.contagem-lote { align-self: center; }

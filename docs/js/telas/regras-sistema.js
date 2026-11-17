@@ -1,7 +1,7 @@
 // Tela "Regras do sistema" (#/regras, em Dados e backup): o administrador escolhe as regras de aluguel, garantia, contrato e
 // rotina; cada uma com a explicação, a consequência e a lei. Padrão do sistema (regras do dono) no código: config-regras.js.
 // Também guarda versões das regras, baixa e carrega o arquivo das regras e volta tudo ao padrão.
-import { alterar, aviso, baixar, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, baixar, confirmar, login, mostrar, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import { dataHoraBr } from '../calculos.js';
 import * as CR from '../config-regras.js';
@@ -188,7 +188,7 @@ export const ACOES_REGRAS = {
     input.value = '';
     if (!arquivo) return;
     const valores = CR.lerArquivoDasRegras(await arquivo.text());
-    if (!confirm('Trocar as regras de agora pelas do arquivo? (Salve uma versão antes, se quiser guardar as de agora.)')) return;
+    if (!(await confirmar('As regras de agora são trocadas pelas do arquivo. Se quiser guardar as de agora, cancele e salve uma versão antes.', { titulo: 'Trocar as regras pelas do arquivo?', sim: 'Trocar as regras' }))) return;
     const n = await alterar((db) => R.salvarRegrasSistema(db, valores, login(), 'Regras do sistema (arquivo carregado)'));
     aviso(`Regras do arquivo carregadas (${n} mudança(s)).`, 'ok');
     await mostrar();

@@ -579,7 +579,7 @@ export const AVULSA = [
 export const EMITENTE = [
   campo('nome', 'Nome no topo da NF', 'texto', { obrig: true, ajuda: 'Ex.: IMOBILIÁRIA EXEMPLO' }),
   campo('razao_social', 'Razão social', 'texto', { obrig: true, largo: true }),
-  campo('cnpj', 'CNPJ', 'cnpj', PREENCHE_CNPJ({ razao: 'razao_social', nome: 'nome', endereco: 'endereco', sede: 'endereco_sede' })),
+  campo('cnpj', 'CNPJ', 'cnpj', PREENCHE_CNPJ({ razao: 'razao_social', nome: 'nome', endereco: 'endereco', sede: 'endereco_sede', uf: 'uf_sede' })),
   campo('endereco', 'Endereço (como aparece na NF)', 'texto', { largo: true }),
   campo('municipio', 'Município do serviço', 'texto', { ajuda: 'Como sai na NF. Ex.: CURITIBA' }),
   campo('aba_modelo', 'Aba no modelo Excel', 'texto', { ajuda: 'Só para quem usa um modelo de NF em Excel próprio: o nome da aba desta empresa. Pode deixar em branco' }),
@@ -588,6 +588,7 @@ export const EMITENTE = [
   campo('assina_documentos', 'Assina os documentos do inquilino', 'simnao', { ajuda: 'Contrato, vistoria, recibos, cartas e e-mails saem em nome desta empresa, mesmo quando o imóvel é dividido com outra. Marque só uma. Sem nenhuma marcada, saem em nome das empresas do imóvel' }),
   campo('endereco_sede', 'Endereço da sede (por extenso)', 'texto', { largo: true, ajuda: 'Ex.: Rua das Flores, nº 100, Centro, Curitiba, Paraná' }),
   campo('cidade_documentos', 'Cidade dos documentos', 'texto', { ajuda: 'Vai no "local e data" do contrato, dos recibos e das cartas quando o imóvel não tem cidade. Ex.: Curitiba' }),
+  campo('uf_sede', 'Estado da sede (UF)', 'texto', { max: 2, ajuda: 'Duas letras. Vai depois da cidade do imóvel ("Curitiba/PR") no contrato, nos recibos e nos e-mails quando o imóvel não tem Estado nem CEP. Ex.: PR' }),
   campo('energia_concessionaria', 'Companhia de energia (nome por extenso)', 'texto', { largo: true, ajuda: 'Sai no contrato e nos e-mails; a sigla vai entre parênteses. Ex.: Companhia Paranaense de Energia (COPEL). Imóvel atendido por outra: informe no cadastro do imóvel' }),
   campo('agua_concessionaria', 'Companhia de água (nome por extenso)', 'texto', { largo: true, ajuda: 'Ex.: Companhia de Saneamento do Paraná (SANEPAR)' }),
   campo('representante_nome', 'Representante que assina', 'texto', { largo: true, ajuda: 'Ex.: MARIA DA SILVA' }),
