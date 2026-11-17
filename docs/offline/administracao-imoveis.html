@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-B66LKEX/Z32OPO7uQNAl8Vu72snoUP2JRmLkQWgJO28='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-qxDAnA+55F4r03LIZZSKqI+DwsZmsIcSOiUGUVRwljc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="31ca77dfe00bdfd5">
+<meta name="fontes" content="7bb59ccd963470cd">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -672,9 +672,18 @@ body.com-visualizador { overflow: hidden; }
 /* Inquilinos: no celular, telefone ao lado do nome (numa linha só; nome comprido diminui a letra) e o botão Contrato
    ao lado da Matrícula; a coluna Contrato some */
 .so-celular { display: none; }
+/* Inquilinos: no computador a Matrícula fica ao lado do nome do imóvel, encostada à direita (todas alinhadas);
+   no celular Matrícula e Contrato lado a lado, mesmo tamanho, numa linha embaixo do nome do imóvel */
+.imovel-matricula { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.imovel-matricula > .so-pc { flex: none; }
+.botoes-doc { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: nowrap; }
+.botoes-doc .botao { margin: 0; }
+.botoes-doc.so-celular { display: none; }
 @media (max-width: 760px) {
   .so-pc { display: none !important; }
   span.so-celular { display: inline; }
+  div.botoes-doc.so-celular { display: flex; justify-content: flex-start; margin-top: 4px; }
+  .botoes-doc .botao { display: inline-flex; align-items: center; justify-content: center; }
   .tel-inq { white-space: nowrap; }
   a.so-celular { display: inline-block; }
   .linha-inq { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, calc((100vw - 76px) / (var(--letras) * 0.5)), 15px); }
@@ -16874,11 +16883,11 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           titulo: "Inquilinos",
           serve: "Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.",
           primeiro: [
-            'Alguém quer alugar? Clique em "Novo interessado (ficha)": os dados, a reserva e os documentos ficam guardados para análise.',
-            'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato".',
+            'Alguém quer alugar? Clique em "Nova ficha em análise": os dados, a reserva e os documentos ficam guardados para análise.',
+            'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
             "Clique no nome do inquilino para abrir a página dele."
           ],
-          exemplo: 'Inquilino que entrou em 10/03/2026 com contrato de 30 meses aparece em "Ativos" com a vigência 10/03/2026 a 09/09/2028. Quando sair, a saída é registrada na página dele e ele passa para "Inativos".'
+          exemplo: 'Inquilino que entrou em 10/03/2026 com contrato de 30 meses aparece em "Contratos ativos" com a vigência 10/03/2026 a 09/09/2028. Quando sair, a saída é registrada na página dele e ele passa para "Inativos".'
         },
         contrato: {
           titulo: "Página do inquilino",
@@ -31726,20 +31735,22 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return doc2 && doc2.arquivo ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc2.contrato.id}" data-nome="${esc(doc2.arquivo)}" title="Abrir o contrato assinado de ${esc(doc2.contrato.inquilino_nome)}">${texto3}</a>` : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto3}</span>`;
     };
     const registrar3 = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
+    const imovelComMatricula = (x) => `<div class="imovel-matricula"><span>${imovel(x)}</span>${x.i ? `<span class="so-pc">${matricula(x)}</span>` : ""}</div>`;
     const comPais = (tel) => tel.length <= 11 ? `55${tel}` : tel;
     const nomeCelular = (x) => {
       const tel = String(x.c.inquilino_telefone || "").replace(/\D/g, "");
       const fone = tel ? `<span class="so-celular"> · <a class="tel-inq" href="tel:+${comPais(tel)}" title="Ligar para ${esc(x.c.inquilino_nome)}">${esc(x.c.inquilino_telefone)}</a></span>` : "";
       return nome(x, fone);
     };
-    const matricula = (x) => x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : "";
+    const matricula = (x, celular = false) => x.i ? `<a href="#" class="botao secundario ${celular ? "mini" : "pequeno"}" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">${celular ? "Matrícula" : "📑 Matrícula"}</a>` : "";
+    const documentosCelular = (x) => x.i ? `<div class="botoes-doc so-celular">${matricula(x, true)}${botaoContrato(x.c, true)}</div>` : "";
     const semAtivos = () => d().contratos.length ? `<span class="suave">${busca ? "Nenhum inquilino ativo encontrado nesta busca." : "Nenhum inquilino ativo hoje."}</span>` : !d().imoveis.length ? proximoPasso("Nenhum inquilino ainda.", "O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.", [opera() && ["#/novo/imoveis", "Cadastrar o primeiro imóvel"]]) : proximoPasso(
       "Nenhum inquilino ainda.",
       "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.",
-      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Novo interessado (ficha)"]]
+      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova ficha em análise"]]
     );
     const resumo2 = resumoSolicitacoes(d());
-    return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? `<div class="acoes">${link("#/novo/fichas", "Novo interessado (ficha)", "botao")} ${link("#/novo/contratos", "Novo contrato", "botao secundario")}</div>` : ""}</div>
+    return `<div class="cabecalho"><h1>Inquilinos</h1></div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo2[s.nome]} ${s.texto}</span>`).join(" ")}</a>
       ${(() => {
@@ -31748,15 +31759,16 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ""}</a>`;
     })()}</div>
     ${caixaFichas()}
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar3(x.c)}
+    <div class="cartao rolagem" id="contratos-ativos"><div class="cabecalho"><h2>Contratos ativos (${atuais.length})</h2>${opera() ? link("#/novo/contratos", "Novo contrato", "botao secundario pequeno") : ""}</div>
+      <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovelComMatricula(x)}${documentosCelular(x)}</td><td>${nomeCelular(x)}</td>${registrar3(x.c)}
         <td class="nw">${x.c.prazo_tipo === "Indeterminado" ? `${x.c.data_entrada || x.c.vigencia_inicio ? `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} · ` : ""}${etiqueta("indeterminado", "aviso")}` : `${dataBr(x.c.data_entrada || x.c.vigencia_inicio)} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || "-")}${valorGarantia(d(), x.c) ? ` ${reais(valorGarantia(d(), x.c))}` : ""}</td></tr>`).join("") || `<tr><td colspan="6">${semAtivos()}</td></tr>`}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
-    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
-      ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)} ${situacao2(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
+    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Situação</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
+      ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)}</td><td class="nw">${situacao2(x.c) || "-"}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
         ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${fimDeVinculo(d(), x.c) ? `contrato continua com ${esc(continuadoPor(d(), x.c).inquilino_nome)}` : opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, "Fazer cálculo final") : x.c.data_saida ? "sem cálculo final" : "-"}</td>`}
-</tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
+</tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
   }
   function telaIptu(ano) {
     const hoje3 = hojeIso();
