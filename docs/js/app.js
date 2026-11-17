@@ -495,11 +495,45 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
       resposta = {};
       for (const [k, v] of fd.entries()) (resposta[k] = resposta[k] || []).push(v);
     });
-    dlg.addEventListener('close', () => { dlg.remove(); resolver(resposta); });
+    const fim = () => { dlg.remove(); resolver(resposta); };
+    // Voltar do aparelho (ou do navegador) fecha a janela como "Cancelar", como no visualizador de anexos: a abertura põe uma
+    // entrada no histórico, com o mesmo endereço, e o Voltar só a consome. Fechada pelos botões ou Esc, a entrada sai antes
+    // de devolver a resposta (quem chamou pode trocar de tela logo depois sem o "voltar" atrasado desfazer a troca).
+    const marca = entradaDaJanela();
+    // (janela aberta por cima de outra: o Voltar fecha só a de cima; a de baixo continua na entrada dela)
+    const aoVoltar = () => { if (history.state && history.state.janela === marca) return; voltou = true; resposta = null; dlg.close(); };
+    let voltou = false;
+    if (marca) window.addEventListener('popstate', aoVoltar);
+    dlg.addEventListener('close', () => {
+      if (marca) { window.removeEventListener('popstate', aoVoltar); janelasAbertas.delete(marca); }
+      if (voltou || !marca || !(history.state && history.state.janela === marca)) { fim(); return; }
+      let feito = false;
+      let t = null;
+      const pronto = () => { if (feito) return; feito = true; window.removeEventListener('popstate', pronto); clearTimeout(t); fim(); };
+      window.addEventListener('popstate', pronto);
+      t = setTimeout(pronto, ESPERA_VOLTAR);
+      history.back();
+    });
     document.body.appendChild(dlg);
     dlg.showModal();
     if (ligar) ligar(dlg);
   });
+}
+
+const janelasAbertas = new Set(); // marcas das janelas abertas agora (uma por cima da outra tem entrada própria)
+const ESPERA_VOLTAR = 500; // ms: navegador que não avisa o "voltar" (popstate) não segura a resposta da janela além disto
+
+/** Põe no histórico a entrada da janela que se abre (mesmo endereço) e devolve a marca dela; null se o navegador não deixa. */
+function entradaDaJanela() {
+  try {
+    if (typeof history === 'undefined' || typeof history.pushState !== 'function' || typeof window.addEventListener !== 'function') return null;
+    const marca = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    // entrada de uma janela anterior que ficou (fechada sem voltar): reaproveitada, para o Voltar não precisar de dois toques
+    if (history.state && history.state.janela && !janelasAbertas.has(history.state.janela)) history.replaceState({ janela: marca }, '');
+    else history.pushState({ janela: marca }, '');
+    janelasAbertas.add(marca);
+    return marca;
+  } catch { return null; }
 }
 
 function fecharMensagem(id) {
