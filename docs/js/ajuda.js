@@ -78,7 +78,7 @@ export const AJUDA_TELAS = {
   },
   cobrancas: {
     titulo: 'Boletos',
-    serve: 'Os boletos do aluguel de cada mês. O mês da tela é o mês de uso do imóvel: o boleto do aluguel de novembro vence em dezembro.',
+    serve: 'Os boletos do aluguel de cada mês. O mês da tela é o mês de uso do imóvel: o boleto do aluguel de novembro vence em dezembro. No alto, o botão "E-mails da régua" abre os e-mails de cobrança preparados pelo sistema, esperando a autorização do administrador (nada é enviado sozinho).',
     primeiro: ['A partir do dia 20, clique em "Gerar boletos" do mês: o sistema calcula o valor de cada inquilino (aluguel, IPTU, seguro, descontos).',
       'Quando o inquilino pagar, clique em "Confirmar pagamento" na linha e informe o dia em que o dinheiro entrou na conta.',
       'Depois, numere as NFs na tela NF.'],
