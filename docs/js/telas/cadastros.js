@@ -763,9 +763,10 @@ export const CADASTROS = {
       // troca de garantia do mesmo inquilino: o valor que saiu na troca; ele continua no imóvel (os boletos em aberto seguem sendo cobrados)
       const t = q.troca && buscar('trocas_garantia', q.troca);
       if (t) return { data: C.hojeIso(), garantia_valor: t.valor_anterior };
-      const aberto = R.cobrancasEmAberto(d(), c.id);
-      return { data: C.hojeIso(), garantia_valor: R.valorGarantia(d(), c), debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0) || null,
-        debitos_descricao: aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`).join('\n') };
+      // débitos pelo valor do dia (vencido com multa e juros; acordo só pelas parcelas; sem o complemento da caução)
+      const deb = R.debitosDaSaida(d(), c, C.hojeIso());
+      return { data: C.hojeIso(), garantia_valor: R.valorGarantia(d(), c), debitos: deb.total || null,
+        debitos_descricao: deb.itens.map((x) => x.texto).join('\n') };
     },
     aviso: (r, q) => {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
@@ -854,7 +855,7 @@ export const CADASTROS = {
     padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término', novo_percentual: R.percentualBonificacao(c) || null }; },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
-    ajustar(dados, erros, r, form) {
+    ajustar(dados, erros, r, form, q) {
       if (dados.tipo === 'Renovado com nova data de término' && !dados.nova_vigencia_fim) erros.nova_vigencia_fim = 'Informe a nova data de término';
       if (dados.tipo === 'Passou a prazo indeterminado') dados.nova_vigencia_fim = null;
       if (dados.tipo === 'Novo valor negociado' && !(dados.novo_valor > 0)) erros.novo_valor = 'Informe o novo valor';
@@ -866,7 +867,10 @@ export const CADASTROS = {
         if (!Number.isFinite(v) || v < 0 || v > dados.novo_valor) erros.novo_bonificado = `Informe um valor entre R$ 0,00 e ${reais(dados.novo_valor)} (aluguel cheio)`;
         else dados.novo_percentual = C.percentualPorBonificado(dados.novo_valor, v);
       }
-      if (!(dados.novo_valor > 0)) dados.novo_percentual = null;
+      if (!(dados.novo_valor > 0)) { dados.novo_percentual = null; dados.vale_desde = null; }
+      else if (dados.vale_desde && !C.competenciaValida(dados.vale_desde, '')) erros.vale_desde = 'Informe o mês (ex.: 12/2026)';
+      else if (dados.vale_desde && dados.vale_desde < String(buscar('contratos', q.contrato).data_entrada || '').slice(0, 7)) erros.vale_desde = 'O mês é anterior à entrada do inquilino';
+      else dados.vale_desde = R.valeDesdeDaRenovacao(dados);
       if (dados.novo_percentual !== null && dados.novo_percentual !== undefined && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = 'Informe um percentual entre 0 e 100';
     },
     salvar: (db, dados, q) => R.registrarRenovacao(db, Number(q.contrato), dados, login()),
@@ -880,7 +884,7 @@ export const CADASTROS = {
     campos: (r, q) => { const c = buscar('contratos', q.contrato); return R.temFci(c) || R.depositosFci(d(), c).length ? F.ENCERRAMENTO : F.ENCERRAMENTO.filter((x) => !x.nome.startsWith('fci_')); },
     padrao: (q) => {
       const c = buscar('contratos', q.contrato);
-      const aberto = R.cobrancasEmAberto(d(), c.id);
+      const deb = R.debitosDaSaida(d(), c, C.hojeIso());
       const lt = R.leituraDo(d(), c.id, 'Saída do inquilino') || {};
       // B5: os reparos da vistoria de saída, com o valor de cada um (com FCI, o fundo paga os danos primeiro)
       const v = resultadoVistoriaSaida(d(), c);
@@ -890,8 +894,8 @@ export const CADASTROS = {
         fci_credito: R.saldoFci(d(), c).corrigido || null,
         fci_danos: comFci && v.totalReparos ? v.totalReparos : null,
         leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.valorGarantia(d(), c),
-        debitos: aberto.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0) + (comFci ? 0 : v.totalReparos),
-        debitos_descricao: [...aberto.map((cb) => `Aluguel ${compBr(cb.competencia)} em aberto: ${reais(R.totais(cb).a_pagar_sem_desconto)}`), ...reparos].join('\n'),
+        debitos: deb.total + (comFci ? 0 : v.totalReparos),
+        debitos_descricao: [...deb.itens.map((x) => x.texto), ...reparos].join('\n'),
       };
     },
     aviso: (r, q) => {
