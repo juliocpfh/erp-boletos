@@ -72,7 +72,8 @@ test('chamarPonte monta /contas/<conta>/…, manda a senha no cabeçalho e JSON 
 test('erros da ponte em português: senha recusada (401/403), erro do banco com o texto dele, resposta que não é JSON, ponte desligada e tempo esgotado', async () => {
   await B.salvarPonteLocal({ ponte_url: PONTE, senha_ponte: SENHA });
   await assert.rejects(B.chamarPonteCrua('GET', '/saude', null, { fetch: fetchFalso(() => ({ status: 401, corpo: { erro: 'x' } })) }), (e) => e instanceof B.ErroPonte && e.status === 401 && /recusou a senha/.test(e.message));
-  await assert.rejects(B.chamarPonteCrua('GET', '/saude', null, { fetch: fetchFalso(() => ({ status: 403, corpo: {} })) }), /recusou a senha/);
+  // 403 não é a senha: a ponte diz o motivo (ex.: rotas de pagamento desligadas)
+  await assert.rejects(B.chamarPonteCrua('GET', '/saude', null, { fetch: fetchFalso(() => ({ status: 403, corpo: { erro: 'As rotas de pagamento estão desligadas nesta ponte (PAGAMENTOS=1 no .env liga).' } })) }), (e) => e.status === 403 && /rotas de pagamento estão desligadas/.test(e.message) && !/recusou a senha/.test(e.message));
   await assert.rejects(B.chamarPonteCrua('GET', '/x', null, { fetch: fetchFalso(() => ({ status: 422, corpo: { erro: 'CPF do pagador inválido' } })) }), (e) => e.status === 422 && e.message === 'CPF do pagador inválido' && !!e.detalhes.erro);
   await assert.rejects(B.chamarPonteCrua('GET', '/x', null, { fetch: fetchFalso(() => ({ status: 500, corpo: { message: 'Internal' } })) }), /Internal/);
   // resposta sem JSON (ex.: página de erro): vira erro com o começo do texto

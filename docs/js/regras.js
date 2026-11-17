@@ -49,7 +49,7 @@ export const MODOS_CONTA_BOLETO = { padrao: 'Sempre pela empresa padrão', escol
  * (canais e momentos; o contrato pode não notificar ou escolher); ``negativacao``: botão de negativar no birô (só administrador).
  */
 export const CONTA_BANCO_PADRAO = { id: '', apelido: '', emitente_id: null, ambiente: 'sandbox', carteira: '', chave_pix: '', tipo_chave_pix: 'EVP', dias_baixa: 30, instrucoes: '',
-  tipo_desconto: 'VALUE_PER_DAY', desconto_dias_antes: 0, // tipo_desconto: primeiro valor do enum da API; confirmar no sandbox no 1º boleto de teste
+  tipo_desconto: 'VALUE_PER_DAY', desconto_dias_antes: 0, desconto_conferido: null, // tipo_desconto: primeiro valor do enum da API; confirmar no sandbox no 1º boleto de teste
   notificar: { email: true, sms: true, emissao: true, antes: true, vencimento: true, depois: true },
   negativacao: { ativa: false, dias_atraso: 30 } };
 
@@ -2274,6 +2274,28 @@ export function debitosDaSaida(d, c, data = C.hojeIso()) {
     return { cobranca: cb, valor, texto: `${nome} em aberto: ${C.reais(valor)}${conta}` };
   }).filter((x) => x.valor > 0);
   return { itens, total: itens.reduce((s, x) => s + x.valor, 0) };
+}
+
+/** O boleto que recebe a diferença (o mesmo de ``aplicarDiferencasPendentes``): o próximo aluguel a cobrar do contrato, ainda não emitido no banco; null se ainda não foi gerado. */
+export const proximoBoletoAberto = (d, cb) => d.cobrancas.filter((x) => x.contrato_id === cb.contrato_id && x.id !== cb.id && x.competencia > cb.competencia && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x))
+  .sort((a, b) => a.competencia.localeCompare(b.competencia) || a.id - b.id)[0] || null;
+
+/**
+ * Pix (ou boleto) pago DEPOIS do vencimento com o valor do desconto (decisão do dono, 16/11/2026): o boleto fica pago com o que
+ * entrou ("Paga com atraso", NF pelo valor em dia) e a diferença (bonificação perdida + multa + juros até o dia em que pagou) vai
+ * para o próximo boleto do aluguel pelo mesmo caminho do pagamento em parte (``diferenca_devida``, ``aplicarDiferencasPendentes``:
+ * sem o boleto gerado ainda, entra quando ele for gerado; desfazer o pagamento tira). Ex.: vence 10/08, pagou R$ 1.218,50 em 30/08,
+ * devido R$ 1.497,85 → R$ 279,35 no boleto do mês seguinte.
+ */
+export function registrarComDiferencaNoProximo(d, cb, { credito, pagou, valor, previsto }, usuario) {
+  const diferenca = previsto.valor_devido - valor;
+  const prox = proximoBoletoAberto(d, cb);
+  const r = registrarPagamento(d, cb.id, credito, valor, usuario, { pagouEmDia: true });
+  atualizar(d, 'cobrancas', cb.id, { situacao: 'Paga com atraso', pagou_em_dia: false, data_pagou: pagou && pagou < credito ? pagou : null, dias_atraso: previsto.dias_atraso,
+    diferenca_devida: diferenca, diferenca_no_boleto: null }, usuario,
+  `Pago com atraso (${C.dataBr(pagou)}) pelo valor do desconto: faltam ${C.reais(diferenca)} (bonificação perdida, multa e juros), que vão para o próximo boleto`);
+  aplicarDiferencasPendentes(d, cb.contrato_id, usuario);
+  return { ...r, diferenca, proximo: prox };
 }
 
 /**
@@ -4773,7 +4795,7 @@ export function salvarContaBanco(d, dados, usuario) {
   const ambiente = ou('ambiente', (v) => (v === 'producao' ? 'producao' : 'sandbox'));
   const tipo = 'EVP';
   const diasBaixa = dados.dias_baixa === '' || dados.dias_baixa === null || dados.dias_baixa === undefined ? (antes ? antes.dias_baixa : CONTA_BANCO_PADRAO.dias_baixa) : Number(dados.dias_baixa);
-  if (!Number.isInteger(diasBaixa) || diasBaixa < 0) throw new Error('Dias para baixa: informe um número inteiro (0 = não baixa sozinho).');
+  if (!Number.isInteger(diasBaixa) || diasBaixa < 1) throw new C.ErroUsuario('Prazo depois do vencimento: informe quantos dias (pelo menos 1) o inquilino ainda pode pagar o boleto depois do vencimento; passado esse prazo, o banco encerra o boleto.');
   const carteira = ou('carteira', (v) => String(v || '').replace(/\D/g, ''));
   const marcado = (v) => v === true || v === '1' || v === 'on';
   const diasAntes = dados.desconto_dias_antes === undefined || dados.desconto_dias_antes === '' ? (antes ? antes.desconto_dias_antes : 0) : Number(dados.desconto_dias_antes);
@@ -4783,9 +4805,13 @@ export function salvarContaBanco(d, dados, usuario) {
   const tipoDesconto = Object.values(M.TIPOS_ENCARGO.desconto).includes(dados.tipo_desconto) ? dados.tipo_desconto : (antes ? antes.tipo_desconto : CONTA_BANCO_PADRAO.tipo_desconto);
   const notificar = {};
   for (const k of [...Object.keys(CANAIS_NOTIFICACAO), ...Object.keys(MOMENTOS_NOTIFICACAO)]) notificar[k] = dados[`notificar_${k}`] === undefined ? (antes ? !!antes.notificar[k] : CONTA_BANCO_PADRAO.notificar[k]) : marcado(dados[`notificar_${k}`]);
+  // "Conferi o desconto no boleto de teste": vale só para o tipo marcado (trocar o tipo pede conferir de novo)
+  const conferidoAntes = antes && antes.desconto_conferido && antes.desconto_conferido.tipo === tipoDesconto ? antes.desconto_conferido : null;
+  const descontoConferido = dados.desconto_conferido_campo === undefined ? conferidoAntes
+    : marcado(dados.desconto_conferido) ? (conferidoAntes || { tipo: tipoDesconto, em: C.hojeIso(), por: usuario || '' }) : null;
   const conta = { ...CONTA_BANCO_PADRAO, ...(antes || {}), id, apelido: ou('apelido', (v) => String(v || '').trim()) || id.toUpperCase(), emitente_id: emitenteId, ambiente, carteira,
     chave_pix: ou('chave_pix', (v) => String(v || '').trim()), tipo_chave_pix: tipo, dias_baixa: diasBaixa, instrucoes: ou('instrucoes', (v) => String(v || '').trim()),
-    tipo_desconto: tipoDesconto, desconto_dias_antes: diasAntes, notificar,
+    tipo_desconto: tipoDesconto, desconto_dias_antes: diasAntes, desconto_conferido: descontoConferido, notificar,
     negativacao: { ativa: dados.negativacao_ativa === undefined ? (antes ? !!antes.negativacao.ativa : false) : marcado(dados.negativacao_ativa), dias_atraso: diasNeg } };
   cfg.contas = antes ? cfg.contas.map((x) => (x.id === id ? conta : x)) : [...cfg.contas, conta];
   // a primeira conta vira a padrão (a escolha muda em Empresas → Emissão de boletos)
@@ -4839,6 +4865,37 @@ export const contaPreMarcada = (d, cb) => (contasDoImovel(d, cb).length === 1 ? 
 export function referenciaExterna(cb, agora = Date.now()) {
   const base = `B${String(cb.id).padStart(8, '0')}${agora.toString(36).toUpperCase()}`;
   return base.replace(/[^A-Z0-9]/g, '').padEnd(26, '0').slice(0, 26);
+}
+
+/** Uma emissão pedida há menos que isto, ainda sem resposta, bloqueia outra (outra aba ou outra pessoa emitindo o mesmo boleto). */
+export const EMISSAO_EM_ANDAMENTO_MS = 3 * 60000;
+
+/**
+ * Antes de chamar a ponte: grava no boleto a emissão pendente (``emissao_pendente``: referência, conta, quando e quem), dentro de
+ * ``alterar`` (uma gravação por vez: duas abas ou duas pessoas não emitem o mesmo boleto). Tentativa nova de uma emissão sem resposta
+ * usa a MESMA referência e vai com ``repetir`` (a ponte confere no banco antes, e o banco nunca cria um 2º boleto).
+ * Devolve { referencia, repetir }. Já emitido ou emissão em andamento há menos de 3 minutos: ErroUsuario.
+ */
+export function iniciarEmissaoBancaria(d, cbId, conta, usuario, agora = Date.now()) {
+  const cb = buscar(d, 'cobrancas', cbId);
+  if (!cb) throw new Error('Boleto não encontrado.');
+  if (emitidoNoBanco(cb)) throw new C.ErroUsuario('Este boleto já foi emitido no banco (talvez em outra tela ou por outra pessoa). Atualize a página.');
+  const p = cb.emissao_pendente;
+  if (p && !p.incerto && agora - Date.parse(p.desde) < EMISSAO_EM_ANDAMENTO_MS) {
+    throw new C.ErroUsuario(`Este boleto está sendo emitido agora${p.por ? ` por ${p.por}` : ''} (desde ${new Date(p.desde).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}). Espere um minuto e atualize a página.`);
+  }
+  // a referência só é reaproveitada na mesma conta (outra conta = outra cobrança no banco)
+  const mesma = p && p.referencia && p.conta_id === conta.id;
+  const referencia = mesma ? p.referencia : referenciaExterna(cb, agora);
+  atualizar(d, 'cobrancas', cb.id, { emissao_pendente: { referencia, conta_id: conta.id, desde: new Date(agora).toISOString(), por: usuario || '', incerto: false } }, usuario,
+    mesma ? 'Emissão no C6 pedida de novo (mesma referência: o banco não cria outro boleto)' : 'Emissão no C6 pedida');
+  return { referencia, repetir: !!mesma };
+}
+
+/** A emissão não chegou a ir ao banco (conferência do sistema): tira a emissão pendente. */
+export function desistirDaEmissao(d, cbId, usuario) {
+  const cb = buscar(d, 'cobrancas', cbId);
+  if (cb && cb.emissao_pendente) atualizar(d, 'cobrancas', cb.id, { emissao_pendente: null }, usuario, 'Emissão no C6 não enviada');
 }
 
 /** Pega o que dá do endereço em uma linha do inquilino ("Rua X, 12, Bairro, Cidade/UF, CEP 80000-000"). */
@@ -4931,7 +4988,12 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   }
   // desconto em reais até o vencimento (first_discount_deadline = dias antes; 0 = até o dia do vencimento, como na v1 "dead_line").
   // discount_type é parametrizável por conta (padrão: primeiro valor do enum da API; confirmar no sandbox no 1º boleto de teste)
-  if (b.desconto > 0) Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
+  if (b.desconto > 0) {
+    // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
+    // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
+    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco C6).`);
+    Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
+  }
   void t;
   // instruções: as fixas da conta e depois a descrição do boleto, até 4 linhas de 80
   // dados do pagador nos limites da API (decisão de 2026-10-16): nome, rua e número, bairro e cidade até 40, e-mail até 70, sem "/"
@@ -4947,6 +5009,7 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
     if (v.length > max) problemas.push(`${rotulo} ${verbo} ${v.length} letras e o banco aceita até ${max} ("${v}"): abrevie ${onde}`);
     if (semBarra && v.includes('/')) problemas.push(`${rotulo} ${verbo} uma barra "/", que o banco não aceita ("${v}"): troque por espaço ou "-" ${onde}`);
   }
+  if (endereco.zip_code.length !== 8) problemas.push(`O CEP tem ${endereco.zip_code.length} números e precisa ter 8 ("${endereco.zip_code}"): corrija ${ondeEndereco('zip_code')}`);
   if (problemas.length) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: ${problemas.join('; ')}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
   const instrucoes = [...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')].map((x) => x.trim().slice(0, L.instrucao)).filter(Boolean).slice(0, L.instrucoes);
   const boleto = { [K.carteira]: carteiraDaConta(conta), [K.seu_numero]: String(cb.id).slice(-L.seu_numero) };
@@ -4959,12 +5022,12 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
     // limites da API (nome, endereço, bairro e cidade 40, e-mail 70) conferidos acima, sem cortar; CEP com 8 dígitos, UF com 2 letras
     [K.pagador]: { [K.pagador_nome]: pagador.nome, [K.pagador_documento]: taxId,
       [K.pagador_endereco]: { [K.endereco_rua]: pagador.rua, [K.endereco_bairro]: pagador.bairro,
-        [K.endereco_cidade]: pagador.cidade, [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code.slice(0, 8) },
+        [K.endereco_cidade]: pagador.cidade, [K.endereco_uf]: corta(endereco.state, 2).toUpperCase(), [K.endereco_cep]: endereco.zip_code },
       ...(pagador.email ? { [K.pagador_email]: pagador.email } : {}),
       // "phone" não é campo da API: a ponte usa só para conferir o destino dos SMS e o descarta antes de mandar ao banco
       ...(String(c.inquilino_telefone || '').replace(/\D/g, '') ? { phone: String(c.inquilino_telefone || '').replace(/\D/g, '') } : {}) },
     [K.forma]: { [K.boleto]: boleto },
-    [K.dias_baixa]: Number(conta.dias_baixa) || 0,
+    [K.dias_baixa]: diasBaixaDaConta(conta),
     [K.origem]: 'ADM-IMOVEIS',
   };
   if (Object.keys(fees).length) pedido[K.encargos] = fees;
@@ -4973,6 +5036,16 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   if (notif.length) pedido[M.NOTIFICACAO.campo] = notif;
   return pedido;
 }
+
+/**
+ * O desconto de pontualidade pode ir ao banco por esta conta: no sandbox sempre (é o teste); em produção só depois de o
+ * administrador conferir, num boleto de teste, que o desconto do tipo escolhido sai certo (``desconto_conferido.tipo``).
+ */
+export const descontoLiberado = (conta) => !conta || conta.ambiente !== 'producao'
+  || !!(conta.desconto_conferido && conta.desconto_conferido.tipo === (conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto));
+
+/** Prazo do boleto depois do vencimento (``days_after_due_date``: o banco encerra a cobrança N dias depois): pelo menos 1. */
+export const diasBaixaDaConta = (conta) => { const n = Number(conta && conta.dias_baixa); return Number.isInteger(n) && n >= 1 ? n : CONTA_BANCO_PADRAO.dias_baixa; };
 
 /** Valor que o boleto leva ao banco: o total sem desconto (o desconto vai à parte, em ``fees``). */
 export const valorNoBanco = (d, cb) => totais(cb).a_pagar_sem_desconto;
@@ -5049,7 +5122,9 @@ export function registrarBoletoBancario(d, cbId, resposta, usuario, extra = {}) 
   const n = normalizarRespostaC6(resposta);
   const antes = cb.banco || {};
   // emissão nova depois de um cancelamento (ou referência externa diferente): a data de emissão é a de agora e a anterior fica guardada
-  const reemissao = !!antes.emitido_em && ((antes.situacao === 'cancelado' && n.situacao !== 'cancelado') || (!!n.id_externo && !!antes.id_externo && n.id_externo !== antes.id_externo));
+  // só é emissão nova com outra referência: consultar logo depois de cancelar, com o banco ainda dizendo CREATED, continua "cancelado"
+  const reemissao = !!antes.emitido_em && !!n.id_externo && !!antes.id_externo && n.id_externo !== antes.id_externo;
+  if (antes.situacao === 'cancelado' && !reemissao && n.situacao === 'emitido') n.situacao = 'cancelado';
   const emissoesAnteriores = reemissao ? [...(antes.emissoes_anteriores || []), { emitido_em: antes.emitido_em, cancelado_em: antes.cancelado_em || null, id_externo: antes.id_externo || null, nosso_numero: antes.nosso_numero || null, linha_digitavel: antes.linha_digitavel || null }] : (antes.emissoes_anteriores || null);
   const banco = {
     provedor: 'c6', conta_id: extra.conta_id || antes.conta_id || null, ambiente: extra.ambiente || antes.ambiente || null,
@@ -5064,21 +5139,31 @@ export function registrarBoletoBancario(d, cbId, resposta, usuario, extra = {}) 
     simulado: !!((resposta && resposta.simulado) || antes.simulado),
   };
   const texto = { emitido: 'Boleto emitido no C6', pago: 'Banco informou o pagamento do boleto', cancelado: 'Boleto cancelado no C6' }[banco.situacao] || 'Situação do boleto no banco atualizada';
-  atualizar(d, 'cobrancas', cb.id, { banco }, usuario, `${texto}${banco.linha_digitavel ? ` · linha digitável ${banco.linha_digitavel}` : ''}${banco.ambiente === 'sandbox' ? ' (sandbox: teste)' : ''}`);
+  // a emissão pendente acabou: o banco respondeu (a mesma referência ou a resposta de uma consulta)
+  const pend = cb.emissao_pendente && (!n.id_externo || cb.emissao_pendente.referencia === n.id_externo) ? { emissao_pendente: null } : {};
+  atualizar(d, 'cobrancas', cb.id, { banco, ...pend }, usuario, `${texto}${banco.linha_digitavel ? ` · linha digitável ${banco.linha_digitavel}` : ''}${banco.ambiente === 'sandbox' ? ' (sandbox: teste)' : ''}`);
   return banco;
 }
 
-/** Emissão falhou: guarda o erro no boleto (o botão "Emitir" continua disponível). */
+/**
+ * Emissão falhou: guarda o erro no boleto (o botão "Emitir" continua disponível). ``extra.incerto``: sem resposta (tempo esgotado,
+ * conexão caída): o boleto PODE ter sido emitido; a emissão pendente fica, e a próxima tentativa usa a mesma referência ("Conferir no
+ * banco"). Recusa clara do banco: a pendência sai. Boleto cancelado que falhou ao emitir de novo também mostra o erro.
+ */
 export function registrarErroBancario(d, cbId, erro, usuario, extra = {}) {
   const cb = buscar(d, 'cobrancas', cbId);
   const antes = cb.banco || {};
+  const incerto = !!extra.incerto;
+  const pend = cb.emissao_pendente ? { emissao_pendente: incerto ? { ...cb.emissao_pendente, incerto: true } : null } : {};
   // boleto já emitido: a falha fica só no histórico, sem apagar a linha digitável
-  if (antes.situacao && antes.situacao !== 'erro') {
+  if (antes.situacao && antes.situacao !== 'erro' && antes.situacao !== 'cancelado') {
+    if (Object.keys(pend).length) atualizar(d, 'cobrancas', cb.id, pend, usuario, 'Emissão no C6 sem resposta');
     registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Falha ao falar com o banco: ${String(erro).slice(0, 300)}`, null, vinculos(d, 'cobrancas', cb));
     return cb.banco;
   }
-  const banco = { ...antes, provedor: 'c6', conta_id: extra.conta_id || antes.conta_id || null, ambiente: extra.ambiente || antes.ambiente || null, situacao: 'erro', erro: String(erro).slice(0, 500), erro_em: new Date().toISOString() };
-  atualizar(d, 'cobrancas', cb.id, { banco }, usuario, `Falha na emissão no C6: ${String(erro).slice(0, 300)}`);
+  const banco = { ...antes, provedor: 'c6', conta_id: extra.conta_id || antes.conta_id || null, ambiente: extra.ambiente || antes.ambiente || null, situacao: 'erro', erro: String(erro).slice(0, 500), erro_em: new Date().toISOString(), incerto,
+    ...(antes.situacao === 'cancelado' ? { cancelado_antes: true } : {}) };
+  atualizar(d, 'cobrancas', cb.id, { banco, ...pend }, usuario, `${incerto ? 'Emissão no C6 sem resposta (pode ter sido emitido: confira no banco)' : 'Falha na emissão no C6'}: ${String(erro).slice(0, 300)}`);
   return banco;
 }
 
@@ -6563,16 +6648,29 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
   const enviados = (d.pagamentos_banco || []).filter((p) => p.situacao === 'agendado' && (p.data_pagamento || hoje) < hoje);
   const semEnvio = (d.pagamentos_banco || []).filter((p) => p.situacao === 'aguardando_aprovacao');
   const erros = (d.pagamentos_banco || []).filter((p) => p.situacao === 'erro');
-  if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length) return null;
+  const abertosNoBanco = pagosAquiAbertosNoBanco(d);
+  if (!semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length && !abertosNoBanco.length) return null;
   const partes = [];
+  if (abertosNoBanco.length) {
+    const c = buscar(d, 'contratos', abertosNoBanco[0].contrato_id);
+    partes.push(`${abertosNoBanco.length} boleto(s) pago(s) aqui e ainda em aberto no C6${abertosNoBanco.some((cb) => cb.banco.negativacao && cb.banco.negativacao.pode_cancelar) ? ', com negativação agendada' : ''} (ex.: ${c ? c.inquilino_nome : ''} ${C.compBr(abertosNoBanco[0].competencia)}): o inquilino pode pagar de novo. Na página do boleto, "Consultar situação no banco" (se o banco já recebeu, acerta sozinho) ou "Cancelar no banco"`);
+  }
   if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${CR.regra('dias_alerta_banco')} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
   if (erros.length) partes.push(`${erros.length} pagamento(s) com erro no banco`);
   const soPagamentos = !semDestino.length && !semComprovante.length;
-  return { nivel: enviados.length || semEnvio.length || erros.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null, link: soPagamentos ? '#/banco/pagamentos' : '#/banco', texto: `${partes.join('; ')}.` };
+  const soAbertos = abertosNoBanco.length && !semDestino.length && !semComprovante.length && !enviados.length && !semEnvio.length && !erros.length;
+  return { nivel: enviados.length || semEnvio.length || erros.length || abertosNoBanco.length ? 'aviso' : 'info', tipo: 'Banco', imovel: '', inquilino: '', ancora: null,
+    link: soAbertos ? `#/cobranca/${abertosNoBanco[0].id}` : soPagamentos ? '#/banco/pagamentos' : '#/banco', texto: `${partes.join('; ')}.` };
 }
+
+/**
+ * Boletos com o pagamento registrado aqui (à mão: Pix direto, dinheiro, extrato) que continuam em aberto no C6: o inquilino pode pagar
+ * de novo ou ser negativado já tendo pago. Pago pela listagem do banco (``pagamento_c6``) ou consultado como pago não entra.
+ */
+export const pagosAquiAbertosNoBanco = (d) => d.cobrancas.filter((cb) => cb.data_pagamento && cb.banco && cb.banco.situacao === 'emitido' && !cb.pagamento_c6 && !aguardandoCredito(cb));
 
 // --------------------------------------------------------------------------
 // Busca global (campo do cabeçalho): imóvel, inquilino, CPF/CNPJ, telefone, nº da NF e valor de boleto

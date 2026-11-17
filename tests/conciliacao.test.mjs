@@ -33,6 +33,7 @@ const entrada = (reference, entry_date, amount, extra = {}) => ({ reference, loc
   operation_type: 'INCOMING', transaction_type: 'CREDIT_PIX_PAYMENT_RECEIVED', title: 'Pix Recebido', description: 'PIX RECEBIDO MARIA EXEMPLO', end_to_end_id: `E${reference}`, ...extra });
 const saida = (reference, entry_date, amount, description, extra = {}) => ({ reference, created_at: `${entry_date}T10:00:00`, entry_date, amount,
   operation_type: 'OUTGOING', transaction_type: 'PAYMENT', title: 'Pagamento', description, ...extra });
+const LIQUIDACAO = { transaction_type: 'OTHER', title: 'Liquidacao de boleto', description: 'LIQUIDACAO BOLETO MARIA EXEMPLO', end_to_end_id: null };
 const importar = (d, conta, lancs, opts) => Z.importarExtrato(d, conta, lancs, 'julio', opts);
 
 test('importação do extrato: converte "1500.00" em centavos, nunca repete o reference na mesma conta e grava até onde importou', () => {
@@ -156,13 +157,13 @@ test('conciliação de boletos pela listagem do C6: por external_reference_id e 
   // pago em dia, creditado depois do vencimento
   let sug = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: null, payments: [{ amount: '1318.50', external_payment_id: 'p1', payment_date: '2026-08-10', credit_date: '2026-08-11', payment_type: 'PIX' }] }]);
   assert.equal(sug.length, 1);
-  assert.deepEqual([sug[0].cobranca_id, sug[0].data_credito, sug[0].valor, sug[0].certeza, sug[0].pagouEmDia, sug[0].external_payment_id], [cb2.id, '2026-08-11', 131850, 'exata', true, 'p1']);
+  assert.deepEqual([sug[0].cobranca_id, sug[0].data_credito, sug[0].valor, sug[0].certeza, sug[0].pagouEmDia, sug[0].external_payment_id], [cb2.id, '2026-08-11', 131850, 'provavel', true, 'p1']); // só pelo valor e pela data: provável (desmarcado)
   // atrasado: valor cheio + multa + juros em 20/08 (R$ 1.603,65) casa pelo previsto
   sug = Z.conciliarBoletos(d, 'ank', [{ amount: '1603.65', payment_date: '2026-08-20', credit_date: '2026-08-20' }]);
-  assert.deepEqual([sug[0].cobranca_id, sug[0].certeza, sug[0].pagouEmDia], [cb2.id, 'exata', false]);
-  // valor em dia mas 5 dias depois do vencimento (tolerância 3): não casa
+  assert.deepEqual([sug[0].cobranca_id, sug[0].certeza, sug[0].pagouEmDia], [cb2.id, 'provavel', false]);
+  // valor em dia mas pago 5 dias depois do vencimento: não casa (com o dia do pagamento informado pelo banco não há tolerância)
   assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }]).length, 0);
-  assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }], { dias: 10 }).length, 1);
+  assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }], { dias: 10 }).length, 0);
   // external_reference_id vence o valor
   cb2.banco = { id_externo: 'ANK00000000000000000000002', nosso_numero: '123' };
   sug = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'ANK00000000000000000000002', payments: [{ amount: '1000.00', payment_date: '2026-08-10', credit_date: '2026-08-10' }] }]);
@@ -180,20 +181,17 @@ test('conciliação de boletos pela listagem do C6: por external_reference_id e 
   assert.equal(Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'ANK00000000000000000000002', payments: [{ amount: '1318.50', payment_date: '2026-08-10', credit_date: '2026-08-10' }] }]).length, 0);
 });
 
-test('conciliação pelo extrato: só entradas casam; nosso número do boleto vence o valor', () => {
+test('conciliação pelo extrato: só entradas casam', () => {
   const { d, cb2 } = base();
   const { novas: [ent, sai] } = importar(d, 'ank', [entrada('e1', '2026-08-10', '1318.50'), saida('s1', '2026-08-10', '1318.50', 'PAGAMENTO')]);
-  let sug = Z.conciliarMovimentacoes(d, [ent, sai]);
+  const sug = Z.conciliarMovimentacoes(d, [ent, sai]);
   assert.deepEqual(sug.map((x) => [x.movimentacao_id, x.cobranca_id, x.certeza]), [[ent.id, cb2.id, 'exata']]);
-  cb2.banco = { id_externo: 'X', nosso_numero: '777' };
-  const [nn] = importar(d, 'jck', [{ id_externo: 'n1', data: '2026-08-12', valor_centavos: 99999, tipo: 'entrada', descricao: 'LIQUIDACAO BOLETO', categoria: 'BOLETO', nosso_numero: '777' }]).novas;
-  sug = Z.conciliarMovimentacoes(d, [nn]);
-  assert.deepEqual([sug[0].cobranca_id, sug[0].certeza], [cb2.id, 'exata']);
 });
 
 test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados, não duplica e o estorno limpa tudo', () => {
   const { d, cb2, loja } = base();
-  const { novas: [ent, ent2] } = importar(d, 'ank', [entrada('e1', '2026-08-11', '1318.50'), entrada('e2', '2026-08-12', '1300.00')]);
+  // e1: boleto pago pelo código de barras e creditado no dia seguinte ao vencimento: em dia (o banco leva de 1 a 3 dias úteis)
+  const { novas: [ent, ent2] } = importar(d, 'ank', [entrada('e1', '2026-08-11', '1318.50', LIQUIDACAO), entrada('e2', '2026-08-12', '1300.00')]);
   const r = Z.confirmarPagamentoPeloBanco(d, cb2.id, ent.id, 'julio');
   assert.equal(r.divergente, false);
   const cb = R.buscar(d, 'cobrancas', cb2.id);

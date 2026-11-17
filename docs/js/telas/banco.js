@@ -286,11 +286,11 @@ function caixaConferirBoletos(conta, mes) {
     const c = cb ? buscar('contratos', cb.contrato_id) : null;
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     if (!cb) return '';
-    const travada = !!cb.data_pagamento || s.jaPago || s.aguardandoCredito;
+    const travada = !!cb.data_pagamento || s.jaPago || s.aguardandoCredito || !!s.alerta;
     return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${travada ? 'disabled' : Z.prontoParaRegistrar(d(), s) ? 'checked' : ''}></td>
       <td><a href="#/cobranca/${cb.id}"><b>${esc(i ? i.nome : '')}</b> · ${esc(c ? c.inquilino_nome : '')}</a><br><span class="suave">boleto ${compBr(cb.competencia)} · vence ${dataBr(cb.vencimento)}${s.certeza === 'provavel' ? ' · casado só pelo valor e pela data: confira' : ''}</span></td>
       <td class="nw">${dataBr(s.data_credito)}${s.data_pagamento && s.data_pagamento !== s.data_credito ? `<br><span class="suave">pagou ${dataBr(s.data_pagamento)}</span>` : ''}</td><td class="n">${reais(s.valor)}${s.previsto !== s.valor ? `<br><span class="texto-aviso">previsto ${reais(s.previsto)}</span>` : ''}</td>
-      <td>${cb.data_pagamento || s.jaPago ? etiqueta('já estava pago', 'neutra') : s.aguardandoCredito ? etiqueta('pago, aguardando crédito no banco', 'aviso') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}${s.alternativas > 1 && !s.jaPago ? `<br>${etiqueta(`este pagamento casa com ${s.alternativas} boletos: marque só o certo`, 'aviso')}` : ''}</td></tr>`;
+      <td>${s.alerta ? etiqueta(s.alerta, 'perigo') : cb.data_pagamento || s.jaPago ? etiqueta('já estava pago', 'neutra') : s.aguardandoCredito ? etiqueta('pago, aguardando crédito no banco', 'aviso') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}${s.alternativas > 1 && !s.jaPago ? `<br>${etiqueta(`este pagamento casa com ${s.alternativas} boletos: marque só o certo`, 'aviso')}` : ''}</td></tr>`;
   };
   return `<div class="cartao" id="conferir-boletos" data-caixa="conferir-boletos"><h2>Conferir boletos pagos no banco</h2>
     <p class="suave">O banco informa quais boletos nossos foram pagos em ${compBr(mes)}. O sistema mostra os que ainda estão em aberto aqui; você marca e confirma, e cada um fica "Pago" com a data em que o dinheiro entrou (a linha do extrato desse dinheiro, se já foi buscada, fica ligada ao boleto). Um pagamento que casa com mais de um boleto (mesmo valor) não vem marcado: marque só o certo. Valor diferente do previsto: confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.</p>
@@ -604,9 +604,37 @@ function abrirDivergencia(r, m) {
   ir(`#/cobranca/${r.cobranca.id}?ir=pagamento`);
 }
 
+/**
+ * Pago depois do vencimento com o valor do desconto (decisão do dono, 16/11/2026): não é "em dia". Pergunta se registra o que entrou
+ * e passa a diferença (desconto perdido, multa e juros) para o próximo boleto. Devolve true (passar), false (outro caminho) ou null (cancelou).
+ */
+async function perguntarDiferencaNoProximo(r, m) {
+  const cb = r.cobranca;
+  const c = buscar('contratos', cb.contrato_id);
+  const resp = await janela({ titulo: 'Pago com atraso pelo valor do desconto', sim: 'Registrar e passar a diferença', nao: 'Cancelar', forte: true,
+    html: `<p>Boleto de <b>${compBr(cb.competencia)}</b> de <b>${esc(c ? c.inquilino_nome : '')}</b>: vencimento ${dataBr(cb.vencimento)}, pago em <b>${dataBr(r.dataPagou || m.data)}</b>${Z.ehPix(m) ? ' por Pix' : ''}.</p>
+      <p>Entrou <b>${reais(r.recebido)}</b> (o valor com a bonificação de pontualidade). Pago depois do vencimento, o devido é <b>${reais(r.previsto)}</b>: faltam <b>${reais(r.diferenca)}</b> (bonificação perdida, multa e juros).</p>
+      ${r.proximo ? `<p>Ao confirmar, este boleto fica "Pago com atraso" com o valor que entrou e os <b>${reais(r.diferenca)}</b> vão como cobrança adicional no boleto de <b>${compBr(r.proximo.competencia)}</b> (vence ${dataBr(r.proximo.vencimento)}).${r.proximo.banco && r.proximo.banco.situacao === 'emitido' ? ' Esse boleto já está no banco: depois, atualize-o lá ("Atualizar o boleto no banco").' : ''}</p>`
+    : `<p>Ao confirmar, este boleto fica "Pago com atraso" com o valor que entrou e os <b>${reais(r.diferenca)}</b> vão para o próximo boleto do aluguel assim que ele for gerado.</p>`}` });
+  if (!resp) return null;
+  return true;
+}
+
+/** Para onde foi a diferença (texto do aviso). */
+const ondeFoiDiferenca = (res) => (res && res.resultado && res.resultado.proximo ? `o boleto de ${compBr(res.resultado.proximo.competencia)}` : 'o próximo boleto, quando ele for gerado');
+
 /** Grava o destino; boleto com valor diferente do previsto não grava e abre o fluxo da divergência. */
 async function salvarDestino(m, destino) {
-  const r = await alterar((db) => Z.vincularMovimentacao(db, m.id, destino, login()));
+  let r = await alterar((db) => Z.vincularMovimentacao(db, m.id, destino, login()));
+  if (r && r.divergente && r.atrasoComDesconto) {
+    const passar = await perguntarDiferencaNoProximo(r, m);
+    if (passar === null) return mostrar();
+    if (passar) {
+      r = await alterar((db) => Z.vincularMovimentacao(db, m.id, { ...destino, diferencaNoProximo: true }, login()));
+      aviso(`Boleto de ${compBr(r.cobranca.competencia)} registrado como pago com atraso; a diferença vai para ${ondeFoiDiferenca(r)}.`, 'ok');
+      return mostrar();
+    }
+  }
   if (r && r.divergente) return abrirDivergencia(r, m);
   if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(r && r.ligada ? `Entrada ligada ao boleto de ${compBr(cb.competencia)}, que já estava pago (${dataBr(cb.data_pagamento)}). Nada foi pago de novo.` : `Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
   return mostrar();
@@ -835,6 +863,15 @@ export const ACOES_BANCO = {
         <p class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou e esta movimentação fica ligada a ele.</p>` });
     if (!r) return;
     const res = await alterar((db) => Z.confirmarPagamentoPeloBanco(db, cb.id, m.id, login()));
+    if (res.divergente && res.atrasoComDesconto) {
+      const passar = await perguntarDiferencaNoProximo(res, m);
+      if (passar === null) return mostrar();
+      if (passar) {
+        const fim = await alterar((db) => Z.confirmarPagamentoPeloBanco(db, cb.id, m.id, login(), { diferencaNoProximo: true }));
+        aviso(`Boleto de ${compBr(cb.competencia)} registrado como pago com atraso; a diferença vai para ${ondeFoiDiferenca(fim)}.`, 'ok');
+        return mostrar();
+      }
+    }
     if (res.divergente) return abrirDivergencia(res, m);
     aviso(`Pagamento do boleto de ${compBr(cb.competencia)} confirmado.`);
     await mostrar();

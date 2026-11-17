@@ -200,7 +200,36 @@ let transporte = null;
 export function trocarTransporteParaTeste(fn) { transporte = fn; }
 
 function pedir(url, opcoes = {}) {
-  return transporte ? transporte(url, opcoes) : pedirNoBanco(url, opcoes);
+  const tentar = async () => (transporte ? transporte(url, opcoes) : pedirNoBanco(url, opcoes));
+  return tentar().catch((e) => { throw erroDeConexao(e, opcoes.metodo || 'GET', url); });
+}
+
+const CODIGOS_TEMPO = ['TEMPO_ESGOTADO', 'ETIMEDOUT', 'ESOCKETTIMEDOUT'];
+const CODIGOS_SEM_CONEXAO = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH', 'ENETDOWN'];
+const CODIGOS_QUEDA = ['ECONNRESET', 'EPIPE', 'ECONNABORTED'];
+
+/**
+ * Falha de rede ou de certificado ao falar com o banco → ErroHttp em português (mantém ``code`` e ``socketReusado`` para as novas
+ * tentativas das consultas). Numa escrita (emissão, alteração…) que o banco pode ter recebido (tempo esgotado ou conexão caída
+ * depois do envio), a resposta é 504 com ``detalhes.incerto``: o site não deve emitir de novo sem conferir.
+ */
+export function erroDeConexao(e, metodo = 'GET', url = '') {
+  if (!e || e instanceof ErroHttp) return e;
+  const code = String(e.code || '');
+  const msg = String(e.message || '');
+  const escrita = String(metodo).toUpperCase() !== 'GET' && !/\/auth\/?$/.test(String(url).split('?')[0]);
+  const marcar = (x) => Object.assign(x, { code: e.code, socketReusado: e.socketReusado });
+  if (CODIGOS_TEMPO.includes(code) || CODIGOS_QUEDA.includes(code) || /socket hang up/i.test(msg)) {
+    const tempo = CODIGOS_TEMPO.includes(code);
+    if (escrita) return marcar(new ErroHttp(504, `${tempo ? 'O banco não respondeu a tempo' : 'A conexão com o banco caiu'} e o pedido PODE ter chegado lá. Não emita de novo sem conferir: use "Conferir no banco" (a mesma referência é usada, sem criar outro boleto).`, { incerto: true, codigo: code }));
+    return marcar(new ErroHttp(504, tempo ? 'O banco não respondeu a tempo. Tente daqui a pouco.' : 'A conexão com o banco caiu. Tente de novo.', { codigo: code }));
+  }
+  if (CODIGOS_SEM_CONEXAO.includes(code)) return marcar(new ErroHttp(502, 'Não consegui me conectar ao banco: confira a internet do computador da ponte (ou o endereço do banco no .env).', { codigo: code }));
+  if (/^ERR_(OSSL|SSL|TLS)/.test(code) || ['CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'EPROTO'].includes(code)
+    || /bad decrypt|mac verify|bad password|PEM|certificate|handshake|alert/i.test(msg)) {
+    return marcar(new ErroHttp(502, 'O certificado do C6 foi recusado (pelo banco ou ao abrir a chave): confira o certificado, a chave privada e a senha da chave (C6_<CONTA>_SENHA_CHAVE) da conta na ponte.', { codigo: code || 'TLS' }));
+  }
+  return e;
 }
 
 function pedirNoBanco(url, { metodo = 'GET', cabecalhos = {}, corpo = null, conta = null, binario = false } = {}) {
@@ -493,7 +522,7 @@ export function montarPedidoSeguro(pedido, conta) {
   const end = pg[K.pagador_endereco] && typeof pg[K.pagador_endereco] === 'object' ? pg[K.pagador_endereco] : {};
   const endereco = { [K.endereco_rua]: textoNoLimite(end[K.endereco_rua], L.endereco, 'A rua e o número do pagador', { semBarra: true }), [K.endereco_bairro]: textoNoLimite(end[K.endereco_bairro], L.bairro, 'O bairro do pagador', { semBarra: true }),
     [K.endereco_cidade]: textoNoLimite(end[K.endereco_cidade], L.cidade, 'A cidade do pagador', { semBarra: true }),
-    [K.endereco_uf]: texto(end[K.endereco_uf], 2).toUpperCase(), [K.endereco_cep]: String(end[K.endereco_cep] || '').replace(/\D/g, '').slice(0, 8) };
+    [K.endereco_uf]: texto(end[K.endereco_uf], 2).toUpperCase(), [K.endereco_cep]: String(end[K.endereco_cep] || '').replace(/\D/g, '') }; // CEP com mais de 8 números é recusado (nunca cortado)
   for (const [k, v] of Object.entries(endereco)) if (!v) throw new ErroHttp(400, `Falta o campo "${k}" no endereço do pagador.`);
   if (endereco[K.endereco_cep].length !== 8) throw new ErroHttp(400, 'CEP do pagador precisa ter 8 dígitos.');
   if (!/^[A-Z]{2}$/.test(endereco[K.endereco_uf])) throw new ErroHttp(400, 'UF do pagador precisa ter 2 letras.');
@@ -600,6 +629,16 @@ export const SERVICOS = {
           return { status: 201, dados: { ...respostaEmissao(r), ambiente: conta.ambiente } };
         }
         exigirConfigurada(conta);
+        // nova tentativa de uma emissão sem resposta (o site manda a MESMA referência e ``repetir``): antes de pedir outra vez,
+        // confere se o banco já tem esta cobrança; se tiver, devolve a que existe (nunca cria um 2º boleto)
+        if (corpo && corpo.repetir === true) {
+          try {
+            const ja = await consultarNoC6(cfg, conta, pedido[M.CAMPOS.referencia]);
+            if (ja && ja[M.RESPOSTA.referencia] === pedido[M.CAMPOS.referencia]) return { status: 200, dados: { ...ja, ambiente: conta.ambiente, ja_existia: true } };
+          } catch (e) {
+            if (!(e instanceof ErroHttp) || e.status !== 404) throw e; // não deu para conferir: não emite às cegas
+          }
+        }
         const contar = conferirLimiteDiario(cfg, conta);
         const r = await chamarC6(cfg, conta, 'POST', M.CAMINHOS.boletos(versao(conta)), pedido);
         contar();
