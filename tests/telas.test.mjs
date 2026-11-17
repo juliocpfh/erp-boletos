@@ -264,8 +264,6 @@ test('telas: erro esperado de quem usa é C.ErroUsuario (aparece na tela, não v
     'Este boleto não é fictício.', 'Não consegui gerar o comprovante pelo banco agora', 'Os pagamentos ficaram como rascunho, mas o banco não respondeu',
     'Clique em "Atualizar situação" para ver o que o banco tem', 'Não tive resposta do banco.', "'Modelo não encontrado.'", 'Formulário sem a tela de destino',
     'A nuvem recusou (erro', "'Backup desconhecido.'",
-    // coladas nas perguntas da PR #286: viram ErroUsuario depois do merge dela
-    'Marque as alterações que quer desfazer.', 'Informe a data do termo aditivo.', 'Informe o assunto do termo aditivo', 'Nada foi salvo. Corrija o que precisar e salve de novo.',
   ];
   const pasta = fileURLToPath(new URL('../docs/js/telas/', import.meta.url));
   const sobra = [];

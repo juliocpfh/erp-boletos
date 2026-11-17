@@ -831,7 +831,7 @@ export const ACOES = {
 
   async desfazerMarcados() {
     const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].map((x) => x.value);
-    if (!itens.length) throw new Error('Marque as alterações que quer desfazer.');
+    if (!itens.length) throw new C.ErroUsuario('Marque as alterações que quer desfazer.');
     if (!(await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: 'Desfazer as alterações marcadas?', sim: 'Desfazer', forte: true }))) return;
     await desfazerItens(itens);
   },
@@ -962,8 +962,8 @@ export const ACOES = {
     const form = el.closest('form');
     const data = form.querySelector('[name=data]').value;
     const assunto = form.querySelector('[name=assunto]').value;
-    if (!data) throw new Error('Informe a data do termo aditivo.');
-    if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+    if (!data) throw new C.ErroUsuario('Informe a data do termo aditivo.');
+    if (!String(assunto || '').trim()) throw new C.ErroUsuario('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
     if (!(await confirmar(`O termo aditivo de ${C.dataBr(data)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`, { titulo: 'Registrar o termo aditivo como perdido?', sim: 'Registrar como perdido' }))) return;
     await alterar((db) => R.registrarAditivo(db, Number(contrato), { data, assunto, perdido: true }, login(), podeUsuario('admin')));
     aviso('Termo aditivo registrado como perdido.');
