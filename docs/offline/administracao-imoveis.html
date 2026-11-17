@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-6tlchuoCogYeILdDX7GxdGjUx6vP4mcTpmHbJ0vsML4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-krNrnZrr5G1pTbbBTDB5NkqbM6dzpUnSZXGzYnwy4y4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ccbfd4be43ec509d">
+<meta name="fontes" content="c675a5f7a744000d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1258,6 +1258,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (new Set(passos.map((p2) => p2.dias)).size !== passos.length) throw new ErroRegra("Régua de cobrança: dois passos com o mesmo número de dias.");
         return passos.sort((a, b) => a.dias - b.dias);
       }
+      case "dias": {
+        const lista3 = (Array.isArray(valor) ? valor : []).map(Number);
+        for (const n of lista3) if (!Number.isInteger(n)) throw new ErroRegra(`${def.rotulo}: use só números inteiros (ex.: -3, 0, 3, 10).`);
+        return [...new Set(lista3.map(faixa))].sort((a, b) => a - b);
+      }
       default:
         return valor;
     }
@@ -1609,6 +1614,29 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           explica: 'O que fazer pelo atraso do boleto vencido mais antigo (só aviso, nada é enviado sozinho). Um passo por linha: "dias: o que fazer". Ex.: "10: Ligar para o inquilino".',
           consequencia: "Muda o passo mostrado no alerta e na tela Inadimplência. Cobrar sem ameaçar nem expor o devedor; para negativar, o órgão avisa a pessoa antes.",
           lei: "CDC, art. 42 e art. 43, §2º; Súmula 359 do STJ; LGPD, art. 7º, X (dados para proteção do crédito)."
+        },
+        // régua por e-mail (pedido do dono em 2026-11-16): o sistema prepara, o administrador autoriza um a um (regua-email.js, #/regua)
+        {
+          chave: "regua_email_dias",
+          grupo: "rotina",
+          rotulo: "Régua de cobrança: quando preparar o e-mail ao inquilino",
+          tipo: "dias",
+          padrao: [-3, 0, 3, 10],
+          min: -30,
+          max: 60,
+          explica: 'Dias em relação ao vencimento do boleto, separados por vírgula: número negativo é antes, 0 é no dia, positivo é depois. Ex.: "-3, 0, 3, 10" → boleto que vence em 10/12: lembrete em 07/12, "vence hoje" em 10/12 e cobrança de atraso em 13/12 e 20/12. O e-mail fica em "E-mails da régua" (Financeiro) esperando a sua autorização: nada é enviado sozinho. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar, o prazo que o banco leva para creditar o boleto (quem pagou no dia não recebe cobrança). Em branco: nenhum e-mail é preparado.',
+          consequencia: 'Só muda quando o e-mail aparece na lista. Boleto pago, em acordo ou de contrato encerrado sai da lista sozinho; e-mail já enviado ou marcado "Não enviar" não volta.',
+          lei: "CDC, art. 42 (cobrança sem constranger nem ameaçar); LGPD, art. 7º, V (dados usados para cumprir o contrato)."
+        },
+        {
+          chave: "regua_envio",
+          grupo: "rotina",
+          rotulo: 'Régua de cobrança: botão "Autorizar e enviar" pelo Gmail da empresa',
+          tipo: "simnao",
+          padrao: false,
+          explica: 'Não (padrão): os e-mails da régua ficam prontos na lista e você abre cada um no Gmail (ou copia o texto) para mandar por lá. Sim: aparece também o botão "Autorizar e enviar", que manda pelo Gmail da empresa (só na nuvem, com o Gmail ligado). Mesmo ligado, nada sai sem o clique do administrador.',
+          consequencia: 'Sim: o e-mail sai na hora do clique, com o boleto e o QR Code do Pix anexados, e fica em "Enviados" no Gmail. Não: o envio é sempre feito à mão pelo Gmail.',
+          lei: "CDC, art. 42; LGPD, art. 7º, V."
         },
         {
           chave: "meses_documentos_ficha",
@@ -7238,10 +7266,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       reserva_abatida_comp: null,
       reserva_abatida_valor: null
     };
-    const copiar3 = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
-    if (copiar3.length) res.comprovante_reserva = a.comprovante_reserva;
+    const copiar4 = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
+    if (copiar4.length) res.comprovante_reserva = a.comprovante_reserva;
     atualizar(d2, "contratos", n.id, res, usuario, `${n.inquilino_nome}: reserva de ${reais(a.reserva_valor)} do contrato (já usada ${reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
-    return copiar3;
+    return copiar4;
   }
   function mesesUsoReserva(d2, a) {
     const meses = [...cadeiaDeContratos(d2, a).antes, a].flatMap((x) => [
@@ -10471,6 +10499,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         guias_impostos: "Guia de imposto",
         modelos_email: "Modelo de e-mail",
         envios_email: "E-mail enviado",
+        regua_emails: "E-mail da régua de cobrança (autorizado ou não)",
         movimentacoes_banco: "Movimentação bancária",
         pagamentos_banco: "Pagamento pelo banco",
         adiamentos_alerta: "Adiamento de alerta",
@@ -15679,14 +15708,14 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     if (!sistemaComecando(db) || passosEscondidos(quem)) return false;
     return passosIniciais(db, opcoes2).some((p2) => !p2.feito);
   }
-  function caixaPrimeirosPassos(db, { quem = "", pode: pode2 = true, admin = false, hoje: hoje3, backupLigado = false } = {}) {
+  function caixaPrimeirosPassos(db, { quem = "", pode: pode2 = true, admin: admin2 = false, hoje: hoje3, backupLigado = false } = {}) {
     if (!pode2 || !mostrarPassos(db, quem, { hoje: hoje3, backupLigado })) return "";
     const passos = passosIniciais(db, { hoje: hoje3, backupLigado });
     const feitos = passos.filter((p2) => p2.feito).length;
-    const proximo = passos.find((p2) => !p2.feito && !(p2.soAdmin && !admin) && !(p2.depois && !passos.find((x) => x.chave === p2.depois).feito));
+    const proximo = passos.find((p2) => !p2.feito && !(p2.soAdmin && !admin2) && !(p2.depois && !passos.find((x) => x.chave === p2.depois).feito));
     const item3 = (p2, n) => {
       const espera = p2.depois && !passos.find((x) => x.chave === p2.depois).feito;
-      const acao = p2.feito ? '<span class="passo-feito">feito</span>' : p2.soAdmin && !admin ? '<span class="suave">(o administrador faz)</span>' : espera ? `<span class="suave">(depois do passo ${passos.findIndex((x) => x.chave === p2.depois) + 1})</span>` : `<a class="botao${p2 === proximo ? "" : " secundario"} pequeno" href="${esc(p2.href)}">${esc(p2.botao)}</a>`;
+      const acao = p2.feito ? '<span class="passo-feito">feito</span>' : p2.soAdmin && !admin2 ? '<span class="suave">(o administrador faz)</span>' : espera ? `<span class="suave">(depois do passo ${passos.findIndex((x) => x.chave === p2.depois) + 1})</span>` : `<a class="botao${p2 === proximo ? "" : " secundario"} pequeno" href="${esc(p2.href)}">${esc(p2.botao)}</a>`;
       return `<li class="${p2.feito ? "feito" : ""}"><span class="passo-numero" aria-hidden="true">${p2.feito ? "✓" : n}</span>
       <div><b>${esc(p2.titulo)}</b><br><span class="suave">${esc(p2.texto)}</span><div class="passo-acao">${acao}</div></div></li>`;
     };
@@ -22353,6 +22382,74 @@ Ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), um lançamento
 {informe}
 
 O aluguel de moradia não reduz o imposto; a informação serve para o cruzamento da Receita Federal. Não houve retenção de imposto de renda na fonte.[fim]`
+        },
+        // Régua de cobrança por e-mail (pedido do dono em 2026-11-16): o sistema prepara (regua-email.js) e só sai com a autorização
+        // do administrador (#/regua). ``boleto``: o e-mail é de um boleto (alvo { contrato, cobranca }); boleto do C6 e QR Code do Pix anexados.
+        {
+          chave: "cobranca_antes",
+          nome: "Lembrete antes do vencimento",
+          etapa: "Régua de cobrança",
+          boleto: true,
+          assunto: "Lembrete: boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}",
+          anexos: "",
+          prontos: ["boleto:pdf", "boleto:pix"],
+          texto: `Olá, {nome}, tudo bem?
+
+Lembramos que o boleto {boleto_referente} do imóvel da {imovel} vence em {vencimento_boleto}[se nao_util], que não é dia útil: pode ser pago sem multa até {limite_pagamento}[fim], no valor de {valor_em_dia}[se bonificacao_boleto] (já com a bonificação de pontualidade)[fim].
+
+Depois de {limite_pagamento}: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
+[se pix]
+PIX COPIA E COLA
+{pix}
+[fim][se linha_digitavel]
+LINHA DIGITÁVEL DO BOLETO
+{linha_digitavel}
+[fim]
+Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
+        },
+        {
+          chave: "cobranca_dia",
+          nome: "Lembrete no dia do vencimento",
+          etapa: "Régua de cobrança",
+          boleto: true,
+          assunto: "Lembrete: boleto {boleto_referente} ({imovel}) vence hoje",
+          anexos: "",
+          prontos: ["boleto:pdf", "boleto:pix"],
+          texto: `Olá, {nome}, tudo bem?
+
+[se nao_util]O boleto {boleto_referente} do imóvel da {imovel} venceu em {vencimento_boleto}, que não é dia útil, e pode ser pago sem multa até hoje, {limite_pagamento}[senão]Lembramos que o boleto {boleto_referente} do imóvel da {imovel} vence hoje, {vencimento_boleto}[fim], no valor de {valor_em_dia}[se bonificacao_boleto] (já com a bonificação de pontualidade)[fim].
+
+A partir de amanhã: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
+[se pix]
+PIX COPIA E COLA
+{pix}
+[fim][se linha_digitavel]
+LINHA DIGITÁVEL DO BOLETO
+{linha_digitavel}
+[fim]
+Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
+        },
+        {
+          chave: "cobranca_atraso",
+          nome: "Boleto em atraso",
+          etapa: "Régua de cobrança",
+          boleto: true,
+          assunto: "Boleto {boleto_referente} em aberto ({imovel})",
+          anexos: "",
+          prontos: ["boleto:pdf", "boleto:pix"],
+          texto: `Olá, {nome}, tudo bem?
+
+O boleto {boleto_referente} do imóvel da {imovel}, com vencimento em {vencimento_boleto}, ainda consta em aberto em nosso sistema ({dias_atraso} dia(s) de atraso).
+
+Valor para pagamento hoje ({data_hoje}): {valor_hoje} ({valor_cheio} + multa de {multa_hoje} + juros de {juros_hoje}). Em outro dia o valor muda: se precisar, responda este e-mail que mandamos o valor atualizado.
+[se pix]
+PIX COPIA E COLA
+{pix}
+[fim][se linha_digitavel]
+LINHA DIGITÁVEL DO BOLETO
+{linha_digitavel}
+[fim]
+Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, responda com o comprovante.`
         }
       ];
     }
@@ -22422,6 +22519,29 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const l = f && f.links_ficha && f.links_ficha[pessoa2];
     const naAba = f && urlDoLink(f.id, pessoa2);
     return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: naAba.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
+  }
+  function camposDoBoleto(cb, campos, hoje3) {
+    const t = totais(cb);
+    const limite = limitePagamento(cb.vencimento);
+    const r = liquidar(cb, hoje3);
+    const b = cb.banco && cb.banco.situacao !== "cancelado" ? cb.banco : {};
+    Object.assign(campos, {
+      boleto_referente: ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ""} do acordo`.replace(/ {2,}/g, " ") : `do aluguel de ${compBr(cb.competencia)}`,
+      vencimento_boleto: dataBr(cb.vencimento),
+      limite_pagamento: dataBr(limite),
+      valor_em_dia: reais(t.a_pagar_pontual),
+      valor_cheio: reais(t.a_pagar_sem_desconto),
+      multa_pct: pct(cb.multa_percentual || 0),
+      juros_pct: pct(cb.juros_mensal_percentual || 0),
+      valor_hoje: reais(r.valor_devido),
+      multa_hoje: reais(r.multa || 0),
+      juros_hoje: reais(r.juros || 0),
+      dias_atraso: String(r.dias_atraso),
+      data_hoje: dataBr(hoje3),
+      pix: b.pix_copia_cola || "",
+      linha_digitavel: b.linha_digitavel || ""
+    });
+    return { nao_util: limite !== cb.vencimento, bonificacao_boleto: t.a_pagar_pontual < t.a_pagar_sem_desconto, pix: !!b.pix_copia_cola, linha_digitavel: !!b.linha_digitavel };
   }
   function respostasPadrao(d2, c, hoje3) {
     const reparos = c ? resultadoVistoriaSaida(d2, c).reparos : [];
@@ -22527,6 +22647,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       link_fiador: !!linkDaFicha(f, "fiador1", hoje3).url,
       varios_fiadores: !!f && fiadoresDaFicha(f).length > 1
     };
+    if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje3));
     const a = alvo.aditivo || null;
     if (a) Object.assign(campos, { aditivo_data: dataBr(a.data), aditivo_assunto: a.assunto || "alteração do contrato" });
     if (a && a.valor_novo > 0) {
@@ -22569,6 +22690,14 @@ ${DICA_DOCUMENTOS}`].join("\n");
           const nome = (DOCUMENTOS_ENTRADA.find(([k]) => k === campo2) || [])[1] || "documento";
           if (doc && doc.arquivo) arquivo("assinados", doc.contrato.id, doc.arquivo, `${nome.toLowerCase()} assinado por todos`);
         }
+        continue;
+      }
+      if (tipo === "boleto") {
+        const cb = alvo.cobranca || null;
+        const b = cb && cb.banco;
+        if (!b || !emitidoNoBanco(cb)) continue;
+        if (qual === "pdf" && b.id_externo && !b.simulado) out.push({ tipo: "boleto", qual, id: cb.id, nome: `boleto-${cb.competencia}.pdf`, rotulo: "boleto do C6 (PDF)" });
+        if (qual === "pix" && b.pix_qr_base64) out.push({ tipo: "boleto", qual, id: cb.id, nome: `pix-${cb.competencia}.png`, rotulo: "QR Code do Pix (imagem)" });
         continue;
       }
       if (tipo === "recibo" && qual === "ficha_fiador") {
@@ -22962,6 +23091,7 @@ ${m.texto}
   <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
   {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
   {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel} (condições nao_util, bonificacao_boleto, pix, linha_digitavel).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
   bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>
@@ -25109,7 +25239,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${tel ? '<p class="suave">O WhatsApp abre a conversa com a pessoa: é só colar a mensagem lá (o link não vai no endereço da página, que fica no histórico do navegador).</p>' : ""}
       ${pessoa2 === "interessado" ? '<p class="suave">O e-mail "Envio de ficha cadastral", mandado agora, já leva este link (e o do fiador, se houver).</p>' : ""}`,
       ligar: (dlg) => {
-        const copiar3 = async () => {
+        const copiar4 = async () => {
           try {
             await navigator.clipboard.writeText(dlg.querySelector("[data-texto-link]").value);
             return true;
@@ -25119,11 +25249,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           }
         };
         dlg.querySelector("[data-copiar-link]").addEventListener("click", async (ev) => {
-          if (await copiar3()) ev.target.textContent = "Copiado ✓";
+          if (await copiar4()) ev.target.textContent = "Copiado ✓";
         });
         const zap = dlg.querySelector("[data-abrir-zap]");
         if (zap) zap.addEventListener("click", () => {
-          copiar3();
+          copiar4();
         });
       }
     });
@@ -28130,7 +28260,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const hoje3 = hojeIso();
     const r = inadimplencia(d(), hoje3);
     const imovelDe2 = (c) => (buscar2("imoveis", c.imovel_id) || {}).nome || "";
-    return `<h1>Financeiro</h1>${abasFinanceiro("inadimplencia")}<div class="cabecalho"><h2>Inadimplência</h2>${link("#/cobrancas", "Ver boletos")}</div>
+    return `<h1>Financeiro</h1>${abasFinanceiro("inadimplencia")}<div class="cabecalho"><h2>Inadimplência</h2><div>${link("#/regua", "E-mails da régua (autorizar)")} ${link("#/cobrancas", "Ver boletos")}</div></div>
     <div class="numeros">
       <div class="cartao"><div class="grande">${r.devedores.length}</div>inquilino(s) em atraso</div>
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
@@ -29005,6 +29135,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         return v.length ? v.map(feriadoTela).join(", ") : "nenhum";
       case "regua":
         return v.map((p2) => `${p2.dias} dia(s): ${p2.passo}`).join("; ");
+      case "dias":
+        return v.length ? v.join(", ") : "nenhum";
       default:
         return String(v ?? "");
     }
@@ -29029,9 +29161,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     linhas2.push("", mudadas ? `${mudadas} regra(s) diferente(s) do padrão do sistema.` : "Todas as regras estão no padrão do sistema.");
     return linhas2.join("\n");
   }
-  function campoRegra(def, v, admin) {
+  function campoRegra(def, v, admin2) {
     const nome = `r_${def.chave}`;
-    const des = admin ? "" : " disabled";
+    const des = admin2 ? "" : " disabled";
     switch (def.tipo) {
       case "opcao":
         return def.opcoes.map(([x, rotulo, explica]) => `<label class="opcao-regra"><input type="radio" name="${nome}" value="${esc(x)}"${x === v ? " checked" : ""}${des}>
@@ -29052,43 +29184,45 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         return `<textarea name="${nome}" rows="3" placeholder="20/01&#10;15/06/2028"${des}>${esc(v.map(feriadoTela).join("\n"))}</textarea>`;
       case "regua":
         return `<textarea name="${nome}" rows="4"${des}>${esc(v.map((p2) => `${p2.dias}: ${p2.passo}`).join("\n"))}</textarea>`;
+      case "dias":
+        return `<input name="${nome}" value="${esc(v.join(", "))}" placeholder="-3, 0, 3, 10" style="width:220px"${des}>`;
       default:
         return "";
     }
   }
-  function blocoRegra(def, regras, admin) {
+  function blocoRegra(def, regras, admin2) {
     const v = regras[def.chave];
     const mudada = !mesmoValor(v, def.padrao);
     return `<div class="regra-sistema" id="regra-${def.chave}">
     <h3>${esc(def.rotulo)} ${mudada ? etiqueta("mudada", "aviso") : etiqueta("padrão do sistema", "neutra")}</h3>
     <p>${esc(def.explica)}</p>
-    <div class="campo-regra">${campoRegra(def, v, admin)}</div>
+    <div class="campo-regra">${campoRegra(def, v, admin2)}</div>
     <p class="suave"><b>Consequência:</b> ${esc(def.consequencia)}</p>
     <p class="suave"><b>Lei:</b> ${esc(def.lei)}</p>
     ${mudada ? `<p class="suave">Padrão do sistema: <b>${esc(valorRegraTexto(def, def.padrao))}</b>.</p>` : ""}</div>`;
   }
   function telaRegras() {
-    const admin = podeUsuario("admin");
+    const admin2 = podeUsuario("admin");
     const regras = regrasDe(d());
     const mudadas = DEFINICOES_REGRAS.filter((x) => !mesmoValor(regras[x.chave], x.padrao));
     const versoes = [...d().versoes_regras || []].sort((a, b) => String(b.salvo_em).localeCompare(String(a.salvo_em)));
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Regras do sistema</h1>
     <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.
       ${mudadas.length ? `<br>Hoje <b>${mudadas.length} regra(s)</b> diferente(s) do padrão: ${mudadas.map((x) => esc(x.rotulo)).join("; ")}.` : "<br>Hoje todas as regras estão no padrão do sistema."}</div>
-    ${admin ? "" : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
+    ${admin2 ? "" : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
     <div class="cartao"><h2>Guardar e recuperar as regras</h2>
       <p>Salve uma versão antes de mudar: se algo der errado, volte a ela. O arquivo das regras guarda todas as regras em uso, para levar a outro sistema ou guardar fora.</p>
-      ${admin ? `<form data-form="salvarVersaoRegras" class="acoes"><input name="nome" placeholder="Ex.: Regras de novembro de 2026" style="max-width:320px"><button class="secundario">Salvar versão das regras</button></form>` : ""}
+      ${admin2 ? `<form data-form="salvarVersaoRegras" class="acoes"><input name="nome" placeholder="Ex.: Regras de novembro de 2026" style="max-width:320px"><button class="secundario">Salvar versão das regras</button></form>` : ""}
       ${versoes.length ? `<table><tr><th>Versão</th><th>Salva em</th><th>Por</th><th></th></tr>${versoes.map((v) => `<tr><td><b>${esc(v.nome)}</b></td><td>${dataHoraBr(v.salvo_em)}</td><td>${esc(v.salvo_por || "-")}</td>
-        <td class="n">${admin ? `${botao("restaurarVersaoRegras", "Voltar a esta versão", { id: v.id }, "secundario pequeno", `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}
+        <td class="n">${admin2 ? `${botao("restaurarVersaoRegras", "Voltar a esta versão", { id: v.id }, "secundario pequeno", `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}
         ${botao("excluirVersaoRegras", "Excluir", { id: v.id }, "perigo pequeno", `Excluir a versão "${v.nome}"? As regras em uso não mudam.`)}` : ""}</td></tr>`).join("")}</table>` : '<p class="suave">Nenhuma versão salva.</p>'}
       <p class="acoes">${botao("baixarArquivoRegras", "Baixar cópia das regras (para carregar depois)", {}, "secundario pequeno")}
-        ${admin ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
+        ${admin2 ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
         ${botao("voltarRegrasPadrao", "Voltar tudo ao padrão do sistema", {}, "perigo pequeno", "Voltar todas as regras ao padrão do sistema? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).")}` : ""}</p></div>
     <form data-form="regrasSistema">
       ${GRUPOS_REGRAS.map(([g, titulo2]) => `<div class="cartao"><h2>${esc(titulo2)}</h2>
-        ${DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join("")}</div>`).join("")}
-      ${admin ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ""}
+        ${DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin2)).join("")}</div>`).join("")}
+      ${admin2 ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ""}
     </form>`;
   }
   function feriadoDigitado(t) {
@@ -29130,6 +29264,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
             const m = linha.match(/^(\d+)\s*(?:dias?)?\s*[:\-–]\s*(.+)$/i);
             if (!m) throw new ErroUsuario(`Régua de cobrança: escreva "dias: o que fazer" em cada linha (ex.: "10: Ligar para o inquilino"). Linha: "${linha}"`);
             return { dias: Number(m[1]), passo: m[2].trim() };
+          });
+          break;
+        case "dias":
+          out[def.chave] = String(t || "").replace(/−/g, "-").split(/[;,\s]+/).filter(Boolean).map((x) => {
+            if (!/^[-+]?\d+$/.test(x)) throw new ErroUsuario(`${def.rotulo}: use números separados por vírgula (ex.: "-3, 0, 3, 10"). Não entendi: "${x}"`);
+            return Number(x);
           });
           break;
         default:
@@ -29201,6 +29341,325 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           if (!await confirmar("As regras de agora são trocadas pelas do arquivo. Se quiser guardar as de agora, cancele e salve uma versão antes.", { titulo: "Trocar as regras pelas do arquivo?", sim: "Trocar as regras" })) return;
           const n = await alterar((db) => salvarRegrasSistema(db, valores, login(), "Regras do sistema (arquivo carregado)"));
           aviso(`Regras do arquivo carregadas (${n} mudança(s)).`, "ok");
+          await mostrar();
+        }
+      };
+    }
+  });
+
+  // docs/js/regua-email.js
+  function dataDaEtapa(cb, dias) {
+    if (dias < 0) return somarDias(cb.vencimento, dias);
+    if (dias === 0) return limitePagamento(cb.vencimento);
+    const data2 = somarDias(cb.vencimento, dias);
+    const inicio = inicioDaCobranca(cb);
+    return data2 > inicio ? data2 : inicio;
+  }
+  function etapaDoBoleto(cb, hoje3, dias = regra("regua_email_dias") || []) {
+    const limite = limitePagamento(cb.vencimento);
+    const etapas = [...dias].sort((a, b) => a - b).map((n2) => ({ n: n2, data: dataDaEtapa(cb, n2) }));
+    let k = -1;
+    for (let i = 0; i < etapas.length; i += 1) if (etapas[i].data <= hoje3) k = i;
+    if (k < 0) return null;
+    const { n, data: data2 } = etapas[k];
+    if (n < 0 && hoje3 >= limite) return null;
+    if (n === 0 && hoje3 !== limite) return null;
+    if (n > 0 && k === etapas.length - 1 && hoje3 > somarDias(data2, JANELA_ULTIMA_ETAPA)) return null;
+    return n;
+  }
+  function filaRegua(d2, hoje3 = hojeIso()) {
+    const dias = regra("regua_email_dias") || [];
+    if (!dias.length) return [];
+    const menor = Math.min(...dias);
+    const maior = Math.max(...dias);
+    const vencDe = somarDias(hoje3, -(Math.max(maior, 0) + JANELA_ULTIMA_ETAPA + 15));
+    const vencAte = somarDias(hoje3, Math.max(-menor, 0) + 1);
+    const decididos = new Set((d2.regua_emails || []).map((x) => `${x.cobranca_id}|${x.dias}`));
+    const entradas = (d2.movimentacoes_banco || []).filter((m) => m.tipo === "entrada" && !m.classificacao && m.data >= somarDias(vencDe, -DIAS_ENTRADA_ANTES));
+    const out = [];
+    for (const cb of d2.cobrancas) {
+      if (!cb.vencimento || cb.vencimento < vencDe || cb.vencimento > vencAte) continue;
+      if (!aCobrar(cb) || ehComplementoCaucao(cb)) continue;
+      if (cb.banco && ["pago", "cancelado"].includes(cb.banco.situacao)) continue;
+      const t = totais(cb);
+      if (!(t.a_pagar_pontual > 0)) continue;
+      const n = etapaDoBoleto(cb, hoje3, dias);
+      if (n === null || decididos.has(`${cb.id}|${n}`)) continue;
+      if (n > 0 && aguardandoCredito(cb)) continue;
+      const c = buscar(d2, "contratos", cb.contrato_id);
+      if (!c || contratoEncerrado(d2, c)) continue;
+      const valor = n > 0 ? liquidar(cb, hoje3).valor_devido : t.a_pagar_pontual;
+      const avisos = [];
+      if (!c.inquilino_email) avisos.push("Sem e-mail no cadastro do inquilino: cadastre o e-mail para mandar.");
+      const pagamento = entradas.find((m) => m.data >= somarDias(cb.vencimento, -DIAS_ENTRADA_ANTES) && [t.a_pagar_pontual, t.a_pagar_sem_desconto, liquidar(cb, m.data).valor_devido].includes(m.valor));
+      if (pagamento) avisos.push(`No extrato há uma entrada de ${reais(pagamento.valor)} em ${dataBr(pagamento.data)} ainda sem destino: pode ser este pagamento. Confira na tela Banco antes de mandar.`);
+      out.push({
+        chave: `${cb.id}|${n}`,
+        cobranca: cb,
+        contrato: c,
+        imovel: buscar(d2, "imoveis", c.imovel_id),
+        dias: n,
+        etapa: nomeDaEtapa(n),
+        modelo: modeloDaEtapa(n),
+        desde: dataDaEtapa(cb, n),
+        para: c.inquilino_email || "",
+        valor,
+        avisos
+      });
+    }
+    return out.sort((a, b) => a.cobranca.vencimento.localeCompare(b.cobranca.vencimento) || String(a.contrato.inquilino_nome).localeCompare(String(b.contrato.inquilino_nome), "pt-BR"));
+  }
+  function registrarDecisao(d2, { cobranca_id, contrato_id, dias, situacao: situacao2, para = "", assunto = "", envio_id = null }, usuario, hoje3 = hojeIso()) {
+    if (!SITUACOES_REGUA[situacao2]) throw new Error(`Situação desconhecida: ${situacao2}`);
+    const ja = decisaoDe(d2, cobranca_id, dias);
+    if (ja) throw new ErroUsuario(`Este e-mail já foi decidido em ${dataBr(ja.data)} (${SITUACOES_REGUA[ja.situacao]}).`);
+    const cb = buscar(d2, "cobrancas", cobranca_id);
+    const c = buscar(d2, "contratos", contrato_id);
+    const nome = `${c ? c.inquilino_nome : "inquilino"}, boleto ${cb ? compBr(cb.competencia) : ""} (${nomeDaEtapa(dias)})`;
+    const texto3 = { enviado: `Régua de cobrança: e-mail enviado para ${para} — ${nome}`, gmail: `Régua de cobrança: e-mail aberto no Gmail para ${para} — ${nome}`, recusado: `Régua de cobrança: "Não enviar" — ${nome}` }[situacao2];
+    return inserir(d2, "regua_emails", { cobranca_id, contrato_id, dias, situacao: situacao2, data: hoje3, para: para || null, assunto: assunto || null, envio_id: envio_id || null }, usuario, texto3);
+  }
+  var JANELA_ULTIMA_ETAPA, DIAS_ENTRADA_ANTES, modeloDaEtapa, nomeDaEtapa, inicioDaCobranca, decisaoDe, SITUACOES_REGUA, itemDaFila, decididosRecentes;
+  var init_regua_email = __esm({
+    "docs/js/regua-email.js"() {
+      init_calculos();
+      init_conciliacao();
+      init_config_regras();
+      init_regras();
+      JANELA_ULTIMA_ETAPA = 30;
+      DIAS_ENTRADA_ANTES = 45;
+      modeloDaEtapa = (dias) => dias < 0 ? "cobranca_antes" : dias === 0 ? "cobranca_dia" : "cobranca_atraso";
+      nomeDaEtapa = (dias) => dias < 0 ? `${-dias} dia(s) antes do vencimento` : dias === 0 ? "no dia do vencimento" : `${dias} dia(s) de atraso`;
+      inicioDaCobranca = (cb) => somarDiasUteis(limitePagamento(cb.vencimento), DIAS_COMPENSACAO_BOLETO + 1);
+      decisaoDe = (d2, cobrancaId, dias) => (d2.regua_emails || []).find((x) => x.cobranca_id === cobrancaId && x.dias === dias) || null;
+      SITUACOES_REGUA = { enviado: "Enviado pelo sistema", gmail: "Aberto no Gmail (enviado à mão)", recusado: "Não enviar" };
+      itemDaFila = (d2, chave, hoje3 = hojeIso()) => filaRegua(d2, hoje3).find((x) => x.chave === chave) || null;
+      decididosRecentes = (d2, hoje3 = hojeIso(), dias = 30) => (d2.regua_emails || []).filter((x) => String(x.data) >= somarDias(hoje3, -dias)).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
+    }
+  });
+
+  // docs/js/telas/regua.js
+  function emailDoItem(db, item3) {
+    const modelo = modeloEmail(db, item3.modelo);
+    const alvo = { contrato: item3.contrato, cobranca: item3.cobranca };
+    return { modelo, alvo, ...montarEmail(modelo, dadosDoEmail(db, alvo)), prontos: anexosProntos(db, modelo, alvo) };
+  }
+  function alertaRegua() {
+    if (!podeUsuario("operador")) return "";
+    const fila = filaRegua(d());
+    if (!fila.length) return "";
+    return `<div class="alerta info"><b>Régua de cobrança:</b> ${fila.length} e-mail(s) ${admin() ? "aguardando a sua autorização" : "aguardando a autorização do administrador"} (nada é enviado sozinho).
+    ${link("#/regua", admin() ? "Ver e autorizar" : "Ver a lista", "botao pequeno")}</div>`;
+  }
+  function linhaDaFila(db, item3, envio) {
+    const e = emailDoItem(db, item3);
+    const pode2 = admin() && !!item3.para;
+    const anexos = e.prontos.map((a) => a.rotulo).join(", ");
+    return `<tr>
+    <td>${pode2 && envio ? `<input type="checkbox" data-regua="${esc(item3.chave)}" title="Marcar para enviar">` : ""}</td>
+    <td><a href="#/contrato/${item3.contrato.id}"><b>${esc(nomeDo(item3))}</b></a></td>
+    <td><a href="#/cobranca/${item3.cobranca.id}">${esc(referente(item3.cobranca))}</a><br><span class="suave nw">vence ${dataBr(item3.cobranca.vencimento)}</span></td>
+    <td>${esc(item3.etapa)}<br><span class="suave nw">desde ${dataBr(item3.desde)}</span></td>
+    <td class="n nw">${reais(item3.valor)}</td>
+    <td>${item3.para ? esc(item3.para) : '<span class="suave">sem e-mail</span>'}</td>
+    <td><details><summary>${esc(e.assunto)}</summary><pre class="previa-email" style="white-space:pre-wrap;font:inherit;margin:6px 0">${esc(e.texto)}</pre>
+      ${anexos ? `<p class="suave">Anexos: ${esc(anexos)}</p>` : '<p class="suave">Sem anexo (boleto não emitido no banco).</p>'}</details>
+      ${item3.avisos.map((a) => `<div class="alerta aviso" style="margin:4px 0">${esc(a)}</div>`).join("")}</td>
+    <td class="nw">${admin() ? `${item3.para ? `${botao("abrirReguaGmail", "Abrir no Gmail", { chave: item3.chave }, "secundario mini")} ` : ""}${botao("copiarRegua", "Copiar texto", { chave: item3.chave }, "secundario mini")}
+      ${botao("recusarRegua", "Não enviar", { chave: item3.chave }, "secundario mini", `Não enviar este e-mail para ${item3.contrato.inquilino_nome} (${item3.etapa})? Ele sai da lista e não volta.`)}` : ""}</td></tr>`;
+  }
+  async function telaRegua() {
+    const db = d();
+    const hoje3 = hojeIso();
+    const fila = filaRegua(db, hoje3);
+    const ligada = regra("regua_envio") === true;
+    const gmail = ligada && admin() ? await emailLigado() : false;
+    const envio = ligada && gmail;
+    const dias = regra("regua_email_dias") || [];
+    const estado2 = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.' : !gmail ? "O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto." : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
+    const recentes = decididosRecentes(db, hoje3);
+    return `<h1>Financeiro</h1><div class="abas"><a href="#/inadimplencia">← Inadimplência</a></div>
+    <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link("#/modelos-email", "Textos dos e-mails")}</div>
+    <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(nomeDaEtapa).join("; "))}` : "(nenhum dia escolhido nas Regras do sistema: nada é preparado)"}. <b>Nada é enviado sozinho.</b>
+      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (o banco leva até 3 dias úteis para creditar o boleto). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
+    <div class="alerta ${envio ? "info" : "aviso"}">${estado2}</div>
+    <div class="cartao rolagem regua"><table>
+      <tr><th>${admin() && envio && fila.some((x) => x.para) ? '<input type="checkbox" data-marcar-todas="regua" title="Marcar todos">' : ""}</th><th>Imóvel / inquilino</th><th>Boleto</th><th>Etapa</th><th class="n">Valor hoje</th><th>Para</th><th>Prévia do e-mail</th><th></th></tr>
+      ${fila.map((x) => linhaDaFila(db, x, envio)).join("") || '<tr><td colspan="8" class="suave">Nenhum e-mail aguardando.</td></tr>'}</table>
+      ${admin() && envio && fila.some((x) => x.para) ? `<div class="acoes" style="margin-top:10px">${botao("enviarReguaSelecionados", "Enviar os selecionados (0)", {}, "botao")}</div>` : ""}</div>
+    <div class="cartao rolagem"><h2>Decididos nos últimos 30 dias</h2><table><tr><th>Data</th><th>Inquilino</th><th>Boleto</th><th>Etapa</th><th>O que foi feito</th></tr>
+      ${recentes.map((x) => {
+      const c = buscar2("contratos", x.contrato_id);
+      const cb = buscar2("cobrancas", x.cobranca_id);
+      return `<tr><td class="nw">${dataBr(x.data)}</td><td>${c ? esc(c.inquilino_nome) : "-"}</td>
+        <td>${cb ? `<a href="#/cobranca/${cb.id}">${esc(referente(cb))}</a>` : "-"}</td><td>${esc(nomeDaEtapa(x.dias))}</td><td>${esc(SITUACOES_REGUA[x.situacao] || x.situacao)}${x.para ? ` <span class="suave">(${esc(x.para)})</span>` : ""}</td></tr>`;
+    }).join("") || '<tr><td colspan="5" class="suave">Nada decidido nos últimos 30 dias.</td></tr>'}</table></div>`;
+  }
+  function ligarRegua(raiz) {
+    const caixa = raiz.querySelector(".regua");
+    const btn = raiz.querySelector("[data-acao=enviarReguaSelecionados]");
+    if (!caixa || !btn) return;
+    const contar = () => {
+      btn.textContent = `Enviar os selecionados (${caixa.querySelectorAll("input[data-regua]:checked").length})`;
+    };
+    caixa.addEventListener("change", () => setTimeout(contar, 0));
+  }
+  function itemAtual(chave) {
+    if (!admin()) throw new ErroUsuario(SO_ADMIN);
+    const item3 = itemDaFila(d(), String(chave));
+    if (!item3) throw new ErroUsuario("Este e-mail saiu da lista (boleto pago, em acordo, já decidido ou a etapa passou). Atualize a tela.");
+    return item3;
+  }
+  async function pdfDoBoletoC6(cb) {
+    let blob = null;
+    try {
+      await chamarPonteCrua("GET", `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+        const r = await fetch(url, o);
+        if (!r.ok) return r;
+        blob = await r.blob();
+        return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+      } });
+    } catch {
+      blob = null;
+    }
+    return blob;
+  }
+  async function anexosDoItem(item3, prontos) {
+    const arquivos = [];
+    const faltou = [];
+    for (const a of prontos) {
+      if (a.tipo !== "boleto") continue;
+      if (a.qual === "pdf") {
+        const blob = await pdfDoBoletoC6(item3.cobranca);
+        if (blob) arquivos.push({ nome: a.nome, blob });
+        else faltou.push(a.rotulo);
+      } else if (a.qual === "pix") {
+        const b = item3.cobranca.banco;
+        const bin = atob(b.pix_qr_base64);
+        const bytes2 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes2[i] = bin.charCodeAt(i);
+        arquivos.push({ nome: a.nome, blob: new Blob([bytes2], { type: b.pix_qr_mime || "image/png" }) });
+      }
+    }
+    return { arquivos, faltou };
+  }
+  async function copiar3(texto3) {
+    try {
+      await navigator.clipboard.writeText(texto3);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  var admin, SO_ADMIN, LIMITE_ENDERECO2, nomeDo, referente, decidir, ACOES_REGUA;
+  var init_regua = __esm({
+    "docs/js/telas/regua.js"() {
+      init_app();
+      init_banco();
+      init_calculos();
+      init_calculos();
+      init_email_dados();
+      init_formularios();
+      init_gmail();
+      init_modelos_email();
+      init_regua_email();
+      init_regras();
+      init_comum();
+      admin = () => podeUsuario("admin");
+      SO_ADMIN = "Só o administrador autoriza os e-mails da régua de cobrança.";
+      LIMITE_ENDERECO2 = 7e3;
+      nomeDo = (item3) => `${item3.imovel ? `${item3.imovel.nome} · ` : ""}${item3.contrato.inquilino_nome}`;
+      referente = (cb) => ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ""}`.trim() : compBr(cb.competencia);
+      decidir = (item3, situacao2, { para = "", assunto = "", gmailId = "" } = {}) => alterar((db) => {
+        let envio = null;
+        if (situacao2 !== "recusado") {
+          const como = situacao2 === "enviado" ? "enviado" : "aberto no Gmail";
+          envio = inserir(db, "envios_email", {
+            data: hojeIso(),
+            chave: item3.modelo,
+            contrato_id: item3.contrato.id,
+            ficha_id: null,
+            aditivo_id: null,
+            cobranca_id: item3.cobranca.id,
+            para,
+            assunto,
+            como,
+            gmail_id: gmailId || null
+          }, login(), null, { historico: false });
+        }
+        return registrarDecisao(db, { cobranca_id: item3.cobranca.id, contrato_id: item3.contrato.id, dias: item3.dias, situacao: situacao2, para, assunto, envio_id: envio ? envio.id : null }, login());
+      });
+      ACOES_REGUA = {
+        /** "Não enviar": sai da lista e não volta. */
+        async recusarRegua({ chave }) {
+          const item3 = itemAtual(chave);
+          await decidir(item3, "recusado");
+          aviso("Pronto: este e-mail não será enviado.");
+          await mostrar();
+        },
+        async copiarRegua({ chave }) {
+          const item3 = itemAtual(chave);
+          const e = emailDoItem(d(), item3);
+          aviso(await copiar3(`${e.assunto}
+
+${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use "Abrir no Gmail" ou "Não enviar" para tirar da lista.' : "O navegador não deixou copiar: abra a prévia e copie o texto.", "info");
+        },
+        /** Abre o Gmail com o e-mail pronto (o administrador manda por lá) e tira da lista. */
+        async abrirReguaGmail({ chave }) {
+          const item3 = itemAtual(chave);
+          const e = emailDoItem(d(), item3);
+          const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
+          const cabe = comCorpo.length <= LIMITE_ENDERECO2;
+          window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank", "noopener");
+          const copiado = cabe || await copiar3(e.texto);
+          await decidir(item3, "gmail", { para: item3.para, assunto: e.assunto });
+          aviso(`${cabe ? "Gmail aberto com o texto." : copiado ? "Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail." : "Gmail aberto: copie o texto da prévia e cole no corpo do e-mail."}${e.prontos.length ? " Anexe o boleto e o QR Code (página do boleto) antes de mandar." : ""}`, cabe ? "ok" : "aviso");
+          await mostrar();
+        },
+        /**
+         * "Enviar os selecionados (N)": só os marcados; mostra a lista final e pede a confirmação; manda um a um pelo Gmail da nuvem.
+         * Cada um é conferido de novo na hora (boleto pago ou decidido em outra aba não sai).
+         */
+        async enviarReguaSelecionados() {
+          if (!admin()) throw new ErroUsuario(SO_ADMIN);
+          if (regra("regua_envio") !== true) throw new ErroUsuario('O envio direto da régua está desligado nas Regras do sistema: use "Abrir no Gmail".');
+          if (!await emailLigado()) throw new ErroUsuario('O Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): use "Abrir no Gmail".');
+          const chaves = [...document.querySelectorAll("input[data-regua]:checked")].map((x) => x.dataset.regua);
+          if (!chaves.length) throw new ErroUsuario("Marque pelo menos um e-mail na lista.");
+          const itens = chaves.map((k) => itemDaFila(d(), k)).filter((x) => x && x.para);
+          if (!itens.length) throw new ErroUsuario("Os e-mails marcados saíram da lista (pago, em acordo ou já decidido). Atualize a tela.");
+          const lista3 = itens.map((x) => `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}`).join("\n");
+          const fora = chaves.length - itens.length;
+          if (!await confirmar(`Vou enviar agora ${itens.length} e-mail(s) pelo Gmail da empresa:
+
+${lista3}${fora ? `
+
+${fora} marcado(s) saíram da lista e não vão.` : ""}
+
+Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${itens.length} e-mail(s)`, nao: "Cancelar" })) return;
+          const enviados = [];
+          const erros = [];
+          const semAnexo = [];
+          for (const k of itens.map((x) => x.chave)) {
+            const item3 = itemDaFila(d(), k);
+            if (!item3) continue;
+            try {
+              const e = emailDoItem(d(), item3);
+              if (/\[preencher: /.test(e.texto + e.assunto)) throw new ErroUsuario('o texto tem "[preencher: ...]": confira o modelo em Modelos de e-mail');
+              const { arquivos, faltou } = await anexosDoItem(item3, e.prontos);
+              const r = await enviarEmail({ para: item3.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
+              await decidir(item3, "enviado", { para: item3.para, assunto: e.assunto, gmailId: r.id });
+              enviados.push(item3);
+              if (faltou.length) semAnexo.push(`${item3.contrato.inquilino_nome} (sem ${faltou.join(", ")})`);
+            } catch (erro) {
+              erros.push(`${item3.contrato.inquilino_nome}: ${erro.message || erro}`);
+            }
+          }
+          aviso([
+            `${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
+            semAnexo.length ? `Sem o PDF do boleto (a ponte do banco não respondeu neste computador; a linha digitável e o Pix foram no texto): ${semAnexo.join("; ")}.` : "",
+            erros.length ? `Não enviados: ${erros.join("; ")}.` : ""
+          ].filter(Boolean).join(" "), erros.length ? "erro" : semAnexo.length ? "aviso" : "ok");
           await mostrar();
         }
       };
@@ -29760,6 +30219,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
 
 14. ALERTAS E AVISOS
 - Régua de cobrança (só aviso, nada é enviado sozinho): pelo boleto vencido mais antigo, a partir de 1 dia de atraso mandar o lembrete por e-mail, de 10 dias ligar para o inquilino, de 30 dias avaliar a negativação. Aparece no alerta de Inadimplência e na tela Inadimplência.
+- Régua de cobrança por e-mail (pedido do dono em 16/11/2026: nada é enviado sem a autorização dele): o sistema prepara o e-mail de cada boleto em aberto 3 dias antes do vencimento, no dia e com 3 e 10 dias de atraso (regra "Régua de cobrança: quando preparar o e-mail"), com o boleto do C6 e o QR Code do Pix anexados, e o põe na lista Financeiro → E-mails da régua, esperando o administrador. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (prazo do banco para creditar o boleto). Boleto pago, em acordo ou de contrato encerrado sai da lista; o que foi enviado ou marcado "Não enviar" não volta. Com a regra "botão Autorizar e enviar" desligada (padrão), cada e-mail é aberto no Gmail e mandado por lá; ligada, o administrador marca os e-mails (todos começam desmarcados) e clica em "Enviar os selecionados", que mostra a lista final e pede confirmação.
 - Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor, prioridade e quanto tempo antes cada alerta com prazo aparece (fim do contrato e seguro 60 dias, fiador 60 dias, IPTU do proprietário 15 dias, reajuste e uso da reserva 1 mês) são editáveis pelo administrador.
 - Avisos antes de salvar: data de pagamento de mais de 90 dias atrás, datas no futuro, endereço sem número, telefone sem DDD, e-mail com erro, leitura menor que a anterior, IPTU ou seguro 30% fora do anterior, lançamento repetido.
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
@@ -30254,6 +30714,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_nuvem2();
       init_fichas();
       init_emails();
+      init_regua();
       init_banco_c6();
       init_cadastros();
       init_campos();
@@ -32128,6 +32589,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         }
       };
       Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS, ACOES_PASTA);
+      Object.assign(ACOES, ACOES_REGUA);
     }
   });
 
@@ -32904,6 +33366,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_reajustes();
       init_comum();
       init_regras_sistema();
+      init_regua();
       init_icone();
       init_comum();
       init_ajuda();
@@ -32926,6 +33389,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           ligarEditorIcone(raiz);
           ligarGarantiasCorrigidas(raiz);
           ligarFichaOnline(raiz);
+          ligarRegua(raiz);
           ligarIndiceBancoCentral(raiz);
           ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, "erro"));
           const regras = [...raiz.querySelectorAll("[data-mostrar-se]")];
@@ -33156,6 +33620,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${podeUsuario("admin") && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link("#/backup-seguro", "Ver o backup seguro")}</div>` : ""}
       ${alertaFichas()}
       ${alertaInformeIr()}
+      ${alertaRegua()}
       ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
         ${link("#/conflitos", podeUsuario("admin") ? "Escolher agora" : "Ver (o administrador escolhe)", "botao pequeno")}</div>` : ""}
       ${avisoBackupSeguro()}
@@ -33233,6 +33698,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         contas: (rota) => telaContas(rota),
         banco: (rota) => telaBanco(rota),
         inadimplencia: () => telaInadimplencia(),
+        regua: () => telaRegua(),
         garantias: () => telaGarantias(),
         // painel de Gestão (números do mês para o dono): carregado só quando aberto (ADIADOS do sw.js)
         gestao: async (rota) => (await carregarParte(() => Promise.resolve().then(() => (init_gestao2(), gestao_exports)))).telaGestao(rota.q),
@@ -34291,7 +34757,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         ["#/faturas", "NF", "fatura"],
         ["#/banco", "Banco", "^banco"],
         ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
-        ["#/financeiro", "Financeiro", "^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias"],
+        ["#/financeiro", "Financeiro", "^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias|^regua"],
         ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas"]
       ];
       MENU_DO_FORMULARIO = {
