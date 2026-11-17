@@ -85,6 +85,12 @@ export function hojeIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Data e hora locais para nomes de arquivo: 'AAAA-MM-DD-HH-MM' (às 20:57 de 16/11/2026 → '2026-11-16-20-57'; não a hora UTC). */
+export function carimboLocal(agora = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${agora.getFullYear()}-${p(agora.getMonth() + 1)}-${p(agora.getDate())}-${p(agora.getHours())}-${p(agora.getMinutes())}`;
+}
+
 export function diasEntre(a, b) {
   return Math.round((paraData(b) - paraData(a)) / MS_DIA);
 }
@@ -533,6 +539,7 @@ const FORMATOS_PARAMETRO = {
   ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,
   ir: /^[\w-]+$/, voltar: /^#\/[\w/?&=.,-]*$/,
   q: /^[^\r\n<>]{1,100}$/, // texto da busca global (a tela ainda passa por esc())
+  situacao: /^(Reprovada|Desistiu)$/, // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
 };
 
 /** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */

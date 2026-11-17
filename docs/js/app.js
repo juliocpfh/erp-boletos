@@ -998,6 +998,8 @@ function cartoesNoCelular(raiz) {
 // --------------------------------------------------------------------------
 document.addEventListener('submit', async (ev) => {
   const form = ev.target.closest('form[data-form]');
+  // formulário só de caixinhas (ex.: pasta física): o Enter não envia (a CSP barra o onsubmit escrito no HTML)
+  if (!form && ev.target.closest('form[data-sem-envio]')) ev.preventDefault();
   if (!form) return;
   ev.preventDefault();
   const botao = form.querySelector('button[type=submit],button:not([type])');

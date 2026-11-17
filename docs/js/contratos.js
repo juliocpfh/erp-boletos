@@ -379,7 +379,8 @@ export function pendenciasDoContrato(d, c) {
   if (c.garantia_tipo === 'Fiador + depósito') falta.push('garantia dupla (fiador + depósito): a Lei 8.245/91, art. 37, permite só uma');
   for (const e of locadorasDoContrato(d, c)) {
     if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
-    if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
+    // o texto usa a sede ou, sem ela, o endereço da empresa: só avisa quando não há nenhum dos dois
+    if (!e.endereco_sede && !e.endereco) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
   }
   return falta;
 }

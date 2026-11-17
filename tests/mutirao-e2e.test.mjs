@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as R from '../docs/js/regras.js';
 import * as F from '../docs/js/formularios.js';
+import * as C from '../docs/js/calculos.js';
+import * as K from '../docs/js/contratos.js';
 
 // Erros achados no teste de ponta a ponta (mutirão de 16/11/2026, frente e2e).
 function base() {
@@ -118,4 +120,34 @@ test('itens 6 e 15-18: aluguel, seguro, IPTU e reforma maiores que zero; valor d
   assert.equal(ler(F.REFORMA.filter((x) => x.nome === 'valor'), { valor: '-1.000,00' }).valor, 'Informe um valor maior que zero');
   assert.equal(ler(F.IMOVEL.filter((x) => x.nome === 'valor_imovel'), { valor_imovel: '-100.000,00' }).valor_imovel, 'O valor não pode ser negativo');
   assert.equal(ler(F.IMOVEL.filter((x) => x.nome === 'valor_imovel'), { valor_imovel: '' }).valor_imovel, undefined, 'em branco continua valendo');
+});
+
+test('item 9: etapa das chaves da saída só fecha com o termo (saídas de antes de 13/11/2026 fecham pelo cálculo final)', () => {
+  const { d, c } = base();
+  R.informarSaida(d, c.id, '2026-11-14', 'julio', '2026-11-20');
+  R.encerrarContrato(d, c.id, { data_saida: '2026-11-14', garantia_valor: 0, indice_percentual: 0, debitos: 0, leitura_agua: '1', leitura_energia: '2' }, 'julio');
+  const chaves = () => R.roteiroSaida(d, c, '2026-11-20').find((x) => x.chave === 'chaves');
+  assert.equal(chaves().feito, false);
+  assert.match(chaves().detalhe, /falta anexar o termo/);
+  c.data_saida = '2026-10-31';
+  assert.equal(chaves().feito, true, 'saída antiga: acertada sem termo');
+  assert.match(chaves().detalhe, /acertada sem termo/);
+});
+
+test('item 11: nome do arquivo com a data e a hora daqui', () => {
+  assert.equal(C.carimboLocal(new Date(2026, 10, 16, 20, 57)), '2026-11-16-20-57');
+});
+
+test('item 12: "Reprovar (com o motivo)" passa a situação pelo endereço', () => {
+  assert.deepEqual(C.sanearParametros({ situacao: 'Reprovada' }), { situacao: 'Reprovada' });
+  assert.deepEqual(C.sanearParametros({ situacao: '<b>x' }), {});
+});
+
+test('item 24: sem endereço da sede, o endereço da empresa vale (e não avisa)', () => {
+  const { d, c } = base();
+  const e = d.emitentes[0];
+  Object.assign(e, { representante_nome: 'Fulano', endereco: 'Rua A, 10', endereco_sede: '' });
+  assert.ok(!K.pendenciasDoContrato(d, c).some((x) => /endereço da sede/.test(x)));
+  e.endereco = '';
+  assert.ok(K.pendenciasDoContrato(d, c).some((x) => /endereço da sede/.test(x)));
 });

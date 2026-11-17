@@ -135,7 +135,7 @@ export async function telaPastaFisica(id) {
   return `${topo}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : 'sem imóvel')}</span></h1>
     <p class="suave">${esc(momento)} · contrato de ${dataBr(c.data_entrada)}${R.fimDoContrato(d(), c) ? ` a ${dataBr(R.fimDoContrato(d(), c))}` : ''}${c.garantia_tipo ? ` · garantia: ${esc(c.garantia_tipo)}` : ''}${fiadores.length ? ` · fiador: ${esc(fiadores.join(', '))}` : ''}${c.data_saida ? ` · saída em ${dataBr(c.data_saida)}, guardar até ${dataBr(AI.guardarAte(c))}` : ''}</p>
     ${espera}
-    <form id="pasta-fisica" onsubmit="return false">${passo1}${passo2}
+    <form id="pasta-fisica" data-sem-envio>${passo1}${passo2}
       <div class="cartao"><p class="suave">Escolha o que vai para o papel. O importante já vem marcado; o que já está na pasta vem desmarcado.</p>
       <div class="rolagem"><table class="compacta">${tabelaDaPasta(s.itens, s.reg, c) || '<tr><td class="suave">Nenhum documento para a pasta ainda.</td></tr>'}</table></div>${acoes}</div></form>`;
 }

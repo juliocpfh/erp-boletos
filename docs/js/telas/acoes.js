@@ -144,6 +144,9 @@ export function oQueSaiNaExclusao(db, tabela, reg) {
     if (nomes) itens.push(`${n} ${n === 1 ? nomes[0] : nomes[1]}`); else outros += n;
   }
   if (outros) itens.push(`${outros} outro(s) registro(s) ligados a ele`);
+  // pagamentos já recebidos saem junto: a receita some dos Resultados (item 10 do teste de ponta a ponta)
+  const pagos = tabela === 'contratos' ? db.cobrancas.filter((cb) => cb.contrato_id === reg.id && cb.data_pagamento) : [];
+  if (pagos.length) itens.unshift(`ATENÇÃO: ${pagos.length} ${pagos.length === 1 ? 'pagamento recebido' : 'pagamentos recebidos'} (${reais(pagos.reduce((t, cb) => t + (cb.valor_pago || 0), 0))}), que saem dos Resultados`);
   const arquivos = tabela === 'contratos'
     ? R.arquivosReferenciados(db).filter((a) => ['contrato', 'assinados', 'aditivos', 'seguro'].includes(a.escopo) && Number(a.id) === reg.id).length : 0;
   return { itens, arquivos };
@@ -1902,14 +1905,14 @@ export const ACOES = {
     const barra = andamentoZip('progresso-exportar');
     let blob;
     try { blob = await S.exportarZip(JSZip, E.pasta, E.d, barra.aoAndar); } finally { barra.fim(); }
-    baixar(blob, `imoveis-${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}.zip`);
+    baixar(blob, `imoveis-${C.carimboLocal()}.zip`); // data e hora daqui (a UTC passava para o dia seguinte depois das 21h)
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Banco e arquivos exportados em ZIP', null, {}, false));
   },
 
   async exportarPlanilhaPdf() {
     // só o jsPDF: este PDF é escrito direto (não fotografa a tela, então não precisa baixar o html2canvas)
     const [ExcelJS, jsPDF, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), jsPdf(), carregarParte(() => import('../exportar.js'))]);
-    const quando = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    const quando = C.carimboLocal();
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Todos os dados exportados em planilha e PDF', null, {}, false));

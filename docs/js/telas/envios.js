@@ -484,6 +484,7 @@ export const FORMULARIOS = {
       if (existente) R.atualizar(db, 'participacoes', existente.id, { percentual }, login());
       else R.inserir(db, 'participacoes', { imovel_id: imovelId, emitente_id: emitenteId, percentual }, login());
     });
+    aviso('Salvo.', 'ok');
     await mostrar();
   },
 
