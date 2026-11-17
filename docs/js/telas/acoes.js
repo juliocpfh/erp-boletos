@@ -1,5 +1,5 @@
 // ACOES: o que cada botão faz (data-acao="nome"), com os auxiliares de PDF, Excel, exclusão (TABELAS_EXCLUSAO) e reajuste.
-import { alterar, atualizarCopiaAberta, aviso, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsPdf, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
+import { alterar, atualizarCopiaAberta, aviso, confirmar, podeSairDaTela, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsPdf, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
 import * as S from '../armazenamento.js';
 import { PAPEIS } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -111,6 +111,61 @@ async function excelDoNumero(ExcelJS, modelo, numero) {
   if (!fs.length) throw new Error('NF não encontrada.');
   const blob = await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes);
   return { blob, nome: S.limparNome(`NF ${R.numeroFatura(numero)} - ${fs[0].tomador_nome}.xlsx`) };
+}
+
+/**
+ * Exclusões grandes: o que sai junto, contado (contrato: todas as tabelas com o contrato_id dele, como R.excluirContrato;
+ * imóvel: IPTU, despesas, reformas, leituras, vistorias, seguros, participações e titularidades). Devolve { itens, arquivos }.
+ */
+const EXCLUSAO_GRANDE = { contratos: true, imoveis: true, fichas: true };
+const NOMES_NA_EXCLUSAO = {
+  cobrancas: ['boleto', 'boletos'], vistorias: ['vistoria', 'vistorias'], aditivos: ['termo aditivo', 'termos aditivos'], fiadores: ['fiador', 'fiadores'],
+  seguros: ['apólice de seguro', 'apólices de seguro'], acordos: ['acordo', 'acordos'], cartas_reajuste: ['carta de reajuste', 'cartas de reajuste'],
+  leituras: ['leitura dos relógios', 'leituras dos relógios'], iptus: ['IPTU', 'IPTUs'], despesas: ['conta ou despesa', 'contas e despesas'],
+  reformas: ['reforma', 'reformas'], titularidades: ['registro de titularidade', 'registros de titularidade'], participacoes: ['participação de empresa', 'participações de empresas'],
+  depositos_garantia: ['depósito da garantia', 'depósitos da garantia'], aplicacoes: ['aplicação da garantia', 'aplicações da garantia'],
+  correcoes: ['correção do aluguel', 'correções do aluguel'], ressarcimentos: ['ressarcimento', 'ressarcimentos'], solicitacoes: ['solicitação', 'solicitações'],
+};
+const TABELAS_DO_IMOVEL = ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias'];
+export function oQueSaiNaExclusao(db, tabela, reg) {
+  const conta = {};
+  if (tabela === 'contratos') {
+    for (const t of Object.keys(R.TABELAS)) {
+      if (['contratos', 'faturas', 'movimentacoes_banco', 'pagamentos_banco'].includes(t) || !Array.isArray(db[t])) continue;
+      const n = db[t].filter((x) => x && x.contrato_id === reg.id).length;
+      if (n) conta[t] = n;
+    }
+  }
+  if (tabela === 'imoveis') for (const t of TABELAS_DO_IMOVEL) { const n = (db[t] || []).filter((p) => p.imovel_id === reg.id).length; if (n) conta[t] = n; }
+  const itens = [];
+  let outros = 0;
+  for (const [t, n] of Object.entries(conta)) {
+    const nomes = NOMES_NA_EXCLUSAO[t];
+    if (nomes) itens.push(`${n} ${n === 1 ? nomes[0] : nomes[1]}`); else outros += n;
+  }
+  if (outros) itens.push(`${outros} outro(s) registro(s) ligados a ele`);
+  const arquivos = tabela === 'contratos'
+    ? R.arquivosReferenciados(db).filter((a) => ['contrato', 'assinados', 'aditivos', 'seguro'].includes(a.escopo) && Number(a.id) === reg.id).length : 0;
+  return { itens, arquivos };
+}
+
+/** Dupla confirmação: 1ª janela mostra o nome e o que sai junto; 2ª pede para digitar APAGAR. Devolve true para seguir. */
+async function confirmarExclusaoGrande(tabela, r) {
+  const quem = { contratos: `o contrato de ${r.inquilino_nome}`, imoveis: `o imóvel ${r.nome}`, fichas: `a ficha de ${r.inquilino_nome}` }[tabela];
+  const { itens, arquivos } = oQueSaiNaExclusao(d(), tabela, r);
+  const fica = { contratos: 'Documentos postos à mão na pasta do inquilino ficam guardados.', imoveis: 'Os arquivos da pasta do imóvel ficam guardados.', fichas: 'Os documentos da pasta da ficha são apagados juntos.' }[tabela];
+  const lista = [...itens, arquivos && `${arquivos} arquivo(s) que o sistema guardou (comprovantes, documentos assinados, apólices)`].filter(Boolean);
+  const primeira = await janela({ titulo: `Excluir ${quem}?`, forte: true, sim: 'Continuar', html: `<p>Você vai excluir <b>${esc(quem)}</b>.</p>
+    ${lista.length ? `<p>Sai junto:</p><ul>${lista.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}<p class="suave">${esc(fica)}</p>` });
+  if (!primeira) return false;
+  const rotulo = { contratos: 'Excluir contrato', imoveis: 'Excluir imóvel', fichas: 'Excluir ficha' }[tabela];
+  const segunda = await janela({ titulo: 'Última confirmação', forte: true, sim: rotulo,
+    html: `<p>Para excluir <b>${esc(quem)}</b>, digite <b>APAGAR</b> no campo abaixo.</p>
+      <p><input name="digitado" autocomplete="off" aria-label="Digite APAGAR para confirmar" style="max-width:220px"></p>`,
+    ligar: (dlg) => dlg.querySelector('input[name=digitado]')?.focus() });
+  if (!segunda) return false;
+  if (String((segunda.digitado || [''])[0]).trim().toUpperCase() !== 'APAGAR') throw new C.ErroUsuario('Nada foi excluído: para confirmar, é preciso digitar APAGAR.');
+  return true;
 }
 
 const TABELAS_EXCLUSAO = {
@@ -475,13 +530,14 @@ export const ACOES = {
   escolherPasta: () => escolherPasta(),
   reabrir: () => reabrirPastaLembrada(),
   async sair() {
+    if (!(await podeSairDaTela())) return; // formulário com mudança não salva (decisão do dono, 2026-11-16)
     // nuvem: tenta mandar o que falta antes; se ainda sobrar (sem internet), avisa antes de sair
     if (E.nuvem) {
       await E.nuvem.sincronizar().catch(() => {});
       await E.anexos?.enviarFila().catch(() => {});
       const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0);
-      if (n && !confirm(`Há ${n} alteração(ões) feitas neste aparelho que ainda não foram enviadas (sem internet).\n\n`
-        + 'Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com internet, mas o mais seguro é esperar a internet voltar e sair depois.\n\nSair mesmo assim?')) return;
+      if (n && !(await confirmar(`Há ${n} alteração(ões) feitas neste aparelho que ainda não foram enviadas (sem internet).\n\n`
+        + 'Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com internet, mas o mais seguro é esperar a internet voltar e sair depois.', { titulo: 'Sair mesmo assim?', sim: 'Sair mesmo assim', nao: 'Esperar a internet' }))) return;
     }
     await sair();
   },
@@ -918,6 +974,14 @@ export const ACOES = {
     const cfg = TABELAS_EXCLUSAO[tabela] || {};
     if (cfg.admin && !podeUsuario('admin')) throw new Error('Só administradores podem excluir.');
     const r = buscar(tabela, id);
+    if (!r) throw new C.ErroUsuario('Este registro já foi excluído.');
+    // exclusão grande (contrato, imóvel, ficha): o motivo de não poder vem antes de qualquer pergunta; depois, a dupla
+    // confirmação com o nome e o que sai junto, digitando APAGAR (decisão do dono, 2026-11-16)
+    if (EXCLUSAO_GRANDE[tabela]) {
+      const problema = cfg.checar ? cfg.checar(d(), r) : null;
+      if (problema) throw new C.ErroUsuario(problema);
+      if (!(await confirmarExclusaoGrande(tabela, r))) return;
+    }
     const destino = cfg.voltar ? cfg.voltar(r) : null;
     // lançamento com anexo (aditivo, comprovante, apólice, fotos da vistoria): o arquivo sai junto. Contrato: saem os arquivos
     // dos registros dele (os documentos postos à mão na pasta ficam, e a pasta com eles). Imóvel guarda a pasta.
@@ -927,7 +991,7 @@ export const ACOES = {
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
       if (problema) throw new Error(problema);
       if (tabela === 'imoveis') {
-        for (const t of ['participacoes', 'seguros', 'leituras', 'reformas', 'iptus', 'titularidades', 'despesas', 'vistorias']) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
+        for (const t of TABELAS_DO_IMOVEL) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') R.excluirContrato(db, reg.id, login());
       else R.excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === 'fichas' ? `Ficha de ${reg.inquilino_nome}` : null));

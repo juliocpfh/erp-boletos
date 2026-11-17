@@ -198,3 +198,22 @@ test('Reajustes: o acumulado do Banco Central é guardado na sessão por índice
     internet.responder = () => { throw new TypeError('sem internet'); };
   }
 });
+
+test('exclusão grande (decisão do dono, 2026-11-16): contrato mostra o nome e o que sai e Cancelar não apaga; imóvel com inquilino é recusado antes de perguntar', async () => {
+  const { c, loja } = comInquilino('Fulano de Teste');
+  entrarComo(E, 'admin');
+  const { oQueSaiNaExclusao } = await import('../docs/js/telas/acoes.js');
+  const r = oQueSaiNaExclusao(E.d, 'contratos', c);
+  assert.ok(r.itens.includes('2 boletos'), r.itens.join(' | '));
+  const antes = janelas.length;
+  await assert.rejects(T.ACOES.excluir({ tabela: 'imoveis', id: loja.id }), /tem inquilinos/);
+  assert.equal(janelas.length, antes, 'imóvel com inquilino: nenhuma janela aberta');
+  const fim = T.ACOES.excluir({ tabela: 'contratos', id: c.id });
+  await new Promise((ok) => { setTimeout(ok, 5); });
+  const j = janelas.at(-1);
+  assert.match(j.innerHTML, /Fulano de Teste/);
+  assert.match(j.innerHTML, /2 boletos/);
+  j.close();
+  await fim;
+  assert.ok(R.buscar(E.d, 'contratos', c.id), 'cancelou: o contrato continua');
+});

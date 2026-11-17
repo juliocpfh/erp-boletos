@@ -397,7 +397,28 @@ export function aviso(texto, tipo = 'ok') {
   const m = { id: proximaMensagem++, texto, tipo };
   mensagens.push(m);
   desenharMensagens();
-  if (tipo !== 'erro') setTimeout(() => fecharMensagem(m.id), tipo === 'aviso' ? 15000 : 6000);
+  // 10 s para "Salvo." (6 s era pouco para quem lê devagar) e 15 s para avisos; com o mouse em cima, espera sair
+  if (tipo !== 'erro') agendarFechar(m.id, tipo === 'aviso' ? 15000 : 10000);
+}
+function agendarFechar(id, ms) {
+  setTimeout(() => {
+    const el = typeof document.querySelector === 'function' ? document.querySelector(`#mensagens [data-msg="${id}"]`) : null;
+    if (el && typeof el.matches === 'function' && el.matches(':hover')) agendarFechar(id, 3000);
+    else fecharMensagem(id);
+  }, ms);
+}
+
+/**
+ * Pergunta de confirmação na janela do sistema (no lugar da caixa do navegador "localhost diz…"): ``texto`` com linhas
+ * em branco vira parágrafos e linhas "• " viram lista; ``forte`` = vermelha, para o que apaga. Devolve true/false.
+ */
+export async function confirmar(texto, { titulo = '', sim = 'Confirmar', nao = 'Cancelar', forte = false } = {}) {
+  const html = String(texto).split(/\n{2,}/).map((p) => {
+    const linhas = p.split('\n');
+    if (linhas.every((l) => /^\s*•/.test(l))) return `<ul>${linhas.map((l) => `<li>${esc(l.replace(/^\s*•\s*/, ''))}</li>`).join('')}</ul>`;
+    return `<p>${linhas.map(esc).join('<br>')}</p>`;
+  }).join('');
+  return !!(await janela({ titulo, html, sim, nao, forte }));
 }
 
 /** Erro: janela no meio da tela com botão "Entendi" (a tela não sobe sozinha, então um aviso no topo passaria despercebido). */
@@ -694,6 +715,15 @@ const MENU = [
   ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas'],
 ];
+/** Formulário (#/novo/<tabela>, #/editar/<tabela>/id) → item do menu que acende (antes todos acendiam "Imóveis"). */
+const MENU_DO_FORMULARIO = {
+  imoveis: 'imoveis', reformas: 'imoveis', iptus: 'imoveis', titularidades: 'imoveis', leituras: 'imoveis', participacoes: 'imoveis',
+  contratos: 'inquilino', fiadores: 'inquilino', aplicacoes: 'inquilino', correcoes_garantia: 'inquilino', depositos_garantia: 'inquilino',
+  devolucoes_garantia: 'inquilino', trocas_garantia: 'inquilino', renovacoes: 'inquilino', encerramentos: 'inquilino', correcoes: 'inquilino',
+  solicitacoes: 'inquilino', ressarcimentos: 'inquilino', seguros: 'inquilino', fichas: 'inquilino', vistorias: 'inquilino', aditivos: 'inquilino',
+  cobrancas: 'cobranca', avulsas: 'fatura', despesas: 'financeiro', ganhos_airbnb: 'financeiro', indices_acumulados: 'reajustes',
+  emitentes: 'empresas', usuarios: 'usuarios',
+};
 
 /** Na nuvem, a aba e o "adicionar à tela de início" do iPhone usam o ícone escolhido (/api/icone-192.png; sem ele, o "ERP"). */
 let versaoIcone = 0;
@@ -729,21 +759,20 @@ function enderecoDaLogo() {
 
 function layout(conteudo, rota) {
   trocarIconeDaAba(false);
-  // formulários de inquilino (novo/editar contratos, fiadores, saída...) ficam no menu Inquilinos
-  const deInquilino = ['novo', 'editar'].includes(rota.partes[0]) && ['contratos', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'devolucoes_garantia', 'renovacoes', 'encerramentos', 'correcoes', 'solicitacoes'].includes(rota.partes[1]);
-  const deIptu = ['novo', 'editar'].includes(rota.partes[0]) && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
-  const form = ['novo', 'editar'].includes(rota.partes[0]) ? { emitentes: 'empresas', usuarios: 'usuarios' }[rota.partes[1]] : null;
-  const atual = deInquilino ? 'inquilino' : deIptu ? 'iptu' : form || rota.partes[0] || '';
+  // formulários (novo/editar) acendem o menu do assunto deles: contrato, fiador, saída... em Inquilinos; boleto em Boletos etc.
+  const ehForm = ['novo', 'editar'].includes(rota.partes[0]);
+  const deIptu = ehForm && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
+  const atual = ehForm ? (deIptu ? 'iptu' : MENU_DO_FORMULARIO[rota.partes[1]] || '-') : TELAS[rota.partes[0] || 'painel'] ? rota.partes[0] || '' : '-';
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
-  return `<header class="topo nao-imprimir">
+  return `<a class="pular-conteudo nao-imprimir" href="#conteudo" data-pular>Pular para o conteúdo</a><header class="topo nao-imprimir">
       <a class="marca" href="#/">${E.d.logo ? `<img src="${esc(enderecoDaLogo())}" alt="Logo">` : ''}Administração de Imóveis</a>
       <button type="button" class="menu-botao" data-menu aria-label="Abrir ou fechar o menu" aria-expanded="false">☰ Menu</button><nav>${menu}</nav>
       <form data-form="ir" data-ir="buscar" class="busca-topo" role="search"><input name="q" type="search" maxlength="100" placeholder="Buscar…" aria-label="Buscar imóvel, inquilino, CPF, NF ou valor" value="${rota.partes[0] === 'buscar' ? esc(rota.q.q || '') : ''}"></form>
       <div class="conta">${esc(E.usuario.nome)}<br><a href="#/minha-senha">Trocar senha</a> · <a href="#" data-acao="sair">Sair</a></div>
     </header>
     <div class="faixa nao-imprimir" id="faixa"></div>
-    <main><div id="mensagens" class="nao-imprimir"></div>${conteudo}</main>`;
+    <main id="conteudo" tabindex="-1"><div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}</main>`;
 }
 
 let paginaDesenhada = null;
@@ -791,7 +820,7 @@ export async function mostrar(estadoForm = null) {
       const tela = TELAS[nome];
       const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
       if (meu !== desenhos) return;
-      html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir"></div>${conteudo}` : layout(conteudo, rota);
+      html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}` : layout(conteudo, rota);
     }
     if (meu !== desenhos) return;
     // na mesma página, as caixas recolhíveis (<details id>) que estavam abertas continuam abertas depois de uma ação
@@ -810,6 +839,10 @@ export async function mostrar(estadoForm = null) {
     else app.style.minHeight = '';
     if (!mesma) document.querySelector('.visualizador')?.fecharSemVoltar?.(); // anexo aberto por cima da página antiga
     app.innerHTML = html;
+    // título da aba: o nome da tela (com várias abas abertas, ou no histórico do navegador, dá para saber qual é qual)
+    const h1 = typeof app.querySelector === 'function' ? app.querySelector('h1') : null;
+    const nomeTela = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
+    document.title = nomeTela && nomeTela !== 'Administração de Imóveis' ? `${nomeTela.slice(0, 60)} · Imóveis` : 'Administração de Imóveis';
     if (subir) window.scrollTo(0, 0);
     // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
     if (E.usuario) carregarClipes();
@@ -937,11 +970,16 @@ document.addEventListener('submit', async (ev) => {
   if (botao) botao.disabled = true;
   const endereco = location.hash;
   const desenhosAntes = desenhos;
+  // enviando: a troca de tela depois de salvar não pergunta "Sair sem salvar?"; se não salvou, a marca volta
+  const alterado = !!form.dataset.alterado;
+  delete form.dataset.alterado;
   try {
     const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
     if (resposta && resposta.erros) {
-      aviso('Confira os campos destacados.', 'erro');
       await mostrar(resposta);
+      const novo = typeof document.querySelector === 'function' ? document.querySelector(`main form[data-form="${form.dataset.form}"]`) : null;
+      if (novo && novo.dataset) novo.dataset.alterado = '1';
+      aviso(marcarCamposComErro(), 'erro');
     }
   } catch (e) {
     logarErro(e);
@@ -950,8 +988,89 @@ document.addEventListener('submit', async (ev) => {
   } finally {
     // saiu sem trocar de tela (ex.: "Cancelar" numa confirmação, arquivo só baixado): o botão volta a funcionar.
     // Se a tela vai ser desenhada de novo (ir/mostrar), fica apagado até a nova aparecer: não dá para enviar duas vezes.
-    if (botao?.isConnected && location.hash === endereco && desenhos === desenhosAntes) botao.disabled = false;
+    const ficou = location.hash === endereco && desenhos === desenhosAntes;
+    if (botao?.isConnected && ficou) botao.disabled = false;
+    if (alterado && ficou && form.isConnected) form.dataset.alterado = '1';
   }
+});
+
+/**
+ * Formulário com erro: cada campo errado ganha aria-invalid e a mensagem ligada a ele; o cursor vai para o primeiro.
+ * Devolve o texto da janela: quantos e quais campos corrigir ("2 campos para corrigir: Tipo de garantia, Dia do vencimento.").
+ */
+function marcarCamposComErro() {
+  const caixas = typeof document.querySelectorAll === 'function' ? [...document.querySelectorAll('main .com-erro')] : [];
+  const nomes = [];
+  caixas.forEach((cx, k) => {
+    const campo = cx.querySelector('input:not([type=hidden]), select, textarea');
+    const msg = cx.querySelector('.erro-campo');
+    if (campo) {
+      campo.setAttribute('aria-invalid', 'true');
+      if (msg) { msg.id = msg.id || `erro_${campo.name || k}`; campo.setAttribute('aria-describedby', msg.id); }
+    }
+    const rotulo = (cx.querySelector('label')?.textContent || '').replace(/\s*\*\s*$/, '').replace(/\s+/g, ' ').trim();
+    if (rotulo && !nomes.includes(rotulo)) nomes.push(rotulo);
+  });
+  const primeiro = caixas[0]?.querySelector('input:not([type=hidden]), select, textarea');
+  if (primeiro) {
+    caixas[0].scrollIntoView({ block: 'center' });
+    primeiro.focus({ preventScroll: true }); // ao fechar a janela do erro, o cursor volta para cá
+  }
+  if (!nomes.length) return 'Confira os campos destacados.';
+  return `${nomes.length === 1 ? '1 campo para corrigir' : `${nomes.length} campos para corrigir`}: ${nomes.join(', ')}.`;
+}
+
+// --------------------------------------------------------------------------
+// Formulário com mudança não salva (decisão do dono, 2026-11-16): trocar de tela (menu, Voltar, links, Sair) pergunta
+// "Sair sem salvar?". A marca fica no próprio formulário (data-alterado): redesenhar a tela a tira junto.
+// Não contam: o filtro e a busca (data-form="ir"), o login, marcar itens de uma lista e arquivo que já faz a ação.
+// --------------------------------------------------------------------------
+const NAO_ALTERA = 'input[type=file][data-acao-arquivo], input[name=ids], [data-marcar-grupo], [data-marcar-todas], [data-ordem-boletos], [data-sem-aviso], [data-lista-novo]';
+function marcarAlterado(ev) {
+  const el = ev.target;
+  if (!el || typeof el.closest !== 'function' || el.closest(NAO_ALTERA)) return;
+  const form = el.closest(SELETOR_FORMULARIO);
+  if (form && form.dataset.form !== 'login') form.dataset.alterado = '1';
+}
+document.addEventListener('input', marcarAlterado);
+document.addEventListener('change', marcarAlterado);
+export const formularioAlterado = () => {
+  const f = typeof document.querySelector === 'function' ? document.querySelector(`${SELETOR_FORMULARIO}[data-alterado]`) : null;
+  return !!(f && f.dataset && f.dataset.alterado);
+};
+
+/** Há mudança não salva? Pergunta; quem escolhe sair perde o que digitou (a marca sai, para não perguntar de novo). */
+export async function podeSairDaTela() {
+  if (!formularioAlterado()) return true;
+  const sair = await confirmar('Você mudou este formulário e ainda não salvou. Se sair agora, o que foi digitado se perde.',
+    { titulo: 'Sair sem salvar?', sim: 'Sair sem salvar', nao: 'Continuar aqui', forte: true });
+  if (sair) for (const f of document.querySelectorAll('[data-alterado]')) delete f.dataset.alterado;
+  return sair;
+}
+
+// link para outra tela com o formulário alterado: pergunta antes (a tela não chega a trocar)
+document.addEventListener('click', async (ev) => {
+  const a = ev.target.closest?.('a[href^="#/"]');
+  if (!a || a.target || a.dataset.acao || ev.ctrlKey || ev.metaKey || ev.shiftKey || !formularioAlterado()) return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  const href = a.getAttribute('href');
+  if (!(await podeSairDaTela())) return;
+  if (href === location.hash) mostrar(); else location.hash = href;
+}, true);
+
+// "Pular para o conteúdo" (teclado): vai para a tela sem passar pelos 11 links do menu (sem mudar o endereço)
+document.addEventListener('click', (ev) => {
+  if (!ev.target.closest?.('[data-pular]')) return;
+  ev.preventDefault();
+  document.getElementById('conteudo')?.focus();
+});
+
+// fechar a aba ou recarregar com mudança não salva: o navegador pergunta
+window.addEventListener('beforeunload', (ev) => {
+  if (!formularioAlterado()) return;
+  ev.preventDefault();
+  ev.returnValue = '';
 });
 
 // datas: o ano tem 4 dígitos (sem o limite, o navegador aceita 6 e o 5º dígito não volta ao começo do ano)
@@ -995,7 +1114,15 @@ document.addEventListener('click', async (ev) => {
   if (!el) return;
   ev.preventDefault();
   if (el.dataset.ocupado) return; // segundo clique enquanto a ação roda (ex.: "Gerar boletos" duas vezes)
-  if (el.dataset.confirmar && !confirm(el.dataset.confirmar)) return;
+  if (el.dataset.confirmar) {
+    // janela do sistema (não a do navegador): vermelha no que apaga, com o botão dizendo a ação
+    const apaga = el.classList.contains('perigo') || el.classList.contains('x-excluir');
+    const rotulo = (el.textContent || '').trim();
+    el.dataset.ocupado = '1';
+    const ok = await confirmar(el.dataset.confirmar, { sim: rotulo && rotulo !== '×' && rotulo.length <= 40 ? rotulo : apaga ? 'Excluir' : 'Confirmar', forte: apaga });
+    delete el.dataset.ocupado;
+    if (!ok) return;
+  }
   el.dataset.ocupado = '1';
   if (el.tagName === 'BUTTON') el.disabled = true;
   try {
@@ -1082,7 +1209,12 @@ document.addEventListener('keydown', (ev) => {
 });
 
 // Página nova começa do topo (com ?ir= a própria tela rola até a caixa).
-window.addEventListener('hashchange', async () => {
+window.addEventListener('hashchange', async (ev) => {
+  // Voltar do navegador (ou endereço digitado) com formulário alterado: pergunta; quem fica continua com o que digitou
+  if (formularioAlterado() && !(await podeSairDaTela())) {
+    if (ev && ev.oldURL) history.pushState(null, '', ev.oldURL);
+    return;
+  }
   subirAoTopo = true; // mostrar sobe logo depois de trocar a tela (antes subia só depois de esperar as listas de anexos)
   await mostrar();
 });

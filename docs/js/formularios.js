@@ -1,6 +1,6 @@
 // Campos de cada cadastro, desenho dos formulários e leitura do que foi digitado.
 import { soDigitos } from './c6-comum.js';
-import { centavos, numero } from './calculos.js';
+import { centavos, ErroUsuario, numero } from './calculos.js';
 
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -689,8 +689,8 @@ export function ler(campos, form, antigo = null) {
       } else if (c.tipo === 'tel') dados[c.nome] = [10, 11].includes(soDigitos(bruto).length) ? mascarar('tel', bruto) : bruto;
       else if (c.tipo === 'opcao' && c.nome.endsWith('_id')) dados[c.nome] = Number(bruto);
       else dados[c.nome] = c.max ? bruto.slice(0, c.max) : bruto;
-    } catch {
-      erros[c.nome] = 'Valor inválido';
+    } catch (e) {
+      erros[c.nome] = e instanceof ErroUsuario ? e.message : 'Valor inválido';
     }
   }
   return { dados, erros };

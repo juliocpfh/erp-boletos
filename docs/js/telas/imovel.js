@@ -93,7 +93,7 @@ export function telaImovel(i) {
   const lembretes = R.desligamentoDe(d(), { tipo: 'Titularidade', imovel_id: i.id }) ? [] : contratos.map((c) => R.alertaTitularidade(d(), c, hoje)).filter(Boolean);
   return `<div class="cabecalho"><h1>${esc(i.nome)}${i.sublote ? ` <span class="suave">· ${esc(i.sublote)}</span>` : ''}</h1><div class="acoes">
       ${opera() ? `${link(`#/novo/contratos?imovel=${i.id}`, 'Novo contrato', 'botao')} ${link(`#/editar/imoveis/${i.id}`, 'Editar imóvel', 'botao secundario')}` : ''}
-      ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo', 'Excluir este imóvel? Os arquivos da pasta são mantidos.') : ''}</div></div>
+      ${podeUsuario('admin') ? (contratos.length ? '<button type="button" class="perigo" disabled title="Este imóvel tem inquilinos">Excluir</button><span class="ajuda nw">Para excluir, exclua antes os contratos dele.</span>' : botao('excluir', 'Excluir', { tabela: 'imoveis', id: i.id }, 'perigo')) : ''}</div></div>
     <div class="endereco">📍 ${esc(endereco(i))}</div>
     ${R.imovelSoControle(d(), i.id) ? `<div class="alerta controle"><b>Boleto de controle.</b> O inquilino atual ${AVISO_CONTROLE}</div>` : ''}
     ${caixaVerificar(i.verificar)}

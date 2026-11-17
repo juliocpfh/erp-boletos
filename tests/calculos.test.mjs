@@ -16,6 +16,10 @@ test('converte valores digitados em centavos', () => {
   assert.equal(C.centavos(''), 0);
   assert.equal(C.numero('8,5%'), 8.5);
   assert.throws(() => C.centavos('abc'));
+  // formato americano: recusado com a orientação (antes "2,300.00" virava R$ 2,30), decisão do dono de 2026-11-16
+  assert.throws(() => C.centavos('2,300.00'), /Use 2\.300,00/);
+  assert.throws(() => C.centavos('R$ 1,234.56'), (e) => e instanceof C.ErroUsuario);
+  assert.equal(C.centavos('2.300,00'), 230000);
   assert.equal(C.reais(123456), 'R$ 1.234,56');
 });
 
