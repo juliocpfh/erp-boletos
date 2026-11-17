@@ -1,15 +1,15 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). **Em aceite:** #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11) e a PR do programa do PC desinstalável.
+Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). Depois, aceitas em 17/11: #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11), #312 (programa do PC desinstalável), #313 (programa do PC se atualiza sozinho) e #314 (respostas do contador). Conferidos pelo dono em 17/11: o sistema no computador e no celular e o programa novo no PC.
 
 Marque com `[x]` o que for concluindo.
 
 ## Para confirmar na sequência (dono)
 
-1. [ ] Abrir o sistema no computador e no celular depois da troca da publicação (17/11) e ver se abre normal. **Celular conferido em 17/11** (desinstalou, instalou de novo, entrou rápido, tudo funcionando); falta o computador. Na 1ª vez ele baixa tudo de novo (pode demorar um pouco mais).
+1. [x] Abrir o sistema no computador e no celular depois da troca da publicação (17/11) e ver se abre normal. **Celular conferido em 17/11** (desinstalou, instalou de novo, entrou rápido, tudo funcionando); **computador conferido em 17/11** (abriu, tudo certo). Na 1ª vez ele baixa tudo de novo (pode demorar um pouco mais).
 2. [x] Aceitar as PRs em aceite: #309, #310 e #312 aceitas em 17/11. Sair e entrar com a senha: feito no celular em 17/11.
    - Depois do merge da #310: **sair e entrar de novo no site com a senha, uma vez** (e de novo sempre que trocar a senha). Sem isso, ligar um computador **novo** ao programa do PC dá "E-mail ou senha errados…". Os computadores já ligados continuam funcionando.
-3. [ ] Depois do merge da PR do programa que se atualiza sozinho (item 11; uns 10 min): baixar o `.exe` novo **pela última vez**, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9) e, no sistema, em Usuários → Aparelhos ligados, a coluna **Programa** com a data da versão (depois da próxima rodada das 20h). Daqui em diante ele se troca sozinho.
+3. [x] Programa do PC novo: **conferido pelo dono em 17/11**: baixou e rodou o `.exe` novo, "Administração de Imóveis" aparece em Configurações → Aplicativos e Usuários → Aparelhos ligados mostra o programa "de 17/11/2026 (c60d8b1)". Daqui em diante ele se troca sozinho (todo dia às 20h e ao entrar no Windows).
 4. [ ] Ligar o Gmail com o Claude (item 1).
 5. [ ] Ficha pela internet com um conhecido (item 3).
 6. [x] Contador: informe do IR (D5), DIMOB e numeração da NF: **encerrado em 17/11** (resposta do contador; nada muda no sistema; ver item 6).
@@ -33,7 +33,7 @@ Marque com `[x]` o que for concluindo.
 | 6 | Decisões que estão com você: abertas só CBS 2027 e corte do texto do boleto; D5 (IR), DIMOB e numeração da NF encerradas em 17/11 com o contador; as outras decididas em 17/11 | você / contador | — |
 | ~~7~~ | ~~Aceitar a PR #231~~ aceita em 14/11 | — | — |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: concluído; "Abrir a pasta no Explorer" funciona (17/11); falta só o `.exe` novo depois do merge do desinstalar | você | 5 min |
+| ~~9~~ | ~~Programa no PC~~ **concluído em 17/11** (Explorer, desinstalar e o `.exe` que se atualiza sozinho conferidos) | — | — |
 | ~~11~~ | ~~Mutirão de 16/11~~ **concluído em 17/11** (2ª rodada na PR #310, em aceite; compactação do código na #308) | — | — |
 | 13 | Mutirão 3000 (16–17/11): 366 erros confirmados; 314 corrigidos no inventário de 17/11 (até #303) e mais correções em #304–#309 e nas PRs em aceite; faltam NF 16/30 e troca de senha (quando acontecerem) | você + Claude | — |
 
@@ -195,7 +195,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ---
 
-## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11; "Abrir a pasta no Explorer" funcionando em 17/11; falta só o `.exe` novo depois do merge do desinstalar, 9f)
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11; "Abrir a pasta no Explorer" funcionando em 17/11; `.exe` novo e desinstalar conferidos em 17/11)
 
 **Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
 
@@ -231,7 +231,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
     4. Confira `ultima-atualizacao.txt` com `ok`. Depois de um dia certo, a pasta `Imoveis chave\atualizador-pc` e o Node podem ser apagados do computador.
     - Testado em 15/11 com o `.exe` de verdade: ajuda, versão, aviso de computador não ligado, atualização completa contra uma nuvem de teste (crachá cifrado pelo Windows) e a rodada sem janela. **Não testado** (não dava sem mexer no seu Windows): criar as tarefas de verdade, a pergunta "Deseja permitir?" e o aviso azul. Se algo falhar, a janela diz o quê; o jeito antigo (Node) continua funcionando.
     - Continua faltando: assinatura (antes do primeiro cliente de fora), o programa se atualizar sozinho e o link para baixar dentro do sistema.
-- [ ] **9f. Programa do PC desinstalável** (pedido do dono em 17/11; PR em aceite): desinstalar pelos Aplicativos do Windows e por um botão no sistema. **Falta você, depois do merge (5 min):** uns 10 minutos depois, baixe o `Instalar-Administracao-de-Imoveis.exe` novo em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc e rode uma vez (aviso azul → **Mais informações → Executar assim mesmo**). Depois, em **Configurações → Aplicativos**, confira que aparece "Administração de Imóveis". Não precisa desinstalar: é só para ver que está lá.
+- [x] **9f. Programa do PC desinstalável** (pedido do dono em 17/11; **conferido pelo dono em 17/11**: aparece em Configurações → Aplicativos): desinstalar pelos Aplicativos do Windows e por um botão no sistema. **Falta você, depois do merge (5 min):** uns 10 minutos depois, baixe o `Instalar-Administracao-de-Imoveis.exe` novo em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc e rode uma vez (aviso azul → **Mais informações → Executar assim mesmo**). Depois, em **Configurações → Aplicativos**, confira que aparece "Administração de Imóveis". Não precisa desinstalar: é só para ver que está lá.
 
 ## 10. Anexar a contra-vistoria de entrada  `[x]` (feito em 15/11)
 
