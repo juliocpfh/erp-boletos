@@ -1,5 +1,6 @@
 // Telas de consulta: busca global, solicitações dos inquilinos, lista de inquilinos, IPTU do ano e calendário do painel.
 import { podeUsuario } from '../app.js';
+import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
@@ -93,6 +94,11 @@ export function telaInquilinos(q) {
     return nome(x, fone); };
   // ao lado do imóvel, o botão que abre o arquivo da matrícula
   const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');
+  // nenhum ativo: sem contrato nenhum, o próximo passo (imóvel primeiro, depois a ficha ou o contrato)
+  const semAtivos = () => (d().contratos.length ? `<span class="suave">${busca ? 'Nenhum inquilino ativo encontrado nesta busca.' : 'Nenhum inquilino ativo hoje.'}</span>`
+    : !d().imoveis.length ? AJ.proximoPasso('Nenhum inquilino ainda.', 'O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])
+      : AJ.proximoPasso('Nenhum inquilino ainda.', 'Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.',
+        [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Novo interessado (ficha)']]));
   const resumo = R.resumoSolicitacoes(d());
   // 1ª etapa de um inquilino novo: a ficha do interessado (proposta, reserva e e-mail da ficha); dela sai o contrato
   return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? `<div class="acoes">${link('#/novo/fichas', 'Novo interessado (ficha)', 'botao')} ${link('#/novo/contratos', 'Novo contrato', 'botao secundario')}</div>` : ''}</div>
@@ -102,7 +108,7 @@ export function telaInquilinos(q) {
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ''}</td><td>${nomeCelular(x)}</td>${registrar(x.c)}
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
-        <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="suave">Nenhum.</td></tr>'}</table>
+        <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || `<tr><td colspan="6">${semAtivos()}</td></tr>`}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
     <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
       ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
@@ -217,7 +223,7 @@ export function telaIptu(ano) {
         <td class="n nw">${opera() ? botao('iptuPago', 'Marcar como paga', { id: g.iptu.id, n: g.parcela.n, texto: `${g.imovel.nome} · IPTU ${g.iptu.ano} · ${g.parcela.n === 0 ? 'cota única' : `${g.parcela.rotulo} parcela`}: sua parte ${reais(g.parcela.valorProprietario)} · vence ${dataBr(g.venc)}` }, 'secundario pequeno') : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhuma guia sua vencida ou vencendo nos próximos 60 dias.</td></tr>'}</table></div>
     <div class="cartao rolagem"><table class="compacta mapa-iptu"><tr><th>Imóvel</th><th>IPTU ${ano}</th><th class="nw meses-iptu">${meses.map((m) => `${m === `${ano + 1}-01` ? '<span class="sep-ano"></span>' : ''}<span>${m.startsWith(String(ano)) ? rotuloMes(m) : `${rotuloMes(m).split('/')[0]}<br>/${m.slice(2, 4)}`}</span>`).join('')}</th><th class="n">Inquilino</th><th class="n">Você paga</th><th></th></tr>
-      ${linhas || '<tr><td colspan="6" class="suave">Nenhum imóvel cadastrado.</td></tr>'}
+      ${linhas || `<tr><td colspan="6">${d().imoveis.length ? '<span class="suave">Nenhum imóvel nesta lista.</span>' : AJ.proximoPasso('Nenhum imóvel cadastrado ainda.', 'O IPTU é lançado por imóvel: cadastre o imóvel primeiro.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])}</td></tr>`}
       ${linhas ? `<tr class="total"><td>Total</td><td></td><td></td><td class="n nw">${reais(soma.inquilino)}</td><td class="n nw">${suaParte(soma.sua, soma.aberto)}${soma.aberto ? `<br><span class="texto-perigo">${reais(soma.aberto)} em aberto</span>` : ''}</td><td></td></tr>` : ''}</table>
     ${linhas ? `<h3>Resumo de ${ano}</h3><table class="compacta resumo-iptu">
       <tr><td>Inquilinos pagam nos boletos</td><td class="n nw"><b>${reais(soma.inquilino)}</b></td></tr>

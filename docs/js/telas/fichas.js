@@ -36,7 +36,7 @@ export function caixaFichas() {
   const tabela = (lista) => `<table><tr><th>Interessado</th><th>Imóvel(is)</th><th>Recebida em</th><th class="n">Reserva</th><th>Situação</th></tr>${lista.map(linha).join('')}</table>`;
   return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas em análise (${abertas.length})</h2>${opera() ? link('#/novo/fichas', 'Nova ficha em análise', 'botao secundario pequeno') : ''}</div>
     <p class="suave">Interessado que manda os dados, a reserva e os documentos para análise. Aprovada, a ficha vira o contrato já preenchido.</p>
-    ${abertas.length ? tabela(abertas) : '<p class="suave">Nenhuma ficha em análise.</p>'}
+    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha em análise.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Nova ficha em análise": os dados da pessoa, a reserva e os documentos ficam guardados até você aprovar.' : ''}</p>`}
     ${encerradas.length ? `<details id="fichas-encerradas"><summary class="suave">${encerradas.length} ficha(s) encerrada(s): aprovadas que viraram contrato, reprovadas e desistências (clique para ver)</summary>${tabela(encerradas)}</details>` : ''}</div>`;
 }
 

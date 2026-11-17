@@ -1,5 +1,6 @@
 // Notas fiscais (#/faturas): lista por número, NF externa, renumeração e NFs avulsas.
 import { podeUsuario } from '../app.js';
+import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
@@ -38,6 +39,18 @@ export const formNfExterna = (tipo, id, data) => `<details class="nf-externa"><s
 
 export const siglaEmpresa = (e) => (e.aba_modelo || e.nome.split(/\s+/)[0]).toLocaleUpperCase('pt-BR');
 
+/** Mês sem NF: o próximo passo (empresa, numerar os pagamentos que esperam ou confirmar um pagamento em Boletos). */
+function mesSemNf(mes, pend) {
+  const titulo = `Nenhuma NF emitida em ${compBr(mes)}.`;
+  if (!d().emitentes.length) {
+    return AJ.proximoPasso(titulo, 'A NF sai em nome da empresa: o administrador cadastra a empresa primeiro (nome, CNPJ e endereço).',
+      [podeUsuario('admin') && ['#/novo/emitentes', 'Cadastrar a empresa']]);
+  }
+  if (pend.length) return AJ.proximoPasso(titulo, `${pend.length} pagamento(s) esperam o número da NF: marque na caixa "Pagamentos aguardando número", acima, e clique em "Numerar as NFs marcadas".`);
+  return AJ.proximoPasso(titulo, 'A NF sai depois que o pagamento do boleto é confirmado. Ex.: o inquilino pagou em 05/11; confirme o pagamento em Boletos e, a partir de 01/12, numere a NF aqui.',
+    [opera() && ['#/cobrancas?filtro=abertos', 'Confirmar um pagamento em Boletos']]);
+}
+
 export function telaFaturas(mes) {
   const pend = R.pendentesDeFatura(d());
   const ultima = R.ultimaFatura(d());
@@ -70,7 +83,7 @@ export function telaFaturas(mes) {
         <td>${etiqueta(fs[0].situacao, ok ? 'ok' : 'perigo')}</td>
         <td class="n nw">${ok ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${opera() ? ` ${botao('cancelarNumero', 'Cancelar', { numero: n }, 'perigo pequeno', `Cancelar a NF nº ${R.numeroFatura(n)}? O pagamento volta para a fila e recebe um número novo. O número ${R.numeroFatura(n)} não será reaproveitado.`)}` : ''}`
           : (podeUsuario('admin') ? botao('apagarCanceladas', '×', { numero: n }, 'x-excluir', `Apagar a NF cancelada nº ${R.numeroFatura(n)} da lista? Fica só o registro no Histórico.`) : '')}</td></tr>`; }).join('')
-      || `<tr><td colspan="9" class="suave">Nenhuma NF emitida em ${compBr(mes)}.</td></tr>`}</table></div>
+      || `<tr><td colspan="9">${mesSemNf(mes, pend)}</td></tr>`}</table></div>
     ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" rel="noopener" href="#/imprimir/faturas?mes=${esc(mes)}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('pdfMes', 'Baixar todas em PDF (ZIP)', { mes })}
       ${[...new Set(doMes.filter((f) => f.situacao === 'Emitida').map((f) => f.emitente_id))].map((id) => buscar('emitentes', id)).filter(Boolean)
     .map((e) => botao('pdfMes', `Todas em PDF ${esc(siglaEmpresa(e))}`, { mes, empresa: e.id })).join(' ')}

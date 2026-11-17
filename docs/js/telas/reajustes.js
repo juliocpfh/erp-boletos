@@ -1,4 +1,5 @@
 // Reajuste anual do aluguel (#/reajustes): índices acumulados, reajustes em aberto e feitos, caução a completar e carta de reajuste.
+import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
@@ -123,7 +124,9 @@ export function telaReajustes(q) {
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : '-'}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : '-'})</div>` : ''}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
-        <div class="reajuste-botoes">${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}<div class="acoes">${p.carta}</div></div></div></div>`; }).join('')}`)).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+        <div class="reajuste-botoes">${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}<div class="acoes">${p.carta}</div></div></div></div>`; }).join('')}`)).join('') || (d().contratos.length ? '<p class="suave">Nenhum reajuste em aberto.</p>'
+      : AJ.proximoPasso('Nenhum reajuste em aberto.', `O reajuste aparece aqui um ano depois da entrada do inquilino (ex.: entrou em março de 2026, o aluguel de março de 2027 já vem corrigido). Primeiro, cadastre ${d().imoveis.length ? 'o contrato' : 'o imóvel e depois o contrato'}.`,
+        [opera() && (d().imoveis.length ? ['#/novo/contratos', 'Cadastrar o contrato'] : ['#/novo/imoveis', 'Cadastrar o primeiro imóvel'])]))}
       </div>
       <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
