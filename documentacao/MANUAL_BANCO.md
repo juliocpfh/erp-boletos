@@ -94,15 +94,29 @@ Pode buscar quantas vezes quiser no mês (uma vez por semana, por exemplo). O im
 
 ### 2.6 Dar destino a cada movimentação
 
-Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quando reconhece a linha (etiqueta "parece: Loja 1 · Água"); basta clicar em **Usar sugestão**. Se a conta (ex.: água de R$ 123,45) já foi lançada à mão em Contas pagas por nós, a sugestão liga a linha a ela, sem lançar outra; se a entrada é de um boleto já registrado à mão (mesma data e valor), a sugestão é "já pago: só ligar". Quando não reconhece, você escolhe:
+Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quando reconhece a linha (etiqueta "parece: Loja 1 · Água"); basta clicar em **Usar sugestão**.
+
+**Só o código liga sozinho (decisão do dono em 17/11/2026).** O sistema só propõe ligar uma linha a um boleto, a um pagamento ou a outra linha quando o **identificador é o mesmo**: o código de barras ou o nosso número do boleto, o Pix do próprio boleto (QR Code do boleto emitido no C6), o código do Pix (`end_to_end_id`) na devolução e na transferência entre as nossas contas por Pix, ou a referência `erp-12` do pagamento feito pelo sistema. Mesmo assim, você confirma. **Pix feito à mão (pela chave, com o mesmo valor e a mesma data, com o nome ou o CPF de quem pagou) nunca é ligado sozinho nem vem marcado**: a linha mostra o aviso **"Pix sem identificação: vincular manualmente"** e o botão **Vincular manualmente** abre a janela sem nenhum boleto escolhido. Exemplos:
+
+- Pix de R$ 1.500,00 em 10/11/2026 com "PIX RECEBIDO JOAO EXEMPLO": aviso "Pix sem identificação: vincular manualmente (1 boleto com este valor)". Você escolhe o boleto 10/2026 do João e salva.
+- Pix do QR Code do boleto 0000003048 (cita o nosso número): proposto o boleto da Maria; você clica em **Usar sugestão**.
+- Saída de luz de R$ 123,45 em 17/11/2026 com a luz já lançada à mão: o sistema procura as contas lançadas **no mês anterior e no mês da saída** (de 01/10/2026 a 30/11/2026) e avisa "vincule e confirme qual é". A luz paga em 10/10 aparece na lista; a de 28/09, não. Na janela, nenhuma vem escolhida: escolha qual conta e de qual mês é, ou "não é nenhuma: lançar agora".
+- TED de R$ 2.000,00 da ANK para a JCK: o destino "Transferência" é sugerido (cita a outra empresa), mas a outra ponta você escolhe na janela; num Pix entre as nossas contas, com o mesmo código nas duas pontas, a outra ponta já vem proposta.
+- Saída de R$ 200,00 com o mesmo valor de um pagamento feito pelo sistema, mas sem a referência `erp-…` na descrição: só o aviso; confirme em **Pagamentos pelo banco → Confirmar pelo extrato** (lá também nenhuma saída vem marcada).
+- IPTU: a parcela só vem escolhida quando o extrato a cita ("PARCELA 3/10"); pelo valor, escolha a parcela na janela.
+
+Quando não reconhece, você escolhe:
 
 | O que é a linha | O que fazer | Exemplo |
 |---|---|---|
 | Conta de um imóvel paga por nós (água, luz, gás, condomínio, internet, outra) | **Atrelar a imóvel/conta**: escolha o imóvel, o tipo e o mês da conta. O sistema lança a conta em **Contas pagas por nós** com o valor e a data do extrato | "PAGAMENTO BOLETO SANEPAR" de R$ 123,45 em 05/11/2026 → Loja 1 · Água 11/2026 |
 | IPTU pago na prefeitura | **Atrelar a imóvel/conta**, tipo **IPTU**, e escolha a parcela em aberto. A parcela fica marcada como paga | R$ 210,00 em 10/11/2026 → Loja 1 · IPTU 2026 · 3ª parcela |
-| Aluguel recebido (boleto ou Pix do boleto) | **É o pagamento do boleto…**: o sistema lista os boletos em aberto que batem ("bate certinho" ou "provável"). Escolha, confira a data e o valor e clique em **Confirmar pagamento** | entrada de R$ 1.219,50 em 11/12/2026 → boleto 11/2026 da Maria Exemplo |
+| Aluguel recebido (boleto ou Pix do boleto) | Com o código do boleto: **É o pagamento do boleto…** e **Confirmar pagamento**. Sem o código (Pix feito à mão): **Vincular manualmente**, escolha o boleto e salve | entrada de R$ 1.219,50 em 11/12/2026 → boleto 11/2026 da Maria Exemplo |
+| O inquilino pagou de novo um boleto já pago (Pix e código de barras, ou o mesmo Pix duas vezes) | **Aluguel recebido (boleto)** e, na lista, o boleto com **"pagou de novo (a mais)"**. O recebido do boleto soma as duas entradas; a NF não muda. A página do boleto avisa "Pago a mais: falta devolver" | boleto 10/2026 de R$ 2.000,00 pago em 10/11 e de novo em 11/11 → recebido R$ 4.000,00, NF R$ 2.000,00 |
+| Devolução ao inquilino do que ele pagou a mais | **Devolução ao inquilino**: escolha o boleto pago a mais. O recebido do boleto diminui o valor devolvido, de volta ao devido; **a NF não muda**. Com a devolução do C6 (`DEBIT_PIX_DEVOLUTION_SENT`) que traz o código do Pix devolvido, o boleto já vem proposto; sem o código, nenhum vem escolhido. Se a devolução deixar o recebido abaixo do devido, o sistema pergunta antes | devolução de R$ 2.000,00 por Pix em 12/11 → boleto 10/2026 com R$ 2.000,00 recebidos, a devolução ligada a ele, NF de R$ 2.000,00 igual |
+| Devolução da reserva (ficha reprovada ou desistência) | **Devolução de Pix ou estorno**, e registre a devolução na ficha (a reserva não passa por boleto; o aviso da linha lembra quando há reserva do mesmo valor a devolver) | reserva de R$ 500,00 da ficha reprovada de Bruno |
 | Airbnb recebido (o Airbnb paga o total) ou reforma | **Airbnb recebido**: escolha o mês de referência e digite quanto é de cada imóvel vago; a soma tem que dar o valor do extrato. Cada parte vira um ganho do imóvel; a NF do Airbnb do mês (uma só, sem imóvel) sai da soma, em **Financeiro → Visão geral**. **Reforma**: escolha o imóvel e diga o que foi feito. Entra nas reformas do imóvel (fica à parte no resultado líquido) | "AIRBNB PAYMENTS" de R$ 1.210,00 → Apto 204 R$ 850,00 + Studio 12 R$ 360,00; "LOJA DE MATERIAIS" de R$ 2.300,00 → Casa · piso da cozinha |
-| Transferência entre as nossas contas | **Outro destino → Transferência**. A linha aparece nos dois extratos (saída na ANK, entrada na JCK) e o sistema liga as duas, para não virar conta de imóvel duas vezes. Tem comprovante também: um PDF só, com o nome da empresa de origem, na pasta do contador da conta de **origem** (`_Contador/ANK/2026-11/`), sem pasta de imóvel | "TED PARA JCK" de R$ 5.000,00 em 20/11/2026 |
+| Transferência entre as nossas contas | **Outro destino → Transferência**. A linha aparece nos dois extratos (saída na ANK, entrada na JCK); escolha a outra ponta na janela (só o Pix com o mesmo código vem proposto) e as duas ficam ligadas, para não virar conta de imóvel duas vezes. Tem comprovante também: um PDF só, com o nome da empresa de origem, na pasta do contador da conta de **origem** (`_Contador/ANK/2026-11/`), sem pasta de imóvel | "TED PARA JCK" de R$ 5.000,00 em 20/11/2026 |
 | Tarifa do banco | **Outro destino → Tarifa** | "TARIFA PACOTE" de R$ 39,90 |
 | Imposto da empresa (PIS/COFINS, IRPJ, CSLL) | **Outro destino → Imposto**, ligando à guia do mês | DARF de R$ 450,00 em 20/11/2026 |
 | Só precisa do comprovante, sem imóvel | **Outro destino → Outro**, com uma observação | compra de material de escritório |
@@ -111,7 +125,7 @@ Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quan
 Regras que o sistema aplica ao atrelar uma conta a um imóvel:
 
 - Aceita conta paga por nós em qualquer imóvel (ex.: débito antigo, troca de titular). Na janela, a conta que pelo contrato é do inquilino aparece marcada "(pelo contrato, o inquilino paga)", só como lembrete. Em Financeiro → Resultado bruto, a etiqueta do imóvel orienta: "vago", "alugado em 15/10/2026: veja se ficou conta nossa pendente" (até 2 meses depois da entrada) ou conta "incluso no contrato".
-- Uma linha só tem um destino. Errou? Clique no **×** (**Desfazer o destino**) e escolha de novo. Se o destino era um boleto, o desfazer é na tela **Boletos**, pelo botão **Desfazer pagamento**.
+- Uma linha só tem um destino. Errou? Clique no **×** (**Desfazer o destino**) e escolha de novo. Se o destino era um boleto, o desfazer é na tela **Boletos**, pelo botão **Desfazer pagamento** (que solta também a entrada a mais e a devolução ligadas a ele). A entrada "pagou de novo (a mais)" e a devolução ao inquilino se desfazem na própria linha; a entrada a mais só depois da devolução ligada ao mesmo boleto.
 - Os dados que vieram do banco (data, valor, descrição) nunca são editados: só o destino, o comprovante e as observações.
 
 ### 2.7 Nomear e guardar os comprovantes
@@ -173,6 +187,7 @@ O Painel também avisa: "N movimentações do extrato sem destino; M comprovante
 - **Nunca negativa um inquilino.** A negativação é uma opção desligada por padrão; quando ligada, cada caso exige a confirmação do administrador.
 - **Nunca dá baixa em boleto sem confirmação.** O aviso do banco e o botão "Conferir boletos pagos no banco" só **mostram**; a baixa acontece quando você clica em **Confirmar pagamento** (ou confirma a baixa em lote). O mesmo vale para o extrato: a entrada só vira pagamento de boleto depois de "É o pagamento do boleto…" e **Confirmar pagamento**.
 - **Nunca inventa um destino.** As sugestões ("parece: Loja 1 · Água") só valem depois de **Usar sugestão**.
+- **Nunca liga pelo valor, pela data, pelo nome ou pelo CPF/CNPJ** (decisão de 17/11/2026). Só o mesmo código (boleto, Pix do boleto, `end_to_end_id`, referência do pagamento) traz um boleto, uma conta ou a outra ponta já proposta; sem ele, só o aviso e a sua escolha.
 - **Nunca apaga o extrato.** Linhas do banco não se excluem; no máximo ficam como "Ignorada".
 - **Nunca envia nada ao inquilino nem ao contador.** Ele prepara (PDF, linha digitável, Pix, pastas) e você manda.
 - **Nunca guarda as chaves do banco na pasta de dados nem no site.** Elas ficam só no computador da ponte.

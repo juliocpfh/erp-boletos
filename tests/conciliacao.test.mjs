@@ -116,13 +116,20 @@ test('sugestão de destino: palavras da descrição com o imóvel pela matrícul
   let s = Z.sugerirDestino(d, agua);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.confianca], ['conta_imovel', loja.id, 'Água', 'media']);
   s = Z.sugerirDestino(d, pix);
-  assert.deepEqual([s.classificacao, s.cobranca_id, s.imovel_id, s.confianca], ['boleto', cb2.id, loja.id, 'alta']);
+  // Pix sem o código do boleto (decisão de 17/11/2026): só o aviso, com o boleto do mesmo valor como candidato, nada escolhido
+  assert.deepEqual([s.classificacao, s.cobranca_id, s.candidatos, s.semIdentificacao, s.confianca], ['boleto', null, [cb2.id], true, 'baixa']);
+  assert.match(s.motivo, /Pix sem identificação: vincular manualmente/);
   assert.equal(Z.sugerirDestino(d, tarifa).classificacao, 'tarifa');
   // transferência: cita a outra empresa (sem a outra ponta no extrato da JCK)
   assert.deepEqual([Z.sugerirDestino(d, ted).classificacao, Z.sugerirDestino(d, ted).confianca], ['transferencia', 'alta']);
-  // com a outra ponta importada na JCK, a sugestão traz o par
+  // com a outra ponta (TED, sem código) importada na JCK: transferência, mas a outra ponta só como candidata
   const [par] = importar(d, 'jck', [{ ...entrada('j1', '2026-11-04', '500.00', { transaction_type: 'TRANSFER', description: 'TED RECEBIDA ANK ADMINISTRADORA', title: 'Transferência recebida' }) }]).novas;
-  assert.equal(Z.sugerirDestino(d, ted).par_movimentacao_id, par.id);
+  assert.deepEqual([Z.sugerirDestino(d, ted).classificacao, Z.sugerirDestino(d, ted).par_movimentacao_id, Z.sugerirDestino(d, ted).candidatosPar], ['transferencia', null, [par.id]]);
+  // Pix entre as nossas contas: o mesmo end_to_end_id nas duas pontas é identificador, a outra ponta vem proposta
+  const E2E = 'E33600000202611040930ANKJCK0001';
+  const [pixAnk] = importar(d, 'ank', [saida('px1', '2026-11-04', '700.00', 'PIX ENVIADO JCK ADMINISTRADORA', { transaction_type: 'DEBIT_PIX_PAYMENT_REALIZED', end_to_end_id: E2E })]).novas;
+  const [pixJck] = importar(d, 'jck', [entrada('px2', '2026-11-04', '700.00', { description: 'PIX RECEBIDO ANK ADMINISTRADORA', end_to_end_id: E2E })]).novas;
+  assert.deepEqual([Z.sugerirDestino(d, pixAnk).par_movimentacao_id, Z.sugerirDestino(d, pixAnk).peloId], [pixJck.id, true]);
   s = Z.sugerirDestino(d, luz);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa], ['conta_imovel', loja.id, 'Luz']);
   s = Z.sugerirDestino(d, iptu);
@@ -135,10 +142,10 @@ test('sugestão de destino: palavras da descrição com o imóvel pela matrícul
     assert.match(s.motivo, /parcela citada/);
   }
   assert.deepEqual([Z.parcelaCitada('PARCELA 3/10'), Z.parcelaCitada('PARC. 07'), Z.parcelaCitada('3ª PARCELA'), Z.parcelaCitada('COTA UNICA'), Z.parcelaCitada('IPTU PREFEITURA')], [3, 7, 3, 0, null]);
-  // parcela citada já paga: cai na regra do valor (primeira em aberto)
+  // parcela citada já paga: só pelo valor nenhuma parcela é escolhida (o usuário escolhe na janela; decisão de 17/11/2026)
   R.marcarIptuPago(d, d.iptus[0].id, 5, '2026-06-10', 'julio');
   const [paga] = importar(d, 'ank', [saida('p5x', '2026-11-09', '100.00', 'IPTU 01.234.567 PARCELA 5/10')]).novas;
-  assert.equal(Z.sugerirDestino(d, paga).iptu.n, 1);
+  assert.deepEqual([Z.sugerirDestino(d, paga).iptu.n, Z.sugerirDestino(d, paga).confianca], [null, 'media']);
   s = Z.sugerirDestino(d, net);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.confianca], ['conta_imovel', null, 'Internet', 'baixa'], 'palavra sem imóvel conhecido: sugestão fraca');
 });
@@ -185,7 +192,8 @@ test('conciliação pelo extrato: só entradas casam', () => {
   const { d, cb2 } = base();
   const { novas: [ent, sai] } = importar(d, 'ank', [entrada('e1', '2026-08-10', '1318.50'), saida('s1', '2026-08-10', '1318.50', 'PAGAMENTO')]);
   const sug = Z.conciliarMovimentacoes(d, [ent, sai]);
-  assert.deepEqual(sug.map((x) => [x.movimentacao_id, x.cobranca_id, x.certeza]), [[ent.id, cb2.id, 'exata']]);
+  // só pelo valor e pela data: candidato "provável", sem identificação (nunca ligado nem marcado sozinho)
+  assert.deepEqual(sug.map((x) => [x.movimentacao_id, x.cobranca_id, x.certeza, x.semId]), [[ent.id, cb2.id, 'provavel', true]]);
 });
 
 test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados, não duplica e o estorno limpa tudo', () => {
@@ -295,7 +303,12 @@ test('destino IPTU marca a parcela paga pelo proprietário e o desfazer devolve;
   assert.equal(R.buscar(d, 'iptus', iptu.id).pagas[1], undefined);
   // transferência: a outra ponta na JCK
   const [par] = importar(d, 'jck', [entrada('j1', '2026-11-05', '500.00', { transaction_type: 'TRANSFER', description: 'TED RECEBIDA ANK' })]).novas;
+  // sem a outra ponta escolhida e sem o mesmo código do Pix, nada é ligado pelo valor e pela data (decisão de 17/11/2026)
   Z.vincularMovimentacao(d, ted.id, { classificacao: 'transferencia' }, 'julio');
+  assert.deepEqual([R.buscar(d, 'movimentacoes_banco', ted.id).par_movimentacao_id, R.buscar(d, 'movimentacoes_banco', par.id).classificacao], [null, null]);
+  Z.desvincularMovimentacao(d, ted.id, 'julio');
+  assert.deepEqual(Z.pontasPossiveis(d, R.buscar(d, 'movimentacoes_banco', ted.id)).map((x) => x.id), [par.id], 'a janela oferece a outra ponta para o usuário escolher');
+  Z.vincularMovimentacao(d, ted.id, { classificacao: 'transferencia', par_movimentacao_id: par.id }, 'julio');
   assert.deepEqual([R.buscar(d, 'movimentacoes_banco', ted.id).par_movimentacao_id, R.buscar(d, 'movimentacoes_banco', par.id).classificacao, R.buscar(d, 'movimentacoes_banco', par.id).par_movimentacao_id], [par.id, 'transferencia', ted.id]);
   Z.desvincularMovimentacao(d, ted.id, 'julio');
   assert.deepEqual([R.buscar(d, 'movimentacoes_banco', par.id).classificacao, R.buscar(d, 'movimentacoes_banco', par.id).par_movimentacao_id], [null, null]);
@@ -408,9 +421,14 @@ test('pagamento confirmado pela saída do extrato: vira pago na data da moviment
   assert.deepEqual([p.imovel_id, p.tipo_conta, p.competencia, p.despesa_id], [sobre.id, 'Água', '2026-11', lanc.id]);
   Z.aprovarPagamento(d, p.id, 'julio');
   Z.atualizarPagamento(d, p.id, { situacao: 'agendado', id_externo: 'it-9', grupo_id: null }, 'julio');
-  const { novas: [mov, outra] } = importar(d, 'jck', [saida('s1', '2026-11-06', '123.45', 'PAGAMENTO BOLETO SANEPAR'), saida('s2', '2026-11-06', '123.46', 'OUTRO')]);
+  // a descrição do pedido mandada ao banco leva a referência "erp-<nº>": é por ela que a saída do extrato é este pagamento
+  const { novas: [mov, outra, semRef] } = importar(d, 'jck', [saida('s1', '2026-11-06', '123.45', `PAGAMENTO BOLETO SANEPAR erp-${p.id}`), saida('s2', '2026-11-06', '123.46', 'OUTRO'), saida('s3', '2026-11-06', '123.45', 'PAGAMENTO BOLETO SANEPAR')]);
   const s = Z.sugerirDestino(d, mov);
   assert.deepEqual([s.classificacao, s.pagamento_banco_id, s.imovel_id, s.confianca], ['conta_imovel', p.id, sobre.id, 'alta']);
+  // só o mesmo valor e a data perto (sem a referência): só o aviso, nada ligado (decisão de 17/11/2026)
+  const s3 = Z.sugerirDestino(d, semRef);
+  assert.deepEqual([s3.pagamento_banco_id, s3.soAviso, s3.semIdentificacao], [undefined, true, true]);
+  assert.match(s3.motivo, /Confirmar pelo extrato/);
   assert.throws(() => Z.marcarPagoPeloExtrato(d, p.id, outra.id, 'julio'), /diferente do pagamento/);
   Z.marcarPagoPeloExtrato(d, p.id, mov.id, 'julio');
   assert.deepEqual([p.situacao, p.pago_em, p.movimentacao_id], ['pago', '2026-11-06', mov.id]);
@@ -462,7 +480,7 @@ test('transferência entre as nossas contas tem comprovante: um só, na pasta do
   const { d, ank } = base();
   const [ted] = importar(d, 'ank', [saida('t1', '2026-11-30', '2000.00', 'TED PARA JCK ADMINISTRADORA', { transaction_type: 'TRANSFER' })]).novas;
   const [rec] = importar(d, 'jck', [entrada('j1', '2026-12-01', '2000.00', { transaction_type: 'TRANSFER', description: 'TED RECEBIDA ANK ADMINISTRADORA', title: 'Transferência recebida' })]).novas;
-  Z.vincularMovimentacao(d, ted.id, { classificacao: 'transferencia' }, 'julio');
+  Z.vincularMovimentacao(d, ted.id, { classificacao: 'transferencia', par_movimentacao_id: rec.id }, 'julio'); // a outra ponta escolhida na janela
   assert.equal(R.buscar(d, 'movimentacoes_banco', rec.id).par_movimentacao_id, ted.id);
   assert.equal(Z.movimentacoesDo(d, { filtro: 'sem_comprovante' }).length, 2, 'as duas pontas pedem comprovante');
   assert.equal(R.pendenciasBancoDoMes(d, '2026-11', '2026-12-05').semComprovante, 1);

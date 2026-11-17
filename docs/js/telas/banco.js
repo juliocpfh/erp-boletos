@@ -37,7 +37,7 @@ const pastaContador = () => config().pasta_contador || PASTA_CONTADOR;
 /** Rótulo de um objeto { id: rotulo } (CLASSIFICACOES, SITUACOES_PAGAMENTO). */
 const rotuloDe = (lista, id) => lista[id] || id;
 /** Nome curto da classificação para as etiquetas da tabela (o nome completo fica na janela "Dar destino"). */
-const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', devolucao: 'Devolução', outro: 'Outro', ignorar: 'Ignorada' };
+const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto', tarifa: 'Tarifa', transferencia: 'Transferência', devolucao: 'Devolução', devolucao_inquilino: 'Devolução ao inquilino', outro: 'Outro', ignorar: 'Ignorada' };
 /** Destinos que não precisam de comprovante (igual a conciliacao.js: só a ignorada; a transferência entre as nossas contas tem um PDF só, na pasta do contador da conta de origem). */
 const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
@@ -55,7 +55,7 @@ const temComprovante = (x) => !!(x.comprovante || x.comprovante_contador);
 const sugestaoDe = (m) => {
   if (m.classificacao) return null;
   const s = Z.sugerirDestino(d(), m, Z.indiceDaTela(d()));
-  return s && soArquivo(m.conta_id) && (s.classificacao === 'boleto' || s.cobranca_id) ? { manual: true } : s;
+  return s && soArquivo(m.conta_id) && (s.classificacao === 'boleto' || (s.cobranca_id && s.classificacao !== 'devolucao_inquilino')) ? { manual: true } : s;
 };
 const centavosDoBanco = (x) => { try { return Z.centavosDoC6(x); } catch { return 0; } };
 
@@ -297,14 +297,27 @@ function descreverSugestao(s) {
   const i = s.imovel_id ? buscar('imoveis', s.imovel_id) : null;
   const cb = s.cobranca_id ? buscar('cobrancas', s.cobranca_id) : null;
   const c = cb ? buscar('contratos', cb.contrato_id) : null;
-  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}${s.ligar ? ' (já pago: só ligar)' : ''}` : '',
-    s.classificacao === 'boleto' && !cb && s.candidatos ? `${s.candidatos.length} boletos com este valor` : ''].filter(Boolean).join(' · ');
+  return [ROTULO_CURTO[s.classificacao] || rotuloDe(Z.CLASSIFICACOES, s.classificacao), s.tipo_despesa || '', i ? i.nome : '', cb ? `boleto ${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}${s.ligar ? ' (já pago: só ligar)' : ''}${s.pago_a_mais ? ' (pagou de novo: a mais)' : ''}` : '',
+    s.classificacao === 'boleto' && !cb && s.candidatos && !s.semIdentificacao ? `${s.candidatos.length} boletos com este valor` : ''].filter(Boolean).join(' · ');
+}
+
+/**
+ * Sugestão sem identificador igual (decisão do dono, 17/11/2026: Pix feito à mão, só o valor, a data ou o nome): aparece como aviso
+ * ("Pix sem identificação: vincular manualmente"); o botão abre a janela sem nada escolhido. ``soAviso``: nem isso (o pagamento pelo
+ * banco se confirma em Pagamentos).
+ */
+function sugestaoHtml(m, s) {
+  if (!s || !s.classificacao) return '';
+  if (s.semIdentificacao) {
+    return `<br><span class="banco-sugestao texto-aviso">${esc(s.motivo || 'sem identificação: vincular manualmente')}</span>${opera() && !s.soAviso ? ` ${botao('darDestino', 'Vincular manualmente', { id: m.id })}` : ''}`;
+  }
+  return `<br><span class="banco-sugestao">parece: ${esc(descreverSugestao(s))}</span>${opera() ? ` ${botao('usarSugestao', 'Usar sugestão', { id: m.id })}` : ''}`;
 }
 
 function destinoHtml(m, sugestao) {
   if (!m.classificacao) {
     if (sugestao && sugestao.manual) return `${etiqueta('sem destino', 'aviso')}<br><span class="banco-sugestao">pode ser o pagamento de um boleto: vincular manualmente (botão "Dar destino")</span>`;
-    return `${etiqueta('sem destino', 'aviso')}${sugestao && sugestao.classificacao ? `<br><span class="banco-sugestao">parece: ${esc(descreverSugestao(sugestao))}</span>${opera() ? ` ${botao('usarSugestao', 'Usar sugestão', { id: m.id })}` : ''}` : ''}`;
+    return `${etiqueta('sem destino', 'aviso')}${sugestaoHtml(m, sugestao)}`;
   }
   const partes = [etiqueta(ROTULO_CURTO[m.classificacao] || rotuloDe(Z.CLASSIFICACOES, m.classificacao), m.classificacao === 'ignorar' ? 'neutra' : 'destino')];
   const i = m.imovel_id ? buscar('imoveis', m.imovel_id) : null;
@@ -312,7 +325,7 @@ function destinoHtml(m, sugestao) {
   const desp = m.despesa_id ? buscar('despesas', m.despesa_id) : null;
   if (desp) partes.push(`<a href="#/contas/${desp.imovel_id}?comp=${desp.competencia}">${esc(desp.tipo)} de ${compBr(desp.competencia)}</a>`);
   const cb = m.cobranca_id ? buscar('cobrancas', m.cobranca_id) : null;
-  if (cb) { const c = buscar('contratos', cb.contrato_id); partes.push(`<a href="#/cobranca/${cb.id}">boleto ${compBr(cb.competencia)}${c ? ` · ${esc(c.inquilino_nome)}` : ''}</a> ${cb.data_pagamento ? etiqueta('pago', 'ok') : etiqueta('boleto em aberto', 'aviso')}`); }
+  if (cb) { const c = buscar('contratos', cb.contrato_id); partes.push(`<a href="#/cobranca/${cb.id}">boleto ${compBr(cb.competencia)}${c ? ` · ${esc(c.inquilino_nome)}` : ''}</a> ${m.pago_a_mais ? etiqueta('pagou de novo (a mais)', 'aviso') : m.classificacao === 'devolucao_inquilino' ? etiqueta(`recebido agora ${reais(cb.valor_pago || 0)}`, 'info') : cb.data_pagamento ? etiqueta('pago', 'ok') : etiqueta('boleto em aberto', 'aviso')}`); }
   const p = m.iptu_id ? buscar('iptus', m.iptu_id) : null;
   if (p) { const pc = R.parcelasIptu(d(), p).find((x) => x.n === Number(m.iptu_parcela)); partes.push(`<a href="#/imovel/${p.imovel_id}?ir=iptu">IPTU ${p.ano}${pc ? ` · ${esc(pc.rotulo)}${pc.n ? ' parcela' : ''}` : ''}</a>`); }
   const g = m.guia_imposto_id ? buscar('guias_impostos', m.guia_imposto_id) : null;
@@ -449,9 +462,10 @@ function linhaMovimentacao(m) {
   const acoes = [];
   if (opera()) {
     if (!m.classificacao) acoes.push(botao('darDestino', 'Dar destino', { id: m.id }));
-    else if (m.classificacao === 'boleto') acoes.push(`<span class="suave" title="O destino desta entrada é o pagamento de um boleto: para desfazer, use 'Desfazer pagamento' na página do boleto">desfaz-se pelo boleto</span>`);
+    else if (m.classificacao === 'boleto' && !m.pago_a_mais) acoes.push(`<span class="suave" title="O destino desta entrada é o pagamento de um boleto: para desfazer, use 'Desfazer pagamento' na página do boleto">desfaz-se pelo boleto</span>`);
     else acoes.push(botao('desvincularMov', 'Desfazer destino', { id: m.id }, 'secundario pequeno', `Desfazer o destino desta movimentação?${comComprovante(m) ? ' O comprovante guardado é apagado.' : ''}`));
-    if (m.tipo === 'entrada' && cb && !cb.data_pagamento) acoes.push(botao('confirmarBoletoPeloBanco', `É o pagamento do boleto ${compBr(cb.competencia)}`, { id: m.id, cobranca: cb.id }, 'botao pequeno'));
+    // só com o identificador igual o sistema aponta um boleto (sugestão pelo valor vem sem boleto: decisão de 17/11/2026)
+    if (m.tipo === 'entrada' && cb && !cb.data_pagamento && !sugestao.semIdentificacao) acoes.push(botao('confirmarBoletoPeloBanco', `É o pagamento do boleto ${compBr(cb.competencia)}`, { id: m.id, cobranca: cb.id }, 'botao pequeno'));
   }
   return `<tr class="${m.classificacao === 'ignorar' ? 'mov-ignorada' : ''}"><td class="nw">${dataBr(m.data)}</td>
     <td><b>${esc(m.titulo || m.descricao || '(sem descrição)')}</b>${m.titulo && m.descricao ? `<br><span class="suave">${esc(m.descricao)}</span>` : ''}${m.categoria_banco ? `<br>${etiqueta(m.categoria_banco, 'neutra')}` : ''}</td>
@@ -481,7 +495,7 @@ function caixaConferirBoletos(conta, mes) {
     if (!cb) return '';
     const travada = !!cb.data_pagamento || s.jaPago || s.aguardandoCredito || !!s.alerta;
     return `<tr><td class="centro"><input type="checkbox" name="pag" value="${n}" ${travada ? 'disabled' : Z.prontoParaRegistrar(d(), s) ? 'checked' : ''}></td>
-      <td><a href="#/cobranca/${cb.id}"><b>${esc(i ? i.nome : '')}</b> · ${esc(c ? c.inquilino_nome : '')}</a><br><span class="suave">boleto ${compBr(cb.competencia)} · vence ${dataBr(cb.vencimento)}${s.certeza === 'provavel' ? ' · casado só pelo valor e pela data: confira' : ''}</span></td>
+      <td><a href="#/cobranca/${cb.id}"><b>${esc(i ? i.nome : '')}</b> · ${esc(c ? c.inquilino_nome : '')}</a><br><span class="suave">boleto ${compBr(cb.competencia)} · vence ${dataBr(cb.vencimento)}${s.certeza === 'provavel' ? ' · sem identificação (só o valor e a data): confira e marque à mão' : ''}</span></td>
       <td class="nw">${dataBr(s.data_credito)}${s.data_pagamento && s.data_pagamento !== s.data_credito ? `<br><span class="suave">pagou ${dataBr(s.data_pagamento)}</span>` : ''}</td><td class="n">${reais(s.valor)}${s.previsto !== s.valor ? `<br><span class="texto-aviso">previsto ${reais(s.previsto)}</span>` : ''}</td>
       <td>${s.alerta ? etiqueta(s.alerta, 'perigo') : cb.data_pagamento || s.jaPago ? etiqueta('já estava pago', 'neutra') : s.aguardandoCredito ? etiqueta('pago, aguardando crédito no banco', 'aviso') : s.previsto === s.valor ? etiqueta('bate certinho', 'ok') : etiqueta('valor diferente', 'aviso')}${s.alternativas > 1 && !s.jaPago ? `<br>${etiqueta(`este pagamento casa com ${s.alternativas} boletos: marque só o certo`, 'aviso')}` : ''}</td></tr>`;
   };
@@ -659,21 +673,39 @@ export function caixaConfigBanco2() {
 // --------------------------------------------------------------------------
 const opcoes = (lista, atual, vazio = '') => `${vazio ? `<option value="">${esc(vazio)}</option>` : ''}${lista.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(atual ?? '') ? 'selected' : ''}>${esc(t)}</option>`).join('')}`;
 
-/** Contas do imóvel já lançadas que ainda não têm movimentação do extrato ligada (as de mesmo valor primeiro). */
-const despesasSemExtrato = (imovelId, m) => R.despesasDo(d(), imovelId).filter((x) => x.valor > 0 && !x.movimentacao_id && !movs().some((y) => y.despesa_id === x.id))
-  .sort((a, b) => (a.valor === m.valor ? -1 : b.valor === m.valor ? 1 : 0)).slice(0, 24);
+/**
+ * Contas do imóvel já lançadas, sem movimentação do extrato ligada, do mês anterior e do mês da saída (decisão do dono, 17/11/2026:
+ * saída em 17/11 → de 01/10 a 30/11); as de mesmo valor primeiro. Nenhuma vem escolhida: o usuário escolhe e confirma.
+ */
+const despesasSemExtrato = (imovelId, m) => Z.contasLancadasPossiveis(d(), imovelId, m).slice(0, 24);
 
 /**
  * Boletos em aberto (do imóvel, se escolhido); o de mesmo valor na data da movimentação vem primeiro. Entram também os já pagos à
- * mão com o mesmo valor até 5 dias antes, ainda sem linha do extrato (escolher um deles só liga a entrada: nada é pago de novo).
+ * mão com o mesmo valor até 5 dias antes, ainda sem linha do extrato (escolher um deles só liga a entrada: nada é pago de novo), e os
+ * já pagos por outra entrada nos últimos 60 dias ("pagou de novo (a mais)": soma no recebido, a NF não muda). Nenhum vem escolhido.
  */
 function boletosAbertos(imovelId, m) {
   const cs = d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id);
   const ligaveis = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && !cb.movimentacao_id && cb.valor_pago === m.valor
     && cb.data_pagamento <= m.data && cb.data_pagamento >= C.somarDias(m.data, -5)).map((cb) => ({ cb, previsto: cb.valor_pago, jaPago: true }));
+  const deNovo = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && cb.movimentacao_id && cb.data_pagamento <= m.data && cb.data_pagamento >= C.somarDias(m.data, -60))
+    .sort((a, b) => String(b.data_pagamento).localeCompare(String(a.data_pagamento))).map((cb) => ({ cb, previsto: cb.valor_pago, aMais: true }));
   return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
     .map((cb) => ({ cb, previsto: R.previstoNoPagamento(cb, m.data).valor_devido }))
-    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento)))].slice(0, 30);
+    .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))), ...deNovo].slice(0, 40);
+}
+
+/**
+ * Boletos pagos (do imóvel, se escolhido) que podem ter recebido a mais a diferença que esta saída devolve: os que receberam a mais
+ * pelo menos o valor dela primeiro, depois os pagos nos últimos 120 dias. Nenhum vem escolhido (só pelo código do Pix devolvido).
+ */
+function boletosParaDevolver(imovelId, m) {
+  const cs = new Set(d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id));
+  const aMais = Z.boletosPagosAMais(d(), m).filter((cb) => cs.has(cb.contrato_id));
+  const de = C.somarDias(m.data, -Z.DIAS_BUSCA_DEVOLUCAO);
+  const outros = d().cobrancas.filter((cb) => cs.has(cb.contrato_id) && cb.data_pagamento && cb.data_pagamento <= m.data && cb.data_pagamento >= de && !aMais.includes(cb))
+    .sort((a, b) => String(b.data_pagamento).localeCompare(String(a.data_pagamento)));
+  return [...aMais, ...outros].slice(0, 40);
 }
 
 /** Guias de imposto da empresa da conta ainda não pagas (as de mesmo valor primeiro). */
@@ -689,13 +721,16 @@ async function janelaDestino(m, inicialDe = null) {
   const classes = Object.entries(Z.CLASSIFICACOES);
   const inicial = s.classificacao || (m.tipo === 'entrada' ? 'boleto' : 'conta_imovel');
   const compInicial = s.competencia || String(m.data).slice(0, 7);
-  const parSugerido = s.par_movimentacao_id ? movs().find((x) => x.id === s.par_movimentacao_id) : Z.parDaTransferencia(d(), m);
+  // a outra ponta da transferência: proposta só pelo mesmo código do Pix; as possíveis (mesmo valor, até 3 dias) para escolher
+  const pontas = Z.pontasPossiveis(d(), m);
+  const parSugerido = s.par_movimentacao_id ? movs().find((x) => x.id === s.par_movimentacao_id) : null;
+  if (parSugerido && !pontas.includes(parSugerido)) pontas.unshift(parSugerido);
   const html = `<p><b>${dataBr(m.data)}</b> · ${esc(m.titulo || '')} ${esc(m.descricao || '')} · <b>${valorHtml(m)}</b> <span class="suave">(${esc(nomeConta(m.conta_id))})</span></p>
     ${s.classificacao ? `<p class="suave">Sugestão: ${esc(descreverSugestao(s))}${s.motivo ? ` (${esc(s.motivo)})` : ''}.</p>` : ''}
     <p><label>O que é esta movimentação</label><select name="classificacao" style="width:100%">${opcoes(classes, inicial)}</select></p>
     <p data-campo="imovel"><label>Imóvel</label><select name="imovel" style="width:100%">${opcoes(imoveis, s.imovel_id, '— sem imóvel')}</select></p>
     <p data-campo="despesa"><label>Conta do imóvel já lançada</label><select name="despesa" style="width:100%"></select>
-      <span class="suave">Se a conta ainda não foi lançada, deixe "— lançar agora": o sistema cria a conta com o valor e a data da movimentação.</span></p>
+      <span class="suave">Contas lançadas no mês anterior e no mês desta saída. Escolha qual conta e de qual mês é; se não for nenhuma, "lançar agora": o sistema cria a conta com o valor e a data da movimentação.</span></p>
     <p data-campo="tipo_despesa"><label>Qual conta</label><select name="tipo_despesa" style="width:100%"></select>
       <label>Mês da conta</label><input type="month" name="competencia" value="${compInicial}" style="width:100%"></p>
     <div data-campo="airbnb"><p><label>Mês de referência do Airbnb</label><input type="month" name="competencia_air" value="${compInicial}" style="width:100%"></p>
@@ -703,10 +738,13 @@ async function janelaDestino(m, inicialDe = null) {
       <p class="suave" data-air-soma></p></div>
     <p data-campo="reforma"><label>O que foi feito na reforma</label><input name="descricao_reforma" placeholder="ex.: piso da cozinha" style="width:100%"></p>
     <p data-campo="boleto"><label>Boleto do inquilino</label><select name="boleto" style="width:100%"></select>
-      <span class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou. Se o valor for diferente do previsto, o sistema pede a justificativa e o valor da NF na página do boleto.</span></p>
+      <span class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou. Se o valor for diferente do previsto, o sistema pede a justificativa e o valor da NF na página do boleto. "Pagou de novo (a mais)": o boleto já estava pago e entrou mais dinheiro; soma no recebido, a NF não muda, e a diferença sai depois pela "Devolução ao inquilino".</span></p>
+    <p data-campo="devolvido"><label>Boleto que o inquilino pagou a mais</label><select name="boleto_devolvido" style="width:100%"></select>
+      <span class="suave">O recebido do boleto diminui o valor desta devolução, de volta ao devido; a NF não muda. Se ficar abaixo do devido, o sistema pergunta antes.</span></p>
     <p data-campo="iptu"><label>IPTU (ano)</label><select name="iptu" style="width:100%"></select><label>Parcela</label><select name="iptu_parcela" style="width:100%"></select></p>
-    <p data-campo="guia"><label>Guia de imposto (opcional)</label><select name="guia" style="width:100%">${opcoes(guiasAbertas(m).map((g) => [g.id, `${g.imposto} ${g.periodo} · ${reais(g.valor)}${g.valor === m.valor ? ' ★ mesmo valor' : ''}`]), (guiasAbertas(m).find((g) => g.valor === m.valor) || {}).id, '— sem guia')}</select></p>
-    <p data-campo="par" class="suave">${parSugerido ? `A outra ponta: <b>${esc(nomeConta(parSugerido.conta_id))}</b> ${dataBr(parSugerido.data)} · ${esc(parSugerido.descricao || '')} (as duas ficam ligadas).` : 'Não achei a outra ponta no extrato da outra conta: busque o extrato dela e dê o destino lá; as duas ficam ligadas.'}</p>
+    <p data-campo="guia"><label>Guia de imposto (opcional)</label><select name="guia" style="width:100%">${opcoes(guiasAbertas(m).map((g) => [g.id, `${g.imposto} ${g.periodo} · ${reais(g.valor)}${g.valor === m.valor ? ' ★ mesmo valor' : ''}`]), s.guia_imposto_id || null, '— sem guia')}</select></p>
+    <p data-campo="par">${pontas.length ? `<label>A outra ponta (no extrato da outra conta)</label><select name="par" style="width:100%">${opcoes(pontas.map((x) => [x.id, `${nomeConta(x.conta_id)} · ${dataBr(x.data)} · ${x.descricao || x.titulo || ''} · ${reais(x.valor)}`]), parSugerido ? parSugerido.id : null, '— escolher depois (dar o destino na outra ponta)')}</select>
+      <span class="suave">${parSugerido ? 'Proposta pelo mesmo código do Pix nas duas pontas.' : 'Sem o mesmo código do Pix, escolha a outra ponta (as duas ficam ligadas).'}</span>` : '<span class="suave">Não achei a outra ponta no extrato da outra conta: busque o extrato dela e dê o destino lá; as duas ficam ligadas.</span>'}</p>
     <p><label>Observações</label><textarea name="observacoes" rows="2" style="width:100%"></textarea></p>`;
   const r = await janela({ titulo: 'Dar destino à movimentação', html, sim: 'Salvar destino', ligar(dlg) {
     const sel = (n) => dlg.querySelector(`[name="${n}"]`);
@@ -737,16 +775,24 @@ async function janelaDestino(m, inicialDe = null) {
       const p = buscar('iptus', Number(sel('iptu').value));
       const pcs = p ? R.parcelasIptu(d(), p).filter((x) => x.proprietario) : [];
       sel('iptu_parcela').innerHTML = opcoes(pcs.map((x) => [x.n, `${x.rotulo}${x.n ? ' parcela' : ''} · ${reais(x.valorProprietario)}${x.vencimento ? ` · vence ${dataBr(x.vencimento)}` : ''}${x.paga ? ` · já paga em ${dataBr(x.paga)}` : ''}${x.valorProprietario === m.valor && !x.paga ? ' ★ mesmo valor' : ''}`]),
-        s.iptu && s.iptu.n !== null && s.iptu.n !== undefined && p && s.iptu.id === p.id ? s.iptu.n : (pcs.find((x) => !x.paga && x.valorProprietario === m.valor) || pcs.find((x) => !x.paga) || {}).n, pcs.length ? '' : '— nenhuma parcela do proprietário');
+        // a parcela só vem escolhida quando citada no extrato; pelo valor, o usuário escolhe (decisão de 17/11/2026)
+        s.iptu && s.iptu.n !== null && s.iptu.n !== undefined && p && s.iptu.id === p.id ? s.iptu.n : null, pcs.length ? '— escolha a parcela' : '— nenhuma parcela do proprietário');
     };
     const encher = () => {
       const imovelId = Number(sel('imovel').value) || null;
       const ds = imovelId ? despesasSemExtrato(imovelId, m) : [];
-      sel('despesa').innerHTML = opcoes(ds.map((x) => [x.id, `${x.tipo} de ${compBr(x.competencia)} · ${reais(x.valor)} · paga em ${dataBr(x.data_pagamento)}${x.valor === m.valor ? ' ★ mesmo valor' : ''}`]), s.despesa_id || (ds.find((x) => x.valor === m.valor) || {}).id, '— lançar agora');
+      // com conta já lançada no período, nenhuma vem escolhida: o usuário diz qual é ou "lançar agora" (decisão de 17/11/2026)
+      const rotuloConta = (x) => `${x.tipo} de ${compBr(x.competencia)} · ${reais(x.valor)}${x.data_pagamento ? ` · paga em ${dataBr(x.data_pagamento)}` : ''}${x.valor === m.valor ? ' ★ mesmo valor' : ''}`;
+      sel('despesa').innerHTML = ds.length ? `${opcoes(ds.map((x) => [x.id, rotuloConta(x)]), s.despesa_id || null, '— escolha a conta já lançada (ou lançar agora)')}<option value="nova">— não é nenhuma: lançar agora</option>`
+        : '<option value="nova">— lançar agora</option>';
       const bs = boletosAbertos(imovelId, m);
-      sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto, jaPago }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · ${jaPago ? `já pago em ${dataBr(cb.data_pagamento)}: só ligar esta entrada` : `vence ${dataBr(cb.vencimento)}`} · ${reais(previsto)}${previsto === m.valor && !jaPago ? ' ★ mesmo valor' : ''}`]; }),
-        // conta de outro banco (arquivo sem o código do boleto): nada vem marcado, o usuário escolhe (decisão do dono em 2026-11-17)
-        s.cobranca_id || (!soArquivo(m.conta_id) && bs.length && !bs.some((x) => x.jaPago) ? (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id : null), '— nenhum');
+      // sem o código do boleto nada vem marcado, em conta do C6 ou de outro banco: o usuário escolhe (decisão do dono em 2026-11-17)
+      const valorBoleto = (x) => (x.aMais ? `mais:${x.cb.id}` : x.cb.id);
+      sel('boleto').innerHTML = opcoes(bs.map((x) => { const { cb, previsto, jaPago, aMais } = x; const c = buscar('contratos', cb.contrato_id); return [valorBoleto(x), `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · ${aMais ? `já pago em ${dataBr(cb.data_pagamento)} (${reais(cb.valor_pago || 0)}): pagou de novo (a mais)` : jaPago ? `já pago em ${dataBr(cb.data_pagamento)}: só ligar esta entrada` : `vence ${dataBr(cb.vencimento)}`}${aMais ? '' : ` · ${reais(previsto)}`}${previsto === m.valor && !jaPago && !aMais ? ' ★ mesmo valor' : ''}`]; }),
+        s.cobranca_id ? (s.pago_a_mais ? `mais:${s.cobranca_id}` : s.cobranca_id) : null, '— escolha o boleto');
+      const dv = m.tipo === 'saida' ? boletosParaDevolver(imovelId, m) : [];
+      sel('boleto_devolvido').innerHTML = opcoes(dv.map((cb) => { const c = buscar('contratos', cb.contrato_id); const aMais = R.pagoAMaisDo(cb); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · recebido ${reais(cb.valor_pago || 0)}, devido ${reais(R.devidoDoPago(cb))}${aMais ? ` · a mais ${reais(aMais)}` : ''}${aMais === m.valor ? ' ★ mesmo valor' : ''}`]; }),
+        s.classificacao === 'devolucao_inquilino' && s.cobranca_id ? s.cobranca_id : null, dv.length ? '— escolha o boleto' : '— nenhum boleto pago neste período');
       const ips = d().iptus.filter((p) => !imovelId || p.imovel_id === imovelId).sort((a, b) => b.ano - a.ano || b.id - a.id);
       sel('iptu').innerHTML = opcoes(ips.map((p) => { const i = buscar('imoveis', p.imovel_id); return [p.id, `${p.ano}${!imovelId && i ? ` · ${i.nome}` : ''}`]; }), s.iptu ? s.iptu.id : (ips[0] || {}).id, ips.length ? '' : '— nenhum IPTU cadastrado');
       encherTipos();
@@ -757,8 +803,9 @@ async function janelaDestino(m, inicialDe = null) {
       const k = sel('classificacao').value;
       campo('imovel').hidden = SEM_IMOVEL.includes(k);
       campo('despesa').hidden = k !== 'conta_imovel';
-      campo('tipo_despesa').hidden = k !== 'conta_imovel' || !!sel('despesa').value;
+      campo('tipo_despesa').hidden = k !== 'conta_imovel' || sel('despesa').value !== 'nova';
       campo('boleto').hidden = k !== 'boleto';
+      campo('devolvido').hidden = k !== 'devolucao_inquilino';
       campo('airbnb').hidden = k !== 'airbnb';
       campo('reforma').hidden = k !== 'reforma';
       campo('iptu').hidden = k !== 'iptu';
@@ -777,12 +824,16 @@ async function janelaDestino(m, inicialDe = null) {
   if (!r) return null;
   const v = (k) => (r[k] || [''])[0];
   const classificacao = v('classificacao');
+  if (classificacao === 'conta_imovel' && v('despesa') === '') throw new C.ErroUsuario('Há conta já lançada que pode ser esta saída: escolha qual conta e de qual mês é, ou "não é nenhuma: lançar agora". Nada foi salvo.');
   const despesaId = classificacao === 'conta_imovel' ? Number(v('despesa')) || null : null;
+  const boleto = String(v('boleto') || '');
+  const cobrancaId = classificacao === 'boleto' ? Number(boleto.replace('mais:', '')) || null : classificacao === 'devolucao_inquilino' ? Number(v('boleto_devolvido')) || null : null;
   return { classificacao, imovel_id: SEM_IMOVEL.includes(classificacao) ? null : Number(v('imovel')) || null, despesa_id: despesaId,
     tipo_despesa: classificacao === 'conta_imovel' && !despesaId ? v('tipo_despesa') || null : null, competencia: classificacao === 'conta_imovel' && !despesaId ? v('competencia') || null : null,
-    cobranca_id: classificacao === 'boleto' ? Number(v('boleto')) || null : null, pagouEmDia: classificacao === 'boleto' && s.cobranca_id === (Number(v('boleto')) || null) ? (s.pagouEmDia ?? null) : null,
+    cobranca_id: cobrancaId, pago_a_mais: classificacao === 'boleto' && boleto.startsWith('mais:'),
+    pagouEmDia: classificacao === 'boleto' && s.cobranca_id === cobrancaId ? (s.pagouEmDia ?? null) : null,
     iptu_id: classificacao === 'iptu' ? Number(v('iptu')) || null : null, iptu_parcela: classificacao === 'iptu' && v('iptu_parcela') !== '' ? Number(v('iptu_parcela')) : null,
-    guia_imposto_id: classificacao === 'imposto' ? Number(v('guia')) || null : null, par_movimentacao_id: classificacao === 'transferencia' && parSugerido ? parSugerido.id : null,
+    guia_imposto_id: classificacao === 'imposto' ? Number(v('guia')) || null : null, par_movimentacao_id: classificacao === 'transferencia' ? Number(v('par')) || null : null,
     competencia_air: classificacao === 'airbnb' ? v('competencia_air') || null : null,
     divisao: classificacao === 'airbnb' ? Object.keys(r).filter((k) => k.startsWith('air_') && String(v(k)).trim()).map((k) => ({ imovel_id: Number(k.slice(4)), valor: C.centavos(v(k)) })) : [],
     descricao_reforma: classificacao === 'reforma' ? String(v('descricao_reforma') || '').trim() : '',
@@ -831,17 +882,33 @@ async function salvarDestino(m, destino) {
     }
   }
   if (r && r.divergente) return abrirDivergencia(r, m);
-  if (destino.classificacao === 'boleto') { const cb = buscar('cobrancas', destino.cobranca_id); aviso(r && r.ligada ? `Entrada ligada ao boleto de ${compBr(cb.competencia)}, que já estava pago (${dataBr(cb.data_pagamento)}). Nada foi pago de novo.` : `Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`); } else aviso('Destino salvo.');
+  // devolução que deixaria o recebido do boleto abaixo do devido: só com a confirmação (nada foi gravado ainda)
+  if (r && r.abaixoDoDevido) {
+    const cb = r.cobranca;
+    const c = buscar('contratos', cb.contrato_id);
+    const ok = await confirmar(`O boleto de ${compBr(cb.competencia)} de ${c ? c.inquilino_nome : ''} recebeu ${reais(r.antes)} e devia ${reais(r.devido)}. Com esta devolução de ${reais(r.valor)}, o recebido fica ${reais(r.novo)}: ${reais(r.devido - r.novo)} ABAIXO do devido. A NF não muda. Confirma mesmo assim?`,
+      { titulo: 'Devolução maior que o pago a mais', sim: 'Confirmar a devolução', forte: true });
+    if (!ok) { aviso('Nada foi salvo.', 'info'); return mostrar(); }
+    r = await alterar((db) => Z.vincularMovimentacao(db, m.id, { ...destino, abaixoDoDevido: true }, login()));
+  }
+  const cb = destino.cobranca_id ? buscar('cobrancas', destino.cobranca_id) : null;
+  if (r && r.devolvido) aviso(`Devolução ligada ao boleto de ${compBr(cb.competencia)}: recebido ${reais(r.antes)} → ${reais(r.novo)} (devido ${reais(r.devido)}). A NF não muda.`, 'ok');
+  else if (r && r.aMais) aviso(`Entrada ligada ao boleto de ${compBr(cb.competencia)} como pagamento a mais: recebido ${reais(r.antes)} → ${reais(r.novo)} (devido ${reais(r.devido)}). A NF não muda; devolva a diferença ao inquilino e dê à saída o destino "Devolução ao inquilino".`, 'aviso');
+  else if (destino.classificacao === 'boleto') aviso(r && r.ligada ? `Entrada ligada ao boleto de ${compBr(cb.competencia)}, que já estava pago (${dataBr(cb.data_pagamento)}). Nada foi pago de novo.` : `Boleto de ${compBr(cb.competencia)} confirmado como pago em ${dataBr(m.data)}.`);
+  else aviso('Destino salvo.');
   return mostrar();
 }
 
-/** Destino a partir da sugestão, sem janela; null se falta algo (aí a janela abre já preenchida). */
+/**
+ * Destino a partir da sugestão, sem janela; null se falta algo (aí a janela abre já preenchida). Sugestão sem identificador igual
+ * (``semIdentificacao``: valor, data, nome) sempre abre a janela, sem nada escolhido (decisão do dono, 17/11/2026).
+ */
 function destinoDaSugestao(s) {
-  if (!s || !s.classificacao) return null;
+  if (!s || !s.classificacao || s.semIdentificacao) return null;
   const base = { classificacao: s.classificacao, imovel_id: s.imovel_id || null, tipo_despesa: s.tipo_despesa || null, competencia: null, despesa_id: s.despesa_id || null, cobranca_id: s.cobranca_id || null,
-    pagouEmDia: s.pagouEmDia ?? null, iptu_id: s.iptu ? s.iptu.id : null, iptu_parcela: s.iptu && s.iptu.n !== null && s.iptu.n !== undefined ? Number(s.iptu.n) : null, guia_imposto_id: null, par_movimentacao_id: s.par_movimentacao_id || null, observacoes: '' };
+    pago_a_mais: !!s.pago_a_mais, pagouEmDia: s.pagouEmDia ?? null, iptu_id: s.iptu ? s.iptu.id : null, iptu_parcela: s.iptu && s.iptu.n !== null && s.iptu.n !== undefined ? Number(s.iptu.n) : null, guia_imposto_id: null, par_movimentacao_id: s.par_movimentacao_id || null, observacoes: '' };
   if (['airbnb', 'reforma'].includes(s.classificacao)) return null; // a janela pede a divisão / o que foi feito
-  if (s.classificacao === 'boleto' && !base.cobranca_id) return null;
+  if (['boleto', 'devolucao_inquilino'].includes(s.classificacao) && (!base.cobranca_id || !s.peloId)) return null;
   if (s.classificacao === 'conta_imovel' && !base.despesa_id && (!base.imovel_id || !R.TIPOS_DESPESA.includes(base.tipo_despesa))) return null;
   if (s.classificacao === 'iptu' && (!base.iptu_id || base.iptu_parcela === null)) return null;
   return base;
@@ -1026,6 +1093,7 @@ export const ACOES_BANCO = {
     const m = mov(id);
     const s = sugestaoDe(m);
     if (!s || !s.classificacao) throw new C.ErroUsuario('Esta movimentação não tem mais sugestão (a tela mudou). Atualize a página e escolha o destino à mão.');
+    if (s.soAviso) throw new C.ErroUsuario(`${s.motivo}.`);
     if (s.pagamento_banco_id) {
       await alterar((db) => Z.marcarPagoPeloExtrato(db, s.pagamento_banco_id, m.id, login()));
       aviso('Pagamento pelo banco confirmado pelo extrato.');
@@ -1263,8 +1331,9 @@ export const ACOES_BANCO = {
     if (!candidatas.length) throw new C.ErroUsuario(`Nenhuma saída de ${reais(p.valor)} sem destino na conta ${nomeConta(p.conta_id)} entre ${dataBr(C.somarDias(alvo, -5))} e ${dataBr(C.somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
     const r = await janela({ titulo: 'Qual saída do extrato é este pagamento?', sim: 'Confirmar pagamento',
       html: `<p>${esc(p.tipo_conta || '')} ${compBr(p.competencia)} · <b>${reais(p.valor)}</b> · pagar em ${dataBr(p.data_pagamento)}</p>
-        ${candidatas.map((m, n) => `<p><label><input type="radio" name="mov" value="${m.id}" ${n === 0 ? 'checked' : ''}> ${dataBr(m.data)} · ${esc(m.titulo || '')} ${esc(m.descricao || '')} · ${reais(m.valor)}</label></p>`).join('')}
-        <p class="suave">O pagamento fica "Pago" na data da saída e a movimentação ganha o destino da conta paga.</p>` });
+        ${candidatas.map((m) => `<p><label><input type="radio" name="mov" value="${m.id}"> ${dataBr(m.data)} · ${esc(m.titulo || '')} ${esc(m.descricao || '')} · ${reais(m.valor)}</label></p>`).join('')}
+        <p class="suave">Nenhuma vem marcada: escolha a saída (decisão de 17/11/2026). O pagamento fica "Pago" na data da saída e a movimentação ganha o destino da conta paga.</p>` });
+    if (r && !r.mov) throw new C.ErroUsuario('Escolha qual saída do extrato é este pagamento. Nada foi salvo.');
     if (!r || !r.mov) return;
     await alterar((db) => Z.marcarPagoPeloExtrato(db, p.id, Number(r.mov[0]), login()));
     aviso('Pagamento confirmado pelo extrato.');
@@ -1301,7 +1370,7 @@ export const FORMULARIOS_BANCO = {
     // valor diferente do previsto, mesmo sem o extrato importado: abre direto a janela da justificativa (um de cada vez)
     if (paraJustificar.length) {
       const { s, r } = paraJustificar[0];
-      const entrada = Z.entradaDoRecebimento(d(), { conta_id: conf.conta, valor: s.valor, data: s.data_credito });
+      const entrada = Z.entradaDoRecebimento(d(), { conta_id: conf.conta, valor: s.valor, ids: [s.external_payment_id, ...Z.identificadoresDoBoleto(buscar('cobrancas', s.cobranca_id))] });
       memoria.pagamentoDivergente = { id: s.cobranca_id, data: s.data_credito, valor: s.valor, pagouEmDia: !!r.pagouEmDia, dataPagou: !r.pagouEmDia && s.data_pagamento && s.data_pagamento < s.data_credito ? s.data_pagamento : null,
         justificativa: `Valor informado pelo banco (C6): ${reais(s.valor)}`, movimentacao_id: entrada ? entrada.id : null };
       aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''} ${divergentes.length} com valor diferente do previsto: ${divergentes.join('; ')}. Informe a justificativa e o valor da NF do primeiro${divergentes.length > 1 ? '; depois, busque os boletos pagos de novo para os outros' : ''}.`, 'aviso');

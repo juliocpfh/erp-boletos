@@ -358,7 +358,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
   if (difere && R.geraNf(buscar('contratos', cb.contrato_id))) {
     // mesmo caminho do pagamento com valor diferente digitado à mão: justificativa + valor da NF na página do boleto
     // a entrada do extrato desse dinheiro, se já importada, fica ligada ao boleto quando o pagamento for confirmado (FORMULARIOS.pagamentoNf)
-    const entrada = Z.entradaDoRecebimento(d(), { conta_id: contaId, valor: valorBanco, data });
+    const entrada = Z.entradaDoRecebimento(d(), { conta_id: contaId, valor: valorBanco, ids: [pagamento && pagamento.external_payment_id, ...Z.identificadoresDoBoleto(cb)] });
     memoria.pagamentoDivergente = { id: cb.id, data, valor: valorBanco, pagouEmDia, dataPagou: pagouEmDia ? null : dataPagou, justificativa: `Valor informado pelo banco (C6): ${reais(valorBanco)}`, movimentacao_id: entrada ? entrada.id : null };
     ir(`#/cobranca/${cb.id}?ir=pagamento`);
     return;
