@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-6Khvc9Qsocbj92wDOSIBy0jLpkRrEMc/4l8VuYvgzHc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-UN+9vM7EgKVpY0IUGp3ZhxbvQHNRA9ciawVVgHujKiE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="49380618ade94f7f">
+<meta name="fontes" content="7abbf140493e263b">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2474,8 +2474,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         pagina: /^\d{1,5}$/,
         // página de uma lista longa (Histórico)
         quem: /^[^\s<>"']{3,200}$/,
-        antes: /^\d{1,12}$/
+        antes: /^\d{1,12}$/,
         // tela Acessos: e-mail da pessoa e "ver os mais antigos"
+        gmail: /^[a-z-]{1,20}$/
+        // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
       };
     }
   });
@@ -23159,6 +23161,44 @@ ${DICA_DOCUMENTOS}`].join("\n");
   async function emailLigado() {
     return (await estadoEmail()).ligado;
   }
+  async function situacaoGmail() {
+    if (local2()) return null;
+    try {
+      const r = await cfg3.buscar(`${cfg3.base}email/estado`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(TEMPO_ESTADO) });
+      if (!r.ok || r.redirected || !ehJson(r)) return null;
+      const d2 = await r.json();
+      estadoGuardado = { ligado: d2.ligado === true, remetente: typeof d2.remetente === "string" ? d2.remetente : null };
+      return d2 && typeof d2 === "object" ? d2 : null;
+    } catch {
+      return null;
+    }
+  }
+  async function pedirGmail(rota) {
+    if (local2() || !cfg3.online()) throw new ErroUsuario("Sem internet: tente de novo quando a conexão voltar.");
+    let r;
+    try {
+      r = await cfg3.buscar(`${cfg3.base}email/google/${rota}`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: limiteDeTempo(TEMPO_ESTADO),
+        headers: { "Content-Type": "application/json", "X-Sistema": "imoveis" },
+        body: "{}"
+      });
+    } catch {
+      throw new ErroUsuario("Sem internet: tente de novo quando a conexão voltar.");
+    }
+    if (r.redirected || !ehJson(r)) throw new ErroUsuario("Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail).");
+    const d2 = await r.json().catch(() => ({}));
+    if (!r.ok) throw new ErroUsuario(d2.erro || `Erro ${r.status} na nuvem.`);
+    estadoGuardado = null;
+    return d2;
+  }
+  async function enderecoParaConectar() {
+    const { url } = await pedirGmail("conectar");
+    if (typeof url !== "string" || !url.startsWith("https://accounts.google.com/")) throw new ErroUsuario("A nuvem não devolveu o endereço do Google.");
+    return url;
+  }
   async function base64DoBlob(blob) {
     const bytes2 = new Uint8Array(await blob.arrayBuffer());
     let s = "";
@@ -23194,7 +23234,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (!r.ok || !d2.ok) throw new ErroUsuario(d2.erro || `O e-mail não foi enviado (erro ${r.status}).`);
     return { ok: true, id: String(d2.id || "") };
   }
-  var MAX_BYTES_ANEXOS, TEMPO_ESTADO, TEMPO_ENVIO, SEM_INTERNET, cfg3, estadoGuardado, ehJson, local2;
+  var MAX_BYTES_ANEXOS, TEMPO_ESTADO, TEMPO_ENVIO, SEM_INTERNET, cfg3, estadoGuardado, ehJson, local2, desconectarGmail;
   var init_gmail = __esm({
     "docs/js/gmail.js"() {
       init_calculos();
@@ -23207,6 +23247,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       estadoGuardado = null;
       ehJson = (r) => (r.headers.get("content-type") || "").includes("json");
       local2 = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
+      desconectarGmail = () => pedirGmail("desconectar");
     }
   });
 
@@ -23365,6 +23406,37 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
     });
     dlg.showModal();
   }
+  async function caixaGmailHtml(volta = "") {
+    if (!podeUsuario("admin")) return "";
+    const topo2 = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
+    if (!E.nuvem) {
+      return `${topo2}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
+    }
+    const s = await situacaoGmail();
+    const [tipo, texto3] = VOLTA_GMAIL[volta] || [];
+    const avisoVolta = texto3 ? `<div class="alerta ${tipo}">${texto3}</div>` : "";
+    if (!s) return `${topo2}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
+    let situacao2;
+    if (s.origem === "conta" && s.ligado) {
+      situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ""}.</p>`;
+    } else if (s.origem === "segredo" && s.ligado) {
+      situacao2 = `<p>${etiqueta("Ligado", "ok")} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || "")}</b>.</p>
+      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o código antigo deixa de ser usado e pode ser apagado no Cloudflare (segredo GMAIL_REFRESH_TOKEN).</p>`;
+    } else if (s.origem === "simulado") {
+      situacao2 = `<p>${etiqueta("Simulado", "info")} Teste no computador: os e-mails só aparecem na janela do programa, nada vai ao Google.</p>`;
+    } else {
+      situacao2 = `<p>${etiqueta("Desligado", "neutra")} Os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p>`;
+    }
+    const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (o Client Secret foi trocado no Google Cloud?). Clique em <b>Conectar o Gmail</b> de novo.</div>' : "";
+    const falta = s.cliente ? "" : '<div class="alerta info">Falta um passo antes de conectar: no Cloudflare, os segredos <b>GMAIL_CLIENT_ID</b> e <b>GMAIL_CLIENT_SECRET</b> da credencial "Aplicativo da Web" do Google Cloud (passo a passo em documentacao/LIGAR_GMAIL.md).</div>';
+    const botoes = s.origem === "simulado" ? "" : `<p>${s.cliente ? botao("conectarGmail", s.origem === "conta" && s.ligado ? "Trocar a conta do Gmail" : "Conectar o Gmail", {}, "pequeno") : ""}
+    ${s.origem === "conta" ? botao("desconectarGmail", "Desconectar", {}, "perigo pequeno", 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ""}</p>`;
+    const retorno = s.retorno ? `<p><label>Endereço de retorno (cole no Google Cloud, na credencial, em "URIs de redirecionamento autorizados")</label>
+    <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao("copiarRetornoGmail", "Copiar", {}, "secundario pequeno")}</span></p>` : "";
+    return `${topo2}${avisoVolta}${ilegivel}
+    <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
+    ${situacao2}${falta}${botoes}${retorno}</div>`;
+  }
   function telaModelosEmail() {
     const etapas = [...new Set(MODELOS_EMAIL.map((m) => m.etapa))];
     const linha = (p2) => {
@@ -23393,7 +23465,7 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
     return `<div class="alerta info"><b>Informe do Imposto de Renda de ${ano}:</b> enviar a ${contratos.length} inquilino(s) (de preferência até o fim de fevereiro):
     ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
   }
-  var LIMITE_ENDERECO, registrar2, campoPergunta, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
+  var LIMITE_ENDERECO, registrar2, campoPergunta, VOLTA_GMAIL, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
   var init_emails = __esm({
     "docs/js/telas/emails.js"() {
       init_app();
@@ -23422,7 +23494,37 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
         const t = tipo === "data" ? "date" : tipo === "ano" ? "number" : "text";
         return `<p><label>${esc(rotulo2)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
       };
+      VOLTA_GMAIL = {
+        ligado: ["ok", 'Gmail conectado. Faça um teste: abra o e-mail de uma etapa, ponha o seu próprio e-mail e clique em <b>Enviar agora</b>; ele aparece em "Enviados" no Gmail.'],
+        cancelado: ["aviso", "Você cancelou na tela do Google: nada foi ligado."],
+        recusado: ["erro", "O pedido venceu ou foi aberto em outro navegador. Clique em <b>Conectar o Gmail</b> de novo e termine em até 10 minutos, no mesmo navegador."],
+        "sem-permissao": ["erro", "Faltou marcar, na tela do Google, a caixa de <b>enviar e-mail em seu nome</b>. Clique em <b>Conectar o Gmail</b> de novo e marque essa caixa."],
+        credencial: ["erro", 'O Google não reconheceu o aplicativo: confira os segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare (copiados da credencial "Aplicativo da Web").'],
+        retorno: ["erro", 'O endereço de retorno cadastrado no Google Cloud está diferente. Copie o endereço abaixo e cole na credencial, em "URIs de redirecionamento autorizados".'],
+        "sem-rede": ["erro", "Não deu para falar com o Google agora. Tente de novo daqui a pouco."],
+        erro: ["erro", "Não deu para ligar o Gmail. Tente de novo; se repetir, veja o passo a passo (documentacao/LIGAR_GMAIL.md)."]
+      };
       ACOES_EMAILS = {
+        async conectarGmail() {
+          const url = await enderecoParaConectar();
+          aviso("Abrindo a tela do Google…", "info");
+          window.location.assign(url);
+        },
+        async desconectarGmail() {
+          const r = await desconectarGmail();
+          aviso(r.segredo_antigo ? "Gmail desconectado. Atenção: ainda existe o código antigo no Cloudflare (GMAIL_REFRESH_TOKEN), que continua enviando até ser apagado lá." : r.havia && !r.revogado ? "Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso." : "Gmail desconectado.", r.segredo_antigo || r.havia && !r.revogado ? "aviso" : "ok");
+          if (/[?&]gmail=/.test(window.location.hash)) ir("#/dados");
+          else await mostrar();
+        },
+        async copiarRetornoGmail() {
+          const campo2 = document.querySelector("[data-retorno-gmail]");
+          if (!campo2) return;
+          if (await copiar2(campo2.value)) aviso("Endereço copiado. Cole no Google Cloud, na credencial.");
+          else {
+            campo2.select();
+            aviso("O navegador não deixou copiar: o endereço ficou selecionado, use Ctrl+C.", "info");
+          }
+        },
         async abrirEmail({ chave, contrato, ficha, aditivo }) {
           if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
           await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {} } : { ficha: Number(ficha) });
@@ -28295,7 +28397,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const lembrar = !ultimo || dias > LEMBRETE_ZIP_DIAS;
     return `<p class="suave">${texto3} ${lembrar ? etiqueta('vale baixar uma cópia para o seu computador (abaixo, "Exportar tudo em ZIP")', "aviso") : ""}</p>`;
   }
-  async function telaDados() {
+  async function telaDados(q = {}) {
     const conflitos = E.nuvem ? [] : await copiasEmConflito(E.pasta);
     let modeloProprio = false;
     try {
@@ -28347,6 +28449,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento")}</div>` : ""}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
     <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>
+    ${await caixaGmailHtml(q.gmail)}
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
@@ -28402,6 +28505,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_banco2();
       init_cadastros();
       init_comum();
+      init_emails();
       init_icone();
       tamanho = (b) => b > 1048576 ? `${(b / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
       FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
@@ -34598,7 +34702,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         solicitacoes: (rota) => telaSolicitacoes(rota.q),
         iptu: (rota) => telaIptu(Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear()),
         historico: (rota) => telaHistorico(rota.q),
-        dados: () => telaDados(),
+        dados: (rota) => telaDados(rota.q),
         "arquivo-impresso": (rota) => telaArquivoImpresso(rota.q),
         "pasta-fisica": (rota) => telaPastaFisica(Number(rota.partes[1])),
         "pasta-impressao": (rota) => telaPastaImpressao(Number(rota.partes[1])),
