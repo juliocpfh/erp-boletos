@@ -155,6 +155,13 @@ test('faturaExcel (modelo padrão): ANK e JCK como hoje; empresa sem aba usa a q
   assert.deepEqual(wb.worksheets.map((w) => w.name), ['ANK', 'JCK']);
   assert.equal(wb.getWorksheet('ANK').getCell('B3').value, 'ANK ADMINISTRADORA');
   assert.equal(wb.getWorksheet('JCK').getCell('K22').value, 1000);
+  assert.equal(wb.getWorksheet('ANK').getCell('B11').value, 'CPF', 'pessoa física');
+  // tomador empresa: "CNPJ" no Excel, como na tela (o modelo dizia sempre "CPF")
+  wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura({ tomador_documento: '11.222.333/0001-81' })], [ANK, JCK]));
+  assert.equal(wb.getWorksheet('ANK').getCell('B11').value, 'CNPJ');
+  assert.equal(wb.getWorksheet('ANK').getCell('E11').value, '11.222.333/0001-81');
+  assert.match(F.faturaHtml(fatura({ tomador_documento: '11.222.333/0001-81' }), ANK), /<b>CNPJ<\/b>/, 'mesma regra da tela');
+  assert.equal(F.rotuloDocumento(fatura()), 'CPF');
   // só a ANK: a aba JCK sobra e sai
   wb = await abrir(await F.faturaExcel(ExcelJS, MODELO, [fatura()], [ANK, JCK]));
   assert.deepEqual(wb.worksheets.map((w) => w.name), ['ANK']);

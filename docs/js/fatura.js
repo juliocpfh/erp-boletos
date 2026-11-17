@@ -9,6 +9,8 @@ const ALTURAS = { 3: 50.25, 7: 9.95, 9: 9.95, 10: 20.1, 11: 20.1, 12: 20.1, 13: 
 
 const maiusc = (t) => String(t || '').toLocaleUpperCase('pt-BR');
 const corta = (t, n) => String(t || '').slice(0, n);
+/** Rótulo do documento do tomador na NF (tela e Excel): mais de 11 dígitos é CNPJ, senão CPF. */
+export const rotuloDocumento = (f) => (String(f.tomador_documento || '').replace(/\D/g, '').length > 11 ? 'CNPJ' : 'CPF');
 /** Linhas da caixa grande de observações (linhas 27 a 31 da planilha), até 90 caracteres cada. */
 export function linhasObservacoes(texto, porLinha = 90, maxLinhas = 5) {
   const linhas = [];
@@ -110,7 +112,7 @@ function linhas(f, emitente) {
     8: [[1, '', 'be bt'], [9, 'TOMADOR DE SERVIÇO', 'bt bd f-11'], [1, '', 'be bd bt'], [2, '', 'bt bd']],
     9: [[1, '', 'be'], [9, '', 'bd'], [1, '', 'be bd'], [2, '', 'bd']],
     10: [[1, '', 'be'], [3, '<b>NOME DO CLIENTE</b>', 'f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_nome, LIMITES_NF.nome)))}</b>`, 'bd f-12 f-light duas-linhas'], [1, '<b>TELEFONE</b>', 'be bd f-10 f-light'], [2, `<b>${esc(f.tomador_telefone || '')}</b>`, 'bd f-11']],
-    11: [[1, '', 'be'], [3, `<b>${String(f.tomador_documento || '').replace(/\D/g, '').length > 11 ? 'CNPJ' : 'CPF'}</b>`, 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
+    11: [[1, '', 'be'], [3, `<b>${rotuloDocumento(f)}</b>`, 'f-12 f-light'], [6, `<b>${esc(f.tomador_documento || '')}</b>`, 'bd f-12 f-light'], [1, '', 'be bd'], [2, '', 'bd']],
     12: [[1, '', 'be bb'], [3, '<b>ENDEREÇO</b>', 'bb f-12 f-light'], [6, `<b>${esc(maiusc(corta(f.tomador_endereco, LIMITES_NF.endereco)))}</b>`, 'bd bb f-12 f-light duas-linhas'], [1, '', 'be bd bb'], [2, '', 'bd bb']],
     13: [vazio(13, 'be bd bt bb')],
     14: [vazio(13, 'be bd bt bb')],
@@ -259,6 +261,7 @@ export async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
     set('L5', `Emissão: ${dataBr(f.emissao)}`);
     set('E10', maiusc(corta(f.tomador_nome, LIMITES_NF.nome)));
     set('L10', f.tomador_telefone || '');
+    set('B11', rotuloDocumento(f)); // como na tela: empresa (mais de 11 dígitos) é CNPJ
     set('E11', f.tomador_documento || '');
     set('E12', maiusc(corta(f.tomador_endereco, LIMITES_NF.endereco)));
     linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
