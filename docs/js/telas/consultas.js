@@ -156,19 +156,21 @@ export function telaIptu(ano) {
   };
   const rotuloMes = (mes) => `${MESES[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? '' : `/${mes.slice(2, 4)}`}`;
   const mesDaParcela = (pc, p) => (pc.n === 0 ? (p.data_quitacao || p.vencimento_primeira || '').slice(0, 7) : pc.mesBoleto || (pc.comp && C.somarMeses(pc.comp, 1)) || '');
+  // contratos e boletos de cada imóvel separados uma vez para a tela inteira (antes, cada conta percorria todos os boletos)
+  const baseDe = R.basesIptu(d());
   const mapas = new Map(imoveis.filter(doAno).map((i) => {
     const p = doAno(i);
     if (p.pago_avista) {
-      const mapa = new Map(R.mapaIptuAvista(d(), p).map((x) => [x.mesBoleto, { avistaMes: x }]));
-      const cota = R.parcelasIptu(d(), p)[0];
+      const mapa = new Map(R.mapaIptuAvista(d(), p, baseDe(p.imovel_id)).map((x) => [x.mesBoleto, { avistaMes: x }]));
+      const cota = R.parcelasIptu(d(), p, baseDe(p.imovel_id))[0];
       const mq = mesDaParcela(cota, p);
       if (mq) mapa.set(mq, { avistaMes: null, ...mapa.get(mq), cota });
       return [i.id, mapa];
     }
-    const mapa = new Map(R.parcelasIptu(d(), p).map((pc) => [mesDaParcela(pc, p), pc]));
+    const mapa = new Map(R.parcelasIptu(d(), p, baseDe(p.imovel_id)).map((pc) => [mesDaParcela(pc, p), pc]));
     // IPTU pago à vista por você e repassado nos boletos: um verde em cada mês em que o inquilino paga (o cinza da
     // cota única fica no mês da quitação; se cair no mesmo mês, o quadradinho mostra os dois)
-    for (const m of R.mesesIptuAvista(d(), p)) {
+    for (const m of R.mesesIptuAvista(d(), p, baseDe(p.imovel_id))) {
       const cota = mapa.get(m.mesBoleto);
       if (cota) cota.avista = m;
       else mapa.set(m.mesBoleto, { n: null, rotulo: m.rotulo, avista: m, valor: m.valor, proprietario: false });
@@ -192,7 +194,7 @@ export function telaIptu(ano) {
     const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias}`;
     if (!p) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, 'aviso')} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, 'botao pequeno') : ''}</td></tr>`;
     const mapa = mapas.get(i.id);
-    const t = R.totaisIptu(d(), p);
+    const t = R.totaisIptu(d(), p, baseDe(p.imovel_id));
     soma.inquilino += t.inquilino; soma.sua += t.proprietario; soma.aberto += t.emAberto;
     soma.custo += t.custo; if (t.proprietario < 0) soma.sobra -= t.proprietario; else soma.parte += t.proprietario;
     return `<tr><td>${nome}</td><td class="nw">${valor(p)}${primeira(p)}</td><td class="nw">${meses.map((m) => quadrado(mapa.get(m), p, m)).join('')}</td>

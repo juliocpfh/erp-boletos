@@ -1287,20 +1287,46 @@ export function iptuNaCompetencia(p, comp, c = {}) {
  * O que é preciso para saber a parte dos inquilinos num IPTU, montado uma vez por cálculo: os contratos do imóvel (também
  * de quem já saiu), os boletos do aluguel deles por contrato e competência e os IPTUs do imóvel.
  */
-/** ``baseIptuDoImovel`` montada uma vez por imóvel dentro de um mesmo cálculo (calendário, resultados, guias a pagar). */
-function basesIptu(d) {
+/**
+ * ``baseIptuDoImovel`` montada uma vez por imóvel dentro de um mesmo cálculo (calendário, resultados, guias a pagar, tela
+ * IPTU's): ``basesIptu(d)`` devolve a função imóvel → base. Os boletos do aluguel são separados por contrato uma vez só
+ * (antes, cada imóvel percorria todos os boletos: 150 imóveis × 8.850 boletos). Só para um cálculo: o banco não pode mudar no meio.
+ */
+export function basesIptu(d) {
   const bases = new Map();
-  return (imovelId) => { if (!bases.has(imovelId)) bases.set(imovelId, baseIptuDoImovel(d, imovelId)); return bases.get(imovelId); };
+  let porContrato = null;
+  return (imovelId) => {
+    if (!bases.has(imovelId)) {
+      porContrato = porContrato || boletosDoAluguelPorContrato(d);
+      bases.set(imovelId, baseIptuDoImovel(d, imovelId, porContrato));
+    }
+    return bases.get(imovelId);
+  };
 }
 
-function baseIptuDoImovel(d, imovelId) {
-  const contratos = d.contratos.filter((c) => c.imovel_id === imovelId);
-  const ids = new Set(contratos.map((c) => c.id));
-  const boletos = new Map();
+/** Boletos do aluguel (sem os avulsos) de cada contrato, na ordem da tabela: contrato_id → [boletos]. */
+function boletosDoAluguelPorContrato(d) {
+  const m = new Map();
   for (const cb of d.cobrancas) {
-    if (!ids.has(cb.contrato_id) || ehBoletoAvulso(cb)) continue;
+    if (ehBoletoAvulso(cb)) continue;
+    const l = m.get(cb.contrato_id);
+    if (l) l.push(cb); else m.set(cb.contrato_id, [cb]);
+  }
+  return m;
+}
+
+function baseIptuDoImovel(d, imovelId, porContrato = null) {
+  const contratos = d.contratos.filter((c) => c.imovel_id === imovelId);
+  const boletos = new Map();
+  const guardar = (cb) => {
     const k = `${cb.contrato_id}|${cb.competencia}`;
     if (!boletos.has(k)) boletos.set(k, cb); // o mesmo que boletoDoMes: o primeiro
+  };
+  if (porContrato) {
+    for (const id of new Set(contratos.map((c) => c.id))) for (const cb of porContrato.get(id) || []) guardar(cb);
+  } else {
+    const ids = new Set(contratos.map((c) => c.id));
+    for (const cb of d.cobrancas) if (ids.has(cb.contrato_id) && !ehBoletoAvulso(cb)) guardar(cb);
   }
   return { contratos, boletos, iptus: d.iptus.filter((x) => x.imovel_id === imovelId) };
 }
@@ -1411,7 +1437,7 @@ export function mesesIptuAvista(d, p, base = null) {
  * 03 a 06 verdes (R$ 100 do inquilino), 07 a 12/2026 = R$ 100 do proprietário cada. Item: { mesBoleto, rotulo, valor,
  * valorInquilino, valorProprietario }.
  */
-export function mapaIptuAvista(d, p) {
+export function mapaIptuAvista(d, p, base = null) {
   if (!p.pago_avista) return [];
   const n = Number(p.num_parcelas) || 0;
   const primeiro = p.primeiro_vencimento_boleto || (p.primeira_competencia && C.somarMeses(p.primeira_competencia, 1));
@@ -1419,7 +1445,7 @@ export function mapaIptuAvista(d, p) {
     ? valoresIptu(p).map((valor, k) => ({ mesBoleto: C.somarMeses(primeiro, k), rotulo: `${k + 1}ª parcela`, valor }))
     : dividirIptu(p, 12).map((valor, k) => ({ mesBoleto: C.somarMeses(`${p.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, '0')}/${p.ano})`, valor }));
   const porMes = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
-  for (const m of mesesIptuAvista(d, p)) {
+  for (const m of mesesIptuAvista(d, p, base)) {
     const it = porMes.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(' (você pagou à vista)', ''), valor: m.valor, valorInquilino: 0 };
     it.valorInquilino += m.valor;
     porMes.set(m.mesBoleto, it);
@@ -1432,9 +1458,9 @@ export function mapaIptuAvista(d, p) {
  * Totais do IPTU no ano: quanto os inquilinos pagam nos boletos e quanto fica com o proprietário (e quanto dessa parte
  * ainda está em guia não paga). À vista: o inquilino paga conforme "Inquilino que entrar" (1/12 ou parcelas) nos meses ocupados.
  */
-export function totaisIptu(d, p) {
-  const ps = parcelasIptu(d, p);
-  const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d, p).reduce((s, x) => s + x.valor, 0);
+export function totaisIptu(d, p, base = null) {
+  const ps = parcelasIptu(d, p, base);
+  const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d, p, base).reduce((s, x) => s + x.valor, 0);
   const custo = ps.reduce((s, x) => s + x.valor, 0);
   return { custo, inquilino, proprietario: custo - inquilino,
     emAberto: ps.filter((x) => x.proprietario && !x.paga).reduce((s, x) => s + x.valorProprietario, 0) };
@@ -5484,14 +5510,42 @@ export function resultadosFinanceiros(d, de, ate) {
   const meses = Math.max(1, C.mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
   const dentro = (x) => x && x >= de && x <= ate;
   const cache = { taxas: new Map(), faturamento: indiceFaturamento(d), nfs: indiceFaturas(d) };
+  // separados por imóvel uma vez, na ordem das tabelas (antes, cada imóvel percorria todos os boletos, avulsas e contas):
+  // os boletos pagos no período de cada imóvel (de todos os contratos e só dos que emitem NF) e as avulsas, ganhos e contas dele
+  const porImovel = (lista, imovelDe) => {
+    const m = new Map();
+    for (const x of lista) { const k = imovelDe(x); const l = m.get(k); if (l) l.push(x); else m.set(k, [x]); }
+    return (id) => m.get(id) || [];
+  };
+  const pagasDoPeriodo = d.cobrancas.filter((cb) => dentro(cb.data_pagamento));
+  // contrato → imóveis (com código repetido, todos os que usam o código, como no filtro de antes)
+  const imoveisDoContrato = (soNf) => {
+    const m = new Map();
+    for (const c of d.contratos) if (!soNf || geraNf(c)) m.set(c.id, [...(m.get(c.id) || []), c.imovel_id]);
+    return m;
+  };
+  const porImovelDosBoletos = (soNf) => {
+    const doContrato = imoveisDoContrato(soNf);
+    const m = new Map();
+    for (const cb of pagasDoPeriodo) {
+      for (const im of new Set(doContrato.get(cb.contrato_id) || [])) { const l = m.get(im); if (l) l.push(cb); else m.set(im, [cb]); }
+    }
+    return (id) => m.get(id) || [];
+  };
+  const pagasNfDe = porImovelDosBoletos(true);
+  const pagasTodasDe = porImovelDosBoletos(false);
+  const avulsasDe = porImovel(d.avulsas.filter((a) => !a.airbnb_competencia && dentro(a.data_pagamento)), (a) => a.imovel_id);
+  const ganhosDe = porImovel((d.ganhos_airbnb || []).filter((g) => dentro(g.data_recebimento)), (g) => g.imovel_id);
+  const contasDe = porImovel(d.despesas.filter((x) => dentro(x.data_pagamento)), (x) => x.imovel_id);
+  const iptusDe = porImovel(d.iptus, (x) => x.imovel_id);
+  const baseDe = basesIptu(d);
   return d.imoveis.map((i) => {
     // boleto de controle (inquilino sem NF) não entra no resultado financeiro
-    const contratos = new Set(d.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
-    const pagas = d.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
+    const pagas = pagasNfDe(i.id);
     const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
-    const listaAvulsas = d.avulsas.filter((a) => a.imovel_id === i.id && !a.airbnb_competencia && dentro(a.data_pagamento));
+    const listaAvulsas = avulsasDe(i.id);
     const avulsas = listaAvulsas.reduce((s, a) => s + a.valor, 0);
-    const ganhos = (d.ganhos_airbnb || []).filter((g) => g.imovel_id === i.id && dentro(g.data_recebimento));
+    const ganhos = ganhosDe(i.id);
     const airbnb = ganhos.reduce((s, g) => s + g.valor, 0);
     let impostos = 0;
     let impostosEstimados = 0;
@@ -5503,25 +5557,22 @@ export function resultadosFinanceiros(d, de, ate) {
       if (nf && nf.valor > 0) { const r = impostoDaOrigem(d, 'avulsa', nf.id, nf.valor, cache); somar({ valor: Math.round((r.valor * g.valor) / nf.valor), confirmado: r.confirmado }); } else somar({ valor: Math.round((g.valor * aliquotaImpostos()) / 100), confirmado: false });
     }
     let iptu = 0;
-    let baseIptu = null; // contratos, boletos e IPTUs do imóvel: montados uma vez (e só se o imóvel tem IPTU)
     // a parte do proprietário em cada guia paga no período (a do inquilino volta nos boletos), como em totaisIptu
-    for (const p of d.iptus.filter((x) => x.imovel_id === i.id)) {
-      baseIptu = baseIptu || baseIptuDoImovel(d, i.id);
-      for (const pc of parcelasIptu(d, p, baseIptu)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
+    // (contratos, boletos e IPTUs do imóvel: montados uma vez, e só se o imóvel tem IPTU)
+    for (const p of iptusDe(i.id)) {
+      for (const pc of parcelasIptu(d, p, baseDe(i.id))) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
       // à vista: o inquilino devolve nos boletos; sai do custo só o que ele já devolveu em boleto pago no período (caixa, não a
       // previsão do ano). Ex.: cota única de R$ 900,00 paga em 02/2026 e nenhum boleto pago ainda → IPTU de R$ 900,00 em fevereiro
       if (p.pago_avista) {
         const doAno = new RegExp(`IPTU ${p.ano}\\b`);
-        const doImovel = new Set(d.contratos.filter((c) => c.imovel_id === i.id).map((c) => c.id));
-        iptu -= d.cobrancas.filter((cb) => doImovel.has(cb.contrato_id) && dentro(cb.data_pagamento) && cb.iptu > 0 && doAno.test(cb.iptu_parcela || ''))
-          .reduce((s, cb) => s + cb.iptu, 0);
+        iptu -= pagasTodasDe(i.id).filter((cb) => cb.iptu > 0 && doAno.test(cb.iptu_parcela || '')).reduce((s, cb) => s + cb.iptu, 0);
       }
     }
     const todasReformas = reformasDo(d, i.id);
     const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
     const investido = todasReformas.filter((r) => String(r.data) <= ate).reduce((s, r) => s + r.valor, 0);
     // contas pagas por nós + ressarcimentos de condomínio abatidos em boletos pagos no período (se não saíram da NF)
-    const contas = d.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0)
+    const contas = contasDe(i.id).reduce((s, x) => s + x.valor, 0)
       + pagas.filter((cb) => !cb.ressarcimento_na_nf).reduce((s, cb) => s + (cb.ressarcimento || 0), 0);
     const receita = aluguel + avulsas + airbnb;
     const resultado = receita - iptu - contas;
@@ -6203,10 +6254,11 @@ export function desfazerReajuste(d, correcaoId, usuario) {
  * Todos os reajustes em aberto (sem correção, ou do ano corrente sem a carta), de qualquer ano, até 3 meses à frente:
  * a tela Reajustes é o único lugar onde eles são aplicados.
  */
-export function reajustesAbertos(d, hoje = C.hojeIso()) {
+export function reajustesAbertos(d, hoje = C.hojeIso(), { contratoId = null } = {}) {
+  // `contratoId`: só os desse contrato (página do contrato), sem calcular os de todos os outros
   const ate = C.somarMeses(C.competenciaDe(hoje), 3);
   const lista = [];
-  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d, x))) {
+  for (const c of d.contratos.filter((x) => (contratoId === null || x.id === contratoId) && x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d, x))) {
     const herdado = contratoHerdado(d, c) && c.data_entrada ? c.data_entrada.slice(0, 7) : '';
     let doContrato = null; // correções e cartas do contrato: separadas uma vez, e só se houver reajuste a olhar
     for (let n = 1, comp = competenciaDoReajuste(c, 1); comp && comp <= ate; n += 1, comp = competenciaDoReajuste(c, n)) {

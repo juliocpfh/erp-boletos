@@ -6,6 +6,7 @@ import * as C from '../calculos.js';
 import { dataBr, pct, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
+import * as AI from '../arquivo-impresso.js';
 
 /** Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). */
 export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') => `<h1>${esc(titulo)}</h1>
@@ -48,7 +49,22 @@ export const SO_ADMIN_NUMERACAO = 'Só o administrador desfaz a numeração das 
 
 export const d = () => E.d;
 
-export const buscar = (t, id) => R.buscar(E.d, t, id);
+// Registro pelo código nas telas: um Map por tabela, montado na 1ª busca e usado enquanto a lista for a mesma (o banco da tela
+// não muda por dentro: cada gravação monta outro). Antes cada busca percorria a tabela inteira (Boletos: 23 ms; NF: 13 ms).
+// Com código repetido fica o primeiro, como no `find`.
+const indicesPorId = new WeakMap(); // lista → { n, porId }
+export const buscar = (t, id) => {
+  const lista = E.d && E.d[t];
+  if (!Array.isArray(lista)) return R.buscar(E.d, t, id);
+  let ix = indicesPorId.get(lista);
+  if (!ix || ix.n !== lista.length) {
+    const porId = new Map();
+    for (const r of lista) if (r && !porId.has(r.id)) porId.set(r.id, r);
+    ix = { n: lista.length, porId };
+    indicesPorId.set(lista, ix);
+  }
+  return ix.porId.get(Number(id));
+};
 
 export const ordenar = (lista, campo) => [...lista].sort((a, b) => String(a[campo] || '').localeCompare(String(b[campo] || ''), 'pt-BR'));
 
@@ -906,6 +922,18 @@ export const botaoDesligarAlerta = (a) => (R.alvoDoAlerta(a) ? botao('desligarAl
 
 /** Alerta desligado (R.alertasDesligados): de quem é, quem desligou, quando, se teria aviso hoje, e o botão para religar. */
 export const alertaDesligado = (x, comNome = true) => `<div class="alerta cor-cinza com-adiar"><span>${comNome ? `<a href="${x.link}">${esc(x.nome)}</a>: ` : ''}<b>${esc(x.tipo)}</b> <span class="suave">· desligado por ${esc(x.quem)} em ${dataBr(x.em)}</span>${x.pendentes ? ` ${etiqueta('teria aviso hoje', 'aviso')}` : ''}</span> ${opera() ? botao('religarAlerta', 'Religar', { id: x.id }, 'secundario mini') : ''}</div>`;
+
+// Alertas (R.alertasComAdiamento) do banco da tela: calculados uma vez enquanto o banco em memória, o dia e as pastas lidas
+// (arquivos soltos, alerta "Pasta física") forem os mesmos. Painel e Pendências recalculavam a cada desenho (122 ms no
+// banco grande). O banco da tela não muda por dentro: cada gravação monta outro objeto. Não mexa na lista devolvida.
+let alertasGuardados = null; // { d, hoje, soltos, lista }
+export function alertasDaTela(hoje = C.hojeIso()) {
+  const g = alertasGuardados;
+  if (g && g.d === E.d && g.hoje === hoje && g.soltos === AI.versaoSoltos) return g.lista;
+  const lista = R.alertasComAdiamento(E.d, hoje);
+  alertasGuardados = { d: E.d, hoje, soltos: AI.versaoSoltos, lista };
+  return lista;
+}
 
 /** Alertas do mesmo tipo juntos, um embaixo do outro; os grupos seguem a ordem do primeiro alerta de cada tipo (prioridade e gravidade). */
 export const gruposDeAlertas = (alertas) => {

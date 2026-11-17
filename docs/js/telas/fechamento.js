@@ -6,6 +6,7 @@ import * as K from '../contratos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { alertaAdiado, alertaDesligado, botao, buscar, classeAlerta, d, etiqueta, gruposDeAlertas, link, nomeAlerta, opera } from './comum.js';
+import { alertasDaTela } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Fechamento do mês e cadastros incompletos
@@ -66,7 +67,7 @@ export function cadastrosIncompletos() {
 export function telaPendencias() {
   const hoje = C.hojeIso();
   const mesAtual = C.competenciaDe(hoje);
-  const alertas = R.alertasComAdiamento(d(), hoje);
+  const alertas = alertasDaTela(hoje);
   const ativos = alertas.filter((a) => !a.adiamento && !a.desligado);
   const adiados = alertas.filter((a) => a.adiamento && !a.desligado);
   const desligados = R.alertasDesligados(d(), hoje, null, alertas);
