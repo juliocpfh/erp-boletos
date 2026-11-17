@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { dadosDoEmail } from '../docs/js/email-dados.js';
-import { FECHO, MODELOS_EMAIL, modeloEmail, montarEmail, preencherEmail } from '../docs/js/modelos-email.js';
+import { MODELOS_EMAIL, fechoEmail, modeloEmail, montarEmail, preencherEmail } from '../docs/js/modelos-email.js';
 import * as R from '../docs/js/regras.js';
 
 function base(extra = {}) {
   const d = R.bancoVazio();
+  R.normalizar(d);
+  // empresa gravada antes dos campos novos (nome com ANK): normalizar dá o e-mail, a assinatura e a conta que eram fixos no código
+  R.inserir(d, 'emitentes', { nome: 'ANK ADMINISTRADORA', razao_social: 'ANK ADMINISTRADORA DE BENS LTDA', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
   R.normalizar(d);
   const i = R.inserir(d, 'imoveis', { nome: 'Flores 3', endereco: 'Rua das Flores, 120', complemento: 'Apto 3', bairro: 'Centro', cidade: 'Curitiba', uf: 'PR' }, 'j');
   const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Maria Souza', inquilino_cpf: '529.982.247-25', inquilino_email: 'maria@exemplo.com', inquilino_tipo: 'Pessoa física',
@@ -14,6 +17,7 @@ function base(extra = {}) {
     conta_agua: 'Por conta do inquilino', conta_energia: 'Por conta do inquilino', conta_iptu: 'Por conta do inquilino', conta_seguro: 'Por conta do inquilino', ...extra }, 'j');
   return { d, c, i };
 }
+const FECHO = fechoEmail({ assinatura: 'Administradora', email: 'administracao@ankjck.com.br' });
 const texto = (d, chave, alvo, resp) => montarEmail(modeloEmail(d, chave), dadosDoEmail(d, alvo, resp, '2026-11-12'));
 
 test('preencher: condições, maiúsculas e campo vazio marcado para preencher', () => {

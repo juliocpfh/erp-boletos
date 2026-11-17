@@ -145,7 +145,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   const assinaEmpresa = { nome: empresa, linha: [e.cnpj ? `CNPJ ${e.cnpj}` : '', 'LOCADORA'].filter(Boolean).join(' · ') };
   const assinaPessoa = (papel) => ({ nome: p.inquilino_nome, linha: [documentoDe(p), papel].filter(Boolean).join(' · ') });
   const nomeArq = (doc, data) => `${doc} ${i ? i.nome : 'sem imovel'} - ${p.inquilino_nome} - ${data || hoje}`;
-  const base = { emitente: e, cidade: (i && i.cidade) || e.municipio || 'Curitiba', data: hoje, tabela: [], depois: [] };
+  const base = { emitente: e, cidade: (i && i.cidade) || e.municipio || K.dadoDaEmpresa(d, alvo.contrato || { imovel_id: i ? i.id : null }, 'cidade_documentos'), data: hoje, tabela: [], depois: [] };
 
   if (tipo === 'ficha') return fichaCadastral(d, f, base, nomeArq);
   if (tipo === 'ficha_fiador') return fichaDoFiador(d, f, Number(alvo.fiador) || 1, i, base, nomeArq);

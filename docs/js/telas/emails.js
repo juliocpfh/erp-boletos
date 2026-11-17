@@ -86,7 +86,7 @@ async function janelaEmail(chave, alvo) {
   dlg.className = 'janela-erro janela-pergunta janela-email';
   dlg.innerHTML = `<form method="dialog"><h3>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || '')}</h3><div class="corpo">
     ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ''}
-    <p class="suave">De: Administradora &lt;administracao@ankjck.com.br&gt;${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ''}</p>
+    <p class="suave">De: ${esc(inicio.remetente.assinatura || 'Administradora')}${inicio.remetente.email ? ` &lt;${esc(inicio.remetente.email)}&gt;` : ''}${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ''}</p>
     ${listaProntos(prontos, ligado)}
     <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
     ${inicio.para ? '' : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
@@ -208,7 +208,7 @@ export const FORMULARIOS_EMAILS = {
 const AJUDA = `<div class="cartao"><h2>Como escrever</h2>
   <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
   {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
-  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano} e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
   bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>

@@ -4,7 +4,7 @@ import * as alertas from './alertas.js';
 import * as AI from './arquivo-impresso.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
-import { locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
+import { camposAntigosDaEmpresa, dadoDaEmpresa, locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
@@ -82,6 +82,10 @@ export function normalizar(d) {
   d.config_banco.contas = (Array.isArray(d.config_banco.contas) ? d.config_banco.contas : []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
     notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } }));
   for (const cb of d.cobrancas) if (cb.banco === undefined) cb.banco = null;
+  // conta padrão dos boletos sem escolha: era a de identificador "ank" (2026-11-05); passou a ser só a escolhida em Empresas
+  if (!d.config_banco.conta_padrao_id && d.config_banco.contas.some((x) => x.id === 'ank')) d.config_banco.conta_padrao_id = 'ank';
+  // o que era fixo da ANK no código (e-mail, assinaturas, conta da caução, cidade, Copel/Sanepar) passou ao cadastro da empresa
+  for (const e of d.emitentes) Object.assign(e, camposAntigosDaEmpresa(e));
   // normalizar roda a cada gravação (e a cada 30 s na nuvem): os cruzamentos entre tabelas usam Set/Map, não laço dentro de laço
   const contratoPorId = new Map(d.contratos.map((c) => [c.id, c]));
   // garantia marcada como passada a um contrato que foi excluído: volta a ser deste (senão não passa ao novo titular)
@@ -4563,8 +4567,8 @@ export function salvarContaBanco(d, dados, usuario) {
     tipo_desconto: tipoDesconto, desconto_dias_antes: diasAntes, notificar,
     negativacao: { ativa: dados.negativacao_ativa === undefined ? (antes ? !!antes.negativacao.ativa : false) : marcado(dados.negativacao_ativa), dias_atraso: diasNeg } };
   cfg.contas = antes ? cfg.contas.map((x) => (x.id === id ? conta : x)) : [...cfg.contas, conta];
-  // a primeira conta (ou a "ank", que é quem emite os boletos) vira a padrão
-  if (!cfg.conta_padrao_id || (id === 'ank' && !cfg.contas.some((x) => x.id === cfg.conta_padrao_id && x.id !== 'ank' && antes))) cfg.conta_padrao_id = id;
+  // a primeira conta vira a padrão (a escolha muda em Empresas → Emissão de boletos)
+  if (!cfg.conta_padrao_id) cfg.conta_padrao_id = id;
   d.config_banco = cfg;
   registrar(d, usuario, antes ? 'Alteração' : 'Inclusão', 'banco', null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? 'alterada' : 'incluída'} na integração C6`, { conta: { de: antes, para: conta } });
   return conta;
@@ -4584,11 +4588,11 @@ export function excluirContaBanco(d, contaId, usuario) {
 
 /**
  * Conta padrão dos boletos (DECISOES.md 2026-11-05: por orientação do contador os boletos saem pela ANK e a JCK recebe o repasse
- * depois). Sem padrão definido, a conta "ank"; senão a primeira. As outras contas ficam para extrato, comprovantes e pagamentos.
+ * depois): a escolhida em Empresas (``conta_padrao_id``); sem escolha, a primeira. As outras contas ficam para extrato, comprovantes e pagamentos.
  */
 export function contaEmissora(d) {
   const cfg = configBanco(d);
-  return cfg.contas.find((x) => x.id === cfg.conta_padrao_id) || cfg.contas.find((x) => x.id === 'ank') || cfg.contas[0] || null;
+  return cfg.contas.find((x) => x.id === cfg.conta_padrao_id) || cfg.contas[0] || null;
 }
 
 /** Contas das empresas que participam do imóvel do boleto (ex.: ANK 50% / JCK 50% → as duas). */
@@ -6347,8 +6351,8 @@ export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
 // --------------------------------------------------------------------------
 // Lembrete ao inquilino (D3): texto pronto para e-mail (canal oficial) ou WhatsApp, conforme a fase do boleto
 // --------------------------------------------------------------------------
-/** Assinatura dos lembretes (decisão do dono, DECISOES.md). */
-export const ASSINATURA_LEMBRETE = 'ANK Administradora';
+/** Assinatura dos lembretes: a do cadastro da empresa ("Assinatura dos lembretes", Empresas); em branco, o nome da empresa. */
+export const assinaturaLembrete = (d, c) => dadoDaEmpresa(d, c, 'assinatura_mensagens') || (locadorasDoContrato(d, c || {})[0] || {}).nome || '';
 
 /**
  * Texto do lembrete de um boleto em aberto. Fase: ``antes`` (vence depois de hoje), ``dia`` (vence hoje) ou ``atrasado``
@@ -6388,7 +6392,8 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   const b = cb.banco || null;
   if (b && b.pix_copia_cola) linhas.push('', 'Pix copia e cola:', b.pix_copia_cola);
   if (b && b.linha_digitavel) linhas.push('', `Linha digitável do boleto: ${b.linha_digitavel}`);
-  linhas.push('', 'Qualquer dúvida, estamos à disposição.', '', ASSINATURA_LEMBRETE);
+  const assinatura = assinaturaLembrete(d, c);
+  linhas.push('', 'Qualquer dúvida, estamos à disposição.', ...(assinatura ? ['', assinatura] : []));
   const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
   return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
 }

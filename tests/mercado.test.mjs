@@ -1,0 +1,147 @@
+// Frente "mercado" (2026-11-16): o que era fixo da ANK no código (e-mail, assinaturas, conta da caução, locadora única,
+// conta padrão dos boletos, Copel/Sanepar, Curitiba) passou ao cadastro da empresa. Para a ANK/JCK nada muda (resumos
+// tirados ANTES da mudança, tests/mercado-fixo.mjs); para outra imobiliária, sai o que ela cadastrar. Dados fictícios.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { dadosDoEmail } from '../docs/js/email-dados.js';
+import * as K from '../docs/js/contratos.js';
+import { modeloEmail, montarEmail } from '../docs/js/modelos-email.js';
+import * as R from '../docs/js/regras.js';
+import { resumosGerados, textosGerados } from './mercado-fixo.mjs';
+
+/** Resumo de cada texto gerado pelo cenário ANK/JCK com o código de ANTES da mudança (2026-11-16). */
+const ANTES = {
+  'contrato:Residencial:Maria Souza': '6407a82adac566b0',
+  'contrato:Não residencial (comercial):Maria Souza': 'fb7135be7179382b',
+  'locadoras:Maria Souza': 'c85480966d9c7b25',
+  'representacao:Maria Souza': '264e192c61a07b4d',
+  'cidade:Maria Souza': '377621052857a5ab',
+  'contrato:Residencial:João Teste': 'b2f693fa30fc0c6c',
+  'contrato:Não residencial (comercial):João Teste': '17bb906244655c4d',
+  'locadoras:João Teste': 'c85480966d9c7b25',
+  'representacao:João Teste': '661b724dffaa2bb9',
+  'cidade:João Teste': '377621052857a5ab',
+  'email:ficha_envio': '9acd606f931ed489',
+  'email:ficha_aprovada': '2c4bbd5376211d57',
+  'email:ficha_reprovada': '673285b1d855f5a1',
+  'email:ficha_devolucao': '3a34dfa37e8fc4cc',
+  'email:contrato_assinar': 'dc40fca168abd149',
+  'email:contrato_assinado': 'b73b624feec97d0f',
+  'email:vistoria_assinada': '5e18e95794e525a1',
+  'email:novo_valor': '99c4ceaa852ebe3f',
+  'email:aditivo_assinado': '340b833230cfcc86',
+  'email:saida_aviso': 'c3b2a249956dca85',
+  'email:saida_vistoria': '0be424faf0da3106',
+  'email:saida_chaves': 'e5c36561432daea6',
+  'email:saida_calculo': '5c9db44568916098',
+  'email:saida_encerramento': '26a18095b802b34a',
+  'email:informe_ir': '71d02f294fa1f4be',
+  'recibo:reserva:ficha': '12d9559b83339d81',
+  'recibo:reserva:Maria Souza': 'fe2c33b412647df6',
+  'recibo:reserva:João Teste': 'a9161e78ea8a4b71',
+  'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
+  'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
+  lembrete: '8efce35480e4a45e',
+  conta_emissora: '30804615d55e104f',
+};
+
+test('ANK/JCK de hoje: contratos, e-mails, recibos, lembrete e conta dos boletos saem idênticos aos de antes', () => {
+  const agora = resumosGerados();
+  assert.deepEqual(Object.keys(agora).sort(), Object.keys(ANTES).sort());
+  for (const [k, v] of Object.entries(ANTES)) assert.equal(agora[k], v, k);
+  const t = textosGerados();
+  assert.match(t['email:contrato_assinar'].texto, /Atenciosamente,\nAdministradora\nadministracao@ankjck\.com\.br$/);
+  assert.match(t['email:contrato_assinar'].texto, /C\/C 36152656-3/);
+  assert.match(t.lembrete.texto, /\n\nANK Administradora$/);
+  assert.equal(t.conta_emissora, 'ank');
+});
+
+test('empresa gravada antes recebe uma vez os dados que eram fixos; empresa nova (formulário) fica em branco e não volta a ser preenchida', () => {
+  const d = R.bancoVazio();
+  R.normalizar(d);
+  const ank = R.inserir(d, 'emitentes', { nome: 'ANK ADMINISTRADORA', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  const jck = R.inserir(d, 'emitentes', { nome: 'JCK ADMINISTRADORA', cnpj: '11.222.333/0001-81', ativo: true }, 'j');
+  R.normalizar(d);
+  assert.equal(ank.assina_documentos, true);
+  assert.equal(ank.email_contato, 'administracao@ankjck.com.br');
+  assert.equal(jck.assina_documentos, false);
+  assert.equal(jck.email_contato, undefined, 'e-mail e conta só na que assinava');
+  assert.equal(jck.cidade_documentos, 'Curitiba');
+  // o administrador desmarca e apaga o e-mail: normalizar não põe de volta
+  Object.assign(ank, { assina_documentos: false, email_contato: null });
+  R.normalizar(d);
+  assert.equal(ank.assina_documentos, false);
+  assert.equal(ank.email_contato, null);
+  // empresa nova pelo formulário com "ANK" no nome: os campos vêm gravados (em branco), nada é preenchido
+  const nova = R.inserir(d, 'emitentes', { nome: 'ANK IMÓVEIS', ativo: true, assina_documentos: false, email_contato: null, conta_deposito: null, cidade_documentos: null }, 'j');
+  R.normalizar(d);
+  assert.equal(nova.email_contato, null);
+  assert.equal(nova.cidade_documentos, null);
+});
+
+/** Outra imobiliária: uma empresa só, de São Paulo, com os campos novos preenchidos. */
+function outraImobiliaria(dados = {}) {
+  const d = R.bancoVazio();
+  R.normalizar(d);
+  const e = R.inserir(d, 'emitentes', { nome: 'IMOBILIÁRIA EXEMPLO', razao_social: 'IMOBILIÁRIA EXEMPLO LTDA', cnpj: '11.222.333/0001-81', ativo: true, assina_documentos: true,
+    cidade_documentos: 'São Paulo', energia_concessionaria: 'Enel Distribuição São Paulo (ENEL)', agua_concessionaria: 'Companhia de Saneamento Básico do Estado de São Paulo (SABESP)',
+    email_contato: 'contato@exemplo.com.br', assinatura_email: 'Equipe Exemplo', assinatura_mensagens: 'Imobiliária Exemplo', conta_deposito: 'Banco 001 · Ag. 1234 · C/C 5678-9', ...dados }, 'j');
+  const i = R.inserir(d, 'imoveis', { nome: 'Casa 1', endereco: 'Rua Teste, 1', copel_uc: '999' }, 'j');
+  R.inserir(d, 'participacoes', { imovel_id: i.id, emitente_id: e.id, percentual: 100 }, 'j');
+  const c = R.inserir(d, 'contratos', { imovel_id: i.id, inquilino_nome: 'Paula Teste', inquilino_cpf: '529.982.247-25', inquilino_tipo: 'Pessoa física', aluguel_inicial: 200000,
+    dia_vencimento: 10, data_entrada: '2026-12-01', vigencia_inicio: '2026-12-01', prazo_meses: 30, prazo_tipo: 'Determinado', garantia_tipo: 'Caução', caucao_valor: 600000,
+    conta_agua: 'Por conta do inquilino', conta_energia: 'Por conta do inquilino' }, 'j');
+  R.normalizar(d);
+  return { d, e, i, c };
+}
+
+const email = (d, chave, c) => montarEmail(modeloEmail(d, chave), dadosDoEmail(d, { contrato: c }, {}, '2026-11-12'));
+
+test('outra imobiliária: contrato, e-mails e lembrete com os dados dela (nada da ANK, de Curitiba ou do Paraná)', () => {
+  const { d, i, c } = outraImobiliaria();
+  const dados = K.dadosDoContrato(d, c);
+  assert.equal(dados.campos.cidade, 'São Paulo');
+  assert.deepEqual(K.representacaoDoContrato(d, c, i), ['a Enel Distribuição São Paulo (ENEL), unidade consumidora nº 999', 'a Companhia de Saneamento Básico do Estado de São Paulo (SABESP)']);
+  const e = email(d, 'contrato_assinar', c);
+  assert.match(e.texto, /Banco 001 · Ag\. 1234 · C\/C 5678-9/);
+  assert.match(e.texto, /Atenciosamente,\nEquipe Exemplo\ncontato@exemplo\.com\.br$/);
+  assert.equal(dadosDoEmail(d, { contrato: c }, {}, '2026-11-12').campos.contas_concessionarias, 'água (Sabesp) e energia (Enel)');
+  const tudo = JSON.stringify([dados.campos, e, email(d, 'contrato_assinado', c)]);
+  assert.doesNotMatch(tudo, /ANK|ankjck|Curitiba|COPEL|SANEPAR|36152656/i);
+  const cb = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-12', vencimento: '2027-01-11', aluguel: 200000 }, 'j');
+  assert.match(R.textoLembrete(d, cb, '2027-01-05').texto, /\n\nImobiliária Exemplo$/);
+  // imóvel atendido por outra companhia: vale a do imóvel
+  i.energia_concessionaria = 'o Departamento Municipal de Energia (DME)';
+  assert.equal(K.representacaoDoContrato(d, c, i)[0], 'o Departamento Municipal de Energia (DME), unidade consumidora nº 999');
+});
+
+test('outra imobiliária sem os campos: e-mail pede a conta da caução e fecha com o nome da empresa; contrato sem companhia fixa', () => {
+  const { d, i, c } = outraImobiliaria({ energia_concessionaria: null, agua_concessionaria: null, email_contato: null, assinatura_email: null, assinatura_mensagens: null, conta_deposito: null });
+  const e = email(d, 'contrato_assinar', c);
+  assert.match(e.texto, /\[preencher: conta_deposito\]/);
+  assert.match(e.texto, /Atenciosamente,\nIMOBILIÁRIA EXEMPLO$/);
+  assert.deepEqual(K.representacaoDoContrato(d, c, i), ['a companhia de energia elétrica, unidade consumidora nº 999', 'a companhia de água e esgoto']);
+  const cb = R.inserir(d, 'cobrancas', { contrato_id: c.id, competencia: '2026-12', vencimento: '2027-01-11', aluguel: 200000 }, 'j');
+  assert.match(R.textoLembrete(d, cb, '2027-01-05').texto, /\n\nIMOBILIÁRIA EXEMPLO$/);
+});
+
+test('nenhuma empresa marcada para assinar: os documentos saem pelas empresas do imóvel, sem procurar nome', () => {
+  const { d, e, c } = outraImobiliaria({ assina_documentos: false });
+  assert.deepEqual(K.locadorasDoContrato(d, c).map((x) => x.id), [e.id]);
+  const outra = R.inserir(d, 'emitentes', { nome: 'ANK SEGUNDA', ativo: true, assina_documentos: false }, 'j');
+  assert.ok(!K.locadorasDoContrato(d, c).includes(outra), 'o nome "ANK" não faz mais da empresa a locadora');
+});
+
+test('conta padrão dos boletos: a escolhida ou a primeira, sem procurar a de identificador "ank"', () => {
+  const { d, e } = outraImobiliaria();
+  const e2 = R.inserir(d, 'emitentes', { nome: 'OUTRA', ativo: true, assina_documentos: false }, 'j');
+  R.salvarContaBanco(d, { id: 'loja', emitente_id: e.id }, 'j');
+  R.salvarContaBanco(d, { id: 'ank', emitente_id: e2.id }, 'j');
+  assert.equal(R.contaEmissora(d).id, 'loja', 'a conta "ank" cadastrada depois não vira a padrão');
+});
+
+test('nome curto da companhia (e-mails): a sigla entre parênteses', () => {
+  assert.equal(K.nomeCurtoCompanhia('Companhia de Saneamento do Paraná (SANEPAR)'), 'Sanepar');
+  assert.equal(K.nomeCurtoCompanhia('Light'), 'Light');
+  assert.equal(K.nomeCurtoCompanhia(''), '');
+});

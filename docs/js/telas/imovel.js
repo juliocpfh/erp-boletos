@@ -103,7 +103,7 @@ export function telaImovel(i) {
       ${item('Área útil', i.area_util ? `${F.pctTexto(i.area_util)} m²` : '-')}${item('Área total', i.area_total ? `${F.pctTexto(i.area_total)} m²` : '-')}
       ${item('Energia', esc([i.energia_ligada ? (i.energia_ligada === 'Sim' ? 'ligada' : 'desligada') : '', i.energia_tipo].filter(Boolean).join(' · ') || '-'))}
       ${item('Matrícula', esc(i.matricula || '-'))}${item('Inscrição IPTU', esc(i.inscricao_iptu || '-'))}
-      ${item('UC Copel / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Matrícula Sanepar / Código hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
+      ${item('Energia: UC / Nº medidor', esc(`${i.copel_uc || '-'} / ${i.copel_medidor || '-'}`))}${item('Água: matrícula / hidrômetro', esc(`${i.sanepar_matricula || '-'} / ${i.sanepar_hidrometro || '-'}`))}
       ${item('Administradora do condomínio', esc(i.administradora_nome || '-'))}${item('Relógio de gás', esc(i.gas_relogio || '-'))}
       ${item('Internet / telefone', esc(i.internet || '-'))}
       ${item('Pasta de arquivos', esc(i.pasta || '-'))}${item('Modelo de vistoria', `${K.lerModeloVistoria(i.modelo_vistoria).length ? `${K.lerModeloVistoria(i.modelo_vistoria).length} cômodo(s)` : '<span class="suave">não montado</span>'} ${opera() ? link(`#/modelo-vistoria/${i.id}`, i.modelo_vistoria ? 'Editar' : 'Montar') : ''}`)}${item('Chaves e controles', i.sem_chaves ? 'não se aplica' : i.chaves ? esc(i.chaves).replace(/\n/g, '<br>') : '<span class="suave">não informado (use Editar)</span>')}</div>

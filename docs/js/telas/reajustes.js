@@ -159,7 +159,7 @@ export function cartaReajuste(c, comp) {
   if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
   return `${x ? '' : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
-    <p class="carta-data">${esc((i && i.cidade) || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
+    <p class="carta-data">${esc((i && i.cidade) || K.dadoDaEmpresa(d(), c, 'cidade_documentos'))}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
     <p>Com o aluguel de <b>${K.mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
     <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>

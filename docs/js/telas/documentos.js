@@ -305,7 +305,7 @@ function declaracaoHtml(r, g) {
     <p>Os valores referem-se exclusivamente ao aluguel efetivamente pago (sem encargos repassados, como IPTU e seguro).</p>
     ${pj ? '' : `<p><b>Como declarar:</b> na ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), com o CNPJ ${esc(e.cnpj || 'da empresa')} e o total acima.</p>`}
     <p>Não houve retenção de imposto de renda na fonte.</p>
-    <p class="carta-data">${esc((i && i.cidade) || e.municipio || 'Curitiba')}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
+    <p class="carta-data">${esc((i && i.cidade) || e.municipio || e.cidade_documentos || K.dadoDaEmpresa(d(), c, 'cidade_documentos'))}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(e.razao_social || e.nome)}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}</p></div>`;
 }
 

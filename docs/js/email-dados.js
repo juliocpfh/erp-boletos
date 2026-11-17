@@ -12,12 +12,16 @@ const CONTAS_FICHA = Object.keys(NOMES_CONTA);
 const primeiroNome = (n) => String(n || '').trim().split(/\s+/)[0] || '';
 const juntar = (itens) => (itens.length <= 1 ? itens.join('') : `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`);
 
-/** Contas que passam para o nome do inquilino: água e energia (salvo incluso ou não tem); gás quando por conta dele. */
-function contasDoInquilino(c) {
+/**
+ * Contas que passam para o nome do inquilino: água e energia (salvo incluso ou não tem); gás quando por conta dele.
+ * A companhia vem do imóvel ou da empresa (Empresas). Ex.: [['água', 'água (Sanepar)'], ['energia', 'energia (Copel)']].
+ */
+function contasDoInquilino(d, c, alvo, imovel) {
   const fora = (k) => ['Incluso no aluguel', 'Não tem'].includes(c[k]);
+  const comCompanhia = (conta, qual) => { const n = K.nomeCurtoCompanhia(K.companhiaDoImovel(d, alvo, imovel, qual)); return n ? `${conta} (${n})` : conta; };
   const out = [];
-  if (!fora('conta_agua')) out.push(['água', 'água (Sanepar)']);
-  if (!fora('conta_energia')) out.push(['energia', 'energia (Copel)']);
+  if (!fora('conta_agua')) out.push(['água', comCompanhia('água', 'agua')]);
+  if (!fora('conta_energia')) out.push(['energia', comCompanhia('energia', 'energia')]);
   if (c.conta_gas === 'Por conta do inquilino') out.push(['gás', 'gás']);
   return out;
 }
@@ -123,7 +127,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const fichaDiz = f && CONTAS_FICHA.some((k) => f[k]);
   const base = c || (fichaDiz ? f : d.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] || {});
   const inclusos = CONTAS_FICHA.filter((k) => base[k] === 'Incluso no aluguel').map((k) => NOMES_CONTA[k]);
-  const contas = contasDoInquilino(base);
+  const doImovel = c || { imovel_id: imoveis[0] ? imoveis[0].id : null };
+  const contas = contasDoInquilino(d, base, doImovel, imoveis[0]);
   const e = c ? R.encerramentoDo(d, c.id) : null;
   const fim = c ? R.fimDoContrato(d, c) : null;
   const inicio = c ? (c.data_entrada || c.vigencia_inicio) : null;
@@ -153,6 +158,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     documentos_ficha: f ? documentosDoEmail(f) : '',
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
     link_fiador: linkDaFicha(f, 'fiador1', hoje).url,
+    conta_deposito: K.dadoDaEmpresa(d, doImovel, 'conta_deposito'),
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
@@ -172,7 +178,10 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
       novo_bonificado: C.reais(a.valor_novo - C.descontoPorPercentual(a.valor_novo, a.percentual || 0)) });
     condicoes.novo_bonificacao = (a.percentual || 0) > 0;
   }
-  return { campos, condicoes, para: p.inquilino_email || '', perguntas: r };
+  // quem assina o fecho e o e-mail da administração: do cadastro da empresa (Empresas)
+  const remetente = { assinatura: K.dadoDaEmpresa(d, doImovel, 'assinatura_email') || (K.locadorasDoContrato(d, doImovel)[0] || {}).nome || '',
+    email: K.dadoDaEmpresa(d, doImovel, 'email_contato') };
+  return { campos, condicoes, para: p.inquilino_email || '', perguntas: r, remetente };
 }
 
 /**
