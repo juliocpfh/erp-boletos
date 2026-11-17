@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-xkxJZplVxVrYhincFt3wYbhbh1dBHVlu6ZHteNXtOi8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-bE9qhf6Dsu2y6x8isx8s12O100r94KYj191FYaL0PCc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="caa6c9e480c209a8">
+<meta name="fontes" content="700b2d8670986734">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -4578,6 +4578,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     vencimentoDoContrato: () => vencimentoDoContrato,
     vencimentoDoReajuste: () => vencimentoDoReajuste,
     vencimentoGuia: () => vencimentoGuia,
+    vinculosBancoOrfaos: () => vinculosBancoOrfaos,
     vistoriasDo: () => vistoriasDo,
     voltarAlerta: () => voltarAlerta,
     voltarRegrasAoPadrao: () => voltarRegrasAoPadrao
@@ -4657,7 +4658,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     migrarAirbnb(d2);
     for (const c of d2.contratos) {
       if (c.fiador_nome && !d2.fiadores.some((f) => f.contrato_id === c.id)) {
-        d2.seq.fiadores = (d2.seq.fiadores || 0) + 1;
+        d2.seq.fiadores = proximoCodigo(d2, "fiadores");
         d2.fiadores.push({
           id: d2.seq.fiadores,
           contrato_id: c.id,
@@ -4869,8 +4870,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       d2.atualizado_por = usuario;
     }
   }
+  function proximoCodigo(d2, tabela) {
+    const lista3 = d2[tabela] || [];
+    const seguinte = Number(d2.seq[tabela]) > 0 ? Number(d2.seq[tabela]) + 1 : 0;
+    if (seguinte && !lista3.some((r) => r.id === seguinte)) return seguinte;
+    let maior = Number(d2.seq[tabela]) || 0;
+    for (const r of lista3) if (r.id > maior) maior = r.id;
+    return maior + 1;
+  }
   function inserir(d2, tabela, dados, usuario, descricao, { historico = true } = {}) {
-    d2.seq[tabela] = (d2.seq[tabela] || Math.max(0, ...d2[tabela].map((r2) => r2.id))) + 1;
+    d2.seq[tabela] = proximoCodigo(d2, tabela);
     const r = { id: d2.seq[tabela], ...dados };
     d2[tabela].push(r);
     if (historico) registrar(d2, usuario, "Inclusão", tabela, r.id, descricao, visivel(dados), vinculos(d2, tabela, r));
@@ -6545,6 +6554,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function excluirContrato(d2, contratoId, usuario, descricao) {
     const c = buscar(d2, "contratos", contratoId);
     if (!c) return;
+    for (const s of (d2.seguros || []).filter((x) => x.contrato_id === c.id && x.herdado_de && buscar(d2, "contratos", x.herdado_de))) {
+      atualizar(d2, "seguros", s.id, { contrato_id: s.herdado_de, herdado_de: null }, usuario, `Seguro volta para o contrato anterior (${c.inquilino_nome} excluído)`);
+    }
     for (const t of Object.keys(TABELAS)) {
       if (FICAM_SEM_O_CONTRATO.has(t) || !Array.isArray(d2[t])) continue;
       d2[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d2, t, x.id, usuario));
@@ -9130,7 +9142,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       n += 1;
       if (!soConferir) excluir(d2, "alertas_desligados", x.id, usuario, `Alerta "${x.tipo}" desligado: o inquilino ou imóvel não existe mais`);
     }
+    for (const { m, campos } of vinculosBancoOrfaos(d2)) {
+      n += 1;
+      if (!soConferir) atualizar(d2, "movimentacoes_banco", m.id, campos, usuario, `Movimentação de ${dataBr(m.data)} (${reais(m.valor)}): o destino foi excluído, volta a ficar sem destino`);
+    }
     return n;
+  }
+  function vinculosBancoOrfaos(d2) {
+    const ids = Object.fromEntries(Object.values(DESTINOS_MOVIMENTACAO).map(([, t]) => [t, new Set((d2[t] || []).map((x) => x.id))]));
+    const out = [];
+    for (const m of d2.movimentacoes_banco || []) {
+      const campos = {};
+      for (const [classe, [campo2, t]] of Object.entries(DESTINOS_MOVIMENTACAO)) {
+        if (!m[campo2] || ids[t].has(m[campo2])) continue;
+        campos[campo2] = null;
+        if (campo2 === "iptu_id") campos.iptu_parcela = null;
+        if (m.classificacao === classe) campos.classificacao = null;
+      }
+      if (Object.keys(campos).length) out.push({ m, campos });
+    }
+    return out;
   }
   function alertaReajuste(d2, c, hoje3) {
     const r = reajustePendente(d2, c, hoje3, regra("antecedencia_reajuste"));
@@ -10032,7 +10063,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, corta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -10529,6 +10560,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       correcaoDoReajuste = (d2, c, comp, lista3 = correcoesDo(d2, c.id)) => lista3.find((x) => x.data_vigencia >= `${somarMeses(comp, -3)}-01` && x.data_vigencia <= `${somarMeses(comp, 1)}-31`) || lista3.find((x) => x.indice === "Negociado" && x.data_vigencia >= `${comp}-01` && x.data_vigencia < `${somarMeses(comp, 12)}-01`) || null;
       cartaDoReajuste = (d2, c, comp, cartas = d2.cartas_reajuste) => cartas.find((x) => x.contrato_id === c.id && x.competencia === comp) || null;
       CARTA_COM_BOLETO_CORRIGIDO_DESDE = "2026-11";
+      DESTINOS_MOVIMENTACAO = { conta_imovel: ["despesa_id", "despesas"], boleto: ["cobranca_id", "cobrancas"], iptu: ["iptu_id", "iptus"], imposto: ["guia_imposto_id", "guias_impostos"], reforma: ["reforma_id", "reformas"] };
       DIAS_VERMELHO = 5;
       contratoEncerrado = (d2, c) => c.ativo === false || !!encerramentoDo(d2, c.id);
       REGUA_COBRANCA = [
@@ -11217,6 +11249,7 @@ ${xref}
   __export(armazenamento_exports, {
     ARQUIVO_BANCO: () => ARQUIVO_BANCO,
     ERRO_TIPO_ARQUIVO: () => ERRO_TIPO_ARQUIVO,
+    MANTER_ANTES_IMPORTACAO: () => MANTER_ANTES_IMPORTACAO,
     MODELO_FATURA: () => MODELO_FATURA,
     PASTA_ARQUIVOS: () => PASTA_ARQUIVOS,
     PASTA_BACKUPS: () => PASTA_BACKUPS,
@@ -11372,9 +11405,21 @@ ${xref}
     const ponto = nome.lastIndexOf(".");
     const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ""];
     let final = nome;
-    for (let n = 2; await arquivoExiste(dir, final); n += 1) final = `${base} (${n})${ext}`;
-    await escreverTexto(dir, final, arquivo);
-    return final;
+    for (let n = 2; ; n += 1) {
+      if (!await arquivoExiste(dir, final)) {
+        if (!dir.gravarSeNovo) {
+          await escreverTexto(dir, final, arquivo);
+          return final;
+        }
+        try {
+          await dir.gravarSeNovo(final, arquivo);
+          return final;
+        } catch (e) {
+          if (e?.status !== 412) throw e;
+        }
+      }
+      final = `${base} (${n})${ext}`;
+    }
   }
   async function abrirArquivo(dir, nome) {
     return (await dir.getFileHandle(nome)).getFile();
@@ -11576,12 +11621,22 @@ ${xref}
     }
     const totalBytes = lista3.reduce((t, x) => t + x.tamanho, 0);
     let bytes2 = 0;
+    const naoIncluidos = [];
     for (const [i, x] of lista3.entries()) {
       aoAndar({ fase: "arquivos", feitos: i, total: lista3.length, bytes: bytes2, totalBytes, nome: x.caminho });
-      const arquivo = await x.h.getFile();
+      let arquivo;
+      try {
+        arquivo = await x.h.getFile();
+      } catch (e) {
+        naoIncluidos.push(`${x.caminho}: ${e?.message || e}`);
+        continue;
+      }
       zip.file(x.caminho, arquivo);
       bytes2 += x.tamanho || arquivo.size || 0;
     }
+    if (naoIncluidos.length) zip.file("NAO-INCLUIDOS.txt", `Arquivos que não entraram neste ZIP (não deu para ler):\r
+${naoIncluidos.join("\r\n")}\r
+`);
     aoAndar({ fase: "compactando", pct: 0 });
     return zip.generateAsync({ type: "blob", compression: "DEFLATE" }, (m) => aoAndar({ fase: "compactando", pct: m.percent }));
   }
@@ -11608,17 +11663,39 @@ ${xref}
       novos.usuarios = dadosAtuais.usuarios;
       novos.seq.usuarios = dadosAtuais.seq.usuarios;
     }
+    let guarda = null;
     if (dadosAtuais) {
       const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
       const carimbo2 = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
       await escreverTexto(dir, `antes-da-importacao-${carimbo2}.json`, JSON.stringify(dadosAtuais));
+      guarda = { dir, nome: `antes-da-importacao-${carimbo2}` };
     }
     for (const { entrada, pastas, nome } of entradas) {
       const dir = await subpasta(pasta, pastas);
+      if (guarda && await arquivoExiste(dir, nome)) {
+        await escreverTexto(await subpasta(guarda.dir, [guarda.nome, ...pastas]), nome, await lerConteudo(await dir.getFileHandle(nome)));
+      }
       await escreverTexto(dir, nome, await entrada.async("blob"));
     }
     await gravarBanco(pasta, novos);
+    if (guarda) await faxinaAntesDaImportacao(guarda.dir);
     return novos;
+  }
+  async function faxinaAntesDaImportacao(dir) {
+    const nomes = /* @__PURE__ */ new Set();
+    for await (const [n] of dir.entries()) {
+      const m = n.match(/^(antes-da-importacao-[0-9TZ-]+?)(\.json)?$/);
+      if (m) nomes.add(m[1]);
+    }
+    const velhos = [...nomes].sort().slice(0, Math.max(0, nomes.size - MANTER_ANTES_IMPORTACAO));
+    for (const v of velhos) {
+      for (const [nome, recursive] of [[`${v}.json`, false], [v, true]]) {
+        try {
+          await dir.removeEntry(nome, { recursive });
+        } catch {
+        }
+      }
+    }
   }
   async function semArquivos(dir) {
     for await (const [, h] of dir.entries()) {
@@ -11642,7 +11719,7 @@ ${xref}
     for await (const [nome, h] of dir.entries()) if (h.kind === "directory") nomes.push(nome);
     return nomes;
   }
-  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR;
+  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR, MANTER_ANTES_IMPORTACAO;
   var init_armazenamento = __esm({
     "docs/js/armazenamento.js"() {
       init_calculos();
@@ -11670,6 +11747,7 @@ ${xref}
       EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
       ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.";
       TIPOS_ABRIR = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
+      MANTER_ANTES_IMPORTACAO = 5;
     }
   });
 
@@ -12564,7 +12642,7 @@ ${xref}
       peso += pesos[i];
     }
     if (atual.length) partes.push(atual);
-    return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em }));
+    return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...l.base !== void 0 ? { base: l.base } : {} }));
   }
   function juntarFaixas(a = {}, b = {}) {
     const r = { ...a };
@@ -12674,6 +12752,12 @@ ${xref}
     return {
       ler: (k) => op("readonly", (s) => s.get(k)),
       gravar: (k, v) => op("readwrite", (s) => s.put(v, k)),
+      /** Várias chaves numa transação só: grava todas ou nenhuma. */
+      gravarVarios: (obj) => op("readwrite", (s) => {
+        let r;
+        for (const [k, v] of Object.entries(obj)) r = s.put(v, k);
+        return r;
+      }),
       apagar: (k) => op("readwrite", (s) => s.delete(k))
     };
   }
@@ -13054,7 +13138,7 @@ ${xref}
         }
         novoLote(ops) {
           this.n += 1;
-          return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, "0")}`, ops, em: (/* @__PURE__ */ new Date()).toISOString() };
+          return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, "0")}`, ops, em: (/* @__PURE__ */ new Date()).toISOString(), base: seqDe(this.base) };
         }
         /**
          * Outra aba deste aparelho pode ter mexido na fila ou nas faixas: relê (sempre dentro da trava). A vista só é refeita se a
@@ -13092,6 +13176,10 @@ ${xref}
         }
         /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
         async gravarFila() {
+          if (this.guardar.gravarVarios) {
+            await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas });
+            return;
+          }
           await this.guardar.gravar("n", this.n);
           await this.guardar.gravar("pendentes", this.pendentes);
           await this.guardar.gravar("faixas", this.faixas);
@@ -13365,8 +13453,8 @@ ${xref}
           this.aoMudar(false);
         }
         /** Primeira carga (nuvem vazia): o banco inteiro vai de uma vez. */
-        async importar(d2, { substituir = false } = {}) {
-          await this.api("POST", "importar", { dados: d2, substituir });
+        async importar(d2, { substituir = false, manterUsuarios = false } = {}) {
+          await this.api("POST", "importar", { dados: d2, substituir, ...manterUsuarios ? { manterUsuarios: true } : {} });
           await this.trava(async () => {
             this.pendentes = [];
             await this.guardar.gravar("pendentes", []);
@@ -13636,9 +13724,13 @@ ${xref}
           }
         }
         /** Grava um arquivo; sem internet, guarda no aparelho e sobe depois (`enviarFila`). */
-        async gravar(partes, blob) {
+        async gravar(partes, blob, { seNovo = false } = {}) {
           try {
-            await this.pedir("PUT", codificar(partes), { corpo: blob });
+            try {
+              await this.pedir("PUT", codificar(partes), { corpo: blob, ...seNovo ? { cabecalhos: { "If-None-Match": "*" } } : {} });
+            } catch (e) {
+              if (!(seNovo && e.status === 412 && await this.mesmoNaNuvem(partes, blob))) throw e;
+            }
             this.anotarNaLista(partes, blob.size);
             this.aoMudar?.();
           } catch (e) {
@@ -13707,6 +13799,12 @@ ${xref}
             for (const f of [...fila]) {
               const blob = await this.guardar.ler(`anexo:${f.id}`);
               let recusado = false;
+              if (!blob && !(await this.mudarFila(() => null)).some((x) => x.id === f.id)) continue;
+              if (!blob) {
+                recusado = true;
+                await this.guardarNaoEnviado(f, "o arquivo sumiu deste aparelho antes de subir (dados do navegador limpos?): anexe de novo");
+                this.avisos.push(`O anexo "${f.partes.at(-1)}" sumiu deste aparelho antes de ir para a nuvem: anexe de novo. Veja em Conflitos da nuvem.`);
+              }
               try {
                 if (blob) await this.pedir("PUT", codificar(f.partes), { corpo: blob, cabecalhos: { "If-None-Match": "*" } });
               } catch (e) {
@@ -13797,6 +13895,10 @@ ${xref}
         async conteudo() {
           if (!this.partes.length) return { pastas: new Set(RAIZES), arquivos: /* @__PURE__ */ new Map() };
           return this.cliente.lista(this.partes);
+        }
+        /** Grava só se o nome ainda não existe na nuvem (salvarArquivo): erro 412 se outro aparelho já gravou esse nome (item 21). */
+        async gravarSeNovo(nome, blob) {
+          await this.cliente.gravar([...this.partes, nome], blob, { seNovo: true });
         }
         async getDirectoryHandle(nome, { create = false } = {}) {
           const filho = [...this.partes, nome];
@@ -14372,6 +14474,7 @@ ${xref}
   }
   async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {
   }, substituir = false }) {
+    if (substituir && sinc.pendentesQtd?.()) throw Object.assign(new Error(`Ainda há ${sinc.pendentesQtd()} mudança(s) deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de substituir os dados.`), { esperado: true });
     const dados = await lerBanco(pasta);
     if (!dados) throw Object.assign(new Error(`A pasta escolhida não tem o arquivo ${ARQUIVO_BANCO}. Escolha a pasta dos dados de sempre.`), { esperado: true });
     const arquivos = [];
@@ -15787,6 +15890,17 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         if (!chave) return void 0;
         return cru.gravar(k, await cifrar2(chave, v));
       },
+      /** Várias chaves de uma vez (fila, contador e faixas): cifra todas e grava numa transação só, se a cópia deixa. */
+      ...cru.gravarVarios ? {
+        async gravarVarios(obj) {
+          const chave = obterChave();
+          if (!chave) return void 0;
+          if (obj.pendentes !== void 0) await cru.gravar("aguardando-dados", (obj.pendentes || []).length);
+          const cifrados = {};
+          for (const [k, v] of Object.entries(obj)) cifrados[k] = ABERTAS.includes(k) ? v : await cifrar2(chave, v);
+          return cru.gravarVarios(cifrados);
+        }
+      } : {},
       apagar: (k) => cru.apagar?.(k)
     };
   }
@@ -21425,17 +21539,15 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const u = ultimoEnvio(chave, alvo);
     return `${botao("abrirEmail", texto3, { chave, ...alvo }, "secundario mini")}${u ? ` <span class="suave" title="${esc(u.como)}">${u.como === "enviado" ? "enviado" : "aberto"} em ${dataBr(u.data)}</span>` : ""}`;
   }
-  var registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => inserir(db, "envios_email", {
-    data: hojeIso(),
-    chave,
-    contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
-    ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
-    aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
-    para,
-    assunto,
-    como,
-    gmail_id: id || null
-  }, login(), `E-mail "${assunto}" ${como === "enviado" ? "enviado" : "aberto no Gmail"} para ${para || "(sem destinatário)"}`));
+  var registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => {
+    const dados = { data: hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null };
+    if (como !== "enviado") {
+      const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id);
+      if (ja) return ja;
+      return inserir(db, "envios_email", dados, login(), null, { historico: false });
+    }
+    return inserir(db, "envios_email", dados, login(), `E-mail "${assunto}" enviado para ${para || "(sem destinatário)"}`);
+  });
   async function copiar2(texto3) {
     try {
       await navigator.clipboard.writeText(texto3);
@@ -27237,8 +27349,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       if (!ok) return;
       const dados = JSON.parse(await (await abrirArquivo(await pastaBackups(), nome)).text());
       if (!dados || dados.formato !== "imoveis-v1" || !Array.isArray(dados.usuarios)) throw new Error("Este backup não está no formato esperado.");
-      E.d = await E.nuvem.importar(dados, { substituir: true });
+      E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });
       await reabrirSessao();
+      await alterar((db) => registrar(db, login(), "Alteração", null, null, `Dados voltaram a ser como estavam ${momento} (backup restaurado por ${login()})`));
       aviso(`Dados voltaram a ser como estavam ${momento}. Os outros aparelhos recebem a versão nova sozinhos.`);
       ir("#/");
     },
@@ -27618,16 +27731,36 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (String((segunda.digitado || [""])[0]).trim().toUpperCase() !== "APAGAR") throw new ErroUsuario("Nada foi excluído: para confirmar, é preciso digitar APAGAR.");
     return true;
   }
+  function motivoNaoExcluirImovel(db, r) {
+    if (db.contratos.some((c) => c.imovel_id === r.id)) return "Este imóvel tem inquilinos. Exclua os contratos antes.";
+    if ((db.ganhos_airbnb || []).some((g) => g.imovel_id === r.id)) return "Este imóvel tem ganhos do Airbnb lançados. Exclua os ganhos antes.";
+    if ((db.avulsas || []).some((a) => a.imovel_id === r.id)) return "Este imóvel tem NFs avulsas. Exclua as NFs avulsas antes.";
+    const doImovel = (t) => (db[t] || []).filter((x) => x.imovel_id === r.id);
+    const despesas = new Set(doImovel("despesas").map((x) => x.id));
+    const iptus = new Set(doImovel("iptus").map((x) => x.id));
+    const reformas = new Set(doImovel("reformas").map((x) => x.id));
+    const ligadas = (db.movimentacoes_banco || []).some((m) => m.imovel_id === r.id || despesas.has(m.despesa_id) || iptus.has(m.iptu_id) || reformas.has(m.reforma_id)) || doImovel("despesas").some((x) => x.movimentacao_id || x.pagamento_banco_id) || (db.pagamentos_banco || []).some((p2) => p2.origem && (p2.origem.tipo === "iptu" && iptus.has(Number(p2.origem.id)) || p2.origem.tipo === "despesa" && despesas.has(Number(p2.origem.id))) && !["cancelado", "erro"].includes(p2.situacao));
+    return ligadas ? "Este imóvel tem lançamentos ligados ao extrato ou a pagamentos do banco: desfaça o destino das movimentações na tela Banco antes." : null;
+  }
   var TABELAS_EXCLUSAO = {
-    imoveis: { admin: true, checar: (db, r) => db.contratos.some((c) => c.imovel_id === r.id) ? "Este imóvel tem inquilinos. Exclua os contratos antes." : null, voltar: () => "#/imoveis" },
+    imoveis: { admin: true, checar: (db, r) => motivoNaoExcluirImovel(db, r), voltar: () => "#/imoveis" },
     contratos: { admin: true, checar: (db, r) => db.cobrancas.some((cb) => cb.contrato_id === r.id && faturasDe(db, "cobranca", cb.id, false).length) ? "Este contrato tem NFs emitidas e não pode ser excluído." : null, voltar: (r) => r.imovel_id ? `#/imovel/${r.imovel_id}` : "#/inquilinos" },
     cobrancas: { checar: (db, r) => emAcordo(r) || ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : faturasDe(db, "cobranca", r.id, false).length ? "Este boleto tem NF. Desfaça o pagamento antes." : r.banco && r.banco.situacao === "emitido" ? "Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir." : null, voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
     correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
-    iptus: { recalcular: (db, r) => (cb) => (buscar(db, "contratos", cb.contrato_id) || {}).imovel_id === r.imovel_id },
+    iptus: {
+      // parcela paga pelo extrato ou pelo C6: a movimentação ficaria apontando para um IPTU apagado (mutirão 3000, item 19)
+      checar: (db, r) => (db.movimentacoes_banco || []).some((m) => m.iptu_id === r.id) || [0, ...Object.keys(r.pagas || {})].some((n) => iptuPagoPeloBanco(db, r.id, n)) ? "Este IPTU tem parcela paga pelo banco: desfaça o destino da movimentação na tela Banco antes." : null,
+      recalcular: (db, r) => (cb) => (buscar(db, "contratos", cb.contrato_id) || {}).imovel_id === r.imovel_id
+    },
     seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
     avulsas: { checar: (db, r) => faturasDe(db, "avulsa", r.id).length ? "Esta NF avulsa já tem número." : null },
-    // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados
-    encerramentos: { admin: true, depois: (db, reg) => liberarBoletosDaSaida(db, reg.id, login()) },
+    // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados; com a devolução do saldo e da
+    // caução já registrada, é barrado (desfazer apagaria o registro e o comprovante: item 46)
+    encerramentos: {
+      admin: true,
+      checar: (db, r) => r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes de desfazer o cálculo final.` : null,
+      depois: (db, reg) => liberarBoletosDaSaida(db, reg.id, login())
+    },
     vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
     aditivos: { depois: (db, r) => marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
     fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
@@ -30928,12 +31061,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   var soSessaoNoDisco = (disco) => disco.revisao_so_sessao === disco.revisao;
   async function alterarAgora(fn, { soSessao = false } = {}) {
     if (E.nuvem) {
-      const resultado2 = await E.nuvem.alterar(fn);
+      const resultado = await E.nuvem.alterar(fn);
       E.d = E.nuvem.atual();
       espelharSeguro();
       atualizarFaixa();
-      return resultado2;
+      return resultado;
     }
+    return travaDaPasta(() => alterarNaPasta(fn, soSessao));
+  }
+  var travaDaPasta = (fn) => globalThis.navigator?.locks ? navigator.locks.request("imoveis-pasta", fn) : fn();
+  async function alterarNaPasta(fn, soSessao) {
     const disco = await lerBanco(E.pasta);
     if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
     if (disco && E.d && disco.revisao !== E.d.revisao) {
@@ -30941,14 +31078,15 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       E.d = disco;
       if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || "outra pessoa"} e recarregados antes de gravar.`, "info");
     }
-    const copia2 = copiar(E.d || disco);
+    const antes = E.d || disco;
+    const copia2 = copiar(antes);
     const resultado = fn(copia2);
     copia2.revisao = (copia2.revisao || 0) + 1;
     copia2.revisao_so_sessao = soSessao ? copia2.revisao : null;
     await gravarBanco(E.pasta, copia2);
     E.d = copia2;
     espelharSeguro();
-    backupDoDia(copia2);
+    backupDoDia(antes);
     atualizarFaixa();
     return resultado;
   }
