@@ -4,6 +4,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as N from '../docs/js/nuvem.js';
 import * as R from '../docs/js/regras.js';
+import { DatabaseSync } from 'node:sqlite';
+import { Cofre } from '../nuvem/cofre.mjs';
+
+function sqlFalso() {
+  const db = new DatabaseSync(':memory:');
+  return {
+    db,
+    exec(q, ...p) {
+      if (!p.length && q.trim().split(';').filter((x) => x.trim()).length > 1) { db.exec(q); return { toArray: () => [] }; }
+      const l = db.prepare(q).all(...p).map((x) => ({ ...x }));
+      return { toArray: () => l };
+    },
+  };
+}
 
 /** Aparelho com uma "nuvem" que responde o que o teste quiser a cada lote. */
 function aparelho(responder) {
@@ -86,6 +100,31 @@ test('desempenho 11: a gravação copia só as tabelas que usa; as outras contin
   const ops = N.diferencas(d, c);
   assert.deepEqual(ops.map((o) => o.op === 'raiz' ? `raiz:${o.campo}` : `${o.op}:${o.tabela || ''}`).sort(), ['alterar:imoveis', 'historico:', 'raiz:config_banco', 'raiz:listas']);
   assert.equal(JSON.stringify(N.copiarSobDemanda(d)), JSON.stringify(d), 'ler tudo dá o mesmo que o original');
+});
+
+test('item 33: a fila da nuvem guarda e manda só os campos mudados; aparelho na versão de antes recebe o registro inteiro', () => {
+  const sql = sqlFalso();
+  const c = new Cofre(sql, (fn) => { sql.db.exec('BEGIN'); try { const r = fn(); sql.db.exec('COMMIT'); return r; } catch (e) { sql.db.exec('ROLLBACK'); throw e; } }, () => new Date('2026-11-17T10:00:00Z'));
+  const DONO = 'dono@exemplo.com.br';
+  const textoGrande = 'Cláusula '.repeat(5000); // modelo de contrato de ~45 KB
+  c.importar({ formato: 'imoveis-v1', usuarios: [{ id: 1, login: DONO, papel: 'admin', ativo: true }], historico: [],
+    modelos_contrato: [{ id: 1, nome: 'Residencial', texto: textoGrande, obs: 'velha' }], imoveis: [{ id: 2, nome: 'Apto' }] }, DONO);
+  const desde = c.ultimoSeq();
+  c.aplicar({ id: 'ap-r3-0001', ops: [{ op: 'alterar', tabela: 'modelos_contrato', id: 1, campos: { nome: { antes: 'Residencial', depois: 'Residencial 2026' }, obs: { antes: 'velha' } } }] }, DONO);
+  c.aplicar({ id: 'ap-r3-0002', ops: [{ op: 'alterar', tabela: 'imoveis', id: 2, campos: { nome: { antes: 'Apto', depois: 'Apto 1' } } }, { op: 'excluir', tabela: 'imoveis', id: 2, base: { id: 2, nome: 'Apto 1' } }] }, DONO);
+  const linha = c.q("SELECT dados FROM log WHERE tipo = 'campos' AND tabela = 'modelos_contrato'")[0];
+  assert.ok(linha.dados.length < 200, `a fila guarda só o que mudou (${linha.dados.length} caracteres, não ~45 mil)`);
+  // aparelho novo (formato 2): só os campos, e ele aplica sobre o que já tem
+  const novo = c.mudancas(desde, null, 2000, 2).mudancas;
+  assert.deepEqual(novo[0], { ...novo[0], tipo: 'campos', dados: { campos: { nome: 'Residencial 2026' }, apagados: ['obs'] } });
+  const d = { modelos_contrato: [{ id: 1, nome: 'Residencial', texto: textoGrande, obs: 'velha' }], imoveis: [{ id: 2, nome: 'Apto' }] };
+  for (const m of novo) N.aplicarMudanca(d, m);
+  assert.deepEqual(d.modelos_contrato, [{ id: 1, nome: 'Residencial 2026', texto: textoGrande }]);
+  assert.deepEqual(d.imoveis, []);
+  // aparelho na versão de antes: o registro inteiro como está agora; o que foi apagado depois não vem (a exclusão vem)
+  const antigo = c.mudancas(desde).mudancas;
+  assert.deepEqual(antigo.map((m) => m.tipo), ['registro', 'exclusao']);
+  assert.deepEqual(antigo[0].dados, { id: 1, nome: 'Residencial 2026', texto: textoGrande });
 });
 
 test('item 44: a mudança recusada porque o registro veio de uma gravação também recusada aparece ligada a ela', async () => {

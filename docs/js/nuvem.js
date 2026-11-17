@@ -176,6 +176,14 @@ export function aplicarMudanca(d, m, tabelas = null) {
     const t = (d[m.tabela] ||= []);
     const i = t.findIndex((r) => r.id === m.id);
     if (i >= 0) t[i] = m.dados; else t.push(m.dados);
+  } else if (m.tipo === 'campos') {
+    // só os campos que mudaram (item 33): o registro é trocado por um novo com eles (o de antes não é mexido no lugar)
+    const t = d[m.tabela] || [];
+    const i = t.findIndex((r) => r.id === m.id);
+    if (i < 0) return d; // (quem chama confere antes: sem o registro, baixa tudo de novo)
+    const novo = { ...t[i], ...(m.dados?.campos || {}) };
+    for (const k of m.dados?.apagados || []) delete novo[k];
+    t[i] = novo;
   } else if (m.tipo === 'exclusao') d[m.tabela] = (d[m.tabela] || []).filter((r) => r.id !== m.id);
   else if (m.tipo === 'raiz') {
     const campo = m.dados?.campo;
@@ -919,17 +927,20 @@ export class Sincronia {
     const tabelas = this.tabelasConhecidas({ comTela: false });
     for (let volta = 0; volta < 1000; volta += 1) {
       const desde = seqDe(this.base);
-      const r = await this.api('GET', `mudancas?desde=${desde}`);
+      // formato 2: alteração vem só com os campos que mudaram (item 33); a nuvem manda o registro inteiro a quem não pede
+      const r = await this.api('GET', `mudancas?desde=${desde}&formato=2`);
       // no meio do pedido, a base desta aba foi trocada pela mais nova que outra aba gravou (releBase): o que veio já está nela
       // (aplicar de novo repetiria o histórico); pede outra vez a partir dela
       if (seqDe(this.base) !== desde) continue;
       if (r.refazer) { await this.baixarTudoAgora(); externo = true; mudou = false; break; } // baixarTudo já gravou a cópia
       // a base muda aqui: a vista deixa de valer já (uma gravação no meio deste puxar não pode virar a vista)
       if (r.mudancas.length || Number(r.seq) !== desde) { mudou = true; this.invalidar(); }
+      // alteração de um registro que esta cópia não tem (não deveria acontecer: a fila vem em ordem): baixa tudo de novo
+      if (r.mudancas.some((m) => m.tipo === 'campos' && !(this.base[m.tabela] || []).some((x) => x.id === m.id))) { await this.baixarTudoAgora(); externo = true; mudou = false; break; }
       for (const m of r.mudancas) {
         aplicarMudanca(this.base, m, tabelas);
         if (m.tipo === 'historico') { if (historicoMeu > 0) historicoMeu -= 1; else externo = true; }
-        else if (m.tipo === 'registro' || m.tipo === 'exclusao') { if (!meus.chaves.has(`${m.tabela}:${m.id}`)) externo = true; }
+        else if (m.tipo === 'registro' || m.tipo === 'campos' || m.tipo === 'exclusao') { if (!meus.chaves.has(`${m.tabela}:${m.id}`)) externo = true; }
         else if (m.tipo === 'raiz') { if (!meus.chaves.has(`raiz:${m.dados?.campo}`)) externo = true; }
         else externo = true; // conflito, escolha, nova carga
       }

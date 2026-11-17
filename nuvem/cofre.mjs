@@ -195,6 +195,15 @@ const codigo = (id) => {
   if (!Number.isSafeInteger(id) || id < 1) throw new ErroCofre(400, 'Código do registro inválido.');
   return id;
 };
+/** Tabelas cuja alteração vai inteira na fila (as outras vão só com os campos que mudaram, item 33). */
+const LOG_INTEIRO = new Set(['usuarios', 'fichas', 'envios_email']);
+/** Só o que mudou de um registro: { campos: { nome: valor novo }, apagados: [nome] } (linha "campos" da fila, item 33). */
+export function camposMudados(antes, depois) {
+  const campos = {}; const apagados = [];
+  for (const [k, v] of Object.entries(depois)) if (JSON.stringify(v) !== JSON.stringify(antes[k])) campos[k] = v;
+  for (const k of Object.keys(antes)) if (!(k in depois)) apagados.push(k);
+  return apagados.length ? { campos, apagados } : { campos };
+}
 const texto = (v) => {
   const t = JSON.stringify(v ?? null);
   if (t.length > MAX_REGISTRO) throw new ErroCofre(413, 'Registro grande demais.');
@@ -406,7 +415,7 @@ export class Cofre {
   }
 
   /** O que mudou desde `desde` (para o aparelho se atualizar). Parado demais: { refazer: true } e ele baixa tudo. */
-  mudancas(desde, quem = null, limite = 2000) {
+  mudancas(desde, quem = null, limite = 2000, formato = 1) {
     const d = Number(desde);
     if (!Number.isSafeInteger(d) || d < 0) throw new ErroCofre(400, 'Parâmetro "desde" inválido.');
     const menor = Number(this.q('SELECT MIN(seq) AS m FROM log')[0]?.m || 0);
@@ -414,14 +423,28 @@ export class Cofre {
     // carga, substituição ou limpeza do histórico (LGPD: 'refazer'): o aparelho baixa tudo de novo e a cópia velha dele sai
     if (d > ultimo || (menor && d < menor - 1) || this.q("SELECT 1 AS x FROM log WHERE seq > ? AND tipo IN ('importacao', 'refazer') LIMIT 1", d).length) return { refazer: true, seq: ultimo };
     const linhas = this.q('SELECT seq, tipo, tabela, id, dados, por, em FROM log WHERE seq > ? ORDER BY seq LIMIT ?', d, limite);
+    // aparelho na versão de antes (sem `formato=2`) não conhece "campos": recebe o registro como está agora (ou nada, se ele
+    // foi apagado depois: a exclusão vem mais adiante na fila)
+    const atuais = new Map();
+    const registroAgora = (tabela, id) => {
+      const k = `${tabela}:${id}`;
+      if (!atuais.has(k)) { const r = this.q('SELECT dados FROM registros WHERE tabela = ? AND id = ?', tabela, id)[0]; atuais.set(k, r ? JSON.parse(r.dados) : null); }
+      return atuais.get(k);
+    };
     return {
       seq: linhas.length ? linhas[linhas.length - 1].seq : d,
       mais: linhas.length === limite,
       mudancas: linhas.map((l) => {
         let dados = l.dados === null ? null : JSON.parse(l.dados);
-        if (l.tipo === 'registro' && l.tabela === 'usuarios') dados = this.usuarioParaAparelho(dados, quem);
-        return { seq: l.seq, tipo: l.tipo, tabela: l.tabela, id: l.id, dados, por: l.por, em: l.em };
-      }),
+        let { tipo } = l;
+        if (tipo === 'campos' && Number(formato) < 2) {
+          dados = registroAgora(l.tabela, l.id);
+          if (!dados) return null;
+          tipo = 'registro';
+        }
+        if (tipo === 'registro' && l.tabela === 'usuarios') dados = this.usuarioParaAparelho(dados, quem);
+        return { seq: l.seq, tipo, tabela: l.tabela, id: l.id, dados, por: l.por, em: l.em };
+      }).filter(Boolean),
       conflitos: this.conflitosAbertos(quem),
       revisao: Number(this.controle('revisao') || 0), atualizado_em: this.controle('atualizado_em'), atualizado_por: this.controle('atualizado_por'),
     };
@@ -656,7 +679,11 @@ export class Cofre {
       if (mudou) {
         if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, dados);
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);
-        this.registrarLog('registro', tabela, id, dados, email);
+        // na fila só os campos que mudaram (item 33 do mutirão 3000: o aparelho já tem o resto; antes ia o registro inteiro, ex.:
+        // o modelo de contrato de 50 KB a cada campo). Vão inteiros: usuários (a cópia deles muda conforme quem pede) e fichas e
+        // e-mails registrados (a faxina dos dados pessoais da ficha, limparRastros, acha nas cópias o que saiu)
+        if (LOG_INTEIRO.has(tabela)) this.registrarLog('registro', tabela, id, dados, email);
+        else this.registrarLog('campos', tabela, id, camposMudados(JSON.parse(atual.dados), dados), email);
       }
       // senha trocada (não o reforço do login, que muda também as voltas): os computadores ligados por esse usuário param
       if (trocouSenha) this.desligarAparelhosDe(id, email);
@@ -895,9 +922,10 @@ export class Cofre {
     const chaveH = (h) => objetoSimples(h) && h.tabela === tabela && Number(h.registro_id) === id;
     let n = 0;
     // 1) as cópias do registro na fila (log) e nos excluídos: os textos que saíram, e a cópia vira a de agora
-    for (const l of this.q("SELECT seq, dados FROM log WHERE tipo = 'registro' AND tabela = ? AND id = ?", tabela, id)) {
-      anotarSaiu(JSON.parse(l.dados || 'null'));
-      this.sql.exec('UPDATE log SET dados = ? WHERE seq = ?', r.dados, l.seq); n += 1;
+    for (const l of this.q("SELECT seq, tipo, dados FROM log WHERE tipo IN ('registro', 'campos') AND tabela = ? AND id = ?", tabela, id)) {
+      const antes = JSON.parse(l.dados || 'null');
+      anotarSaiu(l.tipo === 'campos' ? antes?.campos : antes);
+      this.sql.exec("UPDATE log SET tipo = 'registro', dados = ? WHERE seq = ?", r.dados, l.seq); n += 1;
     }
     for (const x of this.q('SELECT rowid AS rid, dados FROM excluidos WHERE tabela = ? AND id = ?', tabela, id)) { anotarSaiu(JSON.parse(x.dados)); this.sql.exec('DELETE FROM excluidos WHERE rowid = ?', x.rid); n += 1; }
     // 2) as linhas do histórico do registro (na tabela e na fila): saem os campos que o registro não tem mais
@@ -909,11 +937,14 @@ export class Cofre {
     // 3) e-mails registrados para ele: o endereço sai do registro (os aparelhos já tiraram) e de tudo que o guardava
     const emails = ligacao ? this.q(`SELECT id, dados FROM registros WHERE tabela = 'envios_email' AND json_extract(dados, '$.${ligacao}') = ?`, id) : [];
     for (const e of emails) {
-      for (const l of this.q("SELECT dados FROM log WHERE tipo = 'registro' AND tabela = 'envios_email' AND id = ?", e.id)) anotar(JSON.parse(l.dados || 'null')?.para);
+      for (const l of this.q("SELECT tipo, dados FROM log WHERE tipo IN ('registro', 'campos') AND tabela = 'envios_email' AND id = ?", e.id)) {
+        const x = JSON.parse(l.dados || 'null');
+        anotar(l.tipo === 'campos' ? x?.campos?.para : x?.para);
+      }
       for (const x of this.q("SELECT dados FROM excluidos WHERE tabela = 'envios_email' AND id = ?", e.id)) anotar(JSON.parse(x.dados)?.para);
       const reg = JSON.parse(e.dados); anotar(reg.para);
       if (!vazioDe(reg.para)) { reg.para = null; this.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'envios_email' AND id = ?", texto(reg), e.id); }
-      this.sql.exec("UPDATE log SET dados = ? WHERE tipo = 'registro' AND tabela = 'envios_email' AND id = ?", texto(reg), e.id);
+      this.sql.exec("UPDATE log SET tipo = 'registro', dados = ? WHERE tipo IN ('registro', 'campos') AND tabela = 'envios_email' AND id = ?", texto(reg), e.id);
     }
     const idsEmail = new Set(emails.map((e) => e.id));
     // textos que saíram: tirados das descrições e detalhes das linhas do histórico do registro e dos e-mails dele
@@ -1217,7 +1248,7 @@ export class CofreDO {
         return new Response(texto, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
       }
       else if (rota === '/acessos' && request.method === 'GET') r = c.listarAcessos(Object.fromEntries(url.searchParams), email);
-      else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
+      else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'), undefined, Number(url.searchParams.get('formato')) || 1);
       else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
       else if (rota === '/chave-backup' && request.method === 'POST') r = await c.ligarChaveDoBackup(await corpo(), email);
