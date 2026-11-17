@@ -23,6 +23,23 @@ export const NOME_VBS_PASTA = 'abrir-pasta.vbs';
  */
 export const PROTOCOLO = 'imoveis-pasta';
 export const CHAVE_PROTOCOLO = `HKCU\\Software\\Classes\\${PROTOCOLO}`;
+/**
+ * Botão "Desinstalar o programa deste computador" do sistema (pedido do dono de 17/11): o link `imoveis-desinstalar:confirmar`
+ * chama desinstalar.vbs, que roda o programa com --desinstalar e nada mais. Quem desinstala é a pessoa: o programa sempre
+ * pergunta antes numa janela do Windows (Sim/Não), então nenhum site consegue desinstalar sem um clique em Sim.
+ */
+export const PROTOCOLO_DESINSTALAR = 'imoveis-desinstalar';
+export const CHAVE_PROTOCOLO_DESINSTALAR = `HKCU\\Software\\Classes\\${PROTOCOLO_DESINSTALAR}`;
+export const NOME_VBS_DESINSTALAR = 'desinstalar.vbs';
+/** A janela de pergunta do Windows (MsgBox), usada só pelo próprio programa ao desinstalar. */
+export const NOME_VBS_JANELA = 'janela.vbs';
+/** Configurações do Windows → Aplicativos → Aplicativos instalados: registro por usuário (sem administrador). */
+export const CHAVE_DESINSTALAR = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AdministracaoDeImoveis';
+export const NOME_NO_WINDOWS = 'Administração de Imóveis';
+/** O que o programa grava na pasta `programa` (ao desinstalar, só isto é apagado; a pasta sai se ficar vazia). */
+export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA];
+export const TEXTO_CONFIRMAR = `Desinstalar ${NOME_NO_WINDOWS}?|As cópias e a pasta de arquivos continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.`;
+export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta do backup seguro e a pasta Arquivos dos imoveis continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.';
 /** As mesmas tarefas (e os mesmos nomes) de instalar-tarefa.cmd: criar de novo troca as antigas, que chamavam o Node. */
 export const TAREFAS = [
   { nome: 'Imoveis - atualizador da versao PC', quando: ['/SC', 'DAILY', '/ST', '20:00'], args: '--atualizar', texto: 'todo dia às 20h: dados, versão PC e arquivos' },
@@ -64,50 +81,193 @@ export const textoVbsPasta = () => [
   '',
 ].join('\r\n');
 
+/**
+ * O que o link imoveis-desinstalar: chama: roda o programa com --desinstalar (com a janela, para a pessoa ver o andamento) e
+ * nada mais: não repassa os argumentos que o Windows possa acrescentar. Quem pergunta "Desinstalar?" é o próprio programa.
+ */
+export const textoVbsDesinstalar = () => [
+  "' Gerado pelo programa Administracao de Imoveis: botao \"Desinstalar o programa deste computador\" do sistema (endereco imoveis-desinstalar:).",
+  "' Nao repassa nada do endereco: o programa sempre pergunta antes (Sim/Nao) numa janela do Windows.",
+  'Dim pasta',
+  'pasta = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)',
+  `CreateObject("WScript.Shell").Run """" & pasta & "\\${NOME_EXE}"" --desinstalar", 1, False`,
+  '',
+].join('\r\n');
+
+/**
+ * A janela do Windows (MsgBox) que o programa abre ao desinstalar: texto (| = quebra de linha), botões e título vêm do
+ * programa; devolve o botão clicado (1 = OK, 6 = Sim, 7 = Não). Não fica registrada em lugar nenhum: só o programa a chama.
+ */
+export const textoVbsJanela = () => [
+  "' Gerado pelo programa Administracao de Imoveis: janela de pergunta do Windows (usada pelo programa ao desinstalar).",
+  'If WScript.Arguments.Count < 3 Then WScript.Quit 0',
+  'WScript.Quit MsgBox(Replace(WScript.Arguments(0), "|", vbCrLf), CInt(WScript.Arguments(1)), WScript.Arguments(2))',
+  '',
+].join('\r\n');
+
 const pastaWindows = (env = process.env) => env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows';
 /** wscript.exe pelo caminho inteiro (o Windows não procura o programa na pasta de quem chamou o link). */
 const wscript = (env = process.env) => path.win32.join(pastaWindows(env), 'System32', 'wscript.exe');
 
-/** Os argumentos do reg.exe para registrar o protocolo imoveis-pasta: (por usuário, sem administrador). `pasta` = a do .exe. */
-export function comandosDoProtocolo(pasta, env = process.env) {
-  const vbs = path.win32.join(pasta, NOME_VBS_PASTA); const exe = path.win32.join(pasta, NOME_EXE);
+/** Os argumentos do reg.exe para um endereço próprio (protocolo) que chama um .vbs, sem nada do endereço (sem %1). */
+function comandosDeUmProtocolo(chave, descricao, vbs, exe, env) {
   return [
-    ['add', CHAVE_PROTOCOLO, '/ve', '/d', 'URL:Abrir a pasta Arquivos dos imoveis', '/f'],
-    ['add', CHAVE_PROTOCOLO, '/v', 'URL Protocol', '/d', '', '/f'],
-    ['add', `${CHAVE_PROTOCOLO}\\DefaultIcon`, '/ve', '/d', `"${exe}",0`, '/f'],
+    ['add', chave, '/ve', '/d', descricao, '/f'],
+    ['add', chave, '/v', 'URL Protocol', '/d', '', '/f'],
+    ['add', `${chave}\\DefaultIcon`, '/ve', '/d', `"${exe}",0`, '/f'],
     // o nome que o Chrome mostra na pergunta "Abrir …?" (sem ele, apareceria o do wscript)
-    ['add', `${CHAVE_PROTOCOLO}\\shell\\open`, '/v', 'FriendlyAppName', '/d', 'Administracao de Imoveis', '/f'],
+    ['add', `${chave}\\shell\\open`, '/v', 'FriendlyAppName', '/d', 'Administracao de Imoveis', '/f'],
     // sem %1: o endereço chamado não entra no comando
-    ['add', `${CHAVE_PROTOCOLO}\\shell\\open\\command`, '/ve', '/d', `"${wscript(env)}" "${vbs}"`, '/f'],
+    ['add', `${chave}\\shell\\open\\command`, '/ve', '/d', `"${wscript(env)}" "${vbs}"`, '/f'],
   ];
 }
 
-const reg = (args) => spawnSync('reg.exe', args, { windowsHide: true, encoding: 'latin1' });
-
-/** Registra o protocolo (idempotente: reg add /f troca o que havia). `true` se deu certo. `rodar` troca nos testes. */
-export function registrarProtocolo(pasta, { rodar = reg, env = process.env } = {}) {
-  return comandosDoProtocolo(pasta, env).every((a) => rodar(a).status === 0);
+/** Os argumentos do reg.exe para registrar o protocolo imoveis-pasta: (por usuário, sem administrador). `pasta` = a do .exe. */
+export function comandosDoProtocolo(pasta, env = process.env) {
+  return comandosDeUmProtocolo(CHAVE_PROTOCOLO, 'URL:Abrir a pasta Arquivos dos imoveis', path.win32.join(pasta, NOME_VBS_PASTA), path.win32.join(pasta, NOME_EXE), env);
 }
 
-/** Tira o protocolo (desinstalar). Devolve 'apagado' | 'não havia' | 'falhou'. */
-export function apagarProtocolo({ rodar = reg } = {}) {
-  if (rodar(['query', CHAVE_PROTOCOLO]).status !== 0) return 'não havia';
-  return rodar(['delete', CHAVE_PROTOCOLO, '/f']).status === 0 ? 'apagado' : 'falhou';
+/** O mesmo para imoveis-desinstalar: (o botão "Desinstalar o programa deste computador"). */
+export function comandosDoProtocoloDesinstalar(pasta, env = process.env) {
+  return comandosDeUmProtocolo(CHAVE_PROTOCOLO_DESINSTALAR, 'URL:Desinstalar o programa Administracao de Imoveis', path.win32.join(pasta, NOME_VBS_DESINSTALAR), path.win32.join(pasta, NOME_EXE), env);
 }
 
 /**
- * Em cada rodada do .exe (para quem já tinha o programa instalado e trocou pelo novo): grava o .vbs e registra o protocolo
- * apontando para o programa instalado. Rodando pelo Node, ou sem o programa instalado, não faz nada.
- * Devolve 'registrado' | 'sem programa instalado' | 'falhou: …'.
+ * Os argumentos do reg.exe para o programa aparecer em Configurações do Windows → Aplicativos → Aplicativos instalados (por
+ * usuário, sem administrador). `versao` = a do .exe; `kb` = o tamanho dele (EstimatedSize é em KB). "Desinstalar" lá roda o
+ * .exe com --desinstalar, que pergunta antes.
  */
-export function garantirProtocolo({ env = process.env, rodar = reg, exe = EXE } = {}) {
+export function comandosDeAplicativos(pasta, { versao = '', kb = 0 } = {}) {
+  const exe = path.win32.join(pasta, NOME_EXE);
+  const texto = (nome, valor) => ['add', CHAVE_DESINSTALAR, '/v', nome, '/t', 'REG_SZ', '/d', valor, '/f'];
+  const numero = (nome, valor) => ['add', CHAVE_DESINSTALAR, '/v', nome, '/t', 'REG_DWORD', '/d', String(valor), '/f'];
+  return [
+    texto('DisplayName', NOME_NO_WINDOWS),
+    texto('DisplayVersion', versao || 'sem versão'),
+    texto('Publisher', NOME_NO_WINDOWS),
+    texto('DisplayIcon', `${exe},0`),
+    texto('InstallLocation', pasta),
+    texto('UninstallString', `"${exe}" --desinstalar`),
+    numero('NoModify', 1),
+    numero('NoRepair', 1),
+    ...(kb > 0 ? [numero('EstimatedSize', Math.ceil(kb))] : []),
+  ];
+}
+
+/** Tudo o que o programa registra no Windows: os dois botões do sistema e a entrada em Aplicativos instalados. */
+export function comandosDoRegistro(pasta, env = process.env, info = {}) {
+  return [...comandosDoProtocolo(pasta, env), ...comandosDoProtocoloDesinstalar(pasta, env), ...comandosDeAplicativos(pasta, info)];
+}
+
+/** As chaves que o desinstalar tira (o que comandosDoRegistro cria). */
+export const CHAVES_DO_PROGRAMA = [CHAVE_PROTOCOLO, CHAVE_PROTOCOLO_DESINSTALAR, CHAVE_DESINSTALAR];
+
+const reg = (args) => spawnSync('reg.exe', args, { windowsHide: true, encoding: 'latin1' });
+
+/** O tamanho do .exe instalado em KB (0 se não achou). */
+const kbDoExe = (pasta) => { try { return Math.ceil(fs.statSync(path.join(pasta, NOME_EXE)).size / 1024); } catch { return 0; } };
+
+/** Grava os .vbs ao lado do .exe (sem acento: .vbs em latin1). */
+function gravarVbs(pasta) {
+  fs.writeFileSync(path.join(pasta, NOME_VBS), textoVbs(), 'latin1');
+  fs.writeFileSync(path.join(pasta, NOME_VBS_PASTA), textoVbsPasta(), 'latin1');
+  fs.writeFileSync(path.join(pasta, NOME_VBS_DESINSTALAR), textoVbsDesinstalar(), 'latin1');
+  fs.writeFileSync(path.join(pasta, NOME_VBS_JANELA), textoVbsJanela(), 'latin1');
+}
+
+/** Registra tudo (idempotente: reg add /f troca o que havia). `true` se deu certo. `rodar` troca nos testes. */
+export function registrarNoWindows(pasta, { rodar = reg, env = process.env, versao = EXE?.versao || '' } = {}) {
+  return comandosDoRegistro(pasta, env, { versao, kb: kbDoExe(pasta) }).every((a) => rodar(a).status === 0);
+}
+
+/** Tira uma chave do registro (desinstalar). Devolve 'apagado' | 'não havia' | 'falhou'. */
+export function apagarChave(chave, { rodar = reg } = {}) {
+  if (rodar(['query', chave]).status !== 0) return 'não havia';
+  return rodar(['delete', chave, '/f']).status === 0 ? 'apagado' : 'falhou';
+}
+export const apagarProtocolo = ({ rodar = reg } = {}) => apagarChave(CHAVE_PROTOCOLO, { rodar });
+
+/**
+ * Em cada rodada do .exe (para quem já tinha o programa instalado e trocou pelo novo): grava os .vbs e registra os botões do
+ * sistema e a entrada em Aplicativos instalados, apontando para o programa instalado. Rodando pelo Node, ou sem o programa
+ * instalado, não faz nada. Devolve 'registrado' | 'sem programa instalado' | 'falhou: …'.
+ */
+export function garantirRegistro({ env = process.env, rodar = reg, exe = EXE } = {}) {
   if (!exe) return 'sem programa instalado';
   const pasta = pastaInstalada(env);
   if (!fs.existsSync(path.join(pasta, NOME_EXE))) return 'sem programa instalado';
   try {
-    fs.writeFileSync(path.join(pasta, NOME_VBS_PASTA), textoVbsPasta(), 'latin1');
-    return registrarProtocolo(pasta, { rodar, env }) ? 'registrado' : 'falhou: o Windows não aceitou o registro';
+    gravarVbs(pasta);
+    return registrarNoWindows(pasta, { rodar, env, versao: exe.versao || '' }) ? 'registrado' : 'falhou: o Windows não aceitou o registro';
   } catch (e) { return `falhou: ${e.message}`; }
+}
+
+/** A pasta do backup seguro guardada em config.json (ao ligar o computador), ou ''. */
+function pastaDoBackup(env = process.env) {
+  try { return String(JSON.parse(fs.readFileSync(path.join(pastaConfig(env), ARQUIVO_CONFIG), 'utf8')).pasta || ''); } catch { return ''; }
+}
+
+/**
+ * A pasta `programa` que o desinstalar pode limpar, ou null: tem de ser exatamente <pasta do crachá>\programa e não pode
+ * conter nem estar dentro da pasta do backup seguro (o backup e os arquivos dos inquilinos nunca são apagados).
+ */
+export function pastaQuePodeApagar(env = process.env) {
+  const pasta = path.resolve(pastaInstalada(env));
+  if (path.basename(pasta) !== 'programa' || path.dirname(pasta) !== path.resolve(pastaConfig(env))) return null;
+  const backup = pastaDoBackup(env);
+  if (backup) {
+    const b = path.resolve(backup).toLowerCase(); const p = pasta.toLowerCase();
+    if (b === p || b.startsWith(p + path.sep) || p.startsWith(b + path.sep)) return null;
+  }
+  return pasta;
+}
+
+/**
+ * Apaga da pasta `programa` só os arquivos do programa (ARQUIVOS_DO_PROGRAMA) e a pasta, se ficar vazia. O .exe em uso não se
+ * apaga sozinho: quando é ele que está rodando, um PowerShell escondido espera o programa fechar e apaga depois.
+ */
+export function apagarPastaDoPrograma(pasta, env = process.env) {
+  if (!fs.existsSync(pasta)) return;
+  if (path.resolve(path.dirname(process.execPath)).toLowerCase() === path.resolve(pasta).toLowerCase()) {
+    const script = '$p=$env:IMOVEIS_PASTA; Wait-Process -Id $env:IMOVEIS_PID -Timeout 600 -ErrorAction SilentlyContinue; '
+      + 'for($i=0;$i -lt 30;$i++){ foreach($n in $env:IMOVEIS_ARQUIVOS.Split("|")){ Remove-Item -LiteralPath (Join-Path $p $n) -Force -ErrorAction SilentlyContinue }; '
+      + 'if(-not (Get-ChildItem -LiteralPath $p -Force -ErrorAction SilentlyContinue)){ Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }; '
+      + 'if(-not (Test-Path -LiteralPath $p)){ break }; Start-Sleep -Seconds 1 }';
+    spawn(path.win32.join(pastaWindows(env), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', script],
+      { env: { ...process.env, IMOVEIS_PASTA: pasta, IMOVEIS_PID: String(process.pid), IMOVEIS_ARQUIVOS: ARQUIVOS_DO_PROGRAMA.join('|') }, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    return;
+  }
+  for (const n of ARQUIVOS_DO_PROGRAMA) fs.rmSync(path.join(pasta, n), { force: true });
+  try { fs.rmdirSync(pasta); } catch { /* sobrou algo que não é do programa: a pasta fica */ }
+}
+
+/**
+ * Janela do Windows (MsgBox por janela.vbs, gravado na pasta `programa`). Com `simNao`: Sim/Não com o Não marcado, devolve
+ * 'sim' | 'não' | 'sem janela' (não abriu); sem: só OK, devolve 'ok' | 'sem janela'.
+ */
+export function janelaDoWindows(texto, { simNao = false, env = process.env } = {}) {
+  try {
+    const pasta = pastaInstalada(env);
+    fs.mkdirSync(pasta, { recursive: true });
+    const vbs = path.join(pasta, NOME_VBS_JANELA);
+    fs.writeFileSync(vbs, textoVbsJanela(), 'latin1');
+    // 4 = Sim/Não, 32 = pergunta, 256 = Não marcado; 64 = informação; 4096 = na frente das outras janelas
+    const botoes = (simNao ? 4 + 32 + 256 : 64) + 4096;
+    const r = spawnSync(wscript(env), [vbs, texto.replace(/"/g, "'"), String(botoes), NOME_NO_WINDOWS]);
+    if (simNao) return r.status === 6 ? 'sim' : r.status === 7 ? 'não' : 'sem janela';
+    return r.status === 1 ? 'ok' : 'sem janela';
+  } catch { return 'sem janela'; }
+}
+
+/** Pergunta "Desinstalar?" na janela do Windows; se ela não abriu, na janela preta (S e Enter). `true` = Sim. */
+async function confirmarNoWindows(texto, env = process.env) {
+  const r = janelaDoWindows(texto, { simNao: true, env });
+  if (r !== 'sem janela') return r === 'sim';
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const resposta = await new Promise((ok) => { rl.question(`\n${texto.replace(/\|/g, '\n')}\nDigite S e Enter para desinstalar (qualquer outra coisa cancela): `, (x) => { rl.close(); ok(x); }); });
+  return /^\s*s/i.test(resposta);
 }
 
 /** O Explorer pelo caminho inteiro, com a pasta como um argumento só (sem passar por cmd). */
@@ -120,8 +280,7 @@ function abrirExplorer(pasta, env = process.env) {
  * computador); ainda sem a cópia, na pasta do backup seguro. Não usa nada de fora (argumentos, endereço). 0 = abriu.
  */
 export function abrirPasta({ env = process.env, abrir = abrirExplorer } = {}) {
-  let base = '';
-  try { base = String(JSON.parse(fs.readFileSync(path.join(pastaConfig(env), ARQUIVO_CONFIG), 'utf8')).pasta || ''); } catch { /* não ligado */ }
+  const base = pastaDoBackup(env);
   if (!base || !path.isAbsolute(base)) return 1;
   const alvo = [path.join(base, PASTA_COPIA), base].find((p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } });
   if (!alvo) return 1;
@@ -174,7 +333,8 @@ Uso:
   ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC e arquivos
   ${NOME_EXE} --arquivos      atualiza agora só a pasta "Arquivos dos imoveis"
   ${NOME_EXE} --instalar      só copia o programa e cria as tarefas (20h, ao entrar e de hora em hora)
-  ${NOME_EXE} --desinstalar   apaga as tarefas do Windows e o botão "Abrir a pasta no Explorer" (o computador continua ligado até Desligar em Usuários)
+  ${NOME_EXE} --desinstalar   pergunta antes e desinstala: tarefas, botões do sistema, Aplicativos instalados e a pasta "programa"
+                              (o backup e os arquivos ficam; o computador continua ligado até Desligar em Usuários)
   ${NOME_EXE} --abrir-pasta   abre no Explorer a pasta "Arquivos dos imoveis" (é o que o botão do sistema chama)
   ${NOME_EXE} --versao       mostra a versão
   ${NOME_EXE} --ajuda         mostra este texto
@@ -190,7 +350,7 @@ function esperarEnter(texto = 'Aperte Enter para fechar.') {
   return new Promise((ok) => { rl.question(`\n${texto} `, () => { rl.close(); ok(); }); });
 }
 
-/** Copia o programa para a pasta instalada (se já não está rodando de lá) e grava o .vbs. Devolve a pasta. */
+/** Copia o programa para a pasta instalada (se já não está rodando de lá) e grava os .vbs. Devolve a pasta. */
 function copiarPrograma(env, dizer) {
   const pasta = pastaInstalada(env); const destino = path.join(pasta, NOME_EXE);
   fs.mkdirSync(pasta, { recursive: true });
@@ -200,8 +360,7 @@ function copiarPrograma(env, dizer) {
     }
     dizer(`Programa copiado para ${pasta} (o arquivo baixado pode ser apagado depois).`);
   }
-  fs.writeFileSync(path.join(pasta, NOME_VBS), textoVbs(), 'latin1');
-  fs.writeFileSync(path.join(pasta, NOME_VBS_PASTA), textoVbsPasta(), 'latin1');
+  gravarVbs(pasta);
   return pasta;
 }
 
@@ -214,14 +373,14 @@ function instalar({ env, simular, elevado, dizer, rodarReg }) {
     const pasta = pastaInstalada(env);
     dizer(`[simulação: nada foi copiado nem criado]\nCopiaria o programa para ${pasta} e criaria as tarefas:`);
     for (const t of comandosDeCriar(pasta)) dizer(`  schtasks ${comoDigitado(t.comando)}`);
-    dizer('Registraria o botão "Abrir a pasta no Explorer" (endereço imoveis-pasta:, só para este usuário):');
-    for (const a of comandosDoProtocolo(pasta, env)) dizer(`  reg ${comoDigitado(a)}`);
+    dizer('Registraria os botões "Abrir a pasta no Explorer" e "Desinstalar o programa deste computador" (endereços imoveis-pasta: e imoveis-desinstalar:) e a entrada em Aplicativos instalados do Windows, só para este usuário:');
+    for (const a of comandosDoRegistro(pasta, env, { versao: EXE?.versao || '' })) dizer(`  reg ${comoDigitado(a)}`);
     return true;
   }
   if (!EXE) throw new Error(`Instalar só funciona no programa ${NOME_EXE} (gerado por tools/gerar-exe.mjs). Pelo Node, use instalar-tarefa.cmd.`);
   const pasta = copiarPrograma(env, dizer);
-  dizer(registrarProtocolo(pasta, { rodar: rodarReg, env }) ? 'Botão "Abrir a pasta no Explorer" do sistema ligado neste computador.'
-    : 'Aviso: não consegui ligar o botão "Abrir a pasta no Explorer" (o resto continua normal).');
+  dizer(registrarNoWindows(pasta, { rodar: rodarReg, env }) ? 'Programa registrado no Windows (Aplicativos instalados) e botões do sistema ligados neste computador.'
+    : 'Aviso: não consegui registrar o programa no Windows (Aplicativos instalados e botões do sistema; o resto continua normal).');
   dizer('Criando as tarefas do Windows:');
   let falharam = criarTarefas(pasta, { dizer });
   if (falharam.length && !elevado) {
@@ -238,18 +397,66 @@ function instalar({ env, simular, elevado, dizer, rodarReg }) {
   return true;
 }
 
+const NOMES_DAS_CHAVES = { [CHAVE_PROTOCOLO]: 'Botão "Abrir a pasta no Explorer"', [CHAVE_PROTOCOLO_DESINSTALAR]: 'Botão "Desinstalar o programa deste computador"', [CHAVE_DESINSTALAR]: 'Aplicativos instalados do Windows' };
+const comoFicou = (r) => (r === 'apagado' ? 'tirado' : r === 'não havia' ? 'não estava' : 'FALHOU ao tirar');
+
 /**
- * O programa inteiro. Devolve o código de saída (0 = certo). `dizer`, `env`, `atualizar`, `garantir` (registro do protocolo em
- * cada rodada), `rodarReg` (o reg.exe) e `abrir` (o Explorer) trocam nos testes.
+ * --desinstalar (Configurações do Windows → Aplicativos instalados → Desinstalar, o botão do sistema ou à mão): pergunta antes
+ * numa janela do Windows (Sim/Não); com Sim, tira os botões do sistema, as tarefas, a entrada em Aplicativos instalados e, por
+ * fim, os arquivos do programa da pasta `programa`. Nunca mexe na pasta do backup seguro, na cópia aberta dos arquivos, no
+ * crachá nem em config.json (o computador continua ligado até Desligar em Usuários → Aparelhos ligados).
+ * Com --elevado (a cópia aberta como administrador por esta mesma rotina): só apaga as tarefas, sem perguntar de novo.
+ */
+async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefas, perguntar, avisar, apagarPasta, elevar, pausar }) {
+  if (simular) {
+    dizer(`[simulação: nada foi apagado]\nPerguntaria antes (Sim/Não) numa janela do Windows. Com Sim, apagaria as tarefas:\n${TAREFAS.map((t) => `  ${t.nome}`).join('\n')}\nTiraria do registro do Windows (só deste usuário):\n${CHAVES_DO_PROGRAMA.map((c) => `  reg delete ${c} /f`).join('\n')}`);
+    const pasta = pastaQuePodeApagar(env);
+    dizer(pasta ? `E apagaria de ${pasta} só os arquivos do programa (${ARQUIVOS_DO_PROGRAMA.join(', ')}).` : 'A pasta do programa não seria apagada (fica junto da pasta do backup seguro).');
+    dizer('Não mexeria na pasta do backup seguro, na pasta "Arquivos dos imoveis", no crachá nem em config.json.');
+    return 0;
+  }
+  if (elevado) { apagarTarefas({ dizer, rodar: rodarTarefas }); return TAREFAS.some((t) => tarefaExiste(t.nome, rodarTarefas)) ? 1 : 0; }
+  if (!(await perguntar(TEXTO_CONFIRMAR, env))) { dizer('Nada foi desinstalado.'); return 0; }
+  dizer('Desinstalando o programa deste computador:');
+  for (const chave of [CHAVE_PROTOCOLO, CHAVE_PROTOCOLO_DESINSTALAR]) dizer(`  ${NOMES_DAS_CHAVES[chave]}: ${comoFicou(apagarChave(chave, { rodar: rodarReg }))}.`);
+  dizer('Apagando as tarefas do Windows:');
+  apagarTarefas({ dizer, rodar: rodarTarefas });
+  if (TAREFAS.some((t) => tarefaExiste(t.nome, rodarTarefas))) {
+    dizer('\nO Windows pede permissão de administrador para apagar: responda "Sim" na janela que vai abrir.');
+    elevar(process.execPath, ['--desinstalar', '--elevado']);
+  }
+  const ficou = TAREFAS.filter((t) => tarefaExiste(t.nome, rodarTarefas));
+  if (ficou.length) {
+    // a entrada em Aplicativos instalados fica, para tentar de novo por lá
+    const texto = `Não consegui apagar: ${ficou.map((t) => t.nome).join('; ')}. Tente de novo em Configurações do Windows → Aplicativos → Aplicativos instalados → ${NOME_NO_WINDOWS} → Desinstalar.`;
+    dizer(texto);
+    if (avisar(`Não terminou.|${texto}`, env) !== 'ok') await pausar();
+    return 1;
+  }
+  dizer(`  ${NOMES_DAS_CHAVES[CHAVE_DESINSTALAR]}: ${comoFicou(apagarChave(CHAVE_DESINSTALAR, { rodar: rodarReg }))}.`);
+  const pasta = pastaQuePodeApagar(env);
+  dizer(`\n${TEXTO_PRONTO.replace(/\|/g, '\n')}`);
+  const viu = avisar(TEXTO_PRONTO, env) === 'ok';
+  // por último: os arquivos do programa (o .exe em uso sai depois que este programa fechar)
+  if (pasta) apagarPasta(pasta, env);
+  if (!viu) await pausar();
+  return 0;
+}
+
+/**
+ * O programa inteiro. Devolve o código de saída (0 = certo). Trocam nos testes: `dizer`, `env`, `atualizar`, `garantir`
+ * (registro no Windows em cada rodada), `rodarReg` (o reg.exe), `rodarTarefas` (o schtasks.exe), `abrir` (o Explorer),
+ * `perguntar` e `avisar` (as janelas do Windows), `apagarPasta` (os arquivos do programa) e `elevar` (pedir administrador).
  */
 export async function executar(args = [], { env = process.env, dizer = console.log, atualizar = principal, pausar = esperarEnter,
-  garantir = garantirProtocolo, rodarReg = reg, abrir = abrirExplorer } = {}) {
+  garantir = garantirRegistro, rodarReg = reg, rodarTarefas = schtasks, abrir = abrirExplorer, perguntar = confirmarNoWindows,
+  avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador } = {}) {
   // o botão do sistema (imoveis-pasta:): abre só a pasta configurada; qualquer outro argumento (até o endereço) é ignorado
   if (args.includes('--abrir-pasta')) return abrirPasta({ env, abrir });
   const versao = EXE?.versao || '';
   const tem = (a) => args.includes(a);
-  // quem já tinha o programa e trocou pelo .exe novo ganha o botão "Abrir a pasta no Explorer" na rodada seguinte
-  const emDia = () => { const r = garantir({ env, rodar: rodarReg }); if (r.startsWith('falhou')) dizer(`Aviso: o botão "Abrir a pasta no Explorer" não foi ligado (${r}).`); };
+  // quem já tinha o programa e trocou pelo .exe novo ganha os botões do sistema e a entrada em Aplicativos na rodada seguinte
+  const emDia = () => { const r = garantir({ env, rodar: rodarReg }); if (r.startsWith('falhou')) dizer(`Aviso: o programa não foi registrado no Windows (botões do sistema e Aplicativos instalados: ${r}).`); };
   const simular = tem('--simular'); const elevado = tem('--elevado');
   const pedidos = args.filter((a) => COMANDOS.includes(a) || a === '-h' || a === '/?');
   const estranhos = args.filter((a) => !pedidos.includes(a) && a !== '--simular' && a !== '--elevado');
@@ -269,24 +476,7 @@ export async function executar(args = [], { env = process.env, dizer = console.l
       await pausar();
       return ok ? 0 : 1;
     }
-    if (pedido === '--desinstalar') {
-      if (simular) { dizer(`[simulação: nada foi apagado]\nApagaria as tarefas:\n${TAREFAS.map((t) => `  ${t.nome}`).join('\n')}\nE o botão "Abrir a pasta no Explorer":\n  reg delete ${CHAVE_PROTOCOLO} /f`); return 0; }
-      if (!elevado) {
-        const p = apagarProtocolo({ rodar: rodarReg });
-        dizer(`Botão "Abrir a pasta no Explorer": ${p === 'apagado' ? 'desligado' : p === 'não havia' ? 'não estava ligado' : 'FALHOU ao desligar'}.`);
-      }
-      dizer('Apagando as tarefas do Windows:');
-      apagarTarefas({ dizer });
-      const sobraram = TAREFAS.filter((t) => tarefaExiste(t.nome));
-      if (sobraram.length && !elevado) {
-        dizer('\nO Windows pede permissão de administrador para apagar: responda "Sim" na janela que vai abrir.');
-        rodarComoAdministrador(process.execPath, ['--desinstalar', '--elevado']);
-      }
-      const ficou = TAREFAS.filter((t) => tarefaExiste(t.nome));
-      dizer(ficou.length ? `Não consegui apagar: ${ficou.map((t) => t.nome).join('; ')}.` : `Pronto: as atualizações automáticas pararam. O computador continua ligado ao sistema: para desligar, no sistema, Usuários → Aparelhos ligados → Desligar. O programa fica em ${pastaInstalada(env)} (pode apagar a pasta "programa").`);
-      if (!elevado) await pausar();
-      return ficou.length ? 1 : 0;
-    }
+    if (pedido === '--desinstalar') return await desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefas, perguntar, avisar, apagarPasta, elevar, pausar });
     if (pedido === '--instalar') {
       const ok = instalar({ env, simular, elevado, dizer, rodarReg });
       if (!elevado && !simular) await pausar();
