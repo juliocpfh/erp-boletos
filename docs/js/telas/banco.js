@@ -964,7 +964,7 @@ export const ACOES_BANCO = {
 
   /** Administrador: a diferença do saldo foi explicada (ex.: lançamento antigo de antes do sistema); o saldo do banco vira o novo ponto de partida. */
   async aceitarSaldoBanco({ conta }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador muda o ponto de partida da conferência do saldo.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador muda o ponto de partida da conferência do saldo. Peça a ele.');
     const u = ((d().saldos_banco || {})[conta] || {}).ultima;
     const ok = await janela({ titulo: 'Usar o saldo do banco como ponto de partida', sim: 'Usar este saldo', forte: true,
       html: `<p>O saldo de <b>${u ? reais(u.valor) : '-'}</b> em ${u ? dataBr(u.data) : '-'} (conta ${esc(nomeConta(conta))}) passa a ser o ponto de partida: as próximas conferências partem dele.</p>
@@ -976,7 +976,7 @@ export const ACOES_BANCO = {
 
   /** Conferência do saldo: apaga a cópia de um lançamento importado em dobro (sem destino nem comprovante) e confere de novo. */
   async apagarCopiaRepetida({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode mexer no extrato.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode mexer no extrato. Peça ao administrador.');
     const m = mov(id);
     const ok = await janela({ titulo: 'Apagar a cópia repetida', sim: 'Apagar a cópia', forte: true,
       html: `<p>${dataBr(m.data)} · ${esc(m.descricao || '')} · <b>${valorHtml(m)}</b></p><p>Este lançamento aparece duas vezes aqui. A cópia sai e a outra fica; o saldo é conferido de novo.</p>` });
@@ -987,10 +987,10 @@ export const ACOES_BANCO = {
 
   /** Painel de saúde: consulta a ponte agora (certificado, último token). */
   async conferirSaudeBanco() {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(TITULO_AGUARDANDO);
     estado.saudePonteEm = Date.now();
     await conferirSaudePonte();
-    if (estado.saudePonteErro) throw new Error(`A ponte não respondeu: ${estado.saudePonteErro}`);
+    if (estado.saudePonteErro) throw new C.ErroUsuario(`A ponte do banco não respondeu (${estado.saudePonteErro}). Confira se o computador da ponte está ligado e tente de novo.`);
   },
 
   async darDestino({ id }) {
