@@ -173,7 +173,43 @@ const TEXTO_SITUACAO_LINK = {
 const COR_LINK = { Respondida: 'info', Assinada: 'ok', Desistiu: 'perigo', 'Falta documento': 'aviso', Assinar: 'aviso' };
 
 /** Link guardado na ficha ainda no prazo (ou null). */
-const linkValido = (f, pessoa) => { const l = (f.links_ficha || {})[pessoa]; return l && l.url && String(l.vence_em) > new Date().toISOString() ? l : null; };
+const linkValido = (f, pessoa) => { const l = (f.links_ficha || {})[pessoa]; return l && !l.encerrado && String(l.vence_em) > new Date().toISOString() ? l : null; };
+
+/**
+ * O link para mostrar: o gerado nesta aba (o endereço não fica no banco) ou, perguntando antes, um link novo (o anterior deixa
+ * de valer; o que a pessoa já mandou continua guardado). null se a pessoa da equipe preferir não gerar.
+ */
+async function linkParaMandar(f, pessoa) {
+  const naAba = FO.urlDoLink(f.id, pessoa);
+  if (naAba) return naAba;
+  const ok = await janela({ titulo: 'Gerar um link novo?', sim: 'Gerar e mostrar', nao: 'Voltar',
+    html: `<p>Por segurança, o link da ficha só aparece na hora em que é gerado (ele não fica guardado no sistema).</p>
+      <p>Para mandar de novo a <b>${esc(FO.nomeDaPessoa(f, pessoa))}</b>, o sistema gera um link novo: o anterior deixa de funcionar. O que a pessoa já mandou continua guardado.</p>` });
+  if (!ok) return null;
+  return novoLinkDaFicha(f, pessoa, { pdf: false });
+}
+
+/** Cria o link na nuvem (com a ficha em PDF, se ``pdf``), guarda na ficha só a validade e devolve { url, vence_em }. */
+async function novoLinkDaFicha(f, pessoa, { pdf = true } = {}) {
+  const link = await FO.criarLinkNaNuvem(FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)));
+  FO.lembrarUrlDoLink(f.id, pessoa, link);
+  // a ficha em PDF (com o que já se sabe) para quem prefere imprimir; sem ela, o link funciona do mesmo jeito
+  if (pdf) {
+    try {
+      const tipo = pessoa === 'interessado' ? 'ficha' : 'ficha_fiador';
+      const arquivo = await pdfDoRecibo(tipo, { ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: Number(pessoa.slice(6)) } : {}) });
+      await FO.guardarPdfNaNuvem(f.id, pessoa, arquivo.blob);
+    } catch (e) { console.warn('ficha em PDF do link', e); }
+  }
+  // no banco, só a validade, quando e por quem (o endereço com a chave da pessoa não vai aos aparelhos nem aos backups)
+  await alterar((db) => {
+    const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
+    const { url, encerrado, ...anterior } = links[pessoa] || {}; // eslint-disable-line no-unused-vars
+    links[pessoa] = { ...anterior, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login() };
+    R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} gerado (vale até ${dataBr(link.vence_em.slice(0, 10))})`);
+  });
+  return { url: link.url, vence_em: link.vence_em };
+}
 
 /** Caixa "Ficha pela internet" da página da ficha: uma linha por pessoa; o que ela mandou aparece depois (ligarFichaOnline). */
 function caixaFichaOnline(f) {
@@ -186,10 +222,10 @@ function caixaFichaOnline(f) {
     return `<li style="margin:6px 0"><b>${esc(FO.nomeDaPessoa(f, p))}</b>${p === 'interessado' ? '' : ' <span class="suave">(fiador)</span>'}
       <span data-situacao-link="${p}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta('link vencido', 'aviso') : '<span class="suave">sem link</span>'}</span><br>
       ${botao('gerarLinkFicha', valido ? 'Gerar novo link' : 'Gerar link', { id: f.id, pessoa: p }, valido ? 'secundario pequeno' : 'pequeno', valido ? 'Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado).' : '')}
-      ${valido ? botao('compartilharLinkFicha', 'Copiar / WhatsApp', { id: f.id, pessoa: p }, 'secundario pequeno') : ''}</li>`;
+      ${valido ? botao('compartilharLinkFicha', FO.urlDoLink(f.id, p) ? 'Copiar / WhatsApp' : 'Mandar de novo', { id: f.id, pessoa: p }, 'secundario pequeno') : ''}</li>`;
   }).join('');
   return `<div class="cartao" data-ficha-online="${f.id}">${titulo}
-    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). Para mandar de novo, o sistema gera outro e o anterior deixa de valer.</p>
     <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
 }
 
@@ -425,14 +461,17 @@ async function janelaDoLink(f, pessoa, link, { lembrete = false, faltando = [] }
   await janela({
     titulo: `Link da ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Fechar', nao: 'Voltar',
     html: `<p>Vale até <b>${dataBr(String(link.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro (e este deixa de valer).</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto)}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
-      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(texto)}">Abrir no WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
-      ${pessoa === 'interessado' ? '<p class="suave">O e-mail "Envio de ficha cadastral" já leva este link (e o do fiador, se houver).</p>' : ''}`,
+      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-abrir-zap>Copiar e abrir o WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
+      ${tel ? '<p class="suave">O WhatsApp abre a conversa com a pessoa: é só colar a mensagem lá (o link não vai no endereço da página, que fica no histórico do navegador).</p>' : ''}
+      ${pessoa === 'interessado' ? '<p class="suave">O e-mail "Envio de ficha cadastral", mandado agora, já leva este link (e o do fiador, se houver).</p>' : ''}`,
     ligar: (dlg) => {
-      dlg.querySelector('[data-copiar-link]').addEventListener('click', async (ev) => {
-        try { await navigator.clipboard.writeText(dlg.querySelector('[data-texto-link]').value); ev.target.textContent = 'Copiado ✓'; } catch { dlg.querySelector('[data-texto-link]').select(); }
-      });
+      const copiar = async () => { try { await navigator.clipboard.writeText(dlg.querySelector('[data-texto-link]').value); return true; } catch { dlg.querySelector('[data-texto-link]').select(); return false; } };
+      dlg.querySelector('[data-copiar-link]').addEventListener('click', async (ev) => { if (await copiar()) ev.target.textContent = 'Copiado ✓'; });
+      const zap = dlg.querySelector('[data-abrir-zap]');
+      if (zap) zap.addEventListener('click', () => { copiar(); });
     },
   });
 }
@@ -445,18 +484,9 @@ export const ACOES_FICHAS = {
     if (!E.nuvem) throw new C.ErroUsuario('A ficha pela internet só funciona no sistema na nuvem.');
     const f = buscar('fichas', id);
     if (!f || !FO.pessoasDaFicha(f).includes(pessoa)) throw new C.ErroUsuario('Ficha ou pessoa não encontrada.');
-    const link = await FO.criarLinkNaNuvem(FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)));
-    // a ficha em PDF (com o que já se sabe) para quem prefere imprimir; sem ela, o link funciona do mesmo jeito
-    try {
-      const tipo = pessoa === 'interessado' ? 'ficha' : 'ficha_fiador';
-      const pdf = await pdfDoRecibo(tipo, { ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: Number(pessoa.slice(6)) } : {}) });
-      await FO.guardarPdfNaNuvem(f.id, pessoa, pdf.blob);
-    } catch (e) { console.warn('ficha em PDF do link', e); }
-    const guardado = { url: link.url, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login() };
-    await alterar((db) => R.atualizar(db, 'fichas', f.id, { links_ficha: { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}), [pessoa]: guardado } }, login(),
-      `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} gerado (vale até ${dataBr(link.vence_em.slice(0, 10))})`));
+    const link = await novoLinkDaFicha(f, pessoa);
     await mostrar();
-    await janelaDoLink(buscar('fichas', id), pessoa, guardado);
+    await janelaDoLink(buscar('fichas', id), pessoa, link);
   },
   /** Traz para a ficha os dados do último envio pelo link (só os preenchidos) e marca os documentos recebidos. */
   async trazerRespostaFicha({ id, pessoa }) {
@@ -504,8 +534,8 @@ export const ACOES_FICHAS = {
     if (!faltando.length) throw new C.ErroUsuario('Marque ou escreva o que falta.');
     await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Falta documento', faltando });
     aviso('Pedido registrado no link.');
-    const link = linkValido(f, pessoa);
-    if (link) await janelaDoLink(f, pessoa, link, { lembrete: true, faltando });
+    const link = linkValido(f, pessoa) && await linkParaMandar(f, pessoa);
+    if (link) await janelaDoLink(buscar('fichas', id), pessoa, link, { lembrete: true, faltando });
     await mostrar();
   },
   /** Gera a ficha em PDF com os dados de agora, guarda no link e pede a assinatura (gov.br ou à mão). */
@@ -517,15 +547,16 @@ export const ACOES_FICHAS = {
     await FO.guardarPdfNaNuvem(f.id, pessoa, pdf.blob);
     await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Assinar', faltando: [] });
     aviso('A ficha com os dados de agora está no link para assinar.');
-    const link = linkValido(f, pessoa);
-    if (link) await janelaDoLink(f, pessoa, link, { lembrete: true, faltando: ['assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)'] });
+    const link = linkValido(f, pessoa) && await linkParaMandar(f, pessoa);
+    if (link) await janelaDoLink(buscar('fichas', id), pessoa, link, { lembrete: true, faltando: ['assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)'] });
     await mostrar();
   },
   async lembrarFicha({ id, pessoa }) {
     const f = buscar('fichas', id);
-    const l = f && linkValido(f, pessoa);
-    if (!l) throw new C.ErroUsuario('O link venceu: gere um novo na página da ficha.');
-    await janelaDoLink(f, pessoa, l, { lembrete: true });
+    if (!f || !linkValido(f, pessoa)) throw new C.ErroUsuario('O link venceu: gere um novo na página da ficha.');
+    const l = await linkParaMandar(f, pessoa);
+    if (!l) return;
+    await janelaDoLink(buscar('fichas', id), pessoa, l, { lembrete: true });
     // a contagem de "sem resposta" do Painel recomeça do lembrete
     await alterar((db) => {
       const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
@@ -540,7 +571,7 @@ export const ACOES_FICHAS = {
     await FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, situacao: 'Encerrado' });
     await alterar((db) => {
       const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
-      if (links[pessoa]) links[pessoa] = { ...links[pessoa], vence_em: new Date().toISOString(), encerrado: true };
+      if (links[pessoa]) { const { url, ...resto } = links[pessoa]; links[pessoa] = { ...resto, vence_em: new Date().toISOString(), encerrado: true }; } // eslint-disable-line no-unused-vars
       R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} encerrado`);
     });
     aviso('Link encerrado.');
@@ -562,9 +593,11 @@ export const ACOES_FICHAS = {
   },
   async compartilharLinkFicha({ id, pessoa }) {
     const f = buscar('fichas', id);
-    const l = f && linkValido(f, pessoa);
-    if (!l) throw new C.ErroUsuario('O link venceu: gere um novo.');
-    await janelaDoLink(f, pessoa, l);
+    if (!f || !linkValido(f, pessoa)) throw new C.ErroUsuario('O link venceu: gere um novo.');
+    const l = await linkParaMandar(f, pessoa);
+    if (!l) return;
+    await janelaDoLink(buscar('fichas', id), pessoa, l);
+    await mostrar();
   },
   /**
    * Desistência antes de assinar: pergunta a data e o motivo, leva os arquivos do contrato não assinado para a pasta da

@@ -1,6 +1,7 @@
 // Dados dos e-mails por etapa: campos e condições que os modelos (modelos-email.js) usam, a partir do contrato ou da ficha.
 // Funções puras (rodam no Node, tests/emails.test.mjs). Valores em centavos viram "R$ 1.234,56"; datas viram "dd/mm/aaaa".
 import * as C from './calculos.js';
+import * as FO from './ficha-online.js';
 import * as K from './contratos.js';
 import { MODELOS_EMAIL } from './modelos-email.js';
 import * as REC from './recibos.js';
@@ -78,10 +79,14 @@ function documentosDoEmail(f) {
   return [num(R.documentosDaFicha(f)), ...blocos, `\n${R.DICA_DOCUMENTOS}`].join('\n');
 }
 
-/** Link da ficha pela internet ainda no prazo: { url, validade } (vazios sem link). */
+/**
+ * Link da ficha pela internet ainda no prazo: { url, validade } (vazios sem link). O endereço só existe na aba em que foi gerado
+ * (FO.urlDoLink; no banco fica só a validade): fora dela, o e-mail sai sem o link e a equipe gera um novo na ficha.
+ */
 function linkDaFicha(f, pessoa, hoje) {
   const l = f && f.links_ficha && f.links_ficha[pessoa];
-  return l && l.url && String(l.vence_em).slice(0, 10) >= hoje ? { url: l.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
+  const naAba = f && FO.urlDoLink(f.id, pessoa);
+  return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje ? { url: naAba.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
 }
 
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */

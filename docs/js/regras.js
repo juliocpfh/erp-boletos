@@ -218,6 +218,17 @@ export function normalizar(d) {
     if (!n.contrato_anterior_id || !n.heranca_transferida || !inicio) continue;
     for (const s of d.seguros) if (s.contrato_id === n.id && s.herdado_de === undefined && s.vigencia_inicio && s.vigencia_inicio < inicio) s.herdado_de = n.contrato_anterior_id;
   }
+  // o link da ficha pela internet leva a chave da pessoa (depois do "#"): não fica no banco (2026-11-16, ia a todos os aparelhos
+  // e aos backups); só a validade, quando e por quem. O link aparece uma vez, na hora de gerar; mandar de novo gera outro.
+  for (const f of d.fichas || []) {
+    if (!f.links_ficha || typeof f.links_ficha !== 'object') continue;
+    if (!Object.values(f.links_ficha).some((l) => l && typeof l === 'object' && 'url' in l)) continue;
+    f.links_ficha = Object.fromEntries(Object.entries(f.links_ficha).map(([p, l]) => {
+      if (!l || typeof l !== 'object' || !('url' in l)) return [p, l];
+      const { url, ...resto } = l; // eslint-disable-line no-unused-vars
+      return [p, resto];
+    }));
+  }
   return d;
 }
 
@@ -350,7 +361,7 @@ export function registrar(d, usuario, acao, tabela, registroId, descricao, detal
   }
 }
 
-const OCULTOS = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes']);
+const OCULTOS = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes', 'links_ficha']);
 const visivel = (obj) => Object.fromEntries(Object.entries(obj)
   .filter(([k, v]) => !OCULTOS.has(k) && v !== null && v !== '' && v !== undefined));
 
