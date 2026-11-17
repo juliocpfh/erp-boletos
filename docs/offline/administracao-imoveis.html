@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-MsEX7oVEgZ+SIfIf+CawE2mqxTTSVy2oPrQma83q4r0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-OQ2yXyOcjwZweRJl4RMUsAhglH0jX61nPAMMZoEDaVE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7975047b1ada43f9">
+<meta name="fontes" content="f5a28b2ba8ba6b46">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1839,6 +1839,31 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           explica: "Enquanto a troca não for registrada, o alerta continua até este número de dias depois da saída.",
           consequencia: "Só muda até quando o alerta aparece.",
           lei: "Sem lei: rotina."
+        },
+        // mutirão 3000 (2ª rodada, itens 24, 28 e 29 da lista dados): o prazo da lixeira já existia fixo (30 dias na nuvem)
+        {
+          chave: "dias_lixeira_anexos",
+          grupo: "rotina",
+          rotulo: "Anexos apagados: guardar na lixeira por (dias)",
+          tipo: "inteiro",
+          padrao: 30,
+          min: 1,
+          max: 365,
+          explica: 'Anexo apagado (ou trocado por outro com o mesmo nome) não some na hora: a versão de antes fica guardada este número de dias, na lixeira da nuvem e, no computador com o backup seguro, na pasta "Apagados na nuvem" ao lado de "Arquivos dos imoveis". Ex.: contrato assinado apagado por engano em 10/03 → até 09/04 dá para recuperar.',
+          consequencia: "Prazo maior protege mais contra apagar por engano, mas guarda por mais tempo documentos pessoais que já saíram do sistema; prazo menor libera espaço mais cedo. O que já passou do prazo não volta.",
+          lei: "LGPD (Lei 13.709/2018), art. 6º, III (guardar só o necessário) e art. 46 (segurança: proteger contra perda acidental)."
+        },
+        {
+          chave: "dias_copias_backup",
+          grupo: "rotina",
+          rotulo: "Backup seguro: guardar as cópias de cada hora por (dias)",
+          tipo: "inteiro",
+          padrao: 2,
+          min: 1,
+          max: 30,
+          explica: "O backup seguro guarda, além da cópia do dia (que continua igual), uma cópia de cada hora em que houve gravação, por este número de dias. Ex.: uma exclusão errada às 15h → a cópia das 14h ainda tem os dados de antes.",
+          consequencia: "Prazo maior ocupa mais espaço na pasta do backup seguro (cada cópia tem o tamanho do banco); prazo menor guarda menos pontos para voltar.",
+          lei: "Sem lei: rotina. LGPD, art. 46 (segurança: proteger contra perda acidental)."
         },
         {
           chave: "dias_sem_imovel",
@@ -4666,6 +4691,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     removerArquivoAditivo: () => removerArquivoAditivo,
     removerComprovanteGarantia: () => removerComprovanteGarantia,
     removerDaLista: () => removerDaLista,
+    renomearArquivoNoBanco: () => renomearArquivoNoBanco,
     renomearReferencias: () => renomearReferencias,
     reservaParaCompetencia: () => reservaParaCompetencia,
     reservaParaMarcarAbatida: () => reservaParaMarcarAbatida,
@@ -8096,6 +8122,37 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       }
     }
     return m;
+  }
+  function trocarNomeNoValor(v, antigo, novo) {
+    if (v === antigo) return novo;
+    if (Array.isArray(v)) return v.includes(antigo) ? v.map((x) => x === antigo ? novo : x) : void 0;
+    if (v && typeof v === "object") {
+      if (!Object.values(v).includes(antigo)) return void 0;
+      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x === antigo ? novo : x]));
+    }
+    return void 0;
+  }
+  function renomearArquivoNoBanco(d2, escopo, id, antigo, novo, usuario, deste = () => true) {
+    const alvo = `${escopo}:${id}|${novo}`;
+    const tem = () => arquivosReferenciados(d2).some((x) => `${x.escopo}:${x.id}|${x.nome}` === alvo);
+    if (!antigo || !novo || antigo === novo || tem()) return 0;
+    const trocas = [];
+    for (const [t, lista3] of Object.entries(d2)) {
+      if (t === "historico" || !Array.isArray(lista3) || !TABELAS[t]) continue;
+      for (const r of lista3) {
+        if (!r || typeof r !== "object" || !deste(t, r.id)) continue;
+        for (const [k, v] of Object.entries(r)) {
+          const trocado = trocarNomeNoValor(v, antigo, novo);
+          if (trocado === void 0) continue;
+          r[k] = trocado;
+          const daPasta = tem();
+          r[k] = v;
+          if (daPasta) trocas.push([t, r.id, k, trocado]);
+        }
+      }
+    }
+    for (const [t, rid, k, valor] of trocas) atualizar(d2, t, rid, { [k]: valor }, usuario, `Arquivo guardado como "${novo}" (já havia outro "${antigo}" na nuvem, de outro aparelho)`);
+    return trocas.length;
   }
   function renomearReferencias(d2, contratoId, antigo, novo, usuario) {
     const texto3 = `Arquivo renomeado para acompanhar o lançamento: ${antigo} → ${novo}`;
@@ -12593,11 +12650,24 @@ ${naoIncluidos.join("\r\n")}\r
       return true;
     };
   }
-  async function espelhar(dir, chave, dados) {
+  function horasParaApagar(nomes, dias = DIAS_HORAS, agora = /* @__PURE__ */ new Date()) {
+    const limite = diaLocal(new Date(agora.getTime() - (Number.isInteger(dias) && dias > 0 ? dias : DIAS_HORAS) * 864e5));
+    return nomes.filter((n) => {
+      const d2 = (n.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})-\d{2}h/) || [])[1];
+      return d2 && d2 < limite;
+    });
+  }
+  async function espelhar(dir, chave, dados, { diasHoras = DIAS_HORAS, agora = /* @__PURE__ */ new Date() } = {}) {
     const sub2 = await dir.getDirectoryHandle(PASTA_DIARIO, { create: true });
     const nome = `imoveis-dados-${hoje()}${EXTENSAO}`;
-    await gravar(sub2, nome, await cifrar(chave, texto(JSON.stringify(dados)), { tipo: "diario", arquivo: "imoveis-dados.json", revisao: dados.revisao }));
+    const cifrado2 = await cifrar(chave, texto(JSON.stringify(dados)), { tipo: "diario", arquivo: "imoveis-dados.json", revisao: dados.revisao });
+    await gravar(sub2, nome, cifrado2);
     for (const velho of diariosParaApagar(await nomesEm(sub2))) await sub2.removeEntry(velho);
+    const horas = await dir.getDirectoryHandle(PASTA_HORAS, { create: true });
+    const daHora = nomeDaHora(agora);
+    const existentes = await nomesEm(horas);
+    if (!existentes.includes(daHora)) await gravar(horas, daHora, cifrado2);
+    for (const velho of horasParaApagar(existentes, diasHoras, agora)) await horas.removeEntry(velho);
     return nome;
   }
   async function gravarCompleto(dir, chave, zipBytes) {
@@ -12649,12 +12719,14 @@ ${naoIncluidos.join("\r\n")}\r
     }
     return lista3.sort((a, b) => b.alterado - a.alterado);
   }
-  var ARQUIVO_CHAVE, PASTA_DIARIO, PASTA_SEMANAL, PASTA_PROGRAMA, EXTENSAO, MAGICO, ITERACOES, ITERACOES_MIN, ITERACOES_MAX, SENHA_MINIMA_BACKUP, MANTER_DIARIOS, MANTER_SEMANAIS, MANTER_MENSAIS, DIAS_ENTRE_COMPLETOS, sutil, b64, deB64, aleatorio, texto, dataDoNome, gravarChave, hoje, CAMINHO_PROGRAMA, ARQUIVO_PROGRAMA, ARQUIVO_LEIAME, TEXTO_LEIAME;
+  var ARQUIVO_CHAVE, PASTA_DIARIO, PASTA_HORAS, DIAS_HORAS, PASTA_SEMANAL, PASTA_PROGRAMA, EXTENSAO, MAGICO, ITERACOES, ITERACOES_MIN, ITERACOES_MAX, SENHA_MINIMA_BACKUP, MANTER_DIARIOS, MANTER_SEMANAIS, MANTER_MENSAIS, DIAS_ENTRE_COMPLETOS, sutil, b64, deB64, aleatorio, texto, dataDoNome, gravarChave, hoje, diaLocal, nomeDaHora, CAMINHO_PROGRAMA, ARQUIVO_PROGRAMA, ARQUIVO_LEIAME, TEXTO_LEIAME;
   var init_backup_seguro = __esm({
     "docs/js/backup-seguro.js"() {
       init_calculos();
       ARQUIVO_CHAVE = "chave-do-backup.json";
       PASTA_DIARIO = "copias-diarias";
+      PASTA_HORAS = "copias-por-hora";
+      DIAS_HORAS = 2;
       PASTA_SEMANAL = "completos-semanais";
       PASTA_PROGRAMA = "programa";
       EXTENSAO = ".bkp";
@@ -12680,6 +12752,8 @@ ${naoIncluidos.join("\r\n")}\r
       dataDoNome = (n) => (n.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
       gravarChave = (dir, chave) => gravar(dir, ARQUIVO_CHAVE, JSON.stringify(chave, null, 1));
       hoje = () => hojeIso();
+      diaLocal = (d2) => `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+      nomeDaHora = (agora = /* @__PURE__ */ new Date()) => `imoveis-dados-${diaLocal(agora)}-${String(agora.getHours()).padStart(2, "0")}h${EXTENSAO}`;
       CAMINHO_PROGRAMA = "offline/administracao-imoveis.html";
       ARQUIVO_PROGRAMA = "administracao-imoveis.html";
       ARQUIVO_LEIAME = "LEIA-ME.txt";
@@ -12688,6 +12762,7 @@ ${naoIncluidos.join("\r\n")}\r
 
 O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
 - ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
+- ${PASTA_HORAS}/   uma copia do banco de cada hora em que houve gravacao (ficam os ultimos dias; para voltar a uma hora antes de um erro)
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
 - ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 
@@ -13840,6 +13915,22 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     await w.write(JSON.stringify(reg));
     await w.close();
   }
+  async function faxinaApagados(dir, dias, agora) {
+    let pasta;
+    try {
+      pasta = await dir.getDirectoryHandle(PASTA_APAGADOS);
+    } catch {
+      return;
+    }
+    const nomes = [];
+    for await (const [nome, h] of pasta.entries()) if (h.kind === "directory") nomes.push(nome);
+    for (const n of diasVencidos(nomes, dias, agora)) {
+      try {
+        await pasta.removeEntry(n, { recursive: true });
+      } catch {
+      }
+    }
+  }
   async function situacaoCopia(dir) {
     const r = await lerRegistro(dir);
     return r ? { total: Object.keys(r.arquivos || {}).length, atualizado_em: r.atualizado_em, por: r.por, falhas: r.falhas || 0 } : null;
@@ -13855,19 +13946,25 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     return (await pai.getFileHandle(p2.at(-1))).getFile();
   }
   async function atualizarCopia(dir, { listar: listar2, ler: ler2, aoAndar = () => {
-  }, por = "site" }) {
+  }, por = "site", diasApagados = DIAS_APAGADOS, agora = /* @__PURE__ */ new Date() }) {
     const reg = await lerRegistro(dir) || { arquivos: {} };
     const arquivos = { ...reg.arquivos || {} };
     const { baixar: baixar2, apagar, atual } = planoCopia(await listar2(), arquivos);
     const raiz = await dir.getDirectoryHandle(PASTA_COPIA, { create: true });
-    const salvar = (falhas2) => gravarRegistro(dir, { atualizado_em: (/* @__PURE__ */ new Date()).toISOString(), por, falhas: falhas2, arquivos });
+    const salvar = (falhas2) => gravarRegistro(dir, { atualizado_em: (/* @__PURE__ */ new Date()).toISOString(), por, falhas: falhas2, dias_apagados: diasApagados, arquivos });
     let falhas = 0;
     let feitos = 0;
     const total = baixar2.length + apagar.length;
+    const hoje3 = diaDeHoje(agora);
     for (const c of apagar) {
       const p2 = caminhoLocal(c);
       try {
         const pai = await pastaDe(raiz, p2.slice(0, -1), false);
+        const arq = await (await pai.getFileHandle(p2.at(-1))).getFile();
+        const destino = await pastaDe(dir, [PASTA_APAGADOS, hoje3, ...p2.slice(0, -1)], true);
+        const w = await (await destino.getFileHandle(p2.at(-1), { create: true })).createWritable();
+        await w.write(arq);
+        await w.close();
         await pai.removeEntry(p2.at(-1));
       } catch {
       }
@@ -13912,13 +14009,21 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     await Promise.all(Array.from({ length: Math.min(EM_PARALELO, baixar2.length) }, emFila2));
     await salvando;
     await salvar(falhas);
+    await faxinaApagados(dir, diasApagados, agora);
     return { baixados: baixar2.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
   }
-  var PASTA_COPIA, ARQUIVO_COPIA, EM_PARALELO, PROIBIDOS, RESERVADOS, caminhoLocal, NAO_COPIAR, copiavel;
+  var PASTA_COPIA, ARQUIVO_COPIA, PASTA_APAGADOS, DIAS_APAGADOS, diaDeHoje, diasVencidos, EM_PARALELO, PROIBIDOS, RESERVADOS, caminhoLocal, NAO_COPIAR, copiavel;
   var init_copia_aberta = __esm({
     "docs/js/copia-aberta.js"() {
       PASTA_COPIA = "Arquivos dos imoveis";
       ARQUIVO_COPIA = "copia-aberta.json";
+      PASTA_APAGADOS = "Apagados na nuvem";
+      DIAS_APAGADOS = 30;
+      diaDeHoje = (agora = /* @__PURE__ */ new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(agora);
+      diasVencidos = (nomes, dias = DIAS_APAGADOS, agora = /* @__PURE__ */ new Date()) => {
+        const limite = diaDeHoje(new Date(agora.getTime() - dias * 864e5));
+        return nomes.filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n) && n < limite);
+      };
       EM_PARALELO = 5;
       PROIBIDOS = /[<>:"|?*]/g;
       RESERVADOS = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
@@ -15363,7 +15468,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         }
         /**
          * Sobe os anexos guardados sem internet. Se outro aparelho gravou um arquivo com o mesmo nome no meio tempo,
-         * este sobe com "(deste aparelho)" no nome e vira aviso (o lançamento continua apontando para o nome antigo: conferir).
+         * este sobe com "(deste aparelho)" no nome e vira aviso; `aoRenomear(pasta, antigo, novo)` acerta o nome no lançamento deste
+         * aparelho (item 22 do mutirão 3000: antes ele continuava apontando para o arquivo do outro aparelho).
          * Mas se o que está na nuvem com esse nome é o MESMO arquivo (este envio já tinha chegado e a resposta se perdeu, ou outra aba
          * deste navegador o enviou), está enviado: nada de cópia nem de aviso.
          * A fila é relida do aparelho (dentro da trava) antes de começar e a cada mudança: outra aba pode ter posto ou enviado anexos.
@@ -15392,7 +15498,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
                       const ponto = nome.lastIndexOf(".");
                       const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
                       await this.pedir("PUT", codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
-                      this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
+                      const acertou = this.aoRenomear ? await Promise.resolve().then(() => this.aoRenomear(f.partes.slice(0, -1), nome, outro, f.em)).catch(() => false) : false;
+                      this.avisos.push(acertou ? `O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}" e o lançamento passou a apontar para ele.` : `O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira o lançamento.`);
                     }
                   } else {
                     recusado = true;
@@ -16280,6 +16387,24 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }
     await apagarAnexos(soltos, "Arquivo apagado junto com o lançamento");
     return r;
+  }
+  async function corrigirAnexoRenomeado(pasta, antigo, novo, em = null) {
+    if (!E.d || !E.usuario || !opera()) return false;
+    const alvo = pasta.join("/");
+    const desde = em ? new Date(new Date(em).getTime() - 6e4).toISOString() : "";
+    const meus = /* @__PURE__ */ new Set();
+    for (let i = E.d.historico.length - 1; i >= 0; i -= 1) {
+      const h = E.d.historico[i];
+      if (desde && String(h.quando) < desde) break;
+      if (h.usuario === login() && h.tabela) meus.add(`${h.tabela}:${h.registro_id}`);
+    }
+    for (const ref of arquivosReferenciados(E.d).filter((x) => x.nome === antigo)) {
+      const p2 = await pastaDoEscopo(ref.escopo, ref.id, false).catch(() => null);
+      if (!p2 || !Array.isArray(p2.partes) || p2.partes.join("/") !== alvo) continue;
+      const n = await alterar((db) => renomearArquivoNoBanco(db, ref.escopo, ref.id, antigo, novo, login(), (t, id) => meus.has(`${t}:${id}`)));
+      if (n) return true;
+    }
+    return false;
   }
   async function apagarAnexosConfirmados() {
     if (!E.nuvem) return 0;
@@ -27837,7 +27962,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   function telaRestaurarBackup() {
     return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
     <h1>Restaurar backup seguro</h1>
-    <p>Use só em caso de desastre (dados perdidos). Site fora do ar ou sem internet: abra pelo aplicativo instalado, que guarda os dados neste aparelho e envia sozinho quando voltar. Para restaurar, escolha um arquivo da pasta do backup seguro (<b>${PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
+    <p>Use só em caso de desastre (dados perdidos). Site fora do ar ou sem internet: abra pelo aplicativo instalado, que guarda os dados neste aparelho e envia sozinho quando voltar. Para restaurar, escolha um arquivo da pasta do backup seguro (<b>${PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${PASTA_HORAS}</b>, a de cada hora dos últimos dias, para voltar a antes de um erro; <b>${PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
     ${FORM_RESTAURAR}
     <p><a href="#/">Voltar</a></p></div></main>`;
   }
@@ -29092,6 +29217,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     let bytes2 = 0;
     let pulados = 0;
     const recusados = [];
+    const trocados = [];
     let jaTem;
     try {
       jaTem = await naNuvem(anexos);
@@ -29103,8 +29229,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const caminho = a.partes.join("/");
       aoAndar({ fase: "anexos", feitos, total, bytes: bytes2, totalBytes, nome: caminho });
       try {
-        if (jaTem(a.partes.slice(0, -1)).get(a.partes.at(-1)) === a.tamanho) pulados += 1;
-        else await anexos.pedir("PUT", codificar(a.partes), { corpo: await lerConteudo(a.handle) });
+        const naNuvemTamanho = jaTem(a.partes.slice(0, -1)).get(a.partes.at(-1));
+        if (naNuvemTamanho === a.tamanho) pulados += 1;
+        else {
+          await anexos.pedir("PUT", codificar(a.partes), { corpo: await lerConteudo(a.handle) });
+          if (naNuvemTamanho !== void 0) trocados.push(caminho);
+        }
       } catch (e) {
         if (caiu(e)) throw Object.assign(new Error(`A internet caiu no arquivo ${caminho}. Clique de novo: o que já subiu é pulado.`), { esperado: true });
         recusados.push({ caminho, motivo: e.message });
@@ -29114,10 +29244,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       aoAndar({ fase: "anexos", feitos, total, bytes: bytes2, totalBytes, nome: caminho });
     });
     recusados.sort((x, y) => x.caminho.localeCompare(y.caminho));
+    trocados.sort();
     aoAndar({ fase: "dados", feitos, total, bytes: bytes2, totalBytes, nome: ARQUIVO_BANCO });
     await sinc.importar(dados, { substituir });
     aoAndar({ fase: "conferencia", feitos, total, bytes: bytes2, totalBytes, nome: "" });
-    return { ...await conferir(dados, arquivos, { anexos, sinc }), total, totalBytes, pulados, recusados };
+    return { ...await conferir(dados, arquivos, { anexos, sinc }), total, totalBytes, pulados, recusados, trocados };
   }
   async function conferir(dados, arquivos, { anexos, sinc }) {
     await sinc.baixarTudo();
@@ -29277,7 +29408,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const itens = [
       `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(", "))}</b>` : "conferidos: iguais à pasta ✓"}`,
       `${r.total} anexos (${mb(r.totalBytes)}) ${r.faltando.length ? `<b>${r.faltando.length} faltando na nuvem</b>: ${esc(r.faltando.slice(0, 10).join("; "))}` : "conferidos: todos na nuvem com o mesmo tamanho ✓"}${r.pulados ? ` (${r.pulados} já estavam lá)` : ""}`,
-      ...r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join("; "))}`] : []
+      ...r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join("; "))}`] : [],
+      ...r.trocados?.length ? [`<b>${r.trocados.length} trocados pelo da pasta</b> (a nuvem tinha outro arquivo com o mesmo nome; a versão de lá ficou guardada na lixeira da nuvem por ${esc(String(regra("dias_lixeira_anexos")))} dias): ${esc(r.trocados.slice(0, 20).join("; "))}${r.trocados.length > 20 ? "…" : ""}`] : []
     ];
     return `<div class="alerta ${r.ok && !r.recusados.length ? "ok" : "perigo"}"><b>${r.ok && !r.recusados.length ? "Pronto: os dados estão na nuvem." : "Terminou, mas confira:"}</b><ul>${itens.map((i) => `<li>${i}</li>`).join("")}</ul></div>`;
   }
@@ -34120,7 +34252,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       return atualizarCopia(E.seguro.dir, {
         listar: () => E.anexos.listaCrua([PASTA_ARQUIVOS]),
         ler: (caminho) => E.anexos.ler([PASTA_ARQUIVOS, ...caminho.split("/")]),
-        aoAndar
+        aoAndar,
+        diasApagados: regra("dias_lixeira_anexos")
+        // o que saiu da nuvem fica em "Apagados na nuvem" (item 28)
       });
     });
     filaCopia = tarefa.catch(() => {
@@ -34345,6 +34479,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     E.nuvem = new Sincronia({ api: apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: travaDoNavegador, normalizar, tabelas: TABELAS_DO_SISTEMA });
     E.anexos = new AnexosNuvem({ guardar });
     E.anexos.aoMudar = agendarCopiaAberta;
+    E.anexos.aoRenomear = corrigirAnexoRenomeado;
     E.anexos.daCopiaLocal = (partes) => partes[0] === PASTA_ARQUIVOS && E.seguro?.dir ? lerDaCopia(E.seguro.dir, partes.slice(1).join("/")) : null;
     E.pasta = E.anexos.raiz();
     await E.anexos.carregarFila();
@@ -34869,7 +35004,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       chaveTentadaEm = 0;
       ESPERA_CHAVE = 6e4;
       AVISAR_DEPOIS_DE = 3;
-      espelharUmaVez = espelhoSemAcumular(naFilaSegura, () => E.seguro && E.seguro.chave && E.d ? espelhar(E.seguro.dir, E.seguro.chave, E.d) : void 0);
+      espelharUmaVez = espelhoSemAcumular(naFilaSegura, () => E.seguro && E.seguro.chave && E.d ? espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: regra("dias_copias_backup") }) : void 0);
       filaCopia = Promise.resolve();
       copiaAgendada = null;
       chaveNaNuvem = "";
