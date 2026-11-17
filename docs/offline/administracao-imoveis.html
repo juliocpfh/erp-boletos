@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-ZMFbj7ULg5Zdscb4Q+wAoLR9NF73LZmTulqFICBi3vQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-Tj4JzPBp97HhEAREX6yvJdtcQ6jADOhy9VB3dHRmzh4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="0895c4078cd6068a">
+<meta name="fontes" content="ddf1a4dfa9f8e1d1">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2341,8 +2341,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         voltar: /^#\/[\w/?&=.,-]*$/,
         q: /^[^\r\n<>]{1,100}$/,
         // texto da busca global (a tela ainda passa por esc())
-        situacao: /^(Reprovada|Desistiu)$/
+        situacao: /^(Reprovada|Desistiu)$/,
         // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
+        pagina: /^\d{1,5}$/
+        // página de uma lista longa (Histórico)
       };
     }
   });
@@ -4957,18 +4959,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (r.movimentacao_id) return `${tabela === "despesas" ? "Esta conta" : "Esta guia"} está ligada ao extrato do banco: desfaça o destino da movimentação na tela Banco.`;
     return null;
   }
-  function alteracoesDesfaziveis(d2) {
+  function alteracoesDesfaziveis(d2, desde = 0) {
     const desfeitos = /* @__PURE__ */ new Set();
-    d2.historico.forEach((h) => {
+    const hist = d2.historico;
+    for (let i = Math.max(0, desde); i < hist.length; i += 1) {
+      const h = hist[i];
       if (h.desfaz !== void 0 && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`);
-    });
+    }
     const topo = /* @__PURE__ */ new Map();
-    d2.historico.forEach((h, i) => {
-      if (h.acao !== "Alteração" || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== void 0) return;
+    for (let i = Math.max(0, desde); i < hist.length; i += 1) {
+      const h = hist[i];
+      if (h.acao !== "Alteração" || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== void 0) continue;
       for (const [k, m] of Object.entries(h.detalhes)) {
         if (m && typeof m === "object" && "de" in m && !desfeitos.has(`${i}:${k}`)) topo.set(`${h.tabela}:${h.registro_id}:${k}`, i);
       }
-    });
+    }
     const out = /* @__PURE__ */ new Set();
     for (const [chave, i] of topo) {
       const h = d2.historico[i];
@@ -11488,7 +11493,10 @@ ${xref}
     await w.close();
   }
   async function gravarBanco(pasta, dados) {
-    await escreverTexto(pasta, ARQUIVO_BANCO, JSON.stringify(dados, null, 1));
+    const conteudo = new Blob([JSON.stringify(dados)], { type: "application/json" });
+    await escreverTexto(pasta, ARQUIVO_BANCO, conteudo);
+    const assinatura = await assinaturaDoBanco(pasta);
+    return assinatura && assinatura.endsWith(`:${conteudo.size}`) ? assinatura : null;
   }
   async function backupDiario(pasta, dados) {
     const dir = await pasta.getDirectoryHandle(PASTA_BACKUPS, { create: true });
@@ -16208,7 +16216,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }).join("");
     return `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nada registrado ainda.</td></tr>'}</table></div>`;
   }
-  var ultimos = (filtro, n = 40) => d().historico.filter(filtro).slice(-n).reverse();
+  var ultimos = (filtro, n = 40) => {
+    const h = d().historico;
+    const out = [];
+    for (let i = h.length - 1; i >= 0 && out.length < n; i -= 1) if (filtro(h[i], i, h)) out.push(h[i]);
+    return out;
+  };
   var SUB_DOCS = "Matrículas";
   var SUB_DOCS_ANTIGA = "Documentos do imóvel";
   var SUB_INQUILINOS = "Inquilinos";
@@ -16929,6 +16942,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     for (const a of alertas) grupos.set(a.tipo, [...grupos.get(a.tipo) || [], a]);
     return [...grupos];
   };
+  var MOSTRAR_ALERTAS = 5;
+  var alertasAbertos = /* @__PURE__ */ new Set();
   var caixaHistorico = (titulo2, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo2}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
   var ACEITA_DOCUMENTOS = ".pdf,.jpg,.jpeg,.png,.webp,.gif";
   var ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
@@ -26494,6 +26509,16 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : "Desfeito.");
     await mostrar();
   }
+  var HISTORICO_POR_PAGINA = 100;
+  var textosHistorico = /* @__PURE__ */ new WeakMap();
+  var textoDaEntrada = (h) => {
+    let t = textosHistorico.get(h);
+    if (t === void 0) {
+      t = `${h.descricao || ""} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase("pt-BR");
+      textosHistorico.set(h, t);
+    }
+    return t;
+  };
   function telaHistorico(q) {
     const trocadas = q.de && q.ate && q.de > q.ate;
     if (trocadas) q = { ...q, de: q.ate, ate: q.de };
@@ -26504,11 +26529,29 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (q.ate) lista3 = lista3.filter((h) => h.quando.slice(0, 10) <= q.ate);
     if (q.texto) {
       const t = q.texto.toLocaleLowerCase("pt-BR");
-      lista3 = lista3.filter((h) => `${h.descricao || ""} ${JSON.stringify(h.detalhes || {})}`.toLocaleLowerCase("pt-BR").includes(t));
+      lista3 = lista3.filter((h) => textoDaEntrada(h).includes(t));
     }
     const usuarios = [...new Set(d().historico.map((h) => h.usuario))].sort();
-    const filtrando = Object.values(q).some(Boolean);
-    const desfazer = podeUsuario("admin") ? { pode: alteracoesDesfaziveis(d()), indice: new Map(d().historico.map((h, i) => [h, i])) } : null;
+    const { pagina: _pagina, ...filtros } = q;
+    const filtrando = Object.values(filtros).some(Boolean);
+    const paginas = Math.max(1, Math.ceil(lista3.length / HISTORICO_POR_PAGINA));
+    const pagina = Math.min(paginas, Math.max(1, Number(q.pagina) || 1));
+    const fim = lista3.length - (pagina - 1) * HISTORICO_POR_PAGINA;
+    const mostrados = lista3.slice(Math.max(0, fim - HISTORICO_POR_PAGINA), fim).reverse();
+    let desfazer = null;
+    if (podeUsuario("admin")) {
+      const naPagina = new Set(mostrados);
+      const indice = /* @__PURE__ */ new Map();
+      d().historico.forEach((h, i) => {
+        if (naPagina.has(h)) indice.set(h, i);
+      });
+      const desde = indice.size ? Math.min(...indice.values()) : d().historico.length;
+      desfazer = { pode: alteracoesDesfaziveis(d(), desde), indice };
+    }
+    const irPara = (n, texto3) => link(`#/historico?${new URLSearchParams({ ...filtros, pagina: String(n) })}`, texto3);
+    const navegar = paginas > 1 ? `<p class="acoes">${pagina > 1 ? `${irPara(1, "« Mais recentes")} ${irPara(pagina - 1, "‹ Anteriores")}` : ""}
+    <span class="suave">Página ${pagina} de ${paginas} (registros ${lista3.length - fim + 1} a ${lista3.length - fim + mostrados.length} de ${lista3.length}, do mais recente para o mais antigo)</span>
+    ${pagina < paginas ? `${irPara(pagina + 1, "Mais antigos ›")} ${irPara(paginas, "Os primeiros »")}` : ""}</p>` : "";
     const usadas = new Set(d().historico.map((h) => h.tabela));
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista3.length} registro(s)${filtrando ? " com o filtro aplicado" : ""}</span></summary>
@@ -26521,7 +26564,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
     ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta o campo ao valor anterior. Cada campo volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
       <p>${botao("desfazerMarcados", "↶ Desfazer os marcados", {}, "secundario pequeno")}</p>` : ""}
-    ${tabelaHistorico(lista3.slice(-500).reverse(), desfazer)}<p class="suave">Mostrando até 500 registros mais recentes.</p></details>`;
+    ${navegar}${tabelaHistorico(mostrados, desfazer)}${navegar}</details>`;
   }
   async function versaoDoSistema() {
     const fmt = (dt) => dt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -29153,6 +29196,12 @@ ${MODELO_COMODOS[comodo].join("\n")}
       aviso(`Alerta "${tipo}" desligado. Para voltar a avisar, use "Religar" em "Alertas desligados", no fim dos alertas do Painel.`);
       await mostrar();
     },
+    /** Painel: mostra todos os alertas de um tipo (começam só os primeiros, MOSTRAR_ALERTAS) ou volta a recolher. */
+    verTodosAlertas({ tipo }) {
+      if (alertasAbertos.has(tipo)) alertasAbertos.delete(tipo);
+      else alertasAbertos.add(tipo);
+      return mostrar();
+    },
     async religarAlerta({ id }) {
       await alterar((db) => religarAlerta(db, id, login()));
       aviso("Alerta religado: volta a aparecer se ainda estiver pendente.");
@@ -31188,8 +31237,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${avisoBackupSeguro()}
       ${calendarioDoPainel(competenciaValida(rota.q.mes, competenciaDe(hoje3)), hoje3)}
       <div class="cartao" id="alertas"><div class="cabecalho"><h2>Alertas</h2>${podeUsuario("admin") ? link("#/alertas-config", "Editar", "botao secundario pequeno") : ""}</div>
-        ${gruposDeAlertas(alertas).map(([tipo, lista3]) => `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista3.length})</span></h3>
-          ${lista3.map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join("")}</div>`).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
+        ${gruposDeAlertas(alertas).map(([tipo, lista3]) => {
+        const todos = alertasAbertos.has(tipo);
+        return `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista3.length})</span></h3>
+          ${(todos ? lista3 : lista3.slice(0, MOSTRAR_ALERTAS)).map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join("")}
+          ${lista3.length > MOSTRAR_ALERTAS ? `<p class="mais-alertas">${botao("verTodosAlertas", todos ? `Mostrar só os ${MOSTRAR_ALERTAS} primeiros` : `Ver todos os ${lista3.length} alertas de "${esc(tipo)}" (mais ${lista3.length - MOSTRAR_ALERTAS})`, { tipo }, "secundario mini")}</p>` : ""}</div>`;
+      }).join("") || '<p class="suave">Nenhum alerta no momento.</p>'}
         ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
           ${adiados.map((a) => alertaAdiado(a, hoje3)).join("")}</details>` : ""}
         ${desligados.length ? `<details id="alertas-desligados"><summary class="suave">${desligados.length} alerta(s) desligado(s) (clique para ver ou religar)</summary>
@@ -31440,20 +31493,24 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   var travaDaPasta = (fn) => globalThis.navigator?.locks ? navigator.locks.request("imoveis-pasta", fn) : fn();
   async function alterarNaPasta(fn, soSessao) {
-    const disco = await lerBanco(E.pasta);
+    const pasta = E.pasta;
+    const igualAoDisco = memoriaIgualAoDisco(pasta) && arquivoConferido.assinatura === await assinaturaDoBanco(pasta);
+    const disco = igualAoDisco ? E.d : await lerBanco(pasta);
     if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
     if (disco && E.d && disco.revisao !== E.d.revisao) {
       const avisar = !soSessaoNoDisco(disco);
       E.d = disco;
       if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || "outra pessoa"} e recarregados antes de gravar.`, "info");
     }
+    if (!igualAoDisco && disco) anotarConferido(pasta, E.d, assinaturaLida(disco));
     const antes = E.d || disco;
     const copia2 = copiar(antes);
     const resultado = fn(copia2);
     copia2.revisao = (copia2.revisao || 0) + 1;
     copia2.revisao_so_sessao = soSessao ? copia2.revisao : null;
-    await gravarBanco(E.pasta, copia2);
+    const assinatura = await gravarBanco(pasta, copia2);
     E.d = copia2;
+    anotarConferido(pasta, copia2, assinatura);
     espelharSeguro();
     backupDoDia(antes);
     atualizarFaixa();
@@ -31603,6 +31660,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     else mostrar();
   }
   var arquivoConferido = null;
+  function anotarConferido(pasta, dados, assinatura) {
+    arquivoConferido = assinatura && dados ? { pasta, assinatura, dados } : null;
+  }
+  var memoriaIgualAoDisco = (pasta) => !!(E.d && arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.dados === E.d);
   var conferindo = false;
   async function verificarMudancasExternas() {
     tentarSeguroDeNovo();
@@ -31630,11 +31691,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     if (!E.pasta || !E.d || document.hidden) return;
     try {
       const pasta = E.pasta;
-      if (arquivoConferido && arquivoConferido.pasta === pasta && arquivoConferido.assinatura === await assinaturaDoBanco(pasta)) return;
+      if (memoriaIgualAoDisco(pasta) && arquivoConferido.assinatura === await assinaturaDoBanco(pasta)) return;
       const disco = await lerBanco(pasta);
       if (pasta !== E.pasta) return;
-      arquivoConferido = disco && assinaturaLida(disco) ? { pasta, assinatura: assinaturaLida(disco) } : null;
-      if (disco && disco.revisao !== E.d.revisao) {
+      const mudou = disco && disco.revisao !== E.d.revisao;
+      anotarConferido(pasta, mudou ? disco : E.d, disco && assinaturaLida(disco));
+      if (mudou) {
         const soSessao = soSessaoNoDisco(disco);
         E.d = disco;
         renovarUsuario();
@@ -31781,6 +31843,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   async function abrirPasta(handle) {
     E.pasta = handle;
     E.d = await lerBanco(handle);
+    anotarConferido(handle, E.d, assinaturaLida(E.d));
     E.backupFeito = false;
     E.usuario = usuarioDaSessao();
     rotinaDeAbertura2();
