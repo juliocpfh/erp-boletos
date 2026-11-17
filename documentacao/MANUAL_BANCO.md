@@ -103,7 +103,7 @@ Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quan
 - Saída de luz de R$ 123,45 em 17/11/2026 com a luz já lançada à mão: o sistema procura as contas lançadas **no mês anterior e no mês da saída** (de 01/10/2026 a 30/11/2026) e avisa "vincule e confirme qual é". A luz paga em 10/10 aparece na lista; a de 28/09, não. Na janela, nenhuma vem escolhida: escolha qual conta e de qual mês é, ou "não é nenhuma: lançar agora".
 - TED de R$ 2.000,00 da ANK para a JCK: o destino "Transferência" é sugerido (cita a outra empresa), mas a outra ponta você escolhe na janela; num Pix entre as nossas contas, com o mesmo código nas duas pontas, a outra ponta já vem proposta.
 - Saída de R$ 200,00 com o mesmo valor de um pagamento feito pelo sistema, mas sem a referência `erp-…` na descrição: só o aviso; confirme em **Pagamentos pelo banco → Confirmar pelo extrato** (lá também nenhuma saída vem marcada).
-- IPTU: a parcela só vem escolhida quando o extrato a cita ("PARCELA 3/10"); pelo valor, escolha a parcela na janela.
+- IPTU: a parcela nunca vem escolhida, nem pelo valor nem quando o extrato a cita ("PARCELA 3/10" não é identificador). A linha mostra "IPTU sem identificação: vincular manualmente (o extrato cita a 3ª parcela; escolha a parcela e confirme)" e você escolhe a parcela na janela.
 
 Quando não reconhece, você escolhe:
 

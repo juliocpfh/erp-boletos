@@ -133,19 +133,20 @@ test('sugestão de destino: palavras da descrição com o imóvel pela matrícul
   s = Z.sugerirDestino(d, luz);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa], ['conta_imovel', loja.id, 'Luz']);
   s = Z.sugerirDestino(d, iptu);
-  assert.deepEqual([s.classificacao, s.imovel_id, s.iptu.n, s.confianca], ['iptu', loja.id, 1, 'alta']);
-  // a parcela citada na descrição vale mais que a primeira em aberto com o mesmo valor (todas de R$ 100,00)
+  // decisão do dono (17/11/2026): nem a parcela citada no extrato é identificador; IPTU é sempre "vincular manualmente", nada escolhido
+  assert.deepEqual([s.classificacao, s.imovel_id, s.iptu.n, s.semIdentificacao, s.confianca], ['iptu', loja.id, null, true, 'baixa']);
   for (const [desc, n] of [['IPTU PREFEITURA CURITIBA INSC 01.234.567 PARCELA 3/10', 3], ['IPTU PREF CURITIBA 01.234.567 PARC 04', 4], ['IPTU 01.234.567 3ª PARCELA', 3], ['IPTU 01.234.567 2A PARC', 2]]) {
     const [m] = importar(d, 'ank', [saida(`p${n}${desc.length}`, '2026-11-09', '100.00', desc)]).novas;
     s = Z.sugerirDestino(d, m);
-    assert.deepEqual([s.classificacao, s.iptu.n, s.confianca], ['iptu', n, 'alta'], desc);
-    assert.match(s.motivo, /parcela citada/);
+    assert.deepEqual([s.classificacao, s.iptu.n, s.semIdentificacao], ['iptu', null, true], desc);
+    assert.match(s.motivo, new RegExp(`IPTU sem identificação: vincular manualmente \\(o extrato cita a ${n}ª parcela`), 'a citada só aparece no aviso');
   }
   assert.deepEqual([Z.parcelaCitada('PARCELA 3/10'), Z.parcelaCitada('PARC. 07'), Z.parcelaCitada('3ª PARCELA'), Z.parcelaCitada('COTA UNICA'), Z.parcelaCitada('IPTU PREFEITURA')], [3, 7, 3, 0, null]);
-  // parcela citada já paga: só pelo valor nenhuma parcela é escolhida (o usuário escolhe na janela; decisão de 17/11/2026)
+  // parcela citada já paga: o aviso não a cita, e nenhuma parcela é escolhida
   R.marcarIptuPago(d, d.iptus[0].id, 5, '2026-06-10', 'julio');
   const [paga] = importar(d, 'ank', [saida('p5x', '2026-11-09', '100.00', 'IPTU 01.234.567 PARCELA 5/10')]).novas;
-  assert.deepEqual([Z.sugerirDestino(d, paga).iptu.n, Z.sugerirDestino(d, paga).confianca], [null, 'media']);
+  assert.deepEqual([Z.sugerirDestino(d, paga).iptu.n, Z.sugerirDestino(d, paga).confianca], [null, 'baixa']);
+  assert.doesNotMatch(Z.sugerirDestino(d, paga).motivo, /cita/);
   s = Z.sugerirDestino(d, net);
   assert.deepEqual([s.classificacao, s.imovel_id, s.tipo_despesa, s.confianca], ['conta_imovel', null, 'Internet', 'baixa'], 'palavra sem imóvel conhecido: sugestão fraca');
 });

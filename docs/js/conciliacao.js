@@ -1118,12 +1118,12 @@ export function sugerirDestino(d, mov, indice = null) {
     if (classificacao === 'iptu') {
       const p = imv ? d.iptus.filter((x) => x.imovel_id === imv.imovel.id).sort((a, b) => b.ano - a.ano)[0] : null;
       const pcs = p ? parcelasIptu(d, p).filter((pc) => pc.proprietario) : [];
-      // "PARCELA 3/10", "PARC 3", "3ª PARCELA": a parcela citada vale mais que a primeira em aberto com o mesmo valor
+      // a parcela nunca vem escolhida (decisão do dono, 17/11/2026): nem pelo valor nem pela citada no texto ("PARCELA 3/10" não é
+      // identificador); a citada só aparece no aviso, como lembrete, e o usuário escolhe e confirma na janela
       const nCitado = parcelaCitada(texto);
       const citada = nCitado !== null ? pcs.find((pc) => pc.n === nCitado && !pc.paga) || null : null;
-      // só pelo valor, a parcela não é escolhida (decisão do dono, 17/11/2026): o usuário escolhe na janela
-      const parcela = citada;
-      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: parcela ? parcela.n : null } : null, motivo: citada ? `descrição de IPTU (${citada.rotulo} parcela citada)` : 'descrição de IPTU: escolha a parcela', confianca: parcela ? 'alta' : 'media' };
+      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: null } : null, semIdentificacao: true, confianca: 'baixa',
+        motivo: `IPTU sem identificação: vincular manualmente (${citada ? `o extrato cita a ${citada.rotulo} parcela; ` : ''}escolha a parcela e confirme)` };
     } else if (classificacao === 'imposto') porPalavra = { classificacao: 'imposto', motivo: 'descrição de imposto', confianca: 'media' };
     else if (classificacao === 'tarifa') porPalavra = { classificacao: 'tarifa', motivo: 'descrição de tarifa', confianca: 'media' };
     else porPalavra = { classificacao: 'conta_imovel', imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === 'nome' ? 'descrição' : 'matrícula/UC cadastrada'}` : `descrição de ${tipo}`, confianca: imv ? 'media' : 'baixa' };
