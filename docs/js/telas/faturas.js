@@ -57,7 +57,7 @@ export function telaFaturas(mes) {
         ${porMes(pend).map(([mes, ps]) => `<tr class="grupo-mes"><th><input type="checkbox" data-marcar-todas="nfp-${mes}" ${R.mesFechado(mes) ? 'checked' : ''} title="Marcar o mês todo"></th>
           <th colspan="5">${compBr(mes)} · ${ps.length} pagamento(s) · ${reais(ps.reduce((t, p) => t + R.baseDaFatura(d(), p.tipo, p.registro).valor, 0))} ${R.mesFechado(mes) ? etiqueta('mês fechado', 'ok') : etiqueta('mês em andamento', 'aviso')}</th></tr>
           ${ps.map((p) => linhaPendente(p, mes, ultima)).join('')}`).join('')}</table>
-        <p class="suave">A numeração segue a data contábil dos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
+        <p class="suave">A numeração segue o dia em que o dinheiro entrou na conta, nos marcados. Algum pagamento já teve a NF emitida fora do sistema? Use "Já emitida" na linha: informe o número e a data, e ele sai da fila sem gastar número novo.</p>
         ${opera() ? `<p>${botao('numerar', 'Numerar as NFs marcadas', {}, '')}</p>` : ''}`
       : '<p class="suave">Nenhum pagamento aguardando número.</p>'}</div>
     ${caixaAvulsas()}
@@ -104,6 +104,8 @@ function linhaPendente(p, mes, ultima) {
 
 /** Lembrete do Airbnb antes de numerar: o mês que acabou de fechar e os meses fechados que estão na fila. */
 function caixaAirbnb(pend) {
+  // quem não usa Airbnb (nenhum imóvel Airbnb e nenhum ganho lançado) não vê o lembrete
+  if (!d().imoveis.some((i) => i.tipo === 'airbnb') && !(d().ganhos_airbnb || []).length) return '';
   const hoje = C.hojeIso();
   const meses = [C.somarMeses(C.competenciaDe(hoje), -1), ...pend.map((p) => p.data.slice(0, 7))];
   const lembretes = R.lembretesAirbnb(d(), meses, hoje);

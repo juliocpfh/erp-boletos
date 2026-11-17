@@ -29,7 +29,7 @@ export function botoesMesC6(comp) {
   const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
   // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
   const conferir = link('#/banco?ir=conferir-boletos', 'Conferir pagamentos no banco (tela Banco)', 'botao secundario');
-  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}`;
+  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
     ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}`;
 }
@@ -49,7 +49,8 @@ export function resumoBancoLinha(cb) {
   const partes = [etiquetaBanco(cb)];
   if (R.emitidoNoBanco(cb) && cb.banco.linha_digitavel) partes.push(botao('copiar', 'Copiar linha digitável', { texto: cb.banco.linha_digitavel }));
   if (R.emitidoNoBanco(cb) && cb.banco.pix_copia_cola) partes.push(botao('copiar', 'Copiar Pix', { texto: cb.banco.pix_copia_cola }));
-  partes.push(botaoEmitirC6(cb));
+  // banco ainda não ligado: o botão apagado em cada linha não explicava nada no celular; o motivo vai uma vez, em cima da lista
+  if (B.pontePronta(d())) partes.push(botaoEmitirC6(cb));
   return partes.filter(Boolean).join(' ');
 }
 
@@ -155,12 +156,12 @@ export function caixaConfigBanco() {
   const emissora = R.contaEmissora(d());
   const resumoNotif = (x) => { const canais = Object.entries(R.CANAIS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); const quando = Object.entries(R.MOMENTOS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); return canais.length && quando.length ? `${canais.join(' e ')}: ${quando.join(', ')}` : 'não avisa'; };
   return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao}</div></div>
-    <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que roda no computador de quem emite (pasta <code>ponte-c6</code> do programa, veja o README dela). As chaves do banco ficam só na ponte, nunca aqui.</p>
+    <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que o técnico instala no computador de quem emite. As chaves do banco ficam só na ponte, nunca aqui.</p>
     <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : 'a padrão'}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
     <form data-form="configBanco" class="formulario">
-      <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(B.ponteLocal().configurada ? B.ponteLocal().ponte_url : '')}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
-      <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(B.ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
-      <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para o arquivo de dados nem para o OneDrive): informe nos dois campos em cada computador que vai usar o banco.${B.ponteLocal().configurada ? '' : ' <b>Ainda não informados aqui.</b>'}</div>
+      <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(B.ponteLocal().configurada ? B.ponteLocal().ponte_url : '')}" placeholder="http://localhost:8765"><div class="ajuda">O técnico informa este endereço ao instalar a ponte</div></div>
+      <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(B.ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A senha combinada com o técnico ao instalar a ponte</div></div>
+      <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para a nuvem nem para o arquivo de dados): informe nos dois campos em cada computador que vai usar o banco.${B.ponteLocal().configurada ? '' : ' <b>Ainda não informados aqui.</b>'}</div>
       <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg.ativo)} ${cfg.contas.length ? '' : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao('testarPonteC6', 'Testar conexão', {}, 'secundario')}${B.ponteLocal().configurada ? ` ${botao('esquecerPonteC6', 'Esquecer a ponte neste computador', {}, 'perigo', 'Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.')}` : ''}</div></form>
     <div id="saude-ponte"></div>
@@ -169,7 +170,7 @@ export function caixaConfigBanco() {
       ${cfg.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta('padrão dos boletos', 'info')}` : ''}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste)', 'aviso')}<br><span class="suave">carteira ${esc(R.carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === 'producao' ? `<br>${etiqueta('desconto não conferido: boleto com bonificação não sai', 'perigo')}` : `<br><span class="suave">desconto: conferir no boleto de teste</span>`}</td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao('testarContaC6', 'Testar conexão', { conta: x.id })} ${botao('editarContaBanco', 'Editar', { conta: x.id })} ${botao('excluirContaBanco', 'Tirar', { conta: x.id }, 'perigo pequeno', `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join('')
-    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador configurado na ponte (linha CONTAS do arquivo .env dela; ex.: CONTAS=loja1,loja2).</td></tr>'}</table></div>
+    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador que o técnico usou na ponte (ex.: loja1).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
     <form data-form="contaBanco" class="formulario" style="margin-top:10px">
       <div><label>Identificador na ponte</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
@@ -191,7 +192,7 @@ export function caixaConfigBanco() {
       <div class="largo"><label>Negativação no birô de crédito</label><div class="acoes"><label class="check-mini"><input type="checkbox" name="negativacao_ativa" value="1"> Mostrar o botão "Negativar" na página do boleto (só administrador)</label>
         após <input name="negativacao_dias" type="number" min="1" value="${padrao.negativacao.dias_atraso}" style="width:80px"> dias de atraso</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar conta</button></div></form></details>
-    <p class="suave" style="margin-top:10px">Como ligar quando as chaves chegarem: <code>documentacao/GUIA_DE_MODIFICACAO.md</code> ("Ligar o boleto com Pix do C6") e <code>ponte-c6/README.md</code>.</p></div>`;
+    <p class="suave" style="margin-top:10px">Para ligar o banco quando as chaves chegarem, peça ao técnico (o passo a passo está na documentação do sistema: "Ligar o boleto com Pix do C6").</p></div>`;
 }
 
 /** Desenha o resultado de /saude na caixa (texto em português, sem jargão). */

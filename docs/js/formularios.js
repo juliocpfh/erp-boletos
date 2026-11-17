@@ -98,8 +98,8 @@ export const IMOVEL = [
   campo('gas_relogio', 'Relógio de gás (nº / identificação)'),
   campo('internet', 'Contrato de internet ou nº do telefone'),
   secao('Área e energia'),
-  campo('area_util', 'Área útil (m²)', 'pct'),
-  campo('area_total', 'Área total (m²)', 'pct'),
+  campo('area_util', 'Área útil (m²)', 'pct', { min: 0 }),
+  campo('area_total', 'Área total (m²)', 'pct', { min: 0 }),
   campo('energia_ligada', 'Energia ligada', 'opcao', { opcoes: ['Sim', 'Não'] }),
   campo('energia_tipo', 'Tipo de ligação da energia', 'opcao', { opcoes: ['Monofásica', 'Bifásica', 'Trifásica'] }),
   secao('Valor do imóvel'),
@@ -619,7 +619,7 @@ export const COBRANCA = [
   campo('seguro', 'Seguro', 'dinheiro'),
   campo('taxa_boleto', 'Taxa do boleto', 'dinheiro'),
   campo('fci', 'FCI (fundo de conservação do imóvel)', 'dinheiro', { ajuda: 'Fora da NF, da multa e dos juros' }),
-  campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
+  campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { negativo: true, ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
   campo('outros_descricao', 'Motivo do ajuste', 'texto', { ajuda: 'Ex.: reforma do banheiro, acerto do mês anterior' }),
   campo('reserva_utilizada', 'Reserva utilizada', 'dinheiro'),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct'),
@@ -676,8 +676,14 @@ export function ler(campos, form, antigo = null) {
       continue;
     }
     try {
-      if (c.tipo === 'dinheiro') dados[c.nome] = centavos(bruto);
-      else if (c.tipo === 'pct') dados[c.nome] = numero(bruto);
+      if (c.tipo === 'dinheiro') {
+        dados[c.nome] = centavos(bruto);
+        // negativo só onde faz sentido (ex.: ajuste do mês que desconta do boleto); senão entrava nos totais
+        if (dados[c.nome] < 0 && !c.negativo && !c.positivo) { erros[c.nome] = 'O valor não pode ser negativo'; continue; }
+      } else if (c.tipo === 'pct') {
+        dados[c.nome] = numero(bruto);
+        if (c.min !== undefined && dados[c.nome] < c.min) { erros[c.nome] = c.min === 0 ? 'Não pode ser negativo' : `Não pode ser menor que ${c.min}`; continue; }
+      }
       else if (c.tipo === 'inteiro') {
         const n = numero(bruto);
         if (!Number.isInteger(n)) throw new Error();
@@ -697,7 +703,15 @@ export function ler(campos, form, antigo = null) {
         const erro = igualAntes ? '' : conferirDocumento(c.tipo, bruto);
         if (erro) { erros[c.nome] = erro; dados[c.nome] = bruto; continue; }
         dados[c.nome] = igualAntes ? antigo[c.nome] : mascarar(c.tipo, bruto);
-      } else if (c.tipo === 'tel') dados[c.nome] = [10, 11].includes(soDigitos(bruto).length) ? mascarar('tel', bruto) : bruto;
+      } else if (c.tipo === 'tel') {
+        // telefone com DDD: 10 ou 11 números (o que já estava salvo e não mudou passa, dados antigos)
+        const n = soDigitos(bruto).length;
+        if (![10, 11].includes(n) && !(antigo && antigo[c.nome] === bruto)) { erros[c.nome] = 'Telefone com DDD: 10 ou 11 números. Ex.: (41) 99999-8888'; dados[c.nome] = bruto; continue; }
+        dados[c.nome] = [10, 11].includes(n) ? mascarar('tel', bruto) : bruto;
+      } else if (c.tipo === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(bruto) && !(antigo && antigo[c.nome] === bruto)) {
+        erros[c.nome] = 'E-mail incompleto. Ex.: nome@gmail.com';
+        dados[c.nome] = bruto;
+      }
       else if (c.tipo === 'opcao' && c.nome.endsWith('_id')) dados[c.nome] = Number(bruto);
       else dados[c.nome] = c.max ? bruto.slice(0, c.max) : bruto;
     } catch (e) {
@@ -786,7 +800,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     } else {
       // link fica como texto: o navegador recusaria "onedrive.live.com/..." sem https://, e ler() completa sozinho
       const tipo = { data: 'date', mes: 'month', email: 'email', tel: 'tel' }[c.tipo] || 'text';
-      const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : ['pct', 'inteiro'].includes(c.tipo) ? 'inputmode="decimal"'
+      const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : c.tipo === 'pct' ? 'inputmode="decimal"' : c.tipo === 'inteiro' ? 'inputmode="numeric"'
         : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : c.base ? 'data-vinculo-base' : '';
       // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)

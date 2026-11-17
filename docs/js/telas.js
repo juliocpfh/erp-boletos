@@ -37,6 +37,23 @@ import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 // --------------------------------------------------------------------------
 const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
 
+/**
+ * Sistema começando (nenhum imóvel ou nenhum contrato): no lugar do "Fechamento: as etapas liberadas estão feitas", os
+ * primeiros passos (empresa → imóvel → contrato → boletos), com ✓ no que já foi feito. Some quando os quatro estão feitos.
+ */
+function primeirosPassos() {
+  const db = d();
+  if (db.imoveis.length && db.contratos.length) return '';
+  const pode = opera();
+  const passos = [
+    [db.emitentes.length > 0, 'Cadastre a empresa que emite as NFs', pode && podeUsuario('admin') ? '#/novo/emitentes' : ''],
+    [db.imoveis.length > 0, 'Cadastre o primeiro imóvel', pode ? '#/novo/imoveis' : ''],
+    [db.contratos.length > 0, 'Cadastre o contrato do inquilino', pode ? '#/novo/contratos' : ''],
+    [db.cobrancas.length > 0, 'Gere os boletos do mês', '#/cobrancas'],
+  ];
+  return `<div class="alerta info primeiros-passos"><b>Primeiros passos</b><ol>${passos.map(([feito, texto, href]) => `<li>${feito ? '✓ ' : ''}${feito || !href ? esc(texto) : `<a href="${href}">${esc(texto)}</a>`}</li>`).join('')}</ol></div>`;
+}
+
 export const TELAS = {
   _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
   _listaArquivos: listaArquivos,
@@ -170,10 +187,10 @@ export const TELAS = {
     const lembrada = await S.pastaLembrada();
     return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:560px">
       <h1>Administração de Imóveis</h1>
-      <p>Os dados ficam numa pasta do seu computador, que pode estar dentro do <b>OneDrive</b> para sincronizar com outros computadores. Nada é guardado na internet.</p>
+      <p>Esta é a versão do sistema que guarda os dados numa pasta deste computador (para usar sem internet). No dia a dia, use o endereço do sistema na internet: os dados ficam na nuvem.</p>
       ${lembrada ? `<p><button data-acao="reabrir">Abrir a pasta "${esc(lembrada.name)}"</button></p><p class="suave">ou</p>` : ''}
       <p><button class="${lembrada ? 'secundario' : ''}" data-acao="escolherPasta">Escolher a pasta dos dados</button></p>
-      <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>OneDrive\\Imoveis</b>, e escolha ela. Para usar os mesmos dados em outro computador, escolha lá a mesma pasta do OneDrive.</p>
+      <p class="suave">Primeira vez? Crie uma pasta, por exemplo <b>Documentos\\Imoveis</b>, e escolha ela.</p>
       ${LINK_RESTAURAR}
     </div></main>`;
   },
@@ -189,28 +206,28 @@ export const TELAS = {
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
       Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
     <form data-form="primeiroAcesso">
-      <p><label>Seu nome</label><input name="nome" autofocus></p>
-      <p><label>Login</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
-      <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
+      <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autocomplete="username"></p>
+      <p><label for="ent_senha">Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input id="ent_senha" type="password" name="senha" autocomplete="new-password"></p>
+      <p><label for="ent_senha2">Repita a senha</label><input id="ent_senha2" type="password" name="senha2" autocomplete="new-password"></p>
       <button>Criar e entrar</button> ${E.nuvem ? '' : botao('escolherPasta', 'Escolher outra pasta')}
     </form>${LINK_RESTAURAR}</div></main>`,
 
   login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}</p>
     <form data-form="login">
-      <p><label>Login</label><input name="login" autofocus autocomplete="username"></p>
-      <p><label>Senha</label><input type="password" name="senha" autocomplete="current-password"></p>
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autofocus autocomplete="username"></p>
+      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha" autocomplete="current-password"></p>
       <button>Entrar</button> ${E.nuvem ? '' : botao('escolherPasta', 'Trocar de pasta')}
     </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
 
   pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Pedir acesso</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}. O administrador recebe o pedido em Usuários e libera o acesso.</p>
     <form data-form="pedirAcesso">
-      <p><label>Seu nome</label><input name="nome" autofocus></p>
-      <p><label>Login (sem espaços)</label><input name="login" autocomplete="username"></p>
-      <p><label>Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input type="password" name="senha" autocomplete="new-password"></p>
-      <p><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></p>
+      <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
+      <p><label for="ent_login">Login (sem espaços)</label><input id="ent_login" name="login" autocomplete="username"></p>
+      <p><label for="ent_senha">Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input id="ent_senha" type="password" name="senha" autocomplete="new-password"></p>
+      <p><label for="ent_senha2">Repita a senha</label><input id="ent_senha2" type="password" name="senha2" autocomplete="new-password"></p>
       <button>Enviar pedido</button> <a class="botao secundario" href="#/">Voltar</a>
     </form></div></main>`,
 
@@ -257,17 +274,18 @@ export const TELAS = {
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/inquilinos')}
         ${n(pend.length, 'pagamentos aguardando NF', '#/faturas')}
-        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${qtdMais}</div>alerta(s) de "${esc(tipoMais)}"<br><span class="suave">o aviso com mais alertas ativos (${alertas.length} no total${adiados.length ? `, ${adiados.length} adiado(s)` : ''}${desligados.length ? `, ${desligados.length} desligado(s)` : ''})</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(', ')}</span>` : ''}`}</a>
+        <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${alertas.length}</div>${alertas.length === 1 ? 'alerta ativo' : 'alertas ativos'}<br><span class="suave">${Object.keys(porTipo).length > 1 ? `o maior grupo: ${esc(tipoMais)} (${qtdMais})` : esc(tipoMais)}${adiados.length ? `, ${adiados.length} adiado(s)` : ''}${desligados.length ? `, ${desligados.length} desligado(s)` : ''}</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(', ')}</span>` : ''}`}</a>
         ${(() => { const r = R.resumoSolicitacoes(d()); return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
-          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos</a>`; })()}
+          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos
+          <div class="suave legenda-simbolos">${SITUACOES_SOLICITACAO.map((s) => `${s.simbolo} ${s.texto}`).join(' · ')}</div></a>`; })()}
       </div>
       ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link('#/pendencias?ir=cadastros', 'Ver os cadastros incompletos', 'botao pequeno')}</div>` : ''}
       ${d().contratos.filter((c) => R.dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join('')}
       ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(', '))}. Confira e apague à mão se não precisar mais.</div>` : ''}
-      <div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
+      ${primeirosPassos() || `<div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
         ${previstas.length ? `<span class="suave">Próximas: ${esc(previstas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]} a partir de ${dataBr(e.aPartirDe)}`).join('; '))}.</span>` : ''}
-        ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>
+        ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>`}
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
       ${podeUsuario('admin') && E.seguroErro ? `<div class="alerta erro"><b>Backup seguro:</b> a última cópia falhou (${esc(E.seguroErro)}). ${link('#/backup-seguro', 'Ver o backup seguro')}</div>` : ''}
       ${alertaFichas()}
@@ -419,9 +437,9 @@ export const TELAS = {
       <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
   },
   'minha-senha': () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
-    <p><label>Senha atual</label><input type="password" name="atual"></p>
-    <p><label>Nova senha</label><input type="password" name="nova"></p>
-    <p><label>Repita a nova senha</label><input type="password" name="nova2"></p><button>Salvar</button></form></div>`,
+    <p><label for="ent_atual">Senha atual</label><input id="ent_atual" type="password" name="atual" autocomplete="current-password"></p>
+    <p><label for="ent_nova">Nova senha</label><input id="ent_nova" type="password" name="nova" autocomplete="new-password"></p>
+    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`,
 };
 
 export { FORMULARIOS } from './telas/envios.js';

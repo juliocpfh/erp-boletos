@@ -8,7 +8,7 @@ import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import { caixaPagarPeloBanco } from './banco.js';
 import { linkComprovante } from './cadastros.js';
-import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
+import { botao, buscar, d, etiqueta, link, naoEncontrado, opera, ordenar } from './comum.js';
 
 /** Acordos em andamento (com boleto ainda em aberto): o que falta pagar de cada um. */
 function caixaAcordos(hoje) {
@@ -71,6 +71,11 @@ function bancoDaDespesa(x) {
 
 export function telaContas(rota) {
   const i = buscar('imoveis', rota.partes[1]);
+  // sem o número do imóvel (#/contas): escolher o imóvel numa lista, em vez de "Imóvel não encontrado"
+  if (!i && !rota.partes[1]) {
+    return `<h1>Contas do imóvel</h1><div class="cartao"><p>Escolha o imóvel para lançar ou ver as contas:</p>
+      <ul>${ordenar(d().imoveis, 'nome').map((x) => `<li><a href="#/contas/${x.id}">${esc(x.nome)}</a></li>`).join('') || '<li class="suave">Nenhum imóvel cadastrado.</li>'}</ul></div>`;
+  }
   if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
   const comp = C.competenciaValida(rota.q.comp, mesComContas(i.id));
   const ultimos = R.ultimosValores(d(), i.id);

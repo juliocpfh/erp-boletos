@@ -199,6 +199,16 @@ test('Reajustes: o acumulado do Banco Central é guardado na sessão por índice
   }
 });
 
+test('mutirão 3000 (telas): pagamento depois de hoje é recusado; contrato novo pelo imóvel sem gás nem condomínio começa com "Não tem"', async () => {
+  const { pagamentoNaoFuturo } = await import('../docs/js/telas/envios.js');
+  const { contasDoImovel } = await import('../docs/js/telas/cadastros.js');
+  assert.throws(() => pagamentoNaoFuturo('2999-12-31'), (e) => e instanceof T.C.ErroUsuario && /depois de hoje/.test(e.message));
+  assert.throws(() => pagamentoNaoFuturo('2026-01-10', '2999-01-01'), /depois de hoje/);
+  assert.doesNotThrow(() => pagamentoNaoFuturo('2026-01-10'));
+  assert.deepEqual(contasDoImovel({ nome: 'Loja 1' }), { conta_gas: 'Não tem', conta_condominio: 'Não tem' });
+  assert.deepEqual(contasDoImovel({ nome: 'Apto 2', gas_relogio: '123', administradora_nome: 'Administradora Exemplo' }), {});
+});
+
 test('exclusão grande (decisão do dono, 2026-11-16): contrato mostra o nome e o que sai e Cancelar não apaga; imóvel com inquilino é recusado antes de perguntar', async () => {
   const { c, loja } = comInquilino('Fulano de Teste');
   entrarComo(E, 'admin');

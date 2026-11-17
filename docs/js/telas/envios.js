@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { abrirPasta, alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
+import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -124,7 +124,8 @@ export const FORMULARIOS = {
     if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe o dia em que pagaram.');
     if (atrasado && dataPagou > data) throw new Error('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
     if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
-    confirmarAvisos([dataNoFuturo(data), dataMuitoAntiga(data)].filter(Boolean));
+    pagamentoNaoFuturo(data, dataPagou);
+    confirmarAvisos([dataMuitoAntiga(data)].filter(Boolean));
     let r;
     await alterar((db) => { r = R.baixarEmLote(db, ids, data, login(), { pagouEmDia: !atrasado, dataPagou }); });
     aviso(`${r.feitos.length} pagamento(s) confirmado(s) ${atrasado ? `com atraso (pagaram em ${dataBr(dataPagou)}, com multa e juros)` : 'em dia'}, com entrada em ${dataBr(data)}.${r.pulados.length ? ` ${r.pulados.length} já estavam pagos ou em carência e ficaram como estavam.` : ''}`, atrasado ? 'aviso' : 'ok');
@@ -415,10 +416,10 @@ export const FORMULARIOS = {
 
   async minhaSenha(form) {
     const f = new FormData(form);
-    if (!(await conferirSenha(E.usuario, String(f.get('atual'))))) throw new Error('Senha atual incorreta.');
+    if (!(await conferirSenha(E.usuario, String(f.get('atual'))))) throw new C.ErroUsuario('Senha atual incorreta.');
     const nova = String(f.get('nova'));
-    if (senhaCurta(nova)) throw new Error(ERRO_SENHA_CURTA);
-    if (nova !== f.get('nova2')) throw new Error('As duas senhas precisam ser iguais.');
+    if (senhaCurta(nova)) throw new C.ErroUsuario(ERRO_SENHA_CURTA);
+    if (nova !== f.get('nova2')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
     const campos = await camposDeSenha(nova);
     await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, campos, login(), 'Trocou a própria senha'));
     E.usuario = R.buscar(E.d, 'usuarios', E.usuario.id);
@@ -437,6 +438,12 @@ export const FORMULARIOS = {
     // documentos já salvos (CPF/CNPJ) e que não mudaram não são barrados; "valores" traz também os que aparecem no formulário (ex.: fiadores no contrato)
     const { dados, erros } = F.ler(campos, form, registro && cfg.valores ? cfg.valores(registro) : registro);
     if (cfg.ajustar && !Object.keys(erros).length) cfg.ajustar(dados, erros, registro, form, rota.q);
+    else if (cfg.ajustar) {
+      // já há erro: confere também o resto (ex.: dia do vencimento 35) numa volta só, sem usar o resultado
+      const mais = {};
+      try { cfg.ajustar({ ...dados }, mais, registro, form, rota.q); } catch { /* conferência que depende de campo errado */ }
+      for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
+    }
     if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new Error('Nada foi salvo.');
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
@@ -471,7 +478,7 @@ export const FORMULARIOS = {
     const imovelId = Number(form.dataset.imovel);
     const emitenteId = Number(f.get('emitente_id'));
     const percentual = C.numero(f.get('percentual'));
-    if (!(percentual > 0 && percentual <= 100)) throw new Error('Percentual inválido.');
+    if (!(percentual > 0 && percentual <= 100)) throw new C.ErroUsuario('Percentual inválido: use um número entre 0 e 100.');
     await alterar((db) => {
       const existente = db.participacoes.find((p) => p.imovel_id === imovelId && p.emitente_id === emitenteId);
       if (existente) R.atualizar(db, 'participacoes', existente.id, { percentual }, login());
@@ -520,7 +527,7 @@ export const FORMULARIOS = {
   async desfazerNumeracao(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const n = Number(new FormData(form).get('numero'));
-    if (!confirm(`Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`)) return;
+    if (!(await confirmar(`Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`, { titulo: `Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}?`, sim: 'Desfazer a numeração', forte: true }))) return;
     const qtd = await alterar((db) => R.desfazerNumeracao(db, n, login()));
     aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
     await mostrar();
@@ -636,7 +643,7 @@ export const FORMULARIOS = {
   async importar(form) {
     const f = new FormData(form);
     const arq = f.get('zip');
-    if (!arq || !arq.size) throw new Error('Escolha o arquivo ZIP.');
+    if (!arq || !arq.size) throw new C.ErroUsuario('Escolha o arquivo ZIP.');
     if (f.get('confirmo') !== '1') throw new Error('Marque a confirmação: a importação substitui os dados desta pasta.');
     const JSZip = await jsZip();
     const novos = await S.importarZip(JSZip, E.pasta, arq, E.d);
@@ -699,6 +706,12 @@ export const FORMULARIOS = {
 Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS);
 
 
+/** Pagamento no futuro (31/12/2027) passava com um OK e o sistema calculava multa e juros até lá: agora é recusado. */
+export function pagamentoNaoFuturo(data, dataPagou = null) {
+  const hoje = C.hojeIso();
+  for (const x of [data, dataPagou]) if (x && x > hoje) throw new C.ErroUsuario(`A data do pagamento (${dataBr(x)}) é depois de hoje (${dataBr(hoje)}). Confira o dia em que o dinheiro entrou.`);
+}
+
 /**
  * Confirma o pagamento de um boleto (linha da tabela, página do boleto ou janela "Confirmar pagamento"). ``f``: FormData com
  * data (contábil), pagou (se atrasou), valor (opcional) e em_dia. Valor diferente do previsto abre a justificativa e segue na página do boleto.
@@ -710,15 +723,15 @@ export async function confirmarPagamentoBoleto(id, f) {
   const pagouEmDia = f.get('em_dia') === '1';
   const dataPagou = String(f.get('pagou') || '') || null;
   const cb = buscar('cobrancas', id);
+  pagamentoNaoFuturo(data, dataPagou);
   confirmarAvisos([
-    dataNoFuturo(data, 'A data do pagamento'),
     dataMuitoAntiga(data, 'A data do pagamento'),
     cb && data < C.somarDias(cb.vencimento, -40) ? `A data do pagamento (${dataBr(data)}) é bem antes do vencimento (${dataBr(cb.vencimento)}).` : '',
   ].filter(Boolean));
   // valor recebido diferente do previsto: justificativa e, na página do boleto, o valor da NF digitado à mão
   const previsto = cb && R.previstoNoPagamento(cb, data, { pagouEmDia, dataPagou });
   if (cb && valor !== null && valor !== previsto.valor_devido && !R.ehComplementoCaucao(cb) && R.geraNf(buscar('contratos', cb.contrato_id))) {
-    if (dataPagou && dataPagou > data) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+    if (dataPagou && dataPagou > data) throw new C.ErroUsuario('O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.');
     const dif = valor - previsto.valor_devido;
     const resp = await janela({ titulo: 'Valor diferente do previsto',
       html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>

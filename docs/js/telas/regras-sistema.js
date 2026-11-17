@@ -102,7 +102,7 @@ export function telaRegras() {
     <form data-form="regrasSistema">
       ${CR.GRUPOS_REGRAS.map(([g, titulo]) => `<div class="cartao"><h2>${esc(titulo)}</h2>
         ${CR.DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join('')}</div>`).join('')}
-      ${admin ? '<p class="acoes"><button>Salvar as regras</button></p>' : ''}
+      ${admin ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ''}
     </form>`;
 }
 
