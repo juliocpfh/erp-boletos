@@ -132,7 +132,13 @@ test('registro no Windows: na instalação, em cada rodada do .exe (programa já
   fs.writeFileSync(path.join(P.pastaInstalada(env), P.NOME_EXE), 'programa');
   assert.equal(P.garantirRegistro({ env, rodar, exe: { versao: 'x' } }), 'registrado');
   assert.equal(chamadas.length, P.comandosDoRegistro('C:\\x', env, { kb: 1 }).length, 'os dois botões e Aplicativos instalados');
-  for (const n of [P.NOME_VBS, P.NOME_VBS_PASTA, P.NOME_VBS_DESINSTALAR, P.NOME_VBS_JANELA]) assert.ok(fs.existsSync(path.join(P.pastaInstalada(env), n)), n);
+  for (const n of [P.NOME_VBS, P.NOME_VBS_PASTA, P.NOME_VBS_DESINSTALAR, P.NOME_VBS_JANELA, P.NOME_ICONE]) assert.ok(fs.existsSync(path.join(P.pastaInstalada(env), n)), n);
+  // o ícone (casinha): um .ico de verdade, com a entrada de 256 px e a de 16 px, gravado em cada rodada
+  const ico = fs.readFileSync(path.join(P.pastaInstalada(env), P.NOME_ICONE));
+  assert.deepEqual([ico.readUInt16LE(0), ico.readUInt16LE(2)], [0, 1], 'cabeçalho de .ico');
+  const lados = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ico[6 + 16 * i] || 256);
+  assert.ok(lados.includes(16) && lados.includes(32) && lados.includes(256), `tamanhos ${lados}`);
+  assert.ok(chamadas.some((a) => a.includes('DisplayIcon') && a.at(-2).endsWith(`${P.NOME_ICONE},0`)), 'Aplicativos instalados mostra a casinha');
   const tamanho = chamadas.find((a) => a.includes('EstimatedSize'));
   assert.equal(tamanho[tamanho.indexOf('/d') + 1], '1', 'tamanho em KB, arredondado para cima');
   assert.equal(fs.readFileSync(path.join(P.pastaInstalada(env), P.NOME_VBS_PASTA), 'latin1'), P.textoVbsPasta(), 'grava o .vbs ao lado do .exe');
@@ -206,7 +212,7 @@ test('Aplicativos instalados: chave por usuário, nome com acento, aspas no cami
   assert.equal(valorDe(cmds, 'DisplayName'), 'Administração de Imóveis');
   assert.equal(valorDe(cmds, 'DisplayVersion'), '2026-11-17 abc1234');
   assert.equal(valorDe(cmds, 'Publisher'), 'Administração de Imóveis');
-  assert.equal(valorDe(cmds, 'DisplayIcon'), `${exe},0`);
+  assert.equal(valorDe(cmds, 'DisplayIcon'), `${PASTA_PROG}\\icone.ico,0`, 'a casinha ao lado do .exe');
   assert.equal(valorDe(cmds, 'InstallLocation'), PASTA_PROG);
   assert.equal(valorDe(cmds, 'UninstallString'), `"${exe}" --desinstalar`, 'o caminho com espaço entre aspas');
   for (const n of ['NoModify', 'NoRepair']) { const a = cmds.find((x) => x.includes(n)); assert.deepEqual(a.slice(4, 8), ['/t', 'REG_DWORD', '/d', '1']); }
