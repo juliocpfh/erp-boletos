@@ -257,12 +257,39 @@ export function calendarioDoPainel(mes, hoje) {
   for (const [dia, evs] of porDia) { const s = C.paraData(dia).getUTCDay(); maisCheio[s] = Math.max(maisCheio[s], evs.length); }
   const colunas = maisCheio.map((q) => `minmax(0, ${q ? 2 + Math.min(q, 7) : 1}fr)`).join(' ');
   const semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const itemDaAgenda = (e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`;
   const agendas = [...porDia].map(([dia, evs]) => `<div class="agenda-dia" data-agenda="${dia}" ${dia === hoje ? '' : 'hidden'}>
       <h3>${dataBr(dia)} · ${semana[C.paraData(dia).getUTCDay()]}${dia === hoje ? ' · hoje' : ''}</h3>
-      ${evs.map((e) => `<div class="evento-cal">${etiqueta(e.tipo, 'info')} <a href="${destino(e)}">${esc(e.texto)}</a> ${etiqueta(e.estado, e.situacao)}</div>`).join('')}</div>`).join('');
+      ${evs.map(itemDaAgenda).join('')}</div>`).join('');
   return `<div class="cartao" id="calendario"><div class="cabecalho"><h2 style="margin:0">Calendário de ${compBr(mes)}</h2>
       <div class="acoes">${link(`#/?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`)} ${link('#/', 'Mês atual')} ${link(`#/?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`)}</div></div>
     <div class="cal-grade" style="--cal-colunas:${colunas}">${semana.map((s) => `<div class="cal-sem">${s}</div>`).join('')}${celulas.join('')}</div>
-    ${agendas || ''}
-    <p class="suave"><span class="so-pc">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links.</span><span class="so-celular"><b>Toque no dia</b> (cada tracinho colorido é um item) para ver a agenda dele logo abaixo do calendário, com os links.</span> Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+    <div class="cal-agendas">${agendas || ''}</div>
+    ${listaDasSemanas(mes, hoje, porDia, itemDaAgenda)}
+    <p class="suave"><span class="so-pc">Dias e semanas sem nada ficam pequenos; a coluna cresce com a quantidade de itens. Cada dia mostra até 7 itens (passe o mouse para ler o texto inteiro); clique no dia para ver a agenda completa, com os links.</span><span class="so-celular"><b>Toque na semana</b> para abrir ou fechar a lista dela; toque num item para abrir a página dele.</span> Cores: vermelho vencido, amarelo a fazer, verde feito, cinza previsto ou no boleto do inquilino. Boletos: gerados e previstos pelos contratos; IPTU: pelo vencimento da guia.</p></div>`;
+}
+
+/**
+ * No celular (a grade fica pequena demais para ler), o calendário vira uma lista por semana (domingo a sábado, dentro do mês):
+ * cada semana abre e fecha; começa aberta a semana de hoje (em outro mês, a primeira semana com algo).
+ */
+export function listaDasSemanas(mes, hoje, porDia, itemDaAgenda) {
+  const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const semanas = [];
+  for (let n = 1; n <= C.diasNoMes(mes); n += 1) {
+    const dia = `${mes}-${String(n).padStart(2, '0')}`;
+    if (n === 1 || C.paraData(dia).getUTCDay() === 0) semanas.push([]);
+    semanas.at(-1).push(dia);
+  }
+  const quantos = (dias) => dias.reduce((t, dia) => t + (porDia.get(dia) || []).length, 0);
+  const aberta = semanas.find((dias) => dias.includes(hoje)) || semanas.find((dias) => quantos(dias)) || semanas[0];
+  return `<div class="cal-lista">${semanas.map((dias) => {
+    const total = quantos(dias);
+    const curta = (dia) => dataBr(dia).slice(0, 5);
+    const comItens = dias.filter((dia) => porDia.has(dia));
+    return `<details class="cal-semana"${dias === aberta ? ' open' : ''}><summary>Semana de ${curta(dias[0])} a ${curta(dias.at(-1))}${dias.includes(hoje) ? ' · esta semana' : ''}
+        <span class="suave">· ${total ? `${total} ${total === 1 ? 'item' : 'itens'}` : 'nada'}</span></summary>
+      ${comItens.map((dia) => `<div class="cal-semana-dia${dia === hoje ? ' hoje' : ''}"><h4>${nomes[C.paraData(dia).getUTCDay()]}, ${curta(dia)}${dia === hoje ? ' · hoje' : ''}</h4>
+        ${porDia.get(dia).map(itemDaAgenda).join('')}</div>`).join('') || '<p class="suave">Nada nesta semana.</p>'}</details>`;
+  }).join('')}</div>`;
 }
