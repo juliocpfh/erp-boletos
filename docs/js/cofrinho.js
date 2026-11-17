@@ -78,6 +78,17 @@ export function guardarCifrado(cru, obterChave) {
       if (!chave) return undefined;
       return cru.gravar(k, await cifrar(chave, v));
     },
+    /** Várias chaves de uma vez (fila, contador e faixas): cifra todas e grava numa transação só, se a cópia deixa. */
+    ...(cru.gravarVarios ? {
+      async gravarVarios(obj) {
+        const chave = obterChave();
+        if (!chave) return undefined;
+        if (obj.pendentes !== undefined) await cru.gravar('aguardando-dados', (obj.pendentes || []).length);
+        const cifrados = {};
+        for (const [k, v] of Object.entries(obj)) cifrados[k] = ABERTAS.includes(k) ? v : await cifrar(chave, v);
+        return cru.gravarVarios(cifrados);
+      },
+    } : {}),
     apagar: (k) => cru.apagar?.(k),
   };
 }

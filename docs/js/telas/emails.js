@@ -30,9 +30,19 @@ export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
   return `${botao('abrirEmail', texto, { chave, ...alvo }, 'secundario mini')}${u ? ` <span class="suave" title="${esc(u.como)}">${u.como === 'enviado' ? 'enviado' : 'aberto'} em ${dataBr(u.data)}</span>` : ''}`;
 }
 
-const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => R.inserir(db, 'envios_email', {
-  data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null,
-}, login(), `E-mail "${assunto}" ${como === 'enviado' ? 'enviado' : 'aberto no Gmail'} para ${para || '(sem destinatário)'}`));
+/**
+ * Guarda o envio. E-mail só aberto no Gmail (sem envio): um registro por etapa, alvo e dia, sem linha no histórico; abrir de
+ * novo no mesmo dia não grava outro (antes, cada clique era uma linha a mais, para sempre: item 48).
+ */
+const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => {
+  const dados = { data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null };
+  if (como !== 'enviado') {
+    const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id);
+    if (ja) return ja;
+    return R.inserir(db, 'envios_email', dados, login(), null, { historico: false });
+  }
+  return R.inserir(db, 'envios_email', dados, login(), `E-mail "${assunto}" enviado para ${para || '(sem destinatário)'}`);
+});
 
 async function copiar(texto) {
   try { await navigator.clipboard.writeText(texto); return true; } catch { return false; }

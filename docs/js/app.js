@@ -155,6 +155,13 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
     atualizarFaixa();
     return resultado;
   }
+  // pasta: duas abas do mesmo navegador gravariam a mesma revisão e a primeira mudança sumiria (item 16): uma de cada vez
+  return travaDaPasta(() => alterarNaPasta(fn, soSessao));
+}
+
+const travaDaPasta = (fn) => (globalThis.navigator?.locks ? navigator.locks.request('imoveis-pasta', fn) : fn());
+
+async function alterarNaPasta(fn, soSessao) {
   const disco = await S.lerBanco(E.pasta);
   if (!disco && E.d) throw new Error(ERRO_ARQUIVO_SUMIU);
   if (disco && E.d && disco.revisao !== E.d.revisao) {
@@ -162,14 +169,15 @@ async function alterarAgora(fn, { soSessao = false } = {}) {
     E.d = disco;
     if (avisar) aviso(`Os dados foram atualizados por ${disco.atualizado_por || 'outra pessoa'} e recarregados antes de gravar.`, 'info');
   }
-  const copia = N.copiar(E.d || disco); // o histórico (só cresce) não é copiado entrada por entrada
+  const antes = E.d || disco;
+  const copia = N.copiar(antes); // o histórico (só cresce) não é copiado entrada por entrada
   const resultado = fn(copia);
   copia.revisao = (copia.revisao || 0) + 1;
   copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   await S.gravarBanco(E.pasta, copia);
   E.d = copia;
   espelharSeguro();
-  backupDoDia(copia);
+  backupDoDia(antes); // o backup do dia é de como estava antes da 1ª gravação do dia (se ela foi a errada, o backup serve): item 42
   atualizarFaixa();
   return resultado;
 }

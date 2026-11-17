@@ -166,7 +166,7 @@ export function dividirLote(l, { maximo = PARTE_MAXIMA, bytes = PARTE_BYTES } = 
     atual.push(l.ops[i]); peso += pesos[i];
   }
   if (atual.length) partes.push(atual);
-  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em }));
+  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) }));
 }
 
 /** Faixas de códigos de duas cópias (memória e aparelho): por tabela vale a mais nova (fim maior) e, na mesma, a mais adiantada. */
@@ -551,7 +551,8 @@ export class Sincronia {
   novoLote(ops) {
     this.n += 1;
     // a aba entra no código do lote: duas abas do mesmo aparelho nunca geram o mesmo (a nuvem trataria o 2º como repetido)
-    return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString() };
+    // `base`: até onde este aparelho tinha visto a nuvem; lote feito antes de uma volta a backup é recusado (item 9 do mutirão 3000)
+    return { id: `${this.aparelho}-${this.aba}-${String(this.n).padStart(6, '0')}`, ops, em: new Date().toISOString(), base: seqDe(this.base) };
   }
 
   /**
@@ -588,6 +589,9 @@ export class Sincronia {
 
   /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
   async gravarFila() {
+    // numa gravação só quando o aparelho deixa (IndexedDB): se a de faixas falhasse depois da fila, a próxima inclusão
+    // repetiria um código da fila e o aparelho não conseguiria mais incluir naquela tabela (item 40)
+    if (this.guardar.gravarVarios) { await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas }); return; }
     await this.guardar.gravar('n', this.n);
     await this.guardar.gravar('pendentes', this.pendentes);
     await this.guardar.gravar('faixas', this.faixas);
@@ -843,8 +847,8 @@ export class Sincronia {
   }
 
   /** Primeira carga (nuvem vazia): o banco inteiro vai de uma vez. */
-  async importar(d, { substituir = false } = {}) {
-    await this.api('POST', 'importar', { dados: d, substituir });
+  async importar(d, { substituir = false, manterUsuarios = false } = {}) {
+    await this.api('POST', 'importar', { dados: d, substituir, ...(manterUsuarios ? { manterUsuarios: true } : {}) });
     await this.trava(async () => { this.pendentes = []; await this.guardar.gravar('pendentes', []); });
     await this.baixarTudo();
     await this.garantirFaixas();
@@ -933,6 +937,8 @@ export function guardarNoNavegador(nome = 'imoveis-nuvem', { indexedDB: idb = gl
   return {
     ler: (k) => op('readonly', (s) => s.get(k)),
     gravar: (k, v) => op('readwrite', (s) => s.put(v, k)),
+    /** Várias chaves numa transação só: grava todas ou nenhuma. */
+    gravarVarios: (obj) => op('readwrite', (s) => { let r; for (const [k, v] of Object.entries(obj)) r = s.put(v, k); return r; }),
     apagar: (k) => op('readwrite', (s) => s.delete(k)),
   };
 }

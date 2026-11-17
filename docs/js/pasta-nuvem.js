@@ -244,9 +244,14 @@ export class AnexosNuvem {
   }
 
   /** Grava um arquivo; sem internet, guarda no aparelho e sobe depois (`enviarFila`). */
-  async gravar(partes, blob) {
+  async gravar(partes, blob, { seNovo = false } = {}) {
     try {
-      await this.pedir('PUT', codificar(partes), { corpo: blob });
+      try {
+        await this.pedir('PUT', codificar(partes), { corpo: blob, ...(seNovo ? { cabecalhos: { 'If-None-Match': '*' } } : {}) });
+      } catch (e) {
+        // "só se novo" (anexo novo): outro aparelho gravou o mesmo nome no meio tempo. Mesmo arquivo (resposta perdida): está gravado
+        if (!(seNovo && e.status === 412 && await this.mesmoNaNuvem(partes, blob))) throw e;
+      }
       this.anotarNaLista(partes, blob.size);
       this.aoMudar?.();
     } catch (e) {
@@ -312,6 +317,14 @@ export class AnexosNuvem {
       for (const f of [...fila]) {
         const blob = await this.guardar.ler(`anexo:${f.id}`);
         let recusado = false;
+        // sem o arquivo: se o item já saiu da fila, outra aba deste navegador o enviou (nada a fazer)
+        if (!blob && !(await this.mudarFila(() => null)).some((x) => x.id === f.id)) continue;
+        if (!blob) {
+          // o arquivo sumiu do aparelho (dados do site limpos, cota): o lançamento aponta para um arquivo que nunca subiu (item 23)
+          recusado = true;
+          await this.guardarNaoEnviado(f, 'o arquivo sumiu deste aparelho antes de subir (dados do navegador limpos?): anexe de novo');
+          this.avisos.push(`O anexo "${f.partes.at(-1)}" sumiu deste aparelho antes de ir para a nuvem: anexe de novo. Veja em Conflitos da nuvem.`);
+        }
         try {
           if (blob) await this.pedir('PUT', codificar(f.partes), { corpo: blob, cabecalhos: { 'If-None-Match': '*' } });
         } catch (e) {
@@ -376,6 +389,11 @@ export class PastaNuvem {
   async conteudo() {
     if (!this.partes.length) return { pastas: new Set(RAIZES), arquivos: new Map() };
     return this.cliente.lista(this.partes);
+  }
+
+  /** Grava só se o nome ainda não existe na nuvem (salvarArquivo): erro 412 se outro aparelho já gravou esse nome (item 21). */
+  async gravarSeNovo(nome, blob) {
+    await this.cliente.gravar([...this.partes, nome], blob, { seNovo: true });
   }
 
   async getDirectoryHandle(nome, { create = false } = {}) {
