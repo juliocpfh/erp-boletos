@@ -2054,7 +2054,7 @@ test('confirmação do termo da troca: a garantia continua a mesma ou é nova (a
   assert.throws(() => R.mudarGarantiaNaTroca(d, novo.id, 'nova', 'julio'), /já foi feita/);
 });
 
-test('garantia herdada desfeita por engano volta pelo histórico; não se pode mais remover/desfazer a herdada', () => {
+test('garantia herdada: não se pode remover/desfazer o depósito que veio do anterior', () => {
   const { d, c } = base();
   Object.assign(c, { garantia_tipo: 'Caução', caucao_valor: 300000, caucao_data: '2025-02-01', reserva_valor: 0 });
   R.registrarDepositoGarantia(d, c.id, 'caucao', { data: '2025-02-02', valor: 300000, arquivo: 'dep.pdf' }, 'julio');
@@ -2065,17 +2065,6 @@ test('garantia herdada desfeita por engano volta pelo histórico; não se pode m
   herancaAntiga(d, c, novo);
   assert.equal(R.garantiaDepositada(novo), true);
   assert.equal(R.podeRemoverComprovanteGarantia(d, novo, 'caucao'), false, 'herdada: sem "Desfazer último depósito"');
-  // o que aconteceu antes desta correção: o depósito herdado foi desfeito
-  const herdado = R.depositosGarantiaDo(d, novo, 'caucao').find((x) => !x.complementar);
-  R.excluir(d, 'depositos_garantia', herdado.id, 'julio');
-  R.atualizar(d, 'contratos', novo.id, { caucao_pago_em: null, comprovante_caucao: null, caucao_por_depositos: null }, 'julio', 'removido');
-  assert.equal(R.garantiaDepositada(novo), false);
-  assert.ok(R.garantiaHerdadaDesfeita(d, novo));
-  const r = R.restaurarGarantiaHerdada(d, novo.id, 'julio');
-  assert.deepEqual(r.arquivos, ['dep.pdf']);
-  assert.equal(R.garantiaDepositada(novo), true);
-  assert.equal(R.depositosGarantiaDo(d, novo, 'caucao').some((x) => x.id === herdado.id), true);
-  assert.equal(R.garantiaHerdadaDesfeita(d, novo), null);
 });
 
 test('garantia herdada cuidada no contrato anterior: comprovante anexado lá aparece no novo titular (arquivo na pasta do anterior)', () => {

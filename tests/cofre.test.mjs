@@ -146,6 +146,18 @@ test('faixas de códigos: dois aparelhos sem internet nunca repetem; código rep
   assert.equal(contrato(c, a.inicio).valor, 1, 'lote com erro não aplica nada (tudo ou nada)');
 });
 
+test('faixas de várias tabelas num pedido só (primeiro acesso): mesma regra da faixa de uma, tudo ou nada', () => {
+  const c = carregado();
+  const r = c.faixa({ tabelas: { contratos: 100, acordos: 10 } }, DONO);
+  assert.deepEqual(r.faixas, [{ tabela: 'contratos', inicio: 26, fim: 125 }, { tabela: 'acordos', inicio: 1, fim: 10 }]);
+  assert.equal(c.faixa({ tabela: 'contratos', quantidade: 1 }, SOCIO).inicio, 126, 'a de uma tabela continua depois');
+  assert.throws(() => c.faixa({ tabelas: { contratos: 5, proxima_fatura: 5 } }, DONO), (e) => e.status === 400, 'campo da configuração não é tabela');
+  assert.equal(c.faixa({ tabela: 'contratos', quantidade: 1 }, DONO).inicio, 127, 'pedido recusado não reservou nada');
+  assert.throws(() => c.faixa({ tabelas: {} }, DONO), (e) => e.status === 400);
+  assert.throws(() => c.faixa({ tabelas: ['contratos'] }, DONO), (e) => e.status === 400);
+  assert.equal(c.faixa({ tabelas: { contratos: 999999 } }, DONO).faixas[0].fim - 128 + 1, MAX_FAIXA);
+});
+
 test('voltar para um backup (ou substituir pelos dados de uma pasta) não reemite faixas de códigos já entregues', () => {
   const c = carregado();
   const backup = c.tudo(); // o backup de 01/11

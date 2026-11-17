@@ -34,6 +34,21 @@ export async function conferirSenha(usuario, senha) {
   return !!usuario && usuario.senha_hash === await resumoSenha(senha, usuario.senha_sal, iteracoesDe(usuario));
 }
 
+/** SHA-256 em hex. */
+export async function sha256(texto) {
+  return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(texto))));
+}
+
+/**
+ * Verificador da senha para ligar o programa do PC (nuvem/aparelhos.mjs), separado do resumo gravado no banco: outro sal, que
+ * só a nuvem guarda (fora do JSON). Quem tem o banco aberto (o resumo `senha_hash`) não consegue mais um crachá sem saber a
+ * senha. `marca` = SHA-256 do `senha_hash` em uso: senha trocada depois → o verificador não vale até entrar de novo no site.
+ */
+export async function verificadorDoAparelho(senha, senhaHash) {
+  const sal = `aparelho:${novoSal()}`;
+  return { sal, iteracoes: ITERACOES_SENHA, resumo: await resumoSenha(senha, sal), marca: await sha256(senhaHash) };
+}
+
 /** Depois de conferir a senha: se o resumo gravado é mais fraco que o atual, devolve os campos novos para gravar; senão null. */
 export async function reforcarSenha(usuario, senha) {
   return iteracoesDe(usuario) >= ITERACOES_SENHA ? null : camposDeSenha(senha);

@@ -126,6 +126,39 @@ test('dois aparelhos sem internet criando registros: códigos diferentes (faixas
   for (const s of [a.sinc, b.sinc]) assert.deepEqual(s.atual().imoveis.map((x) => x.nome).sort(), ['Apto 604', 'Sala do PC', 'Sala do celular']);
 });
 
+test('primeiro acesso: as faixas de todas as tabelas vêm num pedido só; nuvem antiga (400) recebe uma por vez', async () => {
+  const cofre = novoCofreDO();
+  const a = aparelho(cofre, DONO);
+  await a.sinc.iniciar();
+  await a.sinc.importar(bancoInicial());
+  const pedidos = [];
+  const b = aparelho(cofre, SOCIA);
+  const api = b.api;
+  b.sinc.api = async (metodo, rota, corpo) => { if (rota === 'faixa') pedidos.push(corpo); return api(metodo, rota, corpo); };
+  await b.sinc.iniciar();
+  await b.sinc.garantirFaixas();
+  assert.equal(pedidos.length, 1, 'uma ida só');
+  const tabelas = Object.keys(pedidos[0].tabelas);
+  assert.ok(tabelas.length > 30 && tabelas.includes('imoveis'), `todas as tabelas (${tabelas.length})`);
+  assert.deepEqual(Object.keys(b.sinc.faixas).sort(), [...tabelas].sort());
+  await b.sinc.garantirFaixas();
+  assert.equal(pedidos.length, 1, 'com faixa suficiente, não pede de novo');
+  // nuvem de antes desta versão: o pedido de várias dá 400 e o aparelho pede uma por vez, como antes
+  const c = aparelho(cofre, DONO);
+  const antigos = [];
+  c.sinc.api = async (metodo, rota, corpo) => {
+    if (rota === 'faixa') { antigos.push(corpo); if (corpo.tabelas) throw new N.ErroNuvem('Tabela desconhecida: undefined.', 400); }
+    return c.api(metodo, rota, corpo);
+  };
+  await c.sinc.iniciar();
+  await c.sinc.garantirFaixas();
+  assert.ok(antigos[0].tabelas && antigos.slice(1).every((x) => x.tabela), 'tentou junto, depois uma a uma');
+  assert.equal(antigos.length - 1, tabelas.length);
+  const ib = await b.sinc.alterar((d) => R.inserir(d, 'imoveis', { nome: 'Sala B' }, SOCIA));
+  const ic = await c.sinc.alterar((d) => R.inserir(d, 'imoveis', { nome: 'Sala C' }, DONO));
+  assert.notEqual(ib.id, ic.id, 'faixas diferentes');
+});
+
 test('mesmo campo nos dois sem internet: fica o que chegou primeiro, os dois veem o conflito e a escolha vale para todos', async () => {
   const { a, b } = await cenario();
   a.internet = false; b.internet = false;

@@ -51,6 +51,34 @@ export async function carregarParte(importar) {
   }
 }
 
+/**
+ * Telas raras carregadas só quando usadas (mutirão de 16/11, 2ª rodada): as ações e os formulários delas (botões data-acao e
+ * data-form) entram em ACOES/FORMULARIOS pelo nome; cada um carrega a parte na 1ª vez e chama o de verdade.
+ * O arquivo precisa estar em ADIADOS do sw.js (sem internet); tests/telas.test.mjs confere a lista de nomes contra a parte.
+ */
+export const PARTES_ADIADAS = {
+  pessoa: { importar: () => import('./pessoa.js'), acoes: ['ACOES_PESSOA', ['escolherPessoa', 'baixarDadosPessoa', 'apagarPessoa']], formularios: ['FORMULARIOS_PESSOA', ['buscarPessoa']] },
+  regras: { importar: () => import('./regras-sistema.js'), acoes: ['ACOES_REGRAS', ['restaurarVersaoRegras', 'excluirVersaoRegras', 'voltarRegrasPadrao', 'baixarArquivoRegras', 'carregarArquivoRegras']],
+    formularios: ['FORMULARIOS_REGRAS', ['regrasSistema', 'salvarVersaoRegras']] },
+  regua: { importar: () => import('./regua.js'), acoes: ['ACOES_REGUA', ['recusarRegua', 'copiarRegua', 'abrirReguaGmail', 'enviarReguaSelecionados']] },
+  nuvem: { importar: () => import('./nuvem.js'), acoes: ['ACOES_NUVEM', ['desligarAparelho', 'levarParaNuvem', 'resolverConflito', 'esquecerRecusas', 'baixarRecusa', 'esquecerRecusa',
+    'baixarNaoEnviado', 'baixarBackupNuvem', 'restaurarBackupNuvem', 'esquecerNaoEnviado']] },
+};
+
+/** A parte adiada (carregada na 1ª vez). */
+export const parteAdiada = (qual) => carregarParte(PARTES_ADIADAS[qual].importar);
+
+/** { nome: função } das ações (tipo 'acoes') ou formulários ('formularios') das partes adiadas, para juntar em ACOES/FORMULARIOS. */
+export function adiados(tipo) {
+  const out = {};
+  for (const [qual, p] of Object.entries(PARTES_ADIADAS)) {
+    if (!p[tipo]) continue;
+    const [objeto, nomes] = p[tipo];
+    for (const nome of nomes) out[nome] = async (...args) => (await parteAdiada(qual))[objeto][nome](...args);
+  }
+  return out;
+}
+
 /** Desfazer a numeração apaga as NFs do ciclo: só o administrador (a nuvem recusa o apagar NF do operador). */
 export const SO_ADMIN_NUMERACAO = 'Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).';
 

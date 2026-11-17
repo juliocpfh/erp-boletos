@@ -24,8 +24,8 @@ export const TABELAS = {
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', pastas_fisicas: 'Pasta física (arquivo impresso)', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
-/** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
-export const SITUACOES = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+/** Quem paga cada conta prevista no contrato (a mesma lista do formulário, `SITUACOES_CONTA`). Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
+export const SITUACOES = F.SITUACOES_CONTA;
 
 /**
  * Concessionárias que vêm na lista de um banco novo, pelo Estado da sede da empresa (Empresas). Até 2026-11-17 era sempre a
@@ -2570,8 +2570,6 @@ export function outrosContratosDaPessoa(d, c, hoje = C.hojeIso()) {
     : x.inquilino_nome.trim().toLocaleLowerCase('pt-BR') === c.inquilino_nome.trim().toLocaleLowerCase('pt-BR')));
 }
 
-/** Dias que um contrato pode ficar sem imóvel; depois disso ele é apagado sozinho (pedido do usuário). */
-export const DIAS_SEM_IMOVEL = 7;
 
 /** Data em que o contrato sem imóvel será apagado (ex.: sem imóvel desde 10/10 → apagado em 17/10), ou null. */
 export function dataApagarSemImovel(c) {
@@ -2590,7 +2588,6 @@ export function contratosSemImovelVencidos(d, hoje = C.hojeIso()) {
 // comprovante) e os documentos pessoais são apagados 3 meses depois da decisão.
 // --------------------------------------------------------------------------
 export const MODOS_FICHA = ['Apenas um dos imóveis', 'Todos juntos'];
-export const MESES_DOCUMENTOS_REPROVADA = 3;
 /** Campos de arquivo da ficha ligados a um lançamento (os demais documentos ficam soltos na pasta da ficha). */
 export const CAMPOS_ARQUIVO_FICHA = ['comprovante_reserva', 'comprovante_devolucao', 'analise_serasa'];
 /** Comprovantes de dinheiro da ficha: ficam mesmo depois de apagados os documentos pessoais da reprovada. */
@@ -2678,12 +2675,10 @@ export const fichaAberta = (d, f) => f.situacao === 'Em análise' || (f.situacao
 export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas || []).find((f) => f.id !== excetoId && fichaAberta(d, f) && (f.imoveis_ids || []).includes(Number(imovelId))) || null;
 
 /**
- * Situações da ficha. "Desistiu" (pedido do dono, 2026-11-13): o interessado desistiu antes de assinar o contrato. Como na
- * reprovada, a reserva volta por inteiro (decisão de 2026-11-12) e os documentos pessoais são apagados depois do prazo.
+ * Ficha encerrada sem contrato: reprovada ou desistência ("Desistiu", pedido do dono, 2026-11-13: o interessado desistiu antes
+ * de assinar). A reserva volta por inteiro (decisão de 2026-11-12) e os documentos pessoais saem depois do prazo.
+ * As situações da ficha: Em análise, Aprovada, Reprovada, Desistiu.
  */
-export const SITUACOES_FICHA = ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'];
-
-/** Ficha encerrada sem contrato: reprovada ou desistência. A reserva é devolvida e os documentos pessoais saem depois. */
 export const fichaSemContrato = (f) => f.situacao === 'Reprovada' || f.situacao === 'Desistiu';
 
 /** Reserva de ficha reprovada (ou com desistência) que ainda não teve a devolução registrada. */
@@ -3863,68 +3858,6 @@ export function contratoDaGarantiaNaTroca(d, n) {
 
 /** Garantia do herdeiro que veio do contrato anterior (não se remove nem se desfaz: muda só por "Corrigir caução"). */
 export const garantiaHerdada = (d, c) => { const a = contratoHerdado(d, c); return !!(a && a.garantia_transferida_para === c.id); };
-
-/**
- * Garantia herdada que foi desfeita depois (ex.: "Desfazer último depósito" tirou o depósito que veio do anterior):
- * pelo histórico, os registros que passaram do anterior para o herdeiro e foram excluídos, e os campos da garantia que
- * vieram na herança e ficaram vazios. { registros: [{ tabela, dados }], campos: {} } ou null.
- */
-export function garantiaHerdadaDesfeita(d, c) {
-  if (!garantiaHerdada(d, c) || !(temCaucao(c) || temDeposito(c))) return null;
-  const a = contratoHerdado(d, c);
-  // garantia trocada depois da herança ("Trocar garantia"): a herdada não volta
-  const herdouEm = d.historico.findIndex((h) => h.acao === 'Alteração' && h.tabela === 'contratos' && h.registro_id === a.id && /garantia passa para/.test(h.descricao || ''));
-  if (d.historico.some((h, i) => i > herdouEm && h.acao === 'Inclusão' && h.tabela === 'trocas_garantia' && h.contrato_id === c.id)) return null;
-  const registros = [];
-  const desmarcar = []; // depósitos que vieram do anterior marcados por engano como "para completar"
-  const vistos = new Set();
-  d.historico.forEach((h) => {
-    const m = h.acao === 'Alteração' && TABELAS_GARANTIA.includes(h.tabela) && h.detalhes && h.detalhes.contrato_id;
-    if (!m || m.de !== a.id || m.para !== c.id || vistos.has(`${h.tabela}:${h.registro_id}`)) return;
-    vistos.add(`${h.tabela}:${h.registro_id}`);
-    const atual = buscar(d, h.tabela, h.registro_id);
-    if (atual) { if (h.tabela === 'depositos_garantia' && atual.complementar) desmarcar.push(atual.id); return; }
-    const exc = [...d.historico].reverse().find((x) => x.acao === 'Exclusão' && x.tabela === h.tabela && x.registro_id === h.registro_id && x.detalhes);
-    if (exc) registros.push({ tabela: h.tabela, dados: { ...exc.detalhes, contrato_id: c.id } });
-  });
-  // campos da garantia gravados na herança ("garantia trazida de…" / "dados do contrato trazidos de…") que hoje estão vazios
-  const campos = {};
-  for (const h of d.historico) {
-    if (h.acao !== 'Alteração' || h.tabela !== 'contratos' || h.registro_id !== c.id || !h.detalhes || !/trazid[ao]s? de/.test(h.descricao || '')) continue;
-    for (const k of CAMPOS_GARANTIA) {
-      const m = h.detalhes[k];
-      if (m && typeof m === 'object' && 'para' in m && m.para !== null && m.para !== '' && (c[k] === null || c[k] === undefined || c[k] === '')) campos[k] = m.para;
-    }
-  }
-  // versão anterior: os depósitos próprios do herdeiro foram somados à caução herdada ("soma à caução herdada")
-  const somados = new Set(d.historico.filter((h) => h.acao === 'Alteração' && h.tabela === 'depositos_garantia' && /soma à caução herdada/.test(h.descricao || '')).map((h) => h.registro_id));
-  const duplicados = (d.depositos_garantia || []).filter((x) => x.contrato_id === c.id && x.complementar && somados.has(x.id)).map((x) => x.id);
-  // depósitos herdados que cobrem a caução sem a marca de "registrada em depósitos" (ficou com o depósito próprio, que saiu)
-  const herdadosDeps = (d.depositos_garantia || []).filter((x) => x.contrato_id === c.id && (!x.complementar || desmarcar.includes(x.id)));
-  const somaHerdados = herdadosDeps.reduce((t, x) => t + x.valor, 0) + registros.filter((r) => r.tabela === 'depositos_garantia').reduce((t, r) => t + (r.dados.valor || 0), 0);
-  if (somaHerdados && somaHerdados >= (c.caucao_valor || 0) && !c.caucao_por_depositos && temCaucao(c) && (registros.length || desmarcar.length || duplicados.length)) campos.caucao_por_depositos = true;
-  return registros.length || desmarcar.length || duplicados.length || Object.keys(campos).length ? { registros, desmarcar, duplicados, campos } : null;
-}
-
-/** Restaura a garantia herdada desfeita (garantiaHerdadaDesfeita). Devolve os comprovantes que ela usa (para conferir na pasta). */
-export function restaurarGarantiaHerdada(d, contratoId, usuario) {
-  const c = buscar(d, 'contratos', contratoId);
-  const x = c && garantiaHerdadaDesfeita(d, c);
-  if (!x) return null;
-  const arquivos = [];
-  for (const { tabela, dados } of x.registros) {
-    if (buscar(d, tabela, dados.id)) continue;
-    d[tabela].push({ ...dados });
-    d.seq[tabela] = Math.max(d.seq[tabela] || 0, dados.id);
-    registrar(d, usuario, 'Inclusão', tabela, dados.id, `${c.inquilino_nome}: ${TABELAS[tabela]} herdado restaurado`, null, vinculos(d, tabela, dados));
-    if (dados.comprovante) arquivos.push(dados.comprovante);
-  }
-  for (const idDep of x.desmarcar) atualizar(d, 'depositos_garantia', idDep, { complementar: null }, usuario, `${c.inquilino_nome}: depósito herdado volta a ser da caução inicial`);
-  for (const idDep of x.duplicados) excluir(d, 'depositos_garantia', idDep, usuario, `${c.inquilino_nome}: depósito próprio que repetia a caução herdada sai (não soma)`);
-  if (Object.keys(x.campos).length) atualizar(d, 'contratos', c.id, x.campos, usuario, `${c.inquilino_nome}: garantia herdada restaurada`);
-  for (const k of ['comprovante_caucao', 'comprovante_deposito']) if (x.campos[k]) arquivos.push(x.campos[k]);
-  return { registros: x.registros.length + x.desmarcar.length, duplicados: x.duplicados.length, campos: Object.keys(x.campos), arquivos: [...new Set(arquivos)] };
-}
 
 /**
  * Garantia herdada cuidada no contrato do titular anterior: o que for anexado lá (comprovante do depósito da caução ou do
@@ -5697,32 +5630,6 @@ export function registrarCancelamentoNegativacao(d, cbId, usuario) {
   return banco;
 }
 
-/**
- * Período da conferência de pagamentos de um mês de boletos (listagem por ``payment_date``, até 60 dias): do primeiro vencimento
- * do mês menos 10 dias até hoje (ou o fim da janela de 60 dias). Ex.: vencimentos em 10/03 e 15/03, hoje 20/03 → 28/02 a 20/03.
- */
-export function periodoConferenciaC6(d, comp, hoje = C.hojeIso()) {
-  const vencs = d.cobrancas.filter((cb) => cb.competencia === comp && cb.vencimento).map((cb) => cb.vencimento).sort();
-  const de = C.somarDias(vencs[0] || `${comp}-01`, -10);
-  const limite = C.somarDias(de, 59);
-  return { de, ate: hoje < limite ? hoje : limite };
-}
-
-/**
- * Casa os itens da listagem do banco com os boletos do sistema pela referência externa. Devolve
- * { casados: [{ cb, item }], desconhecidos: [item] } (desconhecidos = emitidos fora do sistema ou de outro período).
- */
-export function casarListagemC6(d, itens, contaId = null) {
-  const porRef = new Map(d.cobrancas.filter((cb) => cb.banco && cb.banco.id_externo && (!contaId || cb.banco.conta_id === contaId)).map((cb) => [cb.banco.id_externo, cb]));
-  const casados = [];
-  const desconhecidos = [];
-  for (const item of itens || []) {
-    const cb = porRef.get(item && item[M.RESPOSTA.referencia]);
-    if (cb) casados.push({ cb, item }); else desconhecidos.push(item);
-  }
-  return { casados, desconhecidos };
-}
-
 /** Boleto emitido e ainda em aberto no banco (não dá para excluir nem emitir de novo sem cancelar). */
 export const emitidoNoBanco = (cb) => !!(cb.banco && ['emitido', 'pago'].includes(cb.banco.situacao));
 
@@ -6343,7 +6250,6 @@ export function imovelVago(d, imovelId, dia) {
   const proximo = doImovel.filter((c) => c.ativo !== false && c.data_entrada > dia).sort((a, b) => a.data_entrada.localeCompare(b.data_entrada))[0] || null;
   return { desde: saida ? C.somarDias(saida, 1) : null, dias: saida ? C.diasEntre(saida, dia) : null, proximo };
 }
-export const MESES_DEPOIS_DE_ALUGAR = 2;
 const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
 
 /**
@@ -6478,9 +6384,6 @@ export function marcarCondominioConferido(d, contratoId, mes, usuario) {
 // --------------------------------------------------------------------------
 // Fechamento do mês: as rotinas em ordem, com o que falta em cada uma
 // --------------------------------------------------------------------------
-/** Dia do mês a partir do qual se geram os boletos do próprio mês (vencem no mês seguinte). */
-export const DIA_GERAR_BOLETOS = 20;
-
 /**
  * Etapas do fechamento do mês ``mes`` (mês do calendário). Ex.: outubro/2026:
  * - a partir de 20/10: gerar os boletos do aluguel de 10/2026 (vencem em 11/2026), com a carta de quem reajusta em 10/2026;
@@ -7032,8 +6935,6 @@ export function marcarCartaEnviada(d, contratoId, comp, enviada, usuario) {
 // --------------------------------------------------------------------------
 // Inadimplência: boletos vencidos e não pagos, por inquilino, e histórico de atrasos
 // --------------------------------------------------------------------------
-/** A partir de quantos dias de atraso o devedor fica em vermelho: padrão da regra `dias_vermelho` (use `regra('dias_vermelho')`). */
-export const DIAS_VERMELHO = 5;
 /** Contrato encerrado (inativo ou com a saída do inquilino registrada): a inadimplência dele some (decisão do dono, C13, 2026-11-07). */
 export const contratoEncerrado = (d, c) => c.ativo === false || !!encerramentoDo(d, c.id);
 

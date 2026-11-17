@@ -274,3 +274,75 @@ test('telas: erro esperado de quem usa é C.ErroUsuario (aparece na tela, não v
   }
   assert.deepEqual(sobra, [], 'use throw new C.ErroUsuario(...) com o que a pessoa deve fazer; se for erro de programa, ponha o trecho em PERMITIDOS');
 });
+
+test('ressarcimento para o boleto de um mês em acordo é recusado na tela (o boleto em acordo não muda)', async () => {
+  const { c, cb } = comInquilino('Maria Exemplo');
+  entrarComo(E, 'admin');
+  R.buscar(E.d, 'cobrancas', cb.id).situacao = 'Em acordo'; // 07/2026 entrou num acordo
+  const rota = { partes: ['novo', 'ressarcimentos'], q: { contrato: String(c.id) } };
+  const campos = (mes) => ({ campos: [['competencia_condominio', '2026-06'], ['descricao', 'Fundo de obras'], ['valor', '150,00'], ['data_pagamento', '2026-06-05'], ['competencia_abatimento', mes]] });
+  const r = await T.FORMULARIOS.cadastro(campos('2026-07'), rota);
+  assert.match(r.erros.competencia_abatimento, /07\/2026 está em acordo/);
+  assert.equal(E.d.ressarcimentos.length, 0, 'nada foi gravado');
+  // outro mês, em aberto, passa
+  const { CADASTROS } = await import('../docs/js/telas/cadastros.js');
+  const erros = {};
+  CADASTROS.ressarcimentos.ajustar({ valor: 15000, data_pagamento: '2026-06-05', competencia_abatimento: '2026-06' }, erros, null, null, rota.q);
+  assert.deepEqual(erros, {}, 'o boleto de 06/2026 recebe');
+});
+
+test('na nuvem, o login com senha manda por trás o verificador do programa do PC (uma vez por senha em cada navegador)', async () => {
+  const antes = E.nuvem;
+  E.nuvem = {}; // só para mandarVerificadorDoAparelho saber que está na nuvem
+  pedidos.length = 0;
+  internet.responder = () => new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+  try {
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha do dono 2026', 'a'.repeat(64)), true);
+    assert.deepEqual(pedidos, ['api/dados/verificador-aparelho']);
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha do dono 2026', 'a'.repeat(64)), false, 'mesma senha: não manda de novo');
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha nova do dono', 'b'.repeat(64)), true, 'senha trocada: manda');
+    E.nuvem = null;
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'x', 'c'.repeat(64)), false, 'fora da nuvem: nada');
+    assert.equal(pedidos.length, 2);
+  } finally {
+    E.nuvem = antes;
+    internet.responder = () => { throw new TypeError('sem internet'); };
+  }
+});
+
+test('telas raras carregadas só quando usadas (2ª rodada do mutirão de 16/11): fora da abertura, com as ações e formulários pelo nome', async () => {
+  // a abertura (import estático a partir de app.js) não chega às partes adiadas
+  const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'js');
+  const vistos = new Set();
+  const andar = (arq) => {
+    if (vistos.has(arq)) return;
+    vistos.add(arq);
+    for (const [, rel] of fs.readFileSync(arq, 'utf8').matchAll(/\b(?:from|import)\s*['"](\.{1,2}\/[^'"]+\.js)['"]/g)) andar(path.resolve(path.dirname(arq), rel));
+  };
+  andar(path.join(raiz, 'app.js'));
+  const sw = fs.readFileSync(path.join(raiz, '..', 'sw.js'), 'utf8');
+  const arquivos = { pessoa: 'telas/pessoa.js', regras: 'telas/regras-sistema.js', regua: 'telas/regua.js', nuvem: 'telas/nuvem.js' };
+  assert.deepEqual(Object.keys(COMUM.PARTES_ADIADAS).sort(), Object.keys(arquivos).sort());
+  for (const [qual, arq] of Object.entries(arquivos)) {
+    assert.equal(vistos.has(path.join(raiz, arq)), false, `${arq} fica fora da abertura`);
+    assert.ok(sw.includes(`'js/${arq}'`), `${arq} está em ADIADOS do sw.js (sem internet)`);
+    const m = await COMUM.parteAdiada(qual);
+    const p = COMUM.PARTES_ADIADAS[qual];
+    for (const [tipo, todos] of [['acoes', T.ACOES], ['formularios', T.FORMULARIOS]]) {
+      if (!p[tipo]) continue;
+      const [objeto, nomes] = p[tipo];
+      assert.deepEqual([...nomes].sort(), Object.keys(m[objeto]).sort(), `${objeto}: a lista de PARTES_ADIADAS é a mesma da parte`);
+      for (const n of nomes) assert.equal(typeof todos[n], 'function', `${n} chega pelo nome`);
+    }
+  }
+  assert.equal(vistos.has(path.join(raiz, 'pessoa.js')), false, 'pessoa.js (LGPD) também');
+  // o clique passa para a função de verdade (carrega a parte na hora)
+  const parte = await COMUM.parteAdiada('regras');
+  const antes = parte.ACOES_REGRAS.baixarArquivoRegras;
+  let chamou = null;
+  parte.ACOES_REGRAS.baixarArquivoRegras = (dados) => { chamou = dados; };
+  try {
+    await T.ACOES.baixarArquivoRegras({ x: '1' });
+    assert.deepEqual(chamou, { x: '1' });
+  } finally { parte.ACOES_REGRAS.baixarArquivoRegras = antes; }
+});

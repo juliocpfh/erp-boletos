@@ -238,6 +238,11 @@ export const CADASTROS = {
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
         erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
       }
+      // boleto em acordo fica como estava no dia do acordo (aplicarRessarcimentos não mexe nele): o ressarcimento novo, de mês
+      // trocado ou de valor mudado não seria abatido. Ex.: boleto de 10/2026 em acordo → escolha 11/2026
+      if (cb && !cb.data_pagamento && R.emAcordo(cb) && (!r || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
+        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
+      }
       // boleto do abatimento já pago com este ressarcimento: mudar o valor não muda o boleto pago. Lance a diferença como
       // outro ressarcimento, no próximo boleto em aberto
       if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {

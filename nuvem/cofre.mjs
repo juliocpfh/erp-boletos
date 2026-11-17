@@ -14,6 +14,7 @@ export const FORMATO = 'imoveis-v1';
 export const MAX_OPS = 2000;
 export const MAX_REGISTRO = 1024 * 1024; // um registro (a logo tem ~270 KB)
 export const MAX_FAIXA = 20000; // uma importação grande pede a faixa do tamanho dela antes de gravar (nuvem.js reservarFaixas)
+export const MAX_TABELAS_FAIXA = 200; // tabelas num pedido só de faixas (garantirFaixas em nuvem.js; hoje são ~60)
 export const DIAS_LOG = 60; // aparelho parado há mais tempo baixa tudo de novo
 export const MANTER_BACKUPS = 30;
 export const DIAS_EXCLUIDOS = 180; // cópia de registro apagado (para conflito "excluído") guardada por até 180 dias
@@ -834,16 +835,27 @@ export class Cofre {
   }
 
   /** Faixa de códigos novos de uma tabela para um aparelho usar mesmo sem internet (nunca repete entre aparelhos). */
-  faixa({ tabela, quantidade = 200 } = {}, email) {
+  faixa({ tabela, quantidade = 200, tabelas } = {}, email) {
     this.exigir(email, 'operador');
+    // várias de uma vez (primeiro acesso de um aparelho: ~60 tabelas numa ida só, em vez de um pedido por tabela):
+    // `tabelas` = { nome: quantidade }; resposta { faixas: [{ tabela, inicio, fim }] }, todas na mesma transação
+    if (tabelas !== undefined) {
+      const pedidos = tabelas && typeof tabelas === 'object' && !Array.isArray(tabelas) ? Object.entries(tabelas) : null;
+      if (!pedidos || !pedidos.length || pedidos.length > MAX_TABELAS_FAIXA) throw new ErroCofre(400, 'Pedido de faixas inválido.');
+      const lista = pedidos.map(([t, q]) => [this.tabelaDeRegistros(t), q]);
+      return this.transacao(() => ({ faixas: lista.map(([t, q]) => this.reservarFaixa(t, q)) }));
+    }
     const t = this.tabelaDeRegistros(tabela);
+    return this.transacao(() => this.reservarFaixa(t, quantidade));
+  }
+
+  /** Reserva a faixa de uma tabela (dentro da transação de quem chama). */
+  reservarFaixa(t, quantidade) {
     const qtd = Math.min(MAX_FAIXA, Math.max(1, Math.floor(Number(quantidade) || 0)));
-    return this.transacao(() => {
-      const maior = Number(this.q('SELECT MAX(id) AS m FROM registros WHERE tabela = ?', t)[0]?.m || 0);
-      const proximo = Math.max(Number(this.q('SELECT proximo FROM tabelas WHERE nome = ?', t)[0]?.proximo || 1), maior + 1);
-      this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?) ON CONFLICT(nome) DO UPDATE SET proximo = excluded.proximo', t, proximo + qtd);
-      return { tabela: t, inicio: proximo, fim: proximo + qtd - 1 };
-    });
+    const maior = Number(this.q('SELECT MAX(id) AS m FROM registros WHERE tabela = ?', t)[0]?.m || 0);
+    const proximo = Math.max(Number(this.q('SELECT proximo FROM tabelas WHERE nome = ?', t)[0]?.proximo || 1), maior + 1);
+    this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?) ON CONFLICT(nome) DO UPDATE SET proximo = excluded.proximo', t, proximo + qtd);
+    return { tabela: t, inicio: proximo, fim: proximo + qtd - 1 };
   }
 
   /** Próximo número de um contador (NF): só com internet, um pedido de cada vez, nunca repete. */
@@ -1239,6 +1251,7 @@ export class CofreDO {
       if (!email) throw new ErroCofre(401, 'Sem login.');
       if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
       else if (rota === '/desligar-aparelho' && request.method === 'POST') r = this.aparelhos.desligar(await corpo(), c.exigir(email, 'consulta'), email);
+      else if (rota === '/verificador-aparelho' && request.method === 'POST') r = await this.aparelhos.guardarVerificador(await corpo(), c.exigir(email, 'consulta'));
       else if (rota === '/papel' && request.method === 'GET') {
         // o Worker pede 'admin' para os backups (banco inteiro, com as senhas de todos): nível desconhecido é recusado, nunca vira 'consulta'
         const nivel = url.searchParams.get('nivel');

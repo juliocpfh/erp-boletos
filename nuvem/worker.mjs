@@ -10,7 +10,8 @@
 // · aparelho/… (sem o login do Access: política Bypass só neste caminho): o programa do PC entra com e-mail e senha
 //   (aparelho/entrar) e depois só LÊ com o crachá do aparelho (Authorization: Bearer ap1_…): saude, dados/tudo, dados/mudancas,
 //   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
-// · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access).
+// · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access);
+//   dados/verificador-aparelho (POST): o site manda o verificador da senha para ligar o programa do PC (aparelhos.mjs).
 // · dados/chave-backup (POST, administrador): a chave pública do backup seguro, para os backups diários saírem cifrados (cifrar-backup.mjs).
 // · dados/acessos (GET, administrador): o registro de acessos (tela Acessos). O Worker anota no cofre quem abriu, anexou,
 //   apagou ou moveu arquivos, baixou backups, mandou e-mail e usou a ficha pela internet (anotarAcesso); o cofre anota
@@ -19,7 +20,7 @@
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
 
-import { crachaValido, hashDoCracha } from './aparelhos.mjs';
+import { crachaValido, ERRO_ENTRAR, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
 import {
@@ -157,7 +158,7 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'chave-backup': 'POST', acessos: 'GET' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'verificador-aparelho': 'POST', 'chave-backup': 'POST', acessos: 'GET' };
 const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
 async function repassarAoCofre(request, env, rota, email, url, origem = 'site') {
@@ -468,7 +469,7 @@ async function atenderAparelho(request, env, rota, url, buscar, ctx = null) {
     if (m !== 'POST') throw new ErroHttp(405, 'Método não aceito.');
     let pedido;
     try { pedido = JSON.parse(new TextDecoder().decode(await lerCorpo(request, 4096))); } catch (e) { throw e instanceof ErroHttp ? e : new ErroHttp(400, 'Pedido inválido.'); }
-    if (!pedido || typeof pedido !== 'object' || !naListaDeEmails(env, pedido.email)) throw new ErroHttp(401, 'E-mail ou senha errados.');
+    if (!pedido || typeof pedido !== 'object' || !naListaDeEmails(env, pedido.email)) throw new ErroHttp(401, ERRO_ENTRAR);
     return cofreDe(env).fetch(new Request('https://cofre/aparelho/entrar', {
       method: 'POST', body: JSON.stringify({ email: pedido.email, senha: pedido.senha, computador: pedido.computador }),
       headers: { 'Content-Type': 'application/json', 'X-Ip': request.headers.get('CF-Connecting-IP') || '' },
