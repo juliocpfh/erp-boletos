@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-ZZ8Y+TuMiWfjipaZcJvZmo8hHHJH7lDlHvTlx+b62Sk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-B66LKEX/Z32OPO7uQNAl8Vu72snoUP2JRmLkQWgJO28='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="bb46fba5a1c827b9">
+<meta name="fontes" content="31ca77dfe00bdfd5">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -21742,7 +21742,8 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     descreverAcesso: () => descreverAcesso,
     telaAcessos: () => telaAcessos,
     telaBackupsNuvem: () => telaBackupsNuvem,
-    telaConflitos: () => telaConflitos
+    telaConflitos: () => telaConflitos,
+    versaoDoProgramaHtml: () => versaoDoProgramaHtml
   });
   function descreverMudanca(o) {
     if (o.op === "historico") return null;
@@ -21891,12 +21892,14 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     }
     const linhas2 = lista3.map((a) => `<tr><td>${esc(a.computador)}</td><td>${esc(a.nome)}${a.usuario_ativo ? "" : ' <span class="suave">(usuário bloqueado: o crachá não vale)</span>'}</td>
     <td>${dataHoraBr(a.ligado_em)}</td><td>${dataHoraBr(a.ultimo_uso)}${a.parado ? ' <span class="suave">(parado há mais de 90 dias: precisa ligar de novo)</span>' : ""}</td>
+    <td>${versaoDoProgramaHtml(a.versao_programa)}</td>
     <td class="n">${botao("desligarAparelho", "Desligar", { id: a.id }, "perigo pequeno", `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join("");
     return `<div class="cartao"><h2>Aparelhos ligados</h2>
-    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
-    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas2 || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
+    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.
+      O programa se atualiza sozinho (todo dia às 20h e ao entrar no Windows); a coluna <b>Programa</b> mostra a versão que cada computador está usando.</p>
+    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th>Programa</th><th></th></tr>${linhas2 || '<tr><td colspan="6" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
   }
-  var valorTexto, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, tamanho, resultadoDoAcesso, MUITO, apiDados, ACOES_NUVEM;
+  var valorTexto, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, tamanho, resultadoDoAcesso, MUITO, apiDados, versaoDoProgramaHtml, ACOES_NUVEM;
   var init_nuvem2 = __esm({
     "docs/js/telas/nuvem.js"() {
       init_app();
@@ -21935,6 +21938,11 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       resultadoDoAcesso = (x) => x >= 400 ? etiqueta(x === 401 ? "Recusado (senha ou login)" : x === 403 ? "Recusado (sem permissão)" : x === 429 ? "Recusado (muitos pedidos)" : `Recusado (${x})`, "perigo") : x === 304 ? '<span class="suave">já estava no aparelho</span>' : "";
       MUITO = 200 * 1048576;
       apiDados = () => apiDoSite("api/dados/");
+      versaoDoProgramaHtml = (v) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2}) (\S+)$/.exec(String(v || ""));
+        if (!m) return '<span class="suave">antiga: baixe o programa novo uma vez (depois ele se atualiza sozinho)</span>';
+        return `de ${m[3]}/${m[2]}/${m[1]} <span class="suave">(${esc(m[4])})</span>`;
+      };
       ACOES_NUVEM = {
         async desligarAparelho({ id }) {
           await apiDados()("POST", "desligar-aparelho", { id: Number(id) });
@@ -31360,7 +31368,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   function caixaDesinstalarPrograma() {
     if (!noComputador() || !noWindows()) return "";
     return `<div class="cartao" id="programa-do-pc"><h2>Programa deste computador</h2>
-    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho. Para tirá-lo deste computador:</p>
+    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho e também <b>se atualiza sozinho</b> quando sai uma versão nova (todo dia às 20h e ao entrar no Windows). A versão de cada computador aparece em ${link("#/usuarios", "Usuários → Aparelhos ligados", "")}. Para tirá-lo deste computador:</p>
     <div class="acoes"><a class="botao perigo pequeno" href="imoveis-desinstalar:confirmar">Desinstalar o programa deste computador</a></div>
     <p class="suave">Pede confirmação no Windows. Depois, se quiser cortar o acesso deste computador, use ${link("#/usuarios", "Usuários → Aparelhos ligados → Desligar", "")}.
       A pasta segura e a pasta <b>${PASTA_COPIA}</b> continuam no computador. Também dá para desinstalar em Configurações do Windows → Aplicativos → Aplicativos instalados.</p></div>`;
