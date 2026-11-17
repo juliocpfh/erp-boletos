@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-nV2LBo/iSAwVHqJJFCDciUl24DqxOMPCwOeTuee6cSo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-ZMFbj7ULg5Zdscb4Q+wAoLR9NF73LZmTulqFICBi3vQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b09f92ec490fc6c1">
+<meta name="fontes" content="0895c4078cd6068a">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -11527,7 +11527,8 @@ ${xref}
     return itens.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }
   function nomeAnexavel(nome) {
-    return !EXTENSOES_PROIBIDAS.test(String(nome || "").trim());
+    const limpo = String(nome || "").trim().replace(/[. ]+$/, "");
+    return !EXTENSOES_PROIBIDAS.test(limpo) && !EXTENSOES_PROIBIDAS.test(limparNome(String(nome || "")));
   }
   function tipoParaAbrir(nome) {
     const ext = (String(nome || "").match(/\.([a-z0-9]+)$/i) || [])[1];
@@ -11854,7 +11855,7 @@ ${naoIncluidos.join("\r\n")}\r
     for await (const [nome, h] of dir.entries()) if (h.kind === "directory") nomes.push(nome);
     return nomes;
   }
-  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR, MANTER_ANTES_IMPORTACAO;
+  var ARQUIVO_BANCO, PASTA_ARQUIVOS, PASTA_BACKUPS, PASTA_MODELOS, MODELO_FATURA, MANTER_BACKUPS, suportado, doDisco, lembrarPasta, pastaLembrada, lembrarPastaSegura, pastaSeguraLembrada, esquecerPastaSegura, lembrarPonte, ponteLembrada, esquecerPonte, assinaturaDoArquivo, assinaturas2, assinaturaLida, EXTENSOES_PROIBIDAS, ERRO_TIPO_ARQUIVO, TIPOS_ABRIR, MANTER_ANTES_IMPORTACAO;
   var init_armazenamento = __esm({
     "docs/js/armazenamento.js"() {
       init_calculos();
@@ -11868,8 +11869,9 @@ ${naoIncluidos.join("\r\n")}\r
       MODELO_FATURA = "fatura-modelo.xlsx";
       MANTER_BACKUPS = 30;
       suportado = () => typeof window !== "undefined" && "showDirectoryPicker" in window;
-      lembrarPasta = (handle) => idbOp("readwrite", (s) => s.put(handle, "pasta"));
-      pastaLembrada = () => idbOp("readonly", (s) => s.get("pasta")).catch(() => null);
+      doDisco = () => typeof location !== "undefined" && location.protocol === "file:";
+      lembrarPasta = (handle) => doDisco() ? Promise.resolve() : idbOp("readwrite", (s) => s.put(handle, "pasta"));
+      pastaLembrada = () => doDisco() ? Promise.resolve(null) : idbOp("readonly", (s) => s.get("pasta")).catch(() => null);
       lembrarPastaSegura = (handle) => idbOp("readwrite", (s) => s.put(handle, "pasta_segura"));
       pastaSeguraLembrada = () => idbOp("readonly", (s) => s.get("pasta_segura")).catch(() => null);
       esquecerPastaSegura = () => idbOp("readwrite", (s) => s.delete("pasta_segura"));
@@ -11879,8 +11881,8 @@ ${naoIncluidos.join("\r\n")}\r
       assinaturaDoArquivo = (arq) => `${arq.lastModified}:${arq.size}`;
       assinaturas2 = /* @__PURE__ */ new WeakMap();
       assinaturaLida = (dados) => assinaturas2.get(dados) || null;
-      EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
-      ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.";
+      EXTENSOES_PROIBIDAS = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i;
+      ERRO_TIPO_ARQUIVO = "Este tipo de arquivo não pode ser anexado (página, script ou programa: .html, .svg, .xml, .js, .exe…). Salve como PDF ou imagem e anexe de novo.";
       TIPOS_ABRIR = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
       MANTER_ANTES_IMPORTACAO = 5;
     }
@@ -15069,19 +15071,31 @@ ${naoIncluidos.join("\r\n")}\r
   var local = { ponte_url: "", senha_ponte: "" };
   async function carregarPonteLocal() {
     try {
-      const p2 = typeof indexedDB === "undefined" ? null : await ponteLembrada();
+      const p2 = lembraNoNavegador() ? await ponteLembrada() : null;
       local = { ponte_url: String(p2 && p2.ponte_url || ""), senha_ponte: String(p2 && p2.senha_ponte || "") };
     } catch {
       local = { ponte_url: "", senha_ponte: "" };
     }
     return { ...local };
   }
+  var lembraNoNavegador = () => typeof indexedDB !== "undefined" && !(typeof location !== "undefined" && location.protocol === "file:");
+  function enderecoDaPonteValido(url) {
+    if (!url) return true;
+    if (/^https:\/\//i.test(url)) return true;
+    const m = /^http:\/\/([^/:]+|\[[^\]]+\])(:\d+)?(\/|$)/i.exec(url);
+    return !!m && ["localhost", "127.0.0.1", "[::1]"].includes(m[1].toLowerCase());
+  }
   async function salvarPonteLocal({ ponte_url, senha_ponte }) {
     const url = String(ponte_url || "").trim().replace(/\/+$/, "");
     if (url && !/^https?:\/\//i.test(url)) throw new Error("O endereço da ponte começa com http:// ou https:// (ex.: http://localhost:8765).");
+    if (!enderecoDaPonteValido(url)) throw new Error("Ponte em outro computador só com https:// (ex.: https://banco.ankjck.com.br): com http:// a senha viajaria aberta pela rede. http:// só para este computador (http://localhost:8765).");
     local = { ponte_url: url, senha_ponte: String(senha_ponte || "") };
-    if (typeof indexedDB !== "undefined") await lembrarPonte({ ...local });
+    if (lembraNoNavegador()) await lembrarPonte({ ...local });
     return { ...local };
+  }
+  async function esquecerSenhaDaPonte() {
+    local = { ...local, senha_ponte: "" };
+    if (lembraNoNavegador()) await lembrarPonte({ ...local });
   }
   async function esquecerPonteLocal() {
     local = { ponte_url: "", senha_ponte: "" };
@@ -15735,10 +15749,13 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     return t;
   }
   var caminhoLocal = (caminho) => caminho.split("/").map(nomeWindows);
+  var NAO_COPIAR = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i;
+  var copiavel = (caminho) => !NAO_COPIAR.test(String(caminho || "").replace(/[. ]+$/, ""));
   function planoCopia(nuvem, anterior = {}) {
     const atual = {};
     const baixar2 = [];
     for (const a of nuvem) {
+      if (!copiavel(a.caminho)) continue;
       const info = { tamanho: a.tamanho, alterado: a.alterado || "" };
       atual[a.caminho] = info;
       const ant = anterior[a.caminho];
@@ -16005,6 +16022,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       return null;
     }
   }
+  async function naoExtraivel(chave) {
+    if (!chave || chave.extractable === false) return chave;
+    return sub().importKey("raw", await sub().exportKey("raw", chave), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  }
   async function cifrar2(chave, valor) {
     const iv = bytes(12);
     if (valor instanceof Blob) {
@@ -16018,7 +16039,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const claro = await sub().decrypt({ name: "AES-GCM", iv: v.iv }, chave, v.dados);
     return v.tipo === "blob" ? new Blob([claro], { type: v.mime }) : JSON.parse(new TextDecoder().decode(claro));
   }
-  var usuariosParaAcesso = (usuarios = []) => usuarios.map((u) => ({
+  var usuariosParaAcesso = (usuarios = [], logins = null) => usuarios.map((u) => ({
     id: u.id,
     login: u.login,
     nome: u.nome,
@@ -16026,9 +16047,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     papel: u.papel,
     ativo: u.ativo,
     pendente: u.pendente,
-    senha_sal: u.senha_sal,
-    senha_hash: u.senha_hash,
-    senha_iteracoes: u.senha_iteracoes
+    ...!logins || logins.includes(u.login) ? { senha_sal: u.senha_sal, senha_hash: u.senha_hash, senha_iteracoes: u.senha_iteracoes } : {}
   }));
   function guardarCifrado(cru, obterChave) {
     return {
@@ -16046,7 +16065,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       },
       async gravar(k, v) {
         if (ABERTAS.includes(k)) return cru.gravar(k, v);
-        if (k === "base" && v?.usuarios) await cru.gravar("acesso", usuariosParaAcesso(v.usuarios));
+        if (k === "base" && v?.usuarios) await cru.gravar("acesso", usuariosParaAcesso(v.usuarios, Object.keys(await cru.ler("embrulhos") || {})));
         if (k === "pendentes") await cru.gravar("aguardando-dados", (v || []).length);
         if (k === "fila-anexos") await cru.gravar("aguardando-anexos", (v || []).length);
         const chave = obterChave();
@@ -16091,7 +16110,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       let chave = emb[login2] ? await desembrulhar(emb[login2], senha) : null;
       let nova = false;
       if (!chave) {
-        chave = this.chave || (await this.cru.ler("chave-sessao"))?.chave || null;
+        chave = this.chave && this.chave.extractable !== false ? this.chave : null;
         if (!chave) {
           nova = Object.keys(emb).length > 0 || !!await this.cru.ler("base");
           const esperando = Number(await this.cru.ler("aguardando-dados") || 0) + Number(await this.cru.ler("aguardando-anexos") || 0);
@@ -16104,7 +16123,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         await this.cru.gravar("embrulhos", emb);
       }
       this.chave = chave;
-      await this.cru.gravar("chave-sessao", { chave, ate: ateMs });
+      await this.cru.gravar("chave-sessao", { chave: await naoExtraivel(chave), ate: ateMs });
       return { chave, nova };
     }
     async sair() {
@@ -16619,14 +16638,20 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       const dir = await pastaDaFicha(f.pasta || nomePastaFicha(f));
       const ficam = new Set(COMPROVANTES_DINHEIRO_FICHA.map((k) => f[k]).filter(Boolean));
       const apagados = [];
+      const falharam = [];
       if (dir) {
         for (const a of await listar(dir)) if (!ficam.has(a.nome)) {
           try {
             await dir.removeEntry(a.nome);
             apagados.push(a.nome);
           } catch {
+            falharam.push(a.nome);
           }
         }
+      }
+      if (falharam.length) {
+        console.warn("documentos da ficha reprovada que não saíram", f.id, falharam.length);
+        continue;
       }
       await alterar((db) => atualizar(
         db,
@@ -16637,6 +16662,9 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         `Documentos da ficha reprovada apagados (${regra("meses_documentos_ficha")} meses depois da decisão)${apagados.length ? `: ${apagados.join(", ")}` : ""}`
       ));
     }
+    const feitas = vencidas.filter((f) => buscar(d(), "fichas", f.id)?.documentos_apagados_em);
+    if (feitas.length < vencidas.length) aviso(`Não deu para apagar todos os documentos de ${vencidas.length - feitas.length} ficha(s) reprovada(s): o sistema tenta de novo na próxima vez que abrir.`, "aviso");
+    vencidas.splice(0, vencidas.length, ...feitas);
     if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${regra("meses_documentos_ficha")} meses: ${vencidas.map((f) => f.inquilino_nome).join(", ")}.`, "info");
   }
   var arquivosFaltando = [];
@@ -26033,6 +26061,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           if (senhaCurta(senha)) erros.login = ERRO_SENHA_CURTA;
           else if (senha !== String(new FormData(form).get("senha2") || "")) erros.login = 'As duas senhas precisam ser iguais (campos "Senha" e "Repita a senha", no fim do formulário)';
           Object.assign(dados, await camposDeSenha(senha));
+          if (r) {
+            const token = r.id === E.usuario.id ? tokenDaSessao() : null;
+            dados.sessoes = token ? [token] : [];
+          }
         } else if (!r) erros.login = "Informe uma senha inicial";
         if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = "Já existe um usuário com este login";
         if (r && r.id === E.usuario.id && (dados.papel !== "admin" || !dados.ativo)) erros.papel = "Você não pode tirar o seu próprio acesso de administrador";
@@ -30593,9 +30625,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       if (senhaCurta(nova)) throw new ErroUsuario(ERRO_SENHA_CURTA);
       if (nova !== f.get("nova2")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
       const campos = await camposDeSenha(nova);
-      await alterar((db) => atualizar(db, "usuarios", E.usuario.id, campos, login(), "Trocou a própria senha"));
+      const token = tokenDaSessao();
+      await alterar((db) => atualizar(db, "usuarios", E.usuario.id, { ...campos, sessoes: token ? [token] : [] }, login(), "Trocou a própria senha"));
       E.usuario = buscar(E.d, "usuarios", E.usuario.id);
-      aviso("Senha alterada.");
+      aviso("Senha alterada. Os outros navegadores e computadores em que você estava entrado vão pedir a senha nova.");
       ir("#/");
     },
     async cadastro(form, rota) {
@@ -31338,6 +31371,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     } catch {
     }
   }
+  var tokenDaSessao = () => (lerSessao() || {}).token || null;
   var novoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
   var usuarioDoEmail = (u, email) => [u.login, u.email].some((v) => String(v || "").toLowerCase() === String(email || "").toLowerCase());
   var usuarioDaSessao = () => {
@@ -31840,14 +31874,50 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     }
     await abrirSessao(E.d.usuarios.find((x) => x.id === u.id) || u);
   }
+  var TENTATIVAS_LOGIN = "imoveis-tentativas";
+  var LIMITE_TENTATIVAS_LOGIN = 10;
+  function lerTentativas() {
+    try {
+      return JSON.parse(sessionStorage.getItem(TENTATIVAS_LOGIN) || "null") || { erros: 0, ate: 0 };
+    } catch {
+      return { erros: 0, ate: 0 };
+    }
+  }
+  function gravarTentativas(t) {
+    try {
+      if (t) sessionStorage.setItem(TENTATIVAS_LOGIN, JSON.stringify(t));
+      else sessionStorage.removeItem(TENTATIVAS_LOGIN);
+    } catch {
+    }
+  }
+  var esperaDoLogin = (erros) => erros < 3 ? 0 : Math.min(30, 2 ** (erros - 2));
+  function conferirTentativas() {
+    const t = lerTentativas();
+    const falta = Math.ceil((t.ate - Date.now()) / 1e3);
+    if (falta > 0) throw new ErroUsuario(falta > 60 ? `Muitas senhas erradas: espere ${Math.ceil(falta / 60)} minuto(s) e tente de novo.` : `Senha errada várias vezes: espere ${falta} segundo(s) e tente de novo.`);
+  }
+  function contarErroDeLogin() {
+    const t = lerTentativas();
+    t.erros += 1;
+    if (t.erros >= LIMITE_TENTATIVAS_LOGIN) {
+      t.ate = Date.now() + 15 * 6e4;
+      t.erros = 0;
+    } else t.ate = Date.now() + esperaDoLogin(t.erros) * 1e3;
+    gravarTentativas(t);
+  }
   async function entrar(loginTexto, senha) {
+    conferirTentativas();
     const disco = E.nuvem ? E.nuvem.atual() || E.d : await lerBanco(E.pasta);
     if (!disco) throw new Error(ERRO_ARQUIVO_SUMIU);
     E.d = disco;
     const u = E.d.usuarios.find((x) => x.login === loginTexto);
     if (E.nuvem && E.saudeNuvem) await E.saudeNuvem;
     if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
-    if (!await conferirSenha(u, senha)) throw new ErroUsuario("Login ou senha incorretos.");
+    if (!await conferirSenha(u, senha)) {
+      contarErroDeLogin();
+      throw new ErroUsuario("Login ou senha incorretos.");
+    }
+    gravarTentativas(null);
     if (u.pendente) throw new Error("Seu pedido de acesso ainda não foi aprovado pelo administrador.");
     if (!u.ativo) throw new Error("Este usuário está bloqueado. Fale com o administrador.");
     if (E.nuvem) await destrancarNuvem(u.login, senha);
@@ -31889,6 +31959,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         await E.cofrinho.cru.apagar("base-seq");
       }
     }
+    await esquecerSenhaDaPonte().catch(() => {
+    });
+    try {
+      for (const k of ["testemunhas_contrato", CLIPES_GUARDADOS]) localStorage.removeItem(k);
+    } catch {
+    }
+    if (E.nuvem && typeof location !== "undefined" && location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)) location.href = "/cdn-cgi/access/logout";
   }
   function rotaAtual() {
     const [caminho, consulta2] = (location.hash.slice(1) || "/").split("?");
