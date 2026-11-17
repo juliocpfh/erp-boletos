@@ -86,9 +86,10 @@ export function telaInquilinos(q) {
     return doc && doc.arquivo
       ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto}</a>`
       : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto}</span>`; };
-  // Matrícula e Contrato lado a lado, do mesmo tamanho: no computador numa coluna própria (alinhados em todas as
-  // linhas); no celular numa linha embaixo do imóvel (pedido do dono, 2026-11-17: antes ficavam colados ao nome)
-  const documentos = (x) => `<td class="centro nw so-pc"><div class="botoes-doc">${matricula(x)}${botaoContrato(x.c)}</div></td>`;
+  // no computador: Matrícula ao lado do nome do imóvel, encostada à direita da coluna (todas alinhadas) e o Contrato
+  // na coluna própria; no celular os dois lado a lado embaixo do imóvel (pedido do dono, 2026-11-17)
+  const registrar = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
+  const imovelComMatricula = (x) => `<div class="imovel-matricula"><span>${imovel(x)}</span>${x.i ? `<span class="so-pc">${matricula(x)}</span>` : ''}</div>`;
   // no celular (cartão): telefone ao lado do nome (toque liga)
   const comPais = (tel) => (tel.length <= 11 ? `55${tel}` : tel);
   const nomeCelular = (x) => { const tel = String(x.c.inquilino_telefone || '').replace(/\D/g, '');
@@ -112,8 +113,8 @@ export function telaInquilinos(q) {
     return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ''}</a>`; })()}</div>
     ${caixaFichas()}
     <div class="cartao rolagem" id="contratos-ativos"><div class="cabecalho"><h2>Contratos ativos (${atuais.length})</h2>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao secundario pequeno') : ''}</div>
-      <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Documentos</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${documentosCelular(x)}</td><td>${nomeCelular(x)}</td>${documentos(x)}
+      <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovelComMatricula(x)}${documentosCelular(x)}</td><td>${nomeCelular(x)}</td>${registrar(x.c)}
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || `<tr><td colspan="6">${semAtivos()}</td></tr>`}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
