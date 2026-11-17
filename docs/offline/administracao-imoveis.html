@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-eM5ZdNtkqETpUraCEcGQas1QZrHJQVoOhdsTdrGQfUo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-xVqxSqTLyR6fccLwGeQ2sbLfveDevdEZAtqAiFyJlz4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="86176e6f6fc43d35">
+<meta name="fontes" content="4c3d489a79e14958">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -4687,6 +4687,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const inicio = n.data_entrada || n.vigencia_inicio;
       if (!n.contrato_anterior_id || !n.heranca_transferida || !inicio) continue;
       for (const s of d2.seguros) if (s.contrato_id === n.id && s.herdado_de === void 0 && s.vigencia_inicio && s.vigencia_inicio < inicio) s.herdado_de = n.contrato_anterior_id;
+    }
+    for (const f of d2.fichas || []) {
+      if (!f.links_ficha || typeof f.links_ficha !== "object") continue;
+      if (!Object.values(f.links_ficha).some((l) => l && typeof l === "object" && "url" in l)) continue;
+      f.links_ficha = Object.fromEntries(Object.entries(f.links_ficha).map(([p2, l]) => {
+        if (!l || typeof l !== "object" || !("url" in l)) return [p2, l];
+        const { url, ...resto } = l;
+        return [p2, resto];
+      }));
     }
     return d2;
   }
@@ -9927,7 +9936,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       NOTIFICACAO_CONTRATO = ["Usar o padrão da conta", "Não notificar", "Escolher"];
       lista2 = (d2, nome) => d2.listas[nome] || LISTAS[nome].padrao;
       buscar = (d2, tabela, id) => d2[tabela].find((r) => r.id === Number(id));
-      OCULTOS = /* @__PURE__ */ new Set(["senha_hash", "senha_sal", "senha_iteracoes", "sessoes"]);
+      OCULTOS = /* @__PURE__ */ new Set(["senha_hash", "senha_sal", "senha_iteracoes", "sessoes", "links_ficha"]);
       visivel = (obj) => Object.fromEntries(Object.entries(obj).filter(([k, v]) => !OCULTOS.has(k) && v !== null && v !== "" && v !== void 0));
       IMAGEM_FORA_DO_HISTORICO = "(imagem guardada só no boleto)";
       semPeso = (tabela, k, v) => tabela === "cobrancas" && k === "banco" && v && typeof v === "object" && v.pix_qr_base64 ? { ...v, pix_qr_base64: IMAGEM_FORA_DO_HISTORICO } : v;
@@ -20271,6 +20280,225 @@ Salvar assim mesmo?`)) {
 
   // docs/js/email-dados.js
   init_calculos();
+
+  // docs/js/ficha-online.js
+  init_calculos();
+  init_formularios();
+  init_regras();
+  var PJ4 = "Pessoa jurídica (empresa)";
+  var nomeDaPessoa = (f, pessoa2) => pessoa2 === "interessado" ? f.inquilino_nome : fiadorDaFicha(f, pessoa2.slice(6)).nome || `fiador ${pessoa2.slice(6)}`;
+  function pessoasDaFicha(f) {
+    const fiadores = fiadoresDaFicha(f).map((x) => `fiador${x.n}`);
+    return ["interessado", ...fiadores.length ? fiadores : temFiador(f) ? ["fiador1"] : []];
+  }
+  var FORA_DO_LINK = /^(inquilino_tipo|inquilino_whatsapp|responsavel_|solidario_|usar_endereco|representante_usar_endereco|.*cep_busca$)/;
+  var PARTES_DO_LINK = { "Interessado (quem vai assinar o contrato)": "Seus dados", "Representante da empresa (pessoa física)": "Representante (quem assina pela empresa)" };
+  var SEMPRE_OBRIGATORIOS = ["inquilino_nome", "inquilino_cpf"];
+  function resolverTipo(c, tipo) {
+    const m = c.mostrarSe;
+    if (m && m.campo === "inquilino_tipo") {
+      if (!m.valores.includes(tipo)) return null;
+      const { mostrarSe, ...resto } = c;
+      c = resto;
+    }
+    if (c.rotuloSe && c.rotuloSe.campo === "inquilino_tipo") {
+      const { rotuloSe, ...resto } = c;
+      c = rotuloSe.valor === tipo ? { ...resto, rotulo: rotuloSe.rotulo } : resto;
+    }
+    return c;
+  }
+  var paraLink = (c, obrig = false) => c.secao ? { secao: c.secao, ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {} } : {
+    nome: c.nome,
+    rotulo: c.rotulo,
+    tipo: c.tipo === "cpfcnpj" ? "cpfcnpj" : c.tipo,
+    ajuda: c.ajuda || "",
+    obrig: obrig || !!c.obrig,
+    largo: !!c.largo,
+    ...c.opcoes ? { opcoes: c.opcoes } : {},
+    ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {}
+  };
+  function formularioDaFicha(f, pessoa2) {
+    const tipo = f.inquilino_tipo || "Pessoa física";
+    if (pessoa2 === "interessado") {
+      const pessoaCampos = camposDaPessoa(CAMPOS_PESSOA).map((c) => resolverTipo(c, tipo)).filter(Boolean).filter((c) => c.secao ? c.secao !== "Inquilino solidário" : !c.quebra && !FORA_DO_LINK.test(c.nome));
+      const renda = FICHA_RENDA.map((c) => resolverTipo(c, tipo)).filter(Boolean);
+      const titulo2 = (s) => s === "Interessado (quem vai assinar o contrato)" && tipo === PJ4 ? "Dados da empresa" : PARTES_DO_LINK[s] || s;
+      const nome = pessoaCampos.find((c) => c.nome === "inquilino_nome");
+      const ordenados = [pessoaCampos[0], nome, ...pessoaCampos.slice(1).filter((c) => c !== nome)].map((c) => c.secao ? c : { ...c, ajuda: "" });
+      return [...ordenados, ...renda].map((c) => c.secao ? { ...c, secao: titulo2(c.secao) } : c).map((c) => paraLink(c, SEMPRE_OBRIGATORIOS.includes(c.nome)));
+    }
+    const n = Number(String(pessoa2).replace("fiador", ""));
+    const p2 = `fiador${n}_`;
+    const campos = FICHA_FIADORES.filter((c) => c.secao ? false : c.nome.startsWith(p2) && !/cep_busca$/.test(c.nome)).map(({ mostrarSe, ...c }) => /_imovel_garantia$/.test(c.nome) ? c : { ...c, ajuda: "" });
+    const conjuge = campos.filter((c) => /_(nome_conjuge|cpf_conjuge|rg_conjuge)$/.test(c.nome));
+    const casado = { campo: `${p2}estado_civil`, valores: ["Casado(a)", "União estável"] };
+    return [
+      { secao: "Seus dados" },
+      ...campos.filter((c) => !conjuge.includes(c) && !/_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c, [`${p2}nome`, `${p2}cpf`].includes(c.nome))),
+      { secao: "Cônjuge ou companheiro(a) (também assina a fiança)", mostrarSe: casado },
+      ...conjuge.map((c) => paraLink({ ...c, mostrarSe: casado })),
+      { secao: "Imóvel do fiador" },
+      ...campos.filter((c) => /_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c))
+    ];
+  }
+  var valoresDaFicha = (f, formulario) => Object.fromEntries(formulario.filter((c) => c.nome && f[c.nome] !== void 0 && f[c.nome] !== null && f[c.nome] !== "").map((c) => [c.nome, f[c.nome]]));
+  function contextoDaFicha(d2, f, pessoa2) {
+    const r = montarRecibo(d2, "ficha", { ficha: f });
+    const e = r.emitente || {};
+    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((i) => [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", "));
+    const fiador = pessoa2 !== "interessado";
+    return {
+      empresa: e.razao_social || e.nome || "",
+      nome: nomeDaPessoa(f, pessoa2),
+      imovel: imoveis.join(" ou "),
+      tipo: f.inquilino_tipo || "Pessoa física",
+      reserva: !fiador && f.reserva_valor > 0 ? reais(f.reserva_valor) : "",
+      de: fiador ? f.inquilino_nome : "",
+      proposta: fiador ? [] : itensDaProposta(f),
+      documentos: fiador ? documentosDoFiador(fiadorDaFicha(f, pessoa2.slice(6))) : documentosDaFicha(f),
+      // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
+      ...!fiador && f.inquilino_tipo !== PJ4 ? { listas: { ...PARTES_DOCUMENTOS_PF, renda: DOCUMENTOS_RENDA } } : {},
+      dica: DICA_DOCUMENTOS
+    };
+  }
+  var pastaNaNuvem = (f, nomePasta) => `arquivos/Fichas em analise/${nomePasta}`;
+  function pedidoDoLink(d2, f, pessoa2, nomePasta) {
+    const formulario = formularioDaFicha(f, pessoa2);
+    return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
+  }
+  function textoWhatsapp(f, pessoa2, link2, { lembrete = false, faltando = [] } = {}) {
+    const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
+    const fiador = pessoa2 !== "interessado";
+    const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral";
+    const validade = dataBr(String(link2.vence_em).slice(0, 10));
+    if (lembrete) {
+      return `Olá${nome ? `, ${nome}` : ""}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join("; ")}` : ""}. O link vale até ${validade}: ${link2.url}
+Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ": a reserva é devolvida por inteiro" : ""}.`;
+    }
+    return `Olá${nome ? `, ${nome}` : ""}! Segue o link ${qual}, que vale até ${validade}: ${link2.url}
+Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
+  }
+  var urlsDestaAba = /* @__PURE__ */ new Map();
+  function lembrarUrlDoLink(fichaId, pessoa2, link2) {
+    if (link2 && link2.url) urlsDestaAba.set(`${fichaId}|${pessoa2}`, { url: String(link2.url), vence_em: String(link2.vence_em || "") });
+  }
+  function urlDoLink(fichaId, pessoa2, agora = (/* @__PURE__ */ new Date()).toISOString()) {
+    const l = urlsDestaAba.get(`${fichaId}|${pessoa2}`);
+    return l && l.vence_em > agora ? l : null;
+  }
+  function documentosDoLink(f, l) {
+    if (l.pessoa !== "interessado") return documentosDoFiador(fiadorDaFicha(f, l.pessoa.slice(6)));
+    return documentosDaFicha(f);
+  }
+  function dadosParaFicha(f, l) {
+    const ultimo = (l.respostas || []).at(-1);
+    const campos = new Set((l.formulario || []).filter((c) => c.nome).map((c) => c.nome));
+    const out = {};
+    if (ultimo) {
+      for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== void 0 && v !== "") out[k] = v;
+    }
+    if (l.pessoa === "interessado") {
+      const docs = (l.arquivos || []).map((a) => a.documento);
+      const renda = /* @__PURE__ */ new Set([...Object.values(DOCUMENTOS_RENDA).flat(), ...PARTES_DOCUMENTOS_PF.renda_padrao, "Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)"]);
+      if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
+      if (docs.some((x) => renda.has(x))) out.doc_renda = true;
+      if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
+      if (docs.some((x) => /assinada/.test(x))) out.doc_ficha = true;
+    }
+    return out;
+  }
+  function telefoneWhatsapp(f, pessoa2) {
+    const t = String((pessoa2 === "interessado" ? f.inquilino_telefone : fiadorDaFicha(f, pessoa2.slice(6)).telefone) || "").replace(/\D/g, "");
+    return t.length >= 10 ? t.length <= 11 ? `55${t}` : t : "";
+  }
+  var cfg2 = { base: "api/ficha-online/", buscar: (...a) => fetch(...a) };
+  async function pedir(caminho, op = {}) {
+    let r;
+    try {
+      r = await cfg2.buscar(`${cfg2.base}${caminho}`, { cache: "no-store", credentials: "same-origin", ...op, headers: { ...op.method && op.method !== "GET" ? { "X-Sistema": "imoveis" } : {}, ...op.headers || {} } });
+    } catch {
+      throw new ErroUsuario("Sem internet: a ficha pela internet precisa de conexão.");
+    }
+    const tipo = r.headers.get("content-type") || "";
+    if (r.redirected || !tipo.includes("json")) throw new ErroUsuario("A nuvem não respondeu (entre de novo no sistema e tente outra vez).");
+    const dados = await r.json();
+    if (!r.ok) throw new ErroUsuario(dados.erro || "A nuvem recusou o pedido.");
+    return dados;
+  }
+  var VALIDADE_LINKS = 9e4;
+  var linksGuardadosPorFicha = /* @__PURE__ */ new Map();
+  var geracaoDosLinks = 0;
+  var chaveDosLinks = (fichaId) => fichaId ? String(Number(fichaId)) : "";
+  function esquecerLinks() {
+    geracaoDosLinks += 1;
+    linksGuardadosPorFicha.clear();
+  }
+  var esquecendo = (promessa) => promessa.finally(esquecerLinks);
+  var criarLinkNaNuvem = (corpo) => esquecendo(pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
+  var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => esquecendo(pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob }));
+  var linksNaNuvem = (fichaId = null) => {
+    const geracao = geracaoDosLinks;
+    return pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => {
+      const links = r.links || [];
+      if (geracao === geracaoDosLinks) linksGuardadosPorFicha.set(chaveDosLinks(fichaId), { em: Date.now(), links });
+      return links;
+    });
+  };
+  var linksGuardados = (fichaId = null) => (linksGuardadosPorFicha.get(chaveDosLinks(fichaId)) || {}).links || null;
+  async function linksRecentes(fichaId = null, agora = Date.now()) {
+    const g = linksGuardadosPorFicha.get(chaveDosLinks(fichaId));
+    return g && agora - g.em < VALIDADE_LINKS ? g.links : linksNaNuvem(fichaId);
+  }
+  var atualizarLinkNaNuvem = (corpo) => esquecendo(pedir("atualizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
+  var chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(t).length / 4) * 4, "=")), (c) => c.charCodeAt(0));
+  var temPush = () => typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof PushManager !== "undefined" && typeof Notification !== "undefined";
+  async function estadoDoAviso() {
+    if (!temPush()) return { possivel: false };
+    const nuvem = await pedir("push").catch(() => ({ ligado: false }));
+    const reg = await navigator.serviceWorker.getRegistration();
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    return { possivel: true, ligadoNaNuvem: !!nuvem.ligado, ligadoAqui: !!inscricao && mesmaChave(inscricao, nuvem.chave), negado: Notification.permission === "denied", chave: nuvem.chave };
+  }
+  var mesmaChave = (inscricao, chave) => {
+    const k = inscricao && inscricao.options && inscricao.options.applicationServerKey;
+    if (!k || !chave) return true;
+    const a = new Uint8Array(k);
+    const b = chaveDoServidor(chave);
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  };
+  async function ligarAviso() {
+    if (!temPush()) throw new ErroUsuario("Este navegador não recebe avisos. No iPhone: instale o aplicativo (Compartilhar → Adicionar à Tela de Início) e abra por ele.");
+    const permissao = await Notification.requestPermission();
+    const e = await estadoDoAviso();
+    if (!e.ligadoNaNuvem) throw new ErroUsuario("O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).");
+    if (permissao !== "granted") throw new ErroUsuario("Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.");
+    const reg = await navigator.serviceWorker.ready;
+    let inscricao = await reg.pushManager.getSubscription();
+    if (inscricao && !mesmaChave(inscricao, e.chave)) {
+      await inscricao.unsubscribe().catch(() => {
+      });
+      inscricao = null;
+    }
+    inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
+    await pedir("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inscricao.toJSON()) });
+  }
+  async function testarAviso() {
+    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    if (!inscricao) return { ok: false, etapa: "aparelho", mensagem: 'Este aparelho não está inscrito: toque em "Ligar".' };
+    if (Notification.permission !== "granted") return { ok: false, etapa: "aparelho", mensagem: "As notificações deste aplicativo estão desligadas no aparelho: libere nas configurações do celular." };
+    return pedir("push-teste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) });
+  }
+  async function desligarAviso() {
+    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
+    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
+    if (!inscricao) return;
+    await pedir("push-sair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) }).catch(() => {
+    });
+    await inscricao.unsubscribe();
+  }
+
+  // docs/js/email-dados.js
   init_contratos();
 
   // docs/js/modelos-email.js
@@ -20656,7 +20884,7 @@ ${fechoEmail(dados.remetente)}` };
 
   // docs/js/email-dados.js
   init_regras();
-  var PJ4 = "Pessoa jurídica (empresa)";
+  var PJ5 = "Pessoa jurídica (empresa)";
   var NOMES_CONTA = { conta_agua: "água", conta_energia: "energia", conta_gas: "gás", conta_internet: "internet", conta_condominio: "condomínio" };
   var CONTAS_FICHA = Object.keys(NOMES_CONTA);
   var primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
@@ -20731,7 +20959,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
   }
   function linkDaFicha(f, pessoa2, hoje3) {
     const l = f && f.links_ficha && f.links_ficha[pessoa2];
-    return l && l.url && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: l.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
+    const naAba = f && urlDoLink(f.id, pessoa2);
+    return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: naAba.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
   }
   function respostasPadrao(d2, c, hoje3) {
     const reparos = c ? resultadoVistoriaSaida(d2, c).reparos : [];
@@ -20751,7 +20980,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const c = alvo.contrato || null;
     const f = alvo.ficha || null;
     const p2 = c || f;
-    const pj = p2.inquilino_tipo === PJ4;
+    const pj = p2.inquilino_tipo === PJ5;
     const imoveis = c ? [buscar(d2, "imoveis", c.imovel_id)].filter(Boolean) : (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean);
     const curto2 = (i) => [i.endereco, i.complemento].filter(Boolean).join(" – ");
     const completo = (i) => [curto2(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", ");
@@ -20930,7 +21159,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
   var TEMPO_ESTADO = 1e4;
   var TEMPO_ENVIO = 12e4;
   var SEM_INTERNET = "Sem internet: o e-mail não foi enviado. Use Copiar texto ou Abrir no Gmail.";
-  var cfg2 = { base: "api/", buscar: (...a) => fetch(...a), online: () => globalThis.navigator?.onLine !== false };
+  var cfg3 = { base: "api/", buscar: (...a) => fetch(...a), online: () => globalThis.navigator?.onLine !== false };
   var estadoGuardado = null;
   var ehJson = (r) => (r.headers.get("content-type") || "").includes("json");
   var local2 = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
@@ -20938,7 +21167,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (estadoGuardado) return estadoGuardado;
     if (local2()) return { ligado: false, remetente: null };
     try {
-      const r = await cfg2.buscar(`${cfg2.base}email/estado`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(TEMPO_ESTADO) });
+      const r = await cfg3.buscar(`${cfg3.base}email/estado`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(TEMPO_ESTADO) });
       if (!r.ok || r.redirected || !ehJson(r)) return { ligado: false, remetente: null };
       const d2 = await r.json();
       estadoGuardado = { ligado: d2.ligado === true, remetente: typeof d2.remetente === "string" ? d2.remetente : null };
@@ -20960,7 +21189,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (!String(para || "").trim()) throw new ErroUsuario("Informe o e-mail do destinatário.");
     const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
     if (total > MAX_BYTES_ANEXOS) throw new ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
-    if (local2() || !cfg2.online()) throw new ErroUsuario(SEM_INTERNET);
+    if (local2() || !cfg3.online()) throw new ErroUsuario(SEM_INTERNET);
     const lista3 = [];
     for (const a of anexos) {
       if (!a?.blob) throw new ErroUsuario(`Anexo sem arquivo: ${a?.nome || ""}`);
@@ -20968,7 +21197,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     }
     let r;
     try {
-      r = await cfg2.buscar(`${cfg2.base}email/enviar`, {
+      r = await cfg3.buscar(`${cfg3.base}email/enviar`, {
         method: "POST",
         cache: "no-store",
         credentials: "same-origin",
@@ -22857,217 +23086,6 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   init_armazenamento();
   init_conferir_pdf();
   init_compactar();
-
-  // docs/js/ficha-online.js
-  init_calculos();
-  init_formularios();
-  init_regras();
-  var PJ5 = "Pessoa jurídica (empresa)";
-  var nomeDaPessoa = (f, pessoa2) => pessoa2 === "interessado" ? f.inquilino_nome : fiadorDaFicha(f, pessoa2.slice(6)).nome || `fiador ${pessoa2.slice(6)}`;
-  function pessoasDaFicha(f) {
-    const fiadores = fiadoresDaFicha(f).map((x) => `fiador${x.n}`);
-    return ["interessado", ...fiadores.length ? fiadores : temFiador(f) ? ["fiador1"] : []];
-  }
-  var FORA_DO_LINK = /^(inquilino_tipo|inquilino_whatsapp|responsavel_|solidario_|usar_endereco|representante_usar_endereco|.*cep_busca$)/;
-  var PARTES_DO_LINK = { "Interessado (quem vai assinar o contrato)": "Seus dados", "Representante da empresa (pessoa física)": "Representante (quem assina pela empresa)" };
-  var SEMPRE_OBRIGATORIOS = ["inquilino_nome", "inquilino_cpf"];
-  function resolverTipo(c, tipo) {
-    const m = c.mostrarSe;
-    if (m && m.campo === "inquilino_tipo") {
-      if (!m.valores.includes(tipo)) return null;
-      const { mostrarSe, ...resto } = c;
-      c = resto;
-    }
-    if (c.rotuloSe && c.rotuloSe.campo === "inquilino_tipo") {
-      const { rotuloSe, ...resto } = c;
-      c = rotuloSe.valor === tipo ? { ...resto, rotulo: rotuloSe.rotulo } : resto;
-    }
-    return c;
-  }
-  var paraLink = (c, obrig = false) => c.secao ? { secao: c.secao, ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {} } : {
-    nome: c.nome,
-    rotulo: c.rotulo,
-    tipo: c.tipo === "cpfcnpj" ? "cpfcnpj" : c.tipo,
-    ajuda: c.ajuda || "",
-    obrig: obrig || !!c.obrig,
-    largo: !!c.largo,
-    ...c.opcoes ? { opcoes: c.opcoes } : {},
-    ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {}
-  };
-  function formularioDaFicha(f, pessoa2) {
-    const tipo = f.inquilino_tipo || "Pessoa física";
-    if (pessoa2 === "interessado") {
-      const pessoaCampos = camposDaPessoa(CAMPOS_PESSOA).map((c) => resolverTipo(c, tipo)).filter(Boolean).filter((c) => c.secao ? c.secao !== "Inquilino solidário" : !c.quebra && !FORA_DO_LINK.test(c.nome));
-      const renda = FICHA_RENDA.map((c) => resolverTipo(c, tipo)).filter(Boolean);
-      const titulo2 = (s) => s === "Interessado (quem vai assinar o contrato)" && tipo === PJ5 ? "Dados da empresa" : PARTES_DO_LINK[s] || s;
-      const nome = pessoaCampos.find((c) => c.nome === "inquilino_nome");
-      const ordenados = [pessoaCampos[0], nome, ...pessoaCampos.slice(1).filter((c) => c !== nome)].map((c) => c.secao ? c : { ...c, ajuda: "" });
-      return [...ordenados, ...renda].map((c) => c.secao ? { ...c, secao: titulo2(c.secao) } : c).map((c) => paraLink(c, SEMPRE_OBRIGATORIOS.includes(c.nome)));
-    }
-    const n = Number(String(pessoa2).replace("fiador", ""));
-    const p2 = `fiador${n}_`;
-    const campos = FICHA_FIADORES.filter((c) => c.secao ? false : c.nome.startsWith(p2) && !/cep_busca$/.test(c.nome)).map(({ mostrarSe, ...c }) => /_imovel_garantia$/.test(c.nome) ? c : { ...c, ajuda: "" });
-    const conjuge = campos.filter((c) => /_(nome_conjuge|cpf_conjuge|rg_conjuge)$/.test(c.nome));
-    const casado = { campo: `${p2}estado_civil`, valores: ["Casado(a)", "União estável"] };
-    return [
-      { secao: "Seus dados" },
-      ...campos.filter((c) => !conjuge.includes(c) && !/_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c, [`${p2}nome`, `${p2}cpf`].includes(c.nome))),
-      { secao: "Cônjuge ou companheiro(a) (também assina a fiança)", mostrarSe: casado },
-      ...conjuge.map((c) => paraLink({ ...c, mostrarSe: casado })),
-      { secao: "Imóvel do fiador" },
-      ...campos.filter((c) => /_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c))
-    ];
-  }
-  var valoresDaFicha = (f, formulario) => Object.fromEntries(formulario.filter((c) => c.nome && f[c.nome] !== void 0 && f[c.nome] !== null && f[c.nome] !== "").map((c) => [c.nome, f[c.nome]]));
-  function contextoDaFicha(d2, f, pessoa2) {
-    const r = montarRecibo(d2, "ficha", { ficha: f });
-    const e = r.emitente || {};
-    const imoveis = (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean).map((i) => [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}/${i.uf || "PR"}` : ""].filter(Boolean).join(", "));
-    const fiador = pessoa2 !== "interessado";
-    return {
-      empresa: e.razao_social || e.nome || "",
-      nome: nomeDaPessoa(f, pessoa2),
-      imovel: imoveis.join(" ou "),
-      tipo: f.inquilino_tipo || "Pessoa física",
-      reserva: !fiador && f.reserva_valor > 0 ? reais(f.reserva_valor) : "",
-      de: fiador ? f.inquilino_nome : "",
-      proposta: fiador ? [] : itensDaProposta(f),
-      documentos: fiador ? documentosDoFiador(fiadorDaFicha(f, pessoa2.slice(6))) : documentosDaFicha(f),
-      // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
-      ...!fiador && f.inquilino_tipo !== PJ5 ? { listas: { ...PARTES_DOCUMENTOS_PF, renda: DOCUMENTOS_RENDA } } : {},
-      dica: DICA_DOCUMENTOS
-    };
-  }
-  var pastaNaNuvem = (f, nomePasta) => `arquivos/Fichas em analise/${nomePasta}`;
-  function pedidoDoLink(d2, f, pessoa2, nomePasta) {
-    const formulario = formularioDaFicha(f, pessoa2);
-    return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
-  }
-  function textoWhatsapp(f, pessoa2, link2, { lembrete = false, faltando = [] } = {}) {
-    const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
-    const fiador = pessoa2 !== "interessado";
-    const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral";
-    const validade = dataBr(String(link2.vence_em).slice(0, 10));
-    if (lembrete) {
-      return `Olá${nome ? `, ${nome}` : ""}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join("; ")}` : ""}. O link vale até ${validade}: ${link2.url}
-Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ": a reserva é devolvida por inteiro" : ""}.`;
-    }
-    return `Olá${nome ? `, ${nome}` : ""}! Segue o link ${qual}, que vale até ${validade}: ${link2.url}
-Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
-  }
-  function documentosDoLink(f, l) {
-    if (l.pessoa !== "interessado") return documentosDoFiador(fiadorDaFicha(f, l.pessoa.slice(6)));
-    return documentosDaFicha(f);
-  }
-  function dadosParaFicha(f, l) {
-    const ultimo = (l.respostas || []).at(-1);
-    const campos = new Set((l.formulario || []).filter((c) => c.nome).map((c) => c.nome));
-    const out = {};
-    if (ultimo) {
-      for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== void 0 && v !== "") out[k] = v;
-    }
-    if (l.pessoa === "interessado") {
-      const docs = (l.arquivos || []).map((a) => a.documento);
-      const renda = /* @__PURE__ */ new Set([...Object.values(DOCUMENTOS_RENDA).flat(), ...PARTES_DOCUMENTOS_PF.renda_padrao, "Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)"]);
-      if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
-      if (docs.some((x) => renda.has(x))) out.doc_renda = true;
-      if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
-      if (docs.some((x) => /assinada/.test(x))) out.doc_ficha = true;
-    }
-    return out;
-  }
-  function telefoneWhatsapp(f, pessoa2) {
-    const t = String((pessoa2 === "interessado" ? f.inquilino_telefone : fiadorDaFicha(f, pessoa2.slice(6)).telefone) || "").replace(/\D/g, "");
-    return t.length >= 10 ? t.length <= 11 ? `55${t}` : t : "";
-  }
-  var cfg3 = { base: "api/ficha-online/", buscar: (...a) => fetch(...a) };
-  async function pedir(caminho, op = {}) {
-    let r;
-    try {
-      r = await cfg3.buscar(`${cfg3.base}${caminho}`, { cache: "no-store", credentials: "same-origin", ...op, headers: { ...op.method && op.method !== "GET" ? { "X-Sistema": "imoveis" } : {}, ...op.headers || {} } });
-    } catch {
-      throw new ErroUsuario("Sem internet: a ficha pela internet precisa de conexão.");
-    }
-    const tipo = r.headers.get("content-type") || "";
-    if (r.redirected || !tipo.includes("json")) throw new ErroUsuario("A nuvem não respondeu (entre de novo no sistema e tente outra vez).");
-    const dados = await r.json();
-    if (!r.ok) throw new ErroUsuario(dados.erro || "A nuvem recusou o pedido.");
-    return dados;
-  }
-  var VALIDADE_LINKS = 9e4;
-  var linksGuardadosPorFicha = /* @__PURE__ */ new Map();
-  var geracaoDosLinks = 0;
-  var chaveDosLinks = (fichaId) => fichaId ? String(Number(fichaId)) : "";
-  function esquecerLinks() {
-    geracaoDosLinks += 1;
-    linksGuardadosPorFicha.clear();
-  }
-  var esquecendo = (promessa) => promessa.finally(esquecerLinks);
-  var criarLinkNaNuvem = (corpo) => esquecendo(pedir("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
-  var guardarPdfNaNuvem = (fichaId, pessoa2, blob) => esquecendo(pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob }));
-  var linksNaNuvem = (fichaId = null) => {
-    const geracao = geracaoDosLinks;
-    return pedir(`lista${fichaId ? `?ficha=${Number(fichaId)}` : ""}`).then((r) => {
-      const links = r.links || [];
-      if (geracao === geracaoDosLinks) linksGuardadosPorFicha.set(chaveDosLinks(fichaId), { em: Date.now(), links });
-      return links;
-    });
-  };
-  var linksGuardados = (fichaId = null) => (linksGuardadosPorFicha.get(chaveDosLinks(fichaId)) || {}).links || null;
-  async function linksRecentes(fichaId = null, agora = Date.now()) {
-    const g = linksGuardadosPorFicha.get(chaveDosLinks(fichaId));
-    return g && agora - g.em < VALIDADE_LINKS ? g.links : linksNaNuvem(fichaId);
-  }
-  var atualizarLinkNaNuvem = (corpo) => esquecendo(pedir("atualizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
-  var chaveDoServidor = (t) => Uint8Array.from(atob(String(t).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(t).length / 4) * 4, "=")), (c) => c.charCodeAt(0));
-  var temPush = () => typeof navigator !== "undefined" && "serviceWorker" in navigator && typeof PushManager !== "undefined" && typeof Notification !== "undefined";
-  async function estadoDoAviso() {
-    if (!temPush()) return { possivel: false };
-    const nuvem = await pedir("push").catch(() => ({ ligado: false }));
-    const reg = await navigator.serviceWorker.getRegistration();
-    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
-    return { possivel: true, ligadoNaNuvem: !!nuvem.ligado, ligadoAqui: !!inscricao && mesmaChave(inscricao, nuvem.chave), negado: Notification.permission === "denied", chave: nuvem.chave };
-  }
-  var mesmaChave = (inscricao, chave) => {
-    const k = inscricao && inscricao.options && inscricao.options.applicationServerKey;
-    if (!k || !chave) return true;
-    const a = new Uint8Array(k);
-    const b = chaveDoServidor(chave);
-    return a.length === b.length && a.every((x, i) => x === b[i]);
-  };
-  async function ligarAviso() {
-    if (!temPush()) throw new ErroUsuario("Este navegador não recebe avisos. No iPhone: instale o aplicativo (Compartilhar → Adicionar à Tela de Início) e abra por ele.");
-    const permissao = await Notification.requestPermission();
-    const e = await estadoDoAviso();
-    if (!e.ligadoNaNuvem) throw new ErroUsuario("O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).");
-    if (permissao !== "granted") throw new ErroUsuario("Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.");
-    const reg = await navigator.serviceWorker.ready;
-    let inscricao = await reg.pushManager.getSubscription();
-    if (inscricao && !mesmaChave(inscricao, e.chave)) {
-      await inscricao.unsubscribe().catch(() => {
-      });
-      inscricao = null;
-    }
-    inscricao = inscricao || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveDoServidor(e.chave) });
-    await pedir("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inscricao.toJSON()) });
-  }
-  async function testarAviso() {
-    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
-    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
-    if (!inscricao) return { ok: false, etapa: "aparelho", mensagem: 'Este aparelho não está inscrito: toque em "Ligar".' };
-    if (Notification.permission !== "granted") return { ok: false, etapa: "aparelho", mensagem: "As notificações deste aplicativo estão desligadas no aparelho: libere nas configurações do celular." };
-    return pedir("push-teste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) });
-  }
-  async function desligarAviso() {
-    const reg = temPush() ? await navigator.serviceWorker.getRegistration() : null;
-    const inscricao = reg ? await reg.pushManager.getSubscription() : null;
-    if (!inscricao) return;
-    await pedir("push-sair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: inscricao.endpoint }) }).catch(() => {
-    });
-    await inscricao.unsubscribe();
-  }
-
-  // docs/js/telas/fichas.js
   init_calculos();
   init_calculos();
   init_formularios();
@@ -23218,8 +23236,41 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
   var COR_LINK = { Respondida: "info", Assinada: "ok", Desistiu: "perigo", "Falta documento": "aviso", Assinar: "aviso" };
   var linkValido = (f, pessoa2) => {
     const l = (f.links_ficha || {})[pessoa2];
-    return l && l.url && String(l.vence_em) > (/* @__PURE__ */ new Date()).toISOString() ? l : null;
+    return l && !l.encerrado && String(l.vence_em) > (/* @__PURE__ */ new Date()).toISOString() ? l : null;
   };
+  async function linkParaMandar(f, pessoa2) {
+    const naAba = urlDoLink(f.id, pessoa2);
+    if (naAba) return naAba;
+    const ok = await janela({
+      titulo: "Gerar um link novo?",
+      sim: "Gerar e mostrar",
+      nao: "Voltar",
+      html: `<p>Por segurança, o link da ficha só aparece na hora em que é gerado (ele não fica guardado no sistema).</p>
+      <p>Para mandar de novo a <b>${esc(nomeDaPessoa(f, pessoa2))}</b>, o sistema gera um link novo: o anterior deixa de funcionar. O que a pessoa já mandou continua guardado.</p>`
+    });
+    if (!ok) return null;
+    return novoLinkDaFicha(f, pessoa2, { pdf: false });
+  }
+  async function novoLinkDaFicha(f, pessoa2, { pdf = true } = {}) {
+    const link2 = await criarLinkNaNuvem(pedidoDoLink(d(), f, pessoa2, f.pasta || nomePastaFicha(f)));
+    lembrarUrlDoLink(f.id, pessoa2, link2);
+    if (pdf) {
+      try {
+        const tipo = pessoa2 === "interessado" ? "ficha" : "ficha_fiador";
+        const arquivo = await pdfDoRecibo(tipo, { ficha: f, ...tipo === "ficha_fiador" ? { fiador: Number(pessoa2.slice(6)) } : {} });
+        await guardarPdfNaNuvem(f.id, pessoa2, arquivo.blob);
+      } catch (e) {
+        console.warn("ficha em PDF do link", e);
+      }
+    }
+    await alterar((db) => {
+      const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
+      const { url, encerrado, ...anterior } = links[pessoa2] || {};
+      links[pessoa2] = { ...anterior, vence_em: link2.vence_em, criado_em: (/* @__PURE__ */ new Date()).toISOString(), por: login() };
+      atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Link da ficha de ${nomeDaPessoa(f, pessoa2)} gerado (vale até ${dataBr(link2.vence_em.slice(0, 10))})`);
+    });
+    return { url: link2.url, vence_em: link2.vence_em };
+  }
   function caixaFichaOnline(f) {
     if (!opera() || fichaSemContrato(f) || f.documentos_no_contrato) return "";
     const titulo2 = "<h2>Ficha pela internet</h2>";
@@ -23230,10 +23281,10 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       return `<li style="margin:6px 0"><b>${esc(nomeDaPessoa(f, p2))}</b>${p2 === "interessado" ? "" : ' <span class="suave">(fiador)</span>'}
       <span data-situacao-link="${p2}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta("link vencido", "aviso") : '<span class="suave">sem link</span>'}</span><br>
       ${botao("gerarLinkFicha", valido ? "Gerar novo link" : "Gerar link", { id: f.id, pessoa: p2 }, valido ? "secundario pequeno" : "pequeno", valido ? "Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado)." : "")}
-      ${valido ? botao("compartilharLinkFicha", "Copiar / WhatsApp", { id: f.id, pessoa: p2 }, "secundario pequeno") : ""}</li>`;
+      ${valido ? botao("compartilharLinkFicha", urlDoLink(f.id, p2) ? "Copiar / WhatsApp" : "Mandar de novo", { id: f.id, pessoa: p2 }, "secundario pequeno") : ""}</li>`;
     }).join("");
     return `<div class="cartao" data-ficha-online="${f.id}">${titulo2}
-    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. O link do interessado também vai no e-mail de envio da ficha.</p>
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). Para mandar de novo, o sistema gera outro e o anterior deixa de valer.</p>
     <ul style="padding-left:18px">${linhas2}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
   }
   async function ligarFichaOnline(raiz) {
@@ -23471,18 +23522,28 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       sim: "Fechar",
       nao: "Voltar",
       html: `<p>Vale até <b>${dataBr(String(link2.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro (e este deixa de valer).</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto3)}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
-      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(texto3)}">Abrir no WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
-      ${pessoa2 === "interessado" ? '<p class="suave">O e-mail "Envio de ficha cadastral" já leva este link (e o do fiador, se houver).</p>' : ""}`,
+      ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-abrir-zap>Copiar e abrir o WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>
+      ${tel ? '<p class="suave">O WhatsApp abre a conversa com a pessoa: é só colar a mensagem lá (o link não vai no endereço da página, que fica no histórico do navegador).</p>' : ""}
+      ${pessoa2 === "interessado" ? '<p class="suave">O e-mail "Envio de ficha cadastral", mandado agora, já leva este link (e o do fiador, se houver).</p>' : ""}`,
       ligar: (dlg) => {
-        dlg.querySelector("[data-copiar-link]").addEventListener("click", async (ev) => {
+        const copiar3 = async () => {
           try {
             await navigator.clipboard.writeText(dlg.querySelector("[data-texto-link]").value);
-            ev.target.textContent = "Copiado ✓";
+            return true;
           } catch {
             dlg.querySelector("[data-texto-link]").select();
+            return false;
           }
+        };
+        dlg.querySelector("[data-copiar-link]").addEventListener("click", async (ev) => {
+          if (await copiar3()) ev.target.textContent = "Copiado ✓";
+        });
+        const zap = dlg.querySelector("[data-abrir-zap]");
+        if (zap) zap.addEventListener("click", () => {
+          copiar3();
         });
       }
     });
@@ -23494,25 +23555,9 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       if (!E.nuvem) throw new ErroUsuario("A ficha pela internet só funciona no sistema na nuvem.");
       const f = buscar2("fichas", id);
       if (!f || !pessoasDaFicha(f).includes(pessoa2)) throw new ErroUsuario("Ficha ou pessoa não encontrada.");
-      const link2 = await criarLinkNaNuvem(pedidoDoLink(d(), f, pessoa2, f.pasta || nomePastaFicha(f)));
-      try {
-        const tipo = pessoa2 === "interessado" ? "ficha" : "ficha_fiador";
-        const pdf = await pdfDoRecibo(tipo, { ficha: f, ...tipo === "ficha_fiador" ? { fiador: Number(pessoa2.slice(6)) } : {} });
-        await guardarPdfNaNuvem(f.id, pessoa2, pdf.blob);
-      } catch (e) {
-        console.warn("ficha em PDF do link", e);
-      }
-      const guardado = { url: link2.url, vence_em: link2.vence_em, criado_em: (/* @__PURE__ */ new Date()).toISOString(), por: login() };
-      await alterar((db) => atualizar(
-        db,
-        "fichas",
-        f.id,
-        { links_ficha: { ...buscar(db, "fichas", f.id).links_ficha || {}, [pessoa2]: guardado } },
-        login(),
-        `Link da ficha de ${nomeDaPessoa(f, pessoa2)} gerado (vale até ${dataBr(link2.vence_em.slice(0, 10))})`
-      ));
+      const link2 = await novoLinkDaFicha(f, pessoa2);
       await mostrar();
-      await janelaDoLink(buscar2("fichas", id), pessoa2, guardado);
+      await janelaDoLink(buscar2("fichas", id), pessoa2, link2);
     },
     /** Traz para a ficha os dados do último envio pelo link (só os preenchidos) e marca os documentos recebidos. */
     async trazerRespostaFicha({ id, pessoa: pessoa2 }) {
@@ -23561,8 +23606,8 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       if (!faltando.length) throw new ErroUsuario("Marque ou escreva o que falta.");
       await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Falta documento", faltando });
       aviso("Pedido registrado no link.");
-      const link2 = linkValido(f, pessoa2);
-      if (link2) await janelaDoLink(f, pessoa2, link2, { lembrete: true, faltando });
+      const link2 = linkValido(f, pessoa2) && await linkParaMandar(f, pessoa2);
+      if (link2) await janelaDoLink(buscar2("fichas", id), pessoa2, link2, { lembrete: true, faltando });
       await mostrar();
     },
     /** Gera a ficha em PDF com os dados de agora, guarda no link e pede a assinatura (gov.br ou à mão). */
@@ -23574,15 +23619,16 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       await guardarPdfNaNuvem(f.id, pessoa2, pdf.blob);
       await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Assinar", faltando: [] });
       aviso("A ficha com os dados de agora está no link para assinar.");
-      const link2 = linkValido(f, pessoa2);
-      if (link2) await janelaDoLink(f, pessoa2, link2, { lembrete: true, faltando: ["assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)"] });
+      const link2 = linkValido(f, pessoa2) && await linkParaMandar(f, pessoa2);
+      if (link2) await janelaDoLink(buscar2("fichas", id), pessoa2, link2, { lembrete: true, faltando: ["assinar a ficha (baixe no link, assine pelo gov.br ou à mão e mande por lá)"] });
       await mostrar();
     },
     async lembrarFicha({ id, pessoa: pessoa2 }) {
       const f = buscar2("fichas", id);
-      const l = f && linkValido(f, pessoa2);
-      if (!l) throw new ErroUsuario("O link venceu: gere um novo na página da ficha.");
-      await janelaDoLink(f, pessoa2, l, { lembrete: true });
+      if (!f || !linkValido(f, pessoa2)) throw new ErroUsuario("O link venceu: gere um novo na página da ficha.");
+      const l = await linkParaMandar(f, pessoa2);
+      if (!l) return;
+      await janelaDoLink(buscar2("fichas", id), pessoa2, l, { lembrete: true });
       await alterar((db) => {
         const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
         links[pessoa2] = { ...links[pessoa2], lembrado_em: (/* @__PURE__ */ new Date()).toISOString() };
@@ -23596,7 +23642,10 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       await atualizarLinkNaNuvem({ ficha_id: f.id, pessoa: pessoa2, situacao: "Encerrado" });
       await alterar((db) => {
         const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
-        if (links[pessoa2]) links[pessoa2] = { ...links[pessoa2], vence_em: (/* @__PURE__ */ new Date()).toISOString(), encerrado: true };
+        if (links[pessoa2]) {
+          const { url, ...resto } = links[pessoa2];
+          links[pessoa2] = { ...resto, vence_em: (/* @__PURE__ */ new Date()).toISOString(), encerrado: true };
+        }
         atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Link da ficha de ${nomeDaPessoa(f, pessoa2)} encerrado`);
       });
       aviso("Link encerrado.");
@@ -23618,9 +23667,11 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     },
     async compartilharLinkFicha({ id, pessoa: pessoa2 }) {
       const f = buscar2("fichas", id);
-      const l = f && linkValido(f, pessoa2);
-      if (!l) throw new ErroUsuario("O link venceu: gere um novo.");
-      await janelaDoLink(f, pessoa2, l);
+      if (!f || !linkValido(f, pessoa2)) throw new ErroUsuario("O link venceu: gere um novo.");
+      const l = await linkParaMandar(f, pessoa2);
+      if (!l) return;
+      await janelaDoLink(buscar2("fichas", id), pessoa2, l);
+      await mostrar();
     },
     /**
      * Desistência antes de assinar: pergunta a data e o motivo, leva os arquivos do contrato não assinado para a pasta da
