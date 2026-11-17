@@ -220,6 +220,10 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     tabela.push([`Garantia corrigida até ${C.dataBr(enc.data_saida)}`, C.reais(enc.garantia_corrigida || enc.garantia_valor)]);
   }
   if (enc.fci_credito) tabela.push(['FCI corrigido (crédito do locatário)', C.reais(enc.fci_credito)]);
+  // os reparos pagos pelo FCI e o que passou dele também saem do saldo: sem essas linhas a tabela não fecha com o saldo
+  if (enc.fci_usado > 0) tabela.push(['(-) Reparos pagos pelo FCI', C.reais(enc.fci_usado)]);
+  const danosAlem = Math.max((enc.fci_danos || 0) - (enc.fci_usado || 0), 0);
+  if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
   tabela.push(['(-) Débitos descontados', C.reais(enc.debitos || 0)]);
   for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
   tabela.push([enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário', C.reais(Math.abs(enc.saldo || 0))]);

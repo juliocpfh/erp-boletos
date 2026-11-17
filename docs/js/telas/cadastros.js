@@ -227,6 +227,11 @@ export const CADASTROS = {
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
         erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
       }
+      // boleto do abatimento já pago com este ressarcimento: mudar o valor não muda o boleto pago. Lance a diferença como
+      // outro ressarcimento, no próximo boleto em aberto
+      if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
+        erros.valor = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
+      }
     },
     salvar(db, dados, q, r) {
       const anterior = r ? r.competencia_abatimento : null;

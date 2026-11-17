@@ -178,7 +178,8 @@ function caixaGarantia(c) {
     const pend = R.devolucaoGarantiaPendente(d(), c);
     const quem = `<a href="#/contrato/${seguinte.id}?ir=garantia">${esc(seguinte.inquilino_nome)}</a>`;
     if (dev) {
-      const contas = R.devolucaoPorRecebedor(d(), c, dev.garantia_corrigida);
+      // reparte o que volta de fato (corrigida − débitos), não a garantia corrigida inteira
+      const contas = R.devolucaoPorRecebedor(d(), c, Math.max(dev.saldo || 0, 0));
       html += `${subtitulo('Devolução da garantia (troca de titular)', '', `${seguinte.inquilino_nome} assumiu o contrato com garantia própria`)}
         <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}</td>
           <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
@@ -353,7 +354,7 @@ function caixaSaida(c) {
     ${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
     ${item('Vistoria de saída', (() => { const v = K.resultadoVistoriaSaida(d(), c); return `${esc(K.textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ''}`; })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
-    ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, e.garantia_corrigida); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
+    ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, R.garantiaADevolverNaSaida(e)); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
     ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
     ${e.saldo !== 0 && e.garantia_devolvida_em ? `<p>${e.saldo > 0 ? 'Comprovante da devolução do saldo' : 'Comprovante do pagamento do saldo'}: ${linkComprovante(c.id, e.comprovante, { tabela: 'encerramentos', id: e.id, campo: 'comprovante', tipo: e.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', data: e.garantia_devolvida_em })}</p>` : ''}
     ${linkRecibo('quitacao', c, 'Termo de entrega do imóvel, acerto final e quitação (assinam a locadora e o inquilino)')}
