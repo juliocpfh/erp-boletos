@@ -2720,6 +2720,49 @@ export function contratosDaDesistencia(d, { fichaId = null, contratoId = null })
 }
 
 /**
+ * Conferências dos documentos do link da ficha (`fichas.conferencias_link`, por nome do arquivo; telas/fichas.js).
+ * ``novas``: { nome: registro } (conferir-pdf.js `registroDaConferencia`, com o resumo SHA-256, quem e quando); a que já
+ * estiver guardada fica (outro aparelho pode ter conferido e compactado antes). Devolve quantas entraram.
+ */
+export function guardarConferenciasDoLink(d, fichaId, novas, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f) return 0;
+  const atuais = f.conferencias_link || {};
+  const entram = Object.fromEntries(Object.entries(novas || {}).filter(([nome]) => !atuais[nome]));
+  const n = Object.keys(entram).length;
+  if (n) atualizar(d, 'fichas', fichaId, { conferencias_link: { ...atuais, ...entram } }, usuario, `Conferência guardada de ${n} documento(s) mandado(s) pelo link`);
+  return n;
+}
+
+/**
+ * A compactação trocou o documento do link já conferido: guarda o resumo SHA-256 do arquivo novo (`sha256_compactado`) junto
+ * da conferência, que continua sendo a do original. Grave ANTES de trocar o arquivo: se a troca falhar, o original ainda
+ * bate com `sha256`. ``resumos``: { nome: sha256 do compactado }. Devolve quantas foram anotadas.
+ */
+export function registrarCompactacaoDoLink(d, fichaId, resumos, usuario, em = new Date().toISOString()) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !f.conferencias_link) return 0;
+  const lista = { ...f.conferencias_link };
+  let n = 0;
+  for (const [nome, sha] of Object.entries(resumos || {})) {
+    if (!lista[nome] || !sha) continue;
+    lista[nome] = { ...lista[nome], sha256_compactado: sha, compactado_em: em };
+    n += 1;
+  }
+  if (n) atualizar(d, 'fichas', fichaId, { conferencias_link: lista }, usuario, `${n} documento(s) do link compactado(s) depois da conferência (resumo do arquivo novo guardado)`);
+  return n;
+}
+
+/** Tira a conferência guardada de um documento do link (o arquivo mudou depois dela): a tela confere de novo o de agora. */
+export function refazerConferenciaDoLink(d, fichaId, nome, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !(f.conferencias_link || {})[nome]) return false;
+  const { [nome]: antiga, ...resto } = f.conferencias_link; // eslint-disable-line no-unused-vars
+  atualizar(d, 'fichas', fichaId, { conferencias_link: resto }, usuario, `Conferência de "${nome}" refeita: o arquivo tinha mudado depois da conferência`);
+  return true;
+}
+
+/**
  * Desistência antes de assinar (pedido do dono, 2026-11-13): o interessado não segue. A ficha fica "Desistiu", com a
  * reserva para devolver por inteiro (devolução registrada depois, com data e comprovante, como na reprovada), e os
  * contratos feitos dela e ainda não assinados são cancelados (apagados com os boletos não pagos). Contrato sem ficha
