@@ -2,6 +2,9 @@
 
 Revisão em 8 frentes, só erros confirmados (cada linha diz como foi provado): **366 erros** (regras 50, banco C6 50, segurança 50, dados 51, telas 50, teste de ponta a ponta 32, desempenho 33, venda 50) e cerca de 130 aprimoramentos. Formato de cada linha: gravidade, erro (arquivo:linha), solução, sugestão, prova.
 
+**Inventário de 17/11 (main até #303):** 314 de 366 erros corrigidos, 14 em parte, 38 não (31 da frente venda, projetos grandes).
+**Correções depois do inventário:** #304–#309 e as PRs em aceite (Regras 31, Segurança 44, Dados 47, Venda 8/14/17/20/24/49, Telas 48, Banco 19, Desempenho 3).
+
 ## Correções (todas na `main`)
 
 - #267 Mutirão 3000: regras e cálculos (parte 1)
