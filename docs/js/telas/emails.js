@@ -82,11 +82,11 @@ const campoPergunta = ([nome, rotulo, tipo], valor) => {
 async function janelaEmail(chave, alvo) {
   const modelo = modeloEmail(d(), chave);
   const reg = alvo.contrato ? buscar('contratos', alvo.contrato) : buscar('fichas', alvo.ficha);
-  if (!modelo || !reg) throw new Error('Inquilino ou ficha não encontrado.');
+  if (!modelo || !reg) throw new C.ErroUsuario('Este inquilino ou ficha não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
   const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
   if (alvo.aditivo) {
     objeto.aditivo = buscar('aditivos', alvo.aditivo);
-    if (!objeto.aditivo) throw new Error('Termo aditivo não encontrado.');
+    if (!objeto.aditivo) throw new C.ErroUsuario('Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.');
   }
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
@@ -179,7 +179,7 @@ async function janelaEmail(chave, alvo) {
 
 export const ACOES_EMAILS = {
   async abrirEmail({ chave, contrato, ficha, aditivo }) {
-    if (!opera()) throw new Error('Seu usuário não pode enviar e-mails.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.');
     await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}) } : { ficha: Number(ficha) });
   },
   async restaurarModeloEmail({ chave }) {
@@ -197,14 +197,14 @@ export const ACOES_EMAILS = {
 
 export const FORMULARIOS_EMAILS = {
   async modeloEmail(form) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar os modelos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar os modelos de e-mail.');
     const f = new FormData(form);
     const chave = String(f.get('chave') || '');
     const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
     if (!padrao) throw new Error('Modelo não encontrado.');
     const assunto = String(f.get('assunto') || '').trim();
     const texto = String(f.get('texto') || '').trim();
-    if (!assunto || !texto) throw new Error('Preencha o assunto e o texto.');
+    if (!assunto || !texto) throw new C.ErroUsuario('Preencha o assunto e o texto do e-mail antes de salvar.');
     await alterar((db) => {
       const m = (db.modelos_email || []).find((x) => x.chave === chave);
       if (m) R.atualizar(db, 'modelos_email', m.id, { assunto, texto }, login(), `Modelo de e-mail "${padrao.nome}"`);

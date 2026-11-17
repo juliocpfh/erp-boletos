@@ -4,7 +4,7 @@ import * as S from '../armazenamento.js';
 import * as AJ from '../ajuda.js';
 import * as AI from '../arquivo-impresso.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, reais } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario, reais } from '../calculos.js';
 import * as CA from '../copia-aberta.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
@@ -117,7 +117,7 @@ export function telaEmpresas() {
 
 /** Desfaz as alterações escolhidas no Histórico (só administrador) e recalcula os boletos em aberto ligados a elas. */
 export async function desfazerItens(itens) {
-  if (!podeUsuario('admin')) throw new Error('Só o administrador desfaz alterações.');
+  if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador desfaz alterações. Peça a ele, se precisar.');
   // nuvem: o Desfazer usa a posição no histórico, que só fica igual em todos os aparelhos depois de enviada
   if (E.nuvem && itens.some((x) => Number(String(x).split(':')[0]) >= (E.nuvem.base?.historico?.length || 0))) {
     throw Object.assign(new Error('Esta alteração ainda não foi para a nuvem. Espere a faixa do topo mostrar "tudo enviado" e desfaça de novo.'), { esperado: true });
@@ -299,7 +299,7 @@ function larguraLogo(dataUrl) {
 }
 
 export async function reduzirImagem(arquivo) {
-  if (!podeUsuario('admin')) throw new Error('Só administradores podem alterar a logo.');
+  if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador troca a logo. Peça a ele, se precisar.');
   const url = URL.createObjectURL(arquivo);
   try {
     const img = await new Promise((ok, falha) => {

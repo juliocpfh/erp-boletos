@@ -1,6 +1,7 @@
 // Ícone do aplicativo (celular): o administrador enquadra a logo (arrastar e zoom) e a nuvem guarda os PNG de 192 e 512
 // (rotas /api/icone-*.png e /api/icone/<tamanho>, nuvem/worker.mjs); sem ícone escolhido, a nuvem manda o padrão "ERP".
 import { aviso, E, login, mostrar, podeUsuario, trocarIconeDaAba } from '../app.js';
+import { ErroUsuario } from '../calculos.js';
 import { buscarComLimite, d } from './comum.js';
 
 // enquadramento em uso na tela (zoom 1 = a logo inteira dentro do círculo que o celular sempre mostra)
@@ -226,8 +227,8 @@ export const ACOES_ICONE = {
   },
 
   async salvarIcone() {
-    if (!podeUsuario('admin')) throw new Error('Só administradores podem trocar o ícone do aplicativo.');
-    if (!E.nuvem) throw new Error('O ícone do aplicativo só muda com os dados na nuvem.');
+    if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador troca o ícone do aplicativo.');
+    if (!E.nuvem) throw new ErroUsuario('O ícone do aplicativo só muda com os dados na nuvem (entre pelo endereço da internet).');
     await carregarLogo();
     const [grande, pequeno] = await Promise.all([pngDoIcone(512), pngDoIcone(192)]);
     await pedirNuvem('icone/512', 'PUT', grande);
@@ -237,7 +238,7 @@ export const ACOES_ICONE = {
   },
 
   async iconePadrao() {
-    if (!podeUsuario('admin')) throw new Error('Só administradores podem trocar o ícone do aplicativo.');
+    if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador troca o ícone do aplicativo.');
     await pedirNuvem('icone', 'DELETE');
     trocarIconeDaAba();
     aviso('O aplicativo voltou ao ícone padrão (ERP).');

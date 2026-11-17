@@ -638,10 +638,10 @@ export const ACOES_FICHAS = {
     ir(`#/ficha/${salva.id}`);
   },
   async decidirFicha({ id, situacao }) {
-    if (!opera()) throw new Error('Seu usuário não pode decidir fichas.');
-    if (situacao !== 'Aprovada') throw new Error('Para reprovar, use "Editar" (com o motivo).');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode aprovar nem reprovar fichas.');
+    if (situacao !== 'Aprovada') throw new C.ErroUsuario('Para reprovar, use "Editar" e escreva o motivo.');
     const f = buscar('fichas', id);
-    if (!f || f.situacao !== 'Em análise') throw new Error('Esta ficha já foi decidida.');
+    if (!f || f.situacao !== 'Em análise') throw new C.ErroUsuario('Esta ficha já foi decidida (talvez por outra pessoa). Atualize a página.');
     await alterar((db) => R.atualizar(db, 'fichas', f.id, { situacao: 'Aprovada', decisao_data: C.hojeIso(), decisao_por: login() }, login(), `Ficha de ${f.inquilino_nome} aprovada`));
     aviso('Ficha aprovada. Agora faça o contrato.');
     await mostrar();

@@ -110,7 +110,7 @@ async function noVisualizador(blob, nome, tipo, esperar = true) {
 
 async function excelDoNumero(ExcelJS, modelo, numero) {
   const fs = E.d.faturas.filter((f) => f.numero === Number(numero) && f.situacao === 'Emitida').sort((a, b) => a.id - b.id);
-  if (!fs.length) throw new Error('NF não encontrada.');
+  if (!fs.length) throw new C.ErroUsuario('Esta NF não existe mais (pode ter sido cancelada ou apagada). Atualize a página.');
   const blob = await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes);
   return { blob, nome: S.limparNome(`NF ${R.numeroFatura(numero)} - ${fs[0].tomador_nome}.xlsx`) };
 }
@@ -268,7 +268,7 @@ async function escolherContaC6(cb, lote = '') {
   const sugerida = cb && R.contaSugerida(d(), cb);
   if (sugerida && !lote) return sugerida;
   const contas = R.configBanco(d()).contas;
-  if (!contas.length) throw new Error('Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).');
+  if (!contas.length) throw new C.ErroUsuario('Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).');
   if (contas.length === 1) return contas[0];
   const marcada = cb ? R.contaPreMarcada(d(), cb) : R.contaEmissora(d());
   const resp = await janela({ titulo: 'Por qual empresa emitir o boleto?',
@@ -348,7 +348,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
   if (!resp) { aviso(cb.banco ? 'Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".' : 'Pagamento não registrado. Registre quando quiser pela tela Banco ("Conferir boletos pagos no banco") ou na página do boleto.', 'info'); return; }
   const data = String((resp.data || [])[0] || '');
   const dataPagou = String((resp.pagou || [])[0] || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe as duas datas.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new C.ErroUsuario('Informe as duas datas.');
   if (dataPagou > data) throw new C.ErroUsuario('O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.');
   // em dia até o vencimento ou, se ele não é dia útil, até o próximo dia útil
   const pagouEmDia = dataPagou <= C.limitePagamento(cb.vencimento) && data > cb.vencimento;
@@ -404,7 +404,7 @@ async function pdfDaFatura(f) {
 async function baixarPdfs(numeros, nomeZip, emitenteId = null) {
   const fs = E.d.faturas.filter((f) => f.situacao === 'Emitida' && numeros.includes(f.numero) && (!emitenteId || f.emitente_id === emitenteId))
     .sort((a, b) => a.numero - b.numero || a.id - b.id);
-  if (!fs.length) throw new Error('Nenhuma NF para exportar.');
+  if (!fs.length) throw new C.ErroUsuario('Não há NF emitida com esses números para exportar.');
   aviso(`Gerando ${fs.length} PDF(s)…`, 'info');
   const JSZip = await jsZip();
   const zip = new JSZip();
@@ -550,7 +550,7 @@ async function enviarArquivosSeguro(contratoId, el) {
   if (!r) return;
   const tipo = String(r.tipo[0]);
   const s = tipo === 'solto' ? null : buscar('seguros', r.seguro[0]);
-  if (s && tipo === 'apolice' && s.arquivo_apolice) throw new Error(`A apólice da vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)} já tem arquivo: apague o atual (×) antes de anexar outro. Nada foi anexado.`);
+  if (s && tipo === 'apolice' && s.arquivo_apolice) throw new C.ErroUsuario(`A apólice da vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)} já tem arquivo: apague o atual (×) antes de anexar outro. Nada foi anexado.`);
   const dir = await pastaDoEscopo('seguro', contratoId);
   const vig = s ? `${s.vigencia_inicio}-a-${s.vigencia_fim}` : '';
   const nomes = [];
@@ -604,7 +604,7 @@ export const ACOES = {
   async documentoWord() {
     const [tipo, q] = documentoDaTela();
     const m = await documentoMontado(tipo, q);
-    if (!m) throw new Error('Registro não encontrado.');
+    if (!m) throw new C.ErroUsuario('Este documento não existe mais (o registro pode ter sido excluído por outra pessoa). Atualize a página.');
     await marcarGeradoNaRotina(tipo, m);
     const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
     const i = buscar('imoveis', m.c.imovel_id);
@@ -640,7 +640,7 @@ export const ACOES = {
   },
 
   async escolherPastaSegura() {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador configura o backup seguro.');
     // celular, Safari, Firefox: o navegador não deixa escolher uma pasta para gravar
     if (!E.teste && !S.suportado()) throw new C.ErroUsuario('Faça isto no computador (Chrome ou Edge).');
     try {
@@ -651,7 +651,7 @@ export const ACOES = {
     }
     if (E.pasta && (await E.pasta.isSameEntry(E.pastaSeguraNova))) {
       E.pastaSeguraNova = null;
-      throw new Error('Escolha uma pasta diferente da pasta dos dados.');
+      throw new C.ErroUsuario('Escolha uma pasta diferente da pasta dos dados.');
     }
     await mostrar();
   },
@@ -784,15 +784,15 @@ export const ACOES = {
     const data = form.querySelector('[name=data]').value;
     const arquivo = form.querySelector('[name=arquivo]').files[0];
     const doc = R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
-    if (!data) throw new Error('Informe a data.');
-    if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
+    if (!data) throw new C.ErroUsuario('Informe a data.');
+    if (!arquivo) throw new C.ErroUsuario(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
     const partes = R.partesDoContrato(d(), buscar('contratos', contrato));
     const r = await janela({ titulo: `De quem falta a assinatura? (${doc[1]})`,
       html: `<p class="suave">Só aparecem as pessoas e empresas cadastradas neste contrato. Marque todas que faltam.</p>
         ${partes.map((p) => `<label class="check"><input type="checkbox" name="falta" value="${esc(R.textoParte(p))}"> <b>${esc(p.nome)}</b> <span class="suave">(${esc(p.papel)})</span></label>`).join('')}`,
       sim: 'Anexar com assinatura faltante' });
     if (!r) return;
-    if (!r.falta || !r.falta.length) throw new Error('Marque de quem falta a assinatura. Nada foi salvo.');
+    if (!r.falta || !r.falta.length) throw new C.ErroUsuario('Marque de quem falta a assinatura. Nada foi salvo.');
     const nome = await salvarAssinado('assinados', Number(contrato), arquivo, `${doc[1]} falta assinatura ${data}`);
     await alterar((db) => R.anexarDocumentoParcial(db, Number(contrato), campo, { data, arquivo: nome, falta: r.falta }, login(), podeUsuario('admin')));
     aviso(podeUsuario('admin') ? 'Anexado. Fica o alerta até chegar o arquivo com todas as assinaturas.' : 'Anexado. O administrador vai analisar; fica o alerta até chegar o arquivo com todas as assinaturas.');
@@ -806,7 +806,7 @@ export const ACOES = {
 
   /** Administrador confirma ou recusa a perda ou o anexo com assinatura faltante registrados por outro usuário. */
   async analisarDocumento({ contrato, campo, tipo, aceitar }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador analisa.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador analisa este pedido.');
     await alterarApagandoAnexos((db) => R.analisarDocumento(db, Number(contrato), campo, tipo, aceitar === '1', login()));
     await mostrar();
   },
@@ -832,7 +832,7 @@ export const ACOES = {
 
   async desfazerMarcados() {
     const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].map((x) => x.value);
-    if (!itens.length) throw new Error('Marque as alterações que quer desfazer.');
+    if (!itens.length) throw new C.ErroUsuario('Marque as alterações que quer desfazer.');
     if (!(await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: 'Desfazer as alterações marcadas?', sim: 'Desfazer', forte: true }))) return;
     await desfazerItens(itens);
   },
@@ -842,10 +842,10 @@ export const ACOES = {
    * A página não é redesenhada: o que já foi digitado no formulário continua lá (ao salvar, o registro é lido de novo).
    */
   async excluirAnexoDoCampo({ campo }, el) {
-    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode apagar arquivos.');
     const [, acao, tabela, id] = location.hash.split('?')[0].split('/');
     const r = acao === 'editar' ? buscar(tabela, id) : null;
-    if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
+    if (!r || !r[campo]) throw new C.ErroUsuario('Este arquivo já não está neste lançamento (talvez outra pessoa tenha apagado). Atualize a página.');
     // comprovante de depósito, correção, aplicação ou reserva: as mesmas contas do "×" da página do inquilino
     await alterarApagandoAnexos((db) => ((ANEXOS_COM_X[tabela] || []).includes(campo) ? R.removerAnexo(db, tabela, r.id, campo, login())
       : R.atualizar(db, tabela, r.id, { [campo]: null }, login(), `Arquivo excluído: ${r[campo]}`)));
@@ -854,9 +854,9 @@ export const ACOES = {
 
   /** "×" do comprovante da ficha no Novo contrato feito dela (o arquivo ainda está na pasta da ficha): tira da ficha e apaga. */
   async apagarArquivoDaFicha({ campo, ficha }, el) {
-    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode apagar arquivos.');
     const f = buscar('fichas', ficha);
-    if (!f || !f[campo] || !R.CAMPOS_ARQUIVO_FICHA.includes(campo)) throw new Error('Arquivo não encontrado na ficha.');
+    if (!f || !f[campo] || !R.CAMPOS_ARQUIVO_FICHA.includes(campo)) throw new C.ErroUsuario('Este arquivo já não está na ficha (talvez outra pessoa tenha apagado). Atualize a página.');
     const nome = f[campo];
     await alterarApagandoAnexos((db) => R.atualizar(db, 'fichas', f.id, { [campo]: null }, login(), `Arquivo excluído: ${nome}`));
     arquivoApagadoNoFormulario(el, nome);
@@ -866,16 +866,16 @@ export const ACOES = {
   async abrirAnexoDoCampo({ campo }) {
     const [, , tabela, id] = location.hash.split('?')[0].split('/');
     const r = buscar(tabela, id);
-    if (!r || !r[campo]) throw new Error('Arquivo não encontrado neste registro.');
+    if (!r || !r[campo]) throw new C.ErroUsuario('Este arquivo já não está neste lançamento (talvez outra pessoa tenha apagado). Atualize a página.');
     const [escopo, dono] = tabela === 'fichas' ? ['ficha', r.id] : tabela === 'seguros' ? ['seguro', r.contrato_id] : tabela === 'contratos' ? ['contrato', r[`${campo}_contrato`] || r.id] : ['contrato', r.contrato_id];
     await ACOES.abrirArquivo({ escopo, id: dono, nome: r[campo] });
   },
 
   /** "Excluir" de uma foto já guardada da vistoria (fachada, relógios, quadro de disjuntores). */
   async excluirFotoVistoria({ campo, vistoria }, el) {
-    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode apagar arquivos.');
     const v = buscar('vistorias', vistoria);
-    if (!v || !(v.fotos || {})[campo]) throw new Error('Foto não encontrada.');
+    if (!v || !(v.fotos || {})[campo]) throw new C.ErroUsuario('Esta foto já foi apagada (talvez por outra pessoa). Atualize a página.');
     const fotos = { ...v.fotos };
     delete fotos[campo];
     await alterarApagandoAnexos((db) => R.atualizar(db, 'vistorias', v.id, { fotos }, login(), `Foto da vistoria excluída: ${v.fotos[campo]}`));
@@ -894,7 +894,7 @@ export const ACOES = {
   async corrigirDataGarantia({ contrato, qual }) {
     const c = buscar('contratos', contrato);
     const g = R.GARANTIAS_DEPOSITADAS[qual];
-    if (!c || !g) throw new Error('Contrato não encontrado.');
+    if (!c || !g) throw new C.ErroUsuario('Este contrato não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const quem = R.pagadorDaGarantia(d(), c, qual);
     const atual = c[g.pago] || quem[g.pago] || '';
     const r = await janela({ titulo: `Data em que a ${g.nome} foi paga`, sim: 'Gravar data',
@@ -953,7 +953,7 @@ export const ACOES = {
   },
 
   async analisarAditivoPerdido({ id, aceitar }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador analisa.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador analisa este pedido.');
     await alterar((db) => R.analisarAditivoPerdido(db, Number(id), aceitar === '1', login()));
     await mostrar();
   },
@@ -963,8 +963,8 @@ export const ACOES = {
     const form = el.closest('form');
     const data = form.querySelector('[name=data]').value;
     const assunto = form.querySelector('[name=assunto]').value;
-    if (!data) throw new Error('Informe a data do termo aditivo.');
-    if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+    if (!data) throw new C.ErroUsuario('Informe a data do termo aditivo.');
+    if (!String(assunto || '').trim()) throw new C.ErroUsuario('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
     if (!(await confirmar(`O termo aditivo de ${C.dataBr(data)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`, { titulo: 'Registrar o termo aditivo como perdido?', sim: 'Registrar como perdido' }))) return;
     await alterar((db) => R.registrarAditivo(db, Number(contrato), { data, assunto, perdido: true }, login(), podeUsuario('admin')));
     aviso('Termo aditivo registrado como perdido.');
@@ -1022,7 +1022,7 @@ export const ACOES = {
   },
 
   async excluirModelo({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores podem excluir modelos.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores podem excluir modelos.');
     await alterar((db) => {
       const m = R.buscar(db, 'modelos_contrato', Number(id));
       if (m) R.excluir(db, 'modelos_contrato', m.id, login(), `Modelo de contrato "${m.nome}" excluído`);
@@ -1033,7 +1033,7 @@ export const ACOES = {
 
   async excluir({ tabela, id }) {
     const cfg = TABELAS_EXCLUSAO[tabela] || {};
-    if (cfg.admin && !podeUsuario('admin')) throw new Error('Só administradores podem excluir.');
+    if (cfg.admin && !podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador exclui este tipo de registro.');
     const r = buscar(tabela, id);
     if (!r) throw new C.ErroUsuario('Este registro já foi excluído.');
     // exclusão grande (contrato, imóvel, ficha): o motivo de não poder vem antes de qualquer pergunta; depois, a dupla
@@ -1050,7 +1050,7 @@ export const ACOES = {
     await (['imoveis', 'fichas'].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
       const reg = R.buscar(db, tabela, id);
       const problema = cfg.checar ? cfg.checar(db, reg) : null;
-      if (problema) throw new Error(problema);
+      if (problema) throw new C.ErroUsuario(problema);
       if (tabela === 'imoveis') {
         for (const t of TABELAS_DO_IMOVEL) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
@@ -1070,7 +1070,7 @@ export const ACOES = {
 
   /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
   async limparAnexosSoltos() {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador apaga arquivos sem lançamento.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador apaga arquivos sem lançamento.');
     const emUso = anexosEmUso();
     const vistas = new Set();
     const soltos = [];
@@ -1109,7 +1109,7 @@ export const ACOES = {
   },
 
   async removerLogo() {
-    if (!podeUsuario('admin')) throw new Error('Só administradores podem alterar a logo.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores podem alterar a logo.');
     await alterar((db) => {
       R.registrar(db, login(), 'Exclusão', null, null, 'Logo da empresa removida');
       delete db.logo;
@@ -1118,23 +1118,23 @@ export const ACOES = {
   },
 
   async tirarAjuste({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.');
     await alterar((db) => R.ajustarBoleto(db, Number(id), 0, '', login()));
     await mostrar();
   },
 
   /** FCI: traz do Banco Central os índices de cada mês desde o primeiro pagamento e guarda no contrato (o saldo corrigido sai deles). */
   async calcularFci({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.');
     const c = buscar('contratos', id);
-    if (!c.fci_indice) throw new Error('Escolha antes o índice de correção do FCI em "Editar" (O que está incluso no contrato).');
+    if (!c.fci_indice) throw new C.ErroUsuario('Escolha antes o índice de correção do FCI em "Editar" (O que está incluso no contrato).');
     const deps = R.depositosFci(d(), c);
-    if (!deps.length) throw new Error('Ainda não há pagamento do FCI para corrigir.');
+    if (!deps.length) throw new C.ErroUsuario('Ainda não há pagamento do FCI para corrigir.');
     const de = C.somarMeses(deps[0].data.slice(0, 7), 1);
     const ate = C.competenciaDe(C.hojeIso());
     if (de > ate) { aviso('Os pagamentos são deste mês: a correção começa no mês que vem.', 'info'); return; }
     const indices = await indicesMensaisFci(c.fci_indice, de, ate);
-    if (!Object.keys(indices).length) throw new Error(`O ${c.fci_indice} de ${compBr(de)} em diante ainda não saiu no Banco Central.`);
+    if (!Object.keys(indices).length) throw new C.ErroUsuario(`O ${c.fci_indice} de ${compBr(de)} em diante ainda não saiu no Banco Central.`);
     await alterar((db) => R.atualizar(db, 'contratos', c.id, { fci_indices: indices, fci_calculado_em: C.hojeIso() }, login(),
       `FCI corrigido pelo ${c.fci_indice} (Banco Central): ${reais(R.saldoFci(db, R.buscar(db, 'contratos', c.id), indices).corrigido)}`));
     const s = R.saldoFci(d(), buscar('contratos', id));
@@ -1144,7 +1144,7 @@ export const ACOES = {
 
   /** Grava os depósitos do FCI de antes do sistema (caixa do FCI); a correção antiga fica para refazer no "Calcular atualização". */
   async salvarFciPrevios({ id }, el) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.');
     const linhas = [...el.closest('details').querySelectorAll('[data-linhas-fci] tr')].map((tr) => {
       const v = tr.querySelector('[name=fci_valor]').value.trim();
       return { data: tr.querySelector('[name=fci_data]').value, valor: v ? C.centavos(v) : 0 };
@@ -1158,7 +1158,7 @@ export const ACOES = {
   },
 
   async alternarNf({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.');
     await alterar((db) => {
       const c = R.buscar(db, 'contratos', id);
       const emite = !R.geraNf(c);
@@ -1183,7 +1183,7 @@ export const ACOES = {
   /** Roteiro da saída (B3): data e hora da vistoria de saída, para o convite por e-mail e o termo de devolução das chaves. */
   async marcarVistoriaSaida({ id }) {
     const c = buscar('contratos', id);
-    if (!c) throw new Error('Inquilino não encontrado.');
+    if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const horas = c.finalidade === 'Não residencial' ? 48 : 72;
     const r = await janela({ titulo: `Vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
       html: `<p>Saída em <b>${dataBr(c.data_saida)}</b>. O contrato prevê a vistoria em até ${horas} horas da devolução das chaves, com o inquilino convidado por escrito. Depois de salvar, mande o convite pelo botão de e-mail da etapa.</p>
@@ -1202,7 +1202,7 @@ export const ACOES = {
   async valoresReparos({ id }) {
     const v = buscar('vistorias', id);
     const c = v && buscar('contratos', v.contrato_id);
-    if (!c) throw new Error('Vistoria de saída não encontrada.');
+    if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const res = K.resultadoVistoriaSaida(d(), c);
     const r = await janela({ titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
       html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
@@ -1225,7 +1225,7 @@ export const ACOES = {
   /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
   async arquivoFisico({ id, desfazer }) {
     const c = buscar('contratos', id);
-    if (!c) throw new Error('Inquilino não encontrado.');
+    if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     if (desfazer === '1') { await alterar((db) => R.marcarArquivoFisico(db, c.id, '', login())); await mostrar(); return; }
     const r = await janela({ titulo: 'Arquivo físico', sim: 'Marcar arquivado',
       html: `<p>Imprima e guarde em papel o processo de <b>${esc(c.inquilino_nome)}</b>: contrato, aditivos, vistorias de entrada e saída, termos das chaves, cálculo final e comprovantes (botão "Ver os documentos"). Guarde por 10 anos depois da saída.</p>
@@ -1238,7 +1238,7 @@ export const ACOES = {
 
   async garantiaDevolvida({ id }) {
     const e = buscar('encerramentos', id);
-    if (!e) throw new Error('Cálculo final não encontrado.');
+    if (!e) throw new C.ErroUsuario('O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.');
     const r = await janela({ titulo: e.saldo >= 0 ? 'Garantia devolvida' : 'Saldo cobrado do inquilino', sim: 'Marcar',
       html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
         <label>Data</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
@@ -1376,7 +1376,7 @@ export const ACOES = {
    */
   async lembrete({ id }) {
     const cb = buscar('cobrancas', id);
-    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    if (!cb || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.');
     const l = R.textoLembrete(d(), cb, C.hojeIso());
     const c = buscar('contratos', cb.contrato_id);
     const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
@@ -1413,7 +1413,7 @@ export const ACOES = {
   /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
   async pagarBoleto({ id }) {
     const cb = buscar('cobrancas', id);
-    if (!cb || cb.data_pagamento) throw new Error('Boleto não encontrado ou já pago.');
+    if (!cb || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.');
     const c = buscar('contratos', cb.contrato_id);
     const i = c ? buscar('imoveis', c.imovel_id) : null;
     const hoje = C.hojeIso();
@@ -1465,7 +1465,7 @@ export const ACOES = {
   /** Fiador: excluir o cadastro (fiador contratual lançado errado; pode ser incluído de novo em "Editar contrato") ou trocar a garantia. */
   async excluirFiador({ id }) {
     const f = buscar('fiadores', id);
-    if (!f) throw new Error('Fiador não encontrado.');
+    if (!f) throw new C.ErroUsuario('Este fiador não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const r = await janela({ titulo: `Fiador ${f.nome}`,
       html: `<p>Deseja excluir fiador contratual ou trocar garantia/fiador?</p>
         <p><label class="check" style="padding-top:0"><input type="radio" name="escolha" value="excluir"> Excluir fiador contratual (cadastro errado). Pode ser incluído de novo em "Editar contrato"</label></p>
@@ -1514,7 +1514,7 @@ export const ACOES = {
       if (!r) return;
       data = String((r.data || [])[0] || '');
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new C.ErroUsuario('Informe a data do pagamento.');
     await alterar((db) => R.marcarIptuPago(db, Number(id), Number(n), data, login()));
     aviso('Parcela do IPTU marcada como paga.');
     await mostrar();
@@ -1554,7 +1554,7 @@ export const ACOES = {
   },
 
   async apagarCanceladas({ numero }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores podem apagar NFs.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores podem apagar NFs.');
     await alterar((db) => R.apagarCanceladas(db, Number(numero), login()));
     aviso(`NF nº ${R.numeroFatura(numero)} apagada da lista.`);
     await mostrar();
@@ -1596,7 +1596,7 @@ export const ACOES = {
     if (!r) return;
     const data = String((r.data || [])[0] || '');
     const arq = (r.arquivo || [])[0];
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do depósito.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new C.ErroUsuario('Informe a data do depósito.');
     const nome = arq && arq.size ? await S.salvarArquivo(await pastaDoEscopo('contrato', c.id), new File([arq], nomeComprovante('complemento-caucao', data, arq))) : null;
     await alterar((db) => R.registrarComplementoDepositado(db, c.id, { data, arquivo: nome }, login()));
     aviso(`Complemento de ${reais(x.complemento)} registrado: caução de ${reais(x.necessaria)}.${nome ? '' : ' Sem comprovante: fica o aviso até anexar.'}`);
@@ -1618,9 +1618,9 @@ export const ACOES = {
    */
   async enviarCartaEmail({ contrato, comp }) {
     const c = buscar('contratos', contrato);
-    if (!c) throw new Error('Inquilino não encontrado.');
+    if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const carta = await pdfDaCarta(c, comp);
-    if (!carta) throw new Error('A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).');
+    if (!carta) throw new C.ErroUsuario('A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).');
     const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar('imoveis', c.imovel_id) || {}).nome || ''}`.trim();
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
@@ -1683,7 +1683,7 @@ export const ACOES = {
     if (!ids.length) throw new C.ErroUsuario('Marque pelo menos um boleto na lista (ou "selecionar todos").');
     const nome = (cb) => { const c = buscar('contratos', cb.contrato_id); return c ? c.inquilino_nome : `boleto ${cb.id}`; };
     const pagos = ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && cb.data_pagamento);
-    if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);
+    if (pagos.length) throw new C.ErroUsuario(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);
     if (!(await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) de ${compBr(comp)}?`, sim: 'Excluir boletos', forte: true }))) return;
     let excluidos = 0;
     await alterar((db) => {
@@ -1692,7 +1692,7 @@ export const ACOES = {
         const cb = R.buscar(db, 'cobrancas', id);
         if (!cb) continue; // já excluído por outra pessoa (ou noutra aba) enquanto a lista estava aberta
         const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
-        if (problema) throw new Error(`${nome(cb)}: ${problema}`);
+        if (problema) throw new C.ErroUsuario(`${nome(cb)}: ${problema}`);
         R.excluir(db, 'cobrancas', id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
         excluidos += 1;
       }
@@ -1738,7 +1738,7 @@ export const ACOES = {
 
   // usuários: aprovar pedido de acesso, recusar e bloquear
   async aprovarUsuario({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores aprovam acessos.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores aprovam acessos.');
     const sel = document.querySelector(`[data-papel-de="${id}"]`);
     const papel = sel ? sel.value : 'consulta';
     await alterar((db) => {
@@ -1750,14 +1750,14 @@ export const ACOES = {
   },
 
   async recusarUsuario({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores recusam acessos.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores recusam acessos.');
     await alterar((db) => R.excluir(db, 'usuarios', Number(id), login(), 'Pedido de acesso recusado'));
     await mostrar();
   },
 
   async bloquearUsuario({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só administradores bloqueiam usuários.');
-    if (Number(id) === E.usuario.id) throw new Error('Você não pode bloquear o seu próprio acesso.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só administradores bloqueiam usuários.');
+    if (Number(id) === E.usuario.id) throw new C.ErroUsuario('Você não pode bloquear o seu próprio acesso.');
     await alterar((db) => {
       const u = R.buscar(db, 'usuarios', id);
       R.atualizar(db, 'usuarios', u.id, { ativo: !u.ativo }, login(), u.ativo ? `Usuário ${u.login} bloqueado` : `Usuário ${u.login} desbloqueado`);
@@ -1961,9 +1961,9 @@ export const ACOES = {
    * conferir o arquivo antes (marcar "conferi"); depois dá para anexar o certo em "Anexar arquivos" dos documentos.
    */
   async excluirArquivoSeguro({ contrato, seguro, nome, conferir }) {
-    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode apagar arquivos.');
     const s = buscar('seguros', seguro);
-    if (!s) throw new Error('Apólice não encontrada.');
+    if (!s) throw new C.ErroUsuario('Esta apólice não existe mais (pode ter sido excluída por outra pessoa). Atualize a página.');
     if (conferir) {
       const resp = await janela({ titulo: 'Apagar a apólice de uma vigência anterior', forte: true, sim: 'Apagar o arquivo', nao: 'Cancelar',
         html: `<p>Este arquivo é a apólice da vigência <b>${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)}</b>. Abra e confira se é mesmo o arquivo errado antes de apagar:</p>
@@ -1971,7 +1971,7 @@ export const ACOES = {
           <p><label class="check"><input type="checkbox" name="conferi" value="1"> Abri o arquivo e confirmo que quero apagar</label></p>
           <p class="suave">Depois, anexe o certo em "Anexar arquivos" dos documentos do seguro, escolhendo "Apólice" e esta vigência.</p>` });
       if (!resp) return;
-      if (!resp.conferi) throw new Error('Marque "Abri o arquivo e confirmo" para apagar. Nada foi apagado.');
+      if (!resp.conferi) throw new C.ErroUsuario('Marque "Abri o arquivo e confirmo" para apagar. Nada foi apagado.');
     }
     await alterarApagandoAnexos((db) => R.tirarArquivoSeguro(db, s.id, nome, login()));
     aviso(`Arquivo apagado: ${nome}.`);
@@ -2031,7 +2031,7 @@ export const ACOES = {
   /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
   /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
   async esquecerPonteC6() {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     await BANCO.esquecerPonteLocal();
     aviso('Ponte esquecida neste computador. Para usar o banco aqui de novo, informe o endereço e a senha e salve.');
     await mostrar();
@@ -2065,7 +2065,7 @@ export const ACOES = {
   /** Preenche o formulário "Incluir ou alterar uma conta" com a conta escolhida. */
   editarContaBanco({ conta }) {
     const c = R.contaBanco(d(), conta);
-    if (!c) throw new Error('Conta não encontrada.');
+    if (!c) throw new C.ErroUsuario('Esta conta bancária não existe mais. Atualize a página.');
     const det = document.getElementById('nova-conta-banco');
     const form = det && det.querySelector('form');
     if (!form) return;
@@ -2080,7 +2080,7 @@ export const ACOES = {
   },
 
   async excluirContaBanco({ conta }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     await alterar((db) => R.excluirContaBanco(db, conta, login()));
     aviso('Conta tirada da integração.');
     await mostrar();
@@ -2088,7 +2088,7 @@ export const ACOES = {
 
   /** Emite um boleto no C6: escolhe a conta (pergunta se o imóvel tem mais de uma empresa), chama a ponte e grava a resposta. */
   async emitirBoletoC6({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode emitir boletos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode emitir boletos.');
     const cb = buscar('cobrancas', id);
     const conta = await escolherContaC6(cb);
     if (!conta) return;
@@ -2100,9 +2100,9 @@ export const ACOES = {
 
   /** Emite todos os boletos em aberto do mês ainda não emitidos; os que precisam de escolha da conta ficam para emitir um a um. */
   async emitirBoletosMesC6({ comp }) {
-    if (!opera()) throw new Error('Seu usuário não pode emitir boletos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode emitir boletos.');
     const lista = R.boletosParaEmitir(d(), comp);
-    if (!lista.length) throw new Error('Nenhum boleto em aberto sem emissão neste mês.');
+    if (!lista.length) throw new C.ErroUsuario('Todos os boletos em aberto deste mês já foram emitidos no banco: nada a emitir.');
     const falhas = [];
     let emitidos = 0;
     // modo "escolher": os boletos de imóvel com uma só empresa usam a conta dela; para os outros, pergunta uma vez
@@ -2129,7 +2129,7 @@ export const ACOES = {
 
   /** Consulta a situação no banco; se o banco diz que foi pago e aqui ainda não está, propõe registrar o pagamento (nunca registra sozinho). */
   async consultarBoletoC6({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar boletos.');
     const cb = buscar('cobrancas', id);
     const resposta = await BANCO.consultarBoleto(d(), cb);
     const banco = await alterar((db) => R.registrarBoletoBancario(db, cb.id, resposta, login()));
@@ -2150,10 +2150,10 @@ export const ACOES = {
 
   /** Negativação do pagador no birô: só administrador, conta com a opção ligada, 2ª confirmação com o nome do inquilino e o prazo. */
   async negativarC6({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador negativa um pagador.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador negativa um pagador.');
     const cb = buscar('cobrancas', id);
     const conta = R.contaBanco(d(), cb.banco && cb.banco.conta_id);
-    if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+    if (!conta || !conta.negativacao.ativa) throw new C.ErroUsuario('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
     const c = buscar('contratos', cb.contrato_id);
     const resp = await janela({ titulo: '2ª confirmação: negativar no birô de crédito', forte: true,
       html: `<p>O banco vai incluir <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? ` (${esc(c.inquilino_cpf)})` : ''} no birô de crédito se o boleto de <b>${esc(compBr(cb.competencia))}</b> (${esc(reais(cb.banco.valor))}, vencimento ${esc(dataBr(cb.vencimento))}) não for pago em até <b>${conta.negativacao.dias_atraso} dias de atraso</b>.</p>
@@ -2161,9 +2161,9 @@ export const ACOES = {
         <p>Digite <b>NEGATIVAR</b> para confirmar: <input name="confirmo" autocomplete="off" required></p>`,
       sim: 'Agendar a negativação', nao: 'Cancelar' });
     if (!resp) return;
-    if (String((resp.confirmo || [])[0] || '').trim().toUpperCase() !== 'NEGATIVAR') throw new Error('Digite NEGATIVAR para confirmar. Nada foi feito.');
+    if (String((resp.confirmo || [])[0] || '').trim().toUpperCase() !== 'NEGATIVAR') throw new C.ErroUsuario('Digite NEGATIVAR para confirmar. Nada foi feito.');
     const dias = Number((resp.dias || [])[0]);
-    if (!Number.isInteger(dias) || dias < 1) throw new Error('Informe os dias de atraso.');
+    if (!Number.isInteger(dias) || dias < 1) throw new C.ErroUsuario('Informe os dias de atraso (número inteiro, a partir de 1).');
     await conferirAntesDeAgirNoBanco(cb.id, 'negativar');
     const resposta = await BANCO.negativarBoleto(d(), buscar('cobrancas', cb.id), dias);
     await alterar((db) => R.registrarNegativacao(db, cb.id, resposta, login(), dias));
@@ -2172,7 +2172,7 @@ export const ACOES = {
   },
 
   async cancelarNegativacaoC6({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador cancela a negativação.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador cancela a negativação.');
     const cb = buscar('cobrancas', id);
     const resposta = await BANCO.cancelarNegativacao(d(), cb);
     await alterar((db) => { R.registrarCancelamentoNegativacao(db, cb.id, login()); if (resposta && resposta.external_reference_id) R.registrarBoletoBancario(db, cb.id, resposta, login()); });
@@ -2182,7 +2182,7 @@ export const ACOES = {
 
   /** Boleto mudou depois de emitido: manda ao banco o valor, o vencimento e a descrição atuais (PATCH). Se recusar, cancelar e emitir outro. */
   async alterarBoletoC6({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar boletos.');
     const cb = buscar('cobrancas', id);
     let resposta;
     try {
@@ -2196,7 +2196,7 @@ export const ACOES = {
   },
 
   async cancelarBoletoC6({ id }) {
-    if (!opera()) throw new Error('Seu usuário não pode alterar boletos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar boletos.');
     await conferirAntesDeAgirNoBanco(id, 'cancelar');
     const cb = buscar('cobrancas', id);
     const resposta = await BANCO.cancelarBoleto(d(), cb);
@@ -2240,7 +2240,7 @@ export const ACOES = {
    * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
    */
   async compactarAnexos() {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador compacta os anexos que já estão no sistema.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador compacta os anexos que já estão no sistema.');
     const caixa = document.getElementById('progresso-compactar');
     const mostrarAndamento = (t) => { if (caixa) caixa.textContent = t; };
     const MB = (b) => `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
@@ -2267,10 +2267,10 @@ export const ACOES = {
   },
 
   async excluirArquivo({ escopo, id, nome }) {
-    if (!opera()) throw new Error('Seu usuário não pode excluir arquivos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode apagar arquivos.');
     // arquivo ligado a um lançamento (inclusive o herdado na troca de titular): só sai pelo × do lançamento
     const dono = R.rotulosDosArquivos(d()).get(`${escopo}:${id}|${nome}`) || (anexosEmUso().has(`${chavePasta(escopo, id)}|${nome}`) ? 'arquivo de um lançamento' : '');
-    if (dono) throw new Error(`Este arquivo é o ${dono}: para apagar, use o "×" ao lado do lançamento (volta o aviso para anexar).`);
+    if (dono) throw new C.ErroUsuario(`Este arquivo é o ${dono}: para apagar, use o "×" ao lado do lançamento (volta o aviso para anexar).`);
     const dir = await pastaDoEscopo(escopo, Number(id));
     await dir.removeEntry(nome);
     const vinc = vinculoDoEscopo(escopo, id);

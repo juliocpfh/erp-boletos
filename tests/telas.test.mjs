@@ -256,3 +256,21 @@ test('exclusão grande (decisão do dono, 2026-11-16): contrato mostra o nome e 
   await fim;
   assert.ok(R.buscar(E.d, 'contratos', c.id), 'cancelou: o contrato continua');
 });
+
+test('telas: erro esperado de quem usa é C.ErroUsuario (aparece na tela, não vai ao console); Error só nos erros de programa ou de fora', () => {
+  // cada `throw new Error(` que fica nas telas tem um motivo; o resto (campo faltando, permissão, registro excluído…) é ErroUsuario
+  const PERMITIDOS = [
+    'Modelo da NF não encontrado.', 'Documento não encontrado.', 'E.seguroErro', 'Empresa ou mês inválido.', 'Alternativa: "Cancelar no banco"',
+    'Este boleto não é fictício.', 'Não consegui gerar o comprovante pelo banco agora', 'Os pagamentos ficaram como rascunho, mas o banco não respondeu',
+    'Clique em "Atualizar situação" para ver o que o banco tem', 'Não tive resposta do banco.', "'Modelo não encontrado.'", 'Formulário sem a tela de destino',
+    'A nuvem recusou (erro', "'Backup desconhecido.'",
+  ];
+  const pasta = fileURLToPath(new URL('../docs/js/telas/', import.meta.url));
+  const sobra = [];
+  for (const arq of fs.readdirSync(pasta).filter((x) => x.endsWith('.js'))) {
+    for (const linha of fs.readFileSync(path.join(pasta, arq), 'utf8').split('\n')) {
+      if (linha.includes('throw new Error(') && !PERMITIDOS.some((p) => linha.includes(p))) sobra.push(`${arq}: ${linha.trim().slice(0, 120)}`);
+    }
+  }
+  assert.deepEqual(sobra, [], 'use throw new C.ErroUsuario(...) com o que a pessoa deve fazer; se for erro de programa, ponha o trecho em PERMITIDOS');
+});

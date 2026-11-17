@@ -484,18 +484,18 @@ export async function pastaDoEscopo(escopo, id, criar = true, contrato = null) {
   const raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true });
   if (escopo === 'ficha') {
     const f = buscar('fichas', id);
-    if (!f) throw new Error('Ficha não encontrada.');
+    if (!f) throw new C.ErroUsuario('Esta ficha não existe mais (pode ter sido excluída por outra pessoa). Atualize a página.');
     return S.subpasta(raiz, [PASTA_FICHAS, f.pasta || nomePastaFicha(f)], criar);
   }
   if (escopoDoContrato(escopo)) {
     const c = contrato || buscar('contratos', id);
-    if (!c) throw new Error('Inquilino não encontrado.');
+    if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     return S.subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...(SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : [])], criar);
   }
   if (escopo === 'contador') {
     const { emitenteId, comp } = decodificarIdContador(Number(id));
     const e = buscar('emitentes', emitenteId);
-    if (!e) throw new Error('Empresa da conta bancária não encontrada.');
+    if (!e) throw new C.ErroUsuario('A empresa desta conta bancária não existe mais. Confira em Empresas.');
     return S.subpasta(raiz, [pastaContador(), e.nome, comp], criar);
   }
   const i = buscar('imoveis', imovelDoEscopo(escopo, id));
