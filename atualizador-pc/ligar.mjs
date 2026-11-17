@@ -61,7 +61,7 @@ export function esquecerLigacao(env = process.env) {
 // Falar com a nuvem
 // ---------------------------------------------------------------------------
 const MAX_ITERACOES = 2000000; // igual a nuvem/aparelhos.mjs: a nuvem não manda este computador fazer uma conta sem fim
-const MIN_ITERACOES = 1000;
+const MIN_ITERACOES = 150000; // as voltas mais fracas que o sistema grava (docs/js/auth.js): um "site" que peça menos quer um resumo fácil de quebrar
 export const TEMPO_LIGAR = 30000; // tempo-limite de cada pedido à nuvem
 
 /** O resumo da senha (PBKDF2-SHA256, 256 bits, em hex): a mesma conta de docs/js/auth.js, feita neste computador. */

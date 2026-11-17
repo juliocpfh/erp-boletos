@@ -139,7 +139,7 @@ test('faixas de códigos: dois aparelhos sem internet nunca repetem; código rep
   assert.deepEqual([a.inicio, a.fim, b.inicio, b.fim], [26, 125, 126, 225]);
   assert.equal(c.faixa({ tabela: 'contratos', quantidade: 99999 }, DONO).fim - 226 + 1, MAX_FAIXA);
   assert.equal(c.tudo().seq.contratos, 225 + MAX_FAIXA, 'quem ainda não usa faixa começa depois das reservadas');
-  const nova = c.faixa({ tabela: 'tabela_nova' }, DONO);
+  const nova = c.faixa({ tabela: 'acordos' }, DONO);
   assert.equal(nova.inicio, 1);
   c.aplicar(lote([{ op: 'inserir', tabela: 'contratos', id: a.inicio, dados: { id: a.inicio, valor: 1 } }]), DONO);
   assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'contratos', id: a.inicio, dados: { id: a.inicio, valor: 2 } }]), SOCIO), (e) => e.status === 409);
@@ -150,12 +150,12 @@ test('voltar para um backup (ou substituir pelos dados de uma pasta) não reemit
   const c = carregado();
   const backup = c.tudo(); // o backup de 01/11
   const celular = c.faixa({ tabela: 'contratos', quantidade: 100 }, SOCIO); // 05/11: celular novo pega a faixa dele
-  const nova = c.faixa({ tabela: 'tabela_nova', quantidade: 10 }, SOCIO); // tabela que não existe no backup
+  const nova = c.faixa({ tabela: 'acordos', quantidade: 10 }, SOCIO); // tabela que não existe no backup
   assert.deepEqual([celular.inicio, celular.fim, nova.inicio, nova.fim], [26, 125, 1, 10]);
   c.importar(backup, DONO, { substituir: true }); // 09/11: "Voltar para este dia"
   const pc = c.faixa({ tabela: 'contratos', quantidade: 100 }, DONO);
   assert.ok(pc.inicio > celular.fim, `faixa do PC (${pc.inicio}–${pc.fim}) não pode cruzar a do celular (${celular.inicio}–${celular.fim})`);
-  assert.ok(c.faixa({ tabela: 'tabela_nova' }, DONO).inicio > nova.fim, 'nem na tabela que o backup não tinha');
+  assert.ok(c.faixa({ tabela: 'acordos' }, DONO).inicio > nova.fim, 'nem na tabela que o backup não tinha');
   assert.ok(c.tudo().seq.contratos >= pc.fim, 'quem ainda não usa faixa também começa depois');
   // pasta com códigos maiores que os já entregues: vale o maior dos dois
   const pasta = bancoExemplo(); pasta.contratos.push({ id: 900, valor: 1 });
@@ -257,7 +257,7 @@ test('tabela e campo da raiz não se trocam: "raiz" com nome de tabela (usuário
   assert.deepEqual([depois.contratos.length, depois.config_banco, depois.listas, depois.proxima_fatura], [2, { ativo: false }, { tipos: ['Condomínio'] }, 157]);
   assert.equal(depois.emitentes, undefined);
   // o normal continua: campo da raiz que não é tabela e registro novo em tabela nova
-  assert.equal(c.aplicar(lote([{ op: 'raiz', campo: 'listas', antes: antes.listas, depois: { tipos: ['Água'] } }, { op: 'inserir', tabela: 'tabela_nova', id: 1, dados: { id: 1 } }]), OPERADOR).ok, true);
+  assert.equal(c.aplicar(lote([{ op: 'raiz', campo: 'listas', antes: antes.listas, depois: { tipos: ['Água'] } }, { op: 'inserir', tabela: 'acordos', id: 1, dados: { id: 1 } }]), OPERADOR).ok, true);
 });
 
 test('entradas perigosas: segredos removidos, nomes que mexem no JavaScript barrados, tamanho limitado', () => {

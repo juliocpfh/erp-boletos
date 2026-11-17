@@ -65,9 +65,9 @@ test('textos de cada etapa: pessoa e equipe; o link não vai no e-mail', () => {
   assert.doesNotMatch(falta.pessoa.texto, /https?:/);
   assert.match(textosDoAviso(r, 'desistiu').pessoa.texto, /reserva de R\$ 1\.000,00 é devolvida por inteiro/);
   assert.match(textosDoAviso(r, 'assinar').pessoa.assunto, /^Sua ficha cadastral está pronta para assinar/);
-  // e-mail da pessoa: o da ficha (posto pela equipe) vale mais que o digitado no link; sem o da ficha, o digitado; inválido não manda
+  // e-mail da pessoa: só o da ficha (posto pela equipe); o digitado no link não vale (o Gmail da empresa não escreve para qualquer um)
   assert.equal(emailDaPessoa(registro({ respostas: [{ valores: { inquilino_email: 'outro@exemplo.com.br' } }] })), 'maria@exemplo.com.br');
-  assert.equal(emailDaPessoa(registro({ valores_iniciais: {}, respostas: [{ valores: { inquilino_email: 'novo@exemplo.com.br' } }] })), 'novo@exemplo.com.br');
+  assert.equal(emailDaPessoa(registro({ valores_iniciais: {}, respostas: [{ valores: { inquilino_email: 'novo@exemplo.com.br' } }] })), '');
   // a segunda ficha assinada não repete os avisos
   assert.ok(textosDoAviso(registro({ arquivos: [{ documento: 'Ficha cadastral assinada' }] }), 'assinou').pessoa);
   assert.equal(textosDoAviso(registro({ arquivos: [{ documento: 'Ficha cadastral assinada' }, { documento: 'Ficha cadastral assinada' }] }), 'assinou').equipe, null);

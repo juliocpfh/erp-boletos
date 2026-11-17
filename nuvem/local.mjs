@@ -38,6 +38,9 @@ const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORTA}`);
+  // só este computador pelo nome certo: um site que faz o próprio nome apontar para 127.0.0.1 ("DNS rebinding") chega com o
+  // Host dele e é recusado (aqui o login é de mentira, MODO_TESTE)
+  if (![`localhost:${PORTA}`, `127.0.0.1:${PORTA}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(421); res.end('endereço não reconhecido'); return; }
   try {
     if (url.pathname === '/__internet') { semInternet = url.searchParams.get('ligar') === '0'; res.end(semInternet ? 'sem internet' : 'com internet'); return; }
     // ficha pela internet: a página (/ficha) e as rotas públicas, como no endereço da ficha
@@ -58,7 +61,7 @@ http.createServer(async (req, res) => {
       return;
     }
     const alvo = path.normalize(path.join(DOCS, decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)));
-    if (!alvo.startsWith(DOCS) || !fs.existsSync(alvo) || fs.statSync(alvo).isDirectory()) { res.writeHead(404); res.end('não encontrado'); return; }
+    if (!alvo.startsWith(DOCS + path.sep) || !fs.existsSync(alvo) || fs.statSync(alvo).isDirectory()) { res.writeHead(404); res.end('não encontrado'); return; }
     res.writeHead(200, { 'Content-Type': TIPOS[path.extname(alvo)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     fs.createReadStream(alvo).pipe(res);
   } catch (e) {

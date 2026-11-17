@@ -36,8 +36,10 @@ export class ErroFicha extends Error {
   constructor(status, mensagem) { super(mensagem); this.status = status; }
 }
 
+/** O endereço da ficha é público: o próprio Worker manda o HSTS (a regra do Cloudflare só cobre o erp). */
+export const HSTS = { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' };
 const json = (status, dados, extra = {}) => new Response(JSON.stringify(dados), {
-  status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...extra },
+  status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...HSTS, ...extra },
 });
 
 async function lerJson(request, maximo = MAX_PEDIDO) {
@@ -244,9 +246,39 @@ export async function guardarPdf(request, env, url) {
   const pessoa = pessoaValida(url.searchParams.get('pessoa'));
   const corpo = await lerBytes(request, MAX_PDF);
   if (tipoDoArquivo(corpo) !== 'pdf') throw new ErroFicha(400, 'A ficha precisa ser um PDF.');
+  // sem o registro do link, o PDF (com dados pessoais) ficaria solto no R2, fora da faxina
+  if (!(await lerRegistro(env, fichaId, pessoa))) throw new ErroFicha(404, 'Link não encontrado.');
   await env.DADOS.put(chavePdf(fichaId, pessoa), corpo, { httpMetadata: { contentType: 'application/pdf' } });
   await mudarRegistro(env, fichaId, pessoa, (r) => { r.pdf = true; r.pdf_em = new Date().toISOString(); });
   return json(200, { ok: true });
+}
+
+/**
+ * Faxina dos links (LGPD), chamada pelo alarme diário do cofre: registro passado DIAS_GUARDA do prazo sai inteiro (registro,
+ * ponteiro e PDF), e PDF sem registro (sobra de um link que já saiu) também. Os documentos ficam na pasta da ficha.
+ */
+export async function faxinaDosLinks(env) {
+  if (!env.DADOS) return 0;
+  let cursor; let apagados = 0;
+  do {
+    const r = await env.DADOS.list({ prefix: 'publico/fichas/', cursor, limit: 1000 });
+    const chaves = new Set(r.objects.map((o) => o.key));
+    for (const o of r.objects) {
+      if (o.key.endsWith('.pdf') && !chaves.has(o.key.replace(/\.pdf$/, '.json')) && !(await env.DADOS.head(o.key.replace(/\.pdf$/, '.json')))) {
+        await env.DADOS.delete(o.key); apagados += 1; continue;
+      }
+      if (!o.key.endsWith('.json')) continue;
+      const obj = await env.DADOS.get(o.key);
+      if (!obj) continue;
+      let reg; try { reg = JSON.parse(await obj.text()); } catch { continue; }
+      if (passou(reg.vence_em, DIAS_GUARDA)) {
+        await env.DADOS.delete([o.key, o.key.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
+        apagados += 1;
+      }
+    }
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  return apagados;
 }
 
 const paraEquipe = (r) => { const { hash, ...resto } = r; return resto; };
@@ -337,6 +369,15 @@ async function registroDaChave(request, env, { gravar = false } = {}) {
 export async function lerFichaPublica(request, env) {
   const { registro: r } = await registroDaChave(request, env);
   const ultimo = r.respostas.at(-1);
+  // passado o prazo, a página mostra só a situação: um link encaminhado não expõe CPF, renda e documentos por mais 30 dias
+  if (r.vence_em < new Date().toISOString()) {
+    const c = r.contexto || {};
+    return json(200, {
+      pessoa: r.pessoa, contexto: { empresa: c.empresa, nome: String(c.nome || '').split(/\s+/)[0], imovel: '', proposta: [], documentos: [], dica: '', de: '', reserva: '' },
+      formulario: [], valores: {}, situacao: r.situacao, faltando: [], vence_em: r.vence_em, vencido: true, pdf: false,
+      enviado_em: ultimo ? ultimo.em : null, desistiu_em: r.desistiu_em, arquivos: [],
+    });
+  }
   return json(200, {
     pessoa: r.pessoa, contexto: r.contexto, formulario: r.formulario, valores: { ...r.valores_iniciais, ...(ultimo ? ultimo.valores : {}) },
     situacao: r.situacao, faltando: r.faltando, vence_em: r.vence_em, vencido: r.vence_em < new Date().toISOString(), pdf: !!r.pdf,
@@ -428,6 +469,7 @@ export async function desistirPublico(request, env, avisar) {
 
 export async function baixarPdfPublico(request, env) {
   const { fichaId, pessoa, registro } = await registroDaChave(request, env);
+  if (registro.vence_em < new Date().toISOString()) throw new ErroFicha(410, 'O prazo deste link acabou. Peça um novo para quem enviou.');
   const obj = registro.pdf ? await env.DADOS.get(chavePdf(fichaId, pessoa)) : null;
   if (!obj) throw new ErroFicha(404, 'A ficha em PDF ainda não está disponível.');
   return new Response(obj.body, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${pessoa === 'interessado' ? 'ficha-cadastral' : 'ficha-do-fiador'}.pdf"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -497,7 +539,7 @@ function paginaDaFicha() {
   const nonce = novaChave().slice(0, 24);
   const csp = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; form-action 'none'; frame-ancestors 'none'; base-uri 'none'`;
   return new Response(PAGINA.replaceAll('{{NONCE}}', nonce), {
-    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' },
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex', ...HSTS },
   });
 }
 

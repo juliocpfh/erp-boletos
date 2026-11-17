@@ -15,8 +15,9 @@
 import { crachaValido, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
-import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail } from './gmail.mjs';
+import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail, validarEnvio } from './gmail.mjs';
 import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
+import { paraLixeira } from './lixeira.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 export { CofreLicencasDO } from './cofre-licencas.mjs'; // licenças (painel de vendas, HOST_VENDAS): separado dos dados
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
@@ -24,10 +25,14 @@ const SO_LEITURA = ['backups']; // backups só o cofre grava
 const MAX_DADOS = 30 * 1024 * 1024; // carga inicial do banco inteiro
 const MAX_ARQUIVO = 50 * 1024 * 1024;
 const POR_PEDIDO = 200; // arquivos movidos por pedido (limite de chamadas do plano grátis)
+const POR_PEDIDO_LIXEIRA = 250; // arquivos levados à lixeira por pedido (3 chamadas ao R2 cada)
 const MOVER_JUNTOS = 3; // arquivos movidos ao mesmo tempo: cada um segura 2 ligações (ler e gravar) e o Worker só abre 6 de cada vez
 const LISTA_TUDO_POR_PEDIDO = 5000; // arquivos por resposta de lista-tudo (5 chamadas ao R2 por pedido)
 const VALIDADE_PAPEL = 60 * 1000; // ms: o papel conferido no cofre vale por 1 min (o Painel faz muitos pedidos de anexos seguidos)
-const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i; // igual a nomeAnexavel (docs/js/armazenamento.js)
+const EXTENSOES_PROIBIDAS = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i; // igual a nomeAnexavel (docs/js/armazenamento.js)
+/** Nome que não pode ser gravado (página, script ou programa); pontos e espaços no fim não escondem a extensão. */
+const nomeProibido = (nome) => EXTENSOES_PROIBIDAS.test(String(nome || '').replace(/[. ]+$/, ''));
+const ERRO_TIPO = 'Este tipo de arquivo não pode ser anexado (página, script ou programa: .html, .svg, .xml, .js, .exe…). Salve como PDF ou imagem e anexe de novo.';
 const TIPOS_ABRIR = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
 
 class ErroHttp extends Error {
@@ -84,7 +89,7 @@ export async function conferirLogin(request, env, buscar = fetch) {
   if (env.MODO_TESTE === '1' && ['localhost', '127.0.0.1'].includes(new URL(request.url).hostname)) return env.EMAIL_TESTE || 'teste@exemplo.com.br';
   const equipe = String(env.ACCESS_EQUIPE || '').trim(); // ex.: ankjck.cloudflareaccess.com
   const aud = String(env.ACCESS_AUD || '').trim();
-  if (!equipe || !aud) throw new ErroHttp(503, 'Worker sem configuração de login (ACCESS_EQUIPE, ACCESS_AUD).');
+  if (!equipe || !aud) { console.error('Worker sem configuração de login (ACCESS_EQUIPE, ACCESS_AUD)'); throw new ErroHttp(503, 'O login ainda não foi configurado neste endereço.'); }
   const token = request.headers.get('Cf-Access-Jwt-Assertion') || '';
   const partes = token.split('.');
   if (partes.length !== 3) throw new ErroHttp(401, 'Entre de novo (login do Access).');
@@ -100,7 +105,10 @@ export async function conferirLogin(request, env, buscar = fetch) {
   if (!ok || !auds.includes(aud) || dados.iss !== `https://${equipe}` || !(dados.exp > agora) || (dados.nbf && dados.nbf > agora + 60)) throw new ErroHttp(401, 'Login inválido ou vencido.');
   // Chave de serviço (atualizador-pc/): o Access assina um token sem e-mail, com o Client ID em `common_name`;
   // SERVICOS (segredo do Worker: "<client id>=<e-mail>,…") diz com qual usuário do sistema ela entra (os papéis valem iguais)
-  const email = String(dados.email || (!dados.email && dados.common_name ? emailDoServico(env, dados.common_name) : '')).toLowerCase();
+  const servico = !dados.email && !!dados.common_name;
+  const email = String(dados.email || (servico ? emailDoServico(env, dados.common_name) : '')).toLowerCase();
+  // a chave de serviço (transição do programa do PC) só lê, como o crachá: gravar e apagar exigem o login de uma pessoa
+  if (servico && !['GET', 'HEAD'].includes(request.method)) throw new ErroHttp(403, 'A chave de serviço só lê: para gravar, entre no site.');
   // EMAILS é opcional (trava extra): quem manda é a lista do Access e o cadastro de usuários do sistema
   if (!email || !naListaDeEmails(env, email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   return email;
@@ -197,7 +205,7 @@ async function lerArquivo(env, chave, request = null) {
 async function gravarArquivo(request, env, chave, email) {
   conferirGravacao(request, env);
   if (SO_LEITURA.includes(raizDe(chave))) throw new ErroHttp(403, 'Os backups não podem ser alterados.');
-  if (EXTENSOES_PROIBIDAS.test(nomeDe(chave))) throw new ErroHttp(415, 'Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.');
+  if (nomeProibido(nomeDe(chave))) throw new ErroHttp(415, ERRO_TIPO);
   const corpo = await lerCorpo(request, MAX_ARQUIVO);
   const seNovo = request.headers.get('If-None-Match') === '*';
   // "só se novo" numa chamada só ao R2: dois aparelhos com o mesmo nome ao mesmo tempo, um grava e o outro recebe o 412
@@ -206,10 +214,10 @@ async function gravarArquivo(request, env, chave, email) {
   return json(200, { ok: true, nome: nomeDe(chave), tamanho: corpo.byteLength });
 }
 
-async function apagarArquivo(request, env, chave) {
+async function apagarArquivo(request, env, chave, email = '') {
   conferirGravacao(request, env);
   if (SO_LEITURA.includes(raizDe(chave))) throw new ErroHttp(403, 'Os backups não podem ser alterados.');
-  await env.DADOS.delete(chave);
+  await paraLixeira(env.DADOS, chave, { por: email }); // fica DIAS_LIXEIRA dias em lixeira/ (lixeira.mjs)
   return json(200, { ok: true });
 }
 
@@ -259,6 +267,8 @@ async function mover(request, env) {
   const itens = arquivoSo ? [{ key: de, rel: '' }] : (await listarTudo(env, `${de}/`)).map((o) => ({ key: o.key, rel: o.key.slice(de.length) }));
   if (!itens.length) throw new ErroHttp(404, 'Nada para mover.');
   const destinos = itens.slice(0, POR_PEDIDO).map((i) => ({ ...i, novo: `${para}${i.rel}` }));
+  // o nome novo passa pela mesma regra do PUT (senão um .txt viraria .html, que o PUT recusa)
+  if (destinos.some((d) => nomeProibido(nomeDe(d.novo)))) throw new ErroHttp(415, ERRO_TIPO);
   // o que já existe no destino: uma listagem (em vez de perguntar arquivo por arquivo); arquivo só, uma pergunta
   const noDestino = arquivoSo ? ((await env.DADOS.head(para)) ? [para] : []) : (await listarTudo(env, `${para}/`)).map((o) => o.key);
   const ocupados = new Set(noDestino);
@@ -300,22 +310,27 @@ async function exigirPapel(env, email, nivel) {
 }
 
 /** Apaga uma pasta inteira (todos os arquivos com esse começo), em partes: responde `mais: true` para o site repetir. */
-async function apagarPasta(request, env) {
+async function apagarPasta(request, env, email = '') {
   conferirGravacao(request, env);
   let pedido;
   try { pedido = JSON.parse(new TextDecoder().decode(await lerCorpo(request, 64 * 1024))); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
   const chave = caminhoSeguro(pedido?.caminho, { pasta: true });
   if (SO_LEITURA.includes(raizDe(chave))) throw new ErroHttp(403, 'Os backups não podem ser alterados.');
   if (!chave.includes('/')) throw new ErroHttp(403, 'As pastas principais não podem ser apagadas.');
-  const r = await env.DADOS.list({ prefix: `${chave}/`, limit: 500 });
+  // cada arquivo vai para a lixeira (copia e apaga: 3 chamadas ao R2), em partes de POR_PEDIDO_LIXEIRA (o site repete com `mais`)
+  const r = await env.DADOS.list({ prefix: `${chave}/`, limit: POR_PEDIDO_LIXEIRA });
   const chaves = r.objects.map((o) => o.key);
-  if (chaves.length) await env.DADOS.delete(chaves);
+  for (let i = 0; i < chaves.length; i += MOVER_JUNTOS) await Promise.all(chaves.slice(i, i + MOVER_JUNTOS).map((k) => paraLixeira(env.DADOS, k, { por: email })));
   return json(200, { ok: true, apagados: chaves.length, mais: !!r.truncated });
 }
 
 /** Leituras que o site e o crachá do aparelho fazem igual (só GET); null = não é uma delas. */
 async function lerRecurso(env, rota, email, url, request = null) {
-  if (rota.startsWith('lista/')) { await exigirPapel(env, email, 'consulta'); return listarPasta(env, caminhoSeguro(rota.slice(6), { pasta: true })); }
+  if (rota.startsWith('lista/')) {
+    const chave = caminhoSeguro(rota.slice(6), { pasta: true });
+    await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta'); // nomes, datas e tamanhos dos backups: só o administrador
+    return listarPasta(env, chave);
+  }
   if (rota.startsWith('lista-tudo/')) {
     const chave = caminhoSeguro(rota.slice(11), { pasta: true });
     await exigirPapel(env, email, raizDe(chave) === 'backups' ? 'admin' : 'consulta');
@@ -338,7 +353,7 @@ async function lerRecurso(env, rota, email, url, request = null) {
 export const URL_PROGRAMA = 'https://raw.githubusercontent.com/juliocpfh/erp-boletos/main/docs/offline/administracao-imoveis.html';
 const ROTAS_DADOS_APARELHO = ['tudo', 'mudancas'];
 const crachasConferidos = new Map(); // hash do crachá → { email, ate }: 1 minuto, como o papel (desligar vale em até 1 min)
-export const esquecerCrachas = () => crachasConferidos.clear();
+export const esquecerCrachas = () => { crachasConferidos.clear(); crachasRecusados.clear(); };
 
 async function conferirCracha(request, env) {
   const m = /^Bearer (\S+)$/.exec(request.headers.get('Authorization') || '');
@@ -346,9 +361,15 @@ async function conferirCracha(request, env) {
   const hash = await hashDoCracha(m[1]);
   const guardado = crachasConferidos.get(hash);
   if (guardado && guardado.ate > Date.now()) return guardado.email;
+  if ((crachasRecusados.get(hash) || 0) > Date.now()) throw new ErroHttp(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha.');
+  limitarIp(request, 'cracha');
   const r = await cofreDe(env).fetch(new Request('https://cofre/aparelho/conferir', { method: 'POST', body: JSON.stringify({ cracha: m[1] }), headers: { 'Content-Type': 'application/json' } }));
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ErroHttp(r.status, d.erro || 'Crachá do aparelho recusado.');
+  if (!r.ok) {
+    if (crachasRecusados.size > 1000) crachasRecusados.clear();
+    if (r.status === 401) crachasRecusados.set(hash, Date.now() + VALIDADE_PAPEL);
+    throw new ErroHttp(r.status, d.erro || 'Crachá do aparelho recusado.');
+  }
   if (!naListaDeEmails(env, d.email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   if (crachasConferidos.size > 200) crachasConferidos.clear();
   crachasConferidos.set(hash, { email: d.email, ate: Date.now() + VALIDADE_PAPEL });
@@ -367,10 +388,29 @@ async function versaoPc(request, env, buscar) {
   });
 }
 
+/**
+ * /api/aparelho/ é público (sem o Access): antes de ir ao cofre (um só, atende um pedido por vez), limite por endereço de
+ * internet neste Worker (em memória: cada instância conta a sua). Passou, 429 sem incomodar o cofre.
+ */
+export const LIMITE_APARELHO = { entrar: 30, cracha: 60, janela: 60000 };
+const pedidosPorIp = new Map(); // "tipo|ip" → { n, desde }
+export const esquecerPedidosPorIp = () => pedidosPorIp.clear();
+function limitarIp(request, tipo) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'desconhecido';
+  const chave = `${tipo}|${ip}`; const agora = Date.now();
+  if (pedidosPorIp.size > 5000) pedidosPorIp.clear();
+  const c = pedidosPorIp.get(chave);
+  if (!c || agora - c.desde > LIMITE_APARELHO.janela) { pedidosPorIp.set(chave, { n: 1, desde: agora }); return; }
+  c.n += 1;
+  if (c.n > LIMITE_APARELHO[tipo]) throw new ErroHttp(429, 'Muitos pedidos deste endereço. Espere um minuto e tente de novo.');
+}
+const crachasRecusados = new Map(); // hash do crachá → até quando (crachá inventado não volta ao cofre por 1 minuto)
+
 async function atenderAparelho(request, env, rota, url, buscar) {
   if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
   const m = request.method;
   if (rota === 'entrar') {
+    limitarIp(request, 'entrar');
     if (m !== 'POST') throw new ErroHttp(405, 'Método não aceito.');
     let pedido;
     try { pedido = JSON.parse(new TextDecoder().decode(await lerCorpo(request, 4096))); } catch (e) { throw e instanceof ErroHttp ? e : new ErroHttp(400, 'Pedido inválido.'); }
@@ -435,6 +475,12 @@ async function rotaEnviarEmail(request, env, email, url, buscar) {
   if (!corpo) throw new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
   let pedido;
   try { pedido = JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
+  // registro no cofre antes de mandar (quem, para quem, assunto e nomes dos anexos; limite por dia): sem o registro, não manda
+  const v = validarEnvio(pedido);
+  if (env.COFRE) {
+    const reg = await cofreDe(env).fetch(new Request('https://cofre/registrar-email', { method: 'POST', body: JSON.stringify({ para: [...v.para, ...v.cco], assunto: v.assunto, anexos: v.anexos.map((a) => a.nome) }), headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email } }));
+    if (!reg.ok) { const e = await reg.json().catch(() => ({})); throw new ErroHttp(reg.status, e.erro || 'Não foi possível registrar o envio.'); }
+  }
   const r = await enviarEmail(env, pedido, { buscar, simular });
   console.log(`e-mail enviado por ${email} (${r.id})`); // só quem e o código: o conteúdo não fica no registro
   return json(200, r);
@@ -468,21 +514,21 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
     if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
     if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
     if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
-    if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'consulta'); return await rotaEnviarEmail(request, env, email, url, buscar); }
+    if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaEnviarEmail(request, env, email, url, buscar); }
     if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
     if (rota.startsWith('ficha-online/')) {
       if (m !== 'GET') conferirGravacao(request, env);
       await exigirPapel(env, email, 'operador');
       return await atenderEquipe(request, env, rota.slice(13), email, { avisar: avisador(ctx, buscar) });
     }
-    if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env); }
+    if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env, email); }
     if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
     if (m === 'GET') { const lido = await lerRecurso(env, rota, email, url, request); if (lido) return lido; }
     if (rota.startsWith('arquivos/') || rota.startsWith('modelos/') || rota.startsWith('backups/')) {
       const chave = caminhoSeguro(rota);
       await exigirPapel(env, email, 'operador');
       if (m === 'PUT') return await gravarArquivo(request, env, chave, email);
-      if (m === 'DELETE') return await apagarArquivo(request, env, chave);
+      if (m === 'DELETE') return await apagarArquivo(request, env, chave, email);
     }
     return json(404, { erro: 'Não encontrado.' });
   } catch (e) {

@@ -175,10 +175,10 @@ test('Worker com os segredos: envia pelo Google; exige o cabeçalho do sistema, 
   W.esquecerPapeis();
   assert.equal((await pedir({ ...SEGREDOS, COFRE }, 'GET', '/api/email/estado')).status, 403);
   assert.equal((await pedir({ ...SEGREDOS, COFRE }, 'POST', '/api/email/enviar', corpoEmail, g.buscar)).status, 403);
-  // papel consulta também envia
+  // papel consulta não envia (mutirão de 16/11: o Gmail da empresa só para quem edita; o envio fica registrado no cofre)
   const consulta = { idFromName: (n) => n, get: () => ({ fetch: async (req) => (new URL(req.url).searchParams.get('nivel') === 'consulta' ? respostaJson(200, { papel: 'consulta' }) : respostaJson(403, { erro: 'não pode' })) }) };
   W.esquecerPapeis();
-  assert.equal((await pedir({ ...SEGREDOS, COFRE: consulta }, 'POST', '/api/email/enviar', corpoEmail, g.buscar)).status, 200);
+  assert.equal((await pedir({ ...SEGREDOS, COFRE: consulta }, 'POST', '/api/email/enviar', corpoEmail, g.buscar)).status, 403);
   W.esquecerPapeis();
 });
 
