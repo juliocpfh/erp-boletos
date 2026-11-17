@@ -12,7 +12,7 @@ import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
 import { avisoBackupSeguro, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
-import { telaBanco } from './telas/banco.js';
+import { lerAvisosAoAbrir, telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
@@ -246,6 +246,8 @@ export const TELAS = {
       .then(() => conferirSoltosUmaVez()).catch((e) => aviso(`Pasta física: ${e.message}`, 'aviso'))
       // fichas reprovadas há 3 meses: os documentos pessoais saem da pasta
       .then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, 'aviso'));
+    // avisos do banco (pagamentos avisados pelo C6): uma leitura por abertura, por trás; só propõe o registro
+    lerAvisosAoAbrir().catch(() => { /* a ponte pode estar desligada: tenta na próxima abertura ou na tela Banco */ });
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
