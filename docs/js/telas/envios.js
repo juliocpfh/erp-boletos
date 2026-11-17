@@ -51,16 +51,16 @@ function avisarImovelSemEmpresa(cb) {
 
 export const FORMULARIOS = {
   async configurarSeguro(form) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador configura o backup seguro.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador configura o backup seguro.');
     const dir = E.pastaSeguraNova;
-    if (!dir) throw new Error('Escolha a pasta segura primeiro.');
+    if (!dir) throw new C.ErroUsuario('Escolha a pasta segura primeiro.');
     const f = new FormData(form);
     const senha = String(f.get('senha') || '');
     let chave = await B.lerChave(dir);
     if (chave) {
-      if (!(await B.conferirSenha(chave, senha))) throw new Error('Senha do backup incorreta.');
+      if (!(await B.conferirSenha(chave, senha))) throw new C.ErroUsuario('Senha do backup incorreta. Confira e digite de novo.');
     } else {
-      if (senha !== String(f.get('senha2') || '')) throw new Error('As duas senhas precisam ser iguais.');
+      if (senha !== String(f.get('senha2') || '')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
       chave = await B.criarChave(senha);
       await B.gravarChave(dir, chave);
     }
@@ -77,7 +77,7 @@ export const FORMULARIOS = {
   async restaurarSeguro(form) {
     const f = new FormData(form);
     const arq = f.get('arquivo');
-    if (!arq || !arq.size) throw new Error('Escolha o arquivo de backup.');
+    if (!arq || !arq.size) throw new C.ErroUsuario('Escolha o arquivo de backup antes de continuar.');
     const { info, dados } = await B.decifrar(await arq.arrayBuffer(), String(f.get('senha') || ''));
     const data = (info.criado_em || '').slice(0, 10);
     const JSZip = await jsZip();
@@ -96,7 +96,7 @@ export const FORMULARIOS = {
     // abrir numa pasta do computador (versão PC com o site fora do ar): grava o banco e os anexos na pasta escolhida e abre
     let dir;
     try { dir = await window.showDirectoryPicker({ id: 'restaurar-backup', mode: 'readwrite' }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
-    if (await S.lerBanco(dir)) throw new Error(`A pasta escolhida já tem um ${S.ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
+    if (await S.lerBanco(dir)) throw new C.ErroUsuario(`A pasta escolhida já tem um ${S.ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
     await S.importarZip(JSZip, dir, blob, null);
     await S.lembrarPasta(dir);
     await abrirPasta(dir);
@@ -114,17 +114,17 @@ export const FORMULARIOS = {
   async baixaLote(form) {
     const fd = new FormData(form);
     const data = String(fd.get('data') || '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data em que o dinheiro entrou.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new C.ErroUsuario('Informe a data em que o dinheiro entrou.');
     const ids = fd.getAll('ids').map(Number);
-    if (!ids.length) throw new Error('Marque os boletos deste vencimento que foram pagos.');
+    if (!ids.length) throw new C.ErroUsuario('Marque os boletos deste vencimento que foram pagos.');
     const vencs = new Set(ids.map((id) => (buscar('cobrancas', id) || {}).vencimento));
-    if (vencs.size > 1) throw new Error('Confirme juntos só boletos do mesmo vencimento.');
+    if (vencs.size > 1) throw new C.ErroUsuario('Confirme juntos só boletos do mesmo vencimento.');
     // atrasados (D7): o grupo informa o dia em que pagaram; multa e juros até esse dia, como na confirmação um a um
     const atrasado = fd.get('atrasado') === '1';
     const dataPagou = atrasado ? String(fd.get('pagou') || '') || data : null;
-    if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error('Informe o dia em que pagaram.');
-    if (atrasado && dataPagou > data) throw new Error('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
-    if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
+    if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new C.ErroUsuario('Informe o dia em que pagaram.');
+    if (atrasado && dataPagou > data) throw new C.ErroUsuario('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
+    if (atrasado && dataPagou <= [...vencs][0]) throw new C.ErroUsuario(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
     pagamentoNaoFuturo(data, dataPagou);
     await confirmarAvisos([dataMuitoAntiga(data)].filter(Boolean));
     let r;
@@ -139,7 +139,7 @@ export const FORMULARIOS = {
       const texto = String(f[`valor_${n}`] || '').trim();
       return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], vencimento: f[`venc_${n}`] || null, observacoes: String(f[`obs_${n}`] || '').trim() };
     });
-    if (!f.competencia) throw new Error('Informe o mês da conta.');
+    if (!f.competencia) throw new C.ErroUsuario('Informe o mês da conta.');
     let n = 0;
     await alterar((db) => { n = R.lancarDespesas(db, Number(f.imovel), f.competencia, linhas, login()).length; });
     aviso(`${n} conta(s) lançada(s).`);
@@ -171,10 +171,10 @@ export const FORMULARIOS = {
 
   async marcarDocumento(form) {
     const f = Object.fromEntries(new FormData(form));
-    if (!f.data) throw new Error('Informe a data.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data.');
     const doc = R.DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
     const arquivo = form.querySelector('[name=arquivo]').files[0];
-    if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
+    if (!arquivo) throw new C.ErroUsuario(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
     const nome = await salvarAssinado('assinados', Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
     await alterar((db) => R.marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
     await mostrar();
@@ -195,7 +195,7 @@ export const FORMULARIOS = {
   /** Rotina de entrada: marca a etapa como feita na data escolhida. */
   async etapaEntrada(form) {
     const f = Object.fromEntries(new FormData(form));
-    if (!f.data) throw new Error('Informe a data.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data.');
     await alterar((db) => R.marcarEtapaEntrada(db, Number(f.contrato), f.chave, { data: f.data }, login()));
     await mostrar();
   },
@@ -207,8 +207,8 @@ export const FORMULARIOS = {
     const g = R.GARANTIAS_DEPOSITADAS[f.qual];
     const valor = C.centavos(f.valor);
     // confere antes de gravar o arquivo na pasta (as mesmas mensagens de R.registrarDepositoGarantia); o comprovante pode vir depois
-    if (!f.data) throw new Error('Informe a data do depósito.');
-    if (!(valor > 0)) throw new Error('Informe o valor depositado.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data do depósito.');
+    if (!(valor > 0)) throw new C.ErroUsuario('Informe o valor depositado.');
     const nome = arq ? await S.salvarArquivo(await pastaDoEscopo('contrato', Number(f.contrato)), new File([arq], nomeComprovante(g.arquivo, f.data, arq))) : null;
     let s;
     await alterar((db) => { s = R.registrarDepositoGarantia(db, Number(f.contrato), f.qual, { data: f.data, valor, arquivo: nome }, login()); });
@@ -221,9 +221,9 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const arquivo = form.querySelector('[name=arquivo]').files[0];
     // confere antes de gravar o arquivo na pasta (as mesmas mensagens de R.registrarAditivo)
-    if (!f.data) throw new Error('Informe a data do termo aditivo.');
-    if (!String(f.assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
-    if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data do termo aditivo.');
+    if (!String(f.assunto || '').trim()) throw new C.ErroUsuario('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
+    if (!arquivo) throw new C.ErroUsuario('Anexe o arquivo do termo aditivo assinado.');
     // novo titular esperando o termo da troca: a caixa diz se este é o termo da troca (só ele faz o contrato passar)
     const tipo = f.pergunta_troca ? (f.troca === '1' ? K.TIPO_ADITIVO_TROCA : 'Outro') : null;
     // termo da troca: antes de gravar, quem anexa dá ciência de que todo o vínculo passa ao novo titular
@@ -238,19 +238,19 @@ export const FORMULARIOS = {
 
   async vistoria(form) {
     const f = Object.fromEntries(new FormData(form));
-    if (!f.data) throw new Error('Informe a data da vistoria.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data da vistoria.');
     const c = buscar('contratos', f.contrato);
     // leitura dos relógios: obrigatória e registrada aqui (entrada ou saída do inquilino)
     const momento = f.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = Object.fromEntries(F.LEITURAS.map(([k]) => [k, String(f[`leitura_${k}`] || '').trim()]));
     const faltaLeitura = R.relogiosDoContrato(c).filter((k) => !leitura[k]);
-    if (faltaLeitura.length) throw new Error(`Informe a leitura do relógio de ${faltaLeitura.map((k) => F.LEITURAS.find(([x]) => x === k)[1].replace('Relógio de ', '')).join(' e ')}.`);
+    if (faltaLeitura.length) throw new C.ErroUsuario(`Informe a leitura do relógio de ${faltaLeitura.map((k) => F.LEITURAS.find(([x]) => x === k)[1].replace('Relógio de ', '')).join(' e ')}.`);
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '',
       texto_abertura: String(f.texto_abertura || '').trim(), texto_final: f.tipo === 'Entrada' ? String(f.texto_final || '').trim() : '' };
     // B3: na saída, se o inquilino acompanhou (sem ele, o relatório vai por e-mail com 5 dias úteis para contestar)
     if (f.tipo === 'Saída') {
-      if (!K.PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new Error('Diga se o inquilino acompanhou a vistoria.');
+      if (!K.PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new C.ErroUsuario('Diga se o inquilino acompanhou a vistoria.');
       dados.inquilino_presente = f.inquilino_presente;
     }
     // texto igual ao padrão fica em branco: vale o padrão (a abertura muda sozinha com ou sem o link das fotos)
@@ -261,7 +261,7 @@ export const FORMULARIOS = {
     for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
     // todo item do modelo precisa de situação (o navegador já aponta o primeiro; aqui a lista completa)
     const semSituacao = dados.itens.filter((x) => !x.situacao);
-    if (semSituacao.length) throw new Error(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join('; ')}${semSituacao.length > 8 ? '…' : ''}. Marque a situação (ou "Não se aplica") antes de salvar.`);
+    if (semSituacao.length) throw new C.ErroUsuario(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join('; ')}${semSituacao.length > 8 ? '…' : ''}. Marque a situação (ou "Não se aplica") antes de salvar.`);
     const tirados = dados.itens.filter((x) => x.situacao === K.NAO_SE_APLICA);
     dados.itens = dados.itens.filter((x) => x.situacao !== K.NAO_SE_APLICA);
     // fotos: reduzidas e guardadas na pasta do inquilino (mesmo nome = substitui a anterior)
@@ -318,7 +318,7 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo').find((m) => String(m.id) === f.modelo);
-    if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
+    if (!f.id && !modelo) throw new C.ErroUsuario('Escolha o modelo do termo aditivo.');
     const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes, testemunhas,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
@@ -331,7 +331,7 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo_troca').find((m) => String(m.id) === f.modelo);
-    if (!f.id && !modelo) throw new Error('Escolha o modelo do termo aditivo.');
+    if (!f.id && !modelo) throw new C.ErroUsuario('Escolha o modelo do termo aditivo.');
     const dados = { data: f.data, testemunhas, garantia_corrigida: String(f.garantia_corrigida || '').trim() ? C.centavos(f.garantia_corrigida) : null,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
@@ -344,8 +344,8 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     const arquivo = form.querySelector('[name=arquivo]').files[0];
     const a = buscar('aditivos', f.id);
-    if (!f.data) throw new Error('Informe a data da assinatura.');
-    if (!arquivo) throw new Error('Anexe o arquivo do termo aditivo assinado.');
+    if (!f.data) throw new C.ErroUsuario('Informe a data da assinatura.');
+    if (!arquivo) throw new C.ErroUsuario('Anexe o arquivo do termo aditivo assinado.');
     const ciencia = a.tipo === K.TIPO_ADITIVO_TROCA ? await cienciaDaTroca(a.contrato_id) : {};
     if (!ciencia) return;
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
@@ -359,7 +359,7 @@ export const FORMULARIOS = {
     const f = new FormData(form);
     const nome = String(f.get('nome') || '').trim();
     const texto = String(f.get('texto') || '');
-    if (!nome || !texto.trim()) throw new Error('Preencha o nome e o texto do modelo.');
+    if (!nome || !texto.trim()) throw new C.ErroUsuario('Preencha o nome e o texto do modelo.');
     const id = Number(f.get('id') || 0);
     const tipo = ['aditivo', 'aditivo_troca'].includes(f.get('tipo')) ? f.get('tipo') : 'contrato';
     await alterar((db) => {
@@ -377,9 +377,9 @@ export const FORMULARIOS = {
     const nome = String(f.get('nome')).trim();
     const lg = String(f.get('login')).trim().toLowerCase();
     const senha = String(f.get('senha'));
-    if (!nome || !lg) throw new Error('Preencha nome e login.');
-    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
-    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
+    if (!nome || !lg) throw new C.ErroUsuario('Preencha o nome e o login.');
+    if (senhaCurta(senha)) throw new C.ErroUsuario(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
     await criarBanco(nome, lg, senha);
     ir('#/');
   },
@@ -404,10 +404,10 @@ export const FORMULARIOS = {
     const nome = String(f.get('nome') || '').trim();
     const lg = String(f.get('login') || '').trim().toLowerCase();
     const senha = String(f.get('senha') || '');
-    if (!nome || !lg || /\s/.test(lg)) throw new Error('Preencha o nome e um login sem espaços.');
-    if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
-    if (senha !== f.get('senha2')) throw new Error('As duas senhas precisam ser iguais.');
-    if (E.d.usuarios.some((u) => u.login === lg)) throw new Error('Já existe um usuário (ou pedido) com este login.');
+    if (!nome || !lg || /\s/.test(lg)) throw new C.ErroUsuario('Preencha o nome e um login sem espaços.');
+    if (senhaCurta(senha)) throw new C.ErroUsuario(ERRO_SENHA_CURTA);
+    if (senha !== f.get('senha2')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
+    if (E.d.usuarios.some((u) => u.login === lg)) throw new C.ErroUsuario('Já existe um usuário (ou pedido) com este login.');
     const campos = await camposDeSenha(senha);
     await alterar((db) => R.inserir(db, 'usuarios', { login: lg, nome, papel: 'consulta', ativo: false, pendente: true, ...campos,
       criado_em: new Date().toISOString() }, lg, `Pedido de acesso de ${nome}`));
@@ -448,7 +448,7 @@ export const FORMULARIOS = {
       try { cfg.ajustar({ ...dados }, mais, registro, form, rota.q); } catch { /* conferência que depende de campo errado */ }
       for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
     }
-    if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new Error('Nada foi salvo.');
+    if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new C.ErroUsuario('Nada foi salvo. Corrija o que precisar e salve de novo.');
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
     await confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
@@ -497,7 +497,7 @@ export const FORMULARIOS = {
   /** Pagamento com valor diferente do previsto: a NF sai com o valor digitado (diferente do calculado) e a justificativa fica no histórico. */
   async pagamentoNf(form) {
     const p = memoria.pagamentoDivergente;
-    if (!p || String(p.id) !== form.dataset.id) throw new Error('Confirme o pagamento de novo.');
+    if (!p || String(p.id) !== form.dataset.id) throw new C.ErroUsuario('Confirme o pagamento de novo.');
     const f = new FormData(form);
     const texto = String(f.get('valor_nf') || '').trim();
     const valorNf = texto ? C.centavos(texto) : null;
@@ -521,9 +521,9 @@ export const FORMULARIOS = {
   async ajuste(form) {
     const f = new FormData(form);
     const valor = Math.abs(C.centavos(String(f.get('valor') || '').trim()));
-    if (!valor) throw new Error('Informe o valor do ajuste.');
+    if (!valor) throw new C.ErroUsuario('Informe o valor do ajuste.');
     const motivo = String(f.get('motivo') || '').trim();
-    if (!motivo) throw new Error('Informe o motivo do ajuste (fica no histórico).');
+    if (!motivo) throw new C.ErroUsuario('Informe o motivo do ajuste (fica no histórico).');
     await alterar((db) => R.ajustarBoleto(db, Number(form.dataset.id), f.get('tipo') === 'ressarcimento' ? -valor : valor, motivo, login()));
     aviso('Ajuste salvo e registrado no histórico.');
     await mostrar();
@@ -548,9 +548,9 @@ export const FORMULARIOS = {
     const f = new FormData(form);
     const indice = String(f.get('indice') || '');
     const mesRef = String(f.get('mes_ref') || '');
-    if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new Error('Informe o mês até onde vai o acumulado.');
+    if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new C.ErroUsuario('Informe o mês até onde vai o acumulado.');
     const percentual = C.numero(f.get('percentual'));
-    if (String(f.get('percentual') || '').trim() === '') throw new Error('Informe o percentual acumulado em 12 meses.');
+    if (String(f.get('percentual') || '').trim() === '') throw new C.ErroUsuario('Informe o percentual acumulado em 12 meses.');
     await alterar((db) => {
       const existente = db.indices_acumulados.find((x) => x.indice === indice && x.mes_ref === mesRef);
       if (existente) R.atualizar(db, 'indices_acumulados', existente.id, { percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
@@ -570,7 +570,7 @@ export const FORMULARIOS = {
     const temPct = String(f.get('percentual') || '').trim() !== '';
     const pctDigitado = temPct ? C.numero(f.get('percentual')) : null;
     const valor = String(f.get('valor_novo') || '').trim() ? C.centavos(f.get('valor_novo')) : 0;
-    if (!temPct && !(valor > 0)) throw new Error('Digite o % da correção ou o novo valor do aluguel.');
+    if (!temPct && !(valor > 0)) throw new C.ErroUsuario('Digite o % da correção ou o novo valor do aluguel.');
     // não mexeu (ou voltou ao % do índice): correção pelo índice cadastrado
     let manual = null;
     if (['valor_novo', 'bonificado'].includes(origem) && valor > 0) manual = valor === C.aplicarCorrecao(Number(form.dataset.atual), pctIndice ?? NaN) ? null : { valor_novo: valor };
@@ -585,7 +585,7 @@ export const FORMULARIOS = {
   async guiaImposto(form) {
     const texto = String(new FormData(form).get('valor') || '').trim();
     const valor = texto ? C.centavos(texto) : null;
-    if (valor !== null && !(valor >= 0)) throw new Error('Valor inválido.');
+    if (valor !== null && !(valor >= 0)) throw new C.ErroUsuario('Valor inválido. Digite só o valor, como 1.234,56 (ou deixe em branco para apagar).');
     const { emitente, imposto, periodo } = form.dataset;
     await alterar((db) => R.salvarGuiaImposto(db, Number(emitente), imposto, periodo, valor, login()));
     aviso(valor === null ? 'Valor do contador apagado.' : 'Valor do contador salvo.');
@@ -600,7 +600,7 @@ export const FORMULARIOS = {
 
   async logo(form) {
     const arquivo = new FormData(form).get('arquivo');
-    if (!arquivo || !arquivo.size) throw new Error('Escolha o arquivo da logo.');
+    if (!arquivo || !arquivo.size) throw new C.ErroUsuario('Escolha o arquivo da logo.');
     const dataUrl = await reduzirImagem(arquivo);
     await alterar((db) => {
       R.registrar(db, login(), 'Alteração', null, null, db.logo ? 'Logo da empresa trocada' : 'Logo da empresa enviada');
@@ -634,7 +634,7 @@ export const FORMULARIOS = {
 
   async proximaFatura(form) {
     const n = Number(new FormData(form).get('numero'));
-    if (!Number.isInteger(n) || n < 1) throw new Error('Número inválido.');
+    if (!Number.isInteger(n) || n < 1) throw new C.ErroUsuario('Digite um número inteiro a partir de 1 para a próxima NF.');
     const ultima = R.ultimaFatura(E.d);
     if (ultima && n <= ultima.numero && !(await confirmar(`Já existe a NF nº ${R.numeroFatura(ultima.numero)}. Usar ${R.numeroFatura(n)} vai repetir números de NF.`, { titulo: 'Repetir número de NF?', sim: 'Usar mesmo assim', forte: true }))) return;
     await alterar((db) => {
@@ -649,7 +649,7 @@ export const FORMULARIOS = {
     const f = new FormData(form);
     const arq = f.get('zip');
     if (!arq || !arq.size) throw new C.ErroUsuario('Escolha o arquivo ZIP.');
-    if (f.get('confirmo') !== '1') throw new Error('Marque a confirmação: a importação substitui os dados desta pasta.');
+    if (f.get('confirmo') !== '1') throw new C.ErroUsuario('Marque a confirmação: a importação substitui os dados desta pasta.');
     const JSZip = await jsZip();
     const novos = await S.importarZip(JSZip, E.pasta, arq, E.d);
     E.d = novos;
@@ -662,7 +662,7 @@ export const FORMULARIOS = {
 
   /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
   async configBanco(form) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = new FormData(form);
     // endereço e senha da ponte: só neste navegador (IndexedDB); o que é compartilhado vai para o JSON
     await BANCO.salvarPonteLocal({ ponte_url: f.get('ponte_url'), senha_ponte: f.get('senha_ponte') });
@@ -673,7 +673,7 @@ export const FORMULARIOS = {
 
   /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
   async modoContaBoleto(form) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = new FormData(form);
     await alterar((db) => R.salvarConfigBanco(db, { modo_conta_boleto: f.get('modo'), conta_padrao_id: f.get('conta_padrao_id') || undefined }, login()));
     aviso(f.get('modo') === 'escolher' ? 'Ao emitir, o sistema vai perguntar a empresa de cada boleto.' : 'Os boletos saem sempre pela empresa padrão.');
@@ -682,7 +682,7 @@ export const FORMULARIOS = {
 
   /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
   async contaBanco(form) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a integração com o banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = Object.fromEntries(new FormData(form));
     const conta = await alterar((db) => R.salvarContaBanco(db, f, login()));
     aviso(`Conta ${conta.apelido} salva. Lembre de configurar a mesma conta ("${conta.id}") no .env da ponte.`);
@@ -691,13 +691,13 @@ export const FORMULARIOS = {
 
   async modeloExcel(form) {
     const arq = new FormData(form).get('modelo');
-    if (!arq || !arq.size) throw new Error('Escolha o arquivo .xlsx.');
+    if (!arq || !arq.size) throw new C.ErroUsuario('Escolha a planilha (arquivo .xlsx) antes de continuar.');
     const ExcelJS = await excelJs();
     const wb = new ExcelJS.Workbook();
     try {
       await wb.xlsx.load(await arq.arrayBuffer());
     } catch {
-      throw new Error('Não consegui abrir este arquivo como planilha Excel (.xlsx).');
+      throw new C.ErroUsuario('Não consegui abrir este arquivo como planilha do Excel. Escolha um arquivo .xlsx (no Excel: Salvar como → Pasta de Trabalho do Excel).');
     }
     const dir = await E.pasta.getDirectoryHandle(S.PASTA_MODELOS, { create: true });
     await S.escreverTexto(dir, S.MODELO_FATURA, arq);
@@ -723,7 +723,7 @@ export function pagamentoNaoFuturo(data, dataPagou = null) {
  */
 export async function confirmarPagamentoBoleto(id, f) {
   const data = String(f.get('data') || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new Error('Informe a data do pagamento.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new C.ErroUsuario('Informe a data do pagamento.');
   const valor = String(f.get('valor') || '').trim() ? C.centavos(f.get('valor')) : null;
   const pagouEmDia = f.get('em_dia') === '1';
   const dataPagou = String(f.get('pagou') || '') || null;
@@ -746,7 +746,7 @@ export async function confirmarPagamentoBoleto(id, f) {
       sim: 'Continuar', nao: 'Cancelar' });
     const justificativa = resp && String((resp.justificativa || [])[0] || '').trim();
     if (!resp) return;
-    if (!justificativa) throw new Error('Informe a justificativa da divergência. Nada foi salvo.');
+    if (!justificativa) throw new C.ErroUsuario('Informe a justificativa da divergência. Nada foi salvo.');
     memoria.pagamentoDivergente = { id: cb.id, data, valor, pagouEmDia, dataPagou, justificativa };
     ir(`#/cobranca/${cb.id}?ir=pagamento`);
     return;
