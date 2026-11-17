@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-pKz7RhLiQCKq0OGhgCiXKqX22epWtpNgxOKQPfihsmw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-ZZ8Y+TuMiWfjipaZcJvZmo8hHHJH7lDlHvTlx+b62Sk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="628d858797b8c43c">
+<meta name="fontes" content="bb46fba5a1c827b9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -31352,14 +31352,23 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
       <div class="acoes">${botao("atualizarCopiaAberta", "Atualizar a pasta agora", { status: "Atualizando a pasta…" }, "secundario")}</div>
       ${caixaAbrirPasta(copia2)}` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
+    ${E.nuvem ? caixaDesinstalarPrograma() : ""}
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista3.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho2(x.tamanho)}</td></tr>`).join("") || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
   }
+  function caixaDesinstalarPrograma() {
+    if (!noComputador() || !noWindows()) return "";
+    return `<div class="cartao" id="programa-do-pc"><h2>Programa deste computador</h2>
+    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho. Para tirá-lo deste computador:</p>
+    <div class="acoes"><a class="botao perigo pequeno" href="imoveis-desinstalar:confirmar">Desinstalar o programa deste computador</a></div>
+    <p class="suave">Pede confirmação no Windows. Depois, se quiser cortar o acesso deste computador, use ${link("#/usuarios", "Usuários → Aparelhos ligados → Desligar", "")}.
+      A pasta segura e a pasta <b>${PASTA_COPIA}</b> continuam no computador. Também dá para desinstalar em Configurações do Windows → Aplicativos → Aplicativos instalados.</p></div>`;
+  }
   function caixaAbrirPasta(copia2) {
     if (!noComputador()) return "";
     const caminho = copia2?.caminho || "";
-    const windows = /Windows/.test(navigator.userAgent);
+    const windows = noWindows();
     return `<div class="abrir-pasta">
     <div class="acoes">${windows ? '<a class="botao" href="imoveis-pasta:abrir">Abrir a pasta no Explorer</a>' : ""}
       ${caminho ? botao("copiar", "Copiar o caminho", { texto: caminho }, "secundario") : ""}</div>
@@ -31594,7 +31603,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       URL.revokeObjectURL(url);
     }
   }
-  var tamanho2, FORM_RESTAURAR, noComputador, AVISO_SEGURO_DISPENSADO, dispensarAvisoSeguro, HISTORICO_POR_PAGINA, textosHistorico, textoDaEntrada, LEMBRETE_ZIP_DIAS, MAIORES_TABELAS, milhar, LOGO_MAX;
+  var tamanho2, FORM_RESTAURAR, noComputador, noWindows, AVISO_SEGURO_DISPENSADO, dispensarAvisoSeguro, HISTORICO_POR_PAGINA, textosHistorico, textoDaEntrada, LEMBRETE_ZIP_DIAS, MAIORES_TABELAS, milhar, LOGO_MAX;
   var init_admin = __esm({
     "docs/js/telas/admin.js"() {
       init_app();
@@ -31621,6 +31630,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
     <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
       noComputador = () => !window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
+      noWindows = () => /Windows/.test(navigator.userAgent);
       AVISO_SEGURO_DISPENSADO = "imoveis-aviso-backup-seguro";
       dispensarAvisoSeguro = () => {
         try {
