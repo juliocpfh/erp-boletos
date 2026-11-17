@@ -5668,6 +5668,20 @@ function vagoNoPeriodo(d, imovelId, ini, fim) {
   }
   return dia <= fim;
 }
+
+/**
+ * Imóvel vago no dia (ninguém ocupando, como em ``ocupadoEm``): { desde, dias, proximo }, ou null se está ocupado (painel de
+ * Gestão). ``desde``: dia seguinte à última saída e ``dias``: quantos dias desde ela (null os dois se nunca teve inquilino);
+ * ``proximo``: contrato já feito que entra depois do dia (ou null). Ex.: saída em 31/10/2026, dia 16/11/2026 → desde
+ * 01/11/2026, há 16 dias; contrato novo com entrada em 01/12/2026 → proximo.
+ */
+export function imovelVago(d, imovelId, dia) {
+  if (ocupadoEm(d, imovelId, dia)) return null;
+  const doImovel = d.contratos.filter((c) => c.imovel_id === imovelId && c.data_entrada);
+  const saida = doImovel.filter((c) => c.data_saida && c.data_saida < dia).map((c) => c.data_saida).sort().pop() || null;
+  const proximo = doImovel.filter((c) => c.ativo !== false && c.data_entrada > dia).sort((a, b) => a.data_entrada.localeCompare(b.data_entrada))[0] || null;
+  return { desde: saida ? C.somarDias(saida, 1) : null, dias: saida ? C.diasEntre(saida, dia) : null, proximo };
+}
 export const MESES_DEPOIS_DE_ALUGAR = 2;
 const NOMES_CONTAS = { conta_agua: 'Água', conta_energia: 'Luz', conta_gas: 'Gás', conta_condominio: 'Condomínio', conta_internet: 'Internet' };
 
@@ -6320,6 +6334,22 @@ export function reajustesAbertos(d, hoje = C.hojeIso(), { contratoId = null } = 
     }
   }
   return lista.sort((a, b) => a.competencia.localeCompare(b.competencia) || a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
+}
+
+/**
+ * Reajustes de uma competência (aluguel de), feitos ou não (painel de Gestão): os mesmos contratos de ``reajustesAbertos``
+ * (ativo, com imóvel, sem troca de titular esperando o termo, ativo no mês e sem o reajuste do titular anterior), com
+ * ``corrigido`` preenchido quando a correção já foi aplicada. Ex.: entrada em 10/11/2025 → reajuste no aluguel de 11/2026.
+ */
+export function reajustesDoMes(d, comp, hoje = C.hojeIso()) {
+  const lista = [];
+  for (const c of d.contratos.filter((x) => x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d, x))) {
+    const herdado = contratoHerdado(d, c) && c.data_entrada ? c.data_entrada.slice(0, 7) : '';
+    if (comp < herdado || !contratoAtivo(c, `${comp}-01`)) continue;
+    const r = reajusteNaCompetencia(d, c, comp, hoje);
+    if (r) lista.push({ contrato: c, ...r });
+  }
+  return lista.sort((a, b) => a.contrato.inquilino_nome.localeCompare(b.contrato.inquilino_nome, 'pt-BR'));
 }
 
 /** Reajustes já aplicados (correções pelo índice, sem os novos valores negociados), do mais recente ao mais antigo. */

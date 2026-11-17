@@ -611,6 +611,14 @@ export const ACOES = {
     baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}${i ? ` - ${i.nome}` : ''}`}.docx`.replace(/[\\/:*?"<>|]/g, '-'));
   },
 
+  /** Tela Gestão: "Relatório em PDF", o resumo do mês numa página (a tela é carregada só quando usada). */
+  async relatorioGestao({ mes }) {
+    const { pdfDaGestao } = await carregarParte(() => import('./gestao.js'));
+    aviso('Gerando o PDF…', 'info');
+    const r = await pdfDaGestao(mes);
+    baixar(r.blob, r.nome);
+  },
+
   /** PDF de um trecho da página (carta de reajuste, demonstrativo do boleto), com margens e "Página X de Y". */
   async baixarPdfTela({ seletor, nome }) {
     const el = document.querySelector(seletor);

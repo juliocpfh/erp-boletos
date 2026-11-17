@@ -38,7 +38,7 @@ const MAX_TENTATIVAS = 3; // arquivo que nem passando por cima dos caches vem co
 // o pdf.js (1,4 MB) também: sem ele, o PDF escaneado anexado sem internet ia sem compactar (compactar.js) e o visualizador do
 // celular não abria. Bibliotecas só voltam a ser baixadas quando VERSAO_VENDOR muda. A planilha (exceljs), maior, continua
 // guardada só depois do primeiro uso.
-const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', 'js/migracao.js',
+const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', 'js/migracao.js', 'js/gestao.js', 'js/telas/gestao.js',
   'vendor/jspdf.umd.min.js', 'vendor/html2canvas.min.js', 'vendor/jszip.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];
 // O que o navegador pede por fora dos módulos (manifest do aplicativo e ícones): guardado também, para não falhar sem internet
 const EXTRAS = ['manifest.webmanifest', 'icones/erp-192.png', 'icones/erp-512.png', 'icones/aviso-96.png'];

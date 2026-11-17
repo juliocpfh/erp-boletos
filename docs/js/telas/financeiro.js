@@ -120,7 +120,7 @@ export function telaContas(rota) {
 }
 
 /** Abas da página Financeiro. */
-const abasFinanceiro = (atual) => `<div class="abas">${[['financeiro', '#/financeiro', 'Visão geral'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
+export const abasFinanceiro = (atual) => `<div class="abas">${[['financeiro', '#/financeiro', 'Visão geral'], ['gestao', '#/gestao', 'Gestão'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
   ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência'], ['garantias', '#/garantias', 'Caução']]
   .map(([k, h, t]) => `<a href="${h}" class="${k === atual ? 'ativo' : ''}">${t}</a>`).join('')}</div>`;
 
