@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-yWcvofWoBnJG6GrfR3SIg1A8YXVsG1vY34K47ct+QtQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-MsEX7oVEgZ+SIfIf+CawE2mqxTTSVy2oPrQma83q4r0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ee7ae03fee7de40d">
+<meta name="fontes" content="7975047b1ada43f9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -4367,6 +4367,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     campoParcialDoc: () => campoParcialDoc,
     campoPerdidoDoc: () => campoPerdidoDoc,
     campoPerdidoPendente: () => campoPerdidoPendente,
+    camposDaGravacao: () => camposDaGravacao,
     cancelarFaturas: () => cancelarFaturas,
     cancelarNumero: () => cancelarNumero,
     cancelarTrocaGarantia: () => cancelarTrocaGarantia,
@@ -4520,6 +4521,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     gerarBoletosCaucao: () => gerarBoletosCaucao,
     gerarCobrancas: () => gerarCobrancas,
     gerarNfAirbnb: () => gerarNfAirbnb,
+    gravacaoDesfazivel: () => gravacaoDesfazivel,
     gravarLeitura: () => gravarLeitura,
     guiasIptuAPagar: () => guiasIptuAPagar,
     herancaAgendada: () => herancaAgendada,
@@ -4623,6 +4625,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     prazoContestarSaida: () => prazoContestarSaida,
     prazoDoContrato: () => prazoDoContrato,
     previaAcordo: () => previaAcordo,
+    previaDoDesfazer: () => previaDoDesfazer,
     previstoNoPagamento: () => previstoNoPagamento,
     proximoBoletoAberto: () => proximoBoletoAberto,
     quitadoNaSaida: () => quitadoNaSaida,
@@ -4801,10 +4804,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (c.conta_iptu === void 0) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
       if (c.conta_seguro === void 0) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
     }
-    for (const n of d2.contratos) {
-      const a = trocaAguardaAditivo(d2, n) && contratoHerdado(d2, n);
-      if (a && n.data_entrada && a.data_saida === somarDias(n.data_entrada, -1)) a.data_saida = null;
-    }
     for (const cb of d2.cobrancas) {
       if (!ehComplementoCaucao(cb) || !cb.multa_percentual && !cb.juros_mensal_percentual && !cb.multa && !cb.juros) continue;
       const cobrado = (cb.multa || 0) + (cb.juros || 0);
@@ -4870,7 +4869,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     for (const i of d2.imoveis) if (!i.uf && ufDoCep(i.cep)) i.uf = ufDoCep(i.cep);
     for (const c of d2.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = hojeIso();
-    for (const c of d2.contratos) if (c.garantia_tipo === "Caução") completarCaucao(c);
+    for (const c of d2.contratos) if (c.garantia_tipo === "Caução") completarCaucao(c, { contaPadrao: true });
     const renovados = new Set(d2.renovacoes.map((x) => x.contrato_id));
     for (const c of d2.contratos) {
       if (!c.contrato_anterior_id) continue;
@@ -4923,10 +4922,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const [maior] = doImovel.map((c) => [c, dias(c)]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
     return maior ? maior[0].id : null;
   }
-  function completarCaucao(c) {
+  function completarCaucao(c, { contaPadrao = false } = {}) {
     if (!c.caucao_data) c.caucao_data = c.vigencia_inicio || c.data_entrada || null;
-    if (!(c.caucao_valor > 0) && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
-      c.caucao_valor = c.caucao_meses * aluguelDaCaucao(c.aluguel_inicial, c);
+    if ((c.caucao_valor === null || c.caucao_valor === void 0 || c.caucao_valor === "") && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
+      const aluguel = contaPadrao ? c.aluguel_inicial - descontoPorPercentual(c.aluguel_inicial, percentualBonificacao(c)) : aluguelDaCaucao(c.aluguel_inicial, c);
+      c.caucao_valor = c.caucao_meses * aluguel;
     }
     return c;
   }
@@ -5109,6 +5109,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
+  function gravacaoDesfazivel(d2, i, pode2 = alteracoesDesfaziveis(d2, i)) {
+    const campos = camposDaGravacao(d2.historico[i]);
+    return campos.length && campos.every((k) => pode2.has(`${i}:${k}`)) ? campos.map((k) => `${i}:${k}`) : null;
+  }
   function desfazerAlteracoes(d2, itens, usuario) {
     const porIndice = /* @__PURE__ */ new Map();
     for (const x of itens) {
@@ -5128,8 +5132,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const motivo = h && h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d2, h.tabela, r, k, h.detalhes[k].de) : null;
         if (motivo) throw new ErroUsuario(motivo);
       }
-      const campos = porIndice.get(i).filter((k) => pode2.has(`${i}:${k}`));
-      if (!campos.length) throw new Error("Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).");
+      const campos = h ? [.../* @__PURE__ */ new Set([...porIndice.get(i), ...camposDaGravacao(h)])].filter((k) => !CAMPOS_SEM_DESFAZER.has(k)) : [];
+      for (const k of campos) {
+        const motivo = h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d2, h.tabela, r, k, h.detalhes[k].de) : null;
+        if (motivo) throw new ErroUsuario(motivo);
+      }
+      const presos = campos.filter((k) => !pode2.has(`${i}:${k}`));
+      if (!campos.length || presos.length === campos.length) throw new Error("Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).");
+      if (presos.length) throw new ErroUsuario(`Esta alteração só volta inteira, e ${presos.map((k) => `"${k}"`).join(", ")} mudou de novo depois dela: desfaça antes a alteração mais recente desse campo.`);
       const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
       for (const k of campos) {
         r[k] = h.detalhes[k].de ?? null;
@@ -5149,6 +5159,40 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       mudados.push({ tabela: h.tabela, id: r.id });
     }
     return mudados;
+  }
+  function previaDoDesfazer(d2, itens, aplicar, { rotuloCampo: rotuloCampo2 = (k) => k, valorTexto: valorTexto3 = (k, v) => String(v) } = {}) {
+    const copia2 = structuredClone(d2);
+    const antes = new Map(d2.cobrancas.map((cb) => [cb.id, cb]));
+    aplicar(copia2, itens);
+    const texto3 = (k, v) => {
+      if (v === null || v === void 0 || v === "") return "(vazio)";
+      if (CODIGO_DE[k] && Number.isSafeInteger(Number(v))) {
+        const nome = nomeCurto(buscar(copia2, CODIGO_DE[k], v));
+        return `nº ${v}${nome ? ` (${nome})` : ""}`;
+      }
+      const t = valorTexto3(k, v);
+      return t.length > 80 ? `${t.slice(0, 80)}…` : t;
+    };
+    const campos = [];
+    for (const h of copia2.historico.slice(d2.historico.length)) {
+      if (!/^Desfeito pelo administrador/.test(h.descricao || "") || !h.detalhes) continue;
+      const nome = nomeCurto(buscar(copia2, h.tabela, h.registro_id));
+      for (const [k, m] of Object.entries(h.detalhes)) {
+        if (m && typeof m === "object") campos.push(`${TABELAS[h.tabela] || h.tabela}${nome ? ` de ${nome}` : ""} · ${rotuloCampo2(k, h.tabela)}: ${texto3(k, m.de)} → ${texto3(k, m.para)}`);
+      }
+    }
+    const doContrato = (cb) => nomeCurto(buscar(copia2, "contratos", cb.contrato_id)) || nomeCurto(buscar(d2, "contratos", cb.contrato_id)) || `contrato nº ${cb.contrato_id}`;
+    const boletos = [];
+    const ficaram = /* @__PURE__ */ new Set();
+    for (const cb of copia2.cobrancas) {
+      ficaram.add(cb.id);
+      const velho = antes.get(cb.id);
+      if (!velho) continue;
+      const [a, b] = [totais(velho).total_sem_desconto, totais(cb).total_sem_desconto];
+      if (a !== b) boletos.push(`Boleto ${compBr(cb.competencia)} de ${doContrato(cb)}: ${reais(a)} → ${reais(b)}`);
+    }
+    for (const cb of d2.cobrancas) if (!ficaram.has(cb.id)) boletos.push(`Boleto ${compBr(cb.competencia)} de ${doContrato(cb)}: excluído (nenhum dia ocupado no mês)`);
+    return { campos, boletos };
   }
   function excluir(d2, tabela, id, usuario, descricao) {
     const i = d2[tabela].findIndex((r2) => r2.id === Number(id));
@@ -7635,11 +7679,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const ant = contratoHerdado(d2, c);
     if (!ant || c.ativo === false || c.data_saida || aditivoDaTroca(d2, c)) return null;
     const gerado = aditivosAguardando(d2, c.id).find((a) => a.tipo === TIPO_ADITIVO_TROCA);
+    const saida = ant.data_saida && !c.heranca_transferida ? ` Atenção: ${ant.inquilino_nome} já tem saída em ${dataBr(ant.data_saida)}; depois dessa data nenhum dos dois recebe boleto até o termo assinado ser anexado.` : "";
     return {
       nivel: "perigo",
       tipo: "Aditivo da troca de titular",
       ancora: "aditivos",
-      texto: gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").` : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").`
+      texto: (gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").` : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").`) + saida
     };
   }
   function partesDoContrato(d2, c) {
@@ -10465,7 +10510,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -10565,6 +10610,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       CAMPOS_SEM_DESFAZER = /* @__PURE__ */ new Set(["pasta"]);
       CAMPOS_PAGAMENTO_BANCO = { despesas: ["data_pagamento", "movimentacao_id", "pagamento_banco_id", "comprovante"], guias_impostos: ["paga_em", "movimentacao_id", "pagamento_banco_id"], iptus: ["pagas", "data_quitacao"] };
       textoComparar = (x) => x === void 0 || x === null ? "" : typeof x === "object" ? JSON.stringify(x) : String(x);
+      camposDaGravacao = (h) => h && h.detalhes ? Object.entries(h.detalhes).filter(([k, m]) => m && typeof m === "object" && "de" in m && !CAMPOS_SEM_DESFAZER.has(k)).map(([k]) => k) : [];
+      CODIGO_DE = { contrato_id: "contratos", herdado_de: "contratos", contrato_anterior_id: "contratos", imovel_id: "imoveis", fiador_id: "fiadores", emitente_id: "emitentes" };
+      nomeCurto = (r) => r ? r.inquilino_nome || r.nome || r.descricao || r.seguradora || null : null;
       correcoesDo = (d2, contratoId) => d2.correcoes.filter((c) => c.contrato_id === contratoId).sort((a, b) => a.data_vigencia.localeCompare(b.data_vigencia));
       percentualBonificacao = (c) => c.bonificacao === false ? 0 : c.desconto_pontualidade_percentual || 0;
       dataBaseCorrecao = (c) => c.data_base_correcao || c.vigencia_inicio || c.data_entrada;
@@ -12895,6 +12943,8 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     esc: () => esc,
     fiadoresNoCadastro: () => fiadoresNoCadastro,
     ler: () => ler,
+    lerValores: () => lerValores,
+    manterMudancasDeOutros: () => manterMudancasDeOutros,
     mascarar: () => mascarar,
     paraFormulario: () => paraFormulario,
     pctTexto: () => pctTexto,
@@ -13051,6 +13101,29 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }
     return { dados, erros };
   }
+  function lerValores(campos, valores, antigo = null) {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(valores || {})) {
+      if (v === true) fd.append(k, "1");
+      else if (v !== false && v !== "" && v !== null && v !== void 0) fd.append(k, String(v));
+    }
+    return ler(campos, fd, antigo).dados;
+  }
+  function manterMudancasDeOutros(campos, dados, valoresAoAbrir, valoresAgora, antigo = null) {
+    if (!valoresAoAbrir || !valoresAgora) return [];
+    const inicial = lerValores(campos, valoresAoAbrir, antigo);
+    const agora = lerValores(campos, valoresAgora, antigo);
+    const mantidos = [];
+    for (const c of campos) {
+      const k = c.nome;
+      if (!k || c.virtual || c.tipo === "arquivo" || !(k in dados) || !(k in inicial)) continue;
+      if (mesmoValor2(dados[k], inicial[k]) && !mesmoValor2(agora[k], inicial[k])) {
+        dados[k] = agora[k];
+        mantidos.push(c.rotulo || k);
+      }
+    }
+    return mantidos;
+  }
   function editorLista(c) {
     const itens = c.opcoes.map((o) => Array.isArray(o) ? o[0] : o);
     return `<button type="button" class="link-botao" data-acao="abrirLista" data-lista="${c.lista}">Editar lista</button>
@@ -13128,7 +13201,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }
     return `<div class="formulario${compacto ? " compacto" : ""}">${partes.join("")}</div>`;
   }
-  var esc, campo, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES2, IMOVEL, SOLICITACAO, REFORMA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ2, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, TROCA_FIADOR, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, chipDaLista;
+  var esc, campo, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES2, IMOVEL, SOLICITACAO, REFORMA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ2, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, TROCA_FIADOR, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, mesmoValor2, chipDaLista;
   var init_formularios = __esm({
     "docs/js/formularios.js"() {
       init_c6_comum();
@@ -13632,6 +13705,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       ];
       FMT_DINHEIRO = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       FMT_PCT2 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 4, useGrouping: false });
+      mesmoValor2 = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
       chipDaLista = (lista3, v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${lista3}" data-valor="${esc(v)}">×</button></span>`;
     }
   });
@@ -15942,9 +16016,9 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       let det = "";
       if (h.acao === "Alteração" && h.detalhes) {
         const i = desfazer ? desfazer.indice.get(h) : -1;
-        const volta = (k) => desfazer && desfazer.pode.has(`${i}:${k}`) ? ` <label class="check-mini" title="Marcar para desfazer junto com outros"><input type="checkbox" data-desfazer value="${i}:${esc(k)}"></label>
-        ${botao("desfazerAlteracao", "↶ Desfazer", { itens: `${i}:${k}` }, "secundario pequeno", `Voltar "${k}" de "${textoValor(h.detalhes[k].para)}" para "${textoValor(h.detalhes[k].de)}"?`)}` : "";
-        det = Object.entries(h.detalhes).map(([k, m]) => m && typeof m === "object" ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}${volta(k)}</div>` : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`).join("");
+        const itens = desfazer ? gravacaoDesfazivel(d(), i, desfazer.pode) : null;
+        det = Object.entries(h.detalhes).map(([k, m]) => m && typeof m === "object" ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}</div>` : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`).join("") + (itens ? `<div class="acoes"><label class="check-mini" title="Marcar para desfazer junto com outras"><input type="checkbox" data-desfazer value="${esc(itens.join(","))}"></label>
+          ${botao("desfazerAlteracao", "↶ Desfazer esta alteração", { itens: itens.join(",") }, "secundario pequeno")}</div>` : "");
       } else if (h.detalhes) {
         det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === "object" ? JSON.stringify(v) : v)}</div>`).join("")}</details>`;
       }
@@ -16709,7 +16783,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       init_arquivo_impresso();
       naoEncontrado = (titulo2, href = "#/", texto3 = "Voltar ao painel") => `<h1>${esc(titulo2)}</h1>
   <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto3, "botao")}${href !== "#/" ? ` ${link("#/", "Voltar ao painel", "botao secundario")}` : ""}</p>`;
-      memoria = { continuacao: null, pagamentoDivergente: null };
+      memoria = { continuacao: null, pagamentoDivergente: null, formularioAberto: null };
       botao = (acao, texto3, dados = {}, cls = "secundario pequeno", confirmar2 = "") => `<button type="button" class="${cls}"${cls === "x-excluir" ? ' title="Excluir" aria-label="Excluir"' : ""} data-acao="${acao}" ${Object.entries(dados).map(([k, v]) => `data-${k}="${esc(v)}"`).join(" ")} ${confirmar2 ? `data-confirmar="${esc(confirmar2)}"` : ""}>${texto3}</button>`;
       link = (hash, texto3, cls = "botao secundario pequeno") => `<a class="${cls}" href="${hash}">${texto3}</a>`;
       etiqueta = (texto3, tipo) => `<span class="etiqueta ${tipo}">${esc(texto3)}</span>`;
@@ -26374,6 +26448,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== void 0).map((c) => [c.nome, c.padrao]));
       valores = paraFormulario(campos, { ...padroes, ...cfg4.padrao ? cfg4.padrao(q) : {} });
     }
+    if (!estado2) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
     const base = cfg4.base ? cfg4.base(registro) : null;
     const avisoTexto = cfg4.aviso ? cfg4.aviso(registro, q) : "";
     return `<h1>${esc(cfg4.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
@@ -27583,6 +27658,181 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
   });
 
+  // docs/js/exportar.js
+  var exportar_exports = {};
+  __export(exportar_exports, {
+    dadosParaExportar: () => dadosParaExportar,
+    ehDinheiro: () => ehDinheiro,
+    nomeAba: () => nomeAba,
+    pdfDeTudo: () => pdfDeTudo,
+    planilhaDeTudo: () => planilhaDeTudo,
+    rotuloCampo: () => rotuloCampo,
+    valorCelula: () => valorCelula,
+    valorTexto: () => valorTexto
+  });
+  function rotuloCampo(nome, tabela = "") {
+    if (nome === "id") return "Nº";
+    const doForm = (FORM_DA_TABELA[tabela] || []).find((c) => c && c.nome === nome && c.rotulo);
+    if (doForm) return doForm.rotulo.replace(/\s*\*$/, "");
+    const t = nome.replace(/_/g, " ");
+    return t.charAt(0).toLocaleUpperCase("pt-BR") + t.slice(1);
+  }
+  function valorCelula(nome, v) {
+    if (v === null || v === void 0 || v === "") return "";
+    if (typeof v === "boolean") return v ? "Sim" : "Não";
+    if (typeof v === "number") return ehDinheiro(nome) && Number.isInteger(v) ? v / 100 : v;
+    if (typeof v === "object") return JSON.stringify(v).slice(0, 32e3);
+    const s = String(v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return dataBr(s);
+    if (/^\d{4}-\d{2}$/.test(s)) return compBr(s);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return dataHoraBr(s);
+    return s.slice(0, 32e3);
+  }
+  function dadosParaExportar(d2, { historico = true } = {}) {
+    const lista3 = [];
+    for (const [tabela, titulo2] of Object.entries(TABELAS)) {
+      const registros = d2[tabela];
+      if (!Array.isArray(registros)) continue;
+      const nomes = ["id"];
+      for (const r of registros) for (const k of Object.keys(r)) if (!SECRETO.test(k) && !nomes.includes(k)) nomes.push(k);
+      lista3.push({ tabela, titulo: titulo2, registros, colunas: nomes.map((nome) => ({ nome, rotulo: rotuloCampo(nome, tabela), dinheiro: ehDinheiro(nome) })) });
+    }
+    if (historico) {
+      lista3.push({
+        tabela: "historico",
+        titulo: "Histórico de alterações",
+        registros: [...d2.historico || []].reverse(),
+        colunas: [["quando", "Quando"], ["usuario", "Usuário"], ["acao", "Ação"], ["tabela", "Cadastro"], ["registro_id", "Nº do registro"], ["descricao", "Descrição"]].map(([nome, rotulo]) => ({ nome, rotulo, dinheiro: false }))
+      });
+    }
+    return lista3;
+  }
+  function nomeAba(titulo2, usados) {
+    const base = titulo2.replace(/[\\/?*[\]:]/g, "-").slice(0, 31);
+    let nome = base;
+    for (let n = 2; usados.has(nome.toLowerCase()); n += 1) nome = `${base.slice(0, 27)} (${n})`;
+    usados.add(nome.toLowerCase());
+    return nome;
+  }
+  async function planilhaDeTudo(ExcelJS, d2) {
+    const wb = new ExcelJS.Workbook();
+    const lista3 = dadosParaExportar(d2);
+    const resumo = wb.addWorksheet("Resumo");
+    resumo.columns = [{ header: "Cadastro", width: 40 }, { header: "Registros", width: 12 }];
+    resumo.addRow([`Todos os dados em ${agoraBr()}`, ""]);
+    for (const t of lista3) resumo.addRow([t.titulo, t.registros.length]);
+    resumo.getRow(1).font = { bold: true };
+    const usados = /* @__PURE__ */ new Set(["resumo"]);
+    for (const t of lista3) {
+      const ws = wb.addWorksheet(nomeAba(t.titulo, usados));
+      ws.columns = t.colunas.map((c) => ({ header: c.rotulo, key: c.nome, width: Math.min(40, Math.max(10, c.rotulo.length + 2)), style: c.dinheiro ? { numFmt: '"R$" #,##0.00' } : {} }));
+      for (const r of t.registros) ws.addRow(t.colunas.map((c) => valorCelula(c.nome, r[c.nome])));
+      ws.getRow(1).font = { bold: true };
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+    }
+    const buf = await wb.xlsx.writeBuffer();
+    return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function tituloRegistro(t, r) {
+    const nome = r.inquilino_nome || r.nome || r.descricao || r.assunto || r.tomador_nome || "";
+    return `${t.titulo} nº ${r.id ?? "-"}${nome ? ` · ${String(nome).slice(0, 80)}` : ""}`;
+  }
+  function pdfDeTudo(JsPDF, d2) {
+    const pdf = new JsPDF({ unit: "mm", format: "a4" });
+    const M = 12;
+    const L = 210 - 2 * M;
+    const FIM = 297 - 14;
+    let y = M;
+    const pular = (h) => {
+      if (y + h > FIM) {
+        pdf.addPage();
+        y = M;
+      }
+    };
+    const escrever = (texto3, { tam = 8, negrito = false, recuo = 0, depois = 0 } = {}) => {
+      pdf.setFont("helvetica", negrito ? "bold" : "normal");
+      pdf.setFontSize(tam);
+      const altura = tam * 0.42;
+      for (const linha of pdf.splitTextToSize(latino(texto3), L - recuo)) {
+        pular(altura);
+        pdf.text(linha, M + recuo, y + altura * 0.8);
+        y += altura;
+      }
+      y += depois;
+    };
+    escrever("Administração de Imóveis · todos os dados", { tam: 14, negrito: true, depois: 1 });
+    escrever(`Gerado em ${agoraBr()}. Só os campos preenchidos; o histórico de alterações está na planilha.`, { depois: 4 });
+    for (const t of dadosParaExportar(d2, { historico: false }).filter((x) => x.registros.length)) {
+      pular(14);
+      escrever(`${t.titulo} (${t.registros.length})`, { tam: 12, negrito: true, depois: 2 });
+      for (const r of t.registros) {
+        pular(10);
+        escrever(tituloRegistro(t, r), { tam: 9, negrito: true, depois: 0.5 });
+        for (const c of t.colunas) {
+          const v = r[c.nome];
+          if (c.nome === "id" || v === null || v === void 0 || v === "" || Array.isArray(v) && !v.length) continue;
+          let txt = valorTexto(c.nome, v);
+          if (txt.length > 600) txt = `${txt.slice(0, 600)}…`;
+          escrever(`${c.rotulo}: ${txt}`, { recuo: 3 });
+        }
+        y += 2.5;
+      }
+      y += 3;
+    }
+    const total = pdf.getNumberOfPages();
+    for (let p2 = 1; p2 <= total; p2 += 1) {
+      pdf.setPage(p2);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.text(`Página ${p2} de ${total}`, 210 - M, 297 - 7, { align: "right" });
+    }
+    return pdf.output("blob");
+  }
+  var CAMPOS2, SECRETO, DINHEIRO, NAO_DINHEIRO, ehDinheiro, FORM_DA_TABELA, valorTexto, latino;
+  var init_exportar = __esm({
+    "docs/js/exportar.js"() {
+      init_calculos();
+      init_formularios();
+      init_regras();
+      CAMPOS2 = /* @__PURE__ */ new Map();
+      for (const v of Object.values(formularios_exports)) {
+        if (!Array.isArray(v)) continue;
+        for (const c of v) if (c && c.nome && c.rotulo && !CAMPOS2.has(c.nome)) CAMPOS2.set(c.nome, { tipo: c.tipo });
+      }
+      SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
+      DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia)(_|$)/;
+      NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs)$/;
+      ehDinheiro = (nome) => CAMPOS2.has(nome) ? CAMPOS2.get(nome).tipo === "dinheiro" : DINHEIRO.test(nome) && !NAO_DINHEIRO.test(nome);
+      FORM_DA_TABELA = {
+        imoveis: IMOVEL,
+        contratos: CONTRATO,
+        correcoes: CORRECAO,
+        seguros: SEGURO,
+        iptus: IPTU,
+        titularidades: TITULARIDADE,
+        cobrancas: COBRANCA,
+        fiadores: FIADOR,
+        aplicacoes: APLICACAO,
+        correcoes_garantia: CORRECAO_GARANTIA,
+        devolucoes_garantia: DEVOLUCAO_GARANTIA,
+        renovacoes: RENOVACAO,
+        encerramentos: ENCERRAMENTO,
+        avulsas: AVULSA,
+        emitentes: EMITENTE,
+        usuarios: USUARIO,
+        reformas: REFORMA,
+        solicitacoes: SOLICITACAO,
+        ressarcimentos: RESSARCIMENTO,
+        leituras: LEITURA
+      };
+      valorTexto = (nome, v) => {
+        const x = valorCelula(nome, v);
+        return typeof x === "number" && ehDinheiro(nome) && Number.isInteger(v) ? reais(v) : String(x);
+      };
+      latino = (s) => String(s).replace(/[^\u0009\u000a -ÿ–—‘’“”•…]/g, "");
+    }
+  });
+
   // docs/js/telas/admin.js
   function telaRestaurarBackup() {
     return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
@@ -27666,15 +27916,26 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (E.nuvem && itens.some((x) => Number(String(x).split(":")[0]) >= (E.nuvem.base?.historico?.length || 0))) {
       throw Object.assign(new Error('Esta alteração ainda não foi para a nuvem. Espere a faixa do topo mostrar "tudo enviado" e desfaça de novo.'), { esperado: true });
     }
+    const { rotuloCampo: rotuloCampo2, valorTexto: valorTexto3 } = await carregarParte(() => Promise.resolve().then(() => (init_exportar(), exportar_exports)));
+    const previa = previaDoDesfazer(d(), itens, (db, lista3) => aplicarDesfazer(db, lista3), { rotuloCampo: rotuloCampo2, valorTexto: valorTexto3 });
+    const html = `<p>Volta${previa.campos.length > 1 ? "m" : ""} junto:</p><ul>${previa.campos.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+    ${previa.boletos.length ? `<p>Boletos em aberto recalculados (valor do boleto, sem o desconto):</p><ul>${previa.boletos.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : '<p class="suave">Nenhum boleto em aberto muda.</p>'}`;
+    if (!await janela({ titulo: "Desfazer esta alteração?", html, sim: "Desfazer" })) return;
     let recalculados = 0;
     await alterar((db) => {
-      for (const { tabela, id } of desfazerAlteracoes(db, itens, login())) {
-        const cfg4 = CADASTROS[tabela];
-        if (cfg4 && cfg4.recalcular) recalculados += recalcularCobrancas(db, cfg4.recalcular(buscar(db, tabela, id), db), login());
-      }
+      recalculados = aplicarDesfazer(db, itens);
     });
     aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : "Desfeito.");
     await mostrar();
+  }
+  function aplicarDesfazer(db, itens) {
+    let recalculados = 0;
+    for (const { tabela, id } of desfazerAlteracoes(db, itens, login())) {
+      const cfg4 = CADASTROS[tabela];
+      const r = buscar(db, tabela, id);
+      if (cfg4 && cfg4.recalcular && r) recalculados += recalcularCobrancas(db, cfg4.recalcular(r, db), login());
+    }
+    return recalculados;
   }
   function telaHistorico(q) {
     const trocadas = q.de && q.ate && q.de > q.ate;
@@ -27719,7 +27980,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <div><label>De</label><input type="date" name="de" value="${esc(q.de || "")}"></div><div><label>Até</label><input type="date" name="ate" value="${esc(q.ate || "")}"></div>
       <div><label>Contém o texto</label><input name="texto" value="${esc(q.texto || "")}"></div>
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
-    ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta o campo ao valor anterior. Cada campo volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
+    ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta a alteração inteira (todos os campos dela juntos). Antes, uma janela mostra o que volta e os boletos em aberto que serão recalculados, com o valor de antes e depois. Volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
       <p>${botao("desfazerMarcados", "↶ Desfazer os marcados", {}, "secundario pequeno")}</p>` : ""}
     ${navegar}${tabelaHistorico(mostrados, desfazer)}${navegar}</details>`;
   }
@@ -28911,8 +29172,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const linhas2 = conflitos.map((c) => {
       if (c.tipo === "campo") {
         return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(c.campo)}</b></td>
-        <td>${esc(valorTexto(c.atual))}<br><span class="suave">${esc(c.por_atual || "")}</span></td>
-        <td>${esc(valorTexto(c.proposto))}<br><span class="suave">${esc(c.por_proposto || "")} · ${esc(quando2(c.em))}</span></td>
+        <td>${esc(valorTexto2(c.atual))}<br><span class="suave">${esc(c.por_atual || "")}</span></td>
+        <td>${esc(valorTexto2(c.proposto))}<br><span class="suave">${esc(c.por_proposto || "")} · ${esc(quando2(c.em))}</span></td>
         <td>${pode2 ? `${botao("resolverConflito", "Fica o 1º", { conflito: c.id, escolha: "atual" }, "secundario pequeno")} ${botao("resolverConflito", "Fica o 2º", { conflito: c.id, escolha: "proposto" }, "secundario pequeno")}` : ""}</td></tr>`;
       }
       if (c.tipo === "lote") {
@@ -28927,7 +29188,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }).join("");
     return `<h1>Conflitos da nuvem</h1>
     <div class="caixa"><h2>Para escolher</h2>
-      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, vale o valor de antes.${pode2 ? "" : " Avise o administrador."}</p>
+      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, fica o 1º valor (o que chegou primeiro à nuvem) e o 2º espera.${pode2 ? "" : " Avise o administrador."}</p>
       ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas2}</table></div>` : "<p>Nenhum conflito. ✓</p>"}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
@@ -29035,7 +29296,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
     <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas2 || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
   }
-  var valorTexto, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, tamanho2, resultadoDoAcesso, MUITO, apiDados, ACOES_NUVEM;
+  var valorTexto2, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, tamanho2, resultadoDoAcesso, MUITO, apiDados, ACOES_NUVEM;
   var init_nuvem2 = __esm({
     "docs/js/telas/nuvem.js"() {
       init_app();
@@ -29046,7 +29307,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_nuvem();
       init_regras();
       init_comum();
-      valorTexto = (v) => {
+      valorTexto2 = (v) => {
         if (v === null || v === void 0 || v === "") return "(vazio)";
         if (typeof v === "object") return JSON.stringify(v).slice(0, 200);
         return String(v);
@@ -29056,13 +29317,13 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         const r = (E.d[c.tabela] || []).find((x) => String(x.id) === c.reg_id);
         const rotulo = TABELAS[c.tabela] || c.tabela;
         const nome = r && (r.nome || r.descricao || r.inquilino_nome || r.competencia || r.numero);
-        return `${rotulo} nº ${c.reg_id}${nome ? ` (${valorTexto(nome)})` : ""}`;
+        return `${rotulo} nº ${c.reg_id}${nome ? ` (${valorTexto2(nome)})` : ""}`;
       };
       quando2 = (t) => t ? dataHoraBr(t) : "";
       SEM_VALOR = /* @__PURE__ */ new Set(["senha_hash", "senha_sal", "senha_iteracoes", "sessoes"]);
       MOSTRAR_MUDANCAS = 8;
       curto = (v) => {
-        const t = valorTexto(v);
+        const t = valorTexto2(v);
         return t.length > 60 ? `${t.slice(0, 60)}…` : t;
       };
       mb = (b) => `${(b / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
@@ -30002,181 +30263,6 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     }
   });
 
-  // docs/js/exportar.js
-  var exportar_exports = {};
-  __export(exportar_exports, {
-    dadosParaExportar: () => dadosParaExportar,
-    ehDinheiro: () => ehDinheiro,
-    nomeAba: () => nomeAba,
-    pdfDeTudo: () => pdfDeTudo,
-    planilhaDeTudo: () => planilhaDeTudo,
-    rotuloCampo: () => rotuloCampo,
-    valorCelula: () => valorCelula,
-    valorTexto: () => valorTexto2
-  });
-  function rotuloCampo(nome, tabela = "") {
-    if (nome === "id") return "Nº";
-    const doForm = (FORM_DA_TABELA[tabela] || []).find((c) => c && c.nome === nome && c.rotulo);
-    if (doForm) return doForm.rotulo.replace(/\s*\*$/, "");
-    const t = nome.replace(/_/g, " ");
-    return t.charAt(0).toLocaleUpperCase("pt-BR") + t.slice(1);
-  }
-  function valorCelula(nome, v) {
-    if (v === null || v === void 0 || v === "") return "";
-    if (typeof v === "boolean") return v ? "Sim" : "Não";
-    if (typeof v === "number") return ehDinheiro(nome) && Number.isInteger(v) ? v / 100 : v;
-    if (typeof v === "object") return JSON.stringify(v).slice(0, 32e3);
-    const s = String(v);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return dataBr(s);
-    if (/^\d{4}-\d{2}$/.test(s)) return compBr(s);
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return dataHoraBr(s);
-    return s.slice(0, 32e3);
-  }
-  function dadosParaExportar(d2, { historico = true } = {}) {
-    const lista3 = [];
-    for (const [tabela, titulo2] of Object.entries(TABELAS)) {
-      const registros = d2[tabela];
-      if (!Array.isArray(registros)) continue;
-      const nomes = ["id"];
-      for (const r of registros) for (const k of Object.keys(r)) if (!SECRETO.test(k) && !nomes.includes(k)) nomes.push(k);
-      lista3.push({ tabela, titulo: titulo2, registros, colunas: nomes.map((nome) => ({ nome, rotulo: rotuloCampo(nome, tabela), dinheiro: ehDinheiro(nome) })) });
-    }
-    if (historico) {
-      lista3.push({
-        tabela: "historico",
-        titulo: "Histórico de alterações",
-        registros: [...d2.historico || []].reverse(),
-        colunas: [["quando", "Quando"], ["usuario", "Usuário"], ["acao", "Ação"], ["tabela", "Cadastro"], ["registro_id", "Nº do registro"], ["descricao", "Descrição"]].map(([nome, rotulo]) => ({ nome, rotulo, dinheiro: false }))
-      });
-    }
-    return lista3;
-  }
-  function nomeAba(titulo2, usados) {
-    const base = titulo2.replace(/[\\/?*[\]:]/g, "-").slice(0, 31);
-    let nome = base;
-    for (let n = 2; usados.has(nome.toLowerCase()); n += 1) nome = `${base.slice(0, 27)} (${n})`;
-    usados.add(nome.toLowerCase());
-    return nome;
-  }
-  async function planilhaDeTudo(ExcelJS, d2) {
-    const wb = new ExcelJS.Workbook();
-    const lista3 = dadosParaExportar(d2);
-    const resumo = wb.addWorksheet("Resumo");
-    resumo.columns = [{ header: "Cadastro", width: 40 }, { header: "Registros", width: 12 }];
-    resumo.addRow([`Todos os dados em ${agoraBr()}`, ""]);
-    for (const t of lista3) resumo.addRow([t.titulo, t.registros.length]);
-    resumo.getRow(1).font = { bold: true };
-    const usados = /* @__PURE__ */ new Set(["resumo"]);
-    for (const t of lista3) {
-      const ws = wb.addWorksheet(nomeAba(t.titulo, usados));
-      ws.columns = t.colunas.map((c) => ({ header: c.rotulo, key: c.nome, width: Math.min(40, Math.max(10, c.rotulo.length + 2)), style: c.dinheiro ? { numFmt: '"R$" #,##0.00' } : {} }));
-      for (const r of t.registros) ws.addRow(t.colunas.map((c) => valorCelula(c.nome, r[c.nome])));
-      ws.getRow(1).font = { bold: true };
-      ws.views = [{ state: "frozen", ySplit: 1 }];
-    }
-    const buf = await wb.xlsx.writeBuffer();
-    return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  }
-  function tituloRegistro(t, r) {
-    const nome = r.inquilino_nome || r.nome || r.descricao || r.assunto || r.tomador_nome || "";
-    return `${t.titulo} nº ${r.id ?? "-"}${nome ? ` · ${String(nome).slice(0, 80)}` : ""}`;
-  }
-  function pdfDeTudo(JsPDF, d2) {
-    const pdf = new JsPDF({ unit: "mm", format: "a4" });
-    const M = 12;
-    const L = 210 - 2 * M;
-    const FIM = 297 - 14;
-    let y = M;
-    const pular = (h) => {
-      if (y + h > FIM) {
-        pdf.addPage();
-        y = M;
-      }
-    };
-    const escrever = (texto3, { tam = 8, negrito = false, recuo = 0, depois = 0 } = {}) => {
-      pdf.setFont("helvetica", negrito ? "bold" : "normal");
-      pdf.setFontSize(tam);
-      const altura = tam * 0.42;
-      for (const linha of pdf.splitTextToSize(latino(texto3), L - recuo)) {
-        pular(altura);
-        pdf.text(linha, M + recuo, y + altura * 0.8);
-        y += altura;
-      }
-      y += depois;
-    };
-    escrever("Administração de Imóveis · todos os dados", { tam: 14, negrito: true, depois: 1 });
-    escrever(`Gerado em ${agoraBr()}. Só os campos preenchidos; o histórico de alterações está na planilha.`, { depois: 4 });
-    for (const t of dadosParaExportar(d2, { historico: false }).filter((x) => x.registros.length)) {
-      pular(14);
-      escrever(`${t.titulo} (${t.registros.length})`, { tam: 12, negrito: true, depois: 2 });
-      for (const r of t.registros) {
-        pular(10);
-        escrever(tituloRegistro(t, r), { tam: 9, negrito: true, depois: 0.5 });
-        for (const c of t.colunas) {
-          const v = r[c.nome];
-          if (c.nome === "id" || v === null || v === void 0 || v === "" || Array.isArray(v) && !v.length) continue;
-          let txt = valorTexto2(c.nome, v);
-          if (txt.length > 600) txt = `${txt.slice(0, 600)}…`;
-          escrever(`${c.rotulo}: ${txt}`, { recuo: 3 });
-        }
-        y += 2.5;
-      }
-      y += 3;
-    }
-    const total = pdf.getNumberOfPages();
-    for (let p2 = 1; p2 <= total; p2 += 1) {
-      pdf.setPage(p2);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7);
-      pdf.text(`Página ${p2} de ${total}`, 210 - M, 297 - 7, { align: "right" });
-    }
-    return pdf.output("blob");
-  }
-  var CAMPOS2, SECRETO, DINHEIRO, NAO_DINHEIRO, ehDinheiro, FORM_DA_TABELA, valorTexto2, latino;
-  var init_exportar = __esm({
-    "docs/js/exportar.js"() {
-      init_calculos();
-      init_formularios();
-      init_regras();
-      CAMPOS2 = /* @__PURE__ */ new Map();
-      for (const v of Object.values(formularios_exports)) {
-        if (!Array.isArray(v)) continue;
-        for (const c of v) if (c && c.nome && c.rotulo && !CAMPOS2.has(c.nome)) CAMPOS2.set(c.nome, { tipo: c.tipo });
-      }
-      SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
-      DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia)(_|$)/;
-      NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs)$/;
-      ehDinheiro = (nome) => CAMPOS2.has(nome) ? CAMPOS2.get(nome).tipo === "dinheiro" : DINHEIRO.test(nome) && !NAO_DINHEIRO.test(nome);
-      FORM_DA_TABELA = {
-        imoveis: IMOVEL,
-        contratos: CONTRATO,
-        correcoes: CORRECAO,
-        seguros: SEGURO,
-        iptus: IPTU,
-        titularidades: TITULARIDADE,
-        cobrancas: COBRANCA,
-        fiadores: FIADOR,
-        aplicacoes: APLICACAO,
-        correcoes_garantia: CORRECAO_GARANTIA,
-        devolucoes_garantia: DEVOLUCAO_GARANTIA,
-        renovacoes: RENOVACAO,
-        encerramentos: ENCERRAMENTO,
-        avulsas: AVULSA,
-        emitentes: EMITENTE,
-        usuarios: USUARIO,
-        reformas: REFORMA,
-        solicitacoes: SOLICITACAO,
-        ressarcimentos: RESSARCIMENTO,
-        leituras: LEITURA
-      };
-      valorTexto2 = (nome, v) => {
-        const x = valorCelula(nome, v);
-        return typeof x === "number" && ehDinheiro(nome) && Number.isInteger(v) ? reais(v) : String(x);
-      };
-      latino = (s) => String(s).replace(/[^\u0009\u000a -ÿ–—‘’“”•…]/g, "");
-    }
-  });
-
   // docs/js/regras-texto.js
   var regras_texto_exports = {};
   __export(regras_texto_exports, {
@@ -31104,9 +31190,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await desfazerItens(String(itens).split(","));
         },
         async desfazerMarcados() {
-          const itens = [...document.querySelectorAll("input[data-desfazer]:checked")].map((x) => x.value);
+          const itens = [...document.querySelectorAll("input[data-desfazer]:checked")].flatMap((x) => x.value.split(","));
           if (!itens.length) throw new ErroUsuario("Marque as alterações que quer desfazer.");
-          if (!await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: "Desfazer as alterações marcadas?", sim: "Desfazer", forte: true })) return;
           await desfazerItens(itens);
         },
         /**
@@ -33173,8 +33258,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           Object.assign(dados, cfg4.fixos ? cfg4.fixos(registro, rota.q) : {});
           const descricao = cfg4.descricao ? cfg4.descricao(dados, registro, rota.q) : null;
           let recalculados = 0;
+          let deOutro = [];
+          const aberto = registro && memoria.formularioAberto?.chave === `${tabela}:${registro.id}` ? memoria.formularioAberto.valores : null;
           const salvo = await alterar((db) => {
-            if (registro && !buscar(db, tabela, registro.id)) throw new ErroUsuario(REGISTRO_EXCLUIDO);
+            const agora = registro && buscar(db, tabela, registro.id);
+            if (registro && !agora) throw new ErroUsuario(REGISTRO_EXCLUIDO);
+            if (aberto) deOutro = manterMudancasDeOutros(campos, dados, aberto, paraFormulario(campos, cfg4.valores ? cfg4.valores(agora, rota.q) : agora), agora);
             let r;
             if (cfg4.salvar) r = cfg4.salvar(db, dados, rota.q, registro);
             else if (registro) {
@@ -33187,7 +33276,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           if (cfg4.depois) await cfg4.depois(salvo, antigo);
           if (["contratos", "depositos_garantia", "correcoes_garantia", "aplicacoes", "devolucoes_garantia"].includes(tabela)) await acertarNomesDosComprovantes(tabela === "contratos" ? salvo.id : salvo.contrato_id);
           if (tabela === "usuarios") renovarUsuario();
+          if (registro) memoria.formularioAberto = null;
           aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : "Salvo.");
+          if (deOutro.length) aviso(`Enquanto o formulário estava aberto, outra pessoa mudou: ${deOutro.join(", ")}. Ficou o valor dela (você não tinha mexido nesses campos).`, "info");
           const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg4.destino ? cfg4.destino(salvo, rota.q) : cfg4.voltar(salvo, rota.q);
           ir(destino);
           return null;
@@ -33692,7 +33783,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       ${alertaFichas()}
       ${alertaInformeIr()}
       ${alertaRegua()}
-      ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
+      ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, fica o valor que chegou primeiro.
         ${link("#/conflitos", podeUsuario("admin") ? "Escolher agora" : "Ver (o administrador escolhe)", "botao pequeno")}</div>` : ""}
       ${avisoBackupSeguro()}
       ${calendarioDoPainel(competenciaValida(rota.q.mes, competenciaDe(hoje3)), hoje3)}
