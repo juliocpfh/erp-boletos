@@ -87,7 +87,7 @@ export async function assinaturaDoBanco(pasta) {
 }
 
 /** JSON de um arquivo: pelo `Response` do navegador (interpreta sem deixar o texto inteiro preso a uma variável) ou pelo texto. */
-const lerJson = async (arq) => (typeof Response === 'function' ? new Response(arq).json() : JSON.parse(await arq.text()));
+const lerJson = async (arq) => (typeof Response === 'function' && typeof Blob === 'function' && arq instanceof Blob ? new Response(arq).json() : JSON.parse(await arq.text()));
 
 export async function lerBanco(pasta) {
   if (!(await arquivoExiste(pasta, ARQUIVO_BANCO))) return null;
